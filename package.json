@@ -1,0 +1,23 @@
+{
+  "name": "nylon-impossible",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "web:open": "code 'src/web'",
+    "web:dev": "pnpm --filter @nylon-impossible/web dev",
+    "web:build": "pnpm --filter @nylon-impossible/web build",
+    "web:test": "pnpm --filter @nylon-impossible/web test",
+    "web:typecheck": "pnpm --filter @nylon-impossible/web typecheck",
+    "web:lint": "pnpm --filter @nylon-impossible/web lint",
+    "web:format": "pnpm --filter @nylon-impossible/web format",
+    "web:check": "pnpm --filter @nylon-impossible/web check",
+    "web:deploy": "pnpm --filter @nylon-impossible/web deploy",
+    "web:db:migrations:apply": "pnpm --filter @nylon-impossible/web db:migrations:apply",
+    "web:db:migrations:apply:remote": "pnpm --filter @nylon-impossible/web db:migrations:apply:remote",
+    "web:db:studio": "pnpm --filter @nylon-impossible/web db:studio",
+    "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
+    "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
+    "ios:simulator": "open -a Simulator"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

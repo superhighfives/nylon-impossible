@@ -4,10 +4,19 @@ A cross-platform todo application with web and iOS clients.
 
 ## Structure
 
-This is a monorepo containing:
+This is a monorepo managed with pnpm workspaces:
 
-- **`web/`** - Full-stack web application built with TanStack Start, deployed on Cloudflare Workers
-- **`ios/`** - Native iOS application built with SwiftUI and SwiftData
+```
+src/
+  web/   - Full-stack web application (TanStack Start + Cloudflare Workers)
+  ios/   - Native iOS application (SwiftUI + SwiftData)
+```
+
+## Getting started
+
+```bash
+pnpm install
+```
 
 ## Web
 
@@ -19,7 +28,17 @@ The web client is a modern, full-stack todo application featuring:
 - Optimistic updates with TanStack Query
 - Tailwind CSS with Cloudflare's Kumo design system
 
-See [`web/README.md`](./web/README.md) for setup and development instructions.
+See [`src/web/README.md`](./src/web/README.md) for detailed setup instructions.
+
+**Commands:**
+
+```bash
+pnpm web:dev      # Start dev server
+pnpm web:build    # Build for production
+pnpm web:test     # Run tests
+pnpm web:deploy   # Deploy to Cloudflare
+pnpm web:db:studio # Open Drizzle Studio
+```
 
 ## iOS
 
@@ -30,21 +49,13 @@ The iOS client is a native SwiftUI application featuring:
 - Custom gradient-based design system
 - Smooth animations and transitions
 
-Open the Xcode project at `ios/Nylon Impossible/Nylon Impossible.xcodeproj` to build and run.
-
-## Getting started
-
-### Web
+**Commands:**
 
 ```bash
-cd web
-npm install
-npm run dev
+pnpm ios:open      # Open in Xcode
+pnpm ios:build     # Build via xcodebuild
+pnpm ios:simulator # Open iOS Simulator
 ```
-
-### iOS
-
-Open `ios/Nylon Impossible/Nylon Impossible.xcodeproj` in Xcode and run on a simulator or device.
 
 ## License
 

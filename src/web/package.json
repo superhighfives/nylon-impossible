@@ -1,5 +1,5 @@
 {
-  "name": "nylon-impossible",
+  "name": "@nylon-impossible/web",
   "private": true,
   "type": "module",
   "scripts": {

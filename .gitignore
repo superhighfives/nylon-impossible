@@ -8,34 +8,37 @@ Thumbs.db
 *.swp
 *.swo
 
+# pnpm
+node_modules/
+pnpm-lock.yaml
+
 # Web (Node.js)
-web/node_modules/
-web/.env
-web/.dev.vars
-web/.nitro/
-web/.tanstack/
-web/.wrangler/
-web/.output/
-web/.vinxi/
-web/dist/
-web/dist-ssr/
+src/web/.env
+src/web/.dev.vars
+src/web/.nitro/
+src/web/.tanstack/
+src/web/.wrangler/
+src/web/.output/
+src/web/.vinxi/
+src/web/dist/
+src/web/dist-ssr/
 *.local
 
 # iOS
-ios/**/xcuserdata/
-ios/**/*.xcworkspace/xcuserdata/
-ios/**/DerivedData/
-ios/**/*.moved-aside
-ios/**/*.pbxuser
-ios/**/*.mode1v3
-ios/**/*.mode2v3
-ios/**/*.perspectivev3
-ios/**/!default.pbxuser
-ios/**/!default.mode1v3
-ios/**/!default.mode2v3
-ios/**/!default.perspectivev3
-ios/**/*.hmap
-ios/**/*.ipa
-ios/**/*.dSYM.zip
-ios/**/*.dSYM
-ios/**/Pods/
+src/ios/**/xcuserdata/
+src/ios/**/*.xcworkspace/xcuserdata/
+src/ios/**/DerivedData/
+src/ios/**/*.moved-aside
+src/ios/**/*.pbxuser
+src/ios/**/*.mode1v3
+src/ios/**/*.mode2v3
+src/ios/**/*.perspectivev3
+src/ios/**/!default.pbxuser
+src/ios/**/!default.mode1v3
+src/ios/**/!default.mode2v3
+src/ios/**/!default.perspectivev3
+src/ios/**/*.hmap
+src/ios/**/*.ipa
+src/ios/**/*.dSYM.zip
+src/ios/**/*.dSYM
+src/ios/**/Pods/
