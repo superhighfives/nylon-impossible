@@ -1,0 +1,86 @@
+//
+//  ContentView.swift
+//  Nylon Impossible
+//
+//  Created by Charlie Gleason on 1/16/26.
+//
+
+import SwiftUI
+import SwiftData
+
+struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
+    @State private var viewModel = TodoViewModel()
+    
+    private var filteredTodos: [TodoItem] {
+        viewModel.filteredTodos(from: todos)
+    }
+    
+    var body: some View {
+        ZStack {
+            GradientBackground()
+            
+            VStack(spacing: 24) {
+                HeaderView()
+                
+                AddTaskInputView(
+                    text: $viewModel.newTaskText,
+                    canAdd: viewModel.canAddTask
+                ) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        viewModel.addTodo(context: modelContext)
+                    }
+                }
+                
+                FilterTabsView(selectedFilter: $viewModel.selectedFilter)
+                
+                // Task list or empty state
+                if filteredTodos.isEmpty {
+                    EmptyStateView()
+                        .transition(.opacity)
+                } else {
+                    taskListView
+                }
+                
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 16)
+        }
+        .animation(.easeInOut(duration: 0.3), value: filteredTodos.count)
+    }
+    
+    private var taskListView: some View {
+        List {
+            ForEach(filteredTodos) { todo in
+                TodoItemRow(todo: todo) {
+                    viewModel.toggleTodo(todo)
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+                .transition(.asymmetric(
+                    insertion: .move(edge: .top).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.deleteTodo(todo, context: modelContext)
+                        }
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollIndicators(.hidden)
+    }
+}
+
+#Preview {
+    ContentView()
+        .modelContainer(for: TodoItem.self, inMemory: true)
+}

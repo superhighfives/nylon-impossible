@@ -1,0 +1,81 @@
+//
+//  AddTaskInputView.swift
+//  Nylon Impossible
+//
+//  Created by Charlie Gleason on 1/16/26.
+//
+
+import SwiftUI
+
+struct AddTaskInputView: View {
+    @Binding var text: String
+    var canAdd: Bool
+    var onAdd: () -> Void
+    
+    @FocusState private var isFocused: Bool
+    
+    var body: some View {
+        HStack(spacing: 0) {
+            TextField("Add a new task...", text: $text)
+                .font(.system(size: 16))
+                .foregroundStyle(.primary)
+                .focused($isFocused)
+                .onSubmit {
+                    if canAdd {
+                        onAdd()
+                    }
+                }
+                .padding(.leading, 20)
+                .padding(.trailing, 56)
+                .padding(.vertical, 18)
+            
+            Spacer()
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.white)
+                .stroke(Color.inputBorder, lineWidth: 0.5)
+                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
+                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+        )
+        .overlay(alignment: .trailing) {
+            Button(action: {
+                onAdd()
+                isFocused = false
+            }) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(LinearGradient.primaryGradient)
+                        .frame(width: 40, height: 40)
+                    
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .opacity(canAdd ? 1.0 : 0.4)
+            .disabled(!canAdd)
+            .padding(.trailing, 8)
+            .animation(.easeInOut(duration: 0.2), value: canAdd)
+        }
+    }
+}
+
+#Preview {
+    ZStack {
+        GradientBackground()
+        VStack {
+            AddTaskInputView(
+                text: .constant(""),
+                canAdd: false,
+                onAdd: {}
+            )
+            AddTaskInputView(
+                text: .constant("Buy groceries"),
+                canAdd: true,
+                onAdd: {}
+            )
+        }
+        .padding()
+    }
+}
