@@ -6,8 +6,8 @@ export function LandingPage() {
     <div className="flex items-center justify-center p-8">
       <div className="w-full max-w-72 space-y-8">
         <div className="text-center">
-          <p className="text-secondary mt-2">
-            A <span className="font-bold underline underline-offset-4 decoration-wavy decoration-indigo-300">todo app</span> to keep you organized.
+          <p className="text-kumo-strong mt-2">
+            A <span className="font-bold underline underline-offset-4 decoration-wavy decoration-kumo-brand">todo app</span> to keep you organized.
           </p>
         </div>
         <div className="flex flex-col gap-3">

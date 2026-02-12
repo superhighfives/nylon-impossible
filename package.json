@@ -11,7 +11,7 @@
     "web:lint": "pnpm --filter @nylon-impossible/web lint",
     "web:format": "pnpm --filter @nylon-impossible/web format",
     "web:check": "pnpm --filter @nylon-impossible/web check",
-    "web:deploy": "pnpm --filter @nylon-impossible/web deploy",
+    "web:deploy": "pnpm --filter @nylon-impossible/web run deploy",
     "web:db:migrations:apply": "pnpm --filter @nylon-impossible/web db:migrations:apply",
     "web:db:migrations:apply:remote": "pnpm --filter @nylon-impossible/web db:migrations:apply:remote",
     "web:db:studio": "pnpm --filter @nylon-impossible/web db:studio",

@@ -56,8 +56,8 @@ export function TodoPreview({
 
   if (todos.length === 0) {
     return (
-      <div className="rounded-xl border border-color bg-surface p-6 text-center">
-        <p className="text-muted">No todos were extracted from the text.</p>
+      <div className="rounded-xl border border-kumo-line bg-kumo-elevated p-6 text-center">
+        <p className="text-kumo-subtle">No todos were extracted from the text.</p>
         <Button variant="ghost" onClick={onCancel} className="mt-4">
           Try again
         </Button>
@@ -69,7 +69,7 @@ export function TodoPreview({
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-secondary">
+        <div className="flex items-center gap-2 text-kumo-strong">
           <Sparkles className="h-4 w-4" />
           <span className="text-sm font-medium">
             {todos.length} todo{todos.length !== 1 ? "s" : ""} extracted
@@ -85,8 +85,8 @@ export function TodoPreview({
         {todos.map((todo) => (
           <div
             key={todo.tempId}
-            className={`rounded-xl border bg-surface p-4 shadow-sm transition-opacity ${
-              todo.selected ? "border-color" : "border-color opacity-50"
+            className={`rounded-xl border bg-kumo-elevated p-4 shadow-sm transition-opacity ${
+              todo.selected ? "border-kumo-line" : "border-kumo-line opacity-50"
             }`}
           >
             <div className="flex items-start gap-3">
@@ -109,20 +109,22 @@ export function TodoPreview({
                   size="sm"
                   className="w-full"
                   disabled={!todo.selected}
+                  aria-label="Todo title"
                 />
 
                 {/* Due date */}
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-muted" />
+                  <Calendar className="h-4 w-4 text-kumo-subtle" />
                   <Input
                     type="date"
-                    value={todo.dueDate ?? ""}
+                    value={todo.dueDate || ""}
                     onChange={(e) =>
                       handleDueDateChange(todo.tempId, e.target.value || null)
                     }
                     size="sm"
                     className="w-auto"
                     disabled={!todo.selected}
+                    aria-label="Due date"
                   />
                   {todo.dueDate && (
                     <Button
@@ -143,7 +145,7 @@ export function TodoPreview({
                 size="sm"
                 shape="square"
                 onClick={() => handleRemove(todo.tempId)}
-                className="text-muted hover:text-error"
+                className="text-kumo-subtle hover:text-kumo-danger"
               >
                 <X className="h-4 w-4" />
               </Button>

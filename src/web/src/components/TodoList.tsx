@@ -10,12 +10,12 @@ export function TodoList() {
   const [editTitle, setEditTitle] = useState("");
 
   if (isLoading) {
-    return <p className="text-center text-muted">Loading todos...</p>;
+    return <p className="text-center text-kumo-subtle">Loading todos...</p>;
   }
 
   if (error) {
     return (
-      <p className="text-center text-error">
+      <p className="text-center text-kumo-danger">
         Failed to load todos. Please try again.
       </p>
     );
@@ -23,7 +23,7 @@ export function TodoList() {
 
   if (!todos || todos.length === 0) {
     return (
-      <p className="text-center text-muted">No todos yet. Add one above!</p>
+      <p className="text-center text-kumo-subtle">No todos yet. Add one above!</p>
     );
   }
 
@@ -64,14 +64,14 @@ export function TodoList() {
       {todos.map((todo) => (
         <div
           key={todo.id}
-          className="rounded-xl border border-color bg-surface p-4 shadow-sm"
+          className="rounded-xl border border-kumo-line bg-kumo-elevated p-4 shadow-sm"
         >
           {editingId === todo.id ? (
             <div className="flex gap-2">
               <Input
                 type="text"
                 value={editTitle}
-				size="sm"
+                size="sm"
                 onChange={(e) => setEditTitle(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSaveEdit(todo.id);
@@ -79,6 +79,7 @@ export function TodoList() {
                 }}
                 autoFocus
                 className="flex-1"
+                aria-label="Edit todo title"
               />
               <Button
                 size="sm"
@@ -104,7 +105,7 @@ export function TodoList() {
                 disabled={updateTodo.isPending}
               />
               <span
-                className={`flex-1 ${todo.completed ? "line-through text-muted" : ""}`}
+                className={`flex-1 ${todo.completed ? "line-through text-kumo-inactive" : ""}`}
               >
                 {todo.title}
               </span>

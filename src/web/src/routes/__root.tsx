@@ -43,12 +43,25 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en">
+    <html lang="en" data-mode="light" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                const mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-mode', mode);
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                  document.documentElement.setAttribute('data-mode', e.matches ? 'dark' : 'light');
+                });
+              })();
+            `,
+          }}
+        />
       </head>
-      <body>
-        <ClerkProvider>
+      <body className="bg-kumo-base text-kumo-default">
+        <ClerkProvider domain="nylonimpossible.com">
           <Header />
           <Outlet />
           <TanStackDevtools
