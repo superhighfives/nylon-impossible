@@ -24,30 +24,41 @@ final class TodoViewModel {
     }
     
     func filteredTodos(from todos: [TodoItem]) -> [TodoItem] {
+        // Filter out soft-deleted items
+        let activeTodos = todos.filter { !$0.isDeleted }
+        
         switch selectedFilter {
         case .all:
-            return todos
+            return activeTodos
         case .active:
-            return todos.filter { !$0.isCompleted }
+            return activeTodos.filter { !$0.isCompleted }
         case .done:
-            return todos.filter { $0.isCompleted }
+            return activeTodos.filter { $0.isCompleted }
         }
     }
     
-    func addTodo(context: ModelContext) {
+    func addTodo(context: ModelContext, userId: String?) {
         let trimmedText = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
         
-        let todo = TodoItem(title: trimmedText)
+        let todo = TodoItem(title: trimmedText, userId: userId)
         context.insert(todo)
         newTaskText = ""
     }
     
     func toggleTodo(_ todo: TodoItem) {
         todo.isCompleted.toggle()
+        todo.markModified()
     }
     
     func deleteTodo(_ todo: TodoItem, context: ModelContext) {
-        context.delete(todo)
+        // Soft delete for sync - mark as deleted rather than removing
+        if todo.userId != nil {
+            todo.isDeleted = true
+            todo.markModified()
+        } else {
+            // Local-only todo, can hard delete
+            context.delete(todo)
+        }
     }
 }

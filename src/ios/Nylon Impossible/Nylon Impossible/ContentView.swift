@@ -10,6 +10,8 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(AuthService.self) private var authService
+    @Environment(SyncService.self) private var syncService
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
     
@@ -22,14 +24,19 @@ struct ContentView: View {
             GradientBackground()
             
             VStack(spacing: 24) {
-                HeaderView()
+                HeaderView(
+                    onSignOut: {
+                        Task { await authService.signOut() }
+                    },
+                    syncState: syncService.state
+                )
                 
                 AddTaskInputView(
                     text: $viewModel.newTaskText,
                     canAdd: viewModel.canAddTask
                 ) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        viewModel.addTodo(context: modelContext)
+                        viewModel.addTodo(context: modelContext, userId: authService.userId)
                     }
                 }
                 
@@ -48,6 +55,9 @@ struct ContentView: View {
             .padding(.horizontal, 16)
         }
         .animation(.easeInOut(duration: 0.3), value: filteredTodos.count)
+        .refreshable {
+            await syncService.sync()
+        }
     }
     
     private var taskListView: some View {
@@ -83,4 +93,6 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .modelContainer(for: TodoItem.self, inMemory: true)
+        .environment(AuthService())
+        .environment(SyncService(authService: AuthService()))
 }

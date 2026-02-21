@@ -11,14 +11,28 @@ import SwiftData
 @Model
 final class TodoItem {
     var id: UUID
+    var userId: String?           // Clerk user ID (nil for local-only todos)
     var title: String
     var isCompleted: Bool
     var createdAt: Date
+    var updatedAt: Date           // For sync conflict resolution
+    var isSynced: Bool            // Whether this item has been synced to server
+    var isDeleted: Bool           // Soft delete for sync
     
-    init(title: String) {
+    init(title: String, userId: String? = nil) {
         self.id = UUID()
+        self.userId = userId
         self.title = title
         self.isCompleted = false
         self.createdAt = Date()
+        self.updatedAt = Date()
+        self.isSynced = false
+        self.isDeleted = false
+    }
+    
+    /// Mark as modified (for sync tracking)
+    func markModified() {
+        updatedAt = Date()
+        isSynced = false
     }
 }

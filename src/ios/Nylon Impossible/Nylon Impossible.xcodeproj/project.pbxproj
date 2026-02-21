@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A52F493BDB00D8344D /* ClerkKit */; };
+		23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A72F493BDB00D8344D /* ClerkKitUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		23C2980D2F1AD043007315F3 /* Nylon Impossible.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Nylon Impossible.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -23,6 +28,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */,
+				23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -65,6 +72,8 @@
 			);
 			name = "Nylon Impossible";
 			packageProductDependencies = (
+				23E768A52F493BDB00D8344D /* ClerkKit */,
+				23E768A72F493BDB00D8344D /* ClerkKitUI */,
 			);
 			productName = "Nylon Impossible";
 			productReference = 23C2980D2F1AD043007315F3 /* Nylon Impossible.app */;
@@ -94,6 +103,9 @@
 			);
 			mainGroup = 23C298042F1AD043007315F3;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 23C2980E2F1AD043007315F3 /* Products */;
 			projectDirPath = "";
@@ -249,10 +261,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Nylon Impossible/Nylon Impossible.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TGHU37N6EX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Nylon-Impossible-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -280,10 +295,13 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Nylon Impossible/Nylon Impossible.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TGHU37N6EX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Nylon-Impossible-Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -328,6 +346,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/clerk/clerk-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		23E768A52F493BDB00D8344D /* ClerkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKit;
+		};
+		23E768A72F493BDB00D8344D /* ClerkKitUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKitUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 23C298052F1AD043007315F3 /* Project object */;
 }

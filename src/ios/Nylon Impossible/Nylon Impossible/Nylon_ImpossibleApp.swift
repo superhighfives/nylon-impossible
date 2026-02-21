@@ -7,13 +7,93 @@
 
 import SwiftUI
 import SwiftData
+import ClerkKit
 
 @main
 struct Nylon_ImpossibleApp: App {
+    @State private var authService = AuthService()
+    @State private var syncService: SyncService?
+    
+    init() {
+        Clerk.configure(publishableKey: Config.clerkPublishableKey)
+    }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView(syncService: syncService)
+                .environment(Clerk.shared)
+                .environment(authService)
+                .onAppear {
+                    if syncService == nil {
+                        syncService = SyncService(authService: authService)
+                    }
+                }
         }
         .modelContainer(for: TodoItem.self)
+    }
+}
+
+struct RootView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(Clerk.self) private var clerk
+    @Environment(AuthService.self) private var authService
+    var syncService: SyncService?
+    
+    @State private var hasTriggeredInitialSync = false
+    
+    private var isSignedIn: Bool {
+        clerk.user != nil
+    }
+    
+    var body: some View {
+        Group {
+            if clerk.client == nil {
+                // Loading state
+                ZStack {
+                    GradientBackground()
+                    ProgressView()
+                }
+            } else if isSignedIn {
+                if let syncService {
+                    ContentView()
+                        .environment(syncService)
+                        .onAppear {
+                            syncService.setModelContext(modelContext)
+                            triggerInitialSync()
+                        }
+                } else {
+                    ContentView()
+                }
+            } else {
+                SignInView()
+            }
+        }
+        .animation(.easeInOut, value: isSignedIn)
+        .animation(.easeInOut, value: clerk.client != nil)
+        .onChange(of: isSignedIn) { _, signedIn in
+            if signedIn {
+                hasTriggeredInitialSync = false
+                triggerInitialSync()
+            } else {
+                // Reset sync on sign out
+                syncService?.reset()
+                hasTriggeredInitialSync = false
+            }
+        }
+    }
+    
+    private func triggerInitialSync() {
+        guard !hasTriggeredInitialSync else { return }
+        guard isSignedIn else { return }
+        guard let syncService else { return }
+        
+        hasTriggeredInitialSync = true
+        
+        Task {
+            // First, migrate any existing local todos
+            await syncService.migrateLocalTodos()
+            // Then sync with server
+            await syncService.sync()
+        }
     }
 }
