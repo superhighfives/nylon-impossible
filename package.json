@@ -17,7 +17,12 @@
     "web:db:studio": "pnpm --filter @nylon-impossible/web db:studio",
     "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
     "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
-    "ios:simulator": "open -a Simulator"
+    "ios:simulator": "open -a Simulator",
+    "api:dev": "pnpm --filter @nylon-impossible/api dev",
+    "api:deploy": "pnpm --filter @nylon-impossible/api run deploy",
+    "api:typecheck": "pnpm --filter @nylon-impossible/api typecheck",
+    "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
+    "deploy": "pnpm web:deploy && pnpm api:deploy"
   },
   "packageManager": "pnpm@9.15.0"
 }
