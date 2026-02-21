@@ -14,8 +14,8 @@ function App() {
       </SignedOut>
 
       <SignedIn>
-        <div className="container max-w-2xl mx-auto py-8 px-4">
-          <div className="space-y-6">
+        <div className="container max-w-xl mx-auto py-8 px-4">
+          <div className="space-y-8">
             <TodoInput />
             <TodoList />
           </div>

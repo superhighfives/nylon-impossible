@@ -60,7 +60,7 @@ function RootDocument() {
           }}
         />
       </head>
-      <body className="bg-kumo-base text-kumo-default">
+        <body className="bg-surface text-surface antialiased">
         <ClerkProvider domain="nylonimpossible.com">
           <Header />
           <Outlet />

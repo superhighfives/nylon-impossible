@@ -10,4 +10,5 @@ export interface UpdateTodoInput {
   title?: string;
   completed?: boolean;
   position?: string;
+  dueDate?: Date | null;
 }

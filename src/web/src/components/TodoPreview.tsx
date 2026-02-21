@@ -1,5 +1,4 @@
-import { Button, Checkbox, Input } from "@cloudflare/kumo";
-import { Calendar, Sparkles, X } from "lucide-react";
+import { Checkbox } from "@cloudflare/kumo";
 import type { ExtractedTodo } from "@/lib/ai-types";
 
 interface TodoPreviewProps {
@@ -10,10 +9,6 @@ interface TodoPreviewProps {
   isCreating: boolean;
 }
 
-/**
- * Preview component for AI-extracted todos
- * Allows users to review, edit, and select which todos to add
- */
 export function TodoPreview({
   todos,
   onTodosChange,
@@ -56,118 +51,107 @@ export function TodoPreview({
 
   if (todos.length === 0) {
     return (
-      <div className="rounded-xl border border-kumo-line bg-kumo-elevated p-6 text-center">
-        <p className="text-kumo-subtle">No todos were extracted from the text.</p>
-        <Button variant="ghost" onClick={onCancel} className="mt-4">
+      <div className="py-8 text-center">
+        <p className="text-sm text-muted">No todos extracted.</p>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="mt-2 text-xs text-muted hover:text-surface"
+        >
           Try again
-        </Button>
+        </button>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-kumo-strong">
-          <Sparkles className="h-4 w-4" />
-          <span className="text-sm font-medium">
-            {todos.length} todo{todos.length !== 1 ? "s" : ""} extracted
-          </span>
-        </div>
-        <Button variant="ghost" size="sm" onClick={handleSelectAll}>
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted">
+          {todos.length} extracted
+        </span>
+        <button
+          type="button"
+          onClick={handleSelectAll}
+          className="text-muted hover:text-surface"
+        >
           {todos.every((t) => t.selected) ? "Deselect all" : "Select all"}
-        </Button>
+        </button>
       </div>
 
-      {/* Todo list */}
-      <div className="space-y-2">
+      <div className="divide-y divide-color">
         {todos.map((todo) => (
           <div
             key={todo.tempId}
-            className={`rounded-xl border bg-kumo-elevated p-4 shadow-sm transition-opacity ${
-              todo.selected ? "border-kumo-line" : "border-kumo-line opacity-50"
-            }`}
+            className={`py-3 ${!todo.selected ? "opacity-40" : ""}`}
           >
             <div className="flex items-start gap-3">
-              {/* Selection checkbox */}
-              <Checkbox
-                checked={todo.selected}
-                onChange={() => handleToggleSelect(todo.tempId)}
-                className="mt-1"
-              />
-
-              {/* Content */}
+              <div className="pt-0.5">
+                <Checkbox
+                  checked={todo.selected}
+                  onChange={() => handleToggleSelect(todo.tempId)}
+                />
+              </div>
               <div className="flex-1 space-y-2">
-                {/* Title input */}
-                <Input
+                <input
                   type="text"
                   value={todo.title}
-                  onChange={(e) =>
-                    handleTitleChange(todo.tempId, e.target.value)
-                  }
-                  size="sm"
-                  className="w-full"
+                  onChange={(e) => handleTitleChange(todo.tempId, e.target.value)}
                   disabled={!todo.selected}
+                  className="w-full bg-transparent text-surface text-sm border-b border-color pb-1 focus:outline-none focus:border-surface disabled:text-muted"
                   aria-label="Todo title"
                 />
-
-                {/* Due date */}
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-kumo-subtle" />
-                  <Input
+                <div className="flex items-center gap-3">
+                  <input
                     type="date"
                     value={todo.dueDate || ""}
                     onChange={(e) =>
                       handleDueDateChange(todo.tempId, e.target.value || null)
                     }
-                    size="sm"
-                    className="w-auto"
                     disabled={!todo.selected}
+                    className="bg-transparent text-muted text-xs focus:outline-none disabled:opacity-50"
                     aria-label="Due date"
                   />
-                  {todo.dueDate && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
+                  {todo.dueDate && todo.selected && (
+                    <button
+                      type="button"
                       onClick={() => handleDueDateChange(todo.tempId, null)}
-                      disabled={!todo.selected}
+                      className="text-xs text-muted hover:text-surface"
                     >
                       Clear
-                    </Button>
+                    </button>
                   )}
                 </div>
               </div>
-
-              {/* Remove button */}
-              <Button
-                variant="ghost"
-                size="sm"
-                shape="square"
+              <button
+                type="button"
                 onClick={() => handleRemove(todo.tempId)}
-                className="text-kumo-subtle hover:text-kumo-danger"
+                className="text-xs text-muted hover:text-error"
               >
-                <X className="h-4 w-4" />
-              </Button>
+                Remove
+              </button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center justify-between pt-2">
-        <Button variant="ghost" onClick={onCancel} disabled={isCreating}>
+      <div className="flex items-center justify-between pt-2 text-xs">
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={isCreating}
+          className="text-muted hover:text-surface disabled:cursor-not-allowed"
+        >
           Cancel
-        </Button>
-        <Button
-          variant="primary"
+        </button>
+        <button
+          type="button"
           onClick={onConfirm}
           disabled={selectedCount === 0 || isCreating}
+          className="text-surface font-medium disabled:text-muted disabled:cursor-not-allowed"
         >
-          {isCreating
-            ? "Adding..."
-            : `Add ${selectedCount} todo${selectedCount !== 1 ? "s" : ""}`}
-        </Button>
+          {isCreating ? "Adding..." : `Add ${selectedCount}`}
+        </button>
       </div>
     </div>
   );

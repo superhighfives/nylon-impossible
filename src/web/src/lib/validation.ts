@@ -9,4 +9,5 @@ export const updateTodoSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),
+  dueDate: z.coerce.date().nullable().optional(),
 });

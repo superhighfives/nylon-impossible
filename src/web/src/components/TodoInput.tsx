@@ -1,5 +1,4 @@
-import { Button, Input, InputArea } from "@cloudflare/kumo";
-import { Loader, Plus, Sparkles } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
   useCreateTodo,
@@ -11,13 +10,6 @@ import { TodoPreview } from "./TodoPreview";
 
 type InputMode = "input" | "extracting" | "preview";
 
-/**
- * Smart todo input that supports both quick add and AI extraction
- *
- * Always shows both options:
- * - "Extract todos" to use AI to parse natural language
- * - "Add as single todo" for quick direct adds
- */
 export function TodoInput() {
   const [text, setText] = useState("");
   const [mode, setMode] = useState<InputMode>("input");
@@ -27,9 +19,6 @@ export function TodoInput() {
   const createTodo = useCreateTodo();
   const extractTodos = useExtractTodos();
   const createTodosBatch = useCreateTodosBatch();
-
-  // Use textarea for multi-line content
-  const isMultiLine = text.includes("\n");
 
   const handleQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +77,6 @@ export function TodoInput() {
     setMode("input");
   };
 
-  // Preview mode - show extracted todos
   if (mode === "preview") {
     return (
       <TodoPreview
@@ -101,67 +89,54 @@ export function TodoInput() {
     );
   }
 
-  // Extracting mode - show loading state
   if (mode === "extracting") {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-xl border border-kumo-line bg-kumo-elevated p-6">
-        <Loader className="h-6 w-6 animate-spin text-kumo-brand" />
-        <p className="text-sm text-kumo-subtle">Extracting todos from text...</p>
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="h-4 w-4 animate-spin text-muted" />
+        <span className="ml-2 text-sm text-muted">Extracting...</span>
       </div>
     );
   }
 
-  // Input mode - always show both options
   return (
     <div className="space-y-3">
       {error && (
-        <div className="rounded-lg bg-kumo-danger-tint p-3 text-sm text-kumo-danger">
-          {error}
-        </div>
+        <p className="text-sm text-error">{error}</p>
       )}
 
-      <form onSubmit={handleQuickAdd} className="space-y-3">
-        {isMultiLine ? (
-          <InputArea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What needs to be done?"
-            aria-label="New todo"
-            disabled={createTodo.isPending}
-            className="min-h-[120px] w-full"
-          />
-        ) : (
-          <Input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What needs to be done?"
-            aria-label="New todo"
-            disabled={createTodo.isPending}
-            className="w-full"
-          />
-        )}
+      <form onSubmit={handleQuickAdd}>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="What needs to be done?"
+          aria-label="New todo"
+          disabled={createTodo.isPending}
+          rows={text.includes("\n") ? 4 : 1}
+          className="w-full bg-transparent text-surface text-sm border-b border-color pb-2 focus:outline-none focus:border-surface placeholder:text-muted resize-none"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey && !text.includes("\n")) {
+              e.preventDefault();
+              handleQuickAdd(e);
+            }
+          }}
+        />
 
-        <div className="flex gap-2">
-          <Button
+        <div className="flex gap-4 pt-2 text-xs">
+          <button
             type="submit"
-            variant="primary"
             disabled={createTodo.isPending || !text.trim()}
-            className="flex items-center gap-2"
+            className="text-surface font-medium disabled:text-muted disabled:cursor-not-allowed"
           >
-            <Plus className="h-4 w-4" />
-            Add todo
-          </Button>
-          <Button
+            Add
+          </button>
+          <button
             type="button"
-            variant="secondary"
             onClick={handleExtract}
             disabled={!text.trim() || extractTodos.isPending}
-            className="flex items-center gap-2"
+            className="text-muted hover:text-surface disabled:cursor-not-allowed"
           >
-            <Sparkles className="h-4 w-4" />
-            Extract todos
-          </Button>
+            Extract with AI
+          </button>
         </div>
       </form>
     </div>

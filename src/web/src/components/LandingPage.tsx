@@ -1,25 +1,28 @@
 import { SignInButton, SignUpButton } from "@clerk/tanstack-react-start";
-import { Button } from "@cloudflare/kumo";
 
 export function LandingPage() {
   return (
     <div className="flex items-center justify-center p-8">
-      <div className="w-full max-w-72 space-y-8">
-        <div className="text-center">
-          <p className="text-kumo-strong mt-2">
-            A <span className="font-bold underline underline-offset-4 decoration-wavy decoration-kumo-brand">todo app</span> to keep you organized.
-          </p>
-        </div>
-        <div className="flex flex-col gap-3">
+      <div className="w-full max-w-xs space-y-8 text-center">
+        <p className="text-sm text-surface">
+          A todo app to keep you organized.
+        </p>
+        <div className="flex flex-col gap-3 text-sm">
           <SignInButton mode="modal">
-            <Button className="w-full" variant="primary" size="lg">
+            <button
+              type="button"
+              className="w-full py-2 border border-surface text-surface font-medium hover:bg-surface hover:text-surface-inverse transition-colors"
+            >
               Sign In
-            </Button>
+            </button>
           </SignInButton>
           <SignUpButton mode="modal">
-            <Button className="w-full" variant="outline" size="lg">
+            <button
+              type="button"
+              className="w-full py-2 text-muted hover:text-surface transition-colors"
+            >
               Sign Up
-            </Button>
+            </button>
           </SignUpButton>
         </div>
       </div>
