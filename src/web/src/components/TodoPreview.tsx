@@ -1,4 +1,4 @@
-import { Checkbox } from "@cloudflare/kumo";
+import { Button, Checkbox, Input } from "@cloudflare/kumo";
 import type { ExtractedTodo } from "@/lib/ai-types";
 
 interface TodoPreviewProps {
@@ -53,30 +53,33 @@ export function TodoPreview({
     return (
       <div className="py-8 text-center">
         <p className="text-sm text-muted">No todos extracted.</p>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           onClick={onCancel}
-          className="mt-2 text-xs text-muted hover:text-surface"
+          className="mt-2"
         >
           Try again
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-muted">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-muted">
           {todos.length} extracted
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           onClick={handleSelectAll}
-          className="text-muted hover:text-surface"
         >
           {todos.every((t) => t.selected) ? "Deselect all" : "Select all"}
-        </button>
+        </Button>
       </div>
 
       <div className="divide-y divide-color">
@@ -93,65 +96,71 @@ export function TodoPreview({
                 />
               </div>
               <div className="flex-1 space-y-2">
-                <input
+                <Input
                   type="text"
                   value={todo.title}
                   onChange={(e) => handleTitleChange(todo.tempId, e.target.value)}
                   disabled={!todo.selected}
-                  className="w-full bg-transparent text-surface text-sm border-b border-color pb-1 focus:outline-none focus:border-surface disabled:text-muted"
+                  className="w-full"
                   aria-label="Todo title"
+                  size="sm"
                 />
-                <div className="flex items-center gap-3">
-                  <input
+                <div className="flex items-center gap-2">
+                  <Input
                     type="date"
                     value={todo.dueDate || ""}
                     onChange={(e) =>
                       handleDueDateChange(todo.tempId, e.target.value || null)
                     }
                     disabled={!todo.selected}
-                    className="bg-transparent text-muted text-xs focus:outline-none disabled:opacity-50"
                     aria-label="Due date"
+                    size="sm"
                   />
                   {todo.dueDate && todo.selected && (
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       type="button"
                       onClick={() => handleDueDateChange(todo.tempId, null)}
-                      className="text-xs text-muted hover:text-surface"
                     >
                       Clear
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>
-              <button
+              <Button
+                variant="secondary-destructive"
+                size="sm"
                 type="button"
                 onClick={() => handleRemove(todo.tempId)}
-                className="text-xs text-muted hover:text-error"
               >
                 Remove
-              </button>
+              </Button>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between pt-2 text-xs">
-        <button
+      <div className="flex items-center justify-between pt-2">
+        <Button
+          variant="ghost"
+          size="sm"
           type="button"
           onClick={onCancel}
           disabled={isCreating}
-          className="text-muted hover:text-surface disabled:cursor-not-allowed"
         >
           Cancel
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
           type="button"
           onClick={onConfirm}
           disabled={selectedCount === 0 || isCreating}
-          className="text-surface font-medium disabled:text-muted disabled:cursor-not-allowed"
+          loading={isCreating}
         >
-          {isCreating ? "Adding..." : `Add ${selectedCount}`}
-        </button>
+          {`Add ${selectedCount}`}
+        </Button>
       </div>
     </div>
   );

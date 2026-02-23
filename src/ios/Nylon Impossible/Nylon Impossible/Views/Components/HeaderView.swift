@@ -10,54 +10,37 @@ import SwiftUI
 struct HeaderView: View {
     var onSignOut: (() -> Void)?
     var syncState: SyncState = .idle
-    
+
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 12) {
             // Top bar with sync status and sign out
             HStack {
                 // Sync status indicator
                 syncStatusView
-                
+
                 Spacer()
-                
+
                 if let onSignOut {
                     Button {
                         onSignOut()
                     } label: {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                             .font(.system(size: 18))
-                            .foregroundStyle(Color.subtitleGray)
+                            .foregroundStyle(Color.kumoStrong)
                     }
                 }
             }
             .frame(height: 24)
-            
-            // App icon
-            ZStack {
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(LinearGradient.primaryGradient)
-                    .frame(width: 64, height: 64)
-                    .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 10)
-                    .shadow(color: .black.opacity(0.1), radius: 6, x: 0, y: 4)
-                
-                Image(systemName: "checkmark")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            
-            // Title with gradient
+
+            // Title
             Text("My Tasks")
-                .font(.system(size: 36, weight: .bold))
-                .foregroundStyle(LinearGradient.primaryGradient)
-            
-            // Subtitle
-            Text("Stay organized, stay productive")
-                .font(.system(size: 16))
-                .foregroundStyle(Color.subtitleGray)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(Color.kumoDefault)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.top, 16)
     }
-    
+
     @ViewBuilder
     private var syncStatusView: some View {
         switch syncState {
@@ -69,25 +52,25 @@ struct HeaderView: View {
                     .scaleEffect(0.7)
                 Text("Syncing...")
                     .font(.caption)
-                    .foregroundStyle(Color.subtitleGray)
+                    .foregroundStyle(Color.kumoSubtle)
             }
         case .success(let date):
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(.green)
+                    .foregroundStyle(Color.kumoSuccess)
                 Text("Synced \(date.formatted(.relative(presentation: .named)))")
                     .font(.caption)
-                    .foregroundStyle(Color.subtitleGray)
+                    .foregroundStyle(Color.kumoSubtle)
             }
         case .error(let message):
             HStack(spacing: 4) {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.kumoDanger)
                 Text(message)
                     .font(.caption)
-                    .foregroundStyle(.red)
+                    .foregroundStyle(Color.kumoDanger)
                     .lineLimit(1)
             }
         }

@@ -24,7 +24,14 @@ final class SyncService {
     
     private(set) var state: SyncState = .idle
     private(set) var lastSyncedAt: Date?
-    
+    private(set) var isPolling: Bool = false
+
+    // Debounce for action-triggered syncs
+    private var debounceTask: Task<Void, Never>?
+
+    // Periodic polling
+    private var pollingTask: Task<Void, Never>?
+
     // UserDefaults key for persisting last sync time
     private let lastSyncedAtKey = "com.nylonimpossible.lastSyncedAt"
     
@@ -42,51 +49,85 @@ final class SyncService {
         self.modelContext = context
     }
     
+    /// Trigger a sync after a user action, debounced to batch rapid changes.
+    func syncAfterAction() {
+        debounceTask?.cancel()
+        debounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled else { return }
+            await sync()
+        }
+    }
+
+    /// Start polling for remote changes. Call when app enters foreground.
+    func startPolling() {
+        guard !isPolling else { return }
+        isPolling = true
+
+        pollingTask = Task { @MainActor in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { break }
+                if state != .syncing {
+                    await sync()
+                }
+            }
+            isPolling = false
+        }
+    }
+
+    /// Stop polling. Call when app enters background.
+    func stopPolling() {
+        pollingTask?.cancel()
+        pollingTask = nil
+        isPolling = false
+    }
+
     /// Perform a full sync with the server
     func sync() async {
         guard state != .syncing else { return }
         guard authService.isSignedIn, let userId = authService.userId else { return }
         guard let modelContext, let apiService else { return }
-        
+
         state = .syncing
-        
+
         do {
             // 1. Gather local changes (unsynced items for this user)
             let localChanges = try gatherLocalChanges(userId: userId)
-            
+            let localChangeIds = Set(localChanges.map { $0.id })
+
             // 2. Send to server, get remote changes
+            // Always request all items (nil lastSyncedAt) so we can detect server-side deletions
             let response = try await apiService.sync(
-                lastSyncedAt: lastSyncedAt,
+                lastSyncedAt: nil,
                 changes: localChanges
             )
-            
-            // 3. Apply remote changes locally
-            try applyRemoteChanges(response.todos, userId: userId)
-            
-            // 4. Mark local items as synced
-            try markAsSynced(localChanges.map { UUID(uuidString: $0.id)! })
-            
-            // 5. Clean up soft-deleted items that have been synced
-            try cleanupDeletedItems(userId: userId)
-            
-            // 6. Update sync timestamp
+
+            // 3. Apply all changes in a single atomic operation
+            try applySync(
+                remoteTodos: response.todos,
+                localChangeIds: localChangeIds,
+                userId: userId
+            )
+
+            // 4. Update sync timestamp
             if let syncedAt = ISO8601DateFormatter().date(from: response.syncedAt) {
                 lastSyncedAt = syncedAt
                 UserDefaults.standard.set(syncedAt, forKey: lastSyncedAtKey)
             }
-            
+
             // Log conflicts if any
             if !response.conflicts.isEmpty {
-                print("Sync conflicts: \(response.conflicts.count)")
+                print("[Sync] Conflicts: \(response.conflicts.count)")
                 for conflict in response.conflicts {
-                    print("  - \(conflict.id): \(conflict.resolution)")
+                    print("[Sync]   - \(conflict.id): \(conflict.resolution)")
                 }
             }
-            
+
             state = .success(Date())
-            
+
         } catch {
-            print("Sync error: \(error)")
+            print("[Sync] Error: \(error)")
             state = .error(error.localizedDescription)
         }
     }
@@ -125,19 +166,20 @@ final class SyncService {
     }
     
     // MARK: - Private Methods
-    
+
     private func gatherLocalChanges(userId: String) throws -> [TodoChange] {
         guard let modelContext else { return [] }
-        
+
         // Fetch unsynced items for this user
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate { $0.userId == userId && !$0.isSynced }
         )
         let unsyncedItems = try modelContext.fetch(descriptor)
-        
+
         return unsyncedItems.map { todo in
             TodoChange(
-                id: todo.id.uuidString,
+                // Normalize UUID to lowercase to match web-generated IDs in D1
+                id: todo.id.uuidString.lowercased(),
                 title: todo.isDeleted ? nil : todo.title,
                 completed: todo.isDeleted ? nil : todo.isCompleted,
                 updatedAt: todo.updatedAt,
@@ -145,20 +187,35 @@ final class SyncService {
             )
         }
     }
-    
-    private func applyRemoteChanges(_ remoteTodos: [APITodo], userId: String) throws {
+
+    /// Apply all sync changes in a single atomic operation
+    private func applySync(
+        remoteTodos: [APITodo],
+        localChangeIds: Set<String>,
+        userId: String
+    ) throws {
         guard let modelContext else { return }
-        
+
+        let remoteIds = Set(remoteTodos.compactMap { UUID(uuidString: $0.id) })
+
+        // Step 1: Apply remote changes
         for remote in remoteTodos {
             guard let remoteId = UUID(uuidString: remote.id) else { continue }
-            
+
             // Try to find existing local todo
             let descriptor = FetchDescriptor<TodoItem>(
                 predicate: #Predicate { $0.id == remoteId }
             )
             let existing = try modelContext.fetch(descriptor).first
-            
+
             if let local = existing {
+                // Skip items that are locally soft-deleted and pending sync.
+                // The local delete intent should be preserved until the server
+                // processes it (which it already has in this sync cycle).
+                if local.isDeleted && !local.isSynced {
+                    continue
+                }
+
                 // Conflict: compare updatedAt, last write wins
                 if remote.updatedAt > local.updatedAt {
                     local.title = remote.title
@@ -179,43 +236,50 @@ final class SyncService {
                 modelContext.insert(todo)
             }
         }
-        
-        try modelContext.save()
-    }
-    
-    private func markAsSynced(_ ids: [UUID]) throws {
-        guard let modelContext else { return }
-        
-        for id in ids {
+
+        // Step 2: Mark all local changes as synced
+        for changeId in localChangeIds {
+            guard let uuid = UUID(uuidString: changeId) else { continue }
             let descriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.id == id }
+                predicate: #Predicate { $0.id == uuid }
             )
             if let todo = try modelContext.fetch(descriptor).first {
                 todo.isSynced = true
             }
         }
-        
-        try modelContext.save()
-    }
-    
-    private func cleanupDeletedItems(userId: String) throws {
-        guard let modelContext else { return }
-        
-        // Delete items that are both soft-deleted AND synced
-        let descriptor = FetchDescriptor<TodoItem>(
+
+        // Step 3: Remove local synced items that no longer exist on the server
+        // (deleted via web or another client)
+        let localDescriptor = FetchDescriptor<TodoItem>(
+            predicate: #Predicate { $0.userId == userId && $0.isSynced && !$0.isDeleted }
+        )
+        let localSyncedTodos = try modelContext.fetch(localDescriptor)
+
+        for local in localSyncedTodos {
+            if !remoteIds.contains(local.id) {
+                modelContext.delete(local)
+            }
+        }
+
+        // Step 4: Clean up soft-deleted items that have been synced
+        let deleteDescriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate { $0.userId == userId && $0.isDeleted && $0.isSynced }
         )
-        let toDelete = try modelContext.fetch(descriptor)
-        
+        let toDelete = try modelContext.fetch(deleteDescriptor)
+
         for todo in toDelete {
             modelContext.delete(todo)
         }
-        
+
+        // Single save for the entire operation
         try modelContext.save()
     }
     
     /// Reset sync state (used on sign out)
     func reset() {
+        stopPolling()
+        debounceTask?.cancel()
+        debounceTask = nil
         lastSyncedAt = nil
         state = .idle
         UserDefaults.standard.removeObject(forKey: lastSyncedAtKey)

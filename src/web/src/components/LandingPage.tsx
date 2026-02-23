@@ -1,4 +1,5 @@
 import { SignInButton, SignUpButton } from "@clerk/tanstack-react-start";
+import { Button } from "@cloudflare/kumo";
 
 export function LandingPage() {
   return (
@@ -9,20 +10,14 @@ export function LandingPage() {
         </p>
         <div className="flex flex-col gap-3 text-sm">
           <SignInButton mode="modal">
-            <button
-              type="button"
-              className="w-full py-2 border border-surface text-surface font-medium hover:bg-surface hover:text-surface-inverse transition-colors"
-            >
+            <Button variant="primary" className="w-full">
               Sign In
-            </button>
+            </Button>
           </SignInButton>
           <SignUpButton mode="modal">
-            <button
-              type="button"
-              className="w-full py-2 text-muted hover:text-surface transition-colors"
-            >
+            <Button variant="ghost" className="w-full">
               Sign Up
-            </button>
+            </Button>
           </SignUpButton>
         </div>
       </div>

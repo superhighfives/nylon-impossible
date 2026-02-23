@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:migrate": "pnpm web:db:migrate && pnpm api:db:migrate",
+    "db:migrate:remote": "pnpm web:db:migrate:remote && pnpm api:db:migrate:remote",
+    "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
+    "deploy": "pnpm web:deploy && pnpm api:deploy",
     "web:open": "code 'src/web'",
     "web:dev": "pnpm --filter @nylon-impossible/web dev",
     "web:build": "pnpm --filter @nylon-impossible/web build",
@@ -12,17 +16,17 @@
     "web:format": "pnpm --filter @nylon-impossible/web format",
     "web:check": "pnpm --filter @nylon-impossible/web check",
     "web:deploy": "pnpm --filter @nylon-impossible/web run deploy",
-    "web:db:migrations:apply": "pnpm --filter @nylon-impossible/web db:migrations:apply",
-    "web:db:migrations:apply:remote": "pnpm --filter @nylon-impossible/web db:migrations:apply:remote",
+    "web:db:migrate": "pnpm --filter @nylon-impossible/web db:migrate",
+    "web:db:migrate:remote": "pnpm --filter @nylon-impossible/web db:migrate:remote",
     "web:db:studio": "pnpm --filter @nylon-impossible/web db:studio",
-    "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
-    "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
-    "ios:simulator": "open -a Simulator",
     "api:dev": "pnpm --filter @nylon-impossible/api dev",
     "api:deploy": "pnpm --filter @nylon-impossible/api run deploy",
     "api:typecheck": "pnpm --filter @nylon-impossible/api typecheck",
-    "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
-    "deploy": "pnpm web:deploy && pnpm api:deploy"
+    "api:db:migrate": "pnpm --filter @nylon-impossible/api db:migrate",
+    "api:db:migrate:remote": "pnpm --filter @nylon-impossible/api db:migrate:remote",
+    "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
+    "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
+    "ios:simulator": "open -a Simulator"
   },
   "packageManager": "pnpm@9.15.0"
 }

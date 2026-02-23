@@ -33,48 +33,24 @@ extension Color {
     }
 }
 
-// MARK: - App Colors
+// MARK: - Kumo Semantic Colors
 extension Color {
-    // Primary gradient colors
-    static let primaryBlue = Color(hex: "2B7FFF")
-    static let primaryPurple = Color(hex: "AD46FF")
-    
-    // Text colors
-    static let subtitleGray = Color(hex: "6A7282")
-    static let placeholderGray = Color(hex: "99A1AF")
-    static let tertiaryGray = Color(hex: "D1D5DC")
-    static let inactiveTabText = Color(hex: "4A5565")
-    
-    // UI colors
-    static let inputBorder = Color(hex: "E5E7EB")
-    
-    // Background gradient colors
-    static let bgBlue = Color(hex: "EFF6FF")
-    static let bgPurple = Color(hex: "FAF5FF")
-    static let bgPink = Color(hex: "FDF2F8")
-}
+    // Brand
+    static let kumoBrand = Color(red: 0.145, green: 0.388, blue: 0.922) // ~#2563EB
 
-// MARK: - App Gradients
-extension LinearGradient {
-    static let primaryGradient = LinearGradient(
-        colors: [.primaryBlue, .primaryPurple],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    
-    static let backgroundGradient = LinearGradient(
-        stops: [
-            .init(color: .bgBlue, location: 0),
-            .init(color: .bgPurple, location: 0.5),
-            .init(color: .bgPink, location: 1)
-        ],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-    
-    static let filterButtonGradient = LinearGradient(
-        colors: [.primaryBlue, .primaryPurple],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
+    // Backgrounds
+    static let kumoBase = Color(.systemBackground)
+    static let kumoElevated = Color(.secondarySystemBackground)
+
+    // Text
+    static let kumoDefault = Color(.label)
+    static let kumoStrong = Color(.secondaryLabel)
+    static let kumoSubtle = Color(.tertiaryLabel)
+    static let kumoInactive = Color(.quaternaryLabel)
+
+    // UI
+    static let kumoLine = Color(.separator)
+    static let kumoTint = Color(.tertiarySystemFill)
+    static let kumoDanger = Color(.systemRed)
+    static let kumoSuccess = Color(.systemGreen)
 }

@@ -7,9 +7,16 @@ import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";
 const TODOS_QUERY_KEY = ["todos"];
 
 export function useTodos() {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
+    refetchInterval: () => {
+      // Pause polling while mutations are in-flight to avoid
+      // overwriting optimistic updates with stale server data
+      if (queryClient.isMutating() > 0) return false;
+      return 3000;
+    },
   });
 }
 

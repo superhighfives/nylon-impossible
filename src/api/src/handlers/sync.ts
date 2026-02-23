@@ -1,11 +1,12 @@
 import { z } from "zod/v4";
-import { getDb, todos, eq, and, gt } from "../lib/db";
+import { createClerkClient } from "@clerk/backend";
+import { getDb, users, todos, eq, and, gt } from "../lib/db";
 import { json, error } from "../lib/response";
 import type { Env, AuthenticatedRequest } from "../types";
 
 // Sync request schema
 const syncRequestSchema = z.object({
-  lastSyncedAt: z.coerce.date().nullable(),
+  lastSyncedAt: z.union([z.null(), z.coerce.date()]).optional(),
   changes: z.array(
     z.object({
       id: z.string().uuid(),
@@ -22,6 +23,20 @@ interface SyncConflict {
   resolution: "local" | "remote";
   localUpdatedAt: Date;
   remoteUpdatedAt: Date;
+}
+
+// Serialize a todo with explicit ISO8601 dates and lowercase ID
+function serializeTodo(todo: typeof todos.$inferSelect) {
+  return {
+    id: todo.id.toLowerCase(),
+    userId: todo.userId,
+    title: todo.title,
+    completed: todo.completed,
+    position: todo.position,
+    dueDate: todo.dueDate?.toISOString() ?? null,
+    createdAt: todo.createdAt.toISOString(),
+    updatedAt: todo.updatedAt.toISOString(),
+  };
 }
 
 // POST /todos/sync - Bidirectional sync
@@ -41,22 +56,39 @@ export async function syncTodos(
   const conflicts: SyncConflict[] = [];
   const syncedAt = new Date();
 
+  // Ensure user exists before inserting todos (FK constraint)
+  const [existingUser] = await db
+    .select()
+    .from(users)
+    .where(eq(users.id, req.userId));
+
+  if (!existingUser) {
+    const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+    const clerkUser = await clerk.users.getUser(req.userId);
+    const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+
+    await db.insert(users).values({ id: req.userId, email }).onConflictDoNothing();
+  }
+
   // 1. Apply client changes (with conflict resolution)
+  // Normalize UUIDs to lowercase to match web-generated IDs
   for (const change of changes) {
+    const normalizedId = change.id.toLowerCase();
+
     const [existing] = await db
       .select()
       .from(todos)
-      .where(and(eq(todos.id, change.id), eq(todos.userId, req.userId)));
+      .where(and(eq(todos.id, normalizedId), eq(todos.userId, req.userId)));
 
     if (change.deleted) {
       // Delete if exists and owned by user
       if (existing) {
         // Last write wins for deletes too
         if (change.updatedAt >= existing.updatedAt) {
-          await db.delete(todos).where(eq(todos.id, change.id));
+          await db.delete(todos).where(eq(todos.id, normalizedId));
         } else {
           conflicts.push({
-            id: change.id,
+            id: normalizedId,
             resolution: "remote",
             localUpdatedAt: change.updatedAt,
             remoteUpdatedAt: existing.updatedAt,
@@ -74,10 +106,10 @@ export async function syncTodos(
             completed: change.completed ?? existing.completed,
             updatedAt: change.updatedAt,
           })
-          .where(eq(todos.id, change.id));
+          .where(eq(todos.id, normalizedId));
       } else {
         conflicts.push({
-          id: change.id,
+          id: normalizedId,
           resolution: "remote",
           localUpdatedAt: change.updatedAt,
           remoteUpdatedAt: existing.updatedAt,
@@ -87,7 +119,7 @@ export async function syncTodos(
       // Create new
       if (change.title) {
         await db.insert(todos).values({
-          id: change.id,
+          id: normalizedId,
           userId: req.userId,
           title: change.title,
           completed: change.completed ?? false,
@@ -115,7 +147,7 @@ export async function syncTodos(
   }
 
   return json({
-    todos: serverTodos,
+    todos: serverTodos.map(serializeTodo),
     syncedAt: syncedAt.toISOString(),
     conflicts,
   });

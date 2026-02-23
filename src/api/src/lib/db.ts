@@ -6,29 +6,29 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 export const users = sqliteTable("users", {
   id: text("id").primaryKey(),
   email: text("email").notNull(),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" })
+  createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+    .default(sql`(unixepoch())`),
 });
 
 export const todos = sqliteTable("todos", {
   id: text("id").primaryKey(),
-  userId: text("userId")
+  userId: text("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
-  position: text("position"),
-  dueDate: integer("dueDate", { mode: "timestamp_ms" }),
-  createdAt: integer("createdAt", { mode: "timestamp_ms" })
+  position: text("position").notNull().default("a0"),
+  dueDate: integer("due_date", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
-    .default(sql`(unixepoch() * 1000)`),
-  updatedAt: integer("updatedAt", { mode: "timestamp_ms" })
+    .default(sql`(unixepoch())`),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
     .notNull()
-    .default(sql`(unixepoch() * 1000)`),
+    .default(sql`(unixepoch())`),
 });
 
 export type Todo = typeof todos.$inferSelect;

@@ -11,38 +11,38 @@ import ClerkKitUI
 
 struct SignInView: View {
     @State private var authIsPresented = false
-    
+
     var body: some View {
         ZStack {
             GradientBackground()
-            
+
             VStack(spacing: 32) {
                 Spacer()
-                
+
                 // Logo/Header
                 VStack(spacing: 8) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 24)
-                            .fill(LinearGradient.primaryGradient)
+                            .fill(Color.kumoBrand)
                             .frame(width: 80, height: 80)
-                            .shadow(color: .black.opacity(0.1), radius: 15, x: 0, y: 10)
-                        
+
                         Image(systemName: "checkmark")
                             .font(.system(size: 36, weight: .bold))
                             .foregroundStyle(.white)
                     }
-                    
+
                     Text("Nylon Impossible")
                         .font(.title)
                         .fontWeight(.bold)
-                    
+                        .foregroundStyle(Color.kumoDefault)
+
                     Text("Sign in to sync your todos")
                         .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.kumoStrong)
                 }
-                
+
                 Spacer()
-                
+
                 // Sign in button
                 Button {
                     authIsPresented = true
@@ -50,10 +50,10 @@ struct SignInView: View {
                     Text("Sign In")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(LinearGradient.primaryGradient)
+                        .background(Color.kumoBrand)
                         .foregroundStyle(.white)
                         .fontWeight(.semibold)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 48)

@@ -38,19 +38,21 @@ struct ContentView: View {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         viewModel.addTodo(context: modelContext, userId: authService.userId)
                     }
+                    syncService.syncAfterAction()
                 }
                 
                 FilterTabsView(selectedFilter: $viewModel.selectedFilter)
                 
                 // Task list or empty state
                 if filteredTodos.isEmpty {
-                    EmptyStateView()
-                        .transition(.opacity)
+                    ScrollView {
+                        EmptyStateView()
+                            .transition(.opacity)
+                            .frame(maxWidth: .infinity)
+                    }
                 } else {
                     taskListView
                 }
-                
-                Spacer(minLength: 0)
             }
             .padding(.horizontal, 16)
         }
@@ -65,6 +67,7 @@ struct ContentView: View {
             ForEach(filteredTodos) { todo in
                 TodoItemRow(todo: todo) {
                     viewModel.toggleTodo(todo)
+                    syncService.syncAfterAction()
                 }
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
@@ -78,6 +81,7 @@ struct ContentView: View {
                         withAnimation(.easeInOut(duration: 0.3)) {
                             viewModel.deleteTodo(todo, context: modelContext)
                         }
+                        syncService.syncAfterAction()
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }

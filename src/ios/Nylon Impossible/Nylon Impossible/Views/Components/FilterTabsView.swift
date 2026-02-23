@@ -10,7 +10,7 @@ import SwiftUI
 struct FilterTabsView: View {
     @Binding var selectedFilter: TodoFilter
     @Namespace private var animation
-    
+
     var body: some View {
         HStack(spacing: 8) {
             ForEach(TodoFilter.allCases, id: \.self) { filter in
@@ -28,9 +28,8 @@ struct FilterTabsView: View {
         .padding(6)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(.white)
-                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
-                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                .fill(Color.kumoElevated)
+                .stroke(Color.kumoLine, lineWidth: 0.5)
         )
     }
 }
@@ -40,19 +39,18 @@ struct FilterButton: View {
     let isSelected: Bool
     var namespace: Namespace.ID
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
-                .foregroundStyle(isSelected ? .white : Color.inactiveTabText)
+                .foregroundStyle(isSelected ? Color(.systemBackground) : Color.kumoStrong)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 10)
                 .background {
                     if isSelected {
                         RoundedRectangle(cornerRadius: 14)
-                            .fill(LinearGradient.filterButtonGradient)
-                            .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
+                            .fill(Color.kumoDefault)
                             .matchedGeometryEffect(id: "selectedTab", in: namespace)
                     }
                 }

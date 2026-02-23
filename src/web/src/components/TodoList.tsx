@@ -1,4 +1,4 @@
-import { Checkbox } from "@cloudflare/kumo";
+import { Button, Checkbox, Input } from "@cloudflare/kumo";
 import { useEffect, useRef, useState } from "react";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 
@@ -154,7 +154,7 @@ export function TodoList() {
           <div key={todo.id} className="py-3 group">
             {isEditing ? (
               <div className="space-y-3">
-                <input
+                <Input
                   ref={editInputRef}
                   type="text"
                   value={editTitle}
@@ -163,32 +163,35 @@ export function TodoList() {
                     if (e.key === "Enter") handleSaveEdit(todo.id);
                     if (e.key === "Escape") handleCancelEdit();
                   }}
-                  className="w-full bg-transparent text-surface text-sm border-b border-color pb-1 focus:outline-none focus:border-surface"
+                  className="w-full"
                   aria-label="Edit todo title"
+                  size="sm"
                 />
                 <div className="flex items-center justify-between">
-                  <input
+                  <Input
                     type="date"
                     value={editDueDate}
                     onChange={(e) => setEditDueDate(e.target.value)}
-                    className="bg-transparent text-muted text-xs border-b border-color pb-1 focus:outline-none focus:border-surface"
                     aria-label="Due date"
+                    size="sm"
                   />
-                  <div className="flex gap-3 text-xs">
-                    <button
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       type="button"
                       onClick={handleCancelEdit}
-                      className="text-muted hover:text-surface"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
                       type="button"
                       onClick={() => handleSaveEdit(todo.id)}
-                      className="text-surface font-medium"
                     >
                       Save
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -197,7 +200,7 @@ export function TodoList() {
                 <div className="pt-0.5">
                   <Checkbox
                     checked={todo.completed}
-                    onChange={() => handleToggle(todo.id, todo.completed)}
+                    onCheckedChange={() => handleToggle(todo.id, todo.completed)}
                     disabled={updateTodo.isPending}
                     aria-label={`Mark "${todo.title}" as ${todo.completed ? "incomplete" : "complete"}`}
                   />
@@ -220,26 +223,28 @@ export function TodoList() {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-                  <button
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     type="button"
                     onClick={() =>
                       handleEdit(todo.id, todo.title, todo.dueDate)
                     }
-                    className="text-muted hover:text-surface"
                     aria-label={`Edit "${todo.title}"`}
                   >
                     Edit
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary-destructive"
+                    size="sm"
                     type="button"
                     onClick={() => handleDelete(todo.id)}
                     disabled={deleteTodo.isPending}
-                    className="text-muted hover:text-error"
                     aria-label={`Delete "${todo.title}"`}
                   >
                     Delete
-                  </button>
+                  </Button>
                 </div>
               </div>
             )}

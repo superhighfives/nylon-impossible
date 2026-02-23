@@ -103,9 +103,15 @@ actor APIService {
                 }
             }
             
-            // Try milliseconds timestamp
+            // Try numeric timestamp (seconds or milliseconds)
             if let timestamp = try? container.decode(Double.self) {
-                return Date(timeIntervalSince1970: timestamp / 1000)
+                // D1 stores unix timestamps in seconds. Values below ~32B are seconds,
+                // values above are likely milliseconds.
+                if timestamp < 32_503_680_000 {
+                    return Date(timeIntervalSince1970: timestamp)
+                } else {
+                    return Date(timeIntervalSince1970: timestamp / 1000)
+                }
             }
             
             throw DecodingError.dataCorruptedError(

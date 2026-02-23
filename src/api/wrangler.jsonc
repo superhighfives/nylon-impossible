@@ -14,7 +14,8 @@
     {
       "binding": "DB",
       "database_name": "nylon-impossible-db",
-      "database_id": "effd712c-bc6e-4536-bddd-735b56502080"
+      "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+      "migrations_dir": "../web/migrations"
     }
   ],
   "observability": {

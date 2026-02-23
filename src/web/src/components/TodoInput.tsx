@@ -1,3 +1,4 @@
+import { Button, InputArea } from "@cloudflare/kumo";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -105,14 +106,14 @@ export function TodoInput() {
       )}
 
       <form onSubmit={handleQuickAdd}>
-        <textarea
+        <InputArea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="What needs to be done?"
           aria-label="New todo"
           disabled={createTodo.isPending}
           rows={text.includes("\n") ? 4 : 1}
-          className="w-full bg-transparent text-surface text-sm border-b border-color pb-2 focus:outline-none focus:border-surface placeholder:text-muted resize-none"
+          className="w-full resize-none"
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey && !text.includes("\n")) {
               e.preventDefault();
@@ -121,22 +122,24 @@ export function TodoInput() {
           }}
         />
 
-        <div className="flex gap-4 pt-2 text-xs">
-          <button
+        <div className="flex gap-2 pt-2">
+          <Button
+            variant="primary"
+            size="sm"
             type="submit"
             disabled={createTodo.isPending || !text.trim()}
-            className="text-surface font-medium disabled:text-muted disabled:cursor-not-allowed"
           >
             Add
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             type="button"
             onClick={handleExtract}
             disabled={!text.trim() || extractTodos.isPending}
-            className="text-muted hover:text-surface disabled:cursor-not-allowed"
           >
             Extract with AI
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -35,10 +35,11 @@ struct Nylon_ImpossibleApp: App {
 
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(Clerk.self) private var clerk
     @Environment(AuthService.self) private var authService
     var syncService: SyncService?
-    
+
     @State private var hasTriggeredInitialSync = false
     
     private var isSignedIn: Bool {
@@ -62,7 +63,10 @@ struct RootView: View {
                             triggerInitialSync()
                         }
                 } else {
-                    ContentView()
+                    ZStack {
+                        GradientBackground()
+                        ProgressView()
+                    }
                 }
             } else {
                 SignInView()
@@ -80,6 +84,19 @@ struct RootView: View {
                 hasTriggeredInitialSync = false
             }
         }
+        .onChange(of: scenePhase) { _, newPhase in
+            guard isSignedIn, let syncService else { return }
+
+            switch newPhase {
+            case .active:
+                Task { await syncService.sync() }
+                syncService.startPolling()
+            case .background, .inactive:
+                syncService.stopPolling()
+            @unknown default:
+                break
+            }
+        }
     }
     
     private func triggerInitialSync() {
@@ -94,6 +111,8 @@ struct RootView: View {
             await syncService.migrateLocalTodos()
             // Then sync with server
             await syncService.sync()
+            // Start polling for remote changes
+            syncService.startPolling()
         }
     }
 }

@@ -10,9 +10,9 @@ import SwiftUI
 struct TodoItemRow: View {
     let todo: TodoItem
     var onToggle: () -> Void
-    
+
     @State private var checkmarkScale: CGFloat = 1.0
-    
+
     var body: some View {
         HStack(spacing: 16) {
             // Checkbox
@@ -20,13 +20,13 @@ struct TodoItemRow: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     checkmarkScale = 1.3
                 }
-                
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     withAnimation(.spring(response: 0.2, dampingFraction: 0.6)) {
                         checkmarkScale = 1.0
                     }
                 }
-                
+
                 withAnimation(.easeInOut(duration: 0.2)) {
                     onToggle()
                 }
@@ -34,16 +34,16 @@ struct TodoItemRow: View {
                 ZStack {
                     Circle()
                         .stroke(
-                            todo.isCompleted ? Color.clear : Color.tertiaryGray,
+                            todo.isCompleted ? Color.clear : Color.kumoLine,
                             lineWidth: 2
                         )
                         .frame(width: 28, height: 28)
-                    
+
                     if todo.isCompleted {
                         Circle()
-                            .fill(LinearGradient.primaryGradient)
+                            .fill(Color.kumoBrand)
                             .frame(width: 28, height: 28)
-                        
+
                         Image(systemName: "checkmark")
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
@@ -52,21 +52,25 @@ struct TodoItemRow: View {
                 }
             }
             .buttonStyle(.plain)
-            
+
             // Task title
             Text(todo.title)
                 .font(.system(size: 16))
-                .foregroundStyle(todo.isCompleted ? Color.placeholderGray : .primary)
-                .strikethrough(todo.isCompleted, color: Color.placeholderGray)
+                .foregroundStyle(todo.isCompleted ? Color.kumoSubtle : Color.kumoDefault)
+                .strikethrough(todo.isCompleted, color: Color.kumoSubtle)
                 .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
-            
+
             Spacer()
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(.white)
+                .fill(Color.kumoElevated)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.kumoLine, lineWidth: 0.5)
         )
         .contentShape(Rectangle())
     }
