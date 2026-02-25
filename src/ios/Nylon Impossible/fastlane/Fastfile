@@ -29,7 +29,7 @@ platform :ios do
       project: "Nylon Impossible.xcodeproj",
       scheme: "Nylon Impossible",
       configuration: "Release",
-      export_method: "app-store-connect",
+      export_method: "app-store",
       xcargs: xcargs,
       cloned_source_packages_path: ENV["SPM_CACHE_PATH"],
       export_options: {
