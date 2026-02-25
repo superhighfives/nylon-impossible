@@ -79,8 +79,7 @@ platform :ios do
     upload_to_testflight(
       api_key: api_key,
       ipa: ipa_path,
-      skip_waiting_for_build_processing: true,
-      skip_submission: true
+      groups: ["Testers"]
     )
   end
 end
