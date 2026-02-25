@@ -44,8 +44,12 @@ jobs:
           PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
-          echo -n "$DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
-          echo -n "$PROVISIONING_PROFILE_BASE64" | base64 --decode -o $PROFILE_PATH
+          echo "$DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > $CERTIFICATE_PATH
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > $PROFILE_PATH
+
+          # Verify the profile decoded correctly
+          echo "Profile file size: $(wc -c < $PROFILE_PATH) bytes"
+          file $PROFILE_PATH
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
