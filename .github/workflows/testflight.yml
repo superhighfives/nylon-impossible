@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "src/ios/**"
+  pull_request:
+    types: [labeled]
   workflow_dispatch:
 
 concurrency:
@@ -13,6 +15,10 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'testflight')
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
