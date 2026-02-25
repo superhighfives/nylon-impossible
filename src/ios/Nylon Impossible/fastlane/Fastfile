@@ -13,12 +13,24 @@ platform :ios do
 
     build_number = ENV["BUILD_NUMBER"] || Time.now.to_i.to_s
 
+    # Write API key to a temp file for xcodebuild automatic signing
+    api_key_path = File.join(Dir.tmpdir, "AuthKey.p8")
+    File.write(api_key_path, ENV["APP_STORE_CONNECT_API_KEY_CONTENT"])
+
+    xcargs = [
+      "CURRENT_PROJECT_VERSION=#{build_number}",
+      "-allowProvisioningUpdates",
+      "-authenticationKeyPath #{api_key_path}",
+      "-authenticationKeyID #{ENV['APP_STORE_CONNECT_API_KEY_ID']}",
+      "-authenticationKeyIssuerID #{ENV['APP_STORE_CONNECT_API_ISSUER_ID']}"
+    ].join(" ")
+
     build_app(
       project: "Nylon Impossible.xcodeproj",
       scheme: "Nylon Impossible",
       configuration: "Release",
       export_method: "app-store",
-      xcargs: "CURRENT_PROJECT_VERSION=#{build_number}",
+      xcargs: xcargs,
       cloned_source_packages_path: ENV["SPM_CACHE_PATH"],
       export_options: {
         signingStyle: "automatic",
