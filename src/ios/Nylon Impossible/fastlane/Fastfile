@@ -32,10 +32,11 @@ platform :ios do
       export_method: "app-store",
       xcargs: xcargs,
       cloned_source_packages_path: ENV["SPM_CACHE_PATH"],
+      skip_profile_detection: true,
       export_options: {
         signingStyle: "manual",
         teamID: "TGHU37N6EX",
-        signingCertificate: "C8A612190D43F82BBA3CD3EEFE43EAA8A79EDF9E",
+        installerSigningCertificate: "Apple Distribution: David  Charles Gleason (TGHU37N6EX)",
         provisioningProfiles: {
           "com.superhighfives.Nylon-Impossible" => ENV["PROVISIONING_PROFILE_NAME"] || "Nylon Impossible AppStore"
         }
