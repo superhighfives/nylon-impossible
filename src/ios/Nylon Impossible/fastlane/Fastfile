@@ -13,26 +13,70 @@ platform :ios do
 
     build_number = ENV["BUILD_NUMBER"] || Time.now.to_i.to_s
 
-    build_app(
-      project: "Nylon Impossible.xcodeproj",
-      scheme: "Nylon Impossible",
-      configuration: "Release",
-      export_method: "app-store",
-      xcargs: "CURRENT_PROJECT_VERSION=#{build_number}",
-      cloned_source_packages_path: ENV["SPM_CACHE_PATH"],
-      skip_profile_detection: true,
-      export_options: {
-        signingStyle: "manual",
-        teamID: "TGHU37N6EX",
-        signingCertificate: "Apple Distribution",
-        provisioningProfiles: {
-          "com.superhighfives.Nylon-Impossible" => "Nylon Impossible AppStore"
-        }
-      }
+    # Write API key to temp file for xcodebuild auth
+    key_id = ENV["APP_STORE_CONNECT_API_KEY_ID"]
+    api_key_path = File.join(Dir.tmpdir, "AuthKey_#{key_id}.p8")
+    File.write(api_key_path, ENV["APP_STORE_CONNECT_API_KEY_CONTENT"])
+
+    archive_path = File.join(Dir.tmpdir, "NylonImpossible.xcarchive")
+    export_path = File.join(Dir.tmpdir, "NylonImpossible-export")
+    export_options_path = File.join(Dir.tmpdir, "ExportOptions.plist")
+
+    # Step 1: Archive WITH -allowProvisioningUpdates (automatic signing)
+    # sh() runs from fastlane/ dir, so project path needs ../
+    archive_cmd = [
+      "xcodebuild", "archive",
+      "-project", "../Nylon Impossible.xcodeproj",
+      "-scheme", "Nylon Impossible",
+      "-configuration", "Release",
+      "-archivePath", archive_path,
+      "-destination", "generic/platform=iOS",
+      "CURRENT_PROJECT_VERSION=#{build_number}",
+      "-allowProvisioningUpdates",
+      "-authenticationKeyID", key_id,
+      "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+      "-authenticationKeyPath", api_key_path
+    ]
+    if ENV["SPM_CACHE_PATH"]
+      archive_cmd += ["-clonedSourcePackagesDirPath", ENV["SPM_CACHE_PATH"]]
+    end
+    sh(*archive_cmd)
+
+    # Step 2: Export WITHOUT -allowProvisioningUpdates (manual signing)
+    File.write(export_options_path, <<~PLIST)
+      <?xml version="1.0" encoding="UTF-8"?>
+      <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+      <plist version="1.0">
+      <dict>
+        <key>method</key>
+        <string>app-store</string>
+        <key>signingStyle</key>
+        <string>manual</string>
+        <key>teamID</key>
+        <string>TGHU37N6EX</string>
+        <key>signingCertificate</key>
+        <string>Apple Distribution</string>
+        <key>provisioningProfiles</key>
+        <dict>
+          <key>com.superhighfives.Nylon-Impossible</key>
+          <string>Nylon Impossible AppStore</string>
+        </dict>
+      </dict>
+      </plist>
+    PLIST
+
+    sh(
+      "xcodebuild", "-exportArchive",
+      "-archivePath", archive_path,
+      "-exportOptionsPlist", export_options_path,
+      "-exportPath", export_path
     )
 
+    # Step 3: Upload to TestFlight
+    ipa_path = Dir.glob(File.join(export_path, "*.ipa")).first
     upload_to_testflight(
       api_key: api_key,
+      ipa: ipa_path,
       skip_waiting_for_build_processing: true,
       skip_submission: true
     )
