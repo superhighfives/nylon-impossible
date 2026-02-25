@@ -61,6 +61,10 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
+          # Debug: list signing identities in keychain
+          echo "=== Signing identities in keychain ==="
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
           # Install provisioning profile with its UUID as filename
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           # Extract UUID using grep on the binary (more reliable than security cms)

@@ -55,7 +55,7 @@ platform :ios do
         <key>teamID</key>
         <string>TGHU37N6EX</string>
         <key>signingCertificate</key>
-        <string>C8A612190D43F82BBA3CD3EEFE43EAA8A79EDF9E</string>
+        <string>Apple Distribution</string>
         <key>provisioningProfiles</key>
         <dict>
           <key>com.superhighfives.Nylon-Impossible</key>
