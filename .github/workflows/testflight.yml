@@ -63,9 +63,14 @@ jobs:
 
           # Install provisioning profile with its UUID as filename
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          PROFILE_UUID=$(security cms -D -i $PROFILE_PATH | plutil -extract UUID raw -)
+          # Extract UUID using grep on the binary (more reliable than security cms)
+          PROFILE_UUID=$(grep -a -o '[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}' $PROFILE_PATH | head -1)
           echo "Installing profile with UUID: $PROFILE_UUID"
           cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
+          # Verify installation
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+          # Show profile name for debugging
+          security cms -D -i $PROFILE_PATH 2>/dev/null | plutil -extract Name raw - 2>/dev/null || echo "Could not extract profile name"
 
       - name: Cache SPM packages
         uses: actions/cache@v4
@@ -88,7 +93,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           BUILD_NUMBER: ${{ github.run_number }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-        run: bundle exec fastlane beta
+        run: bundle exec fastlane beta --verbose
 
       - name: Clean up keychain
         if: always()
