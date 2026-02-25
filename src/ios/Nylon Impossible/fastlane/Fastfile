@@ -17,8 +17,8 @@ platform :ios do
     xcargs = [
       "CURRENT_PROJECT_VERSION=#{build_number}",
       "CODE_SIGN_STYLE=Manual",
-      "CODE_SIGN_IDENTITY=Apple Distribution: David  Charles Gleason (TGHU37N6EX)",
-      "PROVISIONING_PROFILE_SPECIFIER=Nylon Impossible AppStore"
+      "'CODE_SIGN_IDENTITY=Apple Distribution: David  Charles Gleason (TGHU37N6EX)'",
+      "'PROVISIONING_PROFILE_SPECIFIER=Nylon Impossible AppStore'"
     ].join(" ")
 
     build_app(
