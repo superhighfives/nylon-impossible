@@ -13,13 +13,18 @@ platform :ios do
 
     build_number = ENV["BUILD_NUMBER"] || Time.now.to_i.to_s
 
+    # Write API key to temp file for xcodebuild auth
+    key_id = ENV["APP_STORE_CONNECT_API_KEY_ID"]
+    api_key_path = File.join(Dir.tmpdir, "AuthKey_#{key_id}.p8")
+    File.write(api_key_path, ENV["APP_STORE_CONNECT_API_KEY_CONTENT"])
+
     archive_path = File.join(Dir.tmpdir, "NylonImpossible.xcarchive")
     export_path = File.join(Dir.tmpdir, "NylonImpossible-export")
     export_options_path = File.join(Dir.tmpdir, "ExportOptions.plist")
 
-    # Step 1: Archive with manual signing using distribution cert
-    # No -allowProvisioningUpdates needed — cert and profile are installed locally.
-    # CODE_SIGN_IDENTITY without PROVISIONING_PROFILE_SPECIFIER avoids breaking SPM targets.
+    # Step 1: Archive with automatic signing + -allowProvisioningUpdates
+    # Requires Apple Development cert in keychain. API key auth lets xcodebuild
+    # talk to App Store Connect for provisioning on CI.
     # sh() runs from fastlane/ dir, so project path needs ../
     archive_cmd = [
       "xcodebuild", "archive",
@@ -29,8 +34,10 @@ platform :ios do
       "-archivePath", archive_path,
       "-destination", "generic/platform=iOS",
       "CURRENT_PROJECT_VERSION=#{build_number}",
-      "CODE_SIGN_STYLE=Manual",
-      "CODE_SIGN_IDENTITY=Apple Distribution"
+      "-allowProvisioningUpdates",
+      "-authenticationKeyID", key_id,
+      "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
+      "-authenticationKeyPath", api_key_path
     ]
     if ENV["SPM_CACHE_PATH"]
       archive_cmd += ["-clonedSourcePackagesDirPath", ENV["SPM_CACHE_PATH"]]
