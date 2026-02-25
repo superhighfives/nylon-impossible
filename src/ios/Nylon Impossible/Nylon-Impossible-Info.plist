@@ -12,6 +12,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>more-unicorn-94.clerk.accounts.dev</string>
+				<string>clerk.nylonimpossible.com</string>
 			</array>
 		</dict>
 	</array>

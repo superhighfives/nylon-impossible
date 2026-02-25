@@ -50,3 +50,10 @@ src/ios/**/*.ipa
 src/ios/**/*.dSYM.zip
 src/ios/**/*.dSYM
 src/ios/**/Pods/
+
+# Fastlane
+src/ios/**/fastlane/report.xml
+src/ios/**/fastlane/Preview.html
+src/ios/**/fastlane/screenshots
+src/ios/**/fastlane/test_output
+src/ios/**/vendor/bundle
