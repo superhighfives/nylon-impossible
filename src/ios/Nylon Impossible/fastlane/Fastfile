@@ -33,12 +33,8 @@ platform :ios do
       xcargs: xcargs,
       cloned_source_packages_path: ENV["SPM_CACHE_PATH"],
       export_options: {
-        signingStyle: "manual",
-        teamID: "TGHU37N6EX",
-        signingCertificate: "Apple Distribution",
-        provisioningProfiles: {
-          "com.superhighfives.Nylon-Impossible" => ENV["PROVISIONING_PROFILE_NAME"] || "Nylon Impossible AppStore"
-        }
+        signingStyle: "automatic",
+        teamID: "TGHU37N6EX"
       }
     )
 
