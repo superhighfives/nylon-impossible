@@ -49,13 +49,13 @@ platform :ios do
       <plist version="1.0">
       <dict>
         <key>method</key>
-        <string>app-store</string>
+        <string>app-store-connect</string>
         <key>signingStyle</key>
         <string>manual</string>
         <key>teamID</key>
         <string>TGHU37N6EX</string>
         <key>signingCertificate</key>
-        <string>Apple Distribution</string>
+        <string>C8A612190D43F82BBA3CD3EEFE43EAA8A79EDF9E</string>
         <key>provisioningProfiles</key>
         <dict>
           <key>com.superhighfives.Nylon-Impossible</key>
