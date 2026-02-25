@@ -26,14 +26,26 @@ final class TodoViewModel {
     func filteredTodos(from todos: [TodoItem]) -> [TodoItem] {
         // Filter out soft-deleted items
         let activeTodos = todos.filter { !$0.isDeleted }
-        
+
+        let filtered: [TodoItem]
         switch selectedFilter {
         case .all:
-            return activeTodos
+            filtered = activeTodos
         case .active:
-            return activeTodos.filter { !$0.isCompleted }
+            filtered = activeTodos.filter { !$0.isCompleted }
         case .done:
-            return activeTodos.filter { $0.isCompleted }
+            filtered = activeTodos.filter { $0.isCompleted }
+        }
+
+        // Sort: incomplete first (by createdAt desc), then completed (most recently completed first)
+        return filtered.sorted { a, b in
+            if a.isCompleted != b.isCompleted {
+                return !a.isCompleted
+            }
+            if a.isCompleted {
+                return a.updatedAt > b.updatedAt
+            }
+            return a.createdAt > b.createdAt
         }
     }
     

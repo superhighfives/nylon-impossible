@@ -133,13 +133,18 @@ export function TodoList() {
     deleteTodo.mutate(id);
   };
 
-  // Sort: incomplete first, then by due date
+  // Sort: incomplete first (by due date), then completed (most recently completed first)
   const sortedTodos = [...todos].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     if (!a.completed) {
       const aDue = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
       const bDue = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
       if (aDue !== bDue) return aDue - bDue;
+    }
+    if (a.completed) {
+      const aUpdated = new Date(a.updatedAt).getTime();
+      const bUpdated = new Date(b.updatedAt).getTime();
+      return bUpdated - aUpdated;
     }
     return 0;
   });
