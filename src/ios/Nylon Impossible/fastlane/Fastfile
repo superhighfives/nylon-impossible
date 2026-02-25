@@ -35,6 +35,7 @@ platform :ios do
       export_options: {
         signingStyle: "manual",
         teamID: "TGHU37N6EX",
+        signingCertificate: "Apple Distribution",
         provisioningProfiles: {
           "com.superhighfives.Nylon-Impossible" => ENV["PROVISIONING_PROFILE_NAME"] || "Nylon Impossible AppStore"
         }
