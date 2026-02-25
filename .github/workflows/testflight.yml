@@ -57,8 +57,11 @@ jobs:
             -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
+          # Install provisioning profile with its UUID as filename
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          PROFILE_UUID=$(security cms -D -i $PROFILE_PATH | plutil -extract UUID raw -)
+          echo "Installing profile with UUID: $PROFILE_UUID"
+          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
 
       - name: Cache SPM packages
         uses: actions/cache@v4
