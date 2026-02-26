@@ -31,6 +31,7 @@ src/web/.vinxi/
 src/web/dist/
 src/web/dist-ssr/
 *.local
+*.tsbuildinfo
 
 # iOS
 src/ios/**/xcuserdata/
