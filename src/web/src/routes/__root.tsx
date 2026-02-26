@@ -61,7 +61,12 @@ function RootDocument() {
         />
       </head>
         <body className="bg-surface text-surface antialiased">
-        <ClerkProvider domain="nylonimpossible.com">
+        <ClerkProvider
+          allowedRedirectOrigins={[
+            "https://nylonimpossible.com",
+            /https:\/\/.*\.superhighfives\.workers\.dev/,
+          ]}
+        >
           <Header />
           <Outlet />
           <TanStackDevtools

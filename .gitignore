@@ -1,9 +1,6 @@
-# OS files
+# OS
 .DS_Store
 Thumbs.db
-
-# Cloudflare
-.wrangler/
 
 # IDE
 .idea/
@@ -12,25 +9,33 @@ Thumbs.db
 *.swo
 .windsurf/
 
-# pnpm
+# Dependencies
 node_modules/
 pnpm-lock.yaml
+package-lock.json
 
-# API
-src/api/.env
-src/api/.dev.vars
+# Environment / secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+!.dev.vars.example
 
-# Web (Node.js)
-src/web/.env
-src/web/.dev.vars
-src/web/.nitro/
-src/web/.tanstack/
-src/web/.wrangler/
-src/web/.output/
-src/web/.vinxi/
-src/web/dist/
-src/web/dist-ssr/
+# Build artifacts
+dist/
+dist-ssr/
+*.tsbuildinfo
 *.local
+*.log
+
+# Cloudflare
+.wrangler/
+.output/
+.nitro/
+.vinxi/
+
+# TanStack
+.tanstack/
 
 # iOS
 src/ios/**/xcuserdata/

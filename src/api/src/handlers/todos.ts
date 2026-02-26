@@ -12,6 +12,7 @@ const createTodoSchema = z.object({
 const updateTodoSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   completed: z.boolean().optional(),
+  position: z.string().optional(),
   updatedAt: z.coerce.date().optional(),
 });
 
@@ -95,6 +96,9 @@ export async function updateTodo(
   }
   if (parsed.data.completed !== undefined) {
     updates.completed = parsed.data.completed;
+  }
+  if (parsed.data.position !== undefined) {
+    updates.position = parsed.data.position;
   }
 
   await db.update(todos).set(updates).where(eq(todos.id, todoId));

@@ -14,15 +14,15 @@ struct ContentView: View {
     @Environment(SyncService.self) private var syncService
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
-    
-    private var filteredTodos: [TodoItem] {
-        viewModel.filteredTodos(from: todos)
+
+    private var sortedTodosList: [TodoItem] {
+        viewModel.sortedTodos(from: todos)
     }
-    
+
     var body: some View {
         ZStack {
             GradientBackground()
-            
+
             VStack(spacing: 24) {
                 HeaderView(
                     onSignOut: {
@@ -30,21 +30,19 @@ struct ContentView: View {
                     },
                     syncState: syncService.state
                 )
-                
+
                 AddTaskInputView(
                     text: $viewModel.newTaskText,
                     canAdd: viewModel.canAddTask
                 ) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        viewModel.addTodo(context: modelContext, userId: authService.userId)
+                        viewModel.addTodo(context: modelContext, userId: authService.userId, allTodos: todos)
                     }
                     syncService.syncAfterAction()
                 }
-                
-                FilterTabsView(selectedFilter: $viewModel.selectedFilter)
-                
+
                 // Task list or empty state
-                if filteredTodos.isEmpty {
+                if sortedTodosList.isEmpty {
                     ScrollView {
                         EmptyStateView()
                             .transition(.opacity)
@@ -56,34 +54,32 @@ struct ContentView: View {
             }
             .padding(.horizontal, 16)
         }
-        .animation(.easeInOut(duration: 0.3), value: filteredTodos.count)
+        .animation(.easeInOut(duration: 0.3), value: sortedTodosList.count)
         .refreshable {
             await syncService.sync()
         }
     }
-    
+
     private var taskListView: some View {
-        List {
-            ForEach(filteredTodos) { todo in
-                TodoItemRow(todo: todo) {
-                    viewModel.toggleTodo(todo)
+        let incomplete = sortedTodosList.filter { !$0.isCompleted }
+        let completed = sortedTodosList.filter { $0.isCompleted }
+
+        return List {
+            Section {
+                ForEach(incomplete) { todo in
+                    todoRow(todo)
+                }
+                .onMove { source, destination in
+                    viewModel.moveTodo(from: source, to: destination, in: sortedTodosList)
                     syncService.syncAfterAction()
                 }
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
-                .transition(.asymmetric(
-                    insertion: .move(edge: .top).combined(with: .opacity),
-                    removal: .move(edge: .trailing).combined(with: .opacity)
-                ))
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            viewModel.deleteTodo(todo, context: modelContext)
-                        }
-                        syncService.syncAfterAction()
-                    } label: {
-                        Label("Delete", systemImage: "trash")
+                .deleteDisabled(true)
+            }
+
+            if !completed.isEmpty {
+                Section {
+                    ForEach(completed) { todo in
+                        todoRow(todo)
                     }
                 }
             }
@@ -91,6 +87,32 @@ struct ContentView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
+        .environment(\.editMode, .constant(.active))
+    }
+
+    @ViewBuilder
+    private func todoRow(_ todo: TodoItem) -> some View {
+        TodoItemRow(todo: todo) {
+            viewModel.toggleTodo(todo)
+            syncService.syncAfterAction()
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+        .transition(.asymmetric(
+            insertion: .move(edge: .top).combined(with: .opacity),
+            removal: .move(edge: .trailing).combined(with: .opacity)
+        ))
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    viewModel.deleteTodo(todo, context: modelContext)
+                }
+                syncService.syncAfterAction()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
     }
 }
 

@@ -18,12 +18,14 @@ final class TodoItem {
     var updatedAt: Date           // For sync conflict resolution
     var isSynced: Bool            // Whether this item has been synced to server
     var isDeleted: Bool           // Soft delete for sync
-    
-    init(title: String, userId: String? = nil) {
+    var position: String = "a0"   // Fractional index for ordering
+
+    init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
         self.userId = userId
         self.title = title
         self.isCompleted = false
+        self.position = position
         self.createdAt = Date()
         self.updatedAt = Date()
         self.isSynced = false
