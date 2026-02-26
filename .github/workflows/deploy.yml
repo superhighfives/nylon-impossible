@@ -1,0 +1,212 @@
+name: Deploy Workers
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/web/**"
+      - "src/api/**"
+      - "package.json"
+      - ".github/workflows/deploy.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "src/web/**"
+      - "src/api/**"
+      - "package.json"
+      - ".github/workflows/deploy.yml"
+
+concurrency:
+  group: deploy-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-production:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Deploy API
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/api
+          command: deploy
+
+      - name: Deploy Web
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/web
+          command: deploy
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+
+  deploy-preview:
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Generate preview config for API
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('src/api/wrangler.jsonc', 'utf8');
+            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            const config = JSON.parse(stripped);
+            config.name = `nylon-impossible-api-pr-${context.payload.pull_request.number}`;
+            delete config.routes;
+            delete config['$schema'];
+            fs.writeFileSync('src/api/wrangler-preview.json', JSON.stringify(config, null, 2));
+
+      - name: Generate preview config for Web
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const raw = fs.readFileSync('src/web/wrangler.jsonc', 'utf8');
+            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            const config = JSON.parse(stripped);
+            config.name = `nylon-impossible-pr-${context.payload.pull_request.number}`;
+            delete config.routes;
+            delete config['$schema'];
+            fs.writeFileSync('src/web/wrangler-preview.json', JSON.stringify(config, null, 2));
+
+      - name: Deploy preview API
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/api
+          command: deploy --config wrangler-preview.json
+          secrets: |
+            CLERK_SECRET_KEY
+            CLERK_PUBLISHABLE_KEY
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+
+      - name: Deploy preview Web
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/web
+          command: deploy --config wrangler-preview.json
+          secrets: |
+            CLERK_SECRET_KEY
+            VITE_CLERK_PUBLISHABLE_KEY
+        env:
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+
+      - name: Comment preview URLs on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request.number;
+            const accountSubdomain = '${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}';
+            const suffix = accountSubdomain ? `.${accountSubdomain}.workers.dev` : `.workers.dev`;
+            const webUrl = `https://nylon-impossible-pr-${prNumber}${suffix}`;
+            const apiUrl = `https://nylon-impossible-api-pr-${prNumber}${suffix}`;
+
+            const body = [
+              `### Preview Deployment`,
+              ``,
+              `| Worker | URL |`,
+              `|--------|-----|`,
+              `| Web | ${webUrl} |`,
+              `| API | ${apiUrl} |`,
+              ``,
+              `_Deployed from ${context.sha.substring(0, 7)}_`,
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+
+            const existing = comments.find(
+              (c) => c.user.type === 'Bot' && c.body.includes('Preview Deployment')
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body,
+              });
+            }
+
+  cleanup-preview:
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Delete preview API worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: delete --name nylon-impossible-api-pr-${{ github.event.pull_request.number }} --force
+        continue-on-error: true
+
+      - name: Delete preview Web worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: delete --name nylon-impossible-pr-${{ github.event.pull_request.number }} --force
+        continue-on-error: true
