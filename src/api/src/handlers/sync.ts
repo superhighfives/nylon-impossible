@@ -1,5 +1,6 @@
 import { z } from "zod/v4";
 import { createClerkClient } from "@clerk/backend";
+import { generateKeyBetween } from "fractional-indexing";
 import { getDb, users, todos, eq, and, gt } from "../lib/db";
 import { json, error } from "../lib/response";
 import type { Env, AuthenticatedRequest } from "../types";
@@ -12,6 +13,7 @@ const syncRequestSchema = z.object({
       id: z.string().uuid(),
       title: z.string().min(1).max(500).optional(),
       completed: z.boolean().optional(),
+      position: z.string().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
     })
@@ -104,6 +106,7 @@ export async function syncTodos(
           .set({
             title: change.title ?? existing.title,
             completed: change.completed ?? existing.completed,
+            position: change.position ?? existing.position,
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
@@ -123,6 +126,7 @@ export async function syncTodos(
           userId: req.userId,
           title: change.title,
           completed: change.completed ?? false,
+          position: change.position ?? generateKeyBetween(null, null),
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });

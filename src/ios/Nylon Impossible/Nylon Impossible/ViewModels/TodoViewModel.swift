@@ -8,61 +8,75 @@
 import Foundation
 import SwiftData
 
-enum TodoFilter: String, CaseIterable {
-    case all = "All"
-    case active = "Active"
-    case done = "Done"
-}
-
 @Observable
 final class TodoViewModel {
     var newTaskText: String = ""
-    var selectedFilter: TodoFilter = .all
-    
+
     var canAddTask: Bool {
         !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
-    
-    func filteredTodos(from todos: [TodoItem]) -> [TodoItem] {
+
+    func sortedTodos(from todos: [TodoItem]) -> [TodoItem] {
         // Filter out soft-deleted items
         let activeTodos = todos.filter { !$0.isDeleted }
 
-        let filtered: [TodoItem]
-        switch selectedFilter {
-        case .all:
-            filtered = activeTodos
-        case .active:
-            filtered = activeTodos.filter { !$0.isCompleted }
-        case .done:
-            filtered = activeTodos.filter { $0.isCompleted }
-        }
-
-        // Sort: incomplete first (by createdAt desc), then completed (most recently completed first)
-        return filtered.sorted { a, b in
+        // Sort: incomplete first (by position asc), then completed (most recently completed first)
+        return activeTodos.sorted { a, b in
             if a.isCompleted != b.isCompleted {
                 return !a.isCompleted
             }
-            if a.isCompleted {
-                return a.updatedAt > b.updatedAt
+            if !a.isCompleted {
+                return a.position < b.position
             }
-            return a.createdAt > b.createdAt
+            // Completed: most recently completed first
+            return a.updatedAt > b.updatedAt
         }
     }
-    
-    func addTodo(context: ModelContext, userId: String?) {
+
+    func addTodo(context: ModelContext, userId: String?, allTodos: [TodoItem]) {
         let trimmedText = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedText.isEmpty else { return }
-        
-        let todo = TodoItem(title: trimmedText, userId: userId)
+
+        // Find the last position among incomplete todos
+        let lastPosition = allTodos
+            .filter { !$0.isDeleted && !$0.isCompleted }
+            .map { $0.position }
+            .sorted()
+            .last
+
+        let position = generateKeyBetween(lastPosition, nil)
+
+        let todo = TodoItem(title: trimmedText, userId: userId, position: position)
         context.insert(todo)
         newTaskText = ""
     }
-    
+
+    func moveTodo(from source: IndexSet, to destination: Int, in todos: [TodoItem]) {
+        // Only operate on incomplete todos sorted by position
+        var incomplete = todos.filter { !$0.isDeleted && !$0.isCompleted }
+            .sorted { $0.position < $1.position }
+
+        incomplete.move(fromOffsets: source, toOffset: destination)
+
+        // Determine the moved item's new index
+        guard let sourceIndex = source.first else { return }
+        let actualDestination = destination > sourceIndex ? destination - 1 : destination
+
+        let movedItem = incomplete[actualDestination]
+        let prevPosition: String? = actualDestination > 0
+            ? incomplete[actualDestination - 1].position : nil
+        let nextPosition: String? = actualDestination < incomplete.count - 1
+            ? incomplete[actualDestination + 1].position : nil
+
+        movedItem.position = generateKeyBetween(prevPosition, nextPosition)
+        movedItem.markModified()
+    }
+
     func toggleTodo(_ todo: TodoItem) {
         todo.isCompleted.toggle()
         todo.markModified()
     }
-    
+
     func deleteTodo(_ todo: TodoItem, context: ModelContext) {
         // Soft delete for sync - mark as deleted rather than removing
         if todo.userId != nil {

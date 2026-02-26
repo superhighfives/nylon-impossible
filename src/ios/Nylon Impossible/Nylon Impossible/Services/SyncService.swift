@@ -182,6 +182,7 @@ final class SyncService {
                 id: todo.id.uuidString.lowercased(),
                 title: todo.isDeleted ? nil : todo.title,
                 completed: todo.isDeleted ? nil : todo.isCompleted,
+                position: todo.isDeleted ? nil : todo.position,
                 updatedAt: todo.updatedAt,
                 deleted: todo.isDeleted ? true : nil
             )
@@ -220,13 +221,14 @@ final class SyncService {
                 if remote.updatedAt > local.updatedAt {
                     local.title = remote.title
                     local.isCompleted = remote.completed
+                    local.position = remote.position ?? local.position
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
                 // If local is newer, it will be synced on next sync
             } else {
                 // New remote item - create locally
-                let todo = TodoItem(title: remote.title, userId: userId)
+                let todo = TodoItem(title: remote.title, userId: userId, position: remote.position ?? "a0")
                 todo.id = remoteId
                 todo.isCompleted = remote.completed
                 todo.createdAt = remote.createdAt
