@@ -114,11 +114,12 @@ jobs:
 
       - name: Upload preview Web secrets
         working-directory: src/web
-        run: echo "$SECRETS_JSON" | pnpm exec wrangler secret bulk
+        run: node -e "console.log(JSON.stringify({CLERK_SECRET_KEY:process.env.CLERK_SECRET_KEY,VITE_CLERK_PUBLISHABLE_KEY:process.env.VITE_CLERK_PUBLISHABLE_KEY}))" | pnpm exec wrangler secret bulk
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          SECRETS_JSON: ${{ format('{{}"CLERK_SECRET_KEY":"{0}","VITE_CLERK_PUBLISHABLE_KEY":"{1}"{}}', secrets.CLERK_SECRET_KEY, secrets.VITE_CLERK_PUBLISHABLE_KEY) }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: Deploy preview Web
         working-directory: src/web
