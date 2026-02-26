@@ -346,7 +346,11 @@ export function TodoList() {
   const sortedTodos = [...todos].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     if (!a.completed) {
-      return (a.position ?? "a0").localeCompare(b.position ?? "a0");
+      const aPos = a.position ?? "a0";
+      const bPos = b.position ?? "a0";
+      if (aPos < bPos) return -1;
+      if (aPos > bPos) return 1;
+      return 0;
     }
     const aUpdated = new Date(a.updatedAt).getTime();
     const bUpdated = new Date(b.updatedAt).getTime();
