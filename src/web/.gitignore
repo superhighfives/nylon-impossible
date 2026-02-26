@@ -1,14 +1,1 @@
-node_modules
-.DS_Store
-dist
-dist-ssr
-*.local
-count.txt
-.env
-.dev.vars
-.nitro
-.tanstack
-.wrangler
-.output
-.vinxi
-todos.json
+wrangler-preview.json
