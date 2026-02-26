@@ -93,12 +93,17 @@ jobs:
             const fs = require('fs');
             const pr = context.payload.pull_request.number;
 
-            for (const [dir, name] of [['src/api', `nylon-impossible-api-pr-${pr}`], ['src/web', `nylon-impossible-pr-${pr}`]]) {
+            const previews = [
+              ['src/api', `nylon-impossible-api-pr-${pr}`, `api-pr-${pr}.nylonimpossible.com`],
+              ['src/web', `nylon-impossible-pr-${pr}`, `pr-${pr}.nylonimpossible.com`],
+            ];
+
+            for (const [dir, name, domain] of previews) {
               const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
               const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
               const config = JSON.parse(stripped);
               config.name = name;
-              delete config.routes;
+              config.routes = [{ pattern: domain, custom_domain: true }];
               fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
             }
 
@@ -142,8 +147,8 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const webUrl = `https://nylon-impossible-pr-${prNumber}.superhighfives.workers.dev`;
-            const apiUrl = `https://nylon-impossible-api-pr-${prNumber}.superhighfives.workers.dev`;
+            const webUrl = `https://pr-${prNumber}.nylonimpossible.com`;
+            const apiUrl = `https://api-pr-${prNumber}.nylonimpossible.com`;
 
             const body = [
               `### Preview Deployment`,
