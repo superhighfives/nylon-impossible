@@ -10,7 +10,7 @@ This is a monorepo managed with pnpm workspaces:
 src/
   web/   - Full-stack web application (TanStack Start + Cloudflare Workers)
   ios/   - Native iOS application (SwiftUI + SwiftData)
-  api/   - REST API Worker (Cloudflare Workers) [planned]
+  api/   - REST API Worker (Cloudflare Workers)
 ```
 
 ## Architecture
@@ -76,6 +76,23 @@ pnpm web:build    # Build for production
 pnpm web:test     # Run tests
 pnpm web:deploy   # Deploy to Cloudflare
 pnpm web:db:studio # Open Drizzle Studio
+```
+
+## API
+
+The API worker is a lightweight REST API for iOS clients featuring:
+
+- Cloudflare Workers + D1 database (shared with web)
+- Clerk JWT verification for authentication
+- REST endpoints for todo CRUD
+- Bidirectional sync endpoint for offline-first iOS client
+
+**Commands:**
+
+```bash
+pnpm api:dev      # Start dev server
+pnpm api:deploy   # Deploy to Cloudflare
+pnpm api:db:migrate # Apply migrations locally
 ```
 
 ## iOS
