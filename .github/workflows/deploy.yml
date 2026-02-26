@@ -84,31 +84,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Generate preview config for API
+      - name: Rewrite wrangler configs for preview
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const raw = fs.readFileSync('src/api/wrangler.jsonc', 'utf8');
-            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
-            const config = JSON.parse(stripped);
-            config.name = `nylon-impossible-api-pr-${context.payload.pull_request.number}`;
-            delete config.routes;
-            delete config['$schema'];
-            fs.writeFileSync('src/api/wrangler-preview.json', JSON.stringify(config, null, 2));
+            const pr = context.payload.pull_request.number;
 
-      - name: Generate preview config for Web
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const raw = fs.readFileSync('src/web/wrangler.jsonc', 'utf8');
-            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
-            const config = JSON.parse(stripped);
-            config.name = `nylon-impossible-pr-${context.payload.pull_request.number}`;
-            delete config.routes;
-            delete config['$schema'];
-            fs.writeFileSync('src/web/wrangler-preview.json', JSON.stringify(config, null, 2));
+            for (const [dir, name] of [['src/api', `nylon-impossible-api-pr-${pr}`], ['src/web', `nylon-impossible-pr-${pr}`]]) {
+              const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
+              const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+              const config = JSON.parse(stripped);
+              config.name = name;
+              delete config.routes;
+              fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
+            }
 
       - name: Deploy preview API
         uses: cloudflare/wrangler-action@v3
@@ -116,7 +106,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy --config wrangler-preview.json
+          command: deploy
           secrets: |
             CLERK_SECRET_KEY
             CLERK_PUBLISHABLE_KEY
@@ -130,7 +120,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/web
-          command: deploy --config wrangler-preview.json
+          command: deploy
           secrets: |
             CLERK_SECRET_KEY
             VITE_CLERK_PUBLISHABLE_KEY
