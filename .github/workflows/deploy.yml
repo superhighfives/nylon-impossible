@@ -142,10 +142,8 @@ jobs:
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const accountSubdomain = '${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}';
-            const suffix = accountSubdomain ? `.${accountSubdomain}.workers.dev` : `.workers.dev`;
-            const webUrl = `https://nylon-impossible-pr-${prNumber}${suffix}`;
-            const apiUrl = `https://nylon-impossible-api-pr-${prNumber}${suffix}`;
+            const webUrl = `https://nylon-impossible-pr-${prNumber}.superhighfives.workers.dev`;
+            const apiUrl = `https://nylon-impossible-api-pr-${prNumber}.superhighfives.workers.dev`;
 
             const body = [
               `### Preview Deployment`,
