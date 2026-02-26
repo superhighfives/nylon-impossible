@@ -32,6 +32,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'src/api/**'
+              - 'package.json'
+              - '.github/workflows/deploy.yml'
+            web:
+              - 'src/web/**'
+              - 'package.json'
+              - '.github/workflows/deploy.yml'
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
@@ -44,6 +58,7 @@ jobs:
         run: pnpm install
 
       - name: Deploy API
+        if: steps.changes.outputs.api == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -52,11 +67,13 @@ jobs:
           command: deploy
 
       - name: Build Web
+        if: steps.changes.outputs.web == 'true'
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: Deploy Web
+        if: steps.changes.outputs.web == 'true'
         working-directory: src/web
         run: pnpm exec wrangler deploy
         env:
@@ -75,6 +92,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Detect changes
+        uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            api:
+              - 'src/api/**'
+              - 'package.json'
+              - '.github/workflows/deploy.yml'
+            web:
+              - 'src/web/**'
+              - 'package.json'
+              - '.github/workflows/deploy.yml'
+
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
@@ -86,28 +117,42 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Rewrite wrangler configs for preview
+      - name: Rewrite API wrangler config for preview
+        if: steps.changes.outputs.api == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
             const pr = context.payload.pull_request.number;
+            const dir = 'src/api';
+            const name = `nylon-impossible-api-pr-${pr}`;
+            const domain = `api-pr-${pr}.nylonimpossible.com`;
+            const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
+            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            const config = JSON.parse(stripped);
+            config.name = name;
+            config.routes = [{ pattern: domain, custom_domain: true }];
+            fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
 
-            const previews = [
-              ['src/api', `nylon-impossible-api-pr-${pr}`, `api-pr-${pr}.nylonimpossible.com`],
-              ['src/web', `nylon-impossible-pr-${pr}`, `pr-${pr}.nylonimpossible.com`],
-            ];
-
-            for (const [dir, name, domain] of previews) {
-              const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
-              const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
-              const config = JSON.parse(stripped);
-              config.name = name;
-              config.routes = [{ pattern: domain, custom_domain: true }];
-              fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
-            }
+      - name: Rewrite Web wrangler config for preview
+        if: steps.changes.outputs.web == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const pr = context.payload.pull_request.number;
+            const dir = 'src/web';
+            const name = `nylon-impossible-pr-${pr}`;
+            const domain = `pr-${pr}.nylonimpossible.com`;
+            const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
+            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            const config = JSON.parse(stripped);
+            config.name = name;
+            config.routes = [{ pattern: domain, custom_domain: true }];
+            fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
 
       - name: Deploy preview API
+        if: steps.changes.outputs.api == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -122,6 +167,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Upload preview Web secrets
+        if: steps.changes.outputs.web == 'true'
         working-directory: src/web
         run: node -e "console.log(JSON.stringify({CLERK_SECRET_KEY:process.env.CLERK_SECRET_KEY,VITE_CLERK_PUBLISHABLE_KEY:process.env.VITE_CLERK_PUBLISHABLE_KEY}))" | pnpm exec wrangler secret bulk
         env:
@@ -131,11 +177,13 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: Build preview Web
+        if: steps.changes.outputs.web == 'true'
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: Deploy preview Web
+        if: steps.changes.outputs.web == 'true'
         working-directory: src/web
         run: pnpm exec wrangler deploy
         env:
@@ -150,13 +198,16 @@ jobs:
             const webUrl = `https://pr-${prNumber}.nylonimpossible.com`;
             const apiUrl = `https://api-pr-${prNumber}.nylonimpossible.com`;
 
+            const apiChanged = '${{ steps.changes.outputs.api }}' === 'true';
+            const webChanged = '${{ steps.changes.outputs.web }}' === 'true';
+
             const body = [
               `### Preview Deployment`,
               ``,
-              `| Worker | URL |`,
-              `|--------|-----|`,
-              `| Web | ${webUrl} |`,
-              `| API | ${apiUrl} |`,
+              `| Worker | URL | Status |`,
+              `|--------|-----|--------|`,
+              `| API | ${apiUrl} | ${apiChanged ? 'Deployed' : 'Skipped (unchanged)'} |`,
+              `| Web | ${webUrl} | ${webChanged ? 'Deployed' : 'Skipped (unchanged)'} |`,
               ``,
               `_Deployed from ${context.sha.substring(0, 7)}_`,
             ].join('\n');
