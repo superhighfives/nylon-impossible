@@ -1,6 +1,12 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, useCallback, useContext, useEffect, useRef } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+} from "react";
 
 const TODOS_QUERY_KEY = ["todos"];
 
@@ -30,7 +36,9 @@ export function useWebSocketConnection(): WebSocketSync {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectDelayRef = useRef(INITIAL_RECONNECT_DELAY);
   const mountedRef = useRef(true);
-  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   const notifyChanged = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

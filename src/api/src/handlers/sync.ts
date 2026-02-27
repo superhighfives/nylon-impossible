@@ -1,8 +1,8 @@
-import { z } from "zod/v4";
-import type { Context } from "hono";
 import { createClerkClient } from "@clerk/backend";
 import { generateKeyBetween } from "fractional-indexing";
-import { getDb, users, todos, eq, and, gt } from "../lib/db";
+import type { Context } from "hono";
+import { z } from "zod/v4";
+import { and, eq, getDb, gt, type Todo, todos, users } from "../lib/db";
 import type { Env } from "../types";
 
 // Sync request schema
@@ -16,7 +16,7 @@ const syncRequestSchema = z.object({
       position: z.string().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
-    })
+    }),
   ),
 });
 
@@ -133,7 +133,7 @@ export async function syncTodos(c: Context<Env>) {
   }
 
   // 2. Fetch all todos updated since lastSyncedAt (or all if first sync)
-  let serverTodos;
+  let serverTodos: Todo[];
   if (lastSyncedAt) {
     serverTodos = await db
       .select()

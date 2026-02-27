@@ -1,6 +1,6 @@
-import { z } from "zod/v4";
 import type { Context } from "hono";
-import { getDb, todos, eq, and } from "../lib/db";
+import { z } from "zod/v4";
+import { and, eq, getDb, todos } from "../lib/db";
 import type { Env } from "../types";
 
 // Validation schemas

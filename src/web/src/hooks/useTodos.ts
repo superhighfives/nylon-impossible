@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ExtractedTodo } from "@/lib/ai-types";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
+import type { ExtractedTodo } from "@/lib/ai-types";
 import { extractTodosFromText } from "@/server/ai";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";

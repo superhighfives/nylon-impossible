@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WebSocketSyncContext } from "@/hooks/useWebSocket";
+import { type RenderOptions, render } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { render, type RenderOptions } from "@testing-library/react";
+import { WebSocketSyncContext } from "@/hooks/useWebSocket";
 
 export function createTestQueryClient() {
   return new QueryClient({

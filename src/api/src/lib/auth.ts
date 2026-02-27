@@ -1,5 +1,5 @@
-import { createMiddleware } from "hono/factory";
 import { verifyToken } from "@clerk/backend";
+import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
 
 export interface AuthResult {
@@ -8,7 +8,7 @@ export interface AuthResult {
 
 export async function verifyClerkJWT(
   authHeader: string | null,
-  env: { CLERK_SECRET_KEY: string }
+  env: { CLERK_SECRET_KEY: string },
 ): Promise<AuthResult | null> {
   if (!authHeader?.startsWith("Bearer ")) {
     return null;
@@ -34,7 +34,7 @@ export async function verifyClerkJWT(
 export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   const auth = await verifyClerkJWT(
     c.req.header("Authorization") ?? null,
-    c.env
+    c.env,
   );
 
   if (!auth) {

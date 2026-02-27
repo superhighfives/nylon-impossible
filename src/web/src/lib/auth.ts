@@ -1,8 +1,8 @@
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { Context, Effect, Layer } from "effect";
 import type { DbClient } from "./db";
-import { users } from "./schema";
 import { UnauthorizedError, UserNotFoundError } from "./errors";
+import { users } from "./schema";
 
 /**
  * User type returned by auth service

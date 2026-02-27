@@ -1,8 +1,13 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { verifyClerkJWT, authMiddleware } from "./lib/auth";
-import { listTodos, createTodo, updateTodo, deleteTodo } from "./handlers/todos";
 import { syncTodos } from "./handlers/sync";
+import {
+  createTodo,
+  deleteTodo,
+  listTodos,
+  updateTodo,
+} from "./handlers/todos";
+import { authMiddleware, verifyClerkJWT } from "./lib/auth";
 import type { Env } from "./types";
 
 export { UserSync } from "./durable-objects/UserSync";
@@ -17,7 +22,7 @@ app.use(
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
-  })
+  }),
 );
 
 // Health check
@@ -31,10 +36,7 @@ app.get("/ws", async (c) => {
   }
 
   const token = c.req.query("token");
-  const auth = await verifyClerkJWT(
-    token ? `Bearer ${token}` : null,
-    c.env
-  );
+  const auth = await verifyClerkJWT(token ? `Bearer ${token}` : null, c.env);
 
   if (!auth) {
     return c.json({ error: "Unauthorized" }, 401);

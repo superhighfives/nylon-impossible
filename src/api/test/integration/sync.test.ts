@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
-import { seedUser, cleanDb } from "../helpers";
+import { beforeEach, describe, expect, it } from "vitest";
+import { cleanDb, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
-const mockVerifyToken = verifyToken as ReturnType<typeof import("vitest")["vi"]["fn"]>;
+const mockVerifyToken = verifyToken as ReturnType<
+  typeof import("vitest")["vi"]["fn"]
+>;
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 

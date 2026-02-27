@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
-import { seedUser, cleanDb } from "../helpers";
+import { beforeEach, describe, expect, it } from "vitest";
+import { cleanDb, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
-const mockVerifyToken = verifyToken as ReturnType<typeof import("vitest")["vi"]["fn"]>;
+const mockVerifyToken = verifyToken as ReturnType<
+  typeof import("vitest")["vi"]["fn"]
+>;
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 
@@ -97,14 +99,11 @@ describe("Todos CRUD", () => {
       const createRes = await createTodoViaAPI("Original title");
       const created = await createRes.json<any>();
 
-      const res = await SELF.fetch(
-        `http://localhost/todos/${created.id}`,
-        {
-          method: "PUT",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: "Updated title" }),
-        }
-      );
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Updated title" }),
+      });
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       expect(body.title).toBe("Updated title");
@@ -114,14 +113,11 @@ describe("Todos CRUD", () => {
       const createRes = await createTodoViaAPI("Toggle me");
       const created = await createRes.json<any>();
 
-      const res = await SELF.fetch(
-        `http://localhost/todos/${created.id}`,
-        {
-          method: "PUT",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ completed: true }),
-        }
-      );
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: true }),
+      });
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       expect(body.completed).toBe(true);
@@ -131,14 +127,11 @@ describe("Todos CRUD", () => {
       const createRes = await createTodoViaAPI("Move me");
       const created = await createRes.json<any>();
 
-      const res = await SELF.fetch(
-        `http://localhost/todos/${created.id}`,
-        {
-          method: "PUT",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ position: "b0" }),
-        }
-      );
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ position: "b0" }),
+      });
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       expect(body.position).toBe("b0");
@@ -151,7 +144,7 @@ describe("Todos CRUD", () => {
           method: "PUT",
           headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
           body: JSON.stringify({ title: "Nope" }),
-        }
+        },
       );
       expect(res.status).toBe(404);
     });
@@ -165,14 +158,11 @@ describe("Todos CRUD", () => {
       mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
       await seedUser("user_other", "other@example.com");
 
-      const res = await SELF.fetch(
-        `http://localhost/todos/${created.id}`,
-        {
-          method: "PUT",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ title: "Stolen!" }),
-        }
-      );
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Stolen!" }),
+      });
       expect(res.status).toBe(404);
     });
   });
@@ -182,13 +172,10 @@ describe("Todos CRUD", () => {
       const createRes = await createTodoViaAPI("Delete me");
       const created = await createRes.json<any>();
 
-      const res = await SELF.fetch(
-        `http://localhost/todos/${created.id}`,
-        {
-          method: "DELETE",
-          headers: AUTH_HEADER,
-        }
-      );
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "DELETE",
+        headers: AUTH_HEADER,
+      });
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       expect(body.success).toBe(true);
@@ -207,7 +194,7 @@ describe("Todos CRUD", () => {
         {
           method: "DELETE",
           headers: AUTH_HEADER,
-        }
+        },
       );
       expect(res.status).toBe(404);
     });
@@ -220,7 +207,7 @@ describe("Todos CRUD", () => {
       const r3 = await createTodoViaAPI("Todo 3");
       const t1 = await r1.json<any>();
       const t2 = await r2.json<any>();
-      const t3 = await r3.json<any>();
+      const _t3 = await r3.json<any>();
 
       // Update todo 1
       await SELF.fetch(`http://localhost/todos/${t1.id}`, {

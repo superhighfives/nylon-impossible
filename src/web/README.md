@@ -73,16 +73,16 @@ The application uses TanStack Query's optimistic update pattern for instant UI f
 
 ### Prerequisites
 
-- Node.js 22.12+
-- npm 10+
+- Node.js 22+
+- pnpm 9+
 - Cloudflare account (for deployment)
 - Clerk account (for authentication)
 
 ### Installation
 
 ```bash
-# Install dependencies
-npm install
+# Install dependencies (from repo root)
+pnpm install
 ```
 
 ### Environment Setup
@@ -232,10 +232,11 @@ nylon-impossible-web/
 - `npm run db:push` - Push schema changes directly (dev only)
 
 ### Code Quality
-- `npm run lint` - Run Biome linter
-- `npm run format` - Format code with Biome
-- `npm run check` - Run both linting and formatting
-- `npm run test` - Run Vitest tests
+- `pnpm lint` - Run Biome linter
+- `pnpm format` - Format code with Biome
+- `pnpm check` - Run Biome lint + format check
+- `pnpm typecheck` - Run TypeScript type checking
+- `pnpm test` - Run Vitest tests
 
 ### Deployment
 - `npm run deploy` - Deploy to Cloudflare Workers

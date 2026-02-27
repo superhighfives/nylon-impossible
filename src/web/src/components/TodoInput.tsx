@@ -101,9 +101,7 @@ export function TodoInput() {
 
   return (
     <div className="space-y-3">
-      {error && (
-        <p className="text-sm text-error">{error}</p>
-      )}
+      {error && <p className="text-sm text-error">{error}</p>}
 
       <form onSubmit={handleQuickAdd}>
         <InputArea

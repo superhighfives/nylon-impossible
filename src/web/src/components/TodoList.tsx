@@ -1,12 +1,13 @@
+import { Button, Checkbox, Input } from "@cloudflare/kumo";
 import {
+  closestCenter,
   DndContext,
+  type DragEndEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
-  closestCenter,
   useSensor,
   useSensors,
-  type DragEndEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -15,7 +16,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Checkbox, Input } from "@cloudflare/kumo";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -82,11 +82,7 @@ interface TodoItemProps {
   editDueDate: string;
   editInputRef: React.RefObject<HTMLInputElement | null>;
   onToggle: (id: string, completed: boolean) => void;
-  onEdit: (
-    id: string,
-    title: string,
-    dueDate: Date | null | undefined,
-  ) => void;
+  onEdit: (id: string, title: string, dueDate: Date | null | undefined) => void;
   onSaveEdit: (id: string) => void;
   onCancelEdit: () => void;
   onDelete: (id: string) => void;
@@ -181,9 +177,7 @@ function TodoItemContent({
         </p>
         {todo.dueDate && (
           <p
-            className={`text-xs mt-1 ${
-              overdue ? "text-error" : "text-muted"
-            }`}
+            className={`text-xs mt-1 ${overdue ? "text-error" : "text-muted"}`}
           >
             {formatDueDate(todo.dueDate)}
           </p>
@@ -375,9 +369,7 @@ export function TodoList() {
 
     const prev = newIndex > 0 ? reordered[newIndex - 1].position : null;
     const next =
-      newIndex < reordered.length - 1
-        ? reordered[newIndex + 1].position
-        : null;
+      newIndex < reordered.length - 1 ? reordered[newIndex + 1].position : null;
     const newPosition = generateKeyBetween(prev ?? null, next ?? null);
 
     updateTodo.mutate({

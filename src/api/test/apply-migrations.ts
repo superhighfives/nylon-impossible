@@ -1,4 +1,4 @@
-import { env, applyD1Migrations } from "cloudflare:test";
+import { applyD1Migrations, env } from "cloudflare:test";
 
 declare module "cloudflare:test" {
   interface ProvidedEnv {

@@ -1,17 +1,16 @@
 # Nylon Impossible
 
-A cross-platform todo application with web and iOS clients.
+A cross-platform todo application with web, API, and iOS clients. Real-time sync across devices via WebSockets, authentication via Clerk, and deployment on Cloudflare Workers.
 
 ## Structure
 
 This is a monorepo managed with pnpm workspaces:
 
-```
-src/
-  web/   - Full-stack web application (TanStack Start + Cloudflare Workers)
-  ios/   - Native iOS application (SwiftUI + SwiftData)
-  api/   - REST API Worker (Cloudflare Workers) [planned]
-```
+| Project | Path | Stack |
+|---------|------|-------|
+| [Web](src/web/) | `src/web` | TanStack Start, React 19, Cloudflare Workers, D1 |
+| [API](src/api/) | `src/api` | Hono, Cloudflare Workers, D1, Durable Objects |
+| [iOS](src/ios/) | `src/ios/Nylon Impossible` | SwiftUI, SwiftData, iOS 26+ |
 
 ## Architecture
 
@@ -22,16 +21,16 @@ src/
 │  │   Web App Worker    │         │     API Worker          │   │
 │  │  (TanStack Start)   │         │  api.nylonimpossible.com│   │
 │  │                     │         │                         │   │
-│  │  - Web UI           │         │  - JWT verification     │   │
-│  │  - Server functions │         │  - REST endpoints       │   │
+│  │  - Web UI           │         │  - Hono REST API        │   │
+│  │  - Server functions │         │  - WebSocket sync       │   │
 │  └──────────┬──────────┘         └────────────┬────────────┘   │
 │             │                                  │                │
 │             └──────────────┬───────────────────┘                │
 │                            ▼                                    │
-│                    ┌───────────────┐                            │
-│                    │   D1 Database │                            │
-│                    │   (shared)    │                            │
-│                    └───────────────┘                            │
+│             ┌───────────────┐  ┌──────────────────┐            │
+│             │   D1 Database │  │  Durable Object  │            │
+│             │   (shared)    │  │  (UserSync WS)   │            │
+│             └───────────────┘  └──────────────────┘            │
 └─────────────────────────────────────────────────────────────────┘
                             ▲
             ┌───────────────┴───────────────┐
@@ -48,52 +47,87 @@ src/
 - Web and iOS are independent clients
 - Both authenticate via Clerk (different SDKs, same user pool)
 - Both read/write to the same D1 database
-- API Worker is a thin REST layer for mobile clients
+- API Worker handles REST endpoints + WebSocket sync via Durable Objects
+- Real-time sync: mutations broadcast via WebSocket, triggering pulls on other clients
 
-## Getting started
+## Getting Started
 
 ```bash
+# Install dependencies
 pnpm install
+
+# Apply database migrations locally
+pnpm db:migrate
+
+# Start web + API dev servers
+pnpm dev
 ```
 
-## Web
+The web app runs at **http://localhost:3001** and the API at **http://localhost:8787**.
 
-The web client is a modern, full-stack todo application featuring:
-
-- TanStack Start with file-based routing
-- Cloudflare Workers + D1 database
-- Authentication via Clerk
-- Optimistic updates with TanStack Query
-- Tailwind CSS with Cloudflare's Kumo design system
-
-See [`src/web/README.md`](./src/web/README.md) for detailed setup instructions.
-
-**Commands:**
+For iOS, open the Xcode project:
 
 ```bash
-pnpm web:dev      # Start dev server
-pnpm web:build    # Build for production
-pnpm web:test     # Run tests
-pnpm web:deploy   # Deploy to Cloudflare
-pnpm web:db:studio # Open Drizzle Studio
+pnpm ios:open
 ```
 
-## iOS
+See each project's README for detailed setup:
+- [`src/web/README.md`](src/web/README.md)
+- [`src/api/README.md`](src/api/README.md)
+- [`src/ios/README.md`](src/ios/README.md)
 
-The iOS client is a native SwiftUI application featuring:
+## Scripts
 
-- SwiftUI with modern declarative UI patterns
-- SwiftData for local persistence
-- Custom gradient-based design system
-- Smooth animations and transitions
+### Development
 
-**Commands:**
+| Script | Description |
+|--------|-------------|
+| `pnpm dev` | Start web + API dev servers in parallel |
+| `pnpm ios:open` | Open iOS project in Xcode |
+| `pnpm ios:simulator` | Open iOS Simulator |
+
+### Code Quality
+
+| Script | Description |
+|--------|-------------|
+| `pnpm lint` | Run Biome linter on web + API |
+| `pnpm check` | Run Biome lint + format check on web + API |
+| `pnpm typecheck` | Run TypeScript type checking on web + API |
+| `pnpm test` | Run Vitest tests on web + API |
+
+### Database
+
+| Script | Description |
+|--------|-------------|
+| `pnpm db:migrate` | Apply D1 migrations locally (web + API) |
+| `pnpm db:migrate:remote` | Apply D1 migrations to production |
+
+### Deployment
+
+| Script | Description |
+|--------|-------------|
+| `pnpm deploy` | Deploy web + API to Cloudflare Workers |
+
+### Per-Project
+
+All project-specific scripts are available with prefixes (`web:*`, `api:*`, `ios:*`):
 
 ```bash
-pnpm ios:open      # Open in Xcode
-pnpm ios:build     # Build via xcodebuild
-pnpm ios:simulator # Open iOS Simulator
+pnpm web:dev        # Start web dev server only
+pnpm api:dev        # Start API dev server only
+pnpm web:test       # Run web tests
+pnpm api:test       # Run API tests
+pnpm web:typecheck  # Type check web only
+pnpm api:lint       # Lint API only
 ```
+
+## CI/CD
+
+| Workflow | Trigger | Description |
+|----------|---------|-------------|
+| `lint.yml` | PRs, push to main | Biome + tsc (web, API), SwiftLint (iOS) |
+| `deploy.yml` | Push to main, PRs | Deploy to Cloudflare Workers + preview environments |
+| `testflight.yml` | Manual | Build and upload iOS app to TestFlight |
 
 ## License
 

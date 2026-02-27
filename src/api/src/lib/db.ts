@@ -1,6 +1,6 @@
+import { and, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { sql, eq, and, gt } from "drizzle-orm";
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Schema - mirrors src/web/src/lib/schema.ts
 export const users = sqliteTable("users", {
