@@ -1,14 +1,14 @@
-import { describe, it, expect } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  UnauthorizedError,
-  UserNotFoundError,
-  DatabaseError,
-  TodoNotFoundError,
-  ValidationError,
-  ForbiddenError,
   AIExtractionError,
   AIRateLimitError,
   AITimeoutError,
+  DatabaseError,
+  ForbiddenError,
+  TodoNotFoundError,
+  UnauthorizedError,
+  UserNotFoundError,
+  ValidationError,
 } from "../errors";
 
 describe("Tagged errors", () => {

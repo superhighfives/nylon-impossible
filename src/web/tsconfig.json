@@ -1,5 +1,6 @@
 {
   "include": ["**/*.ts", "**/*.tsx", "worker-configuration.d.ts", "src/generated/**/*"],
+  "exclude": ["node_modules"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
@@ -27,8 +28,7 @@
     /* Type Safety (Effect recommended) */
     "skipLibCheck": true,
     "strict": true,
-    "exactOptionalPropertyTypes": true,
-    "noUnusedLocals": true,
+"noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
 import { env } from "cloudflare:test";
+import { describe, expect, it } from "vitest";
 
 describe("UserSync Durable Object", () => {
   it("upgrades to WebSocket", async () => {

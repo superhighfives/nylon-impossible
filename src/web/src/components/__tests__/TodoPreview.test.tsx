@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 import { TodoPreview } from "../TodoPreview";
 
 // Mock Kumo components to basic HTML
@@ -9,12 +9,7 @@ vi.mock("@cloudflare/kumo", () => ({
     <button {...props}>{children}</button>
   ),
   Checkbox: ({ checked, onChange, ...props }: any) => (
-    <input
-      type="checkbox"
-      checked={checked}
-      onChange={onChange}
-      {...props}
-    />
+    <input type="checkbox" checked={checked} onChange={onChange} {...props} />
   ),
   Input: ({ ...props }: any) => <input {...props} />,
 }));
@@ -102,7 +97,10 @@ describe("TodoPreview", () => {
   it("calls onTodosChange when Remove is clicked", async () => {
     const user = userEvent.setup();
     const onTodosChange = vi.fn();
-    const todos = [makeTodo({ title: "Remove me" }), makeTodo({ title: "Keep me" })];
+    const todos = [
+      makeTodo({ title: "Remove me" }),
+      makeTodo({ title: "Keep me" }),
+    ];
     render(
       <TodoPreview
         {...defaultProps}

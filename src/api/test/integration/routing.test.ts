@@ -1,10 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
+import { beforeEach, describe, expect, it } from "vitest";
 import { cleanDb } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
-const mockVerifyToken = verifyToken as ReturnType<typeof import("vitest")["vi"]["fn"]>;
+const mockVerifyToken = verifyToken as ReturnType<
+  typeof import("vitest")["vi"]["fn"]
+>;
 
 describe("API routing", () => {
   beforeEach(async () => {
@@ -24,10 +26,10 @@ describe("API routing", () => {
       expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
       expect(res.headers.get("Access-Control-Allow-Methods")).toContain("PUT");
       expect(res.headers.get("Access-Control-Allow-Methods")).toContain(
-        "DELETE"
+        "DELETE",
       );
       expect(res.headers.get("Access-Control-Allow-Headers")).toContain(
-        "Authorization"
+        "Authorization",
       );
     });
   });

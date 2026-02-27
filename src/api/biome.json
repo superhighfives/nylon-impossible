@@ -7,15 +7,7 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": [
-      "**/src/**/*",
-      "**/.vscode/**/*",
-      "**/index.html",
-      "**/vite.config.js",
-      "!**/src/routeTree.gen.ts",
-      "!**/src/styles.css",
-      "!**/src/generated/**/*"
-    ]
+    "includes": ["**/src/**/*", "**/test/**/*"]
   },
   "formatter": {
     "enabled": true,
@@ -31,7 +23,7 @@
   },
   "overrides": [
     {
-      "includes": ["**/__tests__/**/*"],
+      "includes": ["**/test/**/*"],
       "linter": {
         "rules": {
           "suspicious": {

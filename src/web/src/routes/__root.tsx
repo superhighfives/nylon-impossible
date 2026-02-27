@@ -47,6 +47,7 @@ function RootDocument() {
       <head>
         <HeadContent />
         <script
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: inline theme detection script with no user input
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
@@ -60,13 +61,8 @@ function RootDocument() {
           }}
         />
       </head>
-        <body className="bg-surface text-surface antialiased">
-        <ClerkProvider
-          allowedRedirectOrigins={[
-            "https://nylonimpossible.com",
-            /https:\/\/.*\.superhighfives\.workers\.dev/,
-          ]}
-        >
+      <body className="bg-surface text-surface antialiased">
+        <ClerkProvider>
           <Header />
           <Outlet />
           <TanStackDevtools

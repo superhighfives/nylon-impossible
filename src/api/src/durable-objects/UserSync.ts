@@ -59,7 +59,7 @@ export class UserSync extends DurableObject {
     }
   }
 
-  async webSocketError(ws: WebSocket, error: unknown) {
+  async webSocketError(ws: WebSocket, _error: unknown) {
     try {
       ws.close(1011, "WebSocket error");
     } catch {

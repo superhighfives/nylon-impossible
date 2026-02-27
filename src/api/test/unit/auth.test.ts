@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach } from "vitest";
 import { verifyToken } from "@clerk/backend";
+import { beforeEach, describe, expect, it } from "vitest";
 import { verifyClerkJWT } from "../../src/lib/auth";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
-const mockVerifyToken = verifyToken as ReturnType<typeof import("vitest")["vi"]["fn"]>;
+const mockVerifyToken = verifyToken as ReturnType<
+  typeof import("vitest")["vi"]["fn"]
+>;
 
 const fakeEnv = { CLERK_SECRET_KEY: "sk_test_fake" };
 

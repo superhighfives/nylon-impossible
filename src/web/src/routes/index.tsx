@@ -4,8 +4,8 @@ import { LandingPage } from "@/components/LandingPage";
 import { TodoInput } from "@/components/TodoInput";
 import { TodoList } from "@/components/TodoList";
 import {
-  WebSocketSyncContext,
   useWebSocketConnection,
+  WebSocketSyncContext,
 } from "@/hooks/useWebSocket";
 
 export const Route = createFileRoute("/")({ component: App });

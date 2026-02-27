@@ -69,9 +69,7 @@ export function TodoPreview({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted">
-          {todos.length} extracted
-        </span>
+        <span className="text-xs text-muted">{todos.length} extracted</span>
         <Button
           variant="ghost"
           size="sm"
@@ -99,7 +97,9 @@ export function TodoPreview({
                 <Input
                   type="text"
                   value={todo.title}
-                  onChange={(e) => handleTitleChange(todo.tempId, e.target.value)}
+                  onChange={(e) =>
+                    handleTitleChange(todo.tempId, e.target.value)
+                  }
                   disabled={!todo.selected}
                   className="w-full"
                   aria-label="Todo title"
