@@ -8,14 +8,15 @@
 import SwiftUI
 
 struct EmptyStateView: View {
+    @State private var appeared = false
+
     var body: some View {
         VStack(spacing: 8) {
             Spacer()
 
-            // Empty circle icon
-            Circle()
-                .stroke(Color.kumoLine, lineWidth: 3)
-                .frame(width: 64, height: 64)
+            Image(systemName: "checklist")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.kumoLine)
                 .padding(.bottom, 16)
 
             Text("No tasks yet")
@@ -29,6 +30,12 @@ struct EmptyStateView: View {
             Spacer()
         }
         .frame(maxWidth: .infinity)
+        .opacity(appeared ? 1 : 0)
+        .onAppear {
+            withAnimation(.easeIn(duration: 0.4)) {
+                appeared = true
+            }
+        }
     }
 }
 

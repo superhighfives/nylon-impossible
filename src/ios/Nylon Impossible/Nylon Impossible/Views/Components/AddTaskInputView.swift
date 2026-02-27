@@ -34,7 +34,7 @@ struct AddTaskInputView: View {
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.kumoElevated)
-                .stroke(Color.kumoLine, lineWidth: 1)
+                .stroke(Color.kumoLine, lineWidth: 0.5)
         )
         .overlay(alignment: .trailing) {
             Button(action: {
