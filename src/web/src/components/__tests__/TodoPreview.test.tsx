@@ -5,7 +5,7 @@ import { TodoPreview } from "../TodoPreview";
 
 // Mock Kumo components to basic HTML
 vi.mock("@cloudflare/kumo", () => ({
-  Button: ({ children, ...props }: any) => (
+  Button: ({ children, loading, ...props }: any) => (
     <button {...props}>{children}</button>
   ),
   Checkbox: ({ checked, onChange, ...props }: any) => (
