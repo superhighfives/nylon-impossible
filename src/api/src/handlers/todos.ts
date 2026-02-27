@@ -1,7 +1,7 @@
 import { z } from "zod/v4";
+import type { Context } from "hono";
 import { getDb, todos, eq, and } from "../lib/db";
-import { json, error, notFound } from "../lib/response";
-import type { Env, AuthenticatedRequest } from "../types";
+import type { Env } from "../types";
 
 // Validation schemas
 const createTodoSchema = z.object({
@@ -17,40 +17,36 @@ const updateTodoSchema = z.object({
 });
 
 // GET /todos - List all todos for user
-export async function listTodos(
-  req: AuthenticatedRequest,
-  env: Env
-): Promise<Response> {
-  const db = getDb(env.DB);
+export async function listTodos(c: Context<Env>) {
+  const db = getDb(c.env.DB);
+  const userId = c.get("userId");
 
   const userTodos = await db
     .select()
     .from(todos)
-    .where(eq(todos.userId, req.userId))
+    .where(eq(todos.userId, userId))
     .orderBy(todos.createdAt);
 
-  return json(userTodos);
+  return c.json(userTodos);
 }
 
 // POST /todos - Create a new todo
-export async function createTodo(
-  req: AuthenticatedRequest,
-  env: Env
-): Promise<Response> {
-  const body = await req.json();
+export async function createTodo(c: Context<Env>) {
+  const body = await c.req.json();
   const parsed = createTodoSchema.safeParse(body);
 
   if (!parsed.success) {
-    return error(parsed.error.message);
+    return c.json({ error: parsed.error.message }, 400);
   }
 
-  const db = getDb(env.DB);
+  const db = getDb(c.env.DB);
+  const userId = c.get("userId");
   const id = parsed.data.id ?? crypto.randomUUID();
   const now = new Date();
 
   await db.insert(todos).values({
     id,
-    userId: req.userId,
+    userId,
     title: parsed.data.title,
     completed: false,
     createdAt: now,
@@ -59,32 +55,30 @@ export async function createTodo(
 
   const [newTodo] = await db.select().from(todos).where(eq(todos.id, id));
 
-  return json(newTodo, 201);
+  return c.json(newTodo, 201);
 }
 
 // PUT /todos/:id - Update a todo
-export async function updateTodo(
-  req: AuthenticatedRequest,
-  env: Env,
-  todoId: string
-): Promise<Response> {
-  const body = await req.json();
+export async function updateTodo(c: Context<Env>) {
+  const todoId = c.req.param("id");
+  const body = await c.req.json();
   const parsed = updateTodoSchema.safeParse(body);
 
   if (!parsed.success) {
-    return error(parsed.error.message);
+    return c.json({ error: parsed.error.message }, 400);
   }
 
-  const db = getDb(env.DB);
+  const db = getDb(c.env.DB);
+  const userId = c.get("userId");
 
   // Check ownership
   const [existing] = await db
     .select()
     .from(todos)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, req.userId)));
+    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   if (!existing) {
-    return notFound("Todo");
+    return c.json({ error: "Todo not found" }, 404);
   }
 
   const updates: Record<string, unknown> = {
@@ -105,28 +99,26 @@ export async function updateTodo(
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
 
-  return json(updated);
+  return c.json(updated);
 }
 
 // DELETE /todos/:id - Delete a todo
-export async function deleteTodo(
-  req: AuthenticatedRequest,
-  env: Env,
-  todoId: string
-): Promise<Response> {
-  const db = getDb(env.DB);
+export async function deleteTodo(c: Context<Env>) {
+  const todoId = c.req.param("id");
+  const db = getDb(c.env.DB);
+  const userId = c.get("userId");
 
   // Check ownership
   const [existing] = await db
     .select()
     .from(todos)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, req.userId)));
+    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   if (!existing) {
-    return notFound("Todo");
+    return c.json({ error: "Todo not found" }, 404);
   }
 
   await db.delete(todos).where(eq(todos.id, todoId));
 
-  return json({ success: true });
+  return c.json({ success: true });
 }

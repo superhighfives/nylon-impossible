@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "wrangler dev --persist-to ../../.wrangler/state",
     "deploy": "wrangler deploy",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types",
     "db:migrate": "wrangler d1 migrations apply nylon-impossible-db --local --persist-to ../../.wrangler/state",
@@ -14,11 +15,14 @@
     "@clerk/backend": "^1.27.0",
     "drizzle-orm": "^0.45.0",
     "fractional-indexing": "^3.2.0",
+    "hono": "^4.12.3",
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@cloudflare/workers-types": "^4.20251202.0",
     "typescript": "^5.7.2",
+    "vitest": "^3.0.5",
     "wrangler": "^4.40.3"
   }
 }

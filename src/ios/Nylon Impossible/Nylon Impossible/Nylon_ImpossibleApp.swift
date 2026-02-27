@@ -89,10 +89,9 @@ struct RootView: View {
 
             switch newPhase {
             case .active:
-                Task { await syncService.sync() }
-                syncService.startPolling()
+                syncService.connectWebSocket()
             case .background, .inactive:
-                syncService.stopPolling()
+                syncService.disconnectWebSocket()
             @unknown default:
                 break
             }
@@ -111,8 +110,8 @@ struct RootView: View {
             await syncService.migrateLocalTodos()
             // Then sync with server
             await syncService.sync()
-            // Start polling for remote changes
-            syncService.startPolling()
+            // Connect WebSocket for real-time updates
+            syncService.connectWebSocket()
         }
     }
 }

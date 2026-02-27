@@ -22,10 +22,17 @@ enum AuthError: Error, LocalizedError {
     }
 }
 
+@MainActor
+protocol AuthProviding {
+    var isSignedIn: Bool { get }
+    var userId: String? { get }
+    func getToken() async throws -> String
+}
+
 /// Helper service for auth-related operations like getting JWT tokens
 @Observable
 @MainActor
-final class AuthService {
+final class AuthService: AuthProviding {
     // Access Clerk.shared lazily to avoid accessing before configure()
     private var clerk: Clerk { Clerk.shared }
     

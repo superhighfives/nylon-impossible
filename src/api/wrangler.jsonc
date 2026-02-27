@@ -18,6 +18,20 @@
       "migrations_dir": "../web/migrations"
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "USER_SYNC",
+        "class_name": "UserSync"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_classes": ["UserSync"]
+    }
+  ],
   "observability": {
     "enabled": true
   }

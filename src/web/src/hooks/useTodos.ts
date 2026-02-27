@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ExtractedTodo } from "@/lib/ai-types";
+import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { extractTodosFromText } from "@/server/ai";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";
@@ -7,32 +8,28 @@ import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";
 const TODOS_QUERY_KEY = ["todos"];
 
 export function useTodos() {
-  const queryClient = useQueryClient();
   return useQuery({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
-    refetchInterval: () => {
-      // Pause polling while mutations are in-flight to avoid
-      // overwriting optimistic updates with stale server data
-      if (queryClient.isMutating() > 0) return false;
-      return 3000;
-    },
   });
 }
 
 export function useCreateTodo() {
   const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
     mutationFn: (input: CreateTodoInput) => createTodo({ data: input }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
     },
   });
 }
 
 export function useUpdateTodo() {
   const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateTodoInput }) =>
@@ -64,12 +61,14 @@ export function useUpdateTodo() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
     },
   });
 }
 
 export function useDeleteTodo() {
   const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
     mutationFn: (id: string) => deleteTodo({ data: id }),
@@ -98,6 +97,7 @@ export function useDeleteTodo() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
     },
   });
 }
@@ -116,6 +116,7 @@ export function useExtractTodos() {
  */
 export function useCreateTodosBatch() {
   const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
     mutationFn: async (todos: ExtractedTodo[]) => {
@@ -134,6 +135,7 @@ export function useCreateTodosBatch() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
     },
   });
 }

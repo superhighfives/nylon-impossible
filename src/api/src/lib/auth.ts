@@ -1,4 +1,6 @@
+import { createMiddleware } from "hono/factory";
 import { verifyToken } from "@clerk/backend";
+import type { Env } from "../types";
 
 export interface AuthResult {
   userId: string;
@@ -28,3 +30,17 @@ export async function verifyClerkJWT(
     return null;
   }
 }
+
+export const authMiddleware = createMiddleware<Env>(async (c, next) => {
+  const auth = await verifyClerkJWT(
+    c.req.header("Authorization") ?? null,
+    c.env
+  );
+
+  if (!auth) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  c.set("userId", auth.userId);
+  await next();
+});

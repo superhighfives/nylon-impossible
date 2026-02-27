@@ -1,9 +1,11 @@
-export interface Env {
-  DB: D1Database;
-  CLERK_SECRET_KEY: string;
-  CLERK_PUBLISHABLE_KEY: string;
-}
-
-export interface AuthenticatedRequest extends Request {
-  userId: string;
-}
+export type Env = {
+  Bindings: {
+    DB: D1Database;
+    USER_SYNC: DurableObjectNamespace;
+    CLERK_SECRET_KEY: string;
+    CLERK_PUBLISHABLE_KEY: string;
+  };
+  Variables: {
+    userId: string;
+  };
+};

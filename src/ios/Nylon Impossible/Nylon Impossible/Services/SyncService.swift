@@ -18,69 +18,64 @@ enum SyncState: Equatable {
 @Observable
 @MainActor
 final class SyncService {
-    private let authService: AuthService
-    private var apiService: APIService?
+    private let authService: any AuthProviding
+    private var apiService: (any APIProviding)?
     private var modelContext: ModelContext?
-    
+
     private(set) var state: SyncState = .idle
     private(set) var lastSyncedAt: Date?
-    private(set) var isPolling: Bool = false
 
-    // Debounce for action-triggered syncs
-    private var debounceTask: Task<Void, Never>?
-
-    // Periodic polling
-    private var pollingTask: Task<Void, Never>?
+    let webSocketService: WebSocketService?
 
     // UserDefaults key for persisting last sync time
     private let lastSyncedAtKey = "com.nylonimpossible.lastSyncedAt"
-    
+
     init(authService: AuthService) {
         self.authService = authService
         self.apiService = APIService(authService: authService)
-        
+        self.webSocketService = WebSocketService(authService: authService)
+
         // Load last synced time from UserDefaults
         if let timestamp = UserDefaults.standard.object(forKey: lastSyncedAtKey) as? Date {
             lastSyncedAt = timestamp
         }
+
+        // Wire up WebSocket sync callback
+        webSocketService?.onSyncNeeded = { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                await self.sync()
+            }
+        }
     }
-    
+
+    /// Test-friendly initializer that accepts protocol types
+    init(authService: any AuthProviding, apiService: any APIProviding) {
+        self.authService = authService
+        self.apiService = apiService
+        self.webSocketService = nil
+    }
+
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
     }
-    
-    /// Trigger a sync after a user action, debounced to batch rapid changes.
+
+    /// Trigger a sync after a user action, then notify other clients via WebSocket.
     func syncAfterAction() {
-        debounceTask?.cancel()
-        debounceTask = Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(500))
-            guard !Task.isCancelled else { return }
+        Task { @MainActor in
             await sync()
+            webSocketService?.notifyChanged()
         }
     }
 
-    /// Start polling for remote changes. Call when app enters foreground.
-    func startPolling() {
-        guard !isPolling else { return }
-        isPolling = true
-
-        pollingTask = Task { @MainActor in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(5))
-                guard !Task.isCancelled else { break }
-                if state != .syncing {
-                    await sync()
-                }
-            }
-            isPolling = false
-        }
+    /// Connect WebSocket. Call when app enters foreground or after sign-in.
+    func connectWebSocket() {
+        webSocketService?.connect()
     }
 
-    /// Stop polling. Call when app enters background.
-    func stopPolling() {
-        pollingTask?.cancel()
-        pollingTask = nil
-        isPolling = false
+    /// Disconnect WebSocket. Call when app enters background or on sign-out.
+    func disconnectWebSocket() {
+        webSocketService?.disconnect()
     }
 
     /// Perform a full sync with the server
@@ -131,40 +126,40 @@ final class SyncService {
             state = .error(error.localizedDescription)
         }
     }
-    
+
     /// Migrate existing local todos to the user's account on first sign-in
     func migrateLocalTodos() async {
         guard authService.isSignedIn, let userId = authService.userId else { return }
         guard let modelContext else { return }
-        
+
         do {
             // Find all local-only todos (no userId)
             let descriptor = FetchDescriptor<TodoItem>(
                 predicate: #Predicate { $0.userId == nil && !$0.isDeleted }
             )
             let localTodos = try modelContext.fetch(descriptor)
-            
+
             if localTodos.isEmpty { return }
-            
+
             print("Migrating \(localTodos.count) local todos to user account")
-            
+
             // Assign userId to all local todos
             for todo in localTodos {
                 todo.userId = userId
                 todo.isSynced = false
                 todo.markModified()
             }
-            
+
             try modelContext.save()
-            
+
             // Trigger a sync to upload them
             await sync()
-            
+
         } catch {
             print("Migration error: \(error)")
         }
     }
-    
+
     // MARK: - Private Methods
 
     private func gatherLocalChanges(userId: String) throws -> [TodoChange] {
@@ -276,12 +271,10 @@ final class SyncService {
         // Single save for the entire operation
         try modelContext.save()
     }
-    
+
     /// Reset sync state (used on sign out)
     func reset() {
-        stopPolling()
-        debounceTask?.cancel()
-        debounceTask = nil
+        webSocketService?.disconnect()
         lastSyncedAt = nil
         state = .idle
         UserDefaults.standard.removeObject(forKey: lastSyncedAtKey)

@@ -69,9 +69,15 @@ struct SyncConflict: Codable {
     let remoteUpdatedAt: Date
 }
 
+// MARK: - API Protocol
+
+protocol APIProviding: Sendable {
+    func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
+}
+
 // MARK: - API Service
 
-actor APIService {
+actor APIService: APIProviding {
     private let baseURL: URL
     private let authService: AuthService
     private let session: URLSession

@@ -1,74 +1,59 @@
-import { verifyClerkJWT } from "./lib/auth";
-import { cors, unauthorized, notFound, error } from "./lib/response";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { verifyClerkJWT, authMiddleware } from "./lib/auth";
 import { listTodos, createTodo, updateTodo, deleteTodo } from "./handlers/todos";
 import { syncTodos } from "./handlers/sync";
-import type { Env, AuthenticatedRequest } from "./types";
+import type { Env } from "./types";
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    const path = url.pathname;
-    const method = request.method;
+export { UserSync } from "./durable-objects/UserSync";
 
-    // Handle CORS preflight
-    if (method === "OPTIONS") {
-      return cors();
-    }
+const app = new Hono<Env>();
 
-    // Health check
-    if (path === "/" || path === "/health") {
-      return new Response("OK", { status: 200 });
-    }
+// CORS
+app.use(
+  "*",
+  cors({
+    origin: "*",
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    maxAge: 86400,
+  })
+);
 
-    // All other routes require auth
-    const auth = await verifyClerkJWT(
-      request.headers.get("Authorization"),
-      env
-    );
+// Health check
+app.get("/", (c) => c.text("OK"));
+app.get("/health", (c) => c.text("OK"));
 
-    if (!auth) {
-      return unauthorized();
-    }
+// WebSocket upgrade — auth via query param
+app.get("/ws", async (c) => {
+  if (c.req.header("Upgrade") !== "websocket") {
+    return c.json({ error: "Expected WebSocket upgrade" }, 400);
+  }
 
-    // Add userId to request
-    const req = request as AuthenticatedRequest;
-    req.userId = auth.userId;
+  const token = c.req.query("token");
+  const auth = await verifyClerkJWT(
+    token ? `Bearer ${token}` : null,
+    c.env
+  );
 
-    try {
-      // Route matching
-      // POST /todos/sync - must come before /todos/:id
-      if (path === "/todos/sync" && method === "POST") {
-        return syncTodos(req, env);
-      }
+  if (!auth) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
 
-      // GET /todos - list all
-      if (path === "/todos" && method === "GET") {
-        return listTodos(req, env);
-      }
+  const id = c.env.USER_SYNC.idFromName(auth.userId);
+  const stub = c.env.USER_SYNC.get(id);
+  return stub.fetch(c.req.raw);
+});
 
-      // POST /todos - create
-      if (path === "/todos" && method === "POST") {
-        return createTodo(req, env);
-      }
+// Auth middleware for todo routes
+app.use("/todos/*", authMiddleware);
+app.use("/todos", authMiddleware);
 
-      // /todos/:id routes
-      const todoMatch = path.match(/^\/todos\/([a-f0-9-]+)$/i);
-      if (todoMatch) {
-        const todoId = todoMatch[1];
+// Todo routes
+app.post("/todos/sync", syncTodos);
+app.get("/todos", listTodos);
+app.post("/todos", createTodo);
+app.put("/todos/:id", updateTodo);
+app.delete("/todos/:id", deleteTodo);
 
-        if (method === "PUT") {
-          return updateTodo(req, env, todoId);
-        }
-
-        if (method === "DELETE") {
-          return deleteTodo(req, env, todoId);
-        }
-      }
-
-      return notFound("Route");
-    } catch (err) {
-      console.error("API error:", err);
-      return error("Internal server error", 500);
-    }
-  },
-};
+export default app;

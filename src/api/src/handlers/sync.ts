@@ -1,9 +1,9 @@
 import { z } from "zod/v4";
+import type { Context } from "hono";
 import { createClerkClient } from "@clerk/backend";
 import { generateKeyBetween } from "fractional-indexing";
 import { getDb, users, todos, eq, and, gt } from "../lib/db";
-import { json, error } from "../lib/response";
-import type { Env, AuthenticatedRequest } from "../types";
+import type { Env } from "../types";
 
 // Sync request schema
 const syncRequestSchema = z.object({
@@ -42,19 +42,17 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
 }
 
 // POST /todos/sync - Bidirectional sync
-export async function syncTodos(
-  req: AuthenticatedRequest,
-  env: Env
-): Promise<Response> {
-  const body = await req.json();
+export async function syncTodos(c: Context<Env>) {
+  const body = await c.req.json();
   const parsed = syncRequestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return error(parsed.error.message);
+    return c.json({ error: parsed.error.message }, 400);
   }
 
   const { lastSyncedAt, changes } = parsed.data;
-  const db = getDb(env.DB);
+  const userId = c.get("userId");
+  const db = getDb(c.env.DB);
   const conflicts: SyncConflict[] = [];
   const syncedAt = new Date();
 
@@ -62,14 +60,14 @@ export async function syncTodos(
   const [existingUser] = await db
     .select()
     .from(users)
-    .where(eq(users.id, req.userId));
+    .where(eq(users.id, userId));
 
   if (!existingUser) {
-    const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
-    const clerkUser = await clerk.users.getUser(req.userId);
+    const clerk = createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY });
+    const clerkUser = await clerk.users.getUser(userId);
     const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
 
-    await db.insert(users).values({ id: req.userId, email }).onConflictDoNothing();
+    await db.insert(users).values({ id: userId, email }).onConflictDoNothing();
   }
 
   // 1. Apply client changes (with conflict resolution)
@@ -80,7 +78,7 @@ export async function syncTodos(
     const [existing] = await db
       .select()
       .from(todos)
-      .where(and(eq(todos.id, normalizedId), eq(todos.userId, req.userId)));
+      .where(and(eq(todos.id, normalizedId), eq(todos.userId, userId)));
 
     if (change.deleted) {
       // Delete if exists and owned by user
@@ -123,7 +121,7 @@ export async function syncTodos(
       if (change.title) {
         await db.insert(todos).values({
           id: normalizedId,
-          userId: req.userId,
+          userId,
           title: change.title,
           completed: change.completed ?? false,
           position: change.position ?? generateKeyBetween(null, null),
@@ -140,17 +138,17 @@ export async function syncTodos(
     serverTodos = await db
       .select()
       .from(todos)
-      .where(and(eq(todos.userId, req.userId), gt(todos.updatedAt, lastSyncedAt)))
+      .where(and(eq(todos.userId, userId), gt(todos.updatedAt, lastSyncedAt)))
       .orderBy(todos.createdAt);
   } else {
     serverTodos = await db
       .select()
       .from(todos)
-      .where(eq(todos.userId, req.userId))
+      .where(eq(todos.userId, userId))
       .orderBy(todos.createdAt);
   }
 
-  return json({
+  return c.json({
     todos: serverTodos.map(serializeTodo),
     syncedAt: syncedAt.toISOString(),
     conflicts,
