@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
 import {
   createTodo,
@@ -52,6 +53,7 @@ app.use("/todos/*", authMiddleware);
 app.use("/todos", authMiddleware);
 
 // Todo routes
+app.post("/todos/smart", smartCreate);
 app.post("/todos/sync", syncTodos);
 app.get("/todos", listTodos);
 app.post("/todos", createTodo);
