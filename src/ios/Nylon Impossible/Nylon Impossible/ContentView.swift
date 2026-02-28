@@ -120,7 +120,6 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .environment(\.editMode, .constant(.active))
     }
 
     @ViewBuilder
