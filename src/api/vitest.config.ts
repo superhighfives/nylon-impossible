@@ -25,7 +25,7 @@ export default defineWorkersConfig(async () => {
         workers: {
           isolatedStorage: false,
           singleWorker: true,
-          wrangler: { configPath: "./wrangler.jsonc" },
+          wrangler: { configPath: "./wrangler.test.jsonc" },
           miniflare: {
             bindings: {
               TEST_MIGRATIONS: migrations,
