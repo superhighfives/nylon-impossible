@@ -29,6 +29,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       {
         title: "Nylon Impossible",
       },
+      {
+        name: "theme-color",
+        content: "#0a0a0a",
+      },
     ],
     links: [
       {
@@ -49,6 +53,10 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         rel: "apple-touch-icon",
         href: "/apple-touch-icon.png",
         sizes: "180x180",
+      },
+      {
+        rel: "manifest",
+        href: "/manifest.json",
       },
     ],
   }),
