@@ -21,20 +21,20 @@ This is a monorepo managed with pnpm workspaces:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Cloudflare                               │
-│  ┌─────────────────────┐         ┌─────────────────────────┐   │
-│  │   Web App Worker    │         │     API Worker          │   │
-│  │  (TanStack Start)   │         │  api.nylonimpossible.com│   │
-│  │                     │         │                         │   │
-│  │  - Web UI           │         │  - Hono REST API        │   │
-│  │  - Server functions │         │  - WebSocket sync       │   │
-│  └──────────┬──────────┘         └────────────┬────────────┘   │
+│  ┌─────────────────────┐         ┌─────────────────────────┐    │
+│  │   Web App Worker    │         │     API Worker          │    │
+│  │  (TanStack Start)   │         │  api.nylonimpossible.com│    │
+│  │                     │         │                         │    │
+│  │  - Web UI           │         │  - Hono REST API        │    │
+│  │  - Server functions │         │  - WebSocket sync       │    │
+│  └──────────┬──────────┘         └────────────┬────────────┘    │
 │             │                                  │                │
 │             └──────────────┬───────────────────┘                │
 │                            ▼                                    │
-│             ┌───────────────┐  ┌──────────────────┐            │
-│             │   D1 Database │  │  Durable Object  │            │
-│             │   (shared)    │  │  (UserSync WS)   │            │
-│             └───────────────┘  └──────────────────┘            │
+│             ┌───────────────┐  ┌──────────────────┐             │
+│             │   D1 Database │  │  Durable Object  │             │
+│             │   (shared)    │  │  (UserSync WS)   │             │
+│             └───────────────┘  └──────────────────┘             │
 └─────────────────────────────────────────────────────────────────┘
                             ▲
             ┌───────────────┴───────────────┐
