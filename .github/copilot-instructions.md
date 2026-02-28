@@ -91,6 +91,22 @@ pnpm web:dev
 pnpm api:dev
 ```
 
+## Required Before Finishing Any Change
+
+Run these commands and fix all reported issues before considering a task complete:
+
+```bash
+pnpm check        # Biome lint + format check (web + API) - fix with: pnpm format
+pnpm typecheck    # TypeScript type checking (web + API)
+pnpm test         # Vitest tests (web + API)
+```
+
+To fix formatting automatically:
+
+```bash
+pnpm format       # Auto-format all files with Biome
+```
+
 ## Code Quality
 
 ```bash
