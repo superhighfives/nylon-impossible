@@ -3,7 +3,7 @@ import { shouldUseAI } from "../../src/lib/smart-input";
 
 describe("shouldUseAI", () => {
   describe("returns false for simple single-item input", () => {
-    it("short task without dates", () => {
+    it("short task", () => {
       expect(shouldUseAI("Buy milk")).toBe(false);
     });
 
@@ -49,40 +49,6 @@ describe("shouldUseAI", () => {
     it("text exactly 120 characters is not triggered", () => {
       const text = "a".repeat(120);
       expect(shouldUseAI(text)).toBe(false);
-    });
-  });
-
-  describe("returns true for relative date patterns", () => {
-    it("tomorrow", () => {
-      expect(shouldUseAI("Buy milk tomorrow")).toBe(true);
-    });
-
-    it("today", () => {
-      expect(shouldUseAI("Finish report today")).toBe(true);
-    });
-
-    it("next week", () => {
-      expect(shouldUseAI("Book flights next week")).toBe(true);
-    });
-
-    it("next Friday", () => {
-      expect(shouldUseAI("Submit report next friday")).toBe(true);
-    });
-
-    it("by Friday", () => {
-      expect(shouldUseAI("Finish report by friday")).toBe(true);
-    });
-
-    it("due tomorrow", () => {
-      expect(shouldUseAI("Report due tomorrow")).toBe(true);
-    });
-
-    it("in 3 days", () => {
-      expect(shouldUseAI("Call back in 3 days")).toBe(true);
-    });
-
-    it("this weekend", () => {
-      expect(shouldUseAI("Clean house this weekend")).toBe(true);
     });
   });
 

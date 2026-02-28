@@ -80,7 +80,7 @@ struct SyncServiceTests {
                 title: "Unsynced task",
                 completed: false,
                 position: "a0",
-                dueDate: nil,
+
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt
             )],
@@ -124,7 +124,7 @@ struct SyncServiceTests {
                 title: "Remote task",
                 completed: true,
                 position: "b0",
-                dueDate: nil,
+
                 createdAt: remoteDate,
                 updatedAt: remoteDate
             )],
@@ -173,7 +173,7 @@ struct SyncServiceTests {
                 title: "Remote title",
                 completed: false,
                 position: "a0",
-                dueDate: nil,
+
                 createdAt: localDate,
                 updatedAt: remoteDate
             )],
@@ -219,7 +219,7 @@ struct SyncServiceTests {
                 title: "Remote title",
                 completed: false,
                 position: "a0",
-                dueDate: nil,
+
                 createdAt: remoteDate,
                 updatedAt: remoteDate
             )],
@@ -259,7 +259,7 @@ struct SyncServiceTests {
                 title: "Task",
                 completed: false,
                 position: "a0",
-                dueDate: nil,
+
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt
             )],

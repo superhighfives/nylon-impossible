@@ -22,7 +22,6 @@ export const todos = sqliteTable("todos", {
   title: text("title").notNull(),
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
   position: text("position").notNull().default("a0"),
-  dueDate: integer("due_date", { mode: "timestamp" }),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
