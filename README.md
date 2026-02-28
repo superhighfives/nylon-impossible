@@ -125,6 +125,16 @@ pnpm web:typecheck  # Type check web only
 pnpm api:lint       # Lint API only
 ```
 
+## Plans
+
+Implementation plans live in the [`plans/`](plans/) directory:
+
+| Folder | Purpose |
+|--------|---------|
+| [`plans/ready/`](plans/ready/) | Plans that are ready to be worked on |
+| [`plans/backlog/`](plans/backlog/) | Stubs and ideas for future work |
+| [`plans/done/`](plans/done/) | Completed plans |
+
 ## CI/CD
 
 | Workflow | Trigger | Description |
