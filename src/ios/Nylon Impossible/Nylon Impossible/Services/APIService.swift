@@ -92,6 +92,7 @@ struct SmartCreateTodo: Codable, Sendable {
 
 // MARK: - API Protocol
 
+@MainActor
 protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
     func smartCreate(text: String) async throws -> SmartCreateResponse
@@ -99,7 +100,8 @@ protocol APIProviding: Sendable {
 
 // MARK: - API Service
 
-actor APIService: APIProviding {
+@MainActor
+final class APIService: APIProviding {
     private let baseURL: URL
     private let authService: AuthService
     private let session: URLSession
@@ -228,13 +230,7 @@ actor APIService: APIProviding {
         var request = URLRequest(url: url)
         request.httpMethod = method
 
-        // Get auth token
-        let token = try await MainActor.run {
-            Task {
-                try await authService.getToken()
-            }
-        }.value
-
+        let token = try await authService.getToken()
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         return request
