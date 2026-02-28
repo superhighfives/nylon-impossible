@@ -11,6 +11,9 @@ on:
       - "src/ios/**"
   workflow_dispatch:
 
+permissions:
+  pull-requests: read
+
 concurrency:
   group: testflight-${{ github.ref }}
   cancel-in-progress: true
