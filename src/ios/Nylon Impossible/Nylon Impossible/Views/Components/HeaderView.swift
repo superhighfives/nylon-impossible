@@ -10,6 +10,7 @@ import SwiftUI
 struct HeaderView: View {
     var onSignOut: (() -> Void)?
     var syncState: SyncState = .idle
+    var todoCount: Int = 0
 
     var body: some View {
         VStack(spacing: 12) {
@@ -32,11 +33,17 @@ struct HeaderView: View {
             }
             .frame(height: 24)
 
-            // Title
-            Text("My Tasks")
-                .font(.system(size: 28, weight: .bold))
-                .foregroundStyle(Color.kumoDefault)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Title and count
+            VStack(alignment: .leading, spacing: 4) {
+                Text("My Tasks")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color.kumoDefault)
+
+                Text("\(todoCount) \(todoCount == 1 ? "task" : "tasks")")
+                    .font(.system(size: 13))
+                    .foregroundStyle(Color.kumoSubtle)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.top, 16)
     }
@@ -81,10 +88,10 @@ struct HeaderView: View {
     ZStack {
         GradientBackground()
         VStack(spacing: 40) {
-            HeaderView(onSignOut: {}, syncState: .idle)
-            HeaderView(onSignOut: {}, syncState: .syncing)
-            HeaderView(onSignOut: {}, syncState: .success(Date()))
-            HeaderView(onSignOut: {}, syncState: .error("Network error"))
+            HeaderView(onSignOut: {}, syncState: .idle, todoCount: 5)
+            HeaderView(onSignOut: {}, syncState: .syncing, todoCount: 3)
+            HeaderView(onSignOut: {}, syncState: .success(Date()), todoCount: 1)
+            HeaderView(onSignOut: {}, syncState: .error("Network error"), todoCount: 0)
         }
     }
 }

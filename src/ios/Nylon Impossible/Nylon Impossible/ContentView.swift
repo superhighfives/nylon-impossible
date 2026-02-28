@@ -28,7 +28,8 @@ struct ContentView: View {
                     onSignOut: {
                         Task { await authService.signOut() }
                     },
-                    syncState: syncService.state
+                    syncState: syncService.state,
+                    todoCount: sortedTodosList.filter { !$0.isCompleted }.count
                 )
 
                 AddTaskInputView(
@@ -68,16 +69,37 @@ struct ContentView: View {
             Section {
                 ForEach(incomplete) { todo in
                     todoRow(todo)
+                        .draggable(todo.id.uuidString)
+                        .dropDestination(for: String.self) { items, _ in
+                            guard let draggedIdString = items.first,
+                                  let draggedId = UUID(uuidString: draggedIdString),
+                                  draggedId != todo.id else { return false }
+
+                            let sorted = incomplete
+                            guard let sourceIndex = sorted.firstIndex(where: { $0.id == draggedId }),
+                                  let destIndex = sorted.firstIndex(where: { $0.id == todo.id }) else { return false }
+
+                            viewModel.moveTodo(
+                                from: IndexSet(integer: sourceIndex),
+                                to: destIndex > sourceIndex ? destIndex + 1 : destIndex,
+                                in: sortedTodosList
+                            )
+                            syncService.syncAfterAction()
+                            return true
+                        }
                 }
-                .onMove { source, destination in
-                    viewModel.moveTodo(from: source, to: destination, in: sortedTodosList)
-                    syncService.syncAfterAction()
-                }
-                .deleteDisabled(true)
             }
 
             if !completed.isEmpty {
                 Section {
+                    Text("Completed")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(Color.kumoSubtle)
+                        .textCase(nil)
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
+
                     ForEach(completed) { todo in
                         todoRow(todo)
                     }
@@ -87,7 +109,7 @@ struct ContentView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
-        .environment(\.editMode, .constant(.active))
+        .scrollDismissesKeyboard(.interactively)
     }
 
     @ViewBuilder

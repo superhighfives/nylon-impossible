@@ -116,6 +116,7 @@ struct APIServiceTests {
             title: nil,
             completed: true,
             position: nil,
+            dueDate: nil,
             updatedAt: Date(timeIntervalSince1970: 1700000000),
             deleted: nil
         )
