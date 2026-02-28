@@ -38,7 +38,6 @@ struct APITodo: Codable {
     let title: String
     let completed: Bool
     let position: String?
-    let dueDate: Date?
     let createdAt: Date
     let updatedAt: Date
 }
@@ -53,7 +52,6 @@ struct TodoChange: Codable {
     let title: String?
     let completed: Bool?
     let position: String?
-    let dueDate: Date?
     let updatedAt: Date
     let deleted: Bool?
 }
@@ -88,7 +86,6 @@ struct SmartCreateTodo: Codable {
     let title: String
     let completed: Bool
     let position: String?
-    let dueDate: String?
     let createdAt: Date
     let updatedAt: Date
 }

@@ -22,72 +22,17 @@ import { useEffect, useRef, useState } from "react";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { Todo } from "@/types/database";
 
-function formatDueDate(date: Date | null | undefined): string {
-  if (!date) return "";
-
-  const now = new Date();
-  const dueDate = new Date(date);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dueDateOnly = new Date(
-    dueDate.getFullYear(),
-    dueDate.getMonth(),
-    dueDate.getDate(),
-  );
-
-  if (dueDateOnly.getTime() === today.getTime()) {
-    return "Today";
-  }
-  if (dueDateOnly.getTime() === tomorrow.getTime()) {
-    return "Tomorrow";
-  }
-
-  const daysUntil = Math.ceil(
-    (dueDateOnly.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (daysUntil > 0 && daysUntil <= 7) {
-    return dueDate.toLocaleDateString("en-US", { weekday: "short" });
-  }
-
-  return dueDate.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function isOverdue(date: Date | null | undefined): boolean {
-  if (!date) return false;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDate = new Date(date);
-  const dueDateOnly = new Date(
-    dueDate.getFullYear(),
-    dueDate.getMonth(),
-    dueDate.getDate(),
-  );
-  return dueDateOnly < today;
-}
-
-function toDateInputValue(date: Date | null | undefined): string {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toISOString().split("T")[0];
-}
-
 interface TodoItemProps {
   todo: Todo;
   isEditing: boolean;
   editTitle: string;
-  editDueDate: string;
   editInputRef: React.RefObject<HTMLInputElement | null>;
   onToggle: (id: string, completed: boolean) => void;
-  onEdit: (id: string, title: string, dueDate: Date | null | undefined) => void;
+  onEdit: (id: string, title: string) => void;
   onSaveEdit: (id: string) => void;
   onCancelEdit: () => void;
   onDelete: (id: string) => void;
   onEditTitleChange: (value: string) => void;
-  onEditDueDateChange: (value: string) => void;
   updatePending: boolean;
   deletePending: boolean;
 }
@@ -96,7 +41,6 @@ function TodoItemContent({
   todo,
   isEditing,
   editTitle,
-  editDueDate,
   editInputRef,
   onToggle,
   onEdit,
@@ -104,12 +48,9 @@ function TodoItemContent({
   onCancelEdit,
   onDelete,
   onEditTitleChange,
-  onEditDueDateChange,
   updatePending,
   deletePending,
 }: TodoItemProps) {
-  const overdue = isOverdue(todo.dueDate) && !todo.completed;
-
   if (isEditing) {
     return (
       <div className="space-y-3">
@@ -126,14 +67,7 @@ function TodoItemContent({
           aria-label="Edit todo title"
           size="sm"
         />
-        <div className="flex items-center justify-between">
-          <Input
-            type="date"
-            value={editDueDate}
-            onChange={(e) => onEditDueDateChange(e.target.value)}
-            aria-label="Due date"
-            size="sm"
-          />
+        <div className="flex items-center justify-end">
           <div className="flex gap-2">
             <Button
               variant="ghost"
@@ -175,20 +109,13 @@ function TodoItemContent({
         >
           {todo.title}
         </p>
-        {todo.dueDate && (
-          <p
-            className={`text-xs mt-1 ${overdue ? "text-error" : "text-muted"}`}
-          >
-            {formatDueDate(todo.dueDate)}
-          </p>
-        )}
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="sm"
           type="button"
-          onClick={() => onEdit(todo.id, todo.title, todo.dueDate)}
+          onClick={() => onEdit(todo.id, todo.title)}
           aria-label={`Edit "${todo.title}"`}
         >
           Edit
@@ -252,7 +179,6 @@ export function TodoList() {
   const deleteTodo = useDeleteTodo();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editDueDate, setEditDueDate] = useState<string>("");
   const editInputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
@@ -295,14 +221,9 @@ export function TodoList() {
     updateTodo.mutate({ id, input: { completed: !completed } });
   };
 
-  const handleEdit = (
-    id: string,
-    title: string,
-    dueDate: Date | null | undefined,
-  ) => {
+  const handleEdit = (id: string, title: string) => {
     setEditingId(id);
     setEditTitle(title);
-    setEditDueDate(toDateInputValue(dueDate));
   };
 
   const handleSaveEdit = (id: string) => {
@@ -313,14 +234,12 @@ export function TodoList() {
         id,
         input: {
           title: editTitle.trim(),
-          dueDate: editDueDate ? new Date(editDueDate) : null,
         },
       },
       {
         onSuccess: () => {
           setEditingId(null);
           setEditTitle("");
-          setEditDueDate("");
         },
       },
     );
@@ -329,7 +248,6 @@ export function TodoList() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditTitle("");
-    setEditDueDate("");
   };
 
   const handleDelete = (id: string) => {
@@ -382,7 +300,6 @@ export function TodoList() {
     todo,
     isEditing: editingId === todo.id,
     editTitle,
-    editDueDate,
     editInputRef,
     onToggle: handleToggle,
     onEdit: handleEdit,
@@ -390,7 +307,6 @@ export function TodoList() {
     onCancelEdit: handleCancelEdit,
     onDelete: handleDelete,
     onEditTitleChange: setEditTitle,
-    onEditDueDateChange: setEditDueDate,
     updatePending: updateTodo.isPending,
     deletePending: deleteTodo.isPending,
   });

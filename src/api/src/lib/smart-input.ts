@@ -1,13 +1,9 @@
 /**
- * Heuristic detection for multi-item or date-containing input
+ * Heuristic detection for multi-item input
  *
- * Routes text to AI if it likely contains multiple todos or relative dates.
- * Simple, single-item text without dates goes through the fast path.
+ * Routes text to AI if it likely contains multiple todos.
+ * Simple, single-item text goes through the fast path.
  */
-
-// Relative date patterns that need AI to resolve
-const DATE_PATTERNS =
-  /\b(tomorrow|yesterday|today|tonight|next\s+(week|month|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|this\s+(week|weekend|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|by\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|end\s+of|next)|due\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday|by|on|next|tomorrow|today)|in\s+\d+\s+(days?|weeks?|months?))\b/i;
 
 // List-like patterns
 const LIST_PATTERNS = /^[\s]*(\d+[.)]\s|[-*]\s)/m;
@@ -21,7 +17,7 @@ const COMMA_CLAUSE = /,\s+[a-z]/;
 /**
  * Determine whether input text should be routed through AI extraction.
  *
- * Returns true if the text likely contains multiple items or relative dates.
+ * Returns true if the text likely contains multiple items.
  */
 export function shouldUseAI(text: string): boolean {
   // Contains newlines (likely multi-item)
@@ -32,9 +28,6 @@ export function shouldUseAI(text: string): boolean {
 
   // Long text is more likely to be multi-item
   if (text.length > 120) return true;
-
-  // Contains relative date references that AI should parse
-  if (DATE_PATTERNS.test(text)) return true;
 
   // Contains "and" joining what look like separate clauses
   if (AND_CLAUSES.test(text)) return true;

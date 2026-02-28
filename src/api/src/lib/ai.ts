@@ -4,13 +4,11 @@
 
 interface ExtractedItem {
   title: string;
-  dueDate: string | null;
 }
 
 interface AIToolCallResponse {
   todos: Array<{
     title: string;
-    dueDate?: string | null;
   }>;
 }
 
@@ -34,12 +32,6 @@ const extractTodosTool = {
                 description:
                   "Concise action item starting with a verb (e.g., 'Buy groceries', 'Email team about Friday meeting', 'Review PR #123')",
               },
-              dueDate: {
-                type: "string",
-                description:
-                  "ISO 8601 date (YYYY-MM-DD) if a deadline is mentioned (e.g., 'by Friday' -> next Friday's date, 'tomorrow' -> tomorrow's date), null if no date mentioned",
-                nullable: true,
-              },
             },
             required: ["title"],
           },
@@ -57,16 +49,13 @@ Guidelines:
 - Extract only clear, actionable tasks (things the user needs to DO)
 - Start each todo with an action verb (Buy, Call, Email, Review, etc.)
 - Keep titles concise but specific (5-10 words ideal)
-- Parse dates relative to today's date when mentioned (e.g., "by Friday", "next week", "tomorrow")
-- If no deadline is mentioned, leave dueDate as null
 - Don't create todos for general statements or observations
 - Combine related items if they're clearly the same task
-- Today's date is: ${new Date().toISOString().split("T")[0]}
 
 Examples of good extractions:
 - "need to buy milk" -> "Buy milk"
 - "should email the team about the meeting" -> "Email team about meeting"
-- "the report is due Friday" -> "Complete report" with dueDate set to this Friday`;
+- "the report is due Friday" -> "Complete report"`;
 }
 
 /**
@@ -105,6 +94,5 @@ export async function extractTodos(
 
   return parsed.todos.map((todo) => ({
     title: todo.title,
-    dueDate: todo.dueDate ?? null,
   }));
 }

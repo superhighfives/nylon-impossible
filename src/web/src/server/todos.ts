@@ -97,7 +97,6 @@ export const createTodo = createServerFn({ method: "POST" })
                 title: validated.title,
                 position,
                 completed: false,
-                dueDate: validated.dueDate ?? null,
               })
               .returning(),
           catch: (error) =>
@@ -143,8 +142,6 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.completed = validated.completed;
         if (validated.position !== undefined)
           updates.position = validated.position;
-        if (validated.dueDate !== undefined)
-          updates.dueDate = validated.dueDate;
 
         // Update todo with compound where clause for authorization
         const [result] = yield* Effect.tryPromise({
