@@ -17,7 +17,9 @@ describe("config", () => {
   });
 
   it("uses VITE_API_BASE_URL when set and not localhost", async () => {
-    vi.stubGlobal("window", { location: { hostname: "pr-42.nylonimpossible.com" } });
+    vi.stubGlobal("window", {
+      location: { hostname: "pr-42.nylonimpossible.com" },
+    });
     vi.stubEnv("VITE_API_BASE_URL", "https://api-pr-42.nylonimpossible.com");
 
     const { API_URL, WS_URL } = await import("../config");
