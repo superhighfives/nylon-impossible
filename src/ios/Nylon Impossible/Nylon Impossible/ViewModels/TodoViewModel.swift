@@ -73,6 +73,11 @@ final class TodoViewModel {
         movedItem.markModified()
     }
 
+    func updateTodoTitle(_ todo: TodoItem, title: String) {
+        todo.title = title
+        todo.markModified()
+    }
+
     func toggleTodo(_ todo: TodoItem) {
         todo.isCompleted.toggle()
         todo.markModified()
