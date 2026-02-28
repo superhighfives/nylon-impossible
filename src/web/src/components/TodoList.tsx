@@ -3,6 +3,8 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -10,6 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -148,9 +151,7 @@ function SortableTodoItem(props: TodoItemProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : undefined,
-    position: "relative" as const,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
@@ -180,6 +181,10 @@ export function TodoList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const editInputRef = useRef<HTMLInputElement>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
+    Todo[] | null
+  >(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -198,6 +203,11 @@ export function TodoList() {
       editInputRef.current.focus();
     }
   }, [editingId]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: todos is used as a trigger to reset local order when server data refreshes
+  useEffect(() => {
+    setLocalIncompleteTodos(null);
+  }, [todos]);
 
   if (isLoading) {
     return <p className="text-center text-muted text-sm py-12">Loading...</p>;
@@ -272,18 +282,31 @@ export function TodoList() {
   const incompleteTodos = sortedTodos.filter((t) => !t.completed);
   const completedTodos = sortedTodos.filter((t) => t.completed);
 
+  const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
+  const activeItem = activeId
+    ? (displayIncompleteTodos.find((t) => t.id === activeId) ?? null)
+    : null;
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveId(active.id as string);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
     if (!over || active.id === over.id) return;
 
-    const oldIndex = incompleteTodos.findIndex((t) => t.id === active.id);
-    const newIndex = incompleteTodos.findIndex((t) => t.id === over.id);
+    const currentItems = localIncompleteTodos ?? incompleteTodos;
+    const oldIndex = currentItems.findIndex((t) => t.id === active.id);
+    const newIndex = currentItems.findIndex((t) => t.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    // Build the reordered array to find neighbors
-    const reordered = [...incompleteTodos];
-    const [moved] = reordered.splice(oldIndex, 1);
-    reordered.splice(newIndex, 0, moved);
+    const reordered = arrayMove(currentItems, oldIndex, newIndex);
+    setLocalIncompleteTodos(reordered);
 
     const prev = newIndex > 0 ? reordered[newIndex - 1].position : null;
     const next =
@@ -316,16 +339,35 @@ export function TodoList() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <SortableContext
-          items={incompleteTodos.map((t) => t.id)}
+          items={displayIncompleteTodos.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          {incompleteTodos.map((todo) => (
+          {displayIncompleteTodos.map((todo) => (
             <SortableTodoItem key={todo.id} {...sharedProps(todo)} />
           ))}
         </SortableContext>
+        <DragOverlay>
+          {activeItem ? (
+            <div className="py-3 bg-surface shadow-lg rounded-md opacity-95">
+              <div className="flex items-start gap-2">
+                <button
+                  type="button"
+                  className="pt-1 cursor-grabbing text-muted"
+                >
+                  <GripVertical size={16} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <TodoItemContent {...sharedProps(activeItem)} />
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
       {completedTodos.map((todo) => (
         <div key={todo.id} className="py-3 group">
