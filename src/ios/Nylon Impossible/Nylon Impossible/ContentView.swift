@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -14,6 +15,7 @@ struct ContentView: View {
     @Environment(SyncService.self) private var syncService
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
+    @State private var draggedTodo: TodoItem?
 
     private var sortedTodosList: [TodoItem] {
         viewModel.sortedTodos(from: todos)
@@ -75,10 +77,19 @@ struct ContentView: View {
             Section {
                 ForEach(incomplete) { todo in
                     todoRow(todo)
-                }
-                .onMove { source, destination in
-                    viewModel.moveTodo(from: source, to: destination, in: sortedTodosList)
-                    syncService.syncAfterAction()
+                        .onDrag {
+                            draggedTodo = todo
+                            return NSItemProvider(object: todo.id.uuidString as NSString)
+                        }
+                        .onDrop(of: [UTType.text], delegate: TodoReorderDropDelegate(
+                            item: todo,
+                            items: incomplete,
+                            draggedItem: $draggedTodo,
+                            onReorder: { source, destination in
+                                viewModel.moveTodo(from: source, to: destination, in: sortedTodosList)
+                                syncService.syncAfterAction()
+                            }
+                        ))
                 }
                 .onDelete { offsets in
                     for index in offsets {
@@ -99,11 +110,9 @@ struct ContentView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
-                        .moveDisabled(true)
 
                     ForEach(completed) { todo in
                         todoRow(todo)
-                            .moveDisabled(true)
                     }
                     .onDelete { offsets in
                         for index in offsets {
@@ -120,7 +129,6 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        .environment(\.editMode, .constant(.active))
     }
 
     @ViewBuilder
@@ -143,6 +151,33 @@ struct ContentView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
+    }
+}
+
+private struct TodoReorderDropDelegate: DropDelegate {
+    let item: TodoItem
+    let items: [TodoItem]
+    @Binding var draggedItem: TodoItem?
+    let onReorder: (IndexSet, Int) -> Void
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard let draggedItem,
+              draggedItem.id != item.id,
+              let from = items.firstIndex(where: { $0.id == draggedItem.id }),
+              let to = items.firstIndex(where: { $0.id == item.id }) else {
+            self.draggedItem = nil
+            return false
+        }
+        let destination = from < to ? to + 1 : to
+        withAnimation(.easeInOut(duration: 0.2)) {
+            onReorder(IndexSet(integer: from), destination)
+        }
+        self.draggedItem = nil
+        return true
     }
 }
 
