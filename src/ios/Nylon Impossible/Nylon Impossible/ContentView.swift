@@ -75,24 +75,18 @@ struct ContentView: View {
             Section {
                 ForEach(incomplete) { todo in
                     todoRow(todo)
-                        .draggable(todo.id.uuidString)
-                        .dropDestination(for: String.self) { items, _ in
-                            guard let draggedIdString = items.first,
-                                  let draggedId = UUID(uuidString: draggedIdString),
-                                  draggedId != todo.id else { return false }
-
-                            let sorted = incomplete
-                            guard let sourceIndex = sorted.firstIndex(where: { $0.id == draggedId }),
-                                  let destIndex = sorted.firstIndex(where: { $0.id == todo.id }) else { return false }
-
-                            viewModel.moveTodo(
-                                from: IndexSet(integer: sourceIndex),
-                                to: destIndex > sourceIndex ? destIndex + 1 : destIndex,
-                                in: sortedTodosList
-                            )
-                            syncService.syncAfterAction()
-                            return true
+                }
+                .onMove { source, destination in
+                    viewModel.moveTodo(from: source, to: destination, in: sortedTodosList)
+                    syncService.syncAfterAction()
+                }
+                .onDelete { offsets in
+                    for index in offsets {
+                        withAnimation(.easeInOut(duration: 0.3)) {
+                            viewModel.deleteTodo(incomplete[index], context: modelContext)
                         }
+                    }
+                    syncService.syncAfterAction()
                 }
             }
 
@@ -105,9 +99,19 @@ struct ContentView: View {
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
                         .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
+                        .moveDisabled(true)
 
                     ForEach(completed) { todo in
                         todoRow(todo)
+                            .moveDisabled(true)
+                    }
+                    .onDelete { offsets in
+                        for index in offsets {
+                            withAnimation(.easeInOut(duration: 0.3)) {
+                                viewModel.deleteTodo(completed[index], context: modelContext)
+                            }
+                        }
+                        syncService.syncAfterAction()
                     }
                 }
             }
@@ -116,14 +120,22 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+        .environment(\.editMode, .constant(.active))
     }
 
     @ViewBuilder
     private func todoRow(_ todo: TodoItem) -> some View {
-        TodoItemRow(todo: todo) {
-            viewModel.toggleTodo(todo)
-            syncService.syncAfterAction()
-        }
+        TodoItemRow(
+            todo: todo,
+            onToggle: {
+                viewModel.toggleTodo(todo)
+                syncService.syncAfterAction()
+            },
+            onEdit: { newTitle in
+                viewModel.updateTodoTitle(todo, title: newTitle)
+                syncService.syncAfterAction()
+            }
+        )
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
@@ -131,16 +143,6 @@ struct ContentView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    viewModel.deleteTodo(todo, context: modelContext)
-                }
-                syncService.syncAfterAction()
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
     }
 }
 

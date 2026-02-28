@@ -10,9 +10,12 @@ import SwiftUI
 struct TodoItemRow: View {
     let todo: TodoItem
     var onToggle: () -> Void
+    var onEdit: (String) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var checkmarkScale: CGFloat = 1.0
+    @State private var isEditing = false
+    @State private var editText = ""
 
     var body: some View {
         HStack(spacing: 16) {
@@ -54,14 +57,19 @@ struct TodoItemRow: View {
             }
             .buttonStyle(.plain)
 
-            // Task title
-            Text(todo.title)
-                .font(.system(size: 16))
-                .foregroundStyle(todo.isCompleted ? Color.kumoSubtle : Color.kumoDefault)
-                .strikethrough(todo.isCompleted, color: Color.kumoSubtle)
-                .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
-
-            Spacer()
+            // Task title — tappable to edit
+            Button(action: {
+                editText = todo.title
+                isEditing = true
+            }) {
+                Text(todo.title)
+                    .font(.system(size: 16))
+                    .foregroundStyle(todo.isCompleted ? Color.kumoSubtle : Color.kumoDefault)
+                    .strikethrough(todo.isCompleted, color: Color.kumoSubtle)
+                    .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
@@ -76,6 +84,16 @@ struct TodoItemRow: View {
         )
         .opacity(todo.isCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
+        .alert("Edit Task", isPresented: $isEditing) {
+            TextField("Task title", text: $editText)
+            Button("Save") {
+                let trimmed = editText.trimmingCharacters(in: .whitespacesAndNewlines)
+                if !trimmed.isEmpty {
+                    onEdit(trimmed)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
 
 }
@@ -89,7 +107,8 @@ struct TodoItemRow: View {
                     let item = TodoItem(title: "Buy groceries")
                     return item
                 }(),
-                onToggle: {}
+                onToggle: {},
+                onEdit: { _ in }
             )
             TodoItemRow(
                 todo: {
@@ -97,7 +116,8 @@ struct TodoItemRow: View {
                     item.isCompleted = true
                     return item
                 }(),
-                onToggle: {}
+                onToggle: {},
+                onEdit: { _ in }
             )
         }
         .padding()
