@@ -60,6 +60,47 @@ final class SyncService {
         self.modelContext = context
     }
 
+    /// Create todos via the smart create API endpoint, then sync results into SwiftData.
+    /// Falls back to local creation if not signed in.
+    func smartCreate(text: String, context: ModelContext, userId: String?, allTodos: [TodoItem]) async {
+        // Offline fallback: create locally
+        guard authService.isSignedIn, userId != nil, let apiService else {
+            // Create a single local todo
+            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else { return }
+            let lastPosition = allTodos
+                .filter { !$0.isDeleted && !$0.isCompleted }
+                .map { $0.position }
+                .sorted()
+                .last
+            let position = generateKeyBetween(lastPosition, nil)
+            let todo = TodoItem(title: trimmedText, userId: userId, position: position)
+            context.insert(todo)
+            return
+        }
+
+        do {
+            let _ = try await apiService.smartCreate(text: text)
+            // Sync to pull the created todos into SwiftData
+            await sync()
+            webSocketService?.notifyChanged()
+        } catch {
+            print("[SmartCreate] Error: \(error), falling back to local creation")
+            // Fallback: create single local todo
+            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmedText.isEmpty else { return }
+            let lastPosition = allTodos
+                .filter { !$0.isDeleted && !$0.isCompleted }
+                .map { $0.position }
+                .sorted()
+                .last
+            let position = generateKeyBetween(lastPosition, nil)
+            let todo = TodoItem(title: trimmedText, userId: userId, position: position)
+            context.insert(todo)
+            syncAfterAction()
+        }
+    }
+
     /// Trigger a sync after a user action, then notify other clients via WebSocket.
     func syncAfterAction() {
         Task { @MainActor in

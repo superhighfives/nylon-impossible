@@ -10,11 +10,26 @@ final class MockAPIService: APIProviding, @unchecked Sendable {
     var syncError: Error?
     var lastSyncRequest: (lastSyncedAt: Date?, changes: [TodoChange])?
 
+    var smartCreateResponse: SmartCreateResponse = SmartCreateResponse(
+        todos: [],
+        ai: false
+    )
+    var smartCreateError: Error?
+    var lastSmartCreateText: String?
+
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse {
         lastSyncRequest = (lastSyncedAt, changes)
         if let error = syncError {
             throw error
         }
         return syncResponse
+    }
+
+    func smartCreate(text: String) async throws -> SmartCreateResponse {
+        lastSmartCreateText = text
+        if let error = smartCreateError {
+            throw error
+        }
+        return smartCreateResponse
     }
 }

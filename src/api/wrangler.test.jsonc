@@ -4,12 +4,6 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
-  "routes": [
-    {
-      "pattern": "api.nylonimpossible.com",
-      "custom_domain": true
-    }
-  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -32,9 +26,8 @@
       "new_classes": ["UserSync"]
     }
   ],
-  "ai": {
-    "binding": "AI"
-  },
+  // AI binding excluded — requires remote auth and is not needed for tests.
+  // Integration tests that need AI should mock the binding via miniflare.
   "observability": {
     "enabled": true
   }

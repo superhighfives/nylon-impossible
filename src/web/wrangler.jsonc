@@ -24,13 +24,6 @@
 			"database_id": "4943b98f-cdcc-42dc-a678-b340d10f4ac7"
 		}
 	],
-	// AI Gateway configuration
-	// Create gateway at: https://dash.cloudflare.com/?to=/:account/ai/ai-gateway
-	// Then set these as secrets: wrangler secret put CF_ACCOUNT_ID, CF_API_TOKEN, AI_GATEWAY_NAME
-	"vars": {
-		// These will be overridden by secrets in production
-		"AI_MODEL": "@cf/qwen/qwen3-30b-a3b-fp8"
-	},
 	"observability": {
 		"enabled": true
 	}

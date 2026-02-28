@@ -50,26 +50,3 @@ export class ForbiddenError extends Data.TaggedError("ForbiddenError")<{
   readonly resource: string;
   readonly userId: string;
 }> {}
-
-/**
- * Thrown when AI extraction fails
- */
-export class AIExtractionError extends Data.TaggedError("AIExtractionError")<{
-  readonly message: string;
-  readonly cause?: unknown;
-}> {}
-
-/**
- * Thrown when AI rate limit is exceeded
- */
-export class AIRateLimitError extends Data.TaggedError("AIRateLimitError")<{
-  readonly message: string;
-  readonly retryAfter?: number;
-}> {}
-
-/**
- * Thrown when AI request times out
- */
-export class AITimeoutError extends Data.TaggedError("AITimeoutError")<{
-  readonly message: string;
-}> {}

@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  AIExtractionError,
-  AIRateLimitError,
-  AITimeoutError,
   DatabaseError,
   ForbiddenError,
   TodoNotFoundError,
@@ -53,26 +50,5 @@ describe("Tagged errors", () => {
     expect(error._tag).toBe("ForbiddenError");
     expect(error.resource).toBe("todo");
     expect(error.userId).toBe("user_789");
-  });
-
-  it("AIExtractionError stores message", () => {
-    const error = new AIExtractionError({ message: "Parsing failed" });
-    expect(error._tag).toBe("AIExtractionError");
-    expect(error.message).toBe("Parsing failed");
-  });
-
-  it("AIRateLimitError stores retryAfter", () => {
-    const error = new AIRateLimitError({
-      message: "Rate limited",
-      retryAfter: 60,
-    });
-    expect(error._tag).toBe("AIRateLimitError");
-    expect(error.retryAfter).toBe(60);
-  });
-
-  it("AITimeoutError stores message", () => {
-    const error = new AITimeoutError({ message: "Timed out" });
-    expect(error._tag).toBe("AITimeoutError");
-    expect(error.message).toBe("Timed out");
   });
 });

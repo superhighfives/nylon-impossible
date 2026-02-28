@@ -1,11 +1,15 @@
+import { useAuth } from "@clerk/tanstack-react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
-import type { ExtractedTodo } from "@/lib/ai-types";
-import { extractTodosFromText } from "@/server/ai";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";
 
 const TODOS_QUERY_KEY = ["todos"];
+
+const API_URL =
+  typeof window !== "undefined" && window.location.hostname === "localhost"
+    ? "http://localhost:8787"
+    : "https://api.nylonimpossible.com";
 
 export function useTodos() {
   return useQuery({
@@ -102,36 +106,41 @@ export function useDeleteTodo() {
   });
 }
 
-/**
- * Hook to extract todos from text using AI
- */
-export function useExtractTodos() {
-  return useMutation({
-    mutationFn: (text: string) => extractTodosFromText({ data: { text } }),
-  });
+interface SmartCreateResponse {
+  todos: Todo[];
+  ai: boolean;
 }
 
 /**
- * Hook to create multiple todos at once (for AI extraction)
+ * Hook to create todos via the smart create API endpoint.
+ * Routes through AI extraction when the text contains multiple items or dates.
  */
-export function useCreateTodosBatch() {
+export function useSmartCreate() {
   const queryClient = useQueryClient();
   const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
 
   return useMutation({
-    mutationFn: async (todos: ExtractedTodo[]) => {
-      // Create todos sequentially to maintain order
-      const results: Todo[] = [];
-      for (const todo of todos) {
-        if (!todo.selected) continue;
-        const input: CreateTodoInput = { title: todo.title };
-        if (todo.dueDate) {
-          input.dueDate = new Date(todo.dueDate);
-        }
-        const result = await createTodo({ data: input });
-        results.push(result);
+    mutationFn: async (text: string): Promise<SmartCreateResponse> => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/smart`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(
+          (error as { error?: string } | null)?.error ??
+            `Request failed (${response.status})`,
+        );
       }
-      return results;
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });

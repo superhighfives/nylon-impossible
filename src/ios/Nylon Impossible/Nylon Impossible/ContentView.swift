@@ -36,10 +36,16 @@ struct ContentView: View {
                     text: $viewModel.newTaskText,
                     canAdd: viewModel.canAddTask
                 ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        viewModel.addTodo(context: modelContext, userId: authService.userId, allTodos: todos)
+                    let text = viewModel.newTaskText
+                    viewModel.newTaskText = ""
+                    Task {
+                        await syncService.smartCreate(
+                            text: text,
+                            context: modelContext,
+                            userId: authService.userId,
+                            allTodos: todos
+                        )
                     }
-                    syncService.syncAfterAction()
                 }
 
                 // Task list or empty state
