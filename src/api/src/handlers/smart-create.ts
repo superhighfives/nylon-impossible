@@ -1,8 +1,8 @@
-import { generateKeyBetween } from "fractional-indexing";
+import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { extractTodos } from "../lib/ai";
-import { desc, eq, getDb, todos } from "../lib/db";
+import { eq, getDb, todos } from "../lib/db";
 import { shouldUseAI } from "../lib/smart-input";
 import type { Env } from "../types";
 
@@ -46,16 +46,16 @@ export async function smartCreate(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  // Get the highest position so new todos are appended at the end
-  const lastTodo = await db
+  // Get the lowest position so new todos are prepended at the start
+  const firstTodo = await db
     .select({ position: todos.position })
     .from(todos)
     .where(eq(todos.userId, userId))
-    .orderBy(desc(todos.position))
+    .orderBy(todos.position)
     .limit(1)
     .then((rows) => rows[0]);
 
-  const lastPosition = lastTodo?.position ?? null;
+  const firstPosition = firstTodo?.position ?? null;
 
   if (shouldUseAI(text)) {
     // AI path: extract and create multiple todos
@@ -69,14 +69,14 @@ export async function smartCreate(c: Context<Env>) {
         "AI extraction failed, falling back to single todo:",
         error,
       );
-      return createAndReturn(db, c, userId, [{ title: text }], lastPosition);
+      return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
     }
 
-    return createAndReturn(db, c, userId, extracted, lastPosition, true);
+    return createAndReturn(db, c, userId, extracted, firstPosition, true);
   }
 
   // Fast path: create single todo directly
-  return createAndReturn(db, c, userId, [{ title: text }], lastPosition);
+  return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
 }
 
 /** Batch-insert todos, fetch them back in one query, and return the response. */
@@ -85,16 +85,17 @@ async function createAndReturn(
   c: Context<Env>,
   userId: string,
   items: Array<{ title: string; dueDate?: string | null }>,
-  lastPosition: string | null,
+  firstPosition: string | null,
   ai = false,
 ) {
   const now = new Date();
   const ids: string[] = [];
 
+  // Generate N positions before the first existing todo
+  const positions = generateNKeysBetween(null, firstPosition, items.length);
+
   // Build all values up-front so we can batch the insert
-  const rows = items.map((item) => {
-    const position = generateKeyBetween(lastPosition, null);
-    lastPosition = position;
+  const rows = items.map((item, i) => {
     const id = crypto.randomUUID();
     ids.push(id);
     return {
@@ -102,7 +103,7 @@ async function createAndReturn(
       userId,
       title: item.title,
       completed: false as const,
-      position,
+      position: positions[i],
       dueDate: parseAIDate(item.dueDate ?? null),
       createdAt: now,
       updatedAt: now,

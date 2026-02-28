@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, sql } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
@@ -38,4 +38,4 @@ export function getDb(d1: D1Database) {
   return drizzle(d1);
 }
 
-export { eq, and, gt, desc };
+export { eq, and, gt };
