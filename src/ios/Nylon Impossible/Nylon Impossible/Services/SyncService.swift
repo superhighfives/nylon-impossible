@@ -123,7 +123,7 @@ final class SyncService {
     func sync() async {
         guard state != .syncing else { return }
         guard authService.isSignedIn, let userId = authService.userId else { return }
-        guard let modelContext, let apiService else { return }
+        guard modelContext != nil, let apiService else { return }
 
         state = .syncing
 

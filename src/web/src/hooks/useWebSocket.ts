@@ -7,13 +7,9 @@ import {
   useEffect,
   useRef,
 } from "react";
+import { WS_URL } from "@/lib/config";
 
 const TODOS_QUERY_KEY = ["todos"];
-
-const WS_URL =
-  typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "ws://localhost:8787/ws"
-    : "wss://api.nylonimpossible.com/ws";
 
 const MAX_RECONNECT_DELAY = 30_000;
 const INITIAL_RECONNECT_DELAY = 1_000;

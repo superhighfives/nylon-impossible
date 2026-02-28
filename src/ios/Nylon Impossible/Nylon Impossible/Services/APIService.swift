@@ -13,7 +13,7 @@ enum APIError: Error, LocalizedError {
     case invalidResponse
     case serverError(Int, String?)
     case decodingError(Error)
-    
+
     var errorDescription: String? {
         switch self {
         case .unauthorized:
@@ -32,7 +32,7 @@ enum APIError: Error, LocalizedError {
 
 // MARK: - API Models
 
-struct APITodo: Codable {
+struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
@@ -42,12 +42,12 @@ struct APITodo: Codable {
     let updatedAt: Date
 }
 
-struct SyncRequest: Codable {
+struct SyncRequest: Codable, Sendable {
     let lastSyncedAt: Date?
     let changes: [TodoChange]
 }
 
-struct TodoChange: Codable {
+struct TodoChange: Codable, Sendable {
     let id: String
     let title: String?
     let completed: Bool?
@@ -56,13 +56,13 @@ struct TodoChange: Codable {
     let deleted: Bool?
 }
 
-struct SyncResponse: Codable {
+struct SyncResponse: Codable, Sendable {
     let todos: [APITodo]
     let syncedAt: String
     let conflicts: [SyncConflict]
 }
 
-struct SyncConflict: Codable {
+struct SyncConflict: Codable, Sendable {
     let id: String
     let resolution: String
     let localUpdatedAt: Date
@@ -71,16 +71,16 @@ struct SyncConflict: Codable {
 
 // MARK: - Smart Create Models
 
-struct SmartCreateRequest: Codable {
+struct SmartCreateRequest: Codable, Sendable {
     let text: String
 }
 
-struct SmartCreateResponse: Codable {
+struct SmartCreateResponse: Codable, Sendable {
     let todos: [SmartCreateTodo]
     let ai: Bool
 }
 
-struct SmartCreateTodo: Codable {
+struct SmartCreateTodo: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
@@ -92,6 +92,7 @@ struct SmartCreateTodo: Codable {
 
 // MARK: - API Protocol
 
+@MainActor
 protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
     func smartCreate(text: String) async throws -> SmartCreateResponse
@@ -99,26 +100,27 @@ protocol APIProviding: Sendable {
 
 // MARK: - API Service
 
-actor APIService: APIProviding {
+@MainActor
+final class APIService: APIProviding {
     private let baseURL: URL
     private let authService: AuthService
     private let session: URLSession
     private let decoder: JSONDecoder
     private let encoder: JSONEncoder
-    
+
     init(authService: AuthService) {
         self.baseURL = Config.apiBaseURL
         self.authService = authService
-        
+
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
         config.timeoutIntervalForResource = 60
         self.session = URLSession(configuration: config)
-        
+
         self.decoder = JSONDecoder()
         self.decoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
-            
+
             // Try ISO8601 with fractional seconds first
             if let dateString = try? container.decode(String.self) {
                 let formatter = ISO8601DateFormatter()
@@ -132,7 +134,7 @@ actor APIService: APIProviding {
                     return date
                 }
             }
-            
+
             // Try numeric timestamp (seconds or milliseconds)
             if let timestamp = try? container.decode(Double.self) {
                 // D1 stores unix timestamps in seconds. Values below ~32B are seconds,
@@ -143,24 +145,24 @@ actor APIService: APIProviding {
                     return Date(timeIntervalSince1970: timestamp / 1000)
                 }
             }
-            
+
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Cannot decode date"
             )
         }
-        
+
         self.encoder = JSONEncoder()
         self.encoder.dateEncodingStrategy = .iso8601
     }
-    
+
     // MARK: - Sync
-    
+
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse {
         let request = SyncRequest(lastSyncedAt: lastSyncedAt, changes: changes)
         return try await post(path: "/todos/sync", body: request)
     }
-    
+
     // MARK: - Smart Create
 
     func smartCreate(text: String) async throws -> SmartCreateResponse {
@@ -172,7 +174,7 @@ actor APIService: APIProviding {
     func listTodos() async throws -> [APITodo] {
         return try await get(path: "/todos")
     }
-    
+
     func createTodo(id: UUID, title: String) async throws -> APITodo {
         struct CreateRequest: Codable {
             let id: String
@@ -180,7 +182,7 @@ actor APIService: APIProviding {
         }
         return try await post(path: "/todos", body: CreateRequest(id: id.uuidString, title: title))
     }
-    
+
     func updateTodo(id: UUID, title: String?, completed: Bool?, updatedAt: Date) async throws -> APITodo {
         struct UpdateRequest: Codable {
             let title: String?
@@ -192,68 +194,62 @@ actor APIService: APIProviding {
             body: UpdateRequest(title: title, completed: completed, updatedAt: updatedAt)
         )
     }
-    
+
     func deleteTodo(id: UUID) async throws {
         let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
-    
+
     // MARK: - HTTP Methods
-    
+
     private func get<T: Decodable>(path: String) async throws -> T {
         let request = try await buildRequest(path: path, method: "GET")
         return try await execute(request)
     }
-    
+
     private func post<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
         var request = try await buildRequest(path: path, method: "POST")
         request.httpBody = try encoder.encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await execute(request)
     }
-    
+
     private func put<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
         var request = try await buildRequest(path: path, method: "PUT")
         request.httpBody = try encoder.encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await execute(request)
     }
-    
+
     private func delete<T: Decodable>(path: String) async throws -> T {
         let request = try await buildRequest(path: path, method: "DELETE")
         return try await execute(request)
     }
-    
+
     private func buildRequest(path: String, method: String) async throws -> URLRequest {
         let url = baseURL.appendingPathComponent(path)
         var request = URLRequest(url: url)
         request.httpMethod = method
-        
-        // Get auth token
-        let token = try await MainActor.run {
-            Task {
-                try await authService.getToken()
-            }
-        }.value
-        
+
+        let token = try await authService.getToken()
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        
+
         return request
     }
-    
+
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
         let data: Data
         let response: URLResponse
-        
+
         do {
             (data, response) = try await session.data(for: request)
         } catch {
             throw APIError.networkError(error)
         }
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.invalidResponse
         }
-        
+
         switch httpResponse.statusCode {
         case 200...299:
             do {
