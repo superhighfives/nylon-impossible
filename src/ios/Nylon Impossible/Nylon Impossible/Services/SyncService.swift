@@ -219,7 +219,6 @@ final class SyncService {
                 title: todo.isDeleted ? nil : todo.title,
                 completed: todo.isDeleted ? nil : todo.isCompleted,
                 position: todo.isDeleted ? nil : todo.position,
-                dueDate: todo.isDeleted ? nil : todo.dueDate,
                 updatedAt: todo.updatedAt,
                 deleted: todo.isDeleted ? true : nil
             )
@@ -259,7 +258,6 @@ final class SyncService {
                     local.title = remote.title
                     local.isCompleted = remote.completed
                     local.position = remote.position ?? local.position
-                    local.dueDate = remote.dueDate
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
@@ -269,7 +267,6 @@ final class SyncService {
                 let todo = TodoItem(title: remote.title, userId: userId, position: remote.position ?? "a0")
                 todo.id = remoteId
                 todo.isCompleted = remote.completed
-                todo.dueDate = remote.dueDate
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
                 todo.isSynced = true

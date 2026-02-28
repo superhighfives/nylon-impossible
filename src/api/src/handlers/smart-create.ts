@@ -10,16 +10,6 @@ const smartCreateSchema = z.object({
   text: z.string().min(1, "Text is required").max(10000, "Text is too long"),
 });
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-/** Validate an AI-returned date string. Returns a Date or null. */
-function parseAIDate(value: string | null): Date | null {
-  if (!value || !ISO_DATE_RE.test(value)) return null;
-  const ms = Date.parse(value);
-  if (Number.isNaN(ms)) return null;
-  return new Date(ms);
-}
-
 function serializeTodo(todo: typeof todos.$inferSelect) {
   return {
     id: todo.id.toLowerCase(),
@@ -27,7 +17,6 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     title: todo.title,
     completed: todo.completed,
     position: todo.position,
-    dueDate: todo.dueDate?.toISOString() ?? null,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -59,7 +48,7 @@ export async function smartCreate(c: Context<Env>) {
 
   if (shouldUseAI(text)) {
     // AI path: extract and create multiple todos
-    let extracted: Array<{ title: string; dueDate: string | null }>;
+    let extracted: Array<{ title: string }>;
 
     try {
       extracted = await extractTodos(c.env.AI, text);
@@ -84,7 +73,7 @@ async function createAndReturn(
   db: ReturnType<typeof getDb>,
   c: Context<Env>,
   userId: string,
-  items: Array<{ title: string; dueDate?: string | null }>,
+  items: Array<{ title: string }>,
   firstPosition: string | null,
   ai = false,
 ) {
@@ -104,7 +93,6 @@ async function createAndReturn(
       title: item.title,
       completed: false as const,
       position: positions[i],
-      dueDate: parseAIDate(item.dueDate ?? null),
       createdAt: now,
       updatedAt: now,
     };

@@ -57,25 +57,17 @@ struct TodoItemRow: View {
             }
             .buttonStyle(.plain)
 
-            // Task title and due date — tappable to edit
+            // Task title — tappable to edit
             Button(action: {
                 editText = todo.title
                 isEditing = true
             }) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(todo.title)
-                        .font(.system(size: 16))
-                        .foregroundStyle(todo.isCompleted ? Color.kumoSubtle : Color.kumoDefault)
-                        .strikethrough(todo.isCompleted, color: Color.kumoSubtle)
-                        .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
-
-                    if let dueDate = todo.dueDate {
-                        Text(formatDueDate(dueDate))
-                            .font(.system(size: 13))
-                            .foregroundStyle(isOverdue(dueDate) && !todo.isCompleted ? Color.kumoDanger : Color.kumoSubtle)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text(todo.title)
+                    .font(.system(size: 16))
+                    .foregroundStyle(todo.isCompleted ? Color.kumoSubtle : Color.kumoDefault)
+                    .strikethrough(todo.isCompleted, color: Color.kumoSubtle)
+                    .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
         }
@@ -104,36 +96,6 @@ struct TodoItemRow: View {
         }
     }
 
-    // MARK: - Due Date Helpers
-
-    private func formatDueDate(_ date: Date) -> String {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let target = calendar.startOfDay(for: date)
-
-        let daysDiff = calendar.dateComponents([.day], from: today, to: target).day ?? 0
-
-        if daysDiff == 0 {
-            return "Today"
-        } else if daysDiff == 1 {
-            return "Tomorrow"
-        } else if daysDiff > 1 && daysDiff <= 7 {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "EEE"
-            return formatter.string(from: date)
-        } else {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "MMM d"
-            return formatter.string(from: date)
-        }
-    }
-
-    private func isOverdue(_ date: Date) -> Bool {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let target = calendar.startOfDay(for: date)
-        return target < today
-    }
 }
 
 #Preview {

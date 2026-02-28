@@ -19,7 +19,6 @@ final class TodoItem {
     var isSynced: Bool            // Whether this item has been synced to server
     var isDeleted: Bool           // Soft delete for sync
     var position: String = "a0"   // Fractional index for ordering
-    var dueDate: Date?            // Optional due date
 
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
@@ -31,7 +30,6 @@ final class TodoItem {
         self.updatedAt = Date()
         self.isSynced = false
         self.isDeleted = false
-        self.dueDate = nil
     }
     
     /// Mark as modified (for sync tracking)

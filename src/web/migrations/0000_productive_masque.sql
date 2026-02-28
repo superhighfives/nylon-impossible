@@ -4,7 +4,6 @@ CREATE TABLE `todos` (
 	`title` text NOT NULL,
 	`completed` integer DEFAULT false NOT NULL,
 	`position` text DEFAULT 'a0' NOT NULL,
-	`due_date` integer,
 	`created_at` integer DEFAULT (unixepoch()) NOT NULL,
 	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
 	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade

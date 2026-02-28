@@ -3,6 +3,8 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
+  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -10,6 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import {
+  arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   useSortable,
@@ -22,72 +25,17 @@ import { useEffect, useRef, useState } from "react";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { Todo } from "@/types/database";
 
-function formatDueDate(date: Date | null | undefined): string {
-  if (!date) return "";
-
-  const now = new Date();
-  const dueDate = new Date(date);
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dueDateOnly = new Date(
-    dueDate.getFullYear(),
-    dueDate.getMonth(),
-    dueDate.getDate(),
-  );
-
-  if (dueDateOnly.getTime() === today.getTime()) {
-    return "Today";
-  }
-  if (dueDateOnly.getTime() === tomorrow.getTime()) {
-    return "Tomorrow";
-  }
-
-  const daysUntil = Math.ceil(
-    (dueDateOnly.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
-  );
-  if (daysUntil > 0 && daysUntil <= 7) {
-    return dueDate.toLocaleDateString("en-US", { weekday: "short" });
-  }
-
-  return dueDate.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function isOverdue(date: Date | null | undefined): boolean {
-  if (!date) return false;
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dueDate = new Date(date);
-  const dueDateOnly = new Date(
-    dueDate.getFullYear(),
-    dueDate.getMonth(),
-    dueDate.getDate(),
-  );
-  return dueDateOnly < today;
-}
-
-function toDateInputValue(date: Date | null | undefined): string {
-  if (!date) return "";
-  const d = new Date(date);
-  return d.toISOString().split("T")[0];
-}
-
 interface TodoItemProps {
   todo: Todo;
   isEditing: boolean;
   editTitle: string;
-  editDueDate: string;
   editInputRef: React.RefObject<HTMLInputElement | null>;
   onToggle: (id: string, completed: boolean) => void;
-  onEdit: (id: string, title: string, dueDate: Date | null | undefined) => void;
+  onEdit: (id: string, title: string) => void;
   onSaveEdit: (id: string) => void;
   onCancelEdit: () => void;
   onDelete: (id: string) => void;
   onEditTitleChange: (value: string) => void;
-  onEditDueDateChange: (value: string) => void;
   updatePending: boolean;
   deletePending: boolean;
 }
@@ -96,7 +44,6 @@ function TodoItemContent({
   todo,
   isEditing,
   editTitle,
-  editDueDate,
   editInputRef,
   onToggle,
   onEdit,
@@ -104,12 +51,9 @@ function TodoItemContent({
   onCancelEdit,
   onDelete,
   onEditTitleChange,
-  onEditDueDateChange,
   updatePending,
   deletePending,
 }: TodoItemProps) {
-  const overdue = isOverdue(todo.dueDate) && !todo.completed;
-
   if (isEditing) {
     return (
       <div className="space-y-3">
@@ -126,14 +70,7 @@ function TodoItemContent({
           aria-label="Edit todo title"
           size="sm"
         />
-        <div className="flex items-center justify-between">
-          <Input
-            type="date"
-            value={editDueDate}
-            onChange={(e) => onEditDueDateChange(e.target.value)}
-            aria-label="Due date"
-            size="sm"
-          />
+        <div className="flex items-center justify-end">
           <div className="flex gap-2">
             <Button
               variant="ghost"
@@ -175,20 +112,13 @@ function TodoItemContent({
         >
           {todo.title}
         </p>
-        {todo.dueDate && (
-          <p
-            className={`text-xs mt-1 ${overdue ? "text-error" : "text-muted"}`}
-          >
-            {formatDueDate(todo.dueDate)}
-          </p>
-        )}
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="sm"
           type="button"
-          onClick={() => onEdit(todo.id, todo.title, todo.dueDate)}
+          onClick={() => onEdit(todo.id, todo.title)}
           aria-label={`Edit "${todo.title}"`}
         >
           Edit
@@ -221,9 +151,7 @@ function SortableTodoItem(props: TodoItemProps) {
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : undefined,
-    position: "relative" as const,
+    opacity: isDragging ? 0.4 : 1,
   };
 
   return (
@@ -252,8 +180,11 @@ export function TodoList() {
   const deleteTodo = useDeleteTodo();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
-  const [editDueDate, setEditDueDate] = useState<string>("");
   const editInputRef = useRef<HTMLInputElement>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
+    Todo[] | null
+  >(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -272,6 +203,11 @@ export function TodoList() {
       editInputRef.current.focus();
     }
   }, [editingId]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: todos is used as a trigger to reset local order when server data refreshes
+  useEffect(() => {
+    setLocalIncompleteTodos(null);
+  }, [todos]);
 
   if (isLoading) {
     return <p className="text-center text-muted text-sm py-12">Loading...</p>;
@@ -295,14 +231,9 @@ export function TodoList() {
     updateTodo.mutate({ id, input: { completed: !completed } });
   };
 
-  const handleEdit = (
-    id: string,
-    title: string,
-    dueDate: Date | null | undefined,
-  ) => {
+  const handleEdit = (id: string, title: string) => {
     setEditingId(id);
     setEditTitle(title);
-    setEditDueDate(toDateInputValue(dueDate));
   };
 
   const handleSaveEdit = (id: string) => {
@@ -313,14 +244,12 @@ export function TodoList() {
         id,
         input: {
           title: editTitle.trim(),
-          dueDate: editDueDate ? new Date(editDueDate) : null,
         },
       },
       {
         onSuccess: () => {
           setEditingId(null);
           setEditTitle("");
-          setEditDueDate("");
         },
       },
     );
@@ -329,7 +258,6 @@ export function TodoList() {
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditTitle("");
-    setEditDueDate("");
   };
 
   const handleDelete = (id: string) => {
@@ -354,18 +282,31 @@ export function TodoList() {
   const incompleteTodos = sortedTodos.filter((t) => !t.completed);
   const completedTodos = sortedTodos.filter((t) => t.completed);
 
+  const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
+  const activeItem = activeId
+    ? (displayIncompleteTodos.find((t) => t.id === activeId) ?? null)
+    : null;
+
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveId(active.id as string);
+  };
+
+  const handleDragCancel = () => {
+    setActiveId(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
     if (!over || active.id === over.id) return;
 
-    const oldIndex = incompleteTodos.findIndex((t) => t.id === active.id);
-    const newIndex = incompleteTodos.findIndex((t) => t.id === over.id);
+    const currentItems = localIncompleteTodos ?? incompleteTodos;
+    const oldIndex = currentItems.findIndex((t) => t.id === active.id);
+    const newIndex = currentItems.findIndex((t) => t.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    // Build the reordered array to find neighbors
-    const reordered = [...incompleteTodos];
-    const [moved] = reordered.splice(oldIndex, 1);
-    reordered.splice(newIndex, 0, moved);
+    const reordered = arrayMove(currentItems, oldIndex, newIndex);
+    setLocalIncompleteTodos(reordered);
 
     const prev = newIndex > 0 ? reordered[newIndex - 1].position : null;
     const next =
@@ -382,7 +323,6 @@ export function TodoList() {
     todo,
     isEditing: editingId === todo.id,
     editTitle,
-    editDueDate,
     editInputRef,
     onToggle: handleToggle,
     onEdit: handleEdit,
@@ -390,7 +330,6 @@ export function TodoList() {
     onCancelEdit: handleCancelEdit,
     onDelete: handleDelete,
     onEditTitleChange: setEditTitle,
-    onEditDueDateChange: setEditDueDate,
     updatePending: updateTodo.isPending,
     deletePending: deleteTodo.isPending,
   });
@@ -400,16 +339,35 @@ export function TodoList() {
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragCancel={handleDragCancel}
       >
         <SortableContext
-          items={incompleteTodos.map((t) => t.id)}
+          items={displayIncompleteTodos.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
         >
-          {incompleteTodos.map((todo) => (
+          {displayIncompleteTodos.map((todo) => (
             <SortableTodoItem key={todo.id} {...sharedProps(todo)} />
           ))}
         </SortableContext>
+        <DragOverlay>
+          {activeItem ? (
+            <div className="py-3 bg-surface shadow-lg rounded-md opacity-95">
+              <div className="flex items-start gap-2">
+                <button
+                  type="button"
+                  className="pt-1 cursor-grabbing text-muted"
+                >
+                  <GripVertical size={16} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <TodoItemContent {...sharedProps(activeItem)} />
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
       </DndContext>
       {completedTodos.map((todo) => (
         <div key={todo.id} className="py-3 group">
