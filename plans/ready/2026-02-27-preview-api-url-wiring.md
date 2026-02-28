@@ -1,6 +1,8 @@
-# Plan: Wire Preview Deployments to Use Preview API
+# Plan: Wire Preview Deployments to Use Preview API + Consolidate CI
 
 ## Context
+
+### Preview API wiring
 
 PR preview deployments create separate workers for web (`pr-N.nylonimpossible.com`) and API (`api-pr-N.nylonimpossible.com`), but both the web app and iOS app always talk to the production API.
 
@@ -17,17 +19,28 @@ Standard CRUD operations (getTodos, createTodo, updateTodo, deleteTodo) are TanS
 2. **WebSocketService.swift** — builds its own `wss://api.nylonimpossible.com/ws` URL
 3. **APIService.swift** — reads from `Config.apiBaseURL` (so fixing Config fixes this)
 
+### CI is redundant
+
+Currently there are 4 workflows that overlap:
+
+| Workflow | Triggers on | Jobs |
+|----------|-------------|------|
+| `lint.yml` | every push to main, every PR | `lint-api`, `lint-web`, `lint-ios` (macOS runner) |
+| `test.yml` | every push to main, every PR, `workflow_call` | `test-api`, `test-web`, (`test-ios` disabled) |
+| `deploy.yml` | web/api changes on main + PRs | calls `test.yml` again via `workflow_call`, then deploys |
+| `testflight.yml` | iOS changes on main, PRs with `testflight` label | builds + uploads |
+
+A single push to main touching web/api files triggers **~8 job runs** across 3 workflows, with tests running twice (once standalone, once via deploy.yml's `workflow_call`). The macOS swiftlint runner fires even for web-only changes.
+
 ## Approach
 
-### Web
+### Preview API — Web
 
 Introduce a `VITE_API_BASE_URL` env var. At build time, Vite bakes it into the client bundle. The deploy workflow conditionally sets it to the preview API URL when the API is also being deployed in that PR.
 
-### iOS
+### Preview API — iOS
 
 Inject the API URL as an Xcode build setting (`API_BASE_URL`) that populates an `Info.plist` entry. `Config.swift` reads it at runtime instead of using a hardcoded value. The `#if targetEnvironment(simulator)` check stays as a local-dev override to `localhost`.
-
-The TestFlight workflow changes from label-triggered to automatic on iOS PRs. It detects whether `src/api/**` also changed in the PR to decide whether to use the preview API or production.
 
 ```
                           API changed in this PR?
@@ -38,6 +51,25 @@ API_BASE_URL = api-pr-N.nylonimpossible.com    API_BASE_URL = api.nylonimpossibl
 ```
 
 **TestFlight caveat:** only one build is "current" at a time. If multiple iOS PRs are open, the latest build wins. This is fine if concurrent iOS PRs are rare.
+
+### CI consolidation
+
+Delete `lint.yml` and `test.yml` as separate workflows. Fold their work into the workflows that actually need them:
+
+- **`deploy.yml`** gets a single `checks` job (lint + typecheck + test for api and web, one runner, one checkout/install). Deploy jobs depend on it via `needs: [checks]`. Path filtering means it only runs when web/api files change.
+- **`testflight.yml`** gets swiftlint as a build step. It already only triggers on iOS changes, so no wasted macOS minutes on web-only PRs.
+- **`copilot-setup-steps.yml`** stays as-is (manual dispatch only).
+
+**Before:** push to main with web changes → 3 workflows, ~8 jobs, tests run twice
+**After:** push to main with web changes → 1 workflow, 2 jobs (checks → deploy), tests run once
+
+| Event | Before | After |
+|-------|--------|-------|
+| Push to main (web/api) | 3 workflows, ~8 jobs | 1 workflow, 2 jobs |
+| PR (web/api) | 3 workflows, ~8 jobs | 1 workflow, 2 jobs |
+| Push to main (iOS) | 3 workflows, ~6 jobs | 1 workflow, 1 job |
+| PR (iOS) | 2 workflows, ~5 jobs | 1 workflow, 1 job |
+| Push to main (both) | 4 workflows, ~12 jobs | 2 workflows, 3 jobs |
 
 ---
 
@@ -77,30 +109,7 @@ import { WS_URL } from "@/lib/config";
 
 Remove the existing `WS_URL` declaration (lines 13-16).
 
-### 4. Update: `.github/workflows/deploy.yml`
-
-In both the `deploy-preview` build step ("Build preview Web") and the `deploy-production` build step ("Build Web"), pass the API URL:
-
-**Production** (no change needed — falls back to default in config.ts):
-```yaml
-- name: Build Web
-  if: steps.changes.outputs.web == 'true'
-  run: pnpm --filter @nylon-impossible/web run build
-  env:
-    VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-```
-
-**Preview** — conditionally set the API URL based on whether the API is also being deployed:
-```yaml
-- name: Build preview Web
-  if: steps.changes.outputs.web == 'true'
-  run: pnpm --filter @nylon-impossible/web run build
-  env:
-    VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-    VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
-```
-
-### 5. Optional: `src/web/src/vite-env.d.ts`
+### 4. Optional: `src/web/src/vite-env.d.ts`
 
 Add type declaration for the new env var so TypeScript knows about it:
 
@@ -114,7 +123,7 @@ interface ImportMetaEnv {
 
 ## iOS File Changes
 
-### 6. Update: `src/ios/Nylon Impossible/Nylon-Impossible-Info.plist`
+### 5. Update: `src/ios/Nylon Impossible/Nylon-Impossible-Info.plist`
 
 Add a new key that reads from the `API_BASE_URL` build setting:
 
@@ -123,7 +132,7 @@ Add a new key that reads from the `API_BASE_URL` build setting:
 <string>$(API_BASE_URL)</string>
 ```
 
-### 7. Update: `src/ios/Nylon Impossible/Nylon Impossible/Services/Config.swift`
+### 6. Update: `src/ios/Nylon Impossible/Nylon Impossible/Services/Config.swift`
 
 Replace the hardcoded `apiBaseURL` with a runtime read from Info.plist, keeping the simulator override for local dev:
 
@@ -157,7 +166,7 @@ enum Config {
 
 The `!override.hasPrefix("$(")` guard handles the case where `API_BASE_URL` isn't set as a build setting in the Xcode project — `$(API_BASE_URL)` would appear as a literal string in the plist.
 
-### 8. Update: `src/ios/Nylon Impossible/Nylon Impossible/Services/WebSocketService.swift`
+### 7. Update: `src/ios/Nylon Impossible/Nylon Impossible/Services/WebSocketService.swift`
 
 Replace the hardcoded WS URL with one derived from `Config.apiBaseURL`:
 
@@ -172,7 +181,66 @@ let urlString = "\(wsBase)/ws?token=\(token)"
 
 This replaces lines 59-63 (the `#if targetEnvironment(simulator)` / `#else` block). The scheme is automatically derived from whatever `Config.apiBaseURL` is — `http://localhost:8787` becomes `ws://`, `https://api-pr-N...` becomes `wss://`.
 
-### 9. Update: `.github/workflows/testflight.yml`
+### 8. Update: `src/ios/Nylon Impossible/fastlane/Fastfile`
+
+Pass `API_BASE_URL` through to xcodebuild as a build setting so it expands in Info.plist:
+
+```ruby
+# In the archive_cmd array, add after CURRENT_PROJECT_VERSION:
+"API_BASE_URL=#{ENV['API_BASE_URL'] || 'https://api.nylonimpossible.com'}",
+```
+
+---
+
+## CI Workflow Changes
+
+### 9. Delete: `.github/workflows/lint.yml`
+
+Remove entirely. Lint + typecheck moves into `deploy.yml`'s `checks` job.
+
+### 10. Delete: `.github/workflows/test.yml`
+
+Remove entirely. Tests move into `deploy.yml`'s `checks` job. The `workflow_call` trigger is no longer needed since nothing calls it.
+
+### 11. Update: `.github/workflows/deploy.yml`
+
+Replace the `tests` job (which called `test.yml`) with an inline `checks` job that does lint, typecheck, and test in one go. Both `deploy-preview` and `deploy-production` depend on it.
+
+**New `checks` job** (replaces the `tests` reference):
+```yaml
+checks:
+  if: github.event_name != 'pull_request' || github.event.action != 'closed'
+  runs-on: ubuntu-latest
+  timeout-minutes: 10
+  steps:
+    - uses: actions/checkout@v4
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - run: pnpm install
+
+    - name: Lint & typecheck API
+      run: pnpm api:check && pnpm api:typecheck
+
+    - name: Lint & typecheck Web
+      run: pnpm web:check && pnpm web:typecheck
+
+    - name: Test API
+      run: pnpm --filter @nylon-impossible/api test
+
+    - name: Test Web
+      run: pnpm --filter @nylon-impossible/web test
+```
+
+**Update `deploy-preview` and `deploy-production`** to use `needs: [checks]` instead of `needs: [tests]`. The rest of these jobs stays the same (change detection, preview URL wiring, etc.), plus the `VITE_API_BASE_URL` additions from step 4 of the web changes above.
+
+**Add `VITE_API_BASE_URL`** to the "Build preview Web" step env:
+```yaml
+VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
+```
+
+### 12. Update: `.github/workflows/testflight.yml`
 
 **Change triggers** — fire on iOS PRs automatically, not just on label:
 
@@ -211,30 +279,20 @@ if: >-
         - 'src/api/**'
 ```
 
+**Add swiftlint step** before the certificate setup:
+
+```yaml
+- name: SwiftLint
+  run: |
+    brew install swiftlint
+    cd "src/ios/Nylon Impossible" && swiftlint
+```
+
 **Set `API_BASE_URL`** in the Fastlane build step env:
 
 ```yaml
-- name: Build and upload to TestFlight
-  env:
-    APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-    APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-    APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-    BUILD_NUMBER: ${{ github.run_number }}
-    SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-    API_BASE_URL: ${{ github.event_name == 'pull_request' && steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
-  run: bundle exec fastlane beta --verbose
+API_BASE_URL: ${{ github.event_name == 'pull_request' && steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
 ```
-
-### 10. Update: `src/ios/Nylon Impossible/fastlane/Fastfile`
-
-Pass `API_BASE_URL` through to xcodebuild as a build setting so it expands in Info.plist:
-
-```ruby
-# In the archive_cmd array, add:
-"API_BASE_URL=#{ENV['API_BASE_URL'] || 'https://api.nylonimpossible.com'}",
-```
-
-This goes after the existing `CURRENT_PROJECT_VERSION=#{build_number}` line.
 
 ---
 
@@ -243,6 +301,7 @@ This goes after the existing `CURRENT_PROJECT_VERSION=#{build_number}` line.
 - **Database isolation** — both preview and production workers bind to the same D1 database. Preview deploys test code changes, not data isolation.
 - **CORS** — the preview API worker gets a custom domain (`api-pr-N.nylonimpossible.com`), and the web preview gets its own (`pr-N.nylonimpossible.com`). If the API has CORS origin checks, they may need updating to allow preview origins. Similarly, iOS preview builds would be making requests from a native app to `api-pr-N`, which should be fine since native apps aren't subject to CORS.
 - **Concurrent iOS PRs** — only one TestFlight build is active at a time. The last iOS PR to push wins. Acceptable if concurrent iOS PRs are rare.
+- **iOS tests** — `test-ios` is currently disabled (needs Xcode 26+ runner). When it's ready, it can be added as a step in `testflight.yml` before the archive, since it already runs on a macOS runner.
 
 ## Testing
 
@@ -256,3 +315,8 @@ This goes after the existing `CURRENT_PROJECT_VERSION=#{build_number}` line.
 5. Push a PR that changes only `src/ios/` — verify the TestFlight build connects to production `api.nylonimpossible.com`
 6. Push iOS changes to `main` — verify the TestFlight build connects to production
 7. Verify simulator local dev (`localhost:8787`) still works as before
+
+### CI consolidation
+8. Push a PR touching only `src/web/` — verify only `deploy.yml` runs (no lint.yml or test.yml)
+9. Push a PR touching only `src/ios/` — verify only `testflight.yml` runs
+10. Push to `main` — verify checks run once, not twice, before deploy
