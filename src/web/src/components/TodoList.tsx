@@ -151,7 +151,7 @@ function SortableTodoItem(props: TodoItemProps) {
   const style = {
     transform: isDragging ? undefined : CSS.Transform.toString(transform),
     transition: isDragging ? "none" : transition,
-    opacity: isDragging ? 0.4 : 1,
+    opacity: isDragging ? 0 : 1,
   };
 
   return (
