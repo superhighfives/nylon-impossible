@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/logo.svg" width="120" height="120" alt="Nylon Impossible logo">
+</p>
+
 # Nylon Impossible
 
 A cross-platform todo application with web, API, and iOS clients. Real-time sync across devices via WebSockets, authentication via Clerk, and deployment on Cloudflare Workers.
