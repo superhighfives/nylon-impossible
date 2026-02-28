@@ -21,12 +21,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  tests:
+  checks:
     if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    uses: ./.github/workflows/test.yml
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install
+
+      - name: Lint & typecheck API
+        run: pnpm api:check && pnpm api:typecheck
+
+      - name: Lint & typecheck Web
+        run: pnpm web:check && pnpm web:typecheck
+
+      - name: Test API
+        run: pnpm --filter @nylon-impossible/api test
+
+      - name: Test Web
+        run: pnpm --filter @nylon-impossible/web test
 
   deploy-production:
-    needs: [tests]
+    needs: [checks]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -86,7 +106,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-preview:
-    needs: [tests]
+    needs: [checks]
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -187,6 +207,7 @@ jobs:
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
 
       - name: Deploy preview Web
         if: steps.changes.outputs.web == 'true'

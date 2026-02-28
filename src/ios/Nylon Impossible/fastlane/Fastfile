@@ -34,6 +34,7 @@ platform :ios do
       "-archivePath", archive_path,
       "-destination", "generic/platform=iOS",
       "CURRENT_PROJECT_VERSION=#{build_number}",
+      "API_BASE_URL=#{ENV['API_BASE_URL'] || 'https://api.nylonimpossible.com'}",
       "-allowProvisioningUpdates",
       "-authenticationKeyID", key_id,
       "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_API_ISSUER_ID"],

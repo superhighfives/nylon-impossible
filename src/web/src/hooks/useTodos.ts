@@ -1,15 +1,11 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
+import { API_URL } from "@/lib/config";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";
 
 const TODOS_QUERY_KEY = ["todos"];
-
-const API_URL =
-  typeof window !== "undefined" && window.location.hostname === "localhost"
-    ? "http://localhost:8787"
-    : "https://api.nylonimpossible.com";
 
 export function useTodos() {
   return useQuery({

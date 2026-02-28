@@ -166,7 +166,6 @@ struct TodoViewModelTests {
     func softDelete() {
         let todo = TodoItem(title: "Test", userId: "user_123")
 
-        let vm = TodoViewModel()
         // Can't call with real context for soft delete, just test the logic
         // When userId is set, it should set isDeleted = true
         if todo.userId != nil {

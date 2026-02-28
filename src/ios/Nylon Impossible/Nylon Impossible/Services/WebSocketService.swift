@@ -56,11 +56,11 @@ final class WebSocketService {
         do {
             let token = try await authService.getToken()
 
-            #if targetEnvironment(simulator)
-            let urlString = "ws://localhost:8787/ws?token=\(token)"
-            #else
-            let urlString = "wss://api.nylonimpossible.com/ws?token=\(token)"
-            #endif
+            let baseString = Config.apiBaseURL.absoluteString
+            let wsScheme = baseString.hasPrefix("https") ? "wss" : "ws"
+            let wsBase = baseString.replacingOccurrences(of: "https://", with: "\(wsScheme)://")
+                .replacingOccurrences(of: "http://", with: "\(wsScheme)://")
+            let urlString = "\(wsBase)/ws?token=\(token)"
 
             guard let url = URL(string: urlString) else { return }
 
@@ -84,7 +84,7 @@ final class WebSocketService {
 
     private func receiveLoop() {
         task?.receive { [weak self] result in
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
                 guard let self else { return }
 
                 switch result {
