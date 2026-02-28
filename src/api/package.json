@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --persist-to ../../.wrangler/state",
+    "dev:remote": "wrangler dev --remote --persist-to ../../.wrangler/state",
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
