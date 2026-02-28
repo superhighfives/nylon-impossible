@@ -149,8 +149,8 @@ function SortableTodoItem(props: TodoItemProps) {
   } = useSortable({ id: props.todo.id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+    transform: isDragging ? undefined : CSS.Transform.toString(transform),
+    transition: isDragging ? "none" : transition,
     opacity: isDragging ? 0.4 : 1,
   };
 
@@ -204,7 +204,7 @@ export function TodoList() {
     }
   }, [editingId]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: todos is used as a trigger to reset local order when server data refreshes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: todos is intentionally used as a trigger to reset local order when server data refreshes
   useEffect(() => {
     setLocalIncompleteTodos(null);
   }, [todos]);
@@ -353,14 +353,14 @@ export function TodoList() {
         </SortableContext>
         <DragOverlay>
           {activeItem ? (
-            <div className="py-3 bg-surface shadow-lg rounded-md opacity-95">
+            <div
+              className="py-3 bg-surface shadow-lg rounded-md opacity-95 pointer-events-none"
+              aria-hidden="true"
+            >
               <div className="flex items-start gap-2">
-                <button
-                  type="button"
-                  className="pt-1 cursor-grabbing text-muted"
-                >
+                <div className="pt-1 cursor-grabbing text-muted">
                   <GripVertical size={16} />
-                </button>
+                </div>
                 <div className="flex-1 min-w-0">
                   <TodoItemContent {...sharedProps(activeItem)} />
                 </div>
