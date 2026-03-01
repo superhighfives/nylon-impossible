@@ -167,7 +167,7 @@ Start the development server:
 npm run dev
 ```
 
-The application will be available at **http://localhost:3001**
+The application will be available at **http://localhost:3000**
 
 ### Development Tools
 
@@ -213,7 +213,7 @@ nylon-impossible-web/
 ## Scripts
 
 ### Development
-- `npm run dev` - Start dev server on port 3001
+- `npm run dev` - Start dev server on port 3000
 - `npm run serve` - Preview production build locally
 
 ### Building
@@ -406,7 +406,7 @@ npm run db:migrations:list
 
 1. Verify your publishable key is correct
 2. Check your Clerk dashboard for allowed domains
-3. Ensure your local development URL (http://localhost:3001) is allowed
+3. Ensure your local development URL (http://localhost:3000) is allowed
 
 ## Learn More
 

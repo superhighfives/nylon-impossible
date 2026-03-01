@@ -67,7 +67,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The web app runs at **http://localhost:3001** and the API at **http://localhost:8787**.
+The web app runs at **http://localhost:3000** and the API at **http://localhost:8787**.
 
 For iOS, open the Xcode project:
 

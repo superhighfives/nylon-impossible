@@ -1,0 +1,32 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "nylon-impossible",
+	"compatibility_date": "2025-09-02",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"main": "@tanstack/react-start/server-entry",
+	"routes": [
+		{
+			"pattern": "nylonimpossible.com",
+			"custom_domain": true
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "nylon-impossible-db",
+			"database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+			"remote": true
+		},
+		{
+			"binding": "nylon_impossible_db",
+			"database_name": "nylon-impossible-db",
+			"database_id": "4943b98f-cdcc-42dc-a678-b340d10f4ac7",
+			"remote": true
+		}
+	],
+	"observability": {
+		"enabled": true
+	}
+}

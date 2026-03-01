@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "prepare": "effect-language-service patch",
-    "dev": "vite dev --port 3001",
+    "dev": "vite dev --port 3000",
+    "dev:remote": "REMOTE_BINDINGS=true vite dev --port 3000",
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest run",

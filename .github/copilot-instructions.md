@@ -84,7 +84,7 @@ pnpm install
 pnpm db:migrate
 
 # Start web + API dev servers in parallel
-pnpm dev           # web at :3001, API at :8787
+pnpm dev           # web at :3000, API at :8787
 
 # Per-project dev
 pnpm web:dev
