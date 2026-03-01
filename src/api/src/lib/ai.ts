@@ -59,22 +59,31 @@ Examples of good extractions:
 }
 
 /**
- * Extract structured todos from natural language text using Workers AI
+ * Extract structured todos from natural language text using Workers AI via AI Gateway
  */
 export async function extractTodos(
   ai: Ai,
+  gatewayId: string,
   text: string,
 ): Promise<ExtractedItem[]> {
-  // @cf/qwen/qwen3-30b-a3b-fp8 isn't in the typed model list yet
-  const model = "@cf/qwen/qwen3-30b-a3b-fp8" as keyof AiModels;
-  const response = (await ai.run(model, {
-    messages: [
-      { role: "system", content: getSystemPrompt() },
-      { role: "user", content: text },
-    ],
-    tools: [extractTodosTool],
-    max_tokens: 16000,
-  })) as AiTextGenerationOutput;
+  const model = "@cf/moonshotai/kimi-k2.5" as keyof AiModels;
+  const response = (await ai.run(
+    model,
+    {
+      messages: [
+        { role: "system", content: getSystemPrompt() },
+        { role: "user", content: text },
+      ],
+      tools: [extractTodosTool],
+      max_tokens: 16000,
+    },
+    {
+      gateway: {
+        id: gatewayId,
+        skipCache: false,
+      },
+    },
+  )) as AiTextGenerationOutput;
 
   // Extract tool call from response
   if (!("tool_calls" in response) || !response.tool_calls?.length) {
