@@ -1,4 +1,7 @@
-# Plan: Centralise AI in the API with Smart Todo Input
+# Centralise AI in the API with Smart Todo Input
+
+**Date**: 2026-02-26
+**Status**: Complete
 
 ## Context
 

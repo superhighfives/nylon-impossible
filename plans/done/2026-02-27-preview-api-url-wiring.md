@@ -1,4 +1,7 @@
-# Plan: Wire Preview Deployments to Use Preview API + Consolidate CI
+# Wire Preview Deployments to Use Preview API + Consolidate CI
+
+**Date**: 2026-02-27
+**Status**: Complete
 
 ## Context
 
