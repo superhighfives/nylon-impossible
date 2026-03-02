@@ -90,11 +90,6 @@ export async function extractTodos(
   const model = "@cf/moonshotai/kimi-k2.5" as keyof AiModels;
   const systemPrompt = getSystemPrompt();
 
-  console.log("=== AI REQUEST ===");
-  console.log("Model:", model);
-  console.log("Text:", text);
-  console.log("System prompt:\n", systemPrompt);
-
   const response = (await ai.run(
     model,
     {
