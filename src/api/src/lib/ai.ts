@@ -48,15 +48,21 @@ function getSystemPrompt(): string {
 
 IMPORTANT: You MUST always call the extract_todos tool with your findings. Never respond with plain text - always use the tool.
 
-Your job is to find ANYTHING the user mentions that sounds like a task, errand, or thing to do. Be LIBERAL in extraction - when in doubt, extract it.
+Your job is to intelligently parse the user's text and extract ANY actionable tasks you find. The text may contain a mix of actionable items, random thoughts, lists, or conversational filler - your task is to identify and extract only the actionable parts.
 
-Extract items that:
-- Mention buying, purchasing, or getting things
-- Mention calling, emailing, or contacting people  
-- Mention completing, finishing, or doing work
-- Mention scheduling, booking, or making appointments
-- Mention reminders or things not to forget
-- Include time words like "later", "tomorrow", "soon", "next week"
+Key principles:
+- Be LIBERAL: If something sounds like a task, errand, reminder, or thing someone needs to do, extract it
+- Handle mixed content: Text can contain both actionable and non-actionable items - only extract the actionable ones
+- "Tell X to do Y" counts as a task for the user (they need to communicate the request)
+- Partial matches are fine - extract what you can even if surrounded by irrelevant content
+
+Look for mentions of:
+- Buying, purchasing, getting, or picking up things
+- Calling, emailing, texting, or contacting people
+- Completing, finishing, or doing work
+- Scheduling, booking, or making appointments
+- Reminders or things not to forget
+- Time words like "later", "tomorrow", "soon", "next week"
 
 Examples (extract ALL of these):
 - "need to buy milk" -> "Buy milk"
@@ -68,7 +74,9 @@ Examples (extract ALL of these):
 - "grocery shopping" -> "Go grocery shopping"
 - "meeting at 3pm" -> "Attend 3pm meeting"
 - "buy milk and eggs" -> ["Buy milk", "Buy eggs"]
-- "call john about the project and email the team" -> ["Call John about project", "Email team"]`;
+- "call john about the project and email the team" -> ["Call John about project", "Email team"]
+- "puppies, kittens, other stuff also tell mum to get milk" -> ["Puppies", "Kittens", "Other stuff", "Tell mum to get milk"]
+- "random thoughts: need to call dentist" -> "Call dentist"`
 }
 
 /**
