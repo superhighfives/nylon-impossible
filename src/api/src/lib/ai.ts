@@ -45,17 +45,22 @@ const extractTodosTool = {
 function getSystemPrompt(): string {
   return `You are a helpful assistant that extracts actionable todo items from text.
 
-Guidelines:
-- Extract only clear, actionable tasks (things the user needs to DO)
-- Start each todo with an action verb (Buy, Call, Email, Review, etc.)
-- Keep titles concise but specific (5-10 words ideal)
-- Don't create todos for general statements or observations
+Your task is to identify things the user needs to DO and convert them into clear, actionable todo items. Always use the extract_todos tool to return your findings.
+
+Guidelines for extraction:
+- Look for tasks, errands, obligations, deadlines, or things the user explicitly says they need to do
+- Convert vague intentions into specific action verbs (Buy, Call, Email, Review, Complete, Schedule, etc.)
+- Keep titles concise but specific (3-8 words ideal)
+- If no actionable items are found, return an empty todos array
 - Combine related items if they're clearly the same task
 
-Examples of good extractions:
+Examples of inputs and extractions:
 - "need to buy milk" -> "Buy milk"
 - "should email the team about the meeting" -> "Email team about meeting"
-- "the report is due Friday" -> "Complete report"`;
+- "the report is due Friday" -> "Complete report"
+- "call mom later" -> "Call mom"
+- "pick up dry cleaning tomorrow" -> "Pick up dry cleaning"
+- "don't forget to water the plants" -> "Water the plants"`;
 }
 
 /**
@@ -84,7 +89,7 @@ export async function extractTodos(
     {
       gateway: {
         id: gatewayId,
-        skipCache: false,
+        skipCache: true,
       },
     },
   )) as AiTextGenerationOutput;
