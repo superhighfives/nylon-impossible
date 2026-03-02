@@ -75,6 +75,10 @@ export async function extractTodos(
         { role: "user", content: text },
       ],
       tools: [extractTodosTool],
+      tool_choice: {
+        type: "function",
+        function: { name: "extract_todos" },
+      },
       max_tokens: 16000,
     },
     {
