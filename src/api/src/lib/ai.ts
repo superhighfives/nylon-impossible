@@ -75,8 +75,8 @@ Examples (extract ALL of these):
 - "meeting at 3pm" -> "Attend 3pm meeting"
 - "buy milk and eggs" -> ["Buy milk", "Buy eggs"]
 - "call john about the project and email the team" -> ["Call John about project", "Email team"]
-- "puppies, kittens, other stuff also tell mum to get milk" -> ["Puppies", "Kittens", "Other stuff", "Tell mum to get milk"]
-- "random thoughts: need to call dentist" -> "Call dentist"`
+- "puppies, kittens, other stuff also tell mum to get milk" -> "Tell mum to get milk"
+- "random thoughts: need to call dentist" -> "Call dentist"`;
 }
 
 /**
