@@ -65,7 +65,7 @@ export async function extractTodos(
   ai: Ai,
   gatewayId: string,
   text: string,
-): Promise<ExtractedItem[]> {
+): Promise<ExtractedItem[] | null> {
   const model = "@cf/moonshotai/kimi-k2.5" as keyof AiModels;
   const response = (await ai.run(
     model,
@@ -148,6 +148,13 @@ export async function extractTodos(
     typeof toolCall.arguments === "string"
       ? (JSON.parse(toolCall.arguments) as AIToolCallResponse)
       : (toolCall.arguments as AIToolCallResponse);
+
+  console.log("AI response parsed:", JSON.stringify(parsed, null, 2));
+
+  if (!parsed.todos || parsed.todos.length === 0) {
+    console.log("AI returned empty todos array, falling back");
+    return null;
+  }
 
   return parsed.todos.map((todo) => ({
     title: todo.title,
