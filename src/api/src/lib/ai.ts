@@ -85,13 +85,57 @@ export async function extractTodos(
     },
   )) as AiTextGenerationOutput;
 
-  // Extract tool call from response
-  if (!("tool_calls" in response) || !response.tool_calls?.length) {
+  // Handle both Workers AI native format and OpenAI-compatible format
+  let toolCall: { name: string; arguments: string | object } | null = null;
+
+  // Check for Workers AI native format (top-level tool_calls)
+  if ("tool_calls" in response && response.tool_calls?.length) {
+    const tc = response.tool_calls[0];
+    if (tc?.name && tc.arguments !== undefined) {
+      toolCall = {
+        name: tc.name,
+        arguments: tc.arguments as string | object,
+      };
+    }
+  }
+  // Check for OpenAI-compatible format (choices[0].message.tool_calls)
+  else if (
+    "choices" in response &&
+    Array.isArray(response.choices) &&
+    response.choices.length > 0
+  ) {
+    const firstChoice = response.choices[0];
+    if (
+      firstChoice &&
+      typeof firstChoice === "object" &&
+      "message" in firstChoice &&
+      firstChoice.message &&
+      typeof firstChoice.message === "object" &&
+      "tool_calls" in firstChoice.message &&
+      Array.isArray(firstChoice.message.tool_calls) &&
+      firstChoice.message.tool_calls.length > 0
+    ) {
+      const tc = firstChoice.message.tool_calls[0];
+      if (
+        tc &&
+        typeof tc === "object" &&
+        tc.type === "function" &&
+        tc.function &&
+        tc.function.name === "extract_todos"
+      ) {
+        toolCall = {
+          name: tc.function.name,
+          arguments: tc.function.arguments,
+        };
+      }
+    }
+  }
+
+  if (!toolCall) {
     console.error("No tool call in AI response", response);
     throw new Error("AI did not return extracted todos");
   }
 
-  const toolCall = response.tool_calls[0];
   if (toolCall.name !== "extract_todos") {
     throw new Error("Unexpected tool call in AI response");
   }
@@ -99,7 +143,7 @@ export async function extractTodos(
   const parsed =
     typeof toolCall.arguments === "string"
       ? (JSON.parse(toolCall.arguments) as AIToolCallResponse)
-      : (toolCall.arguments as unknown as AIToolCallResponse);
+      : (toolCall.arguments as AIToolCallResponse);
 
   return parsed.todos.map((todo) => ({
     title: todo.title,
