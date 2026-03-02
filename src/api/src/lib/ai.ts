@@ -17,20 +17,21 @@ const extractTodosTool = {
   function: {
     name: "extract_todos",
     description:
-      "Extract actionable todo items from text. Each todo should be a clear, concise action item. Only extract items that represent tasks the user needs to do.",
+      "Extract all actionable tasks, errands, or to-do items from the user's text. Convert any task-like statements into clear todo items with action verbs. If the user mentions things they need to do, buy, call, complete, schedule, or handle - extract them. Return them in the todos array. If there are truly no actionable items, return an empty array.",
     parameters: {
       type: "object",
       properties: {
         todos: {
           type: "array",
-          description: "List of extracted todo items",
+          description:
+            "List of extracted todo items. Always populate this with any actionable tasks found in the text. Be liberal in what you consider actionable.",
           items: {
             type: "object",
             properties: {
               title: {
                 type: "string",
                 description:
-                  "Concise action item starting with a verb (e.g., 'Buy groceries', 'Email team about Friday meeting', 'Review PR #123')",
+                  "Concise action item starting with a verb (e.g., 'Buy milk', 'Call mom', 'Email team about Friday meeting', 'Review PR #123', 'Schedule dentist appointment')",
               },
             },
             required: ["title"],
@@ -45,22 +46,29 @@ const extractTodosTool = {
 function getSystemPrompt(): string {
   return `You are a helpful assistant that extracts actionable todo items from text.
 
-Your task is to identify things the user needs to DO and convert them into clear, actionable todo items. Always use the extract_todos tool to return your findings.
+IMPORTANT: You MUST always call the extract_todos tool with your findings. Never respond with plain text - always use the tool.
 
-Guidelines for extraction:
-- Look for tasks, errands, obligations, deadlines, or things the user explicitly says they need to do
-- Convert vague intentions into specific action verbs (Buy, Call, Email, Review, Complete, Schedule, etc.)
-- Keep titles concise but specific (3-8 words ideal)
-- If no actionable items are found, return an empty todos array
-- Combine related items if they're clearly the same task
+Your job is to find ANYTHING the user mentions that sounds like a task, errand, or thing to do. Be LIBERAL in extraction - when in doubt, extract it.
 
-Examples of inputs and extractions:
+Extract items that:
+- Mention buying, purchasing, or getting things
+- Mention calling, emailing, or contacting people  
+- Mention completing, finishing, or doing work
+- Mention scheduling, booking, or making appointments
+- Mention reminders or things not to forget
+- Include time words like "later", "tomorrow", "soon", "next week"
+
+Examples (extract ALL of these):
 - "need to buy milk" -> "Buy milk"
-- "should email the team about the meeting" -> "Email team about meeting"
-- "the report is due Friday" -> "Complete report"
+- "should email the team" -> "Email team"
 - "call mom later" -> "Call mom"
 - "pick up dry cleaning tomorrow" -> "Pick up dry cleaning"
-- "don't forget to water the plants" -> "Water the plants"`;
+- "don't forget to water plants" -> "Water plants"
+- "finish the report" -> "Finish report"
+- "grocery shopping" -> "Go grocery shopping"
+- "meeting at 3pm" -> "Attend 3pm meeting"
+- "buy milk and eggs" -> ["Buy milk", "Buy eggs"]
+- "call john about the project and email the team" -> ["Call John about project", "Email team"]`;
 }
 
 /**
@@ -72,11 +80,18 @@ export async function extractTodos(
   text: string,
 ): Promise<ExtractedItem[] | null> {
   const model = "@cf/moonshotai/kimi-k2.5" as keyof AiModels;
+  const systemPrompt = getSystemPrompt();
+
+  console.log("=== AI REQUEST ===");
+  console.log("Model:", model);
+  console.log("Text:", text);
+  console.log("System prompt:\n", systemPrompt);
+
   const response = (await ai.run(
     model,
     {
       messages: [
-        { role: "system", content: getSystemPrompt() },
+        { role: "system", content: systemPrompt },
         { role: "user", content: text },
       ],
       tools: [extractTodosTool],
@@ -93,6 +108,9 @@ export async function extractTodos(
       },
     },
   )) as AiTextGenerationOutput;
+
+  console.log("=== AI RAW RESPONSE ===");
+  console.log(JSON.stringify(response, null, 2));
 
   // Handle both Workers AI native format and OpenAI-compatible format
   let toolCall: { name: string; arguments: string | object } | null = null;
@@ -141,23 +159,38 @@ export async function extractTodos(
   }
 
   if (!toolCall) {
-    console.error("No tool call in AI response", response);
+    console.error("No tool call found in AI response");
+    console.error("Response structure:", Object.keys(response));
     throw new Error("AI did not return extracted todos");
   }
 
+  console.log("=== TOOL CALL FOUND ===");
+  console.log("Tool name:", toolCall.name);
+  console.log("Arguments type:", typeof toolCall.arguments);
+  console.log("Raw arguments:", toolCall.arguments);
+
   if (toolCall.name !== "extract_todos") {
-    throw new Error("Unexpected tool call in AI response");
+    throw new Error(`Unexpected tool call: ${toolCall.name}`);
   }
 
-  const parsed =
-    typeof toolCall.arguments === "string"
-      ? (JSON.parse(toolCall.arguments) as AIToolCallResponse)
-      : (toolCall.arguments as AIToolCallResponse);
+  let parsed: AIToolCallResponse;
+  try {
+    parsed =
+      typeof toolCall.arguments === "string"
+        ? (JSON.parse(toolCall.arguments) as AIToolCallResponse)
+        : (toolCall.arguments as AIToolCallResponse);
+  } catch (e) {
+    console.error("Failed to parse tool arguments:", toolCall.arguments);
+    console.error("Parse error:", e);
+    throw new Error("Failed to parse AI response");
+  }
 
-  console.log("AI response parsed:", JSON.stringify(parsed, null, 2));
+  console.log("=== PARSED RESPONSE ===");
+  console.log("Todos count:", parsed.todos?.length ?? 0);
+  console.log("Todos:", JSON.stringify(parsed.todos, null, 2));
 
   if (!parsed.todos || parsed.todos.length === 0) {
-    console.log("AI returned empty todos array, falling back");
+    console.log("AI returned empty todos array - falling back to single todo");
     return null;
   }
 
