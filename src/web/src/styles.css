@@ -3,8 +3,13 @@
 @import "@cloudflare/kumo/styles/tailwind";
 @import 'tw-animate-css';
 
+@theme {
+  --font-family-sans: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  --font-family-mono: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+}
+
 body {
-  @apply m-0 font-sans;
+  @apply m-0 font-mono;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
