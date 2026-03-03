@@ -1,9 +1,11 @@
 import { createClerkClient } from "@clerk/backend";
-import { generateKeyBetween } from "fractional-indexing";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, eq, getDb, gt, type Todo, todos, users } from "../lib/db";
+import { and, eq, getDb, gt, type Todo, todos, users, lists } from "../lib/db";
 import type { Env } from "../types";
+
+const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
 
 // Sync request schema
 const syncRequestSchema = z.object({
@@ -73,6 +75,20 @@ export async function syncTodos(c: Context<Env>) {
     const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
 
     await db.insert(users).values({ id: userId, email }).onConflictDoNothing();
+
+    // Seed default lists for new user
+    const positions = generateNKeysBetween(null, null, DEFAULT_LISTS.length);
+    const now = new Date();
+    await db.insert(lists).values(
+      DEFAULT_LISTS.map((name, i) => ({
+        id: crypto.randomUUID(),
+        userId,
+        name,
+        position: positions[i],
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
   }
 
   // 1. Apply client changes (with conflict resolution)
