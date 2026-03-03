@@ -12,8 +12,11 @@ const syncRequestSchema = z.object({
     z.object({
       id: z.string().uuid(),
       title: z.string().min(1).max(500).optional(),
+      description: z.string().max(10000).nullable().optional(),
       completed: z.boolean().optional(),
       position: z.string().optional(),
+      dueDate: z.coerce.date().nullable().optional(),
+      priority: z.enum(["high", "low"]).nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
     }),
@@ -33,8 +36,11 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     title: todo.title,
+    description: todo.description,
     completed: todo.completed,
     position: todo.position,
+    dueDate: todo.dueDate?.toISOString() ?? null,
+    priority: todo.priority,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -102,8 +108,18 @@ export async function syncTodos(c: Context<Env>) {
           .update(todos)
           .set({
             title: change.title ?? existing.title,
+            description:
+              change.description !== undefined
+                ? change.description
+                : existing.description,
             completed: change.completed ?? existing.completed,
             position: change.position ?? existing.position,
+            dueDate:
+              change.dueDate !== undefined ? change.dueDate : existing.dueDate,
+            priority:
+              change.priority !== undefined
+                ? change.priority
+                : existing.priority,
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
@@ -122,8 +138,11 @@ export async function syncTodos(c: Context<Env>) {
           id: normalizedId,
           userId,
           title: change.title,
+          description: change.description ?? null,
           completed: change.completed ?? false,
           position: change.position ?? generateKeyBetween(null, null),
+          dueDate: change.dueDate ?? null,
+          priority: change.priority ?? null,
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });
