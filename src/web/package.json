@@ -25,6 +25,7 @@
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
+    "@nylon-impossible/shared": "workspace:*",
     "@clerk/clerk-react": "^5.49.0",
     "@clerk/tanstack-react-start": "^0.27.6",
     "@cloudflare/kumo": "^1.5.0",

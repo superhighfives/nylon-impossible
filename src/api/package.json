@@ -16,6 +16,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote"
   },
   "dependencies": {
+    "@nylon-impossible/shared": "workspace:*",
     "@clerk/backend": "^1.27.0",
     "drizzle-orm": "^0.45.0",
     "fractional-indexing": "^3.2.0",
