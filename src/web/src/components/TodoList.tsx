@@ -20,14 +20,21 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { generateKeyBetween } from "fractional-indexing";
-import { GripVertical } from "lucide-react";
+import { AlertCircle, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
+import { TodoItemExpanded } from "@/components/TodoItemExpanded";
+import {
+  useDeleteTodo,
+  useTodos,
+  useTodoWithUrls,
+  useUpdateTodo,
+} from "@/hooks/useTodos";
 import type { Todo } from "@/types/database";
 
 interface TodoItemProps {
   todo: Todo;
   isEditing: boolean;
+  isExpanded: boolean;
   editTitle: string;
   editInputRef: React.RefObject<HTMLInputElement | null>;
   onToggle: (id: string, completed: boolean) => void;
@@ -36,13 +43,52 @@ interface TodoItemProps {
   onCancelEdit: () => void;
   onDelete: (id: string) => void;
   onEditTitleChange: (value: string) => void;
+  onToggleExpand: (id: string) => void;
   updatePending: boolean;
   deletePending: boolean;
+}
+
+/** Indicator badges for due date and priority */
+function TodoIndicators({ todo }: { todo: Todo }) {
+  const hasDueDate = !!todo.dueDate;
+  const hasPriority = !!todo.priority;
+
+  if (!hasDueDate && !hasPriority) return null;
+
+  const dueDate = todo.dueDate ? new Date(todo.dueDate) : null;
+  const isOverdue = dueDate && dueDate < new Date() && !todo.completed;
+
+  return (
+    <div className="flex items-center gap-1.5 mt-1">
+      {hasPriority && (
+        <span
+          className={`text-xs px-1.5 py-0.5 rounded ${
+            todo.priority === "high"
+              ? "bg-error-surface text-error"
+              : "bg-secondary text-muted"
+          }`}
+        >
+          {todo.priority === "high" ? "High" : "Low"}
+        </span>
+      )}
+      {hasDueDate && dueDate && (
+        <span
+          className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
+            isOverdue ? "bg-error-surface text-error" : "bg-secondary text-muted"
+          }`}
+        >
+          {isOverdue && <AlertCircle size={10} />}
+          {dueDate.toLocaleDateString()}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function TodoItemContent({
   todo,
   isEditing,
+  isExpanded,
   editTitle,
   editInputRef,
   onToggle,
@@ -51,6 +97,7 @@ function TodoItemContent({
   onCancelEdit,
   onDelete,
   onEditTitleChange,
+  onToggleExpand,
   updatePending,
   deletePending,
 }: TodoItemProps) {
@@ -112,8 +159,18 @@ function TodoItemContent({
         >
           {todo.title}
         </p>
+        <TodoIndicators todo={todo} />
       </div>
       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={() => onToggleExpand(todo.id)}
+          aria-label={isExpanded ? "Collapse details" : "Expand details"}
+        >
+          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -138,7 +195,50 @@ function TodoItemContent({
   );
 }
 
-function SortableTodoItem(props: TodoItemProps) {
+/** Wrapper that fetches and displays expanded todo details */
+function ExpandedSection({
+  todoId,
+  onUpdate,
+  isUpdating,
+}: {
+  todoId: string;
+  onUpdate: (updates: {
+    description?: string | null;
+    dueDate?: Date | null;
+    priority?: "high" | "low" | null;
+  }) => void;
+  isUpdating: boolean;
+}) {
+  const { data: todoWithUrls, isLoading } = useTodoWithUrls(todoId);
+
+  if (isLoading) {
+    return (
+      <div className="mt-3 pl-7 text-sm text-muted">Loading details...</div>
+    );
+  }
+
+  if (!todoWithUrls) {
+    return null;
+  }
+
+  return (
+    <TodoItemExpanded
+      todo={todoWithUrls}
+      onUpdate={onUpdate}
+      isUpdating={isUpdating}
+    />
+  );
+}
+
+function SortableTodoItem(
+  props: TodoItemProps & {
+    onUpdateExpanded: (updates: {
+      description?: string | null;
+      dueDate?: Date | null;
+      priority?: "high" | "low" | null;
+    }) => void;
+  },
+) {
   const {
     attributes,
     listeners,
@@ -168,6 +268,13 @@ function SortableTodoItem(props: TodoItemProps) {
         </button>
         <div className="flex-1 min-w-0">
           <TodoItemContent {...props} />
+          {props.isExpanded && (
+            <ExpandedSection
+              todoId={props.todo.id}
+              onUpdate={props.onUpdateExpanded}
+              isUpdating={props.updatePending}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -180,6 +287,7 @@ export function TodoList() {
   const deleteTodo = useDeleteTodo();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
@@ -264,6 +372,20 @@ export function TodoList() {
     deleteTodo.mutate(id);
   };
 
+  const handleToggleExpand = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
+
+  const handleUpdateExpanded =
+    (id: string) =>
+    (updates: {
+      description?: string | null;
+      dueDate?: Date | null;
+      priority?: "high" | "low" | null;
+    }) => {
+      updateTodo.mutate({ id, input: updates });
+    };
+
   // Sort: incomplete first (by position), then completed (most recently completed first)
   const sortedTodos = [...todos].sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
@@ -322,6 +444,7 @@ export function TodoList() {
   const sharedProps = (todo: Todo) => ({
     todo,
     isEditing: editingId === todo.id,
+    isExpanded: expandedId === todo.id,
     editTitle,
     editInputRef,
     onToggle: handleToggle,
@@ -330,6 +453,7 @@ export function TodoList() {
     onCancelEdit: handleCancelEdit,
     onDelete: handleDelete,
     onEditTitleChange: setEditTitle,
+    onToggleExpand: handleToggleExpand,
     updatePending: updateTodo.isPending,
     deletePending: deleteTodo.isPending,
   });
@@ -348,7 +472,11 @@ export function TodoList() {
           strategy={verticalListSortingStrategy}
         >
           {displayIncompleteTodos.map((todo) => (
-            <SortableTodoItem key={todo.id} {...sharedProps(todo)} />
+            <SortableTodoItem
+              key={todo.id}
+              {...sharedProps(todo)}
+              onUpdateExpanded={handleUpdateExpanded(todo.id)}
+            />
           ))}
         </SortableContext>
         <DragOverlay>
@@ -372,6 +500,13 @@ export function TodoList() {
       {completedTodos.map((todo) => (
         <div key={todo.id} className="py-3 group">
           <TodoItemContent {...sharedProps(todo)} />
+          {expandedId === todo.id && (
+            <ExpandedSection
+              todoId={todo.id}
+              onUpdate={handleUpdateExpanded(todo.id)}
+              isUpdating={updateTodo.isPending}
+            />
+          )}
         </div>
       ))}
     </div>

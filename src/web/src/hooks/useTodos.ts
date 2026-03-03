@@ -3,7 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { API_URL } from "@/lib/config";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
-import type { CreateTodoInput, Todo, UpdateTodoInput } from "@/types/database";
+import type {
+  CreateTodoInput,
+  Todo,
+  TodoWithUrls,
+  UpdateTodoInput,
+} from "@/types/database";
 
 const TODOS_QUERY_KEY = ["todos"];
 
@@ -99,6 +104,38 @@ export function useDeleteTodo() {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
     },
+  });
+}
+
+/**
+ * Hook to fetch a single todo with its URLs.
+ * Only fetches when todoId is provided and enabled.
+ */
+export function useTodoWithUrls(todoId: string | null) {
+  const { getToken } = useAuth();
+
+  return useQuery({
+    queryKey: ["todo", todoId],
+    queryFn: async (): Promise<TodoWithUrls> => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(
+          (error as { error?: string } | null)?.error ??
+            `Request failed (${response.status})`,
+        );
+      }
+
+      return response.json();
+    },
+    enabled: !!todoId,
+    staleTime: 30_000, // Consider fresh for 30 seconds
   });
 }
 
