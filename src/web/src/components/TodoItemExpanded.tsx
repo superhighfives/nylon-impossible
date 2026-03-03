@@ -1,0 +1,175 @@
+import { Button, Input, Select } from "@cloudflare/kumo";
+import { Calendar, ExternalLink, Link2, X } from "lucide-react";
+import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
+
+interface TodoItemExpandedProps {
+  todo: TodoWithUrls;
+  onUpdate: (updates: {
+    description?: string | null;
+    dueDate?: Date | null;
+    priority?: "high" | "low" | null;
+  }) => void;
+  isUpdating: boolean;
+}
+
+function formatDate(isoString: string | null): string {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  return date.toISOString().split("T")[0];
+}
+
+function UrlCard({ url }: { url: SerializedTodoUrl }) {
+  const displayTitle = url.title ?? url.siteName ?? new URL(url.url).hostname;
+  const favicon = url.favicon ?? `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}&sz=32`;
+
+  return (
+    <a
+      href={url.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-start gap-3 p-3 rounded-md bg-secondary hover:bg-subtle transition-colors group"
+    >
+      <img
+        src={favicon}
+        alt=""
+        className="w-4 h-4 mt-0.5 flex-shrink-0"
+        onError={(e) => {
+          e.currentTarget.style.display = "none";
+        }}
+      />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-surface truncate group-hover:underline">
+          {displayTitle}
+        </p>
+        {url.description && (
+          <p className="text-xs text-muted mt-0.5 line-clamp-2">
+            {url.description}
+          </p>
+        )}
+        <p className="text-xs text-muted mt-1 truncate">{url.url}</p>
+      </div>
+      <ExternalLink size={14} className="text-muted flex-shrink-0 mt-0.5" />
+    </a>
+  );
+}
+
+export function TodoItemExpanded({
+  todo,
+  onUpdate,
+  isUpdating,
+}: TodoItemExpandedProps) {
+  const handleDescriptionBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    const value = e.target.value.trim();
+    if (value !== (todo.description ?? "")) {
+      onUpdate({ description: value || null });
+    }
+  };
+
+  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    onUpdate({ dueDate: value ? new Date(value) : null });
+  };
+
+  const handleClearDueDate = () => {
+    onUpdate({ dueDate: null });
+  };
+
+  const handlePriorityChange = (value: string | null) => {
+    if (value === null) return;
+    const priority = value === "none" ? null : (value as "high" | "low");
+    onUpdate({ priority });
+  };
+
+  return (
+    <div className="mt-3 pl-7 space-y-4">
+      {/* Description */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={`desc-${todo.id}`}
+          className="text-xs font-medium text-muted"
+        >
+          Description
+        </label>
+        <textarea
+          id={`desc-${todo.id}`}
+          defaultValue={todo.description ?? ""}
+          onBlur={handleDescriptionBlur}
+          placeholder="Add a description..."
+          className="w-full min-h-[80px] text-sm p-2 rounded-md bg-secondary text-surface placeholder:text-muted ring-1 ring-border focus:ring-2 focus:ring-active focus:outline-none resize-y"
+          disabled={isUpdating}
+        />
+      </div>
+
+      {/* Due Date and Priority row */}
+      <div className="flex flex-wrap gap-4">
+        {/* Due Date */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor={`due-${todo.id}`}
+            className="text-xs font-medium text-muted flex items-center gap-1"
+          >
+            <Calendar size={12} />
+            Due date
+          </label>
+          <div className="flex items-center gap-1">
+            <Input
+              id={`due-${todo.id}`}
+              type="date"
+              value={formatDate(todo.dueDate)}
+              onChange={handleDueDateChange}
+              className="w-[160px]"
+              size="sm"
+              disabled={isUpdating}
+            />
+            {todo.dueDate && (
+              <Button
+                variant="ghost"
+                size="xs"
+                shape="square"
+                onClick={handleClearDueDate}
+                disabled={isUpdating}
+                aria-label="Clear due date"
+              >
+                <X size={14} />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Priority */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor={`priority-${todo.id}`}
+            className="text-xs font-medium text-muted"
+          >
+            Priority
+          </label>
+          <Select
+            value={todo.priority ?? "none"}
+            onValueChange={handlePriorityChange}
+            disabled={isUpdating}
+          >
+            <Select.Option value="none">None</Select.Option>
+            <Select.Option value="high">High</Select.Option>
+            <Select.Option value="low">Low</Select.Option>
+          </Select>
+        </div>
+      </div>
+
+      {/* URLs */}
+      {todo.urls && todo.urls.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-muted flex items-center gap-1">
+            <Link2 size={12} />
+            Links ({todo.urls.length})
+          </p>
+          <div className="space-y-2">
+            {todo.urls.map((url) => (
+              <UrlCard key={url.id} url={url} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
