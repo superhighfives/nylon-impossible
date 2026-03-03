@@ -100,6 +100,34 @@ export const todoLists = sqliteTable(
   ],
 );
 
+// Todo URLs with fetched metadata
+export const todoUrls = sqliteTable(
+  "todo_urls",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    todoId: text("todo_id")
+      .notNull()
+      .references(() => todos.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    title: text("title"),
+    description: text("description"),
+    siteName: text("site_name"),
+    favicon: text("favicon"),
+    position: text("position").notNull().default("a0"),
+    fetchedAt: integer("fetched_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`)
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index("idx_todo_urls_todo").on(table.todoId)],
+);
+
 // Relations (for relational query API)
 export const usersRelations = relations(users, ({ many }) => ({
   todos: many(todos),
@@ -119,3 +147,5 @@ export type Todo = typeof todos.$inferSelect;
 export type NewTodo = typeof todos.$inferInsert;
 export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
+export type TodoUrl = typeof todoUrls.$inferSelect;
+export type NewTodoUrl = typeof todoUrls.$inferInsert;
