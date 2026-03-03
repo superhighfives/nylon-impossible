@@ -95,8 +95,11 @@ export const createTodo = createServerFn({ method: "POST" })
               .values({
                 userId: user.id,
                 title: validated.title,
+                description: validated.description ?? null,
                 position,
                 completed: false,
+                dueDate: validated.dueDate ?? null,
+                priority: validated.priority ?? null,
               })
               .returning(),
           catch: (error) =>
@@ -138,10 +141,15 @@ export const updateTodo = createServerFn({ method: "POST" })
         // Build update object dynamically
         const updates: Record<string, unknown> = {};
         if (validated.title !== undefined) updates.title = validated.title;
+        if (validated.description !== undefined)
+          updates.description = validated.description;
         if (validated.completed !== undefined)
           updates.completed = validated.completed;
         if (validated.position !== undefined)
           updates.position = validated.position;
+        if (validated.dueDate !== undefined) updates.dueDate = validated.dueDate;
+        if (validated.priority !== undefined)
+          updates.priority = validated.priority;
 
         // Update todo with compound where clause for authorization
         const [result] = yield* Effect.tryPromise({
