@@ -4,11 +4,15 @@
 
 interface ExtractedItem {
   title: string;
+  urls?: string[];
+  dueDate?: string; // ISO date string YYYY-MM-DD
 }
 
 interface AIToolCallResponse {
   todos: Array<{
     title: string;
+    urls?: string[];
+    dueDate?: string;
   }>;
 }
 
@@ -17,7 +21,7 @@ const extractTodosTool = {
   function: {
     name: "extract_todos",
     description:
-      "Extract all actionable tasks, errands, or to-do items from the user's text. Convert any task-like statements into clear todo items with action verbs. If the user mentions things they need to do, buy, call, complete, schedule, or handle - extract them. Return them in the todos array. If there are truly no actionable items, return an empty array.",
+      "Extract all actionable tasks, errands, or to-do items from the user's text. Convert any task-like statements into clear todo items with action verbs. If the user mentions things they need to do, buy, call, complete, schedule, or handle - extract them. Also extract any URLs mentioned and convert relative dates to ISO format. Return them in the todos array. If there are truly no actionable items, return an empty array.",
     parameters: {
       type: "object",
       properties: {
@@ -31,7 +35,20 @@ const extractTodosTool = {
               title: {
                 type: "string",
                 description:
-                  "Concise action item starting with a verb (e.g., 'Buy milk', 'Call mom', 'Email team about Friday meeting', 'Review PR #123', 'Schedule dentist appointment')",
+                  "Concise action item starting with a verb. Do NOT include raw URLs in the title - describe the action instead (e.g., 'Check Google' not 'check https://google.com')",
+              },
+              urls: {
+                type: "array",
+                description:
+                  "Any URLs mentioned in relation to this task. Extract full URLs including protocol (http:// or https://)",
+                items: {
+                  type: "string",
+                },
+              },
+              dueDate: {
+                type: "string",
+                description:
+                  "Due date in ISO format (YYYY-MM-DD). Convert relative dates like 'tomorrow', 'next week', 'Friday' to absolute ISO dates based on today's date provided in the system prompt",
               },
             },
             required: ["title"],
@@ -44,7 +61,11 @@ const extractTodosTool = {
 };
 
 function getSystemPrompt(): string {
+  const today = new Date().toISOString().split("T")[0];
+
   return `You are a helpful assistant that extracts actionable todo items from text.
+
+Today's date is: ${today}
 
 IMPORTANT: You MUST always call the extract_todos tool with your findings. Never respond with plain text - always use the tool.
 
@@ -55,6 +76,8 @@ Key principles:
 - Handle mixed content: Text can contain both actionable and non-actionable items - only extract the actionable ones
 - "Tell X to do Y" counts as a task for the user (they need to communicate the request)
 - Partial matches are fine - extract what you can even if surrounded by irrelevant content
+- Extract URLs: If a task mentions a URL, extract it into the urls array and describe the action in the title (don't put raw URLs in titles)
+- Convert dates: Convert relative dates (tomorrow, next week, Friday, in 3 days) to ISO format YYYY-MM-DD based on today's date
 
 Look for mentions of:
 - Buying, purchasing, getting, or picking up things
@@ -63,20 +86,22 @@ Look for mentions of:
 - Scheduling, booking, or making appointments
 - Reminders or things not to forget
 - Time words like "later", "tomorrow", "soon", "next week"
+- URLs (http:// or https://) related to tasks
 
 Examples (extract ALL of these):
-- "need to buy milk" -> "Buy milk"
-- "should email the team" -> "Email team"
-- "call mom later" -> "Call mom"
-- "pick up dry cleaning tomorrow" -> "Pick up dry cleaning"
-- "don't forget to water plants" -> "Water plants"
-- "finish the report" -> "Finish report"
-- "grocery shopping" -> "Go grocery shopping"
-- "meeting at 3pm" -> "Attend 3pm meeting"
-- "buy milk and eggs" -> ["Buy milk", "Buy eggs"]
-- "call john about the project and email the team" -> ["Call John about project", "Email team"]
-- "puppies, kittens, other stuff also tell mum to get milk" -> "Tell mum to get milk"
-- "random thoughts: need to call dentist" -> "Call dentist"`;
+- "need to buy milk" -> { title: "Buy milk" }
+- "should email the team" -> { title: "Email team" }
+- "call mom later" -> { title: "Call mom" }
+- "pick up dry cleaning tomorrow" -> { title: "Pick up dry cleaning", dueDate: "[tomorrow's date in YYYY-MM-DD]" }
+- "don't forget to water plants" -> { title: "Water plants" }
+- "finish the report by Friday" -> { title: "Finish report", dueDate: "[Friday's date in YYYY-MM-DD]" }
+- "check https://google.com tomorrow" -> { title: "Check Google", urls: ["https://google.com"], dueDate: "[tomorrow's date]" }
+- "review https://github.com/user/repo/pull/123" -> { title: "Review pull request", urls: ["https://github.com/user/repo/pull/123"] }
+- "read article at https://example.com/post next week" -> { title: "Read article", urls: ["https://example.com/post"], dueDate: "[next week's date]" }
+- "buy milk and eggs" -> [{ title: "Buy milk" }, { title: "Buy eggs" }]
+- "call john about the project and email the team" -> [{ title: "Call John about project" }, { title: "Email team" }]
+- "puppies, kittens, other stuff also tell mum to get milk" -> { title: "Tell mum to get milk" }
+- "random thoughts: need to call dentist" -> { title: "Call dentist" }`;
 }
 
 /**
@@ -197,7 +222,14 @@ export async function extractTodos(
     return null;
   }
 
-  return parsed.todos.map((todo) => ({
-    title: todo.title,
-  }));
+  return parsed.todos.map((todo) => {
+    const item: ExtractedItem = { title: todo.title };
+    if (todo.urls && todo.urls.length > 0) {
+      item.urls = todo.urls;
+    }
+    if (todo.dueDate) {
+      item.dueDate = todo.dueDate;
+    }
+    return item;
+  });
 }
