@@ -1,5 +1,11 @@
 import { relations, sql } from "drizzle-orm";
-import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from "drizzle-orm/sqlite-core";
 
 // Users table
 export const users = sqliteTable(
@@ -71,6 +77,27 @@ export const lists = sqliteTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [index("idx_lists_user_id").on(table.userId)],
+);
+
+// Todo-Lists join table
+export const todoLists = sqliteTable(
+  "todo_lists",
+  {
+    todoId: text("todo_id")
+      .notNull()
+      .references(() => todos.id, { onDelete: "cascade" }),
+    listId: text("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    primaryKey({ columns: [table.todoId, table.listId] }),
+    index("idx_todo_lists_todo").on(table.todoId),
+    index("idx_todo_lists_list").on(table.listId),
+  ],
 );
 
 // Relations (for relational query API)
