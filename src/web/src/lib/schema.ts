@@ -131,12 +131,41 @@ export const todoUrls = sqliteTable(
 // Relations (for relational query API)
 export const usersRelations = relations(users, ({ many }) => ({
   todos: many(todos),
+  lists: many(lists),
 }));
 
-export const todosRelations = relations(todos, ({ one }) => ({
+export const todosRelations = relations(todos, ({ one, many }) => ({
   user: one(users, {
     fields: [todos.userId],
     references: [users.id],
+  }),
+  todoLists: many(todoLists),
+  todoUrls: many(todoUrls),
+}));
+
+export const listsRelations = relations(lists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [lists.userId],
+    references: [users.id],
+  }),
+  todoLists: many(todoLists),
+}));
+
+export const todoListsRelations = relations(todoLists, ({ one }) => ({
+  todo: one(todos, {
+    fields: [todoLists.todoId],
+    references: [todos.id],
+  }),
+  list: one(lists, {
+    fields: [todoLists.listId],
+    references: [lists.id],
+  }),
+}));
+
+export const todoUrlsRelations = relations(todoUrls, ({ one }) => ({
+  todo: one(todos, {
+    fields: [todoUrls.todoId],
+    references: [todos.id],
   }),
 }));
 
@@ -147,5 +176,7 @@ export type Todo = typeof todos.$inferSelect;
 export type NewTodo = typeof todos.$inferInsert;
 export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
+export type TodoList = typeof todoLists.$inferSelect;
+export type NewTodoList = typeof todoLists.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
