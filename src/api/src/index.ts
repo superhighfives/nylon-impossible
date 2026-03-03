@@ -5,6 +5,7 @@ import { syncTodos } from "./handlers/sync";
 import {
   createTodo,
   deleteTodo,
+  getTodo,
   listTodos,
   updateTodo,
 } from "./handlers/todos";
@@ -57,6 +58,7 @@ app.post("/todos/smart", smartCreate);
 app.post("/todos/sync", syncTodos);
 app.get("/todos", listTodos);
 app.post("/todos", createTodo);
+app.get("/todos/:id", getTodo);
 app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
 

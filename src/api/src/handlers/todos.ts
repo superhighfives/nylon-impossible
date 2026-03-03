@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, eq, getDb, todos } from "../lib/db";
+import { and, eq, getDb, todos, todoUrls } from "../lib/db";
 import type { Env } from "../types";
 
 // Validation schemas
@@ -16,6 +16,39 @@ const updateTodoSchema = z.object({
   updatedAt: z.coerce.date().optional(),
 });
 
+// Serialize a todo with ISO dates
+function serializeTodo(todo: typeof todos.$inferSelect) {
+  return {
+    id: todo.id.toLowerCase(),
+    userId: todo.userId,
+    title: todo.title,
+    description: todo.description,
+    completed: todo.completed,
+    position: todo.position,
+    dueDate: todo.dueDate?.toISOString() ?? null,
+    priority: todo.priority,
+    createdAt: todo.createdAt.toISOString(),
+    updatedAt: todo.updatedAt.toISOString(),
+  };
+}
+
+// Serialize a URL record with ISO dates
+function serializeUrl(url: typeof todoUrls.$inferSelect) {
+  return {
+    id: url.id.toLowerCase(),
+    todoId: url.todoId.toLowerCase(),
+    url: url.url,
+    title: url.title,
+    description: url.description,
+    siteName: url.siteName,
+    favicon: url.favicon,
+    position: url.position,
+    fetchedAt: url.fetchedAt?.toISOString() ?? null,
+    createdAt: url.createdAt.toISOString(),
+    updatedAt: url.updatedAt.toISOString(),
+  };
+}
+
 // GET /todos - List all todos for user
 export async function listTodos(c: Context<Env>) {
   const db = getDb(c.env.DB);
@@ -27,7 +60,34 @@ export async function listTodos(c: Context<Env>) {
     .where(eq(todos.userId, userId))
     .orderBy(todos.createdAt);
 
-  return c.json(userTodos);
+  return c.json(userTodos.map(serializeTodo));
+}
+
+// GET /todos/:id - Get a single todo with URLs
+export async function getTodo(c: Context<Env>) {
+  const todoId = c.req.param("id").toLowerCase();
+  const db = getDb(c.env.DB);
+  const userId = c.get("userId");
+
+  const [todo] = await db
+    .select()
+    .from(todos)
+    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
+
+  if (!todo) {
+    return c.json({ error: "Todo not found" }, 404);
+  }
+
+  const urls = await db
+    .select()
+    .from(todoUrls)
+    .where(eq(todoUrls.todoId, todoId))
+    .orderBy(todoUrls.position);
+
+  return c.json({
+    ...serializeTodo(todo),
+    urls: urls.map(serializeUrl),
+  });
 }
 
 // POST /todos - Create a new todo
@@ -55,7 +115,7 @@ export async function createTodo(c: Context<Env>) {
 
   const [newTodo] = await db.select().from(todos).where(eq(todos.id, id));
 
-  return c.json(newTodo, 201);
+  return c.json(serializeTodo(newTodo), 201);
 }
 
 // PUT /todos/:id - Update a todo
@@ -99,7 +159,7 @@ export async function updateTodo(c: Context<Env>) {
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
 
-  return c.json(updated);
+  return c.json(serializeTodo(updated));
 }
 
 // DELETE /todos/:id - Delete a todo
