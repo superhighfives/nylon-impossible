@@ -1,4 +1,4 @@
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 
 // Re-export schema from shared package
@@ -24,4 +24,4 @@ export function getDb(d1: D1Database) {
   return drizzle(d1);
 }
 
-export { eq, and, gt };
+export { eq, and, gt, sql };

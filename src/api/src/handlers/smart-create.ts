@@ -2,8 +2,9 @@ import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { extractTodos } from "../lib/ai";
-import { eq, getDb, todos } from "../lib/db";
+import { eq, getDb, todos, todoUrls } from "../lib/db";
 import { shouldUseAI } from "../lib/smart-input";
+import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
 
 const smartCreateSchema = z.object({
@@ -15,8 +16,11 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     title: todo.title,
+    description: todo.description,
     completed: todo.completed,
     position: todo.position,
+    dueDate: todo.dueDate?.toISOString() ?? null,
+    priority: todo.priority,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -48,7 +52,11 @@ export async function smartCreate(c: Context<Env>) {
 
   if (shouldUseAI(text)) {
     // AI path: extract and create multiple todos
-    let extracted: Array<{ title: string }> | null;
+    let extracted: Array<{
+      title: string;
+      urls?: string[];
+      dueDate?: string;
+    }> | null;
 
     try {
       extracted = await extractTodos(c.env.AI, c.env.AI_GATEWAY_ID, text);
@@ -73,12 +81,18 @@ export async function smartCreate(c: Context<Env>) {
   return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
 }
 
+interface ExtractedItem {
+  title: string;
+  urls?: string[];
+  dueDate?: string;
+}
+
 /** Batch-insert todos, fetch them back in one query, and return the response. */
 async function createAndReturn(
   db: ReturnType<typeof getDb>,
   c: Context<Env>,
   userId: string,
-  items: Array<{ title: string }>,
+  items: ExtractedItem[],
   firstPosition: string | null,
   ai = false,
 ) {
@@ -98,6 +112,7 @@ async function createAndReturn(
       title: item.title,
       completed: false as const,
       position: positions[i],
+      dueDate: item.dueDate ? new Date(item.dueDate) : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -105,6 +120,48 @@ async function createAndReturn(
 
   // Single batch insert
   await db.insert(todos).values(rows);
+
+  // Collect URLs to insert and fetch metadata for
+  const urlsToInsert: Array<{
+    id: string;
+    todoId: string;
+    url: string;
+    position: string;
+  }> = [];
+
+  items.forEach((item, i) => {
+    if (item.urls && item.urls.length > 0) {
+      const todoId = ids[i];
+      const urlPositions = generateNKeysBetween(null, null, item.urls.length);
+      item.urls.forEach((url, j) => {
+        urlsToInsert.push({
+          id: crypto.randomUUID(),
+          todoId,
+          url,
+          position: urlPositions[j],
+        });
+      });
+    }
+  });
+
+  // Insert URL records if any
+  if (urlsToInsert.length > 0) {
+    await db.insert(todoUrls).values(
+      urlsToInsert.map((u) => ({
+        id: u.id,
+        todoId: u.todoId,
+        url: u.url,
+        position: u.position,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
+
+    // Fetch metadata in background and update records
+    c.executionCtx.waitUntil(
+      fetchAndUpdateUrlMetadata(db, urlsToInsert, c.env, userId),
+    );
+  }
 
   // Single select to retrieve all created todos (preserves insertion order)
   const created = await db
@@ -123,6 +180,49 @@ async function createAndReturn(
   await notifySync(c.env, userId);
 
   return c.json({ todos: created.map(serializeTodo), ai });
+}
+
+/** Fetch metadata for URLs in background and update records */
+async function fetchAndUpdateUrlMetadata(
+  db: ReturnType<typeof getDb>,
+  urls: Array<{ id: string; todoId: string; url: string }>,
+  env: { USER_SYNC: DurableObjectNamespace },
+  userId: string,
+) {
+  const results = await Promise.allSettled(
+    urls.map(async ({ id, url }) => {
+      const metadata = await fetchUrlMetadata(url);
+      if (
+        metadata.title ||
+        metadata.description ||
+        metadata.siteName ||
+        metadata.favicon
+      ) {
+        await db
+          .update(todoUrls)
+          .set({
+            title: metadata.title,
+            description: metadata.description,
+            siteName: metadata.siteName,
+            favicon: metadata.favicon,
+            fetchedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(todoUrls.id, id));
+      }
+      return { id, metadata };
+    }),
+  );
+
+  // Log any failures for debugging
+  results.forEach((result, i) => {
+    if (result.status === "rejected") {
+      console.error(`Failed to fetch metadata for ${urls[i].url}:`, result.reason);
+    }
+  });
+
+  // Notify clients that metadata has been updated
+  await notifySync(env, userId);
 }
 
 /** Notify all connected WebSocket clients for this user to sync */
