@@ -3,6 +3,7 @@ export type Env = {
     DB: D1Database;
     USER_SYNC: DurableObjectNamespace;
     AI: Ai;
+    AI_GATEWAY_ID: string;
     CLERK_SECRET_KEY: string;
     CLERK_PUBLISHABLE_KEY: string;
   };

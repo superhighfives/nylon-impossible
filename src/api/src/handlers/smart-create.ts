@@ -48,16 +48,21 @@ export async function smartCreate(c: Context<Env>) {
 
   if (shouldUseAI(text)) {
     // AI path: extract and create multiple todos
-    let extracted: Array<{ title: string }>;
+    let extracted: Array<{ title: string }> | null;
 
     try {
-      extracted = await extractTodos(c.env.AI, text);
+      extracted = await extractTodos(c.env.AI, c.env.AI_GATEWAY_ID, text);
     } catch (error) {
       // Fallback: create single todo with original text on AI failure
       console.error(
         "AI extraction failed, falling back to single todo:",
         error,
       );
+      return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
+    }
+
+    // If AI returned null or empty, fall back to single todo
+    if (!extracted || extracted.length === 0) {
       return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
     }
 
