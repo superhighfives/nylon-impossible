@@ -1,4 +1,37 @@
-# Item Schema Update Implementation Plan
+# Rich Todos
+
+**Date**: 2026-03-02
+**Status**: Complete
+
+## Overview
+
+Expanded the todo schema to support description, URLs with metadata, due dates, priority, and lists. Added AI extraction for URLs and relative dates from natural language input. Implemented inline expansion UI on web and full edit sheet on iOS.
+
+## Architecture
+
+- **Schema**: Added columns to `todos` (description, dueDate, priority), created `lists`, `todo_lists`, `todo_urls` tables in shared package
+- **API**: Extended AI extraction to parse `{ title, urls[], dueDate }`, background URL metadata fetching via `waitUntil`
+- **Web**: Inline expanded edit view with title, description, due date, priority, and URL display
+- **iOS**: Full edit sheet with all fields, plus URL display fetched from API
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `src/shared/src/schema.ts` | Database schema with todos, lists, todoUrls tables |
+| `src/api/src/lib/ai.ts` | AI extraction with URL and date parsing |
+| `src/api/src/lib/url-metadata.ts` | URL metadata fetching utility |
+| `src/api/src/lib/smart-input.ts` | Heuristic detection including URL pattern |
+| `src/api/src/handlers/smart-create.ts` | Creates todos with URLs, background metadata fetch |
+| `src/api/src/handlers/todos.ts` | GET /todos/:id returns URLs |
+| `src/web/src/components/TodoItemExpanded.tsx` | Expanded view with all fields |
+| `src/web/src/components/TodoList.tsx` | List with inline expansion |
+| `src/ios/.../TodoEditSheet.swift` | iOS edit sheet with URL display |
+| `src/ios/.../APIService.swift` | iOS models for URLs |
+
+---
+
+## Original Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
