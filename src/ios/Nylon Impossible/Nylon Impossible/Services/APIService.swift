@@ -36,8 +36,11 @@ struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
+    let description: String?
     let completed: Bool
     let position: String?
+    let dueDate: Date?
+    let priority: String?
     let createdAt: Date
     let updatedAt: Date
 }
@@ -50,8 +53,11 @@ struct SyncRequest: Codable, Sendable {
 struct TodoChange: Codable, Sendable {
     let id: String
     let title: String?
+    let description: String?
     let completed: Bool?
     let position: String?
+    let dueDate: Date?
+    let priority: String?
     let updatedAt: Date
     let deleted: Bool?
 }
@@ -84,8 +90,11 @@ struct SmartCreateTodo: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
+    let description: String?
     let completed: Bool
     let position: String?
+    let dueDate: Date?
+    let priority: String?
     let createdAt: Date
     let updatedAt: Date
 }
