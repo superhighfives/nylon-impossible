@@ -1,4 +1,4 @@
-import { Button, Checkbox, Input } from "@cloudflare/kumo";
+import { Button, Checkbox } from "@cloudflare/kumo";
 import {
   closestCenter,
   DndContext,
@@ -20,8 +20,13 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { generateKeyBetween } from "fractional-indexing";
-import { AlertCircle, ChevronDown, ChevronUp, GripVertical } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import {
   useDeleteTodo,
@@ -33,16 +38,9 @@ import type { Todo } from "@/types/database";
 
 interface TodoItemProps {
   todo: Todo;
-  isEditing: boolean;
   isExpanded: boolean;
-  editTitle: string;
-  editInputRef: React.RefObject<HTMLInputElement | null>;
   onToggle: (id: string, completed: boolean) => void;
-  onEdit: (id: string, title: string) => void;
-  onSaveEdit: (id: string) => void;
-  onCancelEdit: () => void;
   onDelete: (id: string) => void;
-  onEditTitleChange: (value: string) => void;
   onToggleExpand: (id: string) => void;
   updatePending: boolean;
   deletePending: boolean;
@@ -74,7 +72,9 @@ function TodoIndicators({ todo }: { todo: Todo }) {
       {hasDueDate && dueDate && (
         <span
           className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
-            isOverdue ? "bg-error-surface text-error" : "bg-secondary text-muted"
+            isOverdue
+              ? "bg-error-surface text-error"
+              : "bg-secondary text-muted"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
@@ -87,60 +87,13 @@ function TodoIndicators({ todo }: { todo: Todo }) {
 
 function TodoItemContent({
   todo,
-  isEditing,
   isExpanded,
-  editTitle,
-  editInputRef,
   onToggle,
-  onEdit,
-  onSaveEdit,
-  onCancelEdit,
   onDelete,
-  onEditTitleChange,
   onToggleExpand,
   updatePending,
   deletePending,
 }: TodoItemProps) {
-  if (isEditing) {
-    return (
-      <div className="space-y-3">
-        <Input
-          ref={editInputRef}
-          type="text"
-          value={editTitle}
-          onChange={(e) => onEditTitleChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onSaveEdit(todo.id);
-            if (e.key === "Escape") onCancelEdit();
-          }}
-          className="w-full"
-          aria-label="Edit todo title"
-          size="sm"
-        />
-        <div className="flex items-center justify-end">
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              type="button"
-              onClick={onCancelEdit}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              type="button"
-              onClick={() => onSaveEdit(todo.id)}
-            >
-              Save
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex items-start gap-3">
       <div className="pt-0.5">
@@ -169,16 +122,12 @@ function TodoItemContent({
           onClick={() => onToggleExpand(todo.id)}
           aria-label={isExpanded ? "Collapse details" : "Expand details"}
         >
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          type="button"
-          onClick={() => onEdit(todo.id, todo.title)}
-          aria-label={`Edit "${todo.title}"`}
-        >
           Edit
+          {isExpanded ? (
+            <ChevronUp size={14} className="ml-1" />
+          ) : (
+            <ChevronDown size={14} className="ml-1" />
+          )}
         </Button>
         <Button
           variant="secondary-destructive"
@@ -203,6 +152,7 @@ function ExpandedSection({
 }: {
   todoId: string;
   onUpdate: (updates: {
+    title?: string;
     description?: string | null;
     dueDate?: Date | null;
     priority?: "high" | "low" | null;
@@ -233,6 +183,7 @@ function ExpandedSection({
 function SortableTodoItem(
   props: TodoItemProps & {
     onUpdateExpanded: (updates: {
+      title?: string;
       description?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
@@ -285,10 +236,7 @@ export function TodoList() {
   const { data: todos, isLoading, error } = useTodos();
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     Todo[] | null
@@ -305,12 +253,6 @@ export function TodoList() {
       coordinateGetter: sortableKeyboardCoordinates,
     }),
   );
-
-  useEffect(() => {
-    if (editingId && editInputRef.current) {
-      editInputRef.current.focus();
-    }
-  }, [editingId]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: todos is intentionally used as a trigger to reset local order when server data refreshes
   useEffect(() => {
@@ -339,35 +281,6 @@ export function TodoList() {
     updateTodo.mutate({ id, input: { completed: !completed } });
   };
 
-  const handleEdit = (id: string, title: string) => {
-    setEditingId(id);
-    setEditTitle(title);
-  };
-
-  const handleSaveEdit = (id: string) => {
-    if (!editTitle.trim()) return;
-
-    updateTodo.mutate(
-      {
-        id,
-        input: {
-          title: editTitle.trim(),
-        },
-      },
-      {
-        onSuccess: () => {
-          setEditingId(null);
-          setEditTitle("");
-        },
-      },
-    );
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditTitle("");
-  };
-
   const handleDelete = (id: string) => {
     deleteTodo.mutate(id);
   };
@@ -379,6 +292,7 @@ export function TodoList() {
   const handleUpdateExpanded =
     (id: string) =>
     (updates: {
+      title?: string;
       description?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
@@ -443,23 +357,16 @@ export function TodoList() {
 
   const sharedProps = (todo: Todo) => ({
     todo,
-    isEditing: editingId === todo.id,
     isExpanded: expandedId === todo.id,
-    editTitle,
-    editInputRef,
     onToggle: handleToggle,
-    onEdit: handleEdit,
-    onSaveEdit: handleSaveEdit,
-    onCancelEdit: handleCancelEdit,
     onDelete: handleDelete,
-    onEditTitleChange: setEditTitle,
     onToggleExpand: handleToggleExpand,
     updatePending: updateTodo.isPending,
     deletePending: deleteTodo.isPending,
   });
 
   return (
-    <div className="divide-y divide-color">
+    <div className="divide-y divide-neutral-200">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

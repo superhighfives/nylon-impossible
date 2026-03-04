@@ -6,6 +6,7 @@ import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 interface TodoItemExpandedProps {
   todo: TodoWithUrls;
   onUpdate: (updates: {
+    title?: string;
     description?: string | null;
     dueDate?: Date | null;
     priority?: "high" | "low" | null;
@@ -60,6 +61,7 @@ export function TodoItemExpanded({
   isUpdating,
 }: TodoItemExpandedProps) {
   // Local state for form fields
+  const [title, setTitle] = useState(todo.title);
   const [description, setDescription] = useState(todo.description ?? "");
   const [dueDate, setDueDate] = useState(formatDate(todo.dueDate));
   const [priority, setPriority] = useState<"high" | "low" | "none">(
@@ -68,16 +70,25 @@ export function TodoItemExpanded({
 
   // Check if there are unsaved changes
   const hasChanges =
+    title.trim() !== todo.title ||
     description.trim() !== (todo.description ?? "") ||
     dueDate !== formatDate(todo.dueDate) ||
     priority !== (todo.priority ?? "none");
 
+  const canSave = hasChanges && title.trim().length > 0;
+
   const handleSave = () => {
     const updates: {
+      title?: string;
       description?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
     } = {};
+
+    const trimmedTitle = title.trim();
+    if (trimmedTitle !== todo.title) {
+      updates.title = trimmedTitle;
+    }
 
     const trimmedDesc = description.trim();
     if (trimmedDesc !== (todo.description ?? "")) {
@@ -108,6 +119,25 @@ export function TodoItemExpanded({
 
   return (
     <div className="mt-3 pl-7 space-y-4">
+      {/* Title */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={`title-${todo.id}`}
+          className="text-xs font-medium text-muted"
+        >
+          Title
+        </label>
+        <Input
+          id={`title-${todo.id}`}
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full"
+          size="sm"
+          disabled={isUpdating}
+        />
+      </div>
+
       {/* Description */}
       <div className="space-y-1.5">
         <label
@@ -188,7 +218,7 @@ export function TodoItemExpanded({
           variant="primary"
           size="sm"
           onClick={handleSave}
-          disabled={!hasChanges || isUpdating}
+          disabled={!canSave || isUpdating}
           loading={isUpdating}
         >
           Save changes
