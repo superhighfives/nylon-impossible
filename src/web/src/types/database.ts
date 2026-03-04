@@ -1,5 +1,5 @@
 // Re-export Drizzle-inferred types for convenience
-export type { Todo, User, List, TodoList, TodoUrl } from "@/lib/schema";
+export type { List, Todo, TodoList, TodoUrl, User } from "@/lib/schema";
 
 export interface CreateTodoInput {
   title: string;

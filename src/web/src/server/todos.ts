@@ -147,7 +147,8 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.completed = validated.completed;
         if (validated.position !== undefined)
           updates.position = validated.position;
-        if (validated.dueDate !== undefined) updates.dueDate = validated.dueDate;
+        if (validated.dueDate !== undefined)
+          updates.dueDate = validated.dueDate;
         if (validated.priority !== undefined)
           updates.priority = validated.priority;
 

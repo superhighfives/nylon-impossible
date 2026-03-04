@@ -22,7 +22,9 @@ function formatDate(isoString: string | null): string {
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
   const displayTitle = url.title ?? url.siteName ?? new URL(url.url).hostname;
-  const favicon = url.favicon ?? `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}&sz=32`;
+  const favicon =
+    url.favicon ??
+    `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}&sz=32`;
 
   return (
     <a
