@@ -29,7 +29,7 @@ struct Nylon_ImpossibleApp: App {
                     }
                 }
         }
-        .modelContainer(for: TodoItem.self)
+        .modelContainer(SharedModelContainer.shared)
     }
 }
 
