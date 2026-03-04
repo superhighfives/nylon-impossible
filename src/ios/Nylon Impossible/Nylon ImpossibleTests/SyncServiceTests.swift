@@ -78,9 +78,11 @@ struct SyncServiceTests {
                 id: todo.id.uuidString.lowercased(),
                 userId: "user_test_123",
                 title: "Unsynced task",
+                description: nil,
                 completed: false,
                 position: "a0",
-
+                dueDate: nil,
+                priority: nil,
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt
             )],
@@ -122,9 +124,11 @@ struct SyncServiceTests {
                 id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
                 userId: "user_test_123",
                 title: "Remote task",
+                description: nil,
                 completed: true,
                 position: "b0",
-
+                dueDate: nil,
+                priority: nil,
                 createdAt: remoteDate,
                 updatedAt: remoteDate
             )],
@@ -171,9 +175,11 @@ struct SyncServiceTests {
                 id: todo.id.uuidString.lowercased(),
                 userId: "user_test_123",
                 title: "Remote title",
+                description: nil,
                 completed: false,
                 position: "a0",
-
+                dueDate: nil,
+                priority: nil,
                 createdAt: localDate,
                 updatedAt: remoteDate
             )],
@@ -217,9 +223,11 @@ struct SyncServiceTests {
                 id: todo.id.uuidString.lowercased(),
                 userId: "user_test_123",
                 title: "Remote title",
+                description: nil,
                 completed: false,
                 position: "a0",
-
+                dueDate: nil,
+                priority: nil,
                 createdAt: remoteDate,
                 updatedAt: remoteDate
             )],
@@ -257,9 +265,11 @@ struct SyncServiceTests {
                 id: todo.id.uuidString.lowercased(),
                 userId: "user_test_123",
                 title: "Task",
+                description: nil,
                 completed: false,
                 position: "a0",
-
+                dueDate: nil,
+                priority: nil,
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt
             )],
