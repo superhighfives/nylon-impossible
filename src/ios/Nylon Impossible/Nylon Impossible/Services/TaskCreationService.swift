@@ -45,6 +45,32 @@ enum TaskCreationService {
         return todo
     }
     
+    /// Create a todo item with an associated URL
+    /// URL will be synced and metadata fetched by the server
+    @MainActor
+    static func createTaskWithURL(
+        title: String,
+        url: String,
+        userId: String?,
+        context: ModelContext,
+        allTodos: [TodoItem]
+    ) -> TodoItem {
+        let todo = createTask(
+            title: title,
+            userId: userId,
+            context: context,
+            allTodos: allTodos
+        )
+        
+        // Store URL in the description for now
+        // The server will extract it and fetch metadata on sync
+        if todo.itemDescription == nil {
+            todo.itemDescription = "URL: \(url)"
+        }
+        
+        return todo
+    }
+    
     /// Fetch all todos for the current user
     @MainActor
     static func fetchAllTodos(userId: String?, context: ModelContext) -> [TodoItem] {
