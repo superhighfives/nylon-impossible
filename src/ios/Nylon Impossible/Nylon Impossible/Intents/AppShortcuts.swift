@@ -12,11 +12,10 @@ struct NylonShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AddTaskIntent(),
             phrases: [
-                "Add \(\.$taskTitle) to \(.applicationName)",
-                "Tell \(.applicationName) to add \(\.$taskTitle)",
-                "Tell \(.applicationName) to remind me to \(\.$taskTitle)",
                 "Add a task to \(.applicationName)",
-                "Create a task in \(.applicationName)"
+                "Create a task in \(.applicationName)",
+                "Add something to \(.applicationName)",
+                "Remind me in \(.applicationName)"
             ],
             shortTitle: "Add Task",
             systemImageName: "plus.circle"
