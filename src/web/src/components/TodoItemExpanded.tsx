@@ -1,5 +1,6 @@
 import { Button, Input, Select } from "@cloudflare/kumo";
 import { Calendar, ExternalLink, Link2, X } from "lucide-react";
+import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 
 interface TodoItemExpandedProps {
@@ -58,26 +59,51 @@ export function TodoItemExpanded({
   onUpdate,
   isUpdating,
 }: TodoItemExpandedProps) {
-  const handleDescriptionBlur = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value.trim();
-    if (value !== (todo.description ?? "")) {
-      onUpdate({ description: value || null });
+  // Local state for form fields
+  const [description, setDescription] = useState(todo.description ?? "");
+  const [dueDate, setDueDate] = useState(formatDate(todo.dueDate));
+  const [priority, setPriority] = useState<"high" | "low" | "none">(
+    todo.priority ?? "none",
+  );
+
+  // Check if there are unsaved changes
+  const hasChanges =
+    description.trim() !== (todo.description ?? "") ||
+    dueDate !== formatDate(todo.dueDate) ||
+    priority !== (todo.priority ?? "none");
+
+  const handleSave = () => {
+    const updates: {
+      description?: string | null;
+      dueDate?: Date | null;
+      priority?: "high" | "low" | null;
+    } = {};
+
+    const trimmedDesc = description.trim();
+    if (trimmedDesc !== (todo.description ?? "")) {
+      updates.description = trimmedDesc || null;
+    }
+
+    if (dueDate !== formatDate(todo.dueDate)) {
+      updates.dueDate = dueDate ? new Date(dueDate) : null;
+    }
+
+    if (priority !== (todo.priority ?? "none")) {
+      updates.priority = priority === "none" ? null : priority;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      onUpdate(updates);
     }
   };
 
-  const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    onUpdate({ dueDate: value ? new Date(value) : null });
-  };
-
   const handleClearDueDate = () => {
-    onUpdate({ dueDate: null });
+    setDueDate("");
   };
 
   const handlePriorityChange = (value: string | null) => {
     if (value === null) return;
-    const priority = value === "none" ? null : (value as "high" | "low");
-    onUpdate({ priority });
+    setPriority(value as "high" | "low" | "none");
   };
 
   return (
@@ -92,8 +118,8 @@ export function TodoItemExpanded({
         </label>
         <textarea
           id={`desc-${todo.id}`}
-          defaultValue={todo.description ?? ""}
-          onBlur={handleDescriptionBlur}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
           placeholder="Add a description..."
           className="w-full min-h-[80px] text-sm p-2 rounded-md bg-secondary text-surface placeholder:text-muted ring-1 ring-border focus:ring-2 focus:ring-active focus:outline-none resize-y"
           disabled={isUpdating}
@@ -115,13 +141,13 @@ export function TodoItemExpanded({
             <Input
               id={`due-${todo.id}`}
               type="date"
-              value={formatDate(todo.dueDate)}
-              onChange={handleDueDateChange}
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
               className="w-[160px]"
               size="sm"
               disabled={isUpdating}
             />
-            {todo.dueDate && (
+            {dueDate && (
               <Button
                 variant="ghost"
                 size="xs"
@@ -145,7 +171,7 @@ export function TodoItemExpanded({
             Priority
           </label>
           <Select
-            value={todo.priority ?? "none"}
+            value={priority}
             onValueChange={handlePriorityChange}
             disabled={isUpdating}
           >
@@ -154,6 +180,19 @@ export function TodoItemExpanded({
             <Select.Option value="low">Low</Select.Option>
           </Select>
         </div>
+      </div>
+
+      {/* Save button */}
+      <div className="flex justify-end pt-2">
+        <Button
+          variant="primary"
+          size="sm"
+          onClick={handleSave}
+          disabled={!hasChanges || isUpdating}
+          loading={isUpdating}
+        >
+          Save changes
+        </Button>
       </div>
 
       {/* URLs */}
