@@ -16,7 +16,7 @@ function SignedInContent() {
   return (
     <WebSocketSyncContext.Provider value={wsSync}>
       <div className="container max-w-xl mx-auto py-8 px-4">
-        <div className="space-y-8">
+        <div className="space-y-4">
           <TodoInput />
           <TodoList />
         </div>

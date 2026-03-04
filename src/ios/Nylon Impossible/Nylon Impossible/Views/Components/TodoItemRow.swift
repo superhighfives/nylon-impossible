@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TodoItemRow: View {
     let todo: TodoItem
+    let apiService: APIService?
     var onToggle: () -> Void
     var onSave: (String, String?, Date?, TodoPriority?) -> Void
 
@@ -107,6 +108,7 @@ struct TodoItemRow: View {
         .sheet(isPresented: $showingEditSheet) {
             TodoEditSheet(
                 todo: todo,
+                apiService: apiService,
                 onSave: { title, description, dueDate, priority in
                     onSave(title, description, dueDate, priority)
                     showingEditSheet = false
@@ -131,6 +133,7 @@ struct TodoItemRow: View {
                     item.priority = "high"
                     return item
                 }(),
+                apiService: nil,
                 onToggle: {},
                 onSave: { _, _, _, _ in }
             )
@@ -140,6 +143,7 @@ struct TodoItemRow: View {
                     item.isCompleted = true
                     return item
                 }(),
+                apiService: nil,
                 onToggle: {},
                 onSave: { _, _, _, _ in }
             )
@@ -149,6 +153,7 @@ struct TodoItemRow: View {
                     item.dueDate = Date().addingTimeInterval(-86400)
                     return item
                 }(),
+                apiService: nil,
                 onToggle: {},
                 onSave: { _, _, _, _ in }
             )

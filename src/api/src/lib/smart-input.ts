@@ -14,6 +14,9 @@ const AND_CLAUSES = /,?\s+and\s+[a-z]/i;
 // Comma followed by what looks like a new action
 const COMMA_CLAUSE = /,\s+[a-z]/;
 
+// URL pattern - matches http:// or https:// URLs
+const URL_PATTERN = /https?:\/\/[^\s]+/i;
+
 /**
  * Determine whether input text should be routed through AI extraction.
  *
@@ -34,6 +37,9 @@ export function shouldUseAI(text: string): boolean {
 
   // Contains comma followed by lowercase (likely separate items)
   if (COMMA_CLAUSE.test(text)) return true;
+
+  // Contains URLs - AI can extract them and fetch metadata
+  if (URL_PATTERN.test(text)) return true;
 
   return false;
 }

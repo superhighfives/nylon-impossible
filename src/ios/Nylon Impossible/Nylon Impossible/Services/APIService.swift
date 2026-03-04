@@ -45,6 +45,34 @@ struct APITodo: Codable, Sendable {
     let updatedAt: Date
 }
 
+struct APITodoUrl: Codable, Sendable, Identifiable {
+    let id: String
+    let todoId: String
+    let url: String
+    let title: String?
+    let description: String?
+    let siteName: String?
+    let favicon: String?
+    let position: String
+    let fetchedAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct APITodoWithUrls: Codable, Sendable {
+    let id: String
+    let userId: String
+    let title: String
+    let description: String?
+    let completed: Bool
+    let position: String?
+    let dueDate: Date?
+    let priority: String?
+    let createdAt: Date
+    let updatedAt: Date
+    let urls: [APITodoUrl]
+}
+
 struct SyncRequest: Codable, Sendable {
     let lastSyncedAt: Date?
     let changes: [TodoChange]
@@ -182,6 +210,10 @@ final class APIService: APIProviding {
 
     func listTodos() async throws -> [APITodo] {
         return try await get(path: "/todos")
+    }
+
+    func getTodo(id: UUID) async throws -> APITodoWithUrls {
+        return try await get(path: "/todos/\(id.uuidString.lowercased())")
     }
 
     func createTodo(id: UUID, title: String) async throws -> APITodo {

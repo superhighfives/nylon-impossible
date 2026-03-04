@@ -126,6 +126,7 @@ struct ContentView: View {
     private func todoRow(_ todo: TodoItem) -> some View {
         TodoItemRow(
             todo: todo,
+            apiService: syncService.apiService,
             onToggle: {
                 viewModel.toggleTodo(todo)
                 syncService.syncAfterAction()

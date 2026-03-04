@@ -19,8 +19,13 @@ enum SyncState: Equatable {
 @MainActor
 final class SyncService {
     private let authService: any AuthProviding
-    private var apiService: (any APIProviding)?
+    private var _apiService: (any APIProviding)?
     private var modelContext: ModelContext?
+    
+    /// Expose API service for direct API calls (e.g. fetching URLs)
+    var apiService: APIService? {
+        _apiService as? APIService
+    }
 
     private(set) var state: SyncState = .idle
     private(set) var lastSyncedAt: Date?
@@ -32,7 +37,7 @@ final class SyncService {
 
     init(authService: AuthService) {
         self.authService = authService
-        self.apiService = APIService(authService: authService)
+        self._apiService = APIService(authService: authService)
         self.webSocketService = WebSocketService(authService: authService)
 
         // Load last synced time from UserDefaults
@@ -52,7 +57,7 @@ final class SyncService {
     /// Test-friendly initializer that accepts protocol types
     init(authService: any AuthProviding, apiService: any APIProviding) {
         self.authService = authService
-        self.apiService = apiService
+        self._apiService = apiService
         self.webSocketService = nil
     }
 
@@ -64,7 +69,7 @@ final class SyncService {
     /// Falls back to local creation if not signed in.
     func smartCreate(text: String, context: ModelContext, userId: String?, allTodos: [TodoItem]) async {
         // Offline fallback: create locally
-        guard authService.isSignedIn, userId != nil, let apiService else {
+        guard authService.isSignedIn, userId != nil, let apiService = _apiService else {
             // Create a single local todo
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !trimmedText.isEmpty else { return }
@@ -123,7 +128,7 @@ final class SyncService {
     func sync() async {
         guard state != .syncing else { return }
         guard authService.isSignedIn, let userId = authService.userId else { return }
-        guard modelContext != nil, let apiService else { return }
+        guard modelContext != nil, let apiService = _apiService else { return }
 
         state = .syncing
 

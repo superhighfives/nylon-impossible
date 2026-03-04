@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TodoEditSheet: View {
     let todo: TodoItem
+    let apiService: APIService?
     var onSave: (String, String?, Date?, TodoPriority?) -> Void
     var onCancel: () -> Void
     
@@ -17,13 +18,17 @@ struct TodoEditSheet: View {
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var priority: TodoPriority?
+    @State private var urls: [APITodoUrl] = []
+    @State private var isLoadingUrls: Bool = false
     
     init(
         todo: TodoItem,
+        apiService: APIService? = nil,
         onSave: @escaping (String, String?, Date?, TodoPriority?) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.todo = todo
+        self.apiService = apiService
         self.onSave = onSave
         self.onCancel = onCancel
         
@@ -79,6 +84,31 @@ struct TodoEditSheet: View {
                 } header: {
                     Text("Priority")
                 }
+                
+                // Links
+                if isLoadingUrls {
+                    Section {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Loading links...")
+                                .foregroundStyle(.secondary)
+                        }
+                    } header: {
+                        Text("Links")
+                    }
+                } else if !urls.isEmpty {
+                    Section {
+                        ForEach(urls) { url in
+                            UrlRow(url: url)
+                        }
+                    } header: {
+                        Text("Links (\(urls.count))")
+                    }
+                }
+            }
+            .task {
+                await loadUrls()
             }
             .navigationTitle("Edit Task")
             .navigationBarTitleDisplayMode(.inline)
@@ -108,6 +138,91 @@ struct TodoEditSheet: View {
         let dueDateValue = hasDueDate ? dueDate : nil
         
         onSave(trimmedTitle, descriptionValue, dueDateValue, priority)
+    }
+    
+    private func loadUrls() async {
+        guard let apiService = apiService else { return }
+        
+        isLoadingUrls = true
+        defer { isLoadingUrls = false }
+        
+        do {
+            let todoWithUrls = try await apiService.getTodo(id: todo.id)
+            urls = todoWithUrls.urls
+        } catch {
+            // Silently fail - URLs are supplementary info
+            print("Failed to load URLs: \(error)")
+        }
+    }
+}
+
+// MARK: - URL Row
+
+struct UrlRow: View {
+    let url: APITodoUrl
+    
+    private var displayTitle: String {
+        if let title = url.title, !title.isEmpty {
+            return title
+        }
+        if let siteName = url.siteName, !siteName.isEmpty {
+            return siteName
+        }
+        return URL(string: url.url)?.host ?? url.url
+    }
+    
+    private var faviconURL: URL? {
+        if let favicon = url.favicon, let faviconUrl = URL(string: favicon) {
+            return faviconUrl
+        }
+        if let host = URL(string: url.url)?.host {
+            return URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=32")
+        }
+        return nil
+    }
+    
+    var body: some View {
+        Link(destination: URL(string: url.url)!) {
+            HStack(spacing: 12) {
+                AsyncImage(url: faviconURL) { image in
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                } placeholder: {
+                    Image(systemName: "link")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(width: 20, height: 20)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(displayTitle)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    
+                    if let description = url.description, !description.isEmpty {
+                        Text(description)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    
+                    Text(url.url)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                Image(systemName: "arrow.up.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

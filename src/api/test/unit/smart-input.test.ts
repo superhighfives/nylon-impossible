@@ -67,4 +67,24 @@ describe("shouldUseAI", () => {
       expect(shouldUseAI("Buy milk, email team")).toBe(true);
     });
   });
+
+  describe("returns true for URLs", () => {
+    it("https URL", () => {
+      expect(shouldUseAI("check https://google.com")).toBe(true);
+    });
+
+    it("http URL", () => {
+      expect(shouldUseAI("read http://example.com/article")).toBe(true);
+    });
+
+    it("URL with path and query", () => {
+      expect(shouldUseAI("review https://github.com/user/repo/pull/123")).toBe(
+        true,
+      );
+    });
+
+    it("standalone URL", () => {
+      expect(shouldUseAI("https://example.com")).toBe(true);
+    });
+  });
 });
