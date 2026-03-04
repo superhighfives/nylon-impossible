@@ -21,6 +21,73 @@ describe("createTodoSchema", () => {
     const result = createTodoSchema.safeParse({ title: "a".repeat(500) });
     expect(result.success).toBe(true);
   });
+
+  it("accepts optional description", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      description: "Some details",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts null description", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      description: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts optional dueDate as Date", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      dueDate: new Date("2026-03-15"),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("coerces dueDate from string", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      dueDate: "2026-03-15",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.dueDate).toBeInstanceOf(Date);
+    }
+  });
+
+  it("accepts priority high", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      priority: "high",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts priority low", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      priority: "low",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects invalid priority", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      priority: "medium",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts null priority", () => {
+    const result = createTodoSchema.safeParse({
+      title: "Task",
+      priority: null,
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("updateTodoSchema", () => {
@@ -46,6 +113,49 @@ describe("updateTodoSchema", () => {
 
   it("accepts empty object (no updates)", () => {
     const result = updateTodoSchema.safeParse({});
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts partial update with description", () => {
+    const result = updateTodoSchema.safeParse({ description: "Updated desc" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts clearing description with null", () => {
+    const result = updateTodoSchema.safeParse({ description: null });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts partial update with dueDate", () => {
+    const result = updateTodoSchema.safeParse({
+      dueDate: new Date("2026-03-20"),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts clearing dueDate with null", () => {
+    const result = updateTodoSchema.safeParse({ dueDate: null });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts partial update with priority", () => {
+    const result = updateTodoSchema.safeParse({ priority: "high" });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts clearing priority with null", () => {
+    const result = updateTodoSchema.safeParse({ priority: null });
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts full update with all new fields", () => {
+    const result = updateTodoSchema.safeParse({
+      title: "Updated task",
+      description: "New description",
+      completed: false,
+      dueDate: new Date("2026-04-01"),
+      priority: "low",
+    });
     expect(result.success).toBe(true);
   });
 });
