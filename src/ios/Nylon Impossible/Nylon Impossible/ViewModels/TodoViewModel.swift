@@ -35,20 +35,15 @@ final class TodoViewModel {
     }
 
     func addTodo(context: ModelContext, userId: String?, allTodos: [TodoItem]) {
-        let trimmedText = newTaskText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedText.isEmpty else { return }
-
-        // Find the last position among incomplete todos
-        let lastPosition = allTodos
-            .filter { !$0.isDeleted && !$0.isCompleted }
-            .map { $0.position }
-            .sorted()
-            .last
-
-        let position = generateKeyBetween(lastPosition, nil)
-
-        let todo = TodoItem(title: trimmedText, userId: userId, position: position)
-        context.insert(todo)
+        guard !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        
+        _ = TaskCreationService.createTask(
+            title: newTaskText,
+            userId: userId,
+            context: context,
+            allTodos: allTodos
+        )
+        
         newTaskText = ""
     }
 
