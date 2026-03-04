@@ -156,11 +156,7 @@ function ExpandedSection({
   isUpdating: boolean;
 }) {
   return (
-    <TodoItemExpanded
-      todo={todo}
-      onUpdate={onUpdate}
-      isUpdating={isUpdating}
-    />
+    <TodoItemExpanded todo={todo} onUpdate={onUpdate} isUpdating={isUpdating} />
   );
 }
 

@@ -11,16 +11,16 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
+import type { Todo, TodoUrl } from "@/lib/schema";
 import { todos, todoUrls } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import { createTodoSchema, updateTodoSchema } from "@/lib/validation";
 import type {
   CreateTodoInput,
-  UpdateTodoInput,
-  TodoWithUrls,
   SerializedTodoUrl,
+  TodoWithUrls,
+  UpdateTodoInput,
 } from "@/types/database";
-import type { Todo, TodoUrl } from "@/lib/schema";
 
 /** Serialize a todo URL for JSON response */
 function serializeUrl(url: TodoUrl): SerializedTodoUrl {
@@ -41,10 +41,7 @@ function serializeUrl(url: TodoUrl): SerializedTodoUrl {
 }
 
 /** Serialize a todo with URLs for JSON response */
-function serializeTodoWithUrls(
-  todo: Todo,
-  urls: TodoUrl[],
-): TodoWithUrls {
+function serializeTodoWithUrls(todo: Todo, urls: TodoUrl[]): TodoWithUrls {
   return {
     id: todo.id,
     userId: todo.userId,
@@ -108,7 +105,9 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         urlsByTodoId.set(url.todoId, existing);
       }
 
-      yield* Effect.log(`Fetched ${userTodos.length} todos for user ${user.id}`);
+      yield* Effect.log(
+        `Fetched ${userTodos.length} todos for user ${user.id}`,
+      );
 
       // Return todos with their URLs
       return userTodos.map((todo) =>

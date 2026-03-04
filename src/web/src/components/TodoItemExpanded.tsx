@@ -44,7 +44,10 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 mt-0.5 flex-shrink-0" />
       ) : isFailed ? (
-        <AlertCircle size={16} className="w-4 h-4 mt-0.5 flex-shrink-0 text-error" />
+        <AlertCircle
+          size={16}
+          className="w-4 h-4 mt-0.5 flex-shrink-0 text-error"
+        />
       ) : (
         <img
           src={favicon}
