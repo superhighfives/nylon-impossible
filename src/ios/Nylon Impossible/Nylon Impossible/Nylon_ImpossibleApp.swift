@@ -81,6 +81,8 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
+                // Persist userId to shared UserDefaults for Siri and Share Extension
+                authService.persistUserIdToSharedDefaults()
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
             } else {
