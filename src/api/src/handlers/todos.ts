@@ -66,7 +66,10 @@ export async function listTodos(c: Context<Env>) {
 
 // GET /todos/:id - Get a single todo with URLs
 export async function getTodo(c: Context<Env>) {
-  const todoId = c.req.param("id").toLowerCase();
+  const todoId = c.req.param("id")?.toLowerCase();
+  if (!todoId) {
+    return c.json({ error: "Todo ID required" }, 400);
+  }
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
@@ -122,6 +125,9 @@ export async function createTodo(c: Context<Env>) {
 // PUT /todos/:id - Update a todo
 export async function updateTodo(c: Context<Env>) {
   const todoId = c.req.param("id");
+  if (!todoId) {
+    return c.json({ error: "Todo ID required" }, 400);
+  }
   const body = await c.req.json();
   const parsed = updateTodoSchema.safeParse(body);
 
@@ -166,6 +172,9 @@ export async function updateTodo(c: Context<Env>) {
 // DELETE /todos/:id - Delete a todo
 export async function deleteTodo(c: Context<Env>) {
   const todoId = c.req.param("id");
+  if (!todoId) {
+    return c.json({ error: "Todo ID required" }, 400);
+  }
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
