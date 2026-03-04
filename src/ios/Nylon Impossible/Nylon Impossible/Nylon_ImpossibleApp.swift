@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import ClerkKit
+import AppIntents
 
 @main
 struct Nylon_ImpossibleApp: App {
@@ -27,6 +28,10 @@ struct Nylon_ImpossibleApp: App {
                     if syncService == nil {
                         syncService = SyncService(authService: authService)
                     }
+                }
+                .task {
+                    // Register app shortcuts on launch
+                    NylonShortcuts.updateAppShortcutParameters()
                 }
         }
         .modelContainer(SharedModelContainer.shared)
