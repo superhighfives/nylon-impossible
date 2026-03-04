@@ -78,6 +78,20 @@ final class TodoViewModel {
         todo.markModified()
     }
 
+    func updateTodo(
+        _ todo: TodoItem,
+        title: String,
+        description: String?,
+        dueDate: Date?,
+        priority: TodoPriority?
+    ) {
+        todo.title = title
+        todo.itemDescription = description
+        todo.dueDate = dueDate
+        todo.todoPriority = priority
+        todo.markModified()
+    }
+
     func toggleTodo(_ todo: TodoItem) {
         todo.isCompleted.toggle()
         todo.markModified()

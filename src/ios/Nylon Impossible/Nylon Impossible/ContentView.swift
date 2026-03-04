@@ -130,8 +130,14 @@ struct ContentView: View {
                 viewModel.toggleTodo(todo)
                 syncService.syncAfterAction()
             },
-            onEdit: { newTitle in
-                viewModel.updateTodoTitle(todo, title: newTitle)
+            onSave: { title, description, dueDate, priority in
+                viewModel.updateTodo(
+                    todo,
+                    title: title,
+                    description: description,
+                    dueDate: dueDate,
+                    priority: priority
+                )
                 syncService.syncAfterAction()
             }
         )
