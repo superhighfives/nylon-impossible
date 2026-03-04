@@ -152,6 +152,7 @@ async function createAndReturn(
         todoId: u.todoId,
         url: u.url,
         position: u.position,
+        fetchStatus: "pending" as const,
         createdAt: now,
         updatedAt: now,
       })),
@@ -191,13 +192,9 @@ async function fetchAndUpdateUrlMetadata(
 ) {
   const results = await Promise.allSettled(
     urls.map(async ({ id, url }) => {
-      const metadata = await fetchUrlMetadata(url);
-      if (
-        metadata.title ||
-        metadata.description ||
-        metadata.siteName ||
-        metadata.favicon
-      ) {
+      try {
+        const metadata = await fetchUrlMetadata(url);
+        // Update with fetched metadata and mark as fetched
         await db
           .update(todoUrls)
           .set({
@@ -205,12 +202,23 @@ async function fetchAndUpdateUrlMetadata(
             description: metadata.description,
             siteName: metadata.siteName,
             favicon: metadata.favicon,
+            fetchStatus: "fetched" as const,
             fetchedAt: new Date(),
             updatedAt: new Date(),
           })
           .where(eq(todoUrls.id, id));
+        return { id, metadata };
+      } catch (error) {
+        // Mark as failed on error
+        await db
+          .update(todoUrls)
+          .set({
+            fetchStatus: "failed" as const,
+            updatedAt: new Date(),
+          })
+          .where(eq(todoUrls.id, id));
+        throw error;
       }
-      return { id, metadata };
     }),
   );
 

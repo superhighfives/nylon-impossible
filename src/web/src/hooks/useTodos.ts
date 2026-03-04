@@ -5,7 +5,6 @@ import { API_URL } from "@/lib/config";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type {
   CreateTodoInput,
-  Todo,
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
@@ -13,7 +12,7 @@ import type {
 const TODOS_QUERY_KEY = ["todos"];
 
 export function useTodos() {
-  return useQuery({
+  return useQuery<TodoWithUrls[]>({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
   });
@@ -44,15 +43,32 @@ export function useUpdateTodo() {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
 
       // Snapshot previous value
-      const previousTodos = queryClient.getQueryData<Todo[]>(TODOS_QUERY_KEY);
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
 
       // Optimistically update
       if (previousTodos) {
-        queryClient.setQueryData<Todo[]>(
+        queryClient.setQueryData<TodoWithUrls[]>(
           TODOS_QUERY_KEY,
-          previousTodos.map((todo) =>
-            todo.id === id ? { ...todo, ...input } : todo,
-          ),
+          previousTodos.map((todo) => {
+            if (todo.id !== id) return todo;
+            // Build optimistic update, converting Date to ISO string
+            return {
+              ...todo,
+              ...(input.title !== undefined && { title: input.title }),
+              ...(input.description !== undefined && {
+                description: input.description,
+              }),
+              ...(input.completed !== undefined && {
+                completed: input.completed,
+              }),
+              ...(input.position !== undefined && { position: input.position }),
+              ...(input.dueDate !== undefined && {
+                dueDate: input.dueDate?.toISOString() ?? null,
+              }),
+              ...(input.priority !== undefined && { priority: input.priority }),
+            };
+          }),
         );
       }
 
@@ -82,11 +98,12 @@ export function useDeleteTodo() {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
 
       // Snapshot previous value
-      const previousTodos = queryClient.getQueryData<Todo[]>(TODOS_QUERY_KEY);
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
 
       // Optimistically remove
       if (previousTodos) {
-        queryClient.setQueryData<Todo[]>(
+        queryClient.setQueryData<TodoWithUrls[]>(
           TODOS_QUERY_KEY,
           previousTodos.filter((todo) => todo.id !== id),
         );
@@ -140,7 +157,7 @@ export function useTodoWithUrls(todoId: string | null) {
 }
 
 interface SmartCreateResponse {
-  todos: Todo[];
+  todos: TodoWithUrls[];
   ai: boolean;
 }
 

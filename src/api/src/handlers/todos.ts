@@ -43,6 +43,7 @@ function serializeUrl(url: typeof todoUrls.$inferSelect) {
     siteName: url.siteName,
     favicon: url.favicon,
     position: url.position,
+    fetchStatus: url.fetchStatus,
     fetchedAt: url.fetchedAt?.toISOString() ?? null,
     createdAt: url.createdAt.toISOString(),
     updatedAt: url.updatedAt.toISOString(),

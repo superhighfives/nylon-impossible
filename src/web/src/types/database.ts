@@ -17,6 +17,9 @@ export interface UpdateTodoInput {
   priority?: "high" | "low" | null;
 }
 
+/** Fetch status for URL metadata */
+export type FetchStatus = "pending" | "fetched" | "failed";
+
 /** Serialized URL metadata from the API */
 export interface SerializedTodoUrl {
   id: string;
@@ -27,6 +30,7 @@ export interface SerializedTodoUrl {
   siteName: string | null;
   favicon: string | null;
   position: string;
+  fetchStatus: FetchStatus;
   fetchedAt: string | null;
   createdAt: string;
   updatedAt: string;

@@ -28,16 +28,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
-import {
-  useDeleteTodo,
-  useTodos,
-  useTodoWithUrls,
-  useUpdateTodo,
-} from "@/hooks/useTodos";
-import type { Todo } from "@/types/database";
+import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
+import type { TodoWithUrls } from "@/types/database";
 
 interface TodoItemProps {
-  todo: Todo;
+  todo: TodoWithUrls;
   isExpanded: boolean;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
@@ -47,9 +42,10 @@ interface TodoItemProps {
 }
 
 /** Indicator badges for due date and priority */
-function TodoIndicators({ todo }: { todo: Todo }) {
+function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   const hasDueDate = !!todo.dueDate;
-  const hasPriority = !!todo.priority;
+  // Only show priority badge for explicit "high" or "low" values
+  const hasPriority = todo.priority === "high" || todo.priority === "low";
 
   if (!hasDueDate && !hasPriority) return null;
 
@@ -114,7 +110,7 @@ function TodoItemContent({
         </p>
         <TodoIndicators todo={todo} />
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="sm"
@@ -144,13 +140,13 @@ function TodoItemContent({
   );
 }
 
-/** Wrapper that fetches and displays expanded todo details */
+/** Wrapper that displays expanded todo details */
 function ExpandedSection({
-  todoId,
+  todo,
   onUpdate,
   isUpdating,
 }: {
-  todoId: string;
+  todo: TodoWithUrls;
   onUpdate: (updates: {
     title?: string;
     description?: string | null;
@@ -159,21 +155,9 @@ function ExpandedSection({
   }) => void;
   isUpdating: boolean;
 }) {
-  const { data: todoWithUrls, isLoading } = useTodoWithUrls(todoId);
-
-  if (isLoading) {
-    return (
-      <div className="mt-3 pl-7 text-sm text-muted">Loading details...</div>
-    );
-  }
-
-  if (!todoWithUrls) {
-    return null;
-  }
-
   return (
     <TodoItemExpanded
-      todo={todoWithUrls}
+      todo={todo}
       onUpdate={onUpdate}
       isUpdating={isUpdating}
     />
@@ -221,7 +205,7 @@ function SortableTodoItem(
           <TodoItemContent {...props} />
           {props.isExpanded && (
             <ExpandedSection
-              todoId={props.todo.id}
+              todo={props.todo}
               onUpdate={props.onUpdateExpanded}
               isUpdating={props.updatePending}
             />
@@ -239,7 +223,7 @@ export function TodoList() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
-    Todo[] | null
+    TodoWithUrls[] | null
   >(null);
 
   const sensors = useSensors(
@@ -355,7 +339,7 @@ export function TodoList() {
     });
   };
 
-  const sharedProps = (todo: Todo) => ({
+  const sharedProps = (todo: TodoWithUrls) => ({
     todo,
     isExpanded: expandedId === todo.id,
     onToggle: handleToggle,
@@ -408,7 +392,7 @@ export function TodoList() {
             <TodoItemContent {...sharedProps(todo)} />
             {expandedId === todo.id && (
               <ExpandedSection
-                todoId={todo.id}
+                todo={todo}
                 onUpdate={handleUpdateExpanded(todo.id)}
                 isUpdating={updateTodo.isPending}
               />

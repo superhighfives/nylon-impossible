@@ -3,7 +3,7 @@
  */
 
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -11,18 +11,63 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
-import { todos } from "@/lib/schema";
+import { todos, todoUrls } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import { createTodoSchema, updateTodoSchema } from "@/lib/validation";
-import type { CreateTodoInput, UpdateTodoInput } from "@/types/database";
+import type {
+  CreateTodoInput,
+  UpdateTodoInput,
+  TodoWithUrls,
+  SerializedTodoUrl,
+} from "@/types/database";
+import type { Todo, TodoUrl } from "@/lib/schema";
+
+/** Serialize a todo URL for JSON response */
+function serializeUrl(url: TodoUrl): SerializedTodoUrl {
+  return {
+    id: url.id,
+    todoId: url.todoId,
+    url: url.url,
+    title: url.title,
+    description: url.description,
+    siteName: url.siteName,
+    favicon: url.favicon,
+    position: url.position,
+    fetchStatus: url.fetchStatus,
+    fetchedAt: url.fetchedAt?.toISOString() ?? null,
+    createdAt: url.createdAt.toISOString(),
+    updatedAt: url.updatedAt.toISOString(),
+  };
+}
+
+/** Serialize a todo with URLs for JSON response */
+function serializeTodoWithUrls(
+  todo: Todo,
+  urls: TodoUrl[],
+): TodoWithUrls {
+  return {
+    id: todo.id,
+    userId: todo.userId,
+    title: todo.title,
+    description: todo.description,
+    completed: todo.completed,
+    position: todo.position,
+    dueDate: todo.dueDate?.toISOString() ?? null,
+    priority: todo.priority,
+    createdAt: todo.createdAt.toISOString(),
+    updatedAt: todo.updatedAt.toISOString(),
+    urls: urls.map(serializeUrl),
+  };
+}
 
 /**
- * Get all todos for the authenticated user
+ * Get all todos for the authenticated user, including their URLs
  */
 export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
   const program = withAuthenticatedUser((user, db) =>
     Effect.gen(function* () {
-      const result = yield* Effect.tryPromise({
+      // Fetch all todos for the user
+      const userTodos = yield* Effect.tryPromise({
         try: () =>
           db
             .select()
@@ -36,9 +81,39 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
           }),
       });
 
-      yield* Effect.log(`Fetched ${result.length} todos for user ${user.id}`);
+      // Fetch all URLs for the user's todos
+      const todoIds = userTodos.map((t) => t.id);
+      let allUrls: TodoUrl[] = [];
+      if (todoIds.length > 0) {
+        allUrls = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(todoUrls)
+              .where(inArray(todoUrls.todoId, todoIds))
+              .orderBy(asc(todoUrls.position)),
+          catch: (error) =>
+            new DatabaseError({
+              operation: "getTodoUrls",
+              cause: error,
+            }),
+        });
+      }
 
-      return result;
+      // Group URLs by todoId
+      const urlsByTodoId = new Map<string, TodoUrl[]>();
+      for (const url of allUrls) {
+        const existing = urlsByTodoId.get(url.todoId) ?? [];
+        existing.push(url);
+        urlsByTodoId.set(url.todoId, existing);
+      }
+
+      yield* Effect.log(`Fetched ${userTodos.length} todos for user ${user.id}`);
+
+      // Return todos with their URLs
+      return userTodos.map((todo) =>
+        serializeTodoWithUrls(todo, urlsByTodoId.get(todo.id) ?? []),
+      );
     }),
   );
 

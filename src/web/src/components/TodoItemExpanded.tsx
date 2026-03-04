@@ -1,5 +1,5 @@
-import { Button, Input, Select } from "@cloudflare/kumo";
-import { Calendar, ExternalLink, Link2, X } from "lucide-react";
+import { Button, Input, Loader, Select } from "@cloudflare/kumo";
+import { AlertCircle, Calendar, ExternalLink, Link2, X } from "lucide-react";
 import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 
@@ -21,7 +21,15 @@ function formatDate(isoString: string | null): string {
 }
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
-  const displayTitle = url.title ?? url.siteName ?? new URL(url.url).hostname;
+  const isPending = url.fetchStatus === "pending";
+  const isFailed = url.fetchStatus === "failed";
+
+  // Show hostname for pending/failed, or full title when fetched
+  const displayTitle =
+    isPending || isFailed
+      ? new URL(url.url).hostname
+      : (url.title ?? url.siteName ?? new URL(url.url).hostname);
+
   const favicon =
     url.favicon ??
     `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}&sz=32`;
@@ -33,19 +41,35 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       rel="noopener noreferrer"
       className="flex items-start gap-3 p-3 rounded-md bg-secondary hover:bg-subtle transition-colors group"
     >
-      <img
-        src={favicon}
-        alt=""
-        className="w-4 h-4 mt-0.5 flex-shrink-0"
-        onError={(e) => {
-          e.currentTarget.style.display = "none";
-        }}
-      />
+      {isPending ? (
+        <Loader size="sm" className="w-4 h-4 mt-0.5 flex-shrink-0" />
+      ) : isFailed ? (
+        <AlertCircle size={16} className="w-4 h-4 mt-0.5 flex-shrink-0 text-error" />
+      ) : (
+        <img
+          src={favicon}
+          alt=""
+          className="w-4 h-4 mt-0.5 flex-shrink-0"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
+      )}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-surface truncate group-hover:underline">
           {displayTitle}
+          {isPending && (
+            <span className="ml-2 text-xs text-muted font-normal">
+              Fetching...
+            </span>
+          )}
+          {isFailed && (
+            <span className="ml-2 text-xs text-error font-normal">
+              Failed to fetch
+            </span>
+          )}
         </p>
-        {url.description && (
+        {!isPending && !isFailed && url.description && (
           <p className="text-xs text-muted mt-0.5 line-clamp-2">
             {url.description}
           </p>

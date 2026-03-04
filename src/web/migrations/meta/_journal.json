@@ -8,6 +8,13 @@
       "when": 1772579435050,
       "tag": "0000_sticky_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772635240743,
+      "tag": "0001_nifty_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

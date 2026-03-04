@@ -116,6 +116,9 @@ export const todoUrls = sqliteTable(
     siteName: text("site_name"),
     favicon: text("favicon"),
     position: text("position").notNull().default("a0"),
+    fetchStatus: text("fetch_status", { enum: ["pending", "fetched", "failed"] })
+      .notNull()
+      .default("pending"),
     fetchedAt: integer("fetched_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()

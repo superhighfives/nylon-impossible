@@ -161,7 +161,19 @@ struct TodoEditSheet: View {
 struct UrlRow: View {
     let url: APITodoUrl
     
+    private var isPending: Bool {
+        url.fetchStatus == .pending
+    }
+    
+    private var isFailed: Bool {
+        url.fetchStatus == .failed
+    }
+    
     private var displayTitle: String {
+        // Show hostname for pending/failed, full title when fetched
+        if isPending || isFailed {
+            return URL(string: url.url)?.host ?? url.url
+        }
         if let title = url.title, !title.isEmpty {
             return title
         }
@@ -184,24 +196,47 @@ struct UrlRow: View {
     var body: some View {
         Link(destination: URL(string: url.url)!) {
             HStack(spacing: 12) {
-                AsyncImage(url: faviconURL) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                } placeholder: {
-                    Image(systemName: "link")
-                        .foregroundStyle(.secondary)
+                // Icon: spinner for pending, error for failed, favicon otherwise
+                Group {
+                    if isPending {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                    } else if isFailed {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundStyle(.red)
+                    } else {
+                        AsyncImage(url: faviconURL) { image in
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } placeholder: {
+                            Image(systemName: "link")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 .frame(width: 20, height: 20)
                 
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(displayTitle)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
+                    HStack(spacing: 4) {
+                        Text(displayTitle)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        
+                        if isPending {
+                            Text("Fetching...")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        } else if isFailed {
+                            Text("Failed to fetch")
+                                .font(.caption2)
+                                .foregroundStyle(.red)
+                        }
+                    }
                     
-                    if let description = url.description, !description.isEmpty {
+                    if !isPending && !isFailed, let description = url.description, !description.isEmpty {
                         Text(description)
                             .font(.caption)
                             .foregroundStyle(.secondary)

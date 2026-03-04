@@ -45,6 +45,13 @@ struct APITodo: Codable, Sendable {
     let updatedAt: Date
 }
 
+/// Fetch status for URL metadata
+enum FetchStatus: String, Codable, Sendable {
+    case pending
+    case fetched
+    case failed
+}
+
 struct APITodoUrl: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
@@ -54,6 +61,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let siteName: String?
     let favicon: String?
     let position: String
+    let fetchStatus: FetchStatus
     let fetchedAt: Date?
     let createdAt: Date
     let updatedAt: Date
