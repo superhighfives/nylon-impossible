@@ -2,7 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, eq, getDb, gt, type Todo, todos, users, lists } from "../lib/db";
+import { and, eq, getDb, gt, lists, type Todo, todos, users } from "../lib/db";
 import type { Env } from "../types";
 
 const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];

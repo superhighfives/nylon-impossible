@@ -217,7 +217,10 @@ async function fetchAndUpdateUrlMetadata(
   // Log any failures for debugging
   results.forEach((result, i) => {
     if (result.status === "rejected") {
-      console.error(`Failed to fetch metadata for ${urls[i].url}:`, result.reason);
+      console.error(
+        `Failed to fetch metadata for ${urls[i].url}:`,
+        result.reason,
+      );
     }
   });
 

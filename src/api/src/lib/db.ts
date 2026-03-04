@@ -3,21 +3,21 @@ import { drizzle } from "drizzle-orm/d1";
 
 // Re-export schema from shared package
 export {
-  users,
-  todos,
+  type List,
   lists,
-  todoLists,
-  todoUrls,
-  type User,
+  type NewList,
+  type NewTodo,
+  type NewTodoList,
+  type NewTodoUrl,
   type NewUser,
   type Todo,
-  type NewTodo,
-  type List,
-  type NewList,
   type TodoList,
-  type NewTodoList,
   type TodoUrl,
-  type NewTodoUrl,
+  todoLists,
+  todos,
+  todoUrls,
+  type User,
+  users,
 } from "@nylon-impossible/shared/schema";
 
 export function getDb(d1: D1Database) {
