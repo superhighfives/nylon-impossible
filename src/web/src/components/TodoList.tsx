@@ -366,14 +366,14 @@ export function TodoList() {
   });
 
   return (
-    <div className="divide-y divide-neutral-200">
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
+    >
+      <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
         <SortableContext
           items={displayIncompleteTodos.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
@@ -403,19 +403,19 @@ export function TodoList() {
             </div>
           ) : null}
         </DragOverlay>
-      </DndContext>
-      {completedTodos.map((todo) => (
-        <div key={todo.id} className="py-3 group">
-          <TodoItemContent {...sharedProps(todo)} />
-          {expandedId === todo.id && (
-            <ExpandedSection
-              todoId={todo.id}
-              onUpdate={handleUpdateExpanded(todo.id)}
-              isUpdating={updateTodo.isPending}
-            />
-          )}
-        </div>
-      ))}
-    </div>
+        {completedTodos.map((todo) => (
+          <div key={todo.id} className="py-3 group">
+            <TodoItemContent {...sharedProps(todo)} />
+            {expandedId === todo.id && (
+              <ExpandedSection
+                todoId={todo.id}
+                onUpdate={handleUpdateExpanded(todo.id)}
+                isUpdating={updateTodo.isPending}
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </DndContext>
   );
 }

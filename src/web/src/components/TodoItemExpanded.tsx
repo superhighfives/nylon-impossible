@@ -157,7 +157,7 @@ export function TodoItemExpanded({
       </div>
 
       {/* Due Date and Priority row */}
-      <div className="flex flex-wrap gap-4">
+      <div className="flex flex-wrap items-end gap-4">
         {/* Due Date */}
         <div className="space-y-1.5">
           <label
@@ -204,6 +204,7 @@ export function TodoItemExpanded({
             value={priority}
             onValueChange={handlePriorityChange}
             disabled={isUpdating}
+            className="w-[100px]"
           >
             <Select.Option value="none">None</Select.Option>
             <Select.Option value="high">High</Select.Option>
