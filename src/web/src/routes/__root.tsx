@@ -1,4 +1,5 @@
 import { ClerkProvider } from "@clerk/tanstack-react-start";
+import { Theme } from "@radix-ui/themes";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -66,7 +67,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en" data-mode="light" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script
@@ -74,33 +75,37 @@ function RootDocument() {
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-mode', mode);
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.classList.toggle('dark', isDark);
+                document.documentElement.classList.toggle('light', !isDark);
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                  document.documentElement.setAttribute('data-mode', e.matches ? 'dark' : 'light');
+                  document.documentElement.classList.toggle('dark', e.matches);
+                  document.documentElement.classList.toggle('light', !e.matches);
                 });
               })();
             `,
           }}
         />
       </head>
-      <body className="bg-surface text-surface antialiased">
-        <ClerkProvider>
-          <Header />
-          <Outlet />
-          <TanStackDevtools
-            config={{
-              position: "bottom-right",
-            }}
-            plugins={[
-              {
-                name: "Tanstack Router",
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-              TanStackQueryDevtools,
-            ]}
-          />
-        </ClerkProvider>
+      <body className="antialiased">
+        <Theme appearance="inherit" accentColor="blue" grayColor="slate" radius="medium">
+          <ClerkProvider>
+            <Header />
+            <Outlet />
+            <TanStackDevtools
+              config={{
+                position: "bottom-right",
+              }}
+              plugins={[
+                {
+                  name: "Tanstack Router",
+                  render: <TanStackRouterDevtoolsPanel />,
+                },
+                TanStackQueryDevtools,
+              ]}
+            />
+          </ClerkProvider>
+        </Theme>
         <Scripts />
       </body>
     </html>

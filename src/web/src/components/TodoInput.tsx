@@ -1,5 +1,4 @@
-import { InputArea } from "@cloudflare/kumo";
-import { Loader2 } from "lucide-react";
+import { TextArea, Spinner } from "@radix-ui/themes";
 import { useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
 
@@ -33,12 +32,12 @@ export function TodoInput() {
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-error">{error}</p>}
-      {feedback && <p className="text-sm text-muted">{feedback}</p>}
+      {error && <p className="text-sm text-red-11">{error}</p>}
+      {feedback && <p className="text-sm text-gray-11">{feedback}</p>}
 
       <form onSubmit={handleSubmit}>
         <div className="relative">
-          <InputArea
+          <TextArea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="What needs to be done?"
@@ -55,7 +54,7 @@ export function TodoInput() {
           />
           {smartCreate.isPending && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Loader2 className="h-4 w-4 animate-spin text-muted" />
+              <Spinner size="1" />
             </div>
           )}
         </div>

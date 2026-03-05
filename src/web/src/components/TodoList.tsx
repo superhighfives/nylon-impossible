@@ -1,4 +1,4 @@
-import { Button, Checkbox } from "@cloudflare/kumo";
+import { Button, Checkbox, Text } from "@radix-ui/themes";
 import {
   closestCenter,
   DndContext,
@@ -58,8 +58,8 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         <span
           className={`text-xs px-1.5 py-0.5 rounded ${
             todo.priority === "high"
-              ? "bg-error-surface text-error"
-              : "bg-secondary text-muted"
+              ? "bg-red-3 text-red-11"
+              : "bg-gray-3 text-gray-11"
           }`}
         >
           {todo.priority === "high" ? "High" : "Low"}
@@ -69,8 +69,8 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         <span
           className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
             isOverdue
-              ? "bg-error-surface text-error"
-              : "bg-secondary text-muted"
+              ? "bg-red-3 text-red-11"
+              : "bg-gray-3 text-gray-11"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
@@ -93,17 +93,18 @@ function TodoItemContent({
   return (
     <div className="flex items-start gap-3">
       <div className="pt-0.5">
-        <Checkbox
-          checked={todo.completed}
-          onCheckedChange={() => onToggle(todo.id, todo.completed)}
-          disabled={updatePending}
-          aria-label={`Mark "${todo.title}" as ${todo.completed ? "incomplete" : "complete"}`}
-        />
+        <Text as="label" size="2">
+          <Checkbox
+            checked={todo.completed}
+            onCheckedChange={() => onToggle(todo.id, todo.completed)}
+            disabled={updatePending}
+          />
+        </Text>
       </div>
       <div className="flex-1 min-w-0">
         <p
           className={`text-sm leading-snug ${
-            todo.completed ? "line-through text-muted" : "text-surface"
+            todo.completed ? "line-through text-gray-11" : "text-gray-12"
           }`}
         >
           {todo.title}
@@ -113,7 +114,7 @@ function TodoItemContent({
       <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
-          size="sm"
+          size="1"
           type="button"
           onClick={() => onToggleExpand(todo.id)}
           aria-label={isExpanded ? "Collapse details" : "Expand details"}
@@ -126,8 +127,9 @@ function TodoItemContent({
           )}
         </Button>
         <Button
-          variant="secondary-destructive"
-          size="sm"
+          variant="soft"
+          color="red"
+          size="1"
           type="button"
           onClick={() => onDelete(todo.id)}
           disabled={deletePending}
@@ -190,7 +192,7 @@ function SortableTodoItem(
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="pt-1 cursor-grab active:cursor-grabbing text-muted hover:text-surface touch-none"
+          className="pt-1 cursor-grab active:cursor-grabbing text-gray-11 hover:text-gray-12 touch-none"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -240,12 +242,12 @@ export function TodoList() {
   }, [todos]);
 
   if (isLoading) {
-    return <p className="text-center text-muted text-sm py-12">Loading...</p>;
+    return <p className="text-center text-gray-11 text-sm py-12">Loading...</p>;
   }
 
   if (error) {
     return (
-      <p className="text-center text-error text-sm py-12">
+      <p className="text-center text-red-11 text-sm py-12">
         Failed to load todos.
       </p>
     );
@@ -253,7 +255,7 @@ export function TodoList() {
 
   if (!todos || todos.length === 0) {
     return (
-      <p className="text-center text-muted text-sm py-12">No todos yet.</p>
+      <p className="text-center text-gray-11 text-sm py-12">No todos yet.</p>
     );
   }
 
@@ -369,11 +371,11 @@ export function TodoList() {
         <DragOverlay>
           {activeItem ? (
             <div
-              className="py-3 bg-surface shadow-lg rounded-md opacity-95 pointer-events-none"
+              className="py-3 bg-gray-2 shadow-lg rounded-md opacity-95 pointer-events-none"
               aria-hidden="true"
             >
               <div className="flex items-start gap-2">
-                <div className="pt-1 cursor-grabbing text-muted">
+                <div className="pt-1 cursor-grabbing text-gray-11">
                   <GripVertical size={16} />
                 </div>
                 <div className="flex-1 min-w-0">

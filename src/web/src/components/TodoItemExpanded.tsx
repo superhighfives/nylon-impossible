@@ -1,4 +1,10 @@
-import { Button, Input, Loader, Select } from "@cloudflare/kumo";
+import {
+  Button,
+  IconButton,
+  Select,
+  Spinner,
+  TextField,
+} from "@radix-ui/themes";
 import { AlertCircle, Calendar, ExternalLink, Link2, X } from "lucide-react";
 import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
@@ -42,7 +48,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       className="flex items-start gap-3 p-3 rounded-md bg-secondary hover:bg-subtle transition-colors group"
     >
       {isPending ? (
-        <Loader size="sm" className="w-4 h-4 mt-0.5 flex-shrink-0" />
+        <Spinner size="1" className="w-4 h-4 mt-0.5 flex-shrink-0" />
       ) : isFailed ? (
         <AlertCircle
           size={16}
@@ -156,13 +162,13 @@ export function TodoItemExpanded({
         >
           Title
         </label>
-        <Input
+        <TextField.Root
           id={`title-${todo.id}`}
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full"
-          size="sm"
+          size="1"
           disabled={isUpdating}
         />
       </div>
@@ -197,26 +203,25 @@ export function TodoItemExpanded({
             Due date
           </label>
           <div className="flex items-center gap-1">
-            <Input
+            <TextField.Root
               id={`due-${todo.id}`}
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               className="w-[160px]"
-              size="sm"
+              size="1"
               disabled={isUpdating}
             />
             {dueDate && (
-              <Button
+              <IconButton
                 variant="ghost"
-                size="xs"
-                shape="square"
+                size="1"
                 onClick={handleClearDueDate}
                 disabled={isUpdating}
                 aria-label="Clear due date"
               >
                 <X size={14} />
-              </Button>
+              </IconButton>
             )}
           </div>
         </div>
@@ -229,28 +234,29 @@ export function TodoItemExpanded({
           >
             Priority
           </label>
-          <Select
+          <Select.Root
             value={priority}
             onValueChange={handlePriorityChange}
             disabled={isUpdating}
-            className="w-[100px]"
           >
-            <Select.Option value="none">None</Select.Option>
-            <Select.Option value="high">High</Select.Option>
-            <Select.Option value="low">Low</Select.Option>
-          </Select>
+            <Select.Trigger className="w-[100px]" />
+            <Select.Content>
+              <Select.Item value="none">None</Select.Item>
+              <Select.Item value="high">High</Select.Item>
+              <Select.Item value="low">Low</Select.Item>
+            </Select.Content>
+          </Select.Root>
         </div>
       </div>
 
       {/* Save button */}
       <div className="flex justify-end pt-2">
         <Button
-          variant="primary"
-          size="sm"
+          size="2"
           onClick={handleSave}
           disabled={!canSave || isUpdating}
-          loading={isUpdating}
         >
+          {isUpdating && <Spinner size="1" />}
           Save changes
         </Button>
       </div>
