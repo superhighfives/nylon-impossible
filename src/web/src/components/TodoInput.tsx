@@ -1,7 +1,7 @@
-import { InputArea } from "@cloudflare/kumo";
-import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
+import { Textarea } from "./ui";
+import { Loader } from "./ui";
 
 export function TodoInput() {
   const [text, setText] = useState("");
@@ -33,19 +33,19 @@ export function TodoInput() {
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-error">{error}</p>}
-      {feedback && <p className="text-sm text-muted">{feedback}</p>}
+      {error && <p className="text-sm text-tomato-11">{error}</p>}
+      {feedback && <p className="text-sm text-gray-11">{feedback}</p>}
 
       <form onSubmit={handleSubmit}>
         <div className="relative">
-          <InputArea
+          <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="What needs to be done?"
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}
-            className="w-full resize-none"
+            className="w-full resize-none min-h-0"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -55,7 +55,7 @@ export function TodoInput() {
           />
           {smartCreate.isPending && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Loader2 className="h-4 w-4 animate-spin text-muted" />
+              <Loader size="sm" className="text-gray-11" />
             </div>
           )}
         </div>

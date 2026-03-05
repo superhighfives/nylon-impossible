@@ -1,6 +1,7 @@
-@source "../node_modules/@cloudflare/kumo/dist/**/*.{js,jsx,ts,tsx}";
 @import 'tailwindcss';
-@import "@cloudflare/kumo/styles/tailwind";
+@import 'tailwindcss-radix-colors/dist/gray.css';
+@import 'tailwindcss-radix-colors/dist/indigo.css';
+@import 'tailwindcss-radix-colors/dist/tomato.css';
 @import 'tw-animate-css';
 
 @theme {
@@ -9,7 +10,7 @@
 }
 
 body {
-  @apply m-0 font-mono;
+  @apply m-0 font-mono bg-gray-1 text-gray-12;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }

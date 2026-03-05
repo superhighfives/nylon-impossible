@@ -1,7 +1,7 @@
-import { Button, Input, Loader, Select } from "@cloudflare/kumo";
 import { AlertCircle, Calendar, ExternalLink, Link2, X } from "lucide-react";
 import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
+import { Button, Input, Loader, Select, Textarea } from "./ui";
 
 interface TodoItemExpandedProps {
   todo: TodoWithUrls;
@@ -39,14 +39,14 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-md bg-secondary hover:bg-subtle transition-colors group"
+      className="flex items-start gap-3 p-3 rounded-md bg-gray-3 hover:bg-gray-4 transition-colors group"
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 mt-0.5 flex-shrink-0" />
       ) : isFailed ? (
         <AlertCircle
           size={16}
-          className="w-4 h-4 mt-0.5 flex-shrink-0 text-error"
+          className="w-4 h-4 mt-0.5 flex-shrink-0 text-tomato-11"
         />
       ) : (
         <img
@@ -59,27 +59,27 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
         />
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-surface truncate group-hover:underline">
+        <p className="text-sm font-medium text-gray-12 truncate group-hover:underline">
           {displayTitle}
           {isPending && (
-            <span className="ml-2 text-xs text-muted font-normal">
+            <span className="ml-2 text-xs text-gray-11 font-normal">
               Fetching...
             </span>
           )}
           {isFailed && (
-            <span className="ml-2 text-xs text-error font-normal">
+            <span className="ml-2 text-xs text-tomato-11 font-normal">
               Failed to fetch
             </span>
           )}
         </p>
         {!isPending && !isFailed && url.description && (
-          <p className="text-xs text-muted mt-0.5 line-clamp-2">
+          <p className="text-xs text-gray-11 mt-0.5 line-clamp-2">
             {url.description}
           </p>
         )}
-        <p className="text-xs text-muted mt-1 truncate">{url.url}</p>
+        <p className="text-xs text-gray-11 mt-1 truncate">{url.url}</p>
       </div>
-      <ExternalLink size={14} className="text-muted flex-shrink-0 mt-0.5" />
+      <ExternalLink size={14} className="text-gray-11 flex-shrink-0 mt-0.5" />
     </a>
   );
 }
@@ -152,7 +152,7 @@ export function TodoItemExpanded({
       <div className="space-y-1.5">
         <label
           htmlFor={`title-${todo.id}`}
-          className="text-xs font-medium text-muted"
+          className="text-xs font-medium text-gray-11"
         >
           Title
         </label>
@@ -162,7 +162,7 @@ export function TodoItemExpanded({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           className="w-full"
-          size="sm"
+          inputSize="sm"
           disabled={isUpdating}
         />
       </div>
@@ -171,16 +171,16 @@ export function TodoItemExpanded({
       <div className="space-y-1.5">
         <label
           htmlFor={`desc-${todo.id}`}
-          className="text-xs font-medium text-muted"
+          className="text-xs font-medium text-gray-11"
         >
           Description
         </label>
-        <textarea
+        <Textarea
           id={`desc-${todo.id}`}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Add a description..."
-          className="w-full min-h-[80px] text-sm p-2 rounded-md bg-secondary text-surface placeholder:text-muted ring-1 ring-border focus:ring-2 focus:ring-active focus:outline-none resize-y"
+          className="resize-y"
           disabled={isUpdating}
         />
       </div>
@@ -191,7 +191,7 @@ export function TodoItemExpanded({
         <div className="space-y-1.5">
           <label
             htmlFor={`due-${todo.id}`}
-            className="text-xs font-medium text-muted flex items-center gap-1"
+            className="text-xs font-medium text-gray-11 flex items-center gap-1"
           >
             <Calendar size={12} />
             Due date
@@ -203,7 +203,7 @@ export function TodoItemExpanded({
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
               className="w-[160px]"
-              size="sm"
+              inputSize="sm"
               disabled={isUpdating}
             />
             {dueDate && (
@@ -225,20 +225,20 @@ export function TodoItemExpanded({
         <div className="space-y-1.5">
           <label
             htmlFor={`priority-${todo.id}`}
-            className="text-xs font-medium text-muted"
+            className="text-xs font-medium text-gray-11"
           >
             Priority
           </label>
           <Select
             value={priority}
-            onValueChange={handlePriorityChange}
+            onValueChange={(value) => handlePriorityChange(value as string)}
             disabled={isUpdating}
-            className="w-[100px]"
-          >
-            <Select.Option value="none">None</Select.Option>
-            <Select.Option value="high">High</Select.Option>
-            <Select.Option value="low">Low</Select.Option>
-          </Select>
+            items={[
+              { value: "none", label: "None" },
+              { value: "high", label: "High" },
+              { value: "low", label: "Low" },
+            ]}
+          />
         </div>
       </div>
 
@@ -258,7 +258,7 @@ export function TodoItemExpanded({
       {/* URLs */}
       {todo.urls && todo.urls.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted flex items-center gap-1">
+          <p className="text-xs font-medium text-gray-11 flex items-center gap-1">
             <Link2 size={12} />
             Links ({todo.urls.length})
           </p>
