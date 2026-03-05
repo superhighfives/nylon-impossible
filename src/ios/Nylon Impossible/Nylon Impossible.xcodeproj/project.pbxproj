@@ -7,11 +7,19 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		23ABA4082F593570004D3D1A /* Nylon Share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 23ABA3FE2F593570004D3D1A /* Nylon Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A52F493BDB00D8344D /* ClerkKit */; };
 		23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A72F493BDB00D8344D /* ClerkKitUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		23ABA4062F593570004D3D1A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 23C298052F1AD043007315F3 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 23ABA3FD2F593570004D3D1A;
+			remoteInfo = "Nylon Share";
+		};
 		CC0000072F4A000000000007 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 23C298052F1AD043007315F3 /* Project object */;
@@ -21,14 +29,60 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		23ABA3F62F593521004D3D1A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				23ABA4082F593570004D3D1A /* Nylon Share.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		23ABA3FE2F593570004D3D1A /* Nylon Share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Nylon Share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		23C2980D2F1AD043007315F3 /* Nylon Impossible.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Nylon Impossible.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC0000012F4A000000000001 /* Nylon ImpossibleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Nylon ImpossibleTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		23ABA41F2F593791004D3D1A /* Exceptions for "Nylon Impossible" folder in "Nylon Share" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/TodoItem.swift,
+				Services/SharedModelContainer.swift,
+				Services/TaskCreationService.swift,
+				Utils/FractionalIndexing.swift,
+			);
+			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
+		};
+		23ABA4232F59387B004D3D1A /* Exceptions for "Nylon Share" folder in "Nylon Share" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		23ABA3FF2F593570004D3D1A /* Nylon Share */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				23ABA4232F59387B004D3D1A /* Exceptions for "Nylon Share" folder in "Nylon Share" target */,
+			);
+			path = "Nylon Share";
+			sourceTree = "<group>";
+		};
 		23C2980F2F1AD043007315F3 /* Nylon Impossible */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				23ABA41F2F593791004D3D1A /* Exceptions for "Nylon Impossible" folder in "Nylon Share" target */,
+			);
 			path = "Nylon Impossible";
 			sourceTree = "<group>";
 		};
@@ -40,6 +94,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		23ABA3FB2F593570004D3D1A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		23C2980A2F1AD043007315F3 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -64,6 +125,7 @@
 			children = (
 				23C2980F2F1AD043007315F3 /* Nylon Impossible */,
 				CC0000022F4A000000000002 /* Nylon ImpossibleTests */,
+				23ABA3FF2F593570004D3D1A /* Nylon Share */,
 				23C2980E2F1AD043007315F3 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +135,7 @@
 			children = (
 				23C2980D2F1AD043007315F3 /* Nylon Impossible.app */,
 				CC0000012F4A000000000001 /* Nylon ImpossibleTests.xctest */,
+				23ABA3FE2F593570004D3D1A /* Nylon Share.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -80,6 +143,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		23ABA3FD2F593570004D3D1A /* Nylon Share */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 23ABA40A2F593570004D3D1A /* Build configuration list for PBXNativeTarget "Nylon Share" */;
+			buildPhases = (
+				23ABA3FA2F593570004D3D1A /* Sources */,
+				23ABA3FB2F593570004D3D1A /* Frameworks */,
+				23ABA3FC2F593570004D3D1A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				23ABA3FF2F593570004D3D1A /* Nylon Share */,
+			);
+			name = "Nylon Share";
+			packageProductDependencies = (
+			);
+			productName = "Nylon Share";
+			productReference = 23ABA3FE2F593570004D3D1A /* Nylon Share.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		23C2980C2F1AD043007315F3 /* Nylon Impossible */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 23C298182F1AD044007315F3 /* Build configuration list for PBXNativeTarget "Nylon Impossible" */;
@@ -87,10 +172,12 @@
 				23C298092F1AD043007315F3 /* Sources */,
 				23C2980A2F1AD043007315F3 /* Frameworks */,
 				23C2980B2F1AD043007315F3 /* Resources */,
+				23ABA3F62F593521004D3D1A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				23ABA4072F593570004D3D1A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				23C2980F2F1AD043007315F3 /* Nylon Impossible */,
@@ -132,9 +219,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2620;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
+					23ABA3FD2F593570004D3D1A = {
+						CreatedOnToolsVersion = 26.3;
+					};
 					23C2980C2F1AD043007315F3 = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -163,11 +253,19 @@
 			targets = (
 				23C2980C2F1AD043007315F3 /* Nylon Impossible */,
 				CC0000062F4A000000000006 /* Nylon ImpossibleTests */,
+				23ABA3FD2F593570004D3D1A /* Nylon Share */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		23ABA3FC2F593570004D3D1A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		23C2980B2F1AD043007315F3 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -185,6 +283,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		23ABA3FA2F593570004D3D1A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		23C298092F1AD043007315F3 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -202,6 +307,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		23ABA4072F593570004D3D1A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
+			targetProxy = 23ABA4062F593570004D3D1A /* PBXContainerItemProxy */;
+		};
 		CC0000082F4A000000000008 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 23C2980C2F1AD043007315F3 /* Nylon Impossible */;
@@ -210,6 +320,64 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		23ABA40B2F593570004D3D1A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Nylon Share/Nylon Share.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TGHU37N6EX;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Nylon Share/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Nylon Share";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.superhighfives.Nylon-Impossible.Nylon-Share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		23ABA40C2F593570004D3D1A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "Nylon Share/Nylon Share.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = TGHU37N6EX;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Nylon Share/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Nylon Share";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.superhighfives.Nylon-Impossible.Nylon-Share";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		23C298162F1AD044007315F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -444,6 +612,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		23ABA40A2F593570004D3D1A /* Build configuration list for PBXNativeTarget "Nylon Share" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				23ABA40B2F593570004D3D1A /* Debug */,
+				23ABA40C2F593570004D3D1A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		23C298082F1AD043007315F3 /* Build configuration list for PBXProject "Nylon Impossible" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
