@@ -68,16 +68,19 @@ jobs:
           DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_BASE64 }}
           DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
           PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+          SHARE_EXTENSION_PROFILE_BASE64: ${{ secrets.SHARE_EXTENSION_PROFILE_BASE64 }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           DEV_CERTIFICATE_PATH=$RUNNER_TEMP/development.p12
           DIST_CERTIFICATE_PATH=$RUNNER_TEMP/distribution.p12
           PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
+          SHARE_PROFILE_PATH=$RUNNER_TEMP/share_profile.mobileprovision
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
 
           echo "$DEVELOPMENT_CERTIFICATE_BASE64" | base64 --decode > $DEV_CERTIFICATE_PATH
           echo "$DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > $DIST_CERTIFICATE_PATH
           echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > $PROFILE_PATH
+          echo "$SHARE_EXTENSION_PROFILE_BASE64" | base64 --decode > $SHARE_PROFILE_PATH
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
@@ -96,11 +99,17 @@ jobs:
           echo "=== Signing identities in keychain ==="
           security find-identity -v -p codesigning $KEYCHAIN_PATH
 
-          # Install provisioning profile with its UUID as filename
+          # Install provisioning profiles with their UUIDs as filenames
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
           PROFILE_UUID=$(grep -a -o '[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}' $PROFILE_PATH | head -1)
-          echo "Installing profile with UUID: $PROFILE_UUID"
+          echo "Installing main app profile with UUID: $PROFILE_UUID"
           cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
+
+          SHARE_PROFILE_UUID=$(grep -a -o '[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}' $SHARE_PROFILE_PATH | head -1)
+          echo "Installing share extension profile with UUID: $SHARE_PROFILE_UUID"
+          cp $SHARE_PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$SHARE_PROFILE_UUID.mobileprovision
+
           ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
 
       - name: Cache SPM packages
