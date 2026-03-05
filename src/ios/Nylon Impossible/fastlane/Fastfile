@@ -63,6 +63,8 @@ platform :ios do
         <dict>
           <key>com.superhighfives.Nylon-Impossible</key>
           <string>Nylon Impossible AppStore</string>
+          <key>com.superhighfives.Nylon-Impossible.Nylon-Share</key>
+          <string>Nylon Share AppStore</string>
         </dict>
       </dict>
       </plist>

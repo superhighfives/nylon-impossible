@@ -6,6 +6,8 @@
 	<string>$(API_BASE_URL)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSSiriUsageDescription</key>
+	<string>Siri helps you add tasks to Nylon with your voice.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -58,10 +58,23 @@ final class AuthService: AuthProviding {
     
     /// Sign out the current user
     func signOut() async {
+        clearUserIdFromSharedDefaults()
         do {
             try await clerk.auth.signOut()
         } catch {
             print("Sign out error: \(error)")
         }
+    }
+    
+    /// Persist userId to shared UserDefaults for Siri and Share Extension access
+    func persistUserIdToSharedDefaults() {
+        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+        sharedDefaults?.set(userId, forKey: "currentUserId")
+    }
+    
+    /// Clear userId from shared UserDefaults on sign out
+    private func clearUserIdFromSharedDefaults() {
+        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+        sharedDefaults?.removeObject(forKey: "currentUserId")
     }
 }

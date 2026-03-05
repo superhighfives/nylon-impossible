@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import ClerkKit
+import AppIntents
 
 @main
 struct Nylon_ImpossibleApp: App {
@@ -28,8 +29,12 @@ struct Nylon_ImpossibleApp: App {
                         syncService = SyncService(authService: authService)
                     }
                 }
+                .task {
+                    // Register app shortcuts on launch
+                    NylonShortcuts.updateAppShortcutParameters()
+                }
         }
-        .modelContainer(for: TodoItem.self)
+        .modelContainer(SharedModelContainer.shared)
     }
 }
 
@@ -76,6 +81,8 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
+                // Persist userId to shared UserDefaults for Siri and Share Extension
+                authService.persistUserIdToSharedDefaults()
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
             } else {
