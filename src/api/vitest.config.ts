@@ -5,7 +5,7 @@ import {
 import path from "node:path";
 
 export default defineWorkersConfig(async () => {
-  const migrationsPath = path.join(__dirname, "..", "web", "migrations");
+  const migrationsPath = path.join(__dirname, "migrations");
   const migrations = await readD1Migrations(migrationsPath);
 
   return {
