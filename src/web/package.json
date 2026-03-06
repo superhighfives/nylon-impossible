@@ -15,14 +15,7 @@
     "check": "biome check",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev",
-    "cf-typegen": "wrangler types",
-    "db:create": "wrangler d1 create nylon-impossible-db",
-    "db:migrations:list": "wrangler d1 migrations list nylon-impossible-db",
-    "db:migrate": "wrangler d1 migrations apply nylon-impossible-db --local --persist-to ../../.wrangler/state",
-    "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote",
-    "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio",
-    "db:push": "drizzle-kit push"
+    "cf-typegen": "wrangler types"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.49.0",
@@ -68,7 +61,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.4",
-    "drizzle-kit": "^0.31.8",
     "jsdom": "^27.0.0",
     "typescript": "^5.7.2",
     "vite": "^7.1.7",

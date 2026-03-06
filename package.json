@@ -3,8 +3,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "db:migrate": "pnpm web:db:migrate && pnpm api:db:migrate",
-    "db:migrate:remote": "pnpm web:db:migrate:remote && pnpm api:db:migrate:remote",
+    "db:migrate": "wrangler d1 migrations apply nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote -c src/api/wrangler.jsonc",
+    "db:generate": "drizzle-kit generate --config src/api/drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config src/api/drizzle.config.ts",
+    "db:push": "drizzle-kit push --config src/api/drizzle.config.ts",
+    "db:reset": "./scripts/db-reset.sh",
+    "db:seed": "wrangler d1 execute nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc --file=src/api/src/db/seeds/seed.sql",
+    "db:fresh": "./scripts/db-reset.sh && pnpm db:seed",
+    "db:backup": "./scripts/db-backup.sh",
+    "db:status": "wrangler d1 migrations list nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
+    "db:export:remote": "wrangler d1 export nylon-impossible-db --remote --output .wrangler/backups/remote-export.sql -c src/api/wrangler.jsonc",
     "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
     "dev:remote": "pnpm web:dev:remote & pnpm api:dev:remote & wait",
     "test": "pnpm web:test && pnpm api:test",
@@ -23,9 +32,6 @@
     "web:format": "pnpm --filter @nylon-impossible/web format",
     "web:check": "pnpm --filter @nylon-impossible/web check",
     "web:deploy": "pnpm --filter @nylon-impossible/web run deploy",
-    "web:db:migrate": "pnpm --filter @nylon-impossible/web db:migrate",
-    "web:db:migrate:remote": "pnpm --filter @nylon-impossible/web db:migrate:remote",
-    "web:db:studio": "pnpm --filter @nylon-impossible/web db:studio",
     "api:test": "pnpm --filter @nylon-impossible/api test",
     "api:dev": "pnpm --filter @nylon-impossible/api dev",
     "api:dev:remote": "pnpm --filter @nylon-impossible/api dev:remote",
@@ -34,11 +40,13 @@
     "api:lint": "pnpm --filter @nylon-impossible/api lint",
     "api:format": "pnpm --filter @nylon-impossible/api format",
     "api:check": "pnpm --filter @nylon-impossible/api check",
-    "api:db:migrate": "pnpm --filter @nylon-impossible/api db:migrate",
-    "api:db:migrate:remote": "pnpm --filter @nylon-impossible/api db:migrate:remote",
     "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
     "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
     "ios:simulator": "open -a Simulator"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "drizzle-kit": "^0.31.8",
+    "wrangler": "^4.40.3"
+  }
 }
