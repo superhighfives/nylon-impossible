@@ -22,7 +22,12 @@
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "db:reset": "rm -f ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite* && pnpm db:migrate",
+    "db:seed": "wrangler d1 execute nylon-impossible-db --local --persist-to ../../.wrangler/state --file=src/db/seeds/seed.sql",
+    "db:fresh": "pnpm db:reset && pnpm db:seed",
+    "db:backup": "mkdir -p ../../.wrangler/backups && cp ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite ../../.wrangler/backups/db-$(date +%Y%m%d-%H%M%S).sqlite && echo \"Backup created: .wrangler/backups/db-$(date +%Y%m%d-%H%M%S).sqlite\"",
+    "db:status": "wrangler d1 migrations list nylon-impossible-db --local --persist-to ../../.wrangler/state"
   },
   "dependencies": {
     "@nylon-impossible/shared": "workspace:*",
