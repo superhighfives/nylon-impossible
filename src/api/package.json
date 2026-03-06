@@ -12,12 +12,17 @@
     "format": "biome format",
     "check": "biome check",
     "cf-typegen": "wrangler types",
+    "db:create": "wrangler d1 create nylon-impossible-db",
+    "db:migrations:list": "wrangler d1 migrations list nylon-impossible-db",
     "db:migrate": "wrangler d1 migrations apply nylon-impossible-db --local --persist-to ../../.wrangler/state",
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote",
-    "db:reset": "rm -f ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite* && pnpm db:migrate",
-    "db:seed": "wrangler d1 execute nylon-impossible-db --local --persist-to ../../.wrangler/state --file=../web/src/db/seeds/seed.sql",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio",
+    "db:push": "drizzle-kit push",
+    "db:seed": "wrangler d1 execute nylon-impossible-db --local --persist-to ../../.wrangler/state --file=src/db/seeds/seed.sql",
     "db:fresh": "pnpm db:reset && pnpm db:seed",
-    "db:backup": "mkdir -p ../../.wrangler/backups && cp ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite ../../.wrangler/backups/db-$(date +%Y%m%d-%H%M%S).sqlite && echo \"Backup created: .wrangler/backups/db-$(date +%Y%m%d-%H%M%S).sqlite\"",
+    "db:reset": "rm -f ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite* && pnpm db:migrate",
+    "db:backup": "mkdir -p ../../.wrangler/backups && cp ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite ../../.wrangler/backups/db-$(date +%Y%m%d-%H%M%S).sqlite",
     "db:status": "wrangler d1 migrations list nylon-impossible-db --local --persist-to ../../.wrangler/state"
   },
   "dependencies": {
@@ -32,6 +37,7 @@
     "@biomejs/biome": "2.2.4",
     "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@cloudflare/workers-types": "^4.20251202.0",
+    "drizzle-kit": "^0.31.8",
     "typescript": "^5.7.2",
     "vitest": "^3.0.5",
     "wrangler": "^4.40.3"
