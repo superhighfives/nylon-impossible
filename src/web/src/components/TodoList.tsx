@@ -97,6 +97,11 @@ function TodoItemContent({
           checked={todo.completed}
           onCheckedChange={() => onToggle(todo.id, todo.completed)}
           disabled={updatePending}
+          aria-label={
+            todo.completed
+              ? `Mark "${todo.title}" as not completed`
+              : `Mark "${todo.title}" as completed`
+          }
         />
       </div>
       <div className="flex-1 min-w-0">
