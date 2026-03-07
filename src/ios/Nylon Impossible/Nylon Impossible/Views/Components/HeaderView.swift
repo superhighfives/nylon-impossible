@@ -27,7 +27,7 @@ struct HeaderView: View {
                     } label: {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                             .font(.system(size: 18))
-                            .foregroundStyle(Color.kumoStrong)
+                            .foregroundStyle(Color.appStrong)
                     }
                 }
             }
@@ -37,11 +37,11 @@ struct HeaderView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("My Tasks")
                     .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color.kumoDefault)
+                    .foregroundStyle(Color.appDefault)
 
                 Text("\(todoCount) \(todoCount == 1 ? "task" : "tasks")")
                     .font(.system(size: 13))
-                    .foregroundStyle(Color.kumoSubtle)
+                    .foregroundStyle(Color.appSubtle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -59,25 +59,25 @@ struct HeaderView: View {
                     .scaleEffect(0.7)
                 Text("Syncing...")
                     .font(.caption)
-                    .foregroundStyle(Color.kumoSubtle)
+                    .foregroundStyle(Color.appSubtle)
             }
         case .success(let date):
             HStack(spacing: 4) {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(Color.kumoSuccess)
+                    .foregroundStyle(Color.appSuccess)
                 Text("Synced \(date.formatted(.relative(presentation: .named)))")
                     .font(.caption)
-                    .foregroundStyle(Color.kumoSubtle)
+                    .foregroundStyle(Color.appSubtle)
             }
         case .error(let message):
             HStack(spacing: 4) {
                 Image(systemName: "exclamationmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(Color.kumoDanger)
+                    .foregroundStyle(Color.appDanger)
                 Text(message)
                     .font(.caption)
-                    .foregroundStyle(Color.kumoDanger)
+                    .foregroundStyle(Color.appDanger)
                     .lineLimit(1)
             }
         }

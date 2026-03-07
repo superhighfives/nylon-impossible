@@ -33,24 +33,24 @@ extension Color {
     }
 }
 
-// MARK: - Kumo Semantic Colors
+// MARK: - App Semantic Colors
 extension Color {
     // Brand
-    static let kumoBrand = Color(red: 0.145, green: 0.388, blue: 0.922) // ~#2563EB
+    static let appBrand = Color(red: 0.145, green: 0.388, blue: 0.922) // ~#2563EB
 
     // Backgrounds
-    static let kumoBase = Color(.systemBackground)
-    static let kumoElevated = Color(.secondarySystemBackground)
+    static let appBase = Color(.systemBackground)
+    static let appElevated = Color(.secondarySystemBackground)
 
     // Text
-    static let kumoDefault = Color(.label)
-    static let kumoStrong = Color(.secondaryLabel)
-    static let kumoSubtle = Color(.tertiaryLabel)
-    static let kumoInactive = Color(.quaternaryLabel)
+    static let appDefault = Color(.label)
+    static let appStrong = Color(.secondaryLabel)
+    static let appSubtle = Color(.tertiaryLabel)
+    static let appInactive = Color(.quaternaryLabel)
 
     // UI
-    static let kumoLine = Color(.separator)
-    static let kumoTint = Color(.tertiarySystemFill)
-    static let kumoDanger = Color(.systemRed)
-    static let kumoSuccess = Color(.systemGreen)
+    static let appLine = Color(.separator)
+    static let appTint = Color(.tertiarySystemFill)
+    static let appDanger = Color(.systemRed)
+    static let appSuccess = Color(.systemGreen)
 }

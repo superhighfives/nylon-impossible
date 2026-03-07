@@ -94,7 +94,7 @@ struct ContentView: View {
                 Section {
                     Text("Completed")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.kumoSubtle)
+                        .foregroundStyle(Color.appSubtle)
                         .textCase(nil)
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)

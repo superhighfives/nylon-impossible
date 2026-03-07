@@ -9,7 +9,7 @@ import SwiftUI
 
 struct GradientBackground: View {
     var body: some View {
-        Color.kumoBase
+        Color.appBase
             .ignoresSafeArea()
     }
 }

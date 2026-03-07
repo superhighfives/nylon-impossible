@@ -16,16 +16,16 @@ struct EmptyStateView: View {
 
             Image(systemName: "checklist")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.kumoLine)
+                .foregroundStyle(Color.appLine)
                 .padding(.bottom, 16)
 
             Text("No tasks yet")
                 .font(.system(size: 18))
-                .foregroundStyle(Color.kumoSubtle)
+                .foregroundStyle(Color.appSubtle)
 
             Text("Add a task to get started")
                 .font(.system(size: 14))
-                .foregroundStyle(Color.kumoInactive)
+                .foregroundStyle(Color.appInactive)
 
             Spacer()
         }

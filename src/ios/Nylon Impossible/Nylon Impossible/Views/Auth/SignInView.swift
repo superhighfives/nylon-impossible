@@ -23,7 +23,7 @@ struct SignInView: View {
                 VStack(spacing: 8) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 24)
-                            .fill(Color.kumoBrand)
+                            .fill(Color.appBrand)
                             .frame(width: 80, height: 80)
 
                         Image(systemName: "checkmark")
@@ -34,11 +34,11 @@ struct SignInView: View {
                     Text("Nylon Impossible")
                         .font(.title)
                         .fontWeight(.bold)
-                        .foregroundStyle(Color.kumoDefault)
+                        .foregroundStyle(Color.appDefault)
 
                     Text("Sign in to sync your todos")
                         .font(.subheadline)
-                        .foregroundStyle(Color.kumoStrong)
+                        .foregroundStyle(Color.appStrong)
                 }
 
                 Spacer()
@@ -50,7 +50,7 @@ struct SignInView: View {
                     Text("Sign In")
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.kumoBrand)
+                        .background(Color.appBrand)
                         .foregroundStyle(.white)
                         .fontWeight(.semibold)
                         .clipShape(RoundedRectangle(cornerRadius: 8))

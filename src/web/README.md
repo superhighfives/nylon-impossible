@@ -11,7 +11,8 @@ A modern, full-stack todo application built with TanStack Start, deployed on Clo
 - **[React 19](https://react.dev/)** - UI library
 - **[TypeScript](https://www.typescriptlang.org/)** - Type safety
 - **[Tailwind CSS v4](https://tailwindcss.com/)** - Utility-first styling
-- **[@cloudflare/kumo](https://github.com/cloudflare/kumo)** - Cloudflare's design system components
+- **[@base-ui/react](https://base-ui.com/)** - Headless UI primitives
+- **[class-variance-authority](https://cva.style/)** - Component variant management
 
 ### Backend & Infrastructure
 - **[Cloudflare Workers](https://workers.cloudflare.com/)** - Serverless edge runtime
@@ -202,7 +203,7 @@ nylon-impossible-web/
 │   │   └── todos.ts        # Todo CRUD server functions
 │   ├── types/              # TypeScript type definitions
 │   │   └── database.ts     # Database types
-│   └── styles.css          # Global styles (Tailwind + Kumo)
+│   └── styles.css          # Global styles (Tailwind)
 ├── .dev.vars               # Local environment variables (git-ignored)
 ├── .env.local              # Vite environment variables (git-ignored)
 ├── wrangler.jsonc          # Cloudflare Workers configuration
@@ -305,15 +306,15 @@ In the [Cloudflare Dashboard](https://dash.cloudflare.com/):
 
 ## Adding Features
 
-### Adding a Kumo Component
+### Adding a UI Component
 
-Kumo components are imported directly from `@cloudflare/kumo`:
+UI components are imported from `@/components/ui`:
 
 ```tsx
-import { Button, Input, Checkbox } from "@cloudflare/kumo";
+import { Button, Input, Checkbox } from "@/components/ui";
 ```
 
-See `AGENTS.md` for the full component API reference and available semantic tokens.
+These are custom components built on `@base-ui/react` primitives with Tailwind styling via `class-variance-authority`. See `src/components/ui/` for available components.
 
 ### Creating a New Route
 

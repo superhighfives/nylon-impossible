@@ -38,14 +38,14 @@ struct TodoItemRow: View {
                 ZStack {
                     Circle()
                         .stroke(
-                            todo.isCompleted ? Color.clear : Color.kumoLine,
+                            todo.isCompleted ? Color.clear : Color.appLine,
                             lineWidth: 2.5
                         )
                         .frame(width: 32, height: 32)
 
                     if todo.isCompleted {
                         Circle()
-                            .fill(Color.kumoBrand)
+                            .fill(Color.appBrand)
                             .frame(width: 32, height: 32)
 
                         Image(systemName: "checkmark")
@@ -72,8 +72,8 @@ struct TodoItemRow: View {
                         
                         Text(todo.title)
                             .font(.system(size: 16))
-                            .foregroundStyle(todo.isCompleted ? Color.kumoSubtle : Color.kumoDefault)
-                            .strikethrough(todo.isCompleted, color: Color.kumoSubtle)
+                            .foregroundStyle(todo.isCompleted ? Color.appSubtle : Color.appDefault)
+                            .strikethrough(todo.isCompleted, color: Color.appSubtle)
                             .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
                     }
                     
@@ -85,7 +85,7 @@ struct TodoItemRow: View {
                             Text(dueDate, style: .date)
                                 .font(.system(size: 12))
                         }
-                        .foregroundStyle(todo.isOverdue ? Color.red : Color.kumoSubtle)
+                        .foregroundStyle(todo.isOverdue ? Color.red : Color.appSubtle)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -96,7 +96,7 @@ struct TodoItemRow: View {
         .padding(.horizontal, 16)
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color.kumoElevated)
+                .fill(Color.appElevated)
         )
         .shadow(
             color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.08),
