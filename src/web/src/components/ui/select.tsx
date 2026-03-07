@@ -1,5 +1,5 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
-import { ChevronDown, Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 
 interface SelectItem {

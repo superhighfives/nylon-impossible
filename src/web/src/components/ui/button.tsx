@@ -1,5 +1,5 @@
 import { Button as BaseButton } from "@base-ui/react/button";
-import { type VariantProps, cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
 const buttonVariants = cva(

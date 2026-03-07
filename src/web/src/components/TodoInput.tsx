@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
-import { Textarea } from "./ui";
-import { Loader } from "./ui";
+import { Loader, Textarea } from "./ui";
 
 export function TodoInput() {
   const [text, setText] = useState("");

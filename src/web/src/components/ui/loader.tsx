@@ -1,4 +1,4 @@
-import { type VariantProps, cva } from "class-variance-authority";
+import { cva, type VariantProps } from "class-variance-authority";
 
 const loaderVariants = cva(
   "animate-spin rounded-full border-2 border-current border-t-transparent",

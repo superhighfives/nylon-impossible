@@ -1,4 +1,3 @@
-import { Button, Checkbox } from "./ui";
 import {
   closestCenter,
   DndContext,
@@ -30,6 +29,7 @@ import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
+import { Button, Checkbox } from "./ui";
 
 interface TodoItemProps {
   todo: TodoWithUrls;
