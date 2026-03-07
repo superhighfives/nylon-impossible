@@ -8,9 +8,11 @@
     "deploy": "wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "biome lint",
-    "format": "biome format",
-    "check": "biome check",
+    "lint": "biome lint --config-path ../..",
+    "lint:fix": "biome lint --write --config-path ../..",
+    "format": "biome format --write --config-path ../..",
+    "check": "biome check --config-path ../..",
+    "check:fix": "biome check --write --config-path ../..",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
@@ -22,7 +24,6 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.4",
     "@cloudflare/vitest-pool-workers": "^0.12.18",
     "@cloudflare/workers-types": "^4.20251202.0",
     "typescript": "^5.7.2",

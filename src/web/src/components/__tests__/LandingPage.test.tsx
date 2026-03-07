@@ -7,12 +7,6 @@ vi.mock("@clerk/tanstack-react-start", () => ({
   SignUpButton: ({ children }: any) => <div>{children}</div>,
 }));
 
-vi.mock("@cloudflare/kumo", () => ({
-  Button: ({ children, ...props }: any) => (
-    <button {...props}>{children}</button>
-  ),
-}));
-
 describe("LandingPage", () => {
   it("renders Sign In and Sign Up buttons", () => {
     render(<LandingPage />);

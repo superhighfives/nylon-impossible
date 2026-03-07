@@ -66,7 +66,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en" data-mode="light" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script
@@ -74,17 +74,19 @@ function RootDocument() {
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const mode = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                document.documentElement.setAttribute('data-mode', mode);
+                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.classList.toggle('dark', isDark);
+                document.documentElement.classList.toggle('light', !isDark);
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                  document.documentElement.setAttribute('data-mode', e.matches ? 'dark' : 'light');
+                  document.documentElement.classList.toggle('dark', e.matches);
+                  document.documentElement.classList.toggle('light', !e.matches);
                 });
               })();
             `,
           }}
         />
       </head>
-      <body className="bg-surface text-surface antialiased">
+      <body className="bg-gray-app text-gray-normal antialiased">
         <ClerkProvider>
           <Header />
           <Outlet />

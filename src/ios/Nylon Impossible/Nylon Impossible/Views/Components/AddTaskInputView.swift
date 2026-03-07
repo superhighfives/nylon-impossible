@@ -18,7 +18,7 @@ struct AddTaskInputView: View {
         HStack(spacing: 0) {
             TextField("Add a new task...", text: $text)
                 .font(.system(size: 16))
-                .foregroundStyle(Color.kumoDefault)
+                .foregroundStyle(Color.appDefault)
                 .focused($isFocused)
                 .onSubmit {
                     if canAdd {
@@ -33,8 +33,8 @@ struct AddTaskInputView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color.kumoElevated)
-                .stroke(Color.kumoLine, lineWidth: 0.5)
+                .fill(Color.appElevated)
+                .stroke(Color.appLine, lineWidth: 0.5)
         )
         .overlay(alignment: .trailing) {
             Button(action: {
@@ -43,7 +43,7 @@ struct AddTaskInputView: View {
             }) {
                 ZStack {
                     RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.kumoBrand)
+                        .fill(Color.appBrand)
                         .frame(width: 40, height: 40)
 
                     Image(systemName: "plus")

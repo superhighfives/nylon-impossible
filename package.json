@@ -3,6 +3,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
+    "dev:remote": "pnpm web:dev:remote & pnpm api:dev:remote & wait",
+    "test": "pnpm web:test && pnpm api:test",
+    "lint": "pnpm web:lint && pnpm api:lint",
+    "format": "pnpm web:format && pnpm api:format",
+    "check": "pnpm web:check && pnpm api:check",
+    "typecheck": "pnpm web:typecheck && pnpm api:typecheck",
+    "deploy": "pnpm web:deploy && pnpm api:deploy",
     "db:migrate": "wrangler d1 migrations apply nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote -c src/api/wrangler.jsonc",
     "db:generate": "drizzle-kit generate --config src/api/drizzle.config.ts",
@@ -14,14 +22,6 @@
     "db:backup": "./scripts/db-backup.sh",
     "db:status": "wrangler d1 migrations list nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
     "db:export:remote": "wrangler d1 export nylon-impossible-db --remote --output .wrangler/backups/remote-export.sql -c src/api/wrangler.jsonc",
-    "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
-    "dev:remote": "pnpm web:dev:remote & pnpm api:dev:remote & wait",
-    "test": "pnpm web:test && pnpm api:test",
-    "lint": "pnpm web:lint && pnpm api:lint",
-    "format": "pnpm web:format && pnpm api:format",
-    "check": "pnpm web:check && pnpm api:check",
-    "typecheck": "pnpm web:typecheck && pnpm api:typecheck",
-    "deploy": "pnpm web:deploy && pnpm api:deploy",
     "web:open": "code 'src/web'",
     "web:dev": "pnpm --filter @nylon-impossible/web dev",
     "web:dev:remote": "pnpm --filter @nylon-impossible/web dev:remote",
@@ -46,6 +46,7 @@
   },
   "packageManager": "pnpm@9.15.0",
   "devDependencies": {
+    "@biomejs/biome": "2.4.6",
     "drizzle-kit": "^0.31.8",
     "wrangler": "^4.40.3"
   }

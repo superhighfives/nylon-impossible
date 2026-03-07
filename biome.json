@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.4.6/schema.json",
   "vcs": {
     "enabled": false,
     "clientKind": "git",
@@ -13,7 +13,6 @@
       "**/index.html",
       "**/vite.config.js",
       "!**/src/routeTree.gen.ts",
-      "!**/src/styles.css",
       "!**/src/generated/**/*"
     ]
   },
@@ -29,24 +28,14 @@
       "recommended": true
     }
   },
-  "overrides": [
-    {
-      "includes": ["**/__tests__/**/*"],
-      "linter": {
-        "rules": {
-          "suspicious": {
-            "noExplicitAny": "off"
-          },
-          "style": {
-            "noNonNullAssertion": "off"
-          }
-        }
-      }
-    }
-  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "double"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   }
 }
