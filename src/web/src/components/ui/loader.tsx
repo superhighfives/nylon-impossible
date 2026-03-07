@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import type { HTMLAttributes } from "react";
 
 const loaderVariants = cva(
   "animate-spin rounded-full border-2 border-current border-t-transparent",
@@ -17,7 +18,7 @@ const loaderVariants = cva(
 );
 
 export interface LoaderProps
-  extends React.HTMLAttributes<HTMLSpanElement>,
+  extends HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof loaderVariants> {}
 
 export function Loader({ className, size, ...props }: LoaderProps) {
