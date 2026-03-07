@@ -231,7 +231,7 @@ export function TodoItemExpanded({
           </label>
           <Select
             value={priority}
-            onValueChange={(value) => handlePriorityChange(value as string)}
+            onValueChange={handlePriorityChange}
             disabled={isUpdating}
             items={[
               { value: "none", label: "None" },
