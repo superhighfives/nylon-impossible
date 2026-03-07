@@ -141,8 +141,8 @@ export function TodoItemExpanded({
     setDueDate("");
   };
 
-  const handlePriorityChange = (value: string | null) => {
-    if (value === null) return;
+  const handlePriorityChange = (value: unknown) => {
+    if (value === null || value === undefined) return;
     setPriority(value as "high" | "low" | "none");
   };
 
