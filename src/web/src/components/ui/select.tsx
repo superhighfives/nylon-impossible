@@ -1,6 +1,6 @@
 import { Select as BaseSelect } from "@base-ui/react/select";
 import { Check, ChevronDown } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps } from "react";
 
 interface SelectItem {
   value: string;
@@ -9,13 +9,11 @@ interface SelectItem {
 
 export interface SelectProps
   extends Omit<ComponentProps<typeof BaseSelect.Root>, "children" | "items"> {
-  children?: ReactNode;
   placeholder?: string;
   items: SelectItem[];
 }
 
 export function Select({
-  children,
   placeholder = "Select an option",
   items,
   ...props
