@@ -7,7 +7,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-indigo-9 text-white hover:bg-indigo-10 active:bg-indigo-10",
+        primary:
+          "bg-indigo-9 text-white hover:bg-indigo-10 active:bg-indigo-10",
         secondary:
           "bg-gray-3 text-gray-12 hover:bg-gray-4 active:bg-gray-5 ring-1 ring-gray-6",
         ghost: "bg-transparent text-gray-12 hover:bg-gray-3 active:bg-gray-4",
@@ -33,7 +34,7 @@ const buttonVariants = cva(
       size: "base",
       shape: "base",
     },
-  }
+  },
 );
 
 export interface ButtonProps

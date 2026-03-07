@@ -21,19 +21,14 @@ const inputVariants = cva(
       variant: "default",
       inputSize: "base",
     },
-  }
+  },
 );
 
 export interface InputProps
   extends Omit<ComponentProps<typeof BaseInput>, "size">,
     VariantProps<typeof inputVariants> {}
 
-export function Input({
-  className,
-  variant,
-  inputSize,
-  ...props
-}: InputProps) {
+export function Input({ className, variant, inputSize, ...props }: InputProps) {
   return (
     <BaseInput
       className={inputVariants({ variant, inputSize, className })}

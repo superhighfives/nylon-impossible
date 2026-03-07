@@ -68,9 +68,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
       {hasDueDate && dueDate && (
         <span
           className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
-            isOverdue
-              ? "bg-tomato-3 text-tomato-11"
-              : "bg-gray-3 text-gray-11"
+            isOverdue ? "bg-tomato-3 text-tomato-11" : "bg-gray-3 text-gray-11"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}

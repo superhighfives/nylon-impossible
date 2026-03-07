@@ -13,7 +13,7 @@ const loaderVariants = cva(
     defaultVariants: {
       size: "base",
     },
-  }
+  },
 );
 
 export interface LoaderProps

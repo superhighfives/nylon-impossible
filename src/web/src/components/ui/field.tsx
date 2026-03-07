@@ -16,7 +16,10 @@ export function Field({
   ...props
 }: FieldProps) {
   return (
-    <BaseField.Root className={`flex flex-col gap-1 ${className ?? ""}`} {...props}>
+    <BaseField.Root
+      className={`flex flex-col gap-1 ${className ?? ""}`}
+      {...props}
+    >
       {label && (
         <BaseField.Label className="text-sm font-medium text-gray-12">
           {label}
@@ -42,7 +45,11 @@ export interface TextareaProps
   variant?: "default" | "error";
 }
 
-export function Textarea({ className, variant = "default", ...props }: TextareaProps) {
+export function Textarea({
+  className,
+  variant = "default",
+  ...props
+}: TextareaProps) {
   const variantClasses = {
     default: "ring-1 ring-gray-6 focus-visible:ring-indigo-8",
     error: "ring-1 ring-tomato-7 focus-visible:ring-tomato-8",

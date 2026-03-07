@@ -3,7 +3,10 @@ import { Check, Minus } from "lucide-react";
 import { type ComponentProps, useId } from "react";
 
 export interface CheckboxProps
-  extends Omit<ComponentProps<typeof BaseCheckbox.Root>, "children" | "checked"> {
+  extends Omit<
+    ComponentProps<typeof BaseCheckbox.Root>,
+    "children" | "checked"
+  > {
   label?: string;
   indeterminate?: boolean;
   checked?: boolean;

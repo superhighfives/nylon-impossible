@@ -10,9 +10,9 @@
     "serve": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "format": "biome format",
-    "lint": "biome lint",
-    "check": "biome check",
+    "format": "biome format --write --config-path ../..",
+    "lint": "biome lint --config-path ../..",
+    "check": "biome check --config-path ../..",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev",
     "cf-typegen": "wrangler types"
@@ -44,13 +44,12 @@
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "tailwindcss": "^4.0.6",
-    "tailwindcss-radix-colors": "^2.1.0",
+    "tailwindcss-radix-colors": "github:mrcaidev/tailwindcss-radix-colors",
     "tw-animate-css": "^1.4.0",
     "vite-tsconfig-paths": "^5.1.4",
     "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.2.4",
     "@cloudflare/workers-types": "^4.20251202.0",
     "@effect/language-service": "^0.63.2",
     "@tanstack/devtools-vite": "^0.3.11",

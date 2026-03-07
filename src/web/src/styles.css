@@ -1,12 +1,17 @@
-@import 'tailwindcss';
-@import 'tailwindcss-radix-colors/dist/gray.css';
-@import 'tailwindcss-radix-colors/dist/indigo.css';
-@import 'tailwindcss-radix-colors/dist/tomato.css';
-@import 'tw-animate-css';
+@import "tailwindcss";
+@import "tailwindcss-radix-colors/dist/gray.css";
+@import "tailwindcss-radix-colors/dist/indigo.css";
+@import "tailwindcss-radix-colors/dist/tomato.css";
+@import "tw-animate-css";
 
 @theme {
-  --font-family-sans: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
-  --font-family-mono: 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', monospace;
+  --color-*: initial;
+  --font-family-sans:
+    "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono",
+    "Courier New", monospace;
+  --font-family-mono:
+    "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono",
+    "Courier New", monospace;
 }
 
 body {
