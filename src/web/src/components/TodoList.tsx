@@ -68,7 +68,9 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
       {hasDueDate && dueDate && (
         <span
           className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
-            isOverdue ? "bg-tomato-ui text-tomato-dim" : "bg-gray-ui text-gray-dim"
+            isOverdue
+              ? "bg-tomato-ui text-tomato-dim"
+              : "bg-gray-ui text-gray-dim"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
@@ -237,7 +239,9 @@ export function TodoList() {
   }, [todos]);
 
   if (isLoading) {
-    return <p className="text-center text-gray-dim text-sm py-12">Loading...</p>;
+    return (
+      <p className="text-center text-gray-dim text-sm py-12">Loading...</p>
+    );
   }
 
   if (error) {
