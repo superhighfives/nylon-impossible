@@ -11,8 +11,10 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write --config-path ../..",
-    "lint": "biome lint --write --config-path ../..",
-    "check": "biome check --write --config-path ../..",
+    "lint": "biome lint --config-path ../..",
+    "lint:fix": "biome lint --write --config-path ../..",
+    "check": "biome check --config-path ../..",
+    "check:fix": "biome check --write --config-path ../..",
     "deploy": "wrangler deploy",
     "preview": "wrangler dev",
     "cf-typegen": "wrangler types"
