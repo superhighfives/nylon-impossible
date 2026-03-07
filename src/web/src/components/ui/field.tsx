@@ -1,5 +1,5 @@
 import { Field as BaseField } from "@base-ui/react/field";
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactNode, TextareaHTMLAttributes } from "react";
 
 export interface FieldProps extends ComponentProps<typeof BaseField.Root> {
   label?: string;
@@ -41,7 +41,7 @@ export function Field({
 }
 
 export interface TextareaProps
-  extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
+  extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   variant?: "default" | "error";
 }
 
