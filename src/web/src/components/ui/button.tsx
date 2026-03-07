@@ -7,15 +7,11 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary:
-          "bg-indigo-9 text-white hover:bg-indigo-10 active:bg-indigo-10",
-        secondary:
-          "bg-gray-3 text-gray-12 hover:bg-gray-4 active:bg-gray-5 ring-1 ring-gray-6",
-        ghost: "bg-transparent text-gray-12 hover:bg-gray-3 active:bg-gray-4",
-        destructive:
-          "bg-tomato-9 text-white hover:bg-tomato-10 active:bg-tomato-10",
-        outline:
-          "bg-transparent text-gray-12 ring-1 ring-gray-7 hover:bg-gray-3 active:bg-gray-4",
+        primary: "bg-indigo-solid text-white",
+        secondary: "bg-gray-ui text-gray-normal ring-1 ring-gray-6",
+        ghost: "bg-gray-ghost text-gray-normal",
+        destructive: "bg-tomato-solid text-white",
+        outline: "bg-gray-ghost text-gray-normal ring-1 ring-gray-7",
       },
       size: {
         xs: "h-7 px-2 text-xs",

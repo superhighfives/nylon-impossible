@@ -33,8 +33,8 @@ export function TodoInput() {
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-tomato-11">{error}</p>}
-      {feedback && <p className="text-sm text-gray-11">{feedback}</p>}
+      {error && <p className="text-sm text-tomato-dim">{error}</p>}
+      {feedback && <p className="text-sm text-gray-dim">{feedback}</p>}
 
       <form onSubmit={handleSubmit}>
         <div className="relative">
@@ -55,7 +55,7 @@ export function TodoInput() {
           />
           {smartCreate.isPending && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Loader size="sm" className="text-gray-11" />
+              <Loader size="sm" className="text-gray-dim" />
             </div>
           )}
         </div>

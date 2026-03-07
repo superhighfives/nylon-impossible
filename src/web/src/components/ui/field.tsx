@@ -21,18 +21,18 @@ export function Field({
       {...props}
     >
       {label && (
-        <BaseField.Label className="text-sm font-medium text-gray-12">
+        <BaseField.Label className="text-sm font-medium text-gray-normal">
           {label}
         </BaseField.Label>
       )}
       {children}
       {description && !error && (
-        <BaseField.Description className="text-xs text-gray-11">
+        <BaseField.Description className="text-xs text-gray-dim">
           {description}
         </BaseField.Description>
       )}
       {error?.message && (
-        <BaseField.Error className="text-xs text-tomato-11">
+        <BaseField.Error className="text-xs text-tomato-dim">
           {error.message}
         </BaseField.Error>
       )}
@@ -57,7 +57,7 @@ export function Textarea({
 
   return (
     <textarea
-      className={`flex min-h-[80px] w-full rounded-md bg-gray-2 px-3 py-2 text-sm text-gray-12 placeholder:text-gray-9 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className ?? ""}`}
+      className={`flex min-h-[80px] w-full rounded-md bg-gray-subtle px-3 py-2 text-sm text-gray-normal placeholder:text-gray-9 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className ?? ""}`}
       {...props}
     />
   );

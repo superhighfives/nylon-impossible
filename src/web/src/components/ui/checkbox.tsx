@@ -30,11 +30,11 @@ export function Checkbox({
         checked={checked}
         indeterminate={indeterminate}
         className={`
-          h-4 w-4 shrink-0 rounded border border-gray-7 bg-gray-1 cursor-pointer
+          h-4 w-4 shrink-0 rounded border border-gray-normal bg-gray-app cursor-pointer
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-8 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1
           disabled:cursor-not-allowed disabled:opacity-50
-          data-[checked]:bg-indigo-9 data-[checked]:border-indigo-9 data-[checked]:text-white
-          data-[indeterminate]:bg-indigo-9 data-[indeterminate]:border-indigo-9 data-[indeterminate]:text-white
+          data-checked:bg-indigo-9 data-checked:border-indigo-9 data-checked:text-white
+          data-indeterminate:bg-indigo-9 data-indeterminate:border-indigo-9 data-indeterminate:text-white
           transition-colors
           ${className ?? ""}
         `}
@@ -49,7 +49,7 @@ export function Checkbox({
         </BaseCheckbox.Indicator>
       </BaseCheckbox.Root>
       {label && (
-        <label htmlFor={id} className="text-sm text-gray-12 cursor-pointer">
+        <label htmlFor={id} className="text-sm text-gray-normal cursor-pointer">
           {label}
         </label>
       )}
