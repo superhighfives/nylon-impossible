@@ -1,4 +1,4 @@
-name: Deploy Workers
+name: Deploy Web
 
 on:
   push:
@@ -7,46 +7,21 @@ on:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
-      - ".github/workflows/deploy.yml"
+      - ".github/workflows/web-deploy.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
     paths:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
-      - ".github/workflows/deploy.yml"
+      - ".github/workflows/web-deploy.yml"
 
 concurrency:
-  group: deploy-${{ github.event.pull_request.number || github.ref }}
+  group: web-deploy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  checks:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - run: pnpm install
-
-      - name: Lint & typecheck API
-        run: pnpm api:check && pnpm api:typecheck
-
-      - name: Lint & typecheck Web
-        run: pnpm web:check && pnpm web:typecheck
-
-      - name: Test API
-        run: pnpm --filter @nylon-impossible/api test
-
-      - name: Test Web
-        run: pnpm --filter @nylon-impossible/web test
-
   deploy-production:
-    needs: [checks]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -65,11 +40,11 @@ jobs:
             api:
               - 'src/api/**'
               - 'package.json'
-              - '.github/workflows/deploy.yml'
+              - '.github/workflows/web-deploy.yml'
             web:
               - 'src/web/**'
               - 'package.json'
-              - '.github/workflows/deploy.yml'
+              - '.github/workflows/web-deploy.yml'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -106,7 +81,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-preview:
-    needs: [checks]
     if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -126,11 +100,11 @@ jobs:
             api:
               - 'src/api/**'
               - 'package.json'
-              - '.github/workflows/deploy.yml'
+              - '.github/workflows/web-deploy.yml'
             web:
               - 'src/web/**'
               - 'package.json'
-              - '.github/workflows/deploy.yml'
+              - '.github/workflows/web-deploy.yml'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4

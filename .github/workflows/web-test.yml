@@ -1,0 +1,44 @@
+name: Web Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/web/**"
+      - "src/api/**"
+      - "package.json"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "src/web/**"
+      - "src/api/**"
+      - "package.json"
+
+concurrency:
+  group: web-test-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install
+
+      - name: Lint & typecheck API
+        run: pnpm api:check && pnpm api:typecheck
+
+      - name: Lint & typecheck Web
+        run: pnpm web:check && pnpm web:typecheck
+
+      - name: Test API
+        run: pnpm --filter @nylon-impossible/api test
+
+      - name: Test Web
+        run: pnpm --filter @nylon-impossible/web test
