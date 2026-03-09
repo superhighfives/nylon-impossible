@@ -36,7 +36,8 @@ extension Color {
 // MARK: - App Semantic Colors
 extension Color {
     // Brand
-    static let appBrand = Color(red: 0.145, green: 0.388, blue: 0.922) // ~#2563EB
+    static let appBrand = Color(red: 1.0, green: 0.902, blue: 0.161) // #FFE629
+    static let appBrandForeground = Color(red: 0.165, green: 0.165, blue: 0.165) // #2A2A2A
 
     // Backgrounds
     static let appBase = Color(.systemBackground)

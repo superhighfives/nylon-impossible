@@ -46,7 +46,7 @@ struct SignInView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.appBrand)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appBrandForeground)
                         .fontWeight(.semibold)
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                 }

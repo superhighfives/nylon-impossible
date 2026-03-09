@@ -48,7 +48,7 @@ struct AddTaskInputView: View {
 
                     Image(systemName: "plus")
                         .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.appBrandForeground)
                 }
             }
             .opacity(canAdd ? 1.0 : 0.4)

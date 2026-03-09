@@ -50,7 +50,7 @@ struct TodoItemRow: View {
 
                         Image(systemName: "checkmark")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.appBrandForeground)
                             .scaleEffect(checkmarkScale)
                     }
                 }
