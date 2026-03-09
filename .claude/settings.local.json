@@ -6,7 +6,11 @@
       "Bash(__NEW_LINE_244f359a1381b0f3__ mkdir -p \"$XCASSETS/Logo.imageset\")",
       "Bash(cp \"$ASSETS/logo-no-background.svg\" \"$XCASSETS/Logo.imageset/logo-no-background.svg\")",
       "Bash(cp \"$ASSETS/logo-inverted-no-background.svg\" \"$XCASSETS/Logo.imageset/logo-inverted-no-background.svg\")",
-      "Bash(\"/Users/superhighfives/Development/nylon-impossible/src/ios/Nylon Impossible/Nylon:*)"
+      "Bash(\"/Users/superhighfives/Development/nylon-impossible/src/ios/Nylon Impossible/Nylon:*)",
+      "Bash(PUBLIC=\"/Users/superhighfives/Development/nylon-impossible/src/web/public\")",
+      "Bash(__NEW_LINE_4661eed067ca1c74__ cp \"$ASSETS/logo-no-background.svg\" \"$PUBLIC/favicon.svg\")",
+      "Bash(cp \"$ASSETS/logo-inverted-no-background.svg\" \"$PUBLIC/favicon-dark.svg\")",
+      "Bash(git pull --rebase origin main)"
     ]
   }
 }
