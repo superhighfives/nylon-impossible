@@ -9,6 +9,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "src/ios/**"
+  workflow_dispatch:
 
 permissions:
   contents: read

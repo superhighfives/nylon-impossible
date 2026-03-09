@@ -13,6 +13,7 @@ on:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
+  workflow_dispatch:
 
 concurrency:
   group: web-test-${{ github.event.pull_request.number || github.ref }}
