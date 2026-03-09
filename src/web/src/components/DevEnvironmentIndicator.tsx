@@ -1,12 +1,17 @@
 import { useLocation } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { API_URL } from "../lib/config";
 
 export default function DevEnvironmentIndicator() {
   const location = useLocation();
+  const [origin, setOrigin] = useState("");
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
 
   if (import.meta.env.PROD) return null;
 
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const currentUrl = `${origin}${location.pathname}${location.searchStr}`;
 
   return (
