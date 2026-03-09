@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(XCASSETS=\"/Users/superhighfives/Development/nylon-impossible/src/ios/Nylon Impossible/Nylon Impossible/Assets.xcassets\")",
+      "Bash(ASSETS=\"/Users/superhighfives/Development/nylon-impossible/assets\")",
+      "Bash(__NEW_LINE_244f359a1381b0f3__ mkdir -p \"$XCASSETS/Logo.imageset\")",
+      "Bash(cp \"$ASSETS/logo-no-background.svg\" \"$XCASSETS/Logo.imageset/logo-no-background.svg\")",
+      "Bash(cp \"$ASSETS/logo-inverted-no-background.svg\" \"$XCASSETS/Logo.imageset/logo-inverted-no-background.svg\")",
+      "Bash(\"/Users/superhighfives/Development/nylon-impossible/src/ios/Nylon Impossible/Nylon:*)"
+    ]
+  }
+}
