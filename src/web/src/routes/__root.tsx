@@ -43,7 +43,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       {
         rel: "icon",
         type: "image/svg+xml",
-        href: "/favicon.svg?v=3",
+        href: "/favicon.svg",
       },
       {
         rel: "icon",
@@ -75,12 +75,18 @@ function RootDocument() {
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                document.documentElement.classList.toggle('dark', isDark);
-                document.documentElement.classList.toggle('light', !isDark);
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                const mq = window.matchMedia('(prefers-color-scheme: dark)');
+                document.documentElement.classList.toggle('dark', mq.matches);
+                document.documentElement.classList.toggle('light', !mq.matches);
+                function updateFavicon(isDark) {
+                  const link = document.querySelector("link[rel='icon'][type='image/svg+xml']");
+                  if (link) link.href = isDark ? '/favicon-dark.svg' : '/favicon.svg';
+                }
+                updateFavicon(mq.matches);
+                mq.addEventListener('change', (e) => {
                   document.documentElement.classList.toggle('dark', e.matches);
                   document.documentElement.classList.toggle('light', !e.matches);
+                  updateFavicon(e.matches);
                 });
               })();
             `,
