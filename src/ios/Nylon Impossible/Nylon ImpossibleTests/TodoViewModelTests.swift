@@ -119,7 +119,7 @@ struct TodoViewModelTests {
     @MainActor
     func toggleTodoUncheckedMovesToEnd() {
         let first = TodoItem(title: "First", position: "a0")
-        let second = TodoItem(title: "Second", position: "b0")
+        let second = TodoItem(title: "Second", position: "a1")
         let todo = TodoItem(title: "Test", position: "a5")
         todo.isCompleted = true
 
