@@ -91,7 +91,7 @@ function RootDocument() {
         <ClerkProvider>
           <Header />
           <Outlet />
-          <DevEnvironmentIndicator />
+          {!import.meta.env.PROD && <DevEnvironmentIndicator />}
           <TanStackDevtools
             config={{
               position: "bottom-right",
