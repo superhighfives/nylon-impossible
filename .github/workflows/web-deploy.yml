@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["Web Tests"]
     types: [completed]
+  workflow_dispatch:
   pull_request:
     types: [closed]
     paths:
@@ -13,16 +14,17 @@ on:
       - ".github/workflows/web-deploy.yml"
 
 concurrency:
-  group: web-deploy-${{ github.event.workflow_run.head_branch || github.event.pull_request.number }}
+  group: web-deploy-${{ github.event.workflow_run.head_branch || github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   deploy-production:
     if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main'
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -32,13 +34,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Detect changes
+        if: github.event_name == 'workflow_run'
         uses: dorny/paths-filter@v3
         id: changes
         with:
-          base: ${{ github.event.workflow_run.head_sha }}
           filters: |
             api:
               - 'src/api/**'
@@ -61,7 +63,7 @@ jobs:
         run: pnpm install
 
       - name: Deploy API
-        if: steps.changes.outputs.api == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.api == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -70,13 +72,13 @@ jobs:
           command: deploy
 
       - name: Build Web
-        if: steps.changes.outputs.web == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
 
       - name: Deploy Web
-        if: steps.changes.outputs.web == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
         working-directory: src/web
         run: pnpm exec wrangler deploy
         env:
@@ -105,7 +107,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prs = github.event?.workflow_run?.pull_requests;
+            const prs = context.payload.workflow_run?.pull_requests;
             if (prs && prs.length > 0) return prs[0].number;
             const { data } = await github.rest.pulls.list({
               owner: context.repo.owner,
@@ -119,7 +121,6 @@ jobs:
         uses: dorny/paths-filter@v3
         id: changes
         with:
-          base: ${{ github.event.workflow_run.head_sha }}
           filters: |
             api:
               - 'src/api/**'
