@@ -271,7 +271,10 @@ export function TodoList() {
           ? displayIncompleteTodos[displayIncompleteTodos.length - 1].position
           : null;
       const newPosition = generateKeyBetween(lastPosition ?? null, null);
-      updateTodo.mutate({ id, input: { completed: false, position: newPosition } });
+      updateTodo.mutate({
+        id,
+        input: { completed: false, position: newPosition },
+      });
     } else {
       updateTodo.mutate({ id, input: { completed: true } });
     }
