@@ -90,6 +90,7 @@ struct TodoViewModelTests {
     }
 
     @Test("toggleTodo flips isCompleted")
+    @MainActor
     func toggleTodo() {
         let todo = TodoItem(title: "Test")
         #expect(todo.isCompleted == false)
@@ -103,6 +104,7 @@ struct TodoViewModelTests {
     }
 
     @Test("toggleTodo calls markModified")
+    @MainActor
     func toggleTodoMarksModified() {
         let todo = TodoItem(title: "Test")
         todo.isSynced = true
@@ -114,6 +116,7 @@ struct TodoViewModelTests {
     }
 
     @Test("toggleTodo unchecking moves to end of incomplete list")
+    @MainActor
     func toggleTodoUncheckedMovesToEnd() {
         let first = TodoItem(title: "First", position: "a0")
         let second = TodoItem(title: "Second", position: "b0")
