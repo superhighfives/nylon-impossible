@@ -1,30 +1,54 @@
-name: Deploy Web
+name: Deploy to Cloudflare
 
 on:
-  workflow_run:
-    workflows: ["Web Tests"]
-    types: [completed]
-  workflow_dispatch:
-  pull_request:
-    types: [closed]
+  push:
+    branches: [main]
     paths:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
       - ".github/workflows/web-deploy.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "src/web/**"
+      - "src/api/**"
+      - "package.json"
+      - ".github/workflows/web-deploy.yml"
+  workflow_dispatch:
 
 concurrency:
-  group: web-deploy-${{ github.event.workflow_run.head_branch || github.event.pull_request.number || github.ref }}
+  group: web-deploy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
+  test:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: pnpm install
+
+      - name: Lint & typecheck API
+        run: pnpm api:check && pnpm api:typecheck
+
+      - name: Lint & typecheck Web
+        run: pnpm web:check && pnpm web:typecheck
+
+      - name: Test API
+        run: pnpm --filter @nylon-impossible/api test
+
+      - name: Test Web
+        run: pnpm --filter @nylon-impossible/web test
+
   deploy-production:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main')
+    needs: [test]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -33,11 +57,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Detect changes
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'push'
         uses: dorny/paths-filter@v3
         id: changes
         with:
@@ -86,10 +108,8 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
   deploy-preview:
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'pull_request'
+    needs: [test]
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -99,23 +119,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-
-      - name: Get PR number
-        id: pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prs = context.payload.workflow_run?.pull_requests;
-            if (prs && prs.length > 0) return prs[0].number;
-            const { data } = await github.rest.pulls.list({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              head: `${context.repo.owner}:${context.payload.workflow_run.head_branch}`,
-            });
-            return data[0]?.number;
 
       - name: Detect changes
         uses: dorny/paths-filter@v3
@@ -148,7 +151,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const pr = ${{ steps.pr.outputs.result }};
+            const pr = context.payload.pull_request.number;
             const dir = 'src/api';
             const name = `nylon-impossible-api-pr-${pr}`;
             const domain = `api-pr-${pr}.nylonimpossible.com`;
@@ -165,7 +168,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const pr = ${{ steps.pr.outputs.result }};
+            const pr = context.payload.pull_request.number;
             const dir = 'src/web';
             const name = `nylon-impossible-pr-${pr}`;
             const domain = `pr-${pr}.nylonimpossible.com`;
@@ -206,7 +209,7 @@ jobs:
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
-          VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', steps.pr.outputs.result) || 'https://api.nylonimpossible.com' }}
+          VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
 
       - name: Deploy preview Web
         if: steps.changes.outputs.web == 'true'
@@ -220,7 +223,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = ${{ steps.pr.outputs.result }};
+            const prNumber = context.payload.pull_request.number;
             const webUrl = `https://pr-${prNumber}.nylonimpossible.com`;
             const apiUrl = `https://api-pr-${prNumber}.nylonimpossible.com`;
 
@@ -235,7 +238,7 @@ jobs:
               `| API | ${apiUrl} | ${apiChanged ? 'Deployed' : 'Skipped (unchanged)'} |`,
               `| Web | ${webUrl} | ${webChanged ? 'Deployed' : 'Skipped (unchanged)'} |`,
               ``,
-              `_Deployed from ${context.payload.workflow_run.head_sha.substring(0, 7)}_`,
+              `_Deployed from ${context.sha.substring(0, 7)}_`,
             ].join('\n');
 
             const { data: comments } = await github.rest.issues.listComments({

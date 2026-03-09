@@ -1,25 +1,69 @@
 name: Deploy to TestFlight
 
 on:
-  workflow_run:
-    workflows: ["iOS Tests"]
-    types: [completed]
+  push:
     branches: [main]
+    paths:
+      - "src/ios/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: testflight-${{ github.ref }}
+  group: ios-deploy-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main')
+  test:
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/ios/Nylon Impossible
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: SwiftLint
+        run: |
+          brew install swiftlint
+          swiftlint
+
+      - name: Select Xcode
+        run: |
+          xcodebuild -version
+
+      - name: Run tests
+        run: |
+          xcrun simctl list runtimes
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "No available iPhone simulator found, downloading iOS platform..."
+            xcodebuild -downloadPlatform iOS
+            DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
+            ")
+          fi
+          echo "Running tests on: $DEVICE"
+          xcodebuild test \
+            -project "Nylon Impossible.xcodeproj" \
+            -scheme "Nylon Impossible" \
+            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -resultBundlePath TestResults \
+            -quiet
+
+  deploy:
+    needs: [test]
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
@@ -29,8 +73,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install Apple certificates and provisioning profile
         env:
