@@ -44,6 +44,10 @@ struct HeaderView: View {
                     .foregroundStyle(Color.appSubtle)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            #if DEBUG
+            DebugBannerView()
+            #endif
         }
         .padding(.top, 16)
     }
