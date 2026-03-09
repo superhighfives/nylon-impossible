@@ -1,10 +1,8 @@
 import { useLocation } from "@tanstack/react-router";
 import { API_URL } from "../lib/config";
 
-export default function DevEnvironmentIndicator() {
+function DevEnvironmentIndicatorInner() {
   const location = useLocation();
-
-  if (import.meta.env.PROD) return null;
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const currentUrl = `${origin}${location.pathname}${location.searchStr}`;
@@ -21,4 +19,9 @@ export default function DevEnvironmentIndicator() {
       </div>
     </div>
   );
+}
+
+export default function DevEnvironmentIndicator() {
+  if (import.meta.env.PROD) return null;
+  return <DevEnvironmentIndicatorInner />;
 }
