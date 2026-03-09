@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import Header from "../components/Header";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
@@ -96,6 +97,7 @@ function RootDocument() {
         <ClerkProvider>
           <Header />
           <Outlet />
+          {!import.meta.env.PROD && <DevEnvironmentIndicator />}
           <TanStackDevtools
             config={{
               position: "bottom-right",
