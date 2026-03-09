@@ -5,15 +5,10 @@ on:
     branches: [main]
     paths:
       - "src/ios/**"
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - "src/ios/**"
   workflow_dispatch:
 
 permissions:
   contents: read
-  pull-requests: read
 
 concurrency:
   group: testflight-${{ github.ref }}
@@ -21,10 +16,6 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    if: >-
-      github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'pull_request'
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
@@ -34,51 +25,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Detect API changes
-        if: github.event_name == 'pull_request'
-        uses: dorny/paths-filter@v3
-        id: changes
-        with:
-          filters: |
-            api:
-              - 'src/api/**'
-
-      - name: SwiftLint
-        run: |
-          brew install swiftlint
-          swiftlint
-
-      - name: Select Xcode
-        run: |
-          xcodebuild -version
-
-      - name: Run tests
-        run: |
-          xcrun simctl list runtimes
-          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
-          print(devices[0]['name'] if devices else '')
-          ")
-          if [ -z "$DEVICE" ]; then
-            echo "No available iPhone simulator found, downloading iOS platform..."
-            xcodebuild -downloadPlatform iOS
-            DEVICE=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
-          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
-            ")
-          fi
-          echo "Running tests on: $DEVICE"
-          xcodebuild test \
-            -project "Nylon Impossible.xcodeproj" \
-            -scheme "Nylon Impossible" \
-            -destination "platform=iOS Simulator,name=$DEVICE" \
-            -resultBundlePath TestResults \
-            -quiet
 
       - name: Install Apple certificates and provisioning profile
         env:
@@ -151,7 +97,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           BUILD_NUMBER: ${{ github.run_number }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-          API_BASE_URL: ${{ github.event_name == 'pull_request' && steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
+          API_BASE_URL: https://api.nylonimpossible.com
         run: bundle exec fastlane beta --verbose
 
       - name: Clean up keychain
