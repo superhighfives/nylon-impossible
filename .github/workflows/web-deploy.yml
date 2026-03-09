@@ -7,14 +7,12 @@ on:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
-      - ".github/workflows/web-deploy.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
     paths:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
-      - ".github/workflows/web-deploy.yml"
   workflow_dispatch:
 
 concurrency:
