@@ -264,7 +264,17 @@ export function TodoList() {
   }
 
   const handleToggle = (id: string, completed: boolean) => {
-    updateTodo.mutate({ id, input: { completed: !completed } });
+    if (completed) {
+      // Unchecking: move to end of incomplete list so it doesn't snap back to original position
+      const lastPosition =
+        displayIncompleteTodos.length > 0
+          ? displayIncompleteTodos[displayIncompleteTodos.length - 1].position
+          : null;
+      const newPosition = generateKeyBetween(lastPosition ?? null, null);
+      updateTodo.mutate({ id, input: { completed: false, position: newPosition } });
+    } else {
+      updateTodo.mutate({ id, input: { completed: true } });
+    }
   };
 
   const handleDelete = (id: string) => {
