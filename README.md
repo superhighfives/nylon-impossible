@@ -7,17 +7,23 @@
 
 # Nylon Impossible
 
-A cross-platform todo application with web, API, and iOS clients. Real-time sync across devices via WebSockets, authentication via Clerk, and deployment on Cloudflare Workers.
+A cross-platform todo app for web and iOS. Real-time sync via WebSockets, AI-assisted task creation, and Clerk authentication — deployed on Cloudflare Workers.
+
+## Features
+
+- **Real-time sync** across devices via WebSockets and Durable Objects
+- **AI task creation** — plain language input parsed into structured todos with tool calling
+- **iOS native** — SwiftUI app with Siri integration and Share Sheet support
+- **PWA** — installable web app with offline-ready architecture
+- **Cross-platform auth** — Clerk sessions on web, JWT on iOS, same user pool
 
 ## Structure
-
-This is a monorepo managed with pnpm workspaces:
 
 | Project | Path | Stack |
 |---------|------|-------|
 | [Web](src/web/) | `src/web` | TanStack Start, React 19, Cloudflare Workers, D1 |
 | [API](src/api/) | `src/api` | Hono, Cloudflare Workers, D1, Durable Objects |
-| [iOS](src/ios/) | `src/ios/Nylon Impossible` | SwiftUI, SwiftData, iOS 26+ |
+| [iOS](src/ios/) | `src/ios/Nylon Impossible` | SwiftUI, SwiftData, iOS 18+ |
 
 ## Architecture
 
@@ -51,11 +57,9 @@ This is a monorepo managed with pnpm workspaces:
      └─────────────┘                 └─────────────┘
 ```
 
-- Web and iOS are independent clients
+- Web and iOS are independent clients sharing the same D1 database
 - Both authenticate via Clerk (different SDKs, same user pool)
-- Both read/write to the same D1 database
-- API Worker handles REST endpoints + WebSocket sync via Durable Objects
-- Real-time sync: mutations broadcast via WebSocket, triggering pulls on other clients
+- Mutations broadcast via WebSocket, triggering pulls on other clients
 
 ## Getting Started
 
@@ -70,7 +74,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The web app runs at **http://localhost:3000** and the API at **http://localhost:8787**.
+Web runs at **http://localhost:3000**, API at **http://localhost:8787**.
 
 For iOS, open the Xcode project:
 
@@ -78,7 +82,7 @@ For iOS, open the Xcode project:
 pnpm ios:open
 ```
 
-See each project's README for detailed setup:
+See each package's README for detailed setup:
 - [`src/web/README.md`](src/web/README.md)
 - [`src/api/README.md`](src/api/README.md)
 - [`src/ios/README.md`](src/ios/README.md)
@@ -108,6 +112,8 @@ See each project's README for detailed setup:
 |--------|-------------|
 | `pnpm db:migrate` | Apply D1 migrations locally (web + API) |
 | `pnpm db:migrate:remote` | Apply D1 migrations to production |
+| `pnpm db:fresh` | Reset, migrate, and seed local database |
+| `pnpm db:seed` | Seed local database with test data |
 
 ### Deployment
 
@@ -115,28 +121,17 @@ See each project's README for detailed setup:
 |--------|-------------|
 | `pnpm deploy` | Deploy web + API to Cloudflare Workers |
 
-### Per-Project
-
-All project-specific scripts are available with prefixes (`web:*`, `api:*`, `ios:*`):
-
-```bash
-pnpm web:dev        # Start web dev server only
-pnpm api:dev        # Start API dev server only
-pnpm web:test       # Run web tests
-pnpm api:test       # Run API tests
-pnpm web:typecheck  # Type check web only
-pnpm api:lint       # Lint API only
-```
+All scripts are also available per-package with `web:*`, `api:*`, and `ios:*` prefixes.
 
 ## Plans
 
-Implementation plans live in the [`plans/`](plans/) directory:
+Implementation plans live in [`plans/`](plans/):
 
 | Folder | Purpose |
 |--------|---------|
-| [`plans/ready/`](plans/ready/) | Plans that are ready to be worked on |
-| [`plans/backlog/`](plans/backlog/) | Stubs and ideas for future work |
-| [`plans/done/`](plans/done/) | Completed plans |
+| [`plans/ready/`](plans/ready/) | Fully specced, ready to implement |
+| [`plans/backlog/`](plans/backlog/) | Ideas and stubs |
+| [`plans/done/`](plans/done/) | Completed work |
 
 ## CI/CD
 
