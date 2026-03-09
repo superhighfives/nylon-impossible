@@ -87,7 +87,14 @@ final class TodoViewModel {
         todo.markModified()
     }
 
-    func toggleTodo(_ todo: TodoItem) {
+    func toggleTodo(_ todo: TodoItem, allTodos: [TodoItem]) {
+        if todo.isCompleted {
+            // Unchecking: move to end of incomplete list so it doesn't snap back to original position
+            let incompleteTodos = allTodos
+                .filter { !$0.isDeleted && !$0.isCompleted && $0.id != todo.id }
+                .sorted { $0.position < $1.position }
+            todo.position = generateKeyBetween(incompleteTodos.last?.position, nil)
+        }
         todo.isCompleted.toggle()
         todo.markModified()
     }

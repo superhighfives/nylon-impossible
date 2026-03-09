@@ -90,27 +90,44 @@ struct TodoViewModelTests {
     }
 
     @Test("toggleTodo flips isCompleted")
+    @MainActor
     func toggleTodo() {
         let todo = TodoItem(title: "Test")
         #expect(todo.isCompleted == false)
 
         let vm = TodoViewModel()
-        vm.toggleTodo(todo)
+        vm.toggleTodo(todo, allTodos: [todo])
         #expect(todo.isCompleted == true)
 
-        vm.toggleTodo(todo)
+        vm.toggleTodo(todo, allTodos: [todo])
         #expect(todo.isCompleted == false)
     }
 
     @Test("toggleTodo calls markModified")
+    @MainActor
     func toggleTodoMarksModified() {
         let todo = TodoItem(title: "Test")
         todo.isSynced = true
 
         let vm = TodoViewModel()
-        vm.toggleTodo(todo)
+        vm.toggleTodo(todo, allTodos: [todo])
 
         #expect(todo.isSynced == false)
+    }
+
+    @Test("toggleTodo unchecking moves to end of incomplete list")
+    @MainActor
+    func toggleTodoUncheckedMovesToEnd() {
+        let first = TodoItem(title: "First", position: "a0")
+        let second = TodoItem(title: "Second", position: "a1")
+        let todo = TodoItem(title: "Test", position: "a5")
+        todo.isCompleted = true
+
+        let vm = TodoViewModel()
+        vm.toggleTodo(todo, allTodos: [first, second, todo])
+
+        #expect(todo.isCompleted == false)
+        #expect(todo.position > second.position)
     }
 
     @Test("addTodo with SwiftData creates item and clears input")

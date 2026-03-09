@@ -128,7 +128,7 @@ struct ContentView: View {
             todo: todo,
             apiService: syncService.apiService,
             onToggle: {
-                viewModel.toggleTodo(todo)
+                viewModel.toggleTodo(todo, allTodos: todos)
                 syncService.syncAfterAction()
             },
             onSave: { title, description, dueDate, priority in
