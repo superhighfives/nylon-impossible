@@ -1,5 +1,8 @@
 <p align="center">
-  <img src="./assets/logo.svg" width="120" height="120" alt="Nylon Impossible logo">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./assets/logo-inverted-no-background.svg">
+    <img src="./assets/logo-no-background.svg" width="120" height="120" alt="Nylon Impossible logo">
+  </picture>
 </p>
 
 # Nylon Impossible
