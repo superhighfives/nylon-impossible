@@ -21,15 +21,10 @@ struct SignInView: View {
 
                 // Logo/Header
                 VStack(spacing: 8) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 24)
-                            .fill(Color.appBrand)
-                            .frame(width: 80, height: 80)
-
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 36, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
+                    Image("Logo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 80, height: 80)
 
                     Text("Nylon Impossible")
                         .font(.title)
