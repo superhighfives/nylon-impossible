@@ -1,10 +1,10 @@
 name: Deploy to TestFlight
 
 on:
-  push:
+  workflow_run:
+    workflows: ["iOS Tests"]
+    types: [completed]
     branches: [main]
-    paths:
-      - "src/ios/**"
   workflow_dispatch:
 
 permissions:
@@ -16,6 +16,10 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: macos-26
     timeout-minutes: 30
     defaults:
@@ -25,6 +29,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Install Apple certificates and provisioning profile
         env:
