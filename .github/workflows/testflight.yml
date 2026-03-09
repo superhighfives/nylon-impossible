@@ -55,10 +55,28 @@ jobs:
 
       - name: Run tests
         run: |
+          xcrun simctl list runtimes
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "No available iPhone simulator found, downloading iOS platform..."
+            xcodebuild -downloadPlatform iOS
+            DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
+            ")
+          fi
+          echo "Running tests on: $DEVICE"
           xcodebuild test \
             -project "Nylon Impossible.xcodeproj" \
             -scheme "Nylon Impossible" \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+            -destination "platform=iOS Simulator,name=$DEVICE" \
             -resultBundlePath TestResults \
             -quiet
 
