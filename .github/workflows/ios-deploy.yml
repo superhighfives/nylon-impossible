@@ -66,6 +66,8 @@ jobs:
     needs: [test]
     runs-on: macos-26
     timeout-minutes: 30
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: src/ios/Nylon Impossible
@@ -73,6 +75,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Increment build number
+        id: build_number
+        run: |
+          CURRENT=$(cat "$GITHUB_WORKSPACE/BUILD_NUMBER")
+          NEXT=$((CURRENT + 1))
+          echo $NEXT > "$GITHUB_WORKSPACE/BUILD_NUMBER"
+          echo "number=$NEXT" >> $GITHUB_OUTPUT
+
+      - name: Commit build number
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$GITHUB_WORKSPACE/BUILD_NUMBER"
+          git commit -m "Bump build number to ${{ steps.build_number.outputs.number }} [skip ci]"
+          git push
+        working-directory: ${{ github.workspace }}
 
       - name: Install Apple certificates and provisioning profile
         env:
@@ -143,7 +164,7 @@ jobs:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-          BUILD_NUMBER: ${{ github.run_number }}
+          BUILD_NUMBER: ${{ steps.build_number.outputs.number }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
           API_BASE_URL: https://api.nylonimpossible.com
         run: bundle exec fastlane beta --verbose
