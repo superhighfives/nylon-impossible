@@ -16,10 +16,13 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
   const isPending = url.fetchStatus === "pending" && !isStale;
   const isFailed = url.fetchStatus === "failed" || isStale;
 
-  // Extract hostname for pending/failed states
+  // Extract hostname for pending/failed states and favicon fallback
   let hostname: string;
+  let validHostname: string | null = null;
   try {
-    hostname = new URL(url.url).hostname;
+    const parsed = new URL(url.url);
+    hostname = parsed.hostname;
+    validHostname = parsed.hostname;
   } catch {
     hostname = url.url;
   }
@@ -28,10 +31,12 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
   const displayTitle =
     isPending || isFailed ? hostname : (url.title ?? url.siteName ?? hostname);
 
-  // Favicon: use fetched or Google's favicon service
+  // Favicon: use fetched or Google's favicon service (only if we have a valid hostname)
   const favicon =
     url.favicon ??
-    `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+    (validHostname
+      ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
+      : null);
 
   return (
     <a
@@ -42,7 +47,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 shrink-0" />
-      ) : (
+      ) : favicon ? (
         <img
           src={favicon}
           alt=""
@@ -51,7 +56,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
             e.currentTarget.style.display = "none";
           }}
         />
-      )}
+      ) : null}
       <span className="text-sm text-gray-normal truncate group-hover:underline">
         {displayTitle}
       </span>

@@ -90,23 +90,55 @@ interface ExtractedItem {
 /** URL regex to extract URLs from text */
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
 
+/** Common trailing punctuation that shouldn't be part of URLs */
+const TRAILING_PUNCT = /[.,;:!?)]+$/;
+
+/**
+ * Validate and clean a URL string.
+ * Returns null if the URL is invalid.
+ */
+function cleanUrl(urlString: string): string | null {
+  // Strip common trailing punctuation
+  const cleaned = urlString.replace(TRAILING_PUNCT, "");
+  try {
+    const parsed = new URL(cleaned);
+    // Only allow http/https
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Extract URLs from title text as a fallback when AI misses them.
  * Merges with any AI-extracted URLs, deduplicating.
  */
 function ensureUrlsExtracted(item: ExtractedItem): ExtractedItem {
-  const urlsInTitle = item.title.match(URL_REGEX) ?? [];
-  if (urlsInTitle.length === 0) {
+  const rawMatches = item.title.match(URL_REGEX) ?? [];
+  const urlsInTitle = rawMatches
+    .map(cleanUrl)
+    .filter((url): url is string => url !== null);
+
+  if (urlsInTitle.length === 0 && !item.urls?.length) {
     return item;
   }
 
+  // Validate existing URLs too
+  const validExisting = (item.urls ?? [])
+    .map(cleanUrl)
+    .filter((url): url is string => url !== null);
+
   // Merge with existing URLs, avoiding duplicates
-  const existingUrls = new Set(item.urls ?? []);
+  const existingUrls = new Set(validExisting);
   const allUrls = [...existingUrls];
 
   for (const url of urlsInTitle) {
     if (!existingUrls.has(url)) {
       allUrls.push(url);
+      existingUrls.add(url);
     }
   }
 

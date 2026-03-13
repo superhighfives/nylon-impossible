@@ -196,8 +196,9 @@ struct UrlRow: View {
         if let favicon = url.favicon, let faviconUrl = URL(string: favicon) {
             return faviconUrl
         }
-        if let host = URL(string: url.url)?.host {
-            return URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=32")
+        if let host = URL(string: url.url)?.host,
+           let encoded = host.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            return URL(string: "https://www.google.com/s2/favicons?domain=\(encoded)&sz=32")
         }
         return nil
     }

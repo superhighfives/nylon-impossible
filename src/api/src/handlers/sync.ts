@@ -45,11 +45,11 @@ interface SyncConflict {
   remoteUpdatedAt: Date;
 }
 
-// Serialize a URL with explicit ISO8601 dates
+// Serialize a URL with explicit ISO8601 dates and lowercase IDs
 function serializeUrl(url: TodoUrl) {
   return {
-    id: url.id,
-    todoId: url.todoId,
+    id: url.id.toLowerCase(),
+    todoId: url.todoId.toLowerCase(),
     url: url.url,
     title: url.title,
     description: url.description,
