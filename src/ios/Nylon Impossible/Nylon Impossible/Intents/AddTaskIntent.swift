@@ -16,10 +16,10 @@ struct AddTaskIntent: AppIntent {
     static var openAppWhenRun: Bool = false
     
     @Parameter(title: "Task", requestValueDialog: "What would you like to add?")
-    var taskTitle: String
+    var task: TaskTitle
     
     static var parameterSummary: some ParameterSummary {
-        Summary("Add \(\.$taskTitle) to Nylon")
+        Summary("Add \(\.$task) to Nylon")
     }
     
     @MainActor
@@ -35,7 +35,7 @@ struct AddTaskIntent: AppIntent {
         let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
         
         let todo = TaskCreationService.createTask(
-            title: taskTitle,
+            title: task.title,
             userId: userId,
             context: context,
             allTodos: allTodos
