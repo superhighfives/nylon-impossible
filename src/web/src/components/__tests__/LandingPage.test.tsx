@@ -1,10 +1,15 @@
 import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { LandingPage } from "../LandingPage";
 
 vi.mock("@clerk/tanstack-react-start", () => ({
-  SignInButton: ({ children }: any) => <div>{children}</div>,
-  SignUpButton: ({ children }: any) => <div>{children}</div>,
+  SignInButton: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
+  SignUpButton: ({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  ),
 }));
 
 describe("LandingPage", () => {

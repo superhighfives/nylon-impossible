@@ -87,6 +87,67 @@ interface ExtractedItem {
   dueDate?: string;
 }
 
+/** URL regex to extract URLs from text */
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+/** Common trailing punctuation that shouldn't be part of URLs */
+const TRAILING_PUNCT = /[.,;:!?)]+$/;
+
+/**
+ * Validate and clean a URL string.
+ * Returns null if the URL is invalid.
+ */
+function cleanUrl(urlString: string): string | null {
+  // Strip common trailing punctuation
+  const cleaned = urlString.replace(TRAILING_PUNCT, "");
+  try {
+    const parsed = new URL(cleaned);
+    // Only allow http/https
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract URLs from title text as a fallback when AI misses them.
+ * Merges with any AI-extracted URLs, deduplicating.
+ */
+function ensureUrlsExtracted(item: ExtractedItem): ExtractedItem {
+  const rawMatches = item.title.match(URL_REGEX) ?? [];
+  const urlsInTitle = rawMatches
+    .map(cleanUrl)
+    .filter((url): url is string => url !== null);
+
+  if (urlsInTitle.length === 0 && !item.urls?.length) {
+    return item;
+  }
+
+  // Validate existing URLs too
+  const validExisting = (item.urls ?? [])
+    .map(cleanUrl)
+    .filter((url): url is string => url !== null);
+
+  // Merge with existing URLs, avoiding duplicates
+  const existingUrls = new Set(validExisting);
+  const allUrls = [...existingUrls];
+
+  for (const url of urlsInTitle) {
+    if (!existingUrls.has(url)) {
+      allUrls.push(url);
+      existingUrls.add(url);
+    }
+  }
+
+  return {
+    ...item,
+    urls: allUrls.length > 0 ? allUrls : undefined,
+  };
+}
+
 /** Batch-insert todos, fetch them back in one query, and return the response. */
 async function createAndReturn(
   db: ReturnType<typeof getDb>,
@@ -99,11 +160,18 @@ async function createAndReturn(
   const now = new Date();
   const ids: string[] = [];
 
+  // Ensure URLs are extracted from titles (fallback for when AI misses them)
+  const itemsWithUrls = items.map(ensureUrlsExtracted);
+
   // Generate N positions before the first existing todo
-  const positions = generateNKeysBetween(null, firstPosition, items.length);
+  const positions = generateNKeysBetween(
+    null,
+    firstPosition,
+    itemsWithUrls.length,
+  );
 
   // Build all values up-front so we can batch the insert
-  const rows = items.map((item, i) => {
+  const rows = itemsWithUrls.map((item, i) => {
     const id = crypto.randomUUID();
     ids.push(id);
     return {
@@ -129,7 +197,7 @@ async function createAndReturn(
     position: string;
   }> = [];
 
-  items.forEach((item, i) => {
+  itemsWithUrls.forEach((item, i) => {
     if (item.urls && item.urls.length > 0) {
       const todoId = ids[i];
       const urlPositions = generateNKeysBetween(null, null, item.urls.length);

@@ -161,12 +161,21 @@ struct TodoEditSheet: View {
 struct UrlRow: View {
     let url: APITodoUrl
     
+    /// Pending URLs older than this threshold are treated as failed (worker likely restarted)
+    private static let stalePendingThreshold: TimeInterval = 30
+    
+    /// Check if a pending URL is stale (fetch likely lost due to worker restart)
+    private var isStale: Bool {
+        url.fetchStatus == .pending &&
+        Date().timeIntervalSince(url.createdAt) > Self.stalePendingThreshold
+    }
+    
     private var isPending: Bool {
-        url.fetchStatus == .pending
+        url.fetchStatus == .pending && !isStale
     }
     
     private var isFailed: Bool {
-        url.fetchStatus == .failed
+        url.fetchStatus == .failed || isStale
     }
     
     private var displayTitle: String {
@@ -187,8 +196,9 @@ struct UrlRow: View {
         if let favicon = url.favicon, let faviconUrl = URL(string: favicon) {
             return faviconUrl
         }
-        if let host = URL(string: url.url)?.host {
-            return URL(string: "https://www.google.com/s2/favicons?domain=\(host)&sz=32")
+        if let host = URL(string: url.url)?.host,
+           let encoded = host.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            return URL(string: "https://www.google.com/s2/favicons?domain=\(encoded)&sz=32")
         }
         return nil
     }

@@ -10,6 +10,7 @@ import SwiftUI
 struct TodoItemRow: View {
     let todo: TodoItem
     let apiService: APIService?
+    let urls: [APITodoUrl]
     var onToggle: () -> Void
     var onSave: (String, String?, Date?, TodoPriority?) -> Void
 
@@ -87,6 +88,15 @@ struct TodoItemRow: View {
                         }
                         .foregroundStyle(todo.isOverdue ? Color.red : Color.appSubtle)
                     }
+                    
+                    // URL cards (compact)
+                    if !urls.isEmpty {
+                        FlowLayout(spacing: 6) {
+                            ForEach(urls) { url in
+                                UrlRowCompact(url: url)
+                            }
+                        }
+                    }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -134,6 +144,7 @@ struct TodoItemRow: View {
                     return item
                 }(),
                 apiService: nil,
+                urls: [],
                 onToggle: {},
                 onSave: { _, _, _, _ in }
             )
@@ -144,6 +155,7 @@ struct TodoItemRow: View {
                     return item
                 }(),
                 apiService: nil,
+                urls: [],
                 onToggle: {},
                 onSave: { _, _, _, _ in }
             )
@@ -154,6 +166,7 @@ struct TodoItemRow: View {
                     return item
                 }(),
                 apiService: nil,
+                urls: [],
                 onToggle: {},
                 onSave: { _, _, _, _ in }
             )

@@ -107,11 +107,15 @@ function extractHostname(url: string): string | null {
   }
 }
 
+/** Timeout for metadata fetch requests (10 seconds) */
+const FETCH_TIMEOUT_MS = 10_000;
+
 /**
  * Fetch and extract metadata from a URL.
  *
  * Extracts Open Graph tags, Twitter Card tags, and standard meta tags.
  * Returns null values for any metadata that cannot be extracted.
+ * Times out after 10 seconds to prevent hanging on slow/unresponsive servers.
  */
 export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
   let response: Response;
@@ -119,6 +123,7 @@ export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
     response = await fetch(url, {
       headers: { "User-Agent": "NylonBot/1.0" },
       redirect: "follow",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch {
     return NULL_METADATA;

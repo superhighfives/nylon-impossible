@@ -29,6 +29,14 @@ final class SyncService {
 
     private(set) var state: SyncState = .idle
     private(set) var lastSyncedAt: Date?
+    
+    /// URLs keyed by todo ID, populated from sync response
+    private(set) var urlsByTodoId: [String: [APITodoUrl]] = [:]
+    
+    /// Get URLs for a specific todo
+    func urls(for todoId: UUID) -> [APITodoUrl] {
+        urlsByTodoId[todoId.uuidString.lowercased()] ?? []
+    }
 
     let webSocketService: WebSocketService?
 
@@ -150,8 +158,17 @@ final class SyncService {
                 localChangeIds: localChangeIds,
                 userId: userId
             )
+            
+            // 4. Extract URLs from response and store in memory
+            var newUrlsByTodoId: [String: [APITodoUrl]] = [:]
+            for todo in response.todos {
+                if let urls = todo.urls, !urls.isEmpty {
+                    newUrlsByTodoId[todo.id.lowercased()] = urls
+                }
+            }
+            urlsByTodoId = newUrlsByTodoId
 
-            // 4. Update sync timestamp
+            // 5. Update sync timestamp
             if let syncedAt = ISO8601DateFormatter().date(from: response.syncedAt) {
                 lastSyncedAt = syncedAt
                 UserDefaults.standard.set(syncedAt, forKey: lastSyncedAtKey)

@@ -84,7 +84,8 @@ struct SyncServiceTests {
                 dueDate: nil,
                 priority: nil,
                 createdAt: todo.createdAt,
-                updatedAt: todo.updatedAt
+                updatedAt: todo.updatedAt,
+                urls: nil
             )],
             syncedAt: "2025-06-01T00:00:00.000Z",
             conflicts: []
@@ -130,7 +131,8 @@ struct SyncServiceTests {
                 dueDate: nil,
                 priority: nil,
                 createdAt: remoteDate,
-                updatedAt: remoteDate
+                updatedAt: remoteDate,
+                urls: nil
             )],
             syncedAt: "2025-06-01T00:00:00.000Z",
             conflicts: []
@@ -181,7 +183,8 @@ struct SyncServiceTests {
                 dueDate: nil,
                 priority: nil,
                 createdAt: localDate,
-                updatedAt: remoteDate
+                updatedAt: remoteDate,
+                urls: nil
             )],
             syncedAt: "2025-06-01T00:00:00.000Z",
             conflicts: []
@@ -229,7 +232,8 @@ struct SyncServiceTests {
                 dueDate: nil,
                 priority: nil,
                 createdAt: remoteDate,
-                updatedAt: remoteDate
+                updatedAt: remoteDate,
+                urls: nil
             )],
             syncedAt: "2025-06-01T00:00:00.000Z",
             conflicts: []
@@ -271,7 +275,8 @@ struct SyncServiceTests {
                 dueDate: nil,
                 priority: nil,
                 createdAt: todo.createdAt,
-                updatedAt: todo.updatedAt
+                updatedAt: todo.updatedAt,
+                urls: nil
             )],
             syncedAt: "2025-06-01T00:00:00.000Z",
             conflicts: []
