@@ -8,8 +8,10 @@ When a URL is added to a todo, there is no visual feedback while the metadata is
 
 ## Expected Behavior
 
-- Show an optimistic/loading state (e.g. skeleton or placeholder) while URL metadata is being fetched
+- Show an optimistic / loading state (e.g. skeleton or placeholder) while URL metadata is being fetched
 - URL fetching should work consistently across both iOS and web platforms
+- I want to show the URL metadata in a small card below the todo item, with a title, description, and image
+- Once URL metadata is added, it should be treated as its own entity, and be able to be removed from the title
 
 ## Areas to Consider
 
