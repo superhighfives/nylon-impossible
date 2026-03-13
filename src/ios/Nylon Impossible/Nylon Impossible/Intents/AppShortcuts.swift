@@ -15,6 +15,7 @@ struct NylonShortcuts: AppShortcutsProvider {
                 "Add a task to \(.applicationName)",
                 "Create a task in \(.applicationName)",
                 "Add something to \(.applicationName)",
+                "New task in \(.applicationName)",
                 "Remind me in \(.applicationName)"
             ],
             shortTitle: "Add Task",

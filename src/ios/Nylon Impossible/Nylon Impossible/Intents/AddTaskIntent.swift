@@ -12,7 +12,10 @@ struct AddTaskIntent: AppIntent {
     static var title: LocalizedStringResource = "Add Task"
     static var description = IntentDescription("Add a new task to Nylon")
     
-    @Parameter(title: "Task")
+    /// Don't open the app when running via Siri - just confirm and return
+    static var openAppWhenRun: Bool = false
+    
+    @Parameter(title: "Task", requestValueDialog: "What would you like to add?")
     var taskTitle: String
     
     static var parameterSummary: some ParameterSummary {
