@@ -87,6 +87,35 @@ interface ExtractedItem {
   dueDate?: string;
 }
 
+/** URL regex to extract URLs from text */
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+/**
+ * Extract URLs from title text as a fallback when AI misses them.
+ * Merges with any AI-extracted URLs, deduplicating.
+ */
+function ensureUrlsExtracted(item: ExtractedItem): ExtractedItem {
+  const urlsInTitle = item.title.match(URL_REGEX) ?? [];
+  if (urlsInTitle.length === 0) {
+    return item;
+  }
+
+  // Merge with existing URLs, avoiding duplicates
+  const existingUrls = new Set(item.urls ?? []);
+  const allUrls = [...existingUrls];
+
+  for (const url of urlsInTitle) {
+    if (!existingUrls.has(url)) {
+      allUrls.push(url);
+    }
+  }
+
+  return {
+    ...item,
+    urls: allUrls.length > 0 ? allUrls : undefined,
+  };
+}
+
 /** Batch-insert todos, fetch them back in one query, and return the response. */
 async function createAndReturn(
   db: ReturnType<typeof getDb>,
@@ -99,11 +128,18 @@ async function createAndReturn(
   const now = new Date();
   const ids: string[] = [];
 
+  // Ensure URLs are extracted from titles (fallback for when AI misses them)
+  const itemsWithUrls = items.map(ensureUrlsExtracted);
+
   // Generate N positions before the first existing todo
-  const positions = generateNKeysBetween(null, firstPosition, items.length);
+  const positions = generateNKeysBetween(
+    null,
+    firstPosition,
+    itemsWithUrls.length,
+  );
 
   // Build all values up-front so we can batch the insert
-  const rows = items.map((item, i) => {
+  const rows = itemsWithUrls.map((item, i) => {
     const id = crypto.randomUUID();
     ids.push(id);
     return {
@@ -129,7 +165,7 @@ async function createAndReturn(
     position: string;
   }> = [];
 
-  items.forEach((item, i) => {
+  itemsWithUrls.forEach((item, i) => {
     if (item.urls && item.urls.length > 0) {
       const todoId = ids[i];
       const urlPositions = generateNKeysBetween(null, null, item.urls.length);

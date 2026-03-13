@@ -2,7 +2,20 @@ import { createClerkClient } from "@clerk/backend";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, eq, getDb, gt, lists, type Todo, todos, users } from "../lib/db";
+import {
+  and,
+  asc,
+  eq,
+  getDb,
+  gt,
+  inArray,
+  lists,
+  type Todo,
+  type TodoUrl,
+  todos,
+  todoUrls,
+  users,
+} from "../lib/db";
 import type { Env } from "../types";
 
 const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
@@ -32,8 +45,29 @@ interface SyncConflict {
   remoteUpdatedAt: Date;
 }
 
+// Serialize a URL with explicit ISO8601 dates
+function serializeUrl(url: TodoUrl) {
+  return {
+    id: url.id,
+    todoId: url.todoId,
+    url: url.url,
+    title: url.title,
+    description: url.description,
+    siteName: url.siteName,
+    favicon: url.favicon,
+    position: url.position,
+    fetchStatus: url.fetchStatus,
+    fetchedAt: url.fetchedAt?.toISOString() ?? null,
+    createdAt: url.createdAt.toISOString(),
+    updatedAt: url.updatedAt.toISOString(),
+  };
+}
+
 // Serialize a todo with explicit ISO8601 dates and lowercase ID
-function serializeTodo(todo: typeof todos.$inferSelect) {
+function serializeTodo(
+  todo: typeof todos.$inferSelect,
+  urls: ReturnType<typeof serializeUrl>[] = [],
+) {
   return {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
@@ -45,6 +79,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     priority: todo.priority,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
+    urls,
   };
 }
 
@@ -182,8 +217,30 @@ export async function syncTodos(c: Context<Env>) {
       .orderBy(todos.createdAt);
   }
 
+  // 3. Fetch all URLs for the returned todos
+  const todoIds = serverTodos.map((t) => t.id);
+  let allUrls: TodoUrl[] = [];
+  if (todoIds.length > 0) {
+    allUrls = await db
+      .select()
+      .from(todoUrls)
+      .where(inArray(todoUrls.todoId, todoIds))
+      .orderBy(asc(todoUrls.position));
+  }
+
+  // Group URLs by todoId
+  const urlsByTodoId = new Map<string, ReturnType<typeof serializeUrl>[]>();
+  for (const url of allUrls) {
+    const serialized = serializeUrl(url);
+    const existing = urlsByTodoId.get(url.todoId) ?? [];
+    existing.push(serialized);
+    urlsByTodoId.set(url.todoId, existing);
+  }
+
   return c.json({
-    todos: serverTodos.map(serializeTodo),
+    todos: serverTodos.map((todo) =>
+      serializeTodo(todo, urlsByTodoId.get(todo.id) ?? []),
+    ),
     syncedAt: syncedAt.toISOString(),
     conflicts,
   });

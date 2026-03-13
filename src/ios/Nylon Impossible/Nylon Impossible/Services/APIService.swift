@@ -43,6 +43,7 @@ struct APITodo: Codable, Sendable {
     let priority: String?
     let createdAt: Date
     let updatedAt: Date
+    let urls: [APITodoUrl]?  // URLs included in sync response
 }
 
 /// Fetch status for URL metadata

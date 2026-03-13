@@ -161,12 +161,21 @@ struct TodoEditSheet: View {
 struct UrlRow: View {
     let url: APITodoUrl
     
+    /// Pending URLs older than this threshold are treated as failed (worker likely restarted)
+    private static let stalePendingThreshold: TimeInterval = 30
+    
+    /// Check if a pending URL is stale (fetch likely lost due to worker restart)
+    private var isStale: Bool {
+        url.fetchStatus == .pending &&
+        Date().timeIntervalSince(url.createdAt) > Self.stalePendingThreshold
+    }
+    
     private var isPending: Bool {
-        url.fetchStatus == .pending
+        url.fetchStatus == .pending && !isStale
     }
     
     private var isFailed: Bool {
-        url.fetchStatus == .failed
+        url.fetchStatus == .failed || isStale
     }
     
     private var displayTitle: String {

@@ -4,3 +4,4 @@ export { Field, type FieldProps, Textarea, type TextareaProps } from "./field";
 export { Input, type InputProps } from "./input";
 export { Loader, type LoaderProps } from "./loader";
 export { Select, type SelectProps } from "./select";
+export { UrlCardCompact } from "./UrlCardCompact";

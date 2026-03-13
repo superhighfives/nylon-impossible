@@ -29,7 +29,7 @@ import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
-import { Button, Checkbox } from "./ui";
+import { Button, Checkbox, UrlCardCompact } from "./ui";
 
 interface TodoItemProps {
   todo: TodoWithUrls;
@@ -112,6 +112,13 @@ function TodoItemContent({
         >
           {todo.title}
         </p>
+        {todo.urls && todo.urls.length > 0 && (
+          <div className="flex flex-col gap-1 mt-1.5">
+            {todo.urls.map((url) => (
+              <UrlCardCompact key={url.id} url={url} />
+            ))}
+          </div>
+        )}
         <TodoIndicators todo={todo} />
       </div>
       <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
