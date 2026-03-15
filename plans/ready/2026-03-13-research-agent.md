@@ -10,21 +10,33 @@ Turn todos into research agents. When a user creates a todo with research intent
 
 ## Core Behavior
 
-- **Trigger**: AI detects research intent during todo extraction (questions, "look up", "how to", comparisons)
-- **Output**: Brief 2-3 sentence summary with numbered citations [1], [2] linking to source URLs
+- **Trigger**: AI detects research intent during todo extraction (questions, "look up", "how to", comparisons, venue names)
+- **Output**: Brief 2-3 sentence summary with numbered citations [1], [2] linking to source URLs; or structured location data for venue todos
 - **Runs on**: Cloudflare Workers AI (`@cf/moonshotai/kimi-k2.5` with thinking + search)
 - **UX**: Optimistic - todo appears immediately, "Researching..." indicator, results appear via WebSocket
 
+### Research Types
+
+The AI classifies each researchable todo into a **research type** which shapes the output format:
+
+| Type | Description |
+|------|-------------|
+| `general` | Default — summary + citations |
+| `location` | Venue/place — structured location data + Google Maps link |
+
 ### What Triggers Research
 
-| Input | Research? | Why |
-|-------|-----------|-----|
-| "Feed dog" | No | Action item |
-| "Buy groceries" | No | Action item |
-| "Dogs ages vs human ages" | Yes | Comparison/question |
-| "Look up white chocolate recipe" | Yes | Explicit research intent |
-| "Best practices for React Server Components" | Yes | Information seeking |
-| "How does OAuth work" | Yes | Question |
+| Input | Research? | Type | Why |
+|-------|-----------|------|-----|
+| "Feed dog" | No | — | Action item |
+| "Buy groceries" | No | — | Action item |
+| "Dogs ages vs human ages" | Yes | `general` | Comparison/question |
+| "Look up white chocolate recipe" | Yes | `general` | Explicit research intent |
+| "Best practices for React Server Components" | Yes | `general` | Information seeking |
+| "How does OAuth work" | Yes | `general` | Question |
+| "Book dinner at San Jalisco" | Yes | `location` | Venue reference |
+| "Drinks at The Rusty Nail" | Yes | `location` | Venue reference |
+| "Check out that new ramen place on Main St" | Yes | `location` | Venue reference |
 
 ### What Research Produces
 
@@ -94,10 +106,11 @@ interface ExtractedItem {
   urls?: string[];
   dueDate?: string;
   needsResearch?: boolean;
+  researchType?: 'general' | 'location'; // only set when needsResearch: true
 }
 ```
 
-Update the AI prompt to detect research intent and return `needsResearch: true` for items that should be researched.
+Update the AI prompt to detect research intent, return `needsResearch: true` for items that should be researched, and set `researchType: 'location'` when the todo references a venue (restaurant, bar, café, venue, etc.).
 
 ### Update `POST /todos/smart`
 
@@ -167,6 +180,50 @@ async function executeResearch(todoId: string, query: string, researchId: string
 }
 ```
 
+### Location Research Execution
+
+When `researchType === 'location'`, the research query is enriched with the user's location (if set in their profile) to find the right venue. The output format is the **same as general research** — a summary with citations [1], [2] — but the source URLs are the venue's website and Google Maps link rather than reference articles.
+
+```ts
+async function executeLocationResearch(todoId: string, query: string, researchId: string, userLocation?: string) {
+  const searchQuery = userLocation
+    ? `${query} near ${userLocation}`
+    : query;
+
+  const result = await ai.run('@cf/moonshotai/kimi-k2.5', {
+    messages: [{
+      role: 'user',
+      content: `Find the business: "${searchQuery}". Write 1-2 sentences describing what it is and where it is. Cite [1] as the venue's website and [2] as the Google Maps link. Return sources as: [website URL, Google Maps URL].`
+    }],
+  });
+
+  // Parsed the same way as general research
+  const { summary, sources } = parseResearchResponse(result);
+  // sources[0] = website, sources[1] = Google Maps URL
+
+  for (const [index, url] of sources.entries()) {
+    await insertTodoUrl({ todoId, researchId, url, position: generatePosition(index), fetchStatus: 'pending' });
+    waitUntil(fetchUrlMetadata(urlId));
+  }
+
+  await updateTodoResearch(researchId, { status: 'completed', summary, researchedAt: new Date() });
+}
+```
+
+No additional columns needed on `todoResearch` — location data is carried entirely through the existing summary + URL card system.
+
+### User Profile: Location
+
+Add an optional `location` field to the user profile to bias location searches locally:
+
+```sql
+ALTER TABLE users ADD COLUMN location TEXT; -- e.g. "Los Angeles, CA"
+```
+
+- Displayed as a simple text input in profile/settings ("Your location")
+- Used as context when building location research queries (`near ${user.location}`)
+- Not required — location research still works without it, just less precise
+
 ### Update Sync Endpoint
 
 Include research data in response:
@@ -194,7 +251,7 @@ Include research data in response:
 
 ## Web UI
 
-### Expanded Todo View
+### Expanded Todo View — General Research
 
 ```
 ┌─────────────────────────────────────────┐
@@ -212,6 +269,30 @@ Include research data in response:
 │ Sources                                 │
 │ [1] 🌐 AKC - Dog Age Calculator         │
 │ [2] 🌐 PetMD - How Dogs Age             │
+└─────────────────────────────────────────┘
+```
+
+### Expanded Todo View — Location Research
+
+Same layout as general research — the summary names the place and its address/character, and citations link to the venue's website and Google Maps. No special rendering needed; existing URL card components handle both.
+
+```
+┌─────────────────────────────────────────┐
+│ ☐ Book dinner at San Jalisco            │
+├─────────────────────────────────────────┤
+│ Notes                                   │
+│ [editable textarea, always available]   │
+├─────────────────────────────────────────┤
+│ Research                    ↻ Refresh   │
+│ ─────────────────────────────────────── │
+│ San Jalisco is a beloved Mexican        │
+│ restaurant at 3 E Olympic Blvd, LA,    │
+│ known for birria and handmade           │
+│ tortillas. [1][2]                       │
+│                                         │
+│ Sources                                 │
+│ [1] 🌐 sanjalisco.com                   │
+│ [2] 🗺  Google Maps — San Jalisco       │
 └─────────────────────────────────────────┘
 ```
 
@@ -261,11 +342,13 @@ Source URLs display with citation number prefix:
 
 ### Phase 2: AI Integration
 
-- [ ] Update `extractTodos` prompt to return `needsResearch`
-- [ ] Create `executeResearch` function
+- [ ] Update `extractTodos` prompt to return `needsResearch` and `researchType` (`general` | `location`)
+- [ ] Create `executeResearch` function (dispatches to general or location handler)
 - [ ] Integrate Workers AI web search
 - [ ] Parse AI response into summary + source URLs
 - [ ] Handle citation formatting [1], [2]
+- [ ] Location prompt: instruct AI to use [1] = website, [2] = Google Maps URL
+- [ ] Pass user `location` profile field as context when `researchType === 'location'`
 
 ### Phase 3: API Changes
 
@@ -275,16 +358,18 @@ Source URLs display with citation number prefix:
 - [ ] Execute research in background via `waitUntil`
 - [ ] Update sync endpoint to include research data
 - [ ] Add re-research endpoint or handle via sync
+- [ ] Add `location` field to user profile (schema + API)
 
 ### Phase 4: Web UI
 
 - [ ] Add research types to `SerializedTodo`
 - [ ] Create `ResearchSection` component
 - [ ] Implement pending/completed/failed states
-- [ ] Create source cards with citation numbers
+- [ ] Create source cards with citation numbers (shared for general + location)
 - [ ] Add "Researching..." indicator to list view
 - [ ] Add refresh button and re-research flow
 - [ ] Update `TodoItemExpanded` to show research section
+- [ ] Add location field to user profile settings UI
 
 ### Phase 5: Polish
 
@@ -312,3 +397,4 @@ Source URLs display with citation number prefix:
 | AI Model | `@cf/moonshotai/kimi-k2.5` (thinking + search) |
 | Research Timeout | 60 seconds |
 | Rate Limiting | None (single user for now) |
+| Location bias | Optional `users.location` text field (e.g. "Los Angeles, CA") |
