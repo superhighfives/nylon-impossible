@@ -4,7 +4,11 @@ import { z } from "zod/v4";
 import { extractTodos } from "../lib/ai";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
 import { shouldUseAI } from "../lib/smart-input";
-import { createFallbackFromUrl, truncateTitle } from "../lib/url-helpers";
+import {
+  cleanUrlString,
+  createFallbackFromUrl,
+  truncateTitle,
+} from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
 
@@ -123,7 +127,9 @@ function createFallbackItem(text: string): ExtractedItem {
   // Check if input is primarily a URL (URL takes up >80% of the text)
   const urlMatch = text.match(URL_REGEX);
   if (urlMatch && urlMatch[0].length > text.length * 0.8) {
-    const fallback = createFallbackFromUrl(urlMatch[0]);
+    // Clean trailing punctuation before processing (regex can match trailing . or ))
+    const cleanedUrl = cleanUrlString(urlMatch[0]);
+    const fallback = createFallbackFromUrl(cleanedUrl);
     if (fallback) {
       return { title: fallback.title, urls: [fallback.url] };
     }

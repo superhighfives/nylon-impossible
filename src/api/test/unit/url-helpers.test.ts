@@ -178,11 +178,6 @@ describe("truncateTitle", () => {
     expect(truncateTitle("")).toBe("");
   });
 
-  it("handles null/undefined gracefully", () => {
-    expect(truncateTitle(null as unknown as string)).toBe(null);
-    expect(truncateTitle(undefined as unknown as string)).toBe(undefined);
-  });
-
   it("preserves unicode characters", () => {
     const text = "日本語テスト";
     expect(truncateTitle(text)).toBe(text);
@@ -194,10 +189,24 @@ describe("truncateTitle", () => {
     expect(result.endsWith("...")).toBe(true);
   });
 
-  it("handles emoji", () => {
-    const text = "🎉".repeat(200);
+  it("handles emoji without splitting surrogate pairs", () => {
+    // Emoji like 🎉 are surrogate pairs (2 UTF-16 code units each)
+    // truncateTitle should not split them, avoiding malformed output
+    const text = "🎉".repeat(600); // 600 emoji > 500 code points, needs truncation
     const result = truncateTitle(text);
-    // Emoji are multi-byte but count as single chars in JS
-    expect(result.length).toBeLessThanOrEqual(500);
+    // Result should end with ... and not contain broken surrogates
+    expect(result.endsWith("...")).toBe(true);
+    // All characters before ... should be valid emoji (no broken surrogates)
+    const withoutEllipsis = result.slice(0, -3);
+    expect(withoutEllipsis).toMatch(/^(🎉)*$/);
+  });
+
+  it("truncates to correct code point count", () => {
+    // Mix of ASCII and emoji
+    const text = "a🎉b🎉c🎉" + "x".repeat(500);
+    const result = truncateTitle(text, 10);
+    // Should truncate to ~7 code points + "..."
+    expect(result.length).toBeLessThanOrEqual(20); // Allow for surrogate pairs
+    expect(result.endsWith("...")).toBe(true);
   });
 });

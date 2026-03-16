@@ -2,6 +2,17 @@
  * URL handling utilities for smart todo creation
  */
 
+/** Common trailing punctuation that shouldn't be part of URLs */
+const TRAILING_PUNCT = /[.,;:!?)]+$/;
+
+/**
+ * Clean a URL string by stripping trailing punctuation.
+ * Returns the cleaned URL or the original if cleaning fails.
+ */
+export function cleanUrlString(urlString: string): string {
+  return urlString.replace(TRAILING_PUNCT, "");
+}
+
 /**
  * Extract the domain from a URL string.
  * Strips www. prefix and returns just the hostname.
@@ -13,7 +24,7 @@ export function extractDomain(urlString: string): string | null {
   }
 
   try {
-    const url = new URL(urlString);
+    const url = new URL(cleanUrlString(urlString));
     // Only allow http/https
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return null;
@@ -33,45 +44,61 @@ export function extractDomain(urlString: string): string | null {
 export function createFallbackFromUrl(
   urlString: string,
 ): { title: string; url: string } | null {
-  const domain = extractDomain(urlString);
+  // Clean trailing punctuation before processing
+  const cleaned = cleanUrlString(urlString);
+  const domain = extractDomain(cleaned);
   if (!domain) {
     return null;
   }
 
-  // Clean the URL (normalize it via URL constructor)
-  let cleanedUrl: string;
+  // Normalize URL via URL constructor
+  let normalizedUrl: string;
   try {
-    cleanedUrl = new URL(urlString).href;
+    normalizedUrl = new URL(cleaned).href;
   } catch {
     return null;
   }
 
   return {
     title: `Check ${domain}`,
-    url: cleanedUrl,
+    url: normalizedUrl,
   };
 }
 
 /**
  * Truncate a title to fit within the specified character limit.
+ * Uses grapheme-aware truncation to avoid splitting emoji/surrogate pairs.
  * Attempts to truncate at word boundaries when possible.
  * Adds "..." suffix if truncated.
  */
 export function truncateTitle(title: string, maxLength = 500): string {
-  if (!title || title.length <= maxLength) {
+  if (title.length <= maxLength) {
     return title;
   }
 
   // Reserve space for ellipsis
   const targetLength = maxLength - 3;
 
+  // Use Array.from to handle surrogate pairs correctly
+  // This splits by code points, not UTF-16 code units
+  const codePoints = Array.from(title);
+
+  if (codePoints.length <= maxLength) {
+    // String length in code units exceeds limit but code points don't
+    // This shouldn't happen often, but handle it safely
+    return title;
+  }
+
+  // Truncate by code points
+  const truncatedCodePoints = codePoints.slice(0, targetLength);
+  const truncated = truncatedCodePoints.join("");
+
   // Try to find a word boundary to truncate at
-  const truncated = title.slice(0, targetLength);
   const lastSpace = truncated.lastIndexOf(" ");
 
   // If there's a space in the last 20% of the string, truncate there
   // Otherwise just hard truncate (handles very long words/URLs)
-  if (lastSpace > targetLength * 0.8) {
+  if (lastSpace > truncated.length * 0.8) {
     return `${truncated.slice(0, lastSpace)}...`;
   }
 
