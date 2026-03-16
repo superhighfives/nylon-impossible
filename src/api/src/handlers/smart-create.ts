@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { extractTodos } from "../lib/ai";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
 import { shouldUseAI } from "../lib/smart-input";
+import { createFallbackFromUrl, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
 
@@ -36,6 +37,12 @@ export async function smartCreate(c: Context<Env>) {
   }
 
   const text = parsed.data.text.trim();
+
+  // Reject whitespace-only input
+  if (text.length === 0) {
+    return c.json({ error: "Text is required" }, 400);
+  }
+
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
@@ -66,19 +73,37 @@ export async function smartCreate(c: Context<Env>) {
         "AI extraction failed, falling back to single todo:",
         error,
       );
-      return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
+      return createAndReturn(
+        db,
+        c,
+        userId,
+        [createFallbackItem(text)],
+        firstPosition,
+      );
     }
 
     // If AI returned null or empty, fall back to single todo
     if (!extracted || extracted.length === 0) {
-      return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
+      return createAndReturn(
+        db,
+        c,
+        userId,
+        [createFallbackItem(text)],
+        firstPosition,
+      );
     }
 
     return createAndReturn(db, c, userId, extracted, firstPosition, true);
   }
 
   // Fast path: create single todo directly
-  return createAndReturn(db, c, userId, [{ title: text }], firstPosition);
+  return createAndReturn(
+    db,
+    c,
+    userId,
+    [createFallbackItem(text)],
+    firstPosition,
+  );
 }
 
 interface ExtractedItem {
@@ -89,6 +114,23 @@ interface ExtractedItem {
 
 /** URL regex to extract URLs from text */
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+/**
+ * Create a fallback item from text when AI is unavailable or fails.
+ * Handles long URLs by extracting the domain for the title and storing the full URL.
+ */
+function createFallbackItem(text: string): ExtractedItem {
+  // Check if input is primarily a URL (URL takes up >80% of the text)
+  const urlMatch = text.match(URL_REGEX);
+  if (urlMatch && urlMatch[0].length > text.length * 0.8) {
+    const fallback = createFallbackFromUrl(urlMatch[0]);
+    if (fallback) {
+      return { title: fallback.title, urls: [fallback.url] };
+    }
+  }
+  // Regular fallback - truncate if needed
+  return { title: truncateTitle(text) };
+}
 
 /** Common trailing punctuation that shouldn't be part of URLs */
 const TRAILING_PUNCT = /[.,;:!?)]+$/;
@@ -171,13 +213,14 @@ async function createAndReturn(
   );
 
   // Build all values up-front so we can batch the insert
+  // Safety truncation ensures titles never exceed 500 chars (AI may return longer)
   const rows = itemsWithUrls.map((item, i) => {
     const id = crypto.randomUUID();
     ids.push(id);
     return {
       id,
       userId,
-      title: item.title,
+      title: truncateTitle(item.title),
       completed: false as const,
       position: positions[i],
       dueDate: item.dueDate ? new Date(item.dueDate) : null,
