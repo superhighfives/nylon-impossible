@@ -26,8 +26,14 @@
       "new_classes": ["UserSync"]
     }
   ],
-  // AI binding excluded — requires remote auth and is not needed for tests.
-  // Integration tests that need AI should mock the binding via miniflare.
+  // AI binding requires Cloudflare auth. Tests skip AI by default.
+  // Run with RUN_AI_TESTS=true to enable real AI tests (requires `wrangler login`).
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "AI_GATEWAY_ID": "nylon-impossible"
+  },
   "observability": {
     "enabled": true
   }
