@@ -12,13 +12,13 @@ struct NylonShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AddTaskIntent(),
             phrases: [
-                // Inline parameter - "Add buy milk to Nylon"
-                "Add \(\.$task) to \(.applicationName)",
+                // Inline parameter - "Nylon add buy milk"
+                "\(.applicationName) add \(\.$task)",
                 // Fallback phrases - Siri will prompt for the task
-                "Add a task to \(.applicationName)",
-                "Create a task in \(.applicationName)",
-                "New task in \(.applicationName)",
-                "Remind me in \(.applicationName)"
+                "\(.applicationName) new item",
+                "\(.applicationName) add item",
+                "Log something in \(.applicationName)",
+                "Save to \(.applicationName)"
             ],
             shortTitle: "Add Task",
             systemImageName: "plus.circle"

@@ -10,6 +10,13 @@
 	<false/>
 	<key>NSSiriUsageDescription</key>
 	<string>Siri helps you add tasks to Nylon with your voice.</string>
+	<key>INAlternativeAppNames</key>
+	<array>
+		<dict>
+			<key>INAlternativeAppName</key>
+			<string>Nylon</string>
+		</dict>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
