@@ -1,8 +1,14 @@
+import path from "node:path";
 import {
   defineWorkersConfig,
   readD1Migrations,
 } from "@cloudflare/vitest-pool-workers/config";
-import path from "node:path";
+
+// Use AI-enabled config when RUN_AI_TESTS=true
+const useAI = process.env.RUN_AI_TESTS === "true";
+const wranglerConfig = useAI
+  ? "./wrangler.test-ai.jsonc"
+  : "./wrangler.test.jsonc";
 
 export default defineWorkersConfig(async () => {
   const migrationsPath = path.join(__dirname, "migrations");
@@ -15,7 +21,7 @@ export default defineWorkersConfig(async () => {
           __dirname,
           "test",
           "__mocks__",
-          "clerk-backend.ts"
+          "clerk-backend.ts",
         ),
       },
     },
@@ -25,7 +31,7 @@ export default defineWorkersConfig(async () => {
         workers: {
           isolatedStorage: false,
           singleWorker: true,
-          wrangler: { configPath: "./wrangler.test.jsonc" },
+          wrangler: { configPath: wranglerConfig },
           miniflare: {
             bindings: {
               TEST_MIGRATIONS: migrations,

@@ -26,7 +26,13 @@
       "new_classes": ["UserSync"]
     }
   ],
-  // AI binding excluded for fast tests. Use RUN_AI_TESTS=true for AI tests.
+  // AI binding for real AI tests. Requires Cloudflare auth (`wrangler login`).
+  "ai": {
+    "binding": "AI"
+  },
+  "vars": {
+    "AI_GATEWAY_ID": "nylon-impossible"
+  },
   "observability": {
     "enabled": true
   }
