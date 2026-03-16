@@ -3,6 +3,12 @@ import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, todoUrls } from "../../src/lib/db";
+import {
+  mockExtractTodos,
+  mockExtractTodosEmpty,
+  mockExtractTodosError,
+  resetAIMock,
+} from "../__mocks__/ai";
 import { cleanDb, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -28,6 +34,7 @@ describe("Smart create endpoint", () => {
     await cleanDb();
     mockVerifyToken.mockReset();
     mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
+    resetAIMock();
     await seedUser();
   });
 
@@ -97,6 +104,175 @@ describe("Smart create endpoint", () => {
       },
       AI_TIMEOUT,
     );
+  });
+
+  describe("AI success path (mocked)", () => {
+    it("creates multiple todos from AI extraction", async () => {
+      mockExtractTodos([
+        { title: "Buy milk" },
+        { title: "Call mom" },
+        { title: "Pick up dry cleaning" },
+      ]);
+
+      // Multi-line text triggers AI path
+      const res = await smartCreate("Buy milk, call mom, pick up dry cleaning");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.ai).toBe(true);
+      expect(body.todos).toHaveLength(3);
+      expect(body.todos[0].title).toBe("Buy milk");
+      expect(body.todos[1].title).toBe("Call mom");
+      expect(body.todos[2].title).toBe("Pick up dry cleaning");
+    });
+
+    it("creates todo with AI-extracted URL", async () => {
+      mockExtractTodos([
+        {
+          title: "Review pull request",
+          urls: ["https://github.com/user/repo/pull/123"],
+        },
+      ]);
+
+      const res = await smartCreate(
+        "Review https://github.com/user/repo/pull/123",
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.ai).toBe(true);
+      expect(body.todos).toHaveLength(1);
+      expect(body.todos[0].title).toBe("Review pull request");
+
+      // Check URL was stored
+      const db = getDb(env.DB);
+      const urls = await db
+        .select()
+        .from(todoUrls)
+        .where(eq(todoUrls.todoId, body.todos[0].id));
+      expect(urls).toHaveLength(1);
+      expect(urls[0].url).toBe("https://github.com/user/repo/pull/123");
+    });
+
+    it("creates todo with AI-extracted due date", async () => {
+      mockExtractTodos([{ title: "Finish report", dueDate: "2026-03-20" }]);
+
+      // Multi-line input triggers AI path
+      const res = await smartCreate(
+        "Finish the report by Friday\nThis is urgent",
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.ai).toBe(true);
+      expect(body.todos).toHaveLength(1);
+      expect(body.todos[0].title).toBe("Finish report");
+      expect(body.todos[0].dueDate).toBe("2026-03-20T00:00:00.000Z");
+    });
+
+    it("truncates long AI-generated title to 500 chars", async () => {
+      const longTitle = "a".repeat(600);
+      mockExtractTodos([{ title: longTitle }]);
+
+      // Multi-line input triggers AI path
+      const res = await smartCreate("Task one\nTask two");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].title.length).toBeLessThanOrEqual(500);
+      expect(body.todos[0].title.endsWith("...")).toBe(true);
+    });
+
+    it("falls back to single todo when AI returns empty", async () => {
+      mockExtractTodosEmpty();
+
+      const res = await smartCreate("Buy milk\nCall mom");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.ai).toBe(false);
+      expect(body.todos).toHaveLength(1);
+    });
+
+    it("falls back to single todo when AI throws error", async () => {
+      mockExtractTodosError(new Error("AI service unavailable"));
+
+      const res = await smartCreate("Buy milk\nCall mom");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.ai).toBe(false);
+      expect(body.todos).toHaveLength(1);
+    });
+
+    it("extracts URLs from title when AI misses them", async () => {
+      // AI returns title with URL but doesn't extract it to urls array
+      mockExtractTodos([{ title: "Check https://example.com for updates" }]);
+
+      const res = await smartCreate("Check https://example.com for updates");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      const todoId = body.todos[0].id;
+
+      // URL should still be extracted and stored
+      const db = getDb(env.DB);
+      const urls = await db
+        .select()
+        .from(todoUrls)
+        .where(eq(todoUrls.todoId, todoId));
+      expect(urls).toHaveLength(1);
+      expect(urls[0].url).toBe("https://example.com/");
+    });
+
+    it("deduplicates URLs between AI extraction and title parsing", async () => {
+      // AI extracts URL, and it's also in the title
+      mockExtractTodos([
+        {
+          title: "Check https://example.com",
+          urls: ["https://example.com"],
+        },
+      ]);
+
+      const res = await smartCreate("Check https://example.com");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      const todoId = body.todos[0].id;
+
+      // Should only have one URL record, not duplicated
+      const db = getDb(env.DB);
+      const urls = await db
+        .select()
+        .from(todoUrls)
+        .where(eq(todoUrls.todoId, todoId));
+      expect(urls).toHaveLength(1);
+    });
+
+    it("handles multiple URLs from AI", async () => {
+      mockExtractTodos([
+        {
+          title: "Review both PRs",
+          urls: [
+            "https://github.com/user/repo/pull/1",
+            "https://github.com/user/repo/pull/2",
+          ],
+        },
+      ]);
+
+      const res = await smartCreate("Review PR #1 and PR #2");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      const todoId = body.todos[0].id;
+
+      const db = getDb(env.DB);
+      const urls = await db
+        .select()
+        .from(todoUrls)
+        .where(eq(todoUrls.todoId, todoId));
+      expect(urls).toHaveLength(2);
+    });
   });
 
   describe("URL handling", () => {

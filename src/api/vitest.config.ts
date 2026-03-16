@@ -14,16 +14,24 @@ export default defineWorkersConfig(async () => {
   const migrationsPath = path.join(__dirname, "migrations");
   const migrations = await readD1Migrations(migrationsPath);
 
+  // Build aliases - always mock Clerk, optionally mock AI
+  const aliases: Record<string, string> = {
+    "@clerk/backend": path.join(
+      __dirname,
+      "test",
+      "__mocks__",
+      "clerk-backend.ts",
+    ),
+  };
+
+  // Mock AI module when not running real AI tests
+  if (!useAI) {
+    aliases["../lib/ai"] = path.join(__dirname, "test", "__mocks__", "ai.ts");
+  }
+
   return {
     resolve: {
-      alias: {
-        "@clerk/backend": path.join(
-          __dirname,
-          "test",
-          "__mocks__",
-          "clerk-backend.ts",
-        ),
-      },
+      alias: aliases,
     },
     test: {
       setupFiles: ["./test/apply-migrations.ts"],
