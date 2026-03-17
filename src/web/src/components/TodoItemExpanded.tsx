@@ -39,14 +39,14 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-md bg-gray-ui transition-colors group"
+      className="flex items-start gap-3 p-3 rounded-lg bg-gray-subtle shadow-sm transition-shadow hover:shadow-base group"
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0" />
       ) : isFailed ? (
         <AlertCircle
           size={16}
-          className="w-4 h-4 mt-0.5 shrink-0 text-tomato-dim"
+          className="w-4 h-4 mt-0.5 shrink-0 text-red-dim"
         />
       ) : (
         <img
@@ -67,7 +67,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
             </span>
           )}
           {isFailed && (
-            <span className="ml-2 text-xs text-tomato-dim font-normal">
+            <span className="ml-2 text-xs text-red-dim font-normal">
               Failed to fetch
             </span>
           )}
@@ -147,7 +147,7 @@ export function TodoItemExpanded({
   };
 
   return (
-    <div className="mt-3 pl-7 space-y-4">
+    <div className="mt-3 pl-7 space-y-4 bg-gray-subtle rounded-lg p-4 shadow-sm">
       {/* Title */}
       <div className="space-y-1.5">
         <label

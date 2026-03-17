@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { HTMLAttributes } from "react";
 
 const loaderVariants = cva(
-  "animate-spin rounded-full border-2 border-current border-t-transparent",
+  "animate-spin rounded-full border-2 border-yellow-9 border-t-transparent dark:border-yellowdark-9",
   {
     variants: {
       size: {

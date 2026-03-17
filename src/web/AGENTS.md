@@ -158,16 +158,46 @@ import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui"
 
 Use Radix color scale tokens via Tailwind. Never use raw Tailwind colors like `bg-gray-500` or `text-blue-600`.
 
+This project uses [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) v2. Colors are imported in `src/styles.css`:
+- **gray** — Neutral backgrounds, text, borders
+- **yellow** — Primary accent, brand color (buttons, focus rings, highlights)
+- **red** — Destructive actions, errors
+
 ### Quick Reference
 
 | Purpose | Token | Example Use |
 |---------|-------|-------------|
-| **Page background** | `bg-gray-1` | Root layout background |
+| **Page background** | `bg-gray-app` | Root layout background |
 | **Card/surface background** | `bg-gray-subtle` | Cards, inputs |
-| **Elevated background** | `bg-gray-ui` | Modals, dropdowns |
+| **Interactive background** | `bg-gray-ui` | Buttons with hover/active states |
 | **Primary text** | `text-gray-normal` | Body text |
 | **Secondary text** | `text-gray-dim` | Placeholders, hints |
 | **Border** | `ring-gray-6` | Input rings |
-| **Brand/accent** | `bg-indigo-solid` | Primary buttons |
-| **Error** | `bg-tomato-solid` | Destructive actions |
-| **Success** | `text-green-9` | Success states |
+| **Brand/accent** | `bg-yellow-solid` | Primary buttons |
+| **Focus ring** | `ring-yellow-8` | Focus states |
+| **Error** | `bg-red-solid` | Destructive actions |
+| **Error text** | `text-red-dim` | Error messages |
+
+### Semantic Classes
+
+These handle dark mode and hover/active states automatically:
+
+| Class | Behavior |
+|-------|----------|
+| `bg-{color}-app` | App background (step 1, auto dark) |
+| `bg-{color}-subtle` | Subtle background (step 2, auto dark) |
+| `bg-{color}-ui` | Interactive UI with hover/active (steps 3→4→5) |
+| `bg-{color}-ghost` | Transparent, shows bg on hover/active |
+| `bg-{color}-solid` | Solid accent with hover (steps 9→10) |
+| `border-{color}-dim` | Subtle border (step 6) |
+| `border-{color}-normal` | Normal border with hover (steps 7→8) |
+| `text-{color}-dim` | Secondary text (step 11) |
+| `text-{color}-normal` | Primary text (step 12) |
+
+### Custom Shadows
+
+Custom shadow utilities are defined in `src/styles.css`:
+- `shadow-sm` — Subtle elevation
+- `shadow-base` — Default card shadow
+- `shadow-lg` — Modal/dropdown shadow
+- `shadow-yellow` — Yellow glow effect

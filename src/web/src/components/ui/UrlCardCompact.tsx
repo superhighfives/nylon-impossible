@@ -43,7 +43,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-2 py-1 rounded bg-gray-ui hover:bg-gray-3 transition-colors group max-w-full"
+      className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-subtle shadow-sm hover:shadow-base transition-shadow group max-w-full"
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 shrink-0" />

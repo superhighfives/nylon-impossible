@@ -30,11 +30,11 @@ export function Checkbox({
         checked={checked}
         indeterminate={indeterminate}
         className={`
-          h-4 w-4 shrink-0 rounded border border-gray-normal bg-gray-app cursor-pointer
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-8 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1
+          h-4 w-4 shrink-0 rounded-md border border-gray-normal bg-gray-subtle cursor-pointer
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-8 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1
           disabled:cursor-not-allowed disabled:opacity-50
-          data-checked:bg-indigo-9 data-checked:border-indigo-9 data-checked:text-white
-          data-indeterminate:bg-indigo-9 data-indeterminate:border-indigo-9 data-indeterminate:text-white
+          data-checked:bg-yellow-9 data-checked:border-yellow-9 data-checked:text-gray-12 dark:data-checked:bg-yellowdark-9 dark:data-checked:border-yellowdark-9
+          data-indeterminate:bg-yellow-9 data-indeterminate:border-yellow-9 data-indeterminate:text-gray-12 dark:data-indeterminate:bg-yellowdark-9 dark:data-indeterminate:border-yellowdark-9
           transition-colors
           ${className ?? ""}
         `}

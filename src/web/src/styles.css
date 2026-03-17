@@ -1,8 +1,15 @@
 @import "tailwindcss";
 @import "tailwindcss-radix-colors/dist/gray.css";
-@import "tailwindcss-radix-colors/dist/indigo.css";
-@import "tailwindcss-radix-colors/dist/tomato.css";
+@import "tailwindcss-radix-colors/dist/yellow.css";
+@import "tailwindcss-radix-colors/dist/red.css";
 @import "tw-animate-css";
+
+@theme {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-base: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-yellow: 0 2px 12px rgba(255, 214, 10, 0.25);
+}
 
 body {
   @apply m-0 bg-gray-app text-gray-normal;

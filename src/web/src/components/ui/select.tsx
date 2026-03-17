@@ -20,7 +20,7 @@ export function Select({
 }: SelectProps) {
   return (
     <BaseSelect.Root items={items} {...props}>
-      <BaseSelect.Trigger className="flex h-9 w-full items-center justify-between rounded-md bg-gray-subtle px-3 py-2 text-sm text-gray-normal ring-1 ring-gray-6 placeholder:text-gray-9 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-8 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+      <BaseSelect.Trigger className="flex h-9 w-full items-center justify-between rounded-lg bg-gray-subtle px-3 py-2 text-sm text-gray-normal ring-1 ring-gray-6 placeholder:text-gray-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-8 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon>
           <ChevronDown className="h-4 w-4 text-gray-dim" />
@@ -28,7 +28,7 @@ export function Select({
       </BaseSelect.Trigger>
       <BaseSelect.Portal>
         <BaseSelect.Positioner sideOffset={4} alignItemWithTrigger={false}>
-          <BaseSelect.Popup className="z-50 min-w-32 overflow-hidden rounded-md border border-gray-dim bg-gray-subtle p-1 shadow-lg">
+          <BaseSelect.Popup className="z-50 min-w-32 overflow-hidden rounded-lg border border-gray-dim bg-gray-subtle p-1 shadow-lg">
             <BaseSelect.List className="flex flex-col">
               {items.map((item) => (
                 <BaseSelect.Item
