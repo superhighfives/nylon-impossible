@@ -208,6 +208,47 @@ CLERK_PUBLISHABLE_KEY=pk_test_...
 
 Both `.dev.vars` and `.env.local` files are git-ignored. Never commit secrets.
 
+## Web Styling (Radix Colors)
+
+The web app uses [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) for the color system. Colors are imported in `src/web/src/styles.css`.
+
+### Semantic classes
+
+Use semantic classes that handle dark mode and hover/active states automatically:
+
+| Class | Equivalent |
+|-------|------------|
+| `bg-{color}-app` | App background (step 1) |
+| `bg-{color}-subtle` | Subtle background (step 2) |
+| `bg-{color}-ui` | Interactive UI (steps 3-5 with hover/active) |
+| `bg-{color}-ghost` | Transparent, shows on hover/active |
+| `bg-{color}-solid` | Solid accent (steps 9-10 with hover) |
+| `border-{color}-dim` | Subtle border (step 6) |
+| `border-{color}-normal` | Normal border (steps 7-8 with hover) |
+| `text-{color}-dim` | Secondary text (step 11) |
+| `text-{color}-normal` | Primary text (step 12) |
+
+Example:
+```html
+<div class="bg-gray-app text-gray-normal border-gray-dim">
+  <button class="bg-yellow-solid text-gray-12">Primary</button>
+  <button class="bg-gray-ui text-gray-normal">Secondary</button>
+</div>
+```
+
+### Importing colors
+
+Import only the colors you need for smaller bundles:
+```css
+@import "tailwindcss-radix-colors/dist/gray.css";
+@import "tailwindcss-radix-colors/dist/yellow.css";
+@import "tailwindcss-radix-colors/dist/red.css";
+```
+
+Available colors include: gray, mauve, slate, sage, olive, sand, gold, bronze, brown, yellow, amber, orange, tomato, red, ruby, crimson, pink, plum, purple, violet, iris, indigo, blue, cyan, teal, jade, green, grass, lime, mint, sky.
+
+Each color has variants: base (`red.css`), alpha (`reda.css`), P3 (`redp3.css`), and P3 alpha (`redp3a.css`).
+
 ## Common Gotchas
 
 - **Database migrations** are defined in `src/api/migrations/` but applied via the root `pnpm db:migrate` command. The API owns the schema; web reads from the same D1 binding.
