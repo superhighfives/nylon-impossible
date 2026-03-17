@@ -249,6 +249,19 @@ Available colors include: gray, mauve, slate, sage, olive, sand, gold, bronze, b
 
 Each color has variants: base (`red.css`), alpha (`reda.css`), P3 (`redp3.css`), and P3 alpha (`redp3a.css`).
 
+### CSS variables
+
+Radix colors are exposed as CSS variables following Tailwind v4 conventions. Use them in custom CSS or inline styles:
+
+```css
+/* Light mode: --color-yellow-9, dark mode: --color-yellowdark-9 */
+.custom-element {
+  background: var(--color-yellow-9);
+}
+```
+
+Variable naming: `--color-{color}-{step}` for light, `--color-{color}dark-{step}` for dark (e.g., `--color-gray-1`, `--color-graydark-1`).
+
 ## Common Gotchas
 
 - **Database migrations** are defined in `src/api/migrations/` but applied via the root `pnpm db:migrate` command. The API owns the schema; web reads from the same D1 binding.
