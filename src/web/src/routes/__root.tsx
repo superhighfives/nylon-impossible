@@ -88,7 +88,7 @@ function RootDocument() {
           }}
         />
       </head>
-      <body className="bg-gray-app text-gray-normal antialiased">
+      <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <Header />
           <Outlet />

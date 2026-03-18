@@ -39,14 +39,14 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-lg bg-gray-subtle shadow-sm transition-shadow hover:shadow-base group"
+      className="flex items-start gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group"
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0" />
       ) : isFailed ? (
         <AlertCircle
           size={16}
-          className="w-4 h-4 mt-0.5 shrink-0 text-red-dim"
+          className="w-4 h-4 mt-0.5 shrink-0 text-red-muted"
         />
       ) : (
         <img
@@ -59,27 +59,27 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
         />
       )}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-normal truncate group-hover:underline">
+        <p className="text-sm font-medium text-gray truncate group-hover:underline">
           {displayTitle}
           {isPending && (
-            <span className="ml-2 text-xs text-gray-dim font-normal">
+            <span className="ml-2 text-xs text-gray-muted font-normal">
               Fetching...
             </span>
           )}
           {isFailed && (
-            <span className="ml-2 text-xs text-red-dim font-normal">
+            <span className="ml-2 text-xs text-red-muted font-normal">
               Failed to fetch
             </span>
           )}
         </p>
         {!isPending && !isFailed && url.description && (
-          <p className="text-xs text-gray-dim mt-0.5 line-clamp-2">
+          <p className="text-xs text-gray-muted mt-0.5 line-clamp-2">
             {url.description}
           </p>
         )}
-        <p className="text-xs text-gray-dim mt-1 truncate">{url.url}</p>
+        <p className="text-xs text-gray-muted mt-1 truncate">{url.url}</p>
       </div>
-      <ExternalLink size={14} className="text-gray-dim shrink-0 mt-0.5" />
+      <ExternalLink size={14} className="text-gray-muted shrink-0 mt-0.5" />
     </a>
   );
 }
@@ -147,12 +147,12 @@ export function TodoItemExpanded({
   };
 
   return (
-    <div className="mt-3 pl-7 space-y-4 bg-gray-subtle rounded-lg p-4 shadow-sm">
+    <div className="mt-3 pl-7 space-y-4 bg-gray-surface rounded-lg p-4 shadow-sm">
       {/* Title */}
       <div className="space-y-1.5">
         <label
           htmlFor={`title-${todo.id}`}
-          className="text-xs font-medium text-gray-dim"
+          className="text-xs font-medium text-gray-muted"
         >
           Title
         </label>
@@ -171,7 +171,7 @@ export function TodoItemExpanded({
       <div className="space-y-1.5">
         <label
           htmlFor={`desc-${todo.id}`}
-          className="text-xs font-medium text-gray-dim"
+          className="text-xs font-medium text-gray-muted"
         >
           Description
         </label>
@@ -191,7 +191,7 @@ export function TodoItemExpanded({
         <div className="space-y-1.5">
           <label
             htmlFor={`due-${todo.id}`}
-            className="text-xs font-medium text-gray-dim flex items-center gap-1"
+            className="text-xs font-medium text-gray-muted flex items-center gap-1"
           >
             <Calendar size={12} />
             Due date
@@ -225,7 +225,7 @@ export function TodoItemExpanded({
         <div className="space-y-1.5">
           <label
             htmlFor={`priority-${todo.id}`}
-            className="text-xs font-medium text-gray-dim"
+            className="text-xs font-medium text-gray-muted"
           >
             Priority
           </label>
@@ -258,7 +258,7 @@ export function TodoItemExpanded({
       {/* URLs */}
       {todo.urls && todo.urls.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-xs font-medium text-gray-dim flex items-center gap-1">
+          <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
             <Link2 size={12} />
             Links ({todo.urls.length})
           </p>

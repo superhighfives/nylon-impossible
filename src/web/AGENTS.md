@@ -158,7 +158,7 @@ import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui"
 
 Use Radix color scale tokens via Tailwind. Never use raw Tailwind colors like `bg-gray-500` or `text-blue-600`.
 
-This project uses [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) v2. Colors are imported in `src/styles.css`:
+Colors are from [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) v2 (imported as `-colors-only.css`). Semantic utilities are in `src/styles/radix-utilities.css`:
 - **gray** — Neutral backgrounds, text, borders
 - **yellow** — Primary accent, brand color (buttons, focus rings, highlights)
 - **red** — Destructive actions, errors
@@ -168,31 +168,51 @@ This project uses [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.
 | Purpose | Token | Example Use |
 |---------|-------|-------------|
 | **Page background** | `bg-gray-app` | Root layout background |
-| **Card/surface background** | `bg-gray-subtle` | Cards, inputs |
-| **Interactive background** | `bg-gray-ui` | Buttons with hover/active states |
-| **Primary text** | `text-gray-normal` | Body text |
-| **Secondary text** | `text-gray-dim` | Placeholders, hints |
-| **Border** | `ring-gray-6` | Input rings |
+| **Card/surface background** | `bg-gray-surface` | Cards, inputs |
+| **Interactive background (normal)** | `bg-gray-base` | Button/element base state |
+| **Interactive background (hover)** | `bg-gray-hover` | Explicit hover state |
+| **Interactive background (active)** | `bg-gray-active` | Explicit active/pressed state |
+| **Primary text** | `text-gray` | Body text |
+| **Secondary text** | `text-gray-muted` | Placeholders, hints |
+| **Border** | `ring-gray-subtle` | Input rings |
 | **Brand/accent** | `bg-yellow-solid` | Primary buttons |
-| **Focus ring** | `ring-yellow-8` | Focus states |
+| **Focus ring** | `ring-yellow-strong` | Focus states |
 | **Error** | `bg-red-solid` | Destructive actions |
-| **Error text** | `text-red-dim` | Error messages |
+| **Error text** | `text-red-muted` | Error messages |
 
-### Semantic Classes
+### Semantic Utilities
 
-These handle dark mode and hover/active states automatically:
+Hover/active states are **explicit** — compose them in the component:
 
-| Class | Behavior |
-|-------|----------|
-| `bg-{color}-app` | App background (step 1, auto dark) |
-| `bg-{color}-subtle` | Subtle background (step 2, auto dark) |
-| `bg-{color}-ui` | Interactive UI with hover/active (steps 3→4→5) |
-| `bg-{color}-ghost` | Transparent, shows bg on hover/active |
-| `bg-{color}-solid` | Solid accent with hover (steps 9→10) |
-| `border-{color}-dim` | Subtle border (step 6) |
-| `border-{color}-normal` | Normal border with hover (steps 7→8) |
-| `text-{color}-dim` | Secondary text (step 11) |
-| `text-{color}-normal` | Primary text (step 12) |
+#### Backgrounds
+| Utility | Step | Use case |
+|---------|------|----------|
+| `bg-{color}-app` | 1 | App background |
+| `bg-{color}-surface` | 2 | Cards, raised surfaces |
+| `bg-{color}-base` | 3 | Component background (normal) |
+| `bg-{color}-hover` | 4 | Component background (hover) |
+| `bg-{color}-active` | 5 | Component background (active) |
+| `bg-{color}-ghost` | transparent | Ghost base |
+| `bg-{color}-ghost-hover` | 3 | Ghost hover |
+| `bg-{color}-ghost-active` | 4 | Ghost active |
+| `bg-{color}-solid` | 9 | Solid accent |
+| `bg-{color}-solid-hover` | 10 | Solid accent hover |
+
+#### Borders / Dividers / Rings / Underlines
+| Utility | Step | Use case |
+|---------|------|----------|
+| `{type}-{color}-subtle` | 6 | Non-interactive, separators |
+| `{type}-{color}` | 7 | Default interactive |
+| `{type}-{color}-strong` | 8 | Emphasis, focus rings |
+
+Where `{type}` is: `border`, `divide`, `ring`, `underline`
+
+#### Text
+| Utility | Step |
+|---------|------|
+| `text-{color}-placeholder` | 10 |
+| `text-{color}-muted` | 11 |
+| `text-{color}` | 12 |
 
 ### Custom Shadows
 

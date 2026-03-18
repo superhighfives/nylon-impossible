@@ -210,44 +210,63 @@ Both `.dev.vars` and `.env.local` files are git-ignored. Never commit secrets.
 
 ## Web Styling (Radix Colors)
 
-The web app uses [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) for the color system. Colors are imported in `src/web/src/styles.css`.
+The web app uses [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) for the color system. Colors are imported in `src/web/src/styles.css` using `-colors-only.css` (raw step classes only). Semantic utilities are defined in `src/web/src/styles/radix-utilities.css`.
 
-### Semantic classes
+### Semantic utilities
 
-Use semantic classes that handle dark mode and hover/active states automatically:
+Custom utilities in `src/web/src/styles/radix-utilities.css` map directly to Radix scale steps. Hover/active states are **explicit** — compose them in the component, not bundled in the utility.
 
-| Class | Equivalent |
-|-------|------------|
-| `bg-{color}-app` | App background (step 1) |
-| `bg-{color}-subtle` | Subtle background (step 2) |
-| `bg-{color}-ui` | Interactive UI (steps 3-5 with hover/active) |
-| `bg-{color}-ghost` | Transparent, shows on hover/active |
-| `bg-{color}-solid` | Solid accent (steps 9-10 with hover) |
-| `border-{color}-dim` | Subtle border (step 6) |
-| `border-{color}-normal` | Normal border (steps 7-8 with hover) |
-| `text-{color}-dim` | Secondary text (step 11) |
-| `text-{color}-normal` | Primary text (step 12) |
+#### Backgrounds
+
+| Utility | Step | Use case |
+|---------|------|----------|
+| `bg-{color}-app` | 1 | App background |
+| `bg-{color}-surface` | 2 | Cards, raised surfaces |
+| `bg-{color}-base` | 3 | Component background (normal) |
+| `bg-{color}-hover` | 4 | Component background (hover) |
+| `bg-{color}-active` | 5 | Component background (active/pressed) |
+| `bg-{color}-ghost` | transparent | Ghost base |
+| `bg-{color}-ghost-hover` | 3 | Ghost hover |
+| `bg-{color}-ghost-active` | 4 | Ghost active |
+| `bg-{color}-solid` | 9 | Solid accent |
+| `bg-{color}-solid-hover` | 10 | Solid accent hover |
+
+#### Borders / Dividers / Rings / Underlines
+
+| Utility | Step | Use case |
+|---------|------|----------|
+| `{type}-{color}-subtle` | 6 | Non-interactive, separators |
+| `{type}-{color}` | 7 | Default interactive |
+| `{type}-{color}-strong` | 8 | Emphasis, focus rings |
+
+Where `{type}` is: `border`, `divide`, `ring`, `underline`
+
+#### Text
+
+| Utility | Step | Use case |
+|---------|------|----------|
+| `text-{color}-placeholder` | 10 | Placeholder text |
+| `text-{color}-muted` | 11 | Secondary/muted text |
+| `text-{color}` | 12 | Primary text (baseline) |
+
+Available colors: `gray`, `yellow`, `red`
 
 Example:
 ```html
-<div class="bg-gray-app text-gray-normal border-gray-dim">
-  <button class="bg-yellow-solid text-gray-12">Primary</button>
-  <button class="bg-gray-ui text-gray-normal">Secondary</button>
+<div class="bg-gray-app text-gray border-b border-gray-subtle">
+  <button class="bg-yellow-solid hover:bg-yellow-solid-hover text-gray-12">Primary</button>
+  <button class="bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray ring-1 ring-gray-subtle">Secondary</button>
 </div>
 ```
 
 ### Importing colors
 
-Import only the colors you need for smaller bundles:
+Colors are imported as `-colors-only.css` (CSS variables + raw step utilities, no bundled semantic classes):
 ```css
-@import "tailwindcss-radix-colors/dist/gray.css";
-@import "tailwindcss-radix-colors/dist/yellow.css";
-@import "tailwindcss-radix-colors/dist/red.css";
+@import "tailwindcss-radix-colors/dist/gray-colors-only.css";
+@import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
+@import "tailwindcss-radix-colors/dist/red-colors-only.css";
 ```
-
-Available colors include: gray, mauve, slate, sage, olive, sand, gold, bronze, brown, yellow, amber, orange, tomato, red, ruby, crimson, pink, plum, purple, violet, iris, indigo, blue, cyan, teal, jade, green, grass, lime, mint, sky.
-
-Each color has variants: base (`red.css`), alpha (`reda.css`), P3 (`redp3.css`), and P3 alpha (`redp3a.css`).
 
 ### CSS variables
 

@@ -1,7 +1,8 @@
 @import "tailwindcss";
-@import "tailwindcss-radix-colors/dist/gray.css";
-@import "tailwindcss-radix-colors/dist/yellow.css";
-@import "tailwindcss-radix-colors/dist/red.css";
+@import "tailwindcss-radix-colors/dist/gray-colors-only.css";
+@import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
+@import "tailwindcss-radix-colors/dist/red-colors-only.css";
+@import "./styles/radix-utilities.css";
 @import "tw-animate-css";
 
 @theme {
@@ -12,7 +13,7 @@
 }
 
 body {
-  @apply m-0 bg-gray-app text-gray-normal;
+  @apply m-0 bg-gray-app text-gray;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
