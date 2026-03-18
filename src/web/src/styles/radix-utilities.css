@@ -1,0 +1,611 @@
+/* ============================================
+   Custom Radix Color Semantic Utilities
+
+   Based on: https://www.radix-ui.com/colors/docs/palette-composition/understanding-the-scale
+   ============================================ */
+
+/* --------------------------------------------
+   Gray Backgrounds
+   -------------------------------------------- */
+@utility bg-gray-app {
+  background-color: var(--color-gray-1);
+  @variant dark {
+    background-color: var(--color-graydark-1);
+  }
+}
+
+@utility bg-gray-surface {
+  background-color: var(--color-gray-2);
+  @variant dark {
+    background-color: var(--color-graydark-2);
+  }
+}
+
+@utility bg-gray-base {
+  background-color: var(--color-gray-3);
+  @variant dark {
+    background-color: var(--color-graydark-3);
+  }
+}
+
+@utility bg-gray-hover {
+  background-color: var(--color-gray-4);
+  @variant dark {
+    background-color: var(--color-graydark-4);
+  }
+}
+
+@utility bg-gray-active {
+  background-color: var(--color-gray-5);
+  @variant dark {
+    background-color: var(--color-graydark-5);
+  }
+}
+
+@utility bg-gray-ghost {
+  background-color: transparent;
+}
+
+@utility bg-gray-ghost-hover {
+  background-color: var(--color-gray-3);
+  @variant dark {
+    background-color: var(--color-graydark-3);
+  }
+}
+
+@utility bg-gray-ghost-active {
+  background-color: var(--color-gray-4);
+  @variant dark {
+    background-color: var(--color-graydark-4);
+  }
+}
+
+@utility bg-gray-solid {
+  background-color: var(--color-gray-9);
+  @variant dark {
+    background-color: var(--color-graydark-9);
+  }
+}
+
+@utility bg-gray-solid-hover {
+  background-color: var(--color-gray-10);
+  @variant dark {
+    background-color: var(--color-graydark-10);
+  }
+}
+
+/* --------------------------------------------
+   Yellow Backgrounds
+   -------------------------------------------- */
+@utility bg-yellow-app {
+  background-color: var(--color-yellow-1);
+  @variant dark {
+    background-color: var(--color-yellowdark-1);
+  }
+}
+
+@utility bg-yellow-surface {
+  background-color: var(--color-yellow-2);
+  @variant dark {
+    background-color: var(--color-yellowdark-2);
+  }
+}
+
+@utility bg-yellow-base {
+  background-color: var(--color-yellow-3);
+  @variant dark {
+    background-color: var(--color-yellowdark-3);
+  }
+}
+
+@utility bg-yellow-hover {
+  background-color: var(--color-yellow-4);
+  @variant dark {
+    background-color: var(--color-yellowdark-4);
+  }
+}
+
+@utility bg-yellow-active {
+  background-color: var(--color-yellow-5);
+  @variant dark {
+    background-color: var(--color-yellowdark-5);
+  }
+}
+
+@utility bg-yellow-ghost {
+  background-color: transparent;
+}
+
+@utility bg-yellow-ghost-hover {
+  background-color: var(--color-yellow-3);
+  @variant dark {
+    background-color: var(--color-yellowdark-3);
+  }
+}
+
+@utility bg-yellow-ghost-active {
+  background-color: var(--color-yellow-4);
+  @variant dark {
+    background-color: var(--color-yellowdark-4);
+  }
+}
+
+@utility bg-yellow-solid {
+  background-color: var(--color-yellow-9);
+  @variant dark {
+    background-color: var(--color-yellowdark-9);
+  }
+}
+
+@utility bg-yellow-solid-hover {
+  background-color: var(--color-yellow-10);
+  @variant dark {
+    background-color: var(--color-yellowdark-10);
+  }
+}
+
+/* --------------------------------------------
+   Red Backgrounds
+   -------------------------------------------- */
+@utility bg-red-app {
+  background-color: var(--color-red-1);
+  @variant dark {
+    background-color: var(--color-reddark-1);
+  }
+}
+
+@utility bg-red-surface {
+  background-color: var(--color-red-2);
+  @variant dark {
+    background-color: var(--color-reddark-2);
+  }
+}
+
+@utility bg-red-base {
+  background-color: var(--color-red-3);
+  @variant dark {
+    background-color: var(--color-reddark-3);
+  }
+}
+
+@utility bg-red-hover {
+  background-color: var(--color-red-4);
+  @variant dark {
+    background-color: var(--color-reddark-4);
+  }
+}
+
+@utility bg-red-active {
+  background-color: var(--color-red-5);
+  @variant dark {
+    background-color: var(--color-reddark-5);
+  }
+}
+
+@utility bg-red-ghost {
+  background-color: transparent;
+}
+
+@utility bg-red-ghost-hover {
+  background-color: var(--color-red-3);
+  @variant dark {
+    background-color: var(--color-reddark-3);
+  }
+}
+
+@utility bg-red-ghost-active {
+  background-color: var(--color-red-4);
+  @variant dark {
+    background-color: var(--color-reddark-4);
+  }
+}
+
+@utility bg-red-solid {
+  background-color: var(--color-red-9);
+  @variant dark {
+    background-color: var(--color-reddark-9);
+  }
+}
+
+@utility bg-red-solid-hover {
+  background-color: var(--color-red-10);
+  @variant dark {
+    background-color: var(--color-reddark-10);
+  }
+}
+
+/* --------------------------------------------
+   Gray Borders
+   -------------------------------------------- */
+@utility border-gray-subtle {
+  border-color: var(--color-gray-6);
+  @variant dark {
+    border-color: var(--color-graydark-6);
+  }
+}
+
+@utility border-gray {
+  border-color: var(--color-gray-7);
+  @variant dark {
+    border-color: var(--color-graydark-7);
+  }
+}
+
+@utility border-gray-strong {
+  border-color: var(--color-gray-8);
+  @variant dark {
+    border-color: var(--color-graydark-8);
+  }
+}
+
+/* --------------------------------------------
+   Yellow Borders
+   -------------------------------------------- */
+@utility border-yellow-subtle {
+  border-color: var(--color-yellow-6);
+  @variant dark {
+    border-color: var(--color-yellowdark-6);
+  }
+}
+
+@utility border-yellow {
+  border-color: var(--color-yellow-7);
+  @variant dark {
+    border-color: var(--color-yellowdark-7);
+  }
+}
+
+@utility border-yellow-strong {
+  border-color: var(--color-yellow-8);
+  @variant dark {
+    border-color: var(--color-yellowdark-8);
+  }
+}
+
+/* --------------------------------------------
+   Red Borders
+   -------------------------------------------- */
+@utility border-red-subtle {
+  border-color: var(--color-red-6);
+  @variant dark {
+    border-color: var(--color-reddark-6);
+  }
+}
+
+@utility border-red {
+  border-color: var(--color-red-7);
+  @variant dark {
+    border-color: var(--color-reddark-7);
+  }
+}
+
+@utility border-red-strong {
+  border-color: var(--color-red-8);
+  @variant dark {
+    border-color: var(--color-reddark-8);
+  }
+}
+
+/* --------------------------------------------
+   Gray Dividers
+   -------------------------------------------- */
+@utility divide-gray-subtle {
+  & > * + * {
+    border-color: var(--color-gray-6);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-graydark-6);
+    }
+  }
+}
+
+@utility divide-gray {
+  & > * + * {
+    border-color: var(--color-gray-7);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-graydark-7);
+    }
+  }
+}
+
+@utility divide-gray-strong {
+  & > * + * {
+    border-color: var(--color-gray-8);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-graydark-8);
+    }
+  }
+}
+
+/* --------------------------------------------
+   Yellow Dividers
+   -------------------------------------------- */
+@utility divide-yellow-subtle {
+  & > * + * {
+    border-color: var(--color-yellow-6);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-yellowdark-6);
+    }
+  }
+}
+
+@utility divide-yellow {
+  & > * + * {
+    border-color: var(--color-yellow-7);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-yellowdark-7);
+    }
+  }
+}
+
+@utility divide-yellow-strong {
+  & > * + * {
+    border-color: var(--color-yellow-8);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-yellowdark-8);
+    }
+  }
+}
+
+/* --------------------------------------------
+   Red Dividers
+   -------------------------------------------- */
+@utility divide-red-subtle {
+  & > * + * {
+    border-color: var(--color-red-6);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-reddark-6);
+    }
+  }
+}
+
+@utility divide-red {
+  & > * + * {
+    border-color: var(--color-red-7);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-reddark-7);
+    }
+  }
+}
+
+@utility divide-red-strong {
+  & > * + * {
+    border-color: var(--color-red-8);
+  }
+  @variant dark {
+    & > * + * {
+      border-color: var(--color-reddark-8);
+    }
+  }
+}
+
+/* --------------------------------------------
+   Gray Rings
+   -------------------------------------------- */
+@utility ring-gray-subtle {
+  --tw-ring-color: var(--color-gray-6);
+  @variant dark {
+    --tw-ring-color: var(--color-graydark-6);
+  }
+}
+
+@utility ring-gray {
+  --tw-ring-color: var(--color-gray-7);
+  @variant dark {
+    --tw-ring-color: var(--color-graydark-7);
+  }
+}
+
+@utility ring-gray-strong {
+  --tw-ring-color: var(--color-gray-8);
+  @variant dark {
+    --tw-ring-color: var(--color-graydark-8);
+  }
+}
+
+/* --------------------------------------------
+   Yellow Rings
+   -------------------------------------------- */
+@utility ring-yellow-subtle {
+  --tw-ring-color: var(--color-yellow-6);
+  @variant dark {
+    --tw-ring-color: var(--color-yellowdark-6);
+  }
+}
+
+@utility ring-yellow {
+  --tw-ring-color: var(--color-yellow-7);
+  @variant dark {
+    --tw-ring-color: var(--color-yellowdark-7);
+  }
+}
+
+@utility ring-yellow-strong {
+  --tw-ring-color: var(--color-yellow-8);
+  @variant dark {
+    --tw-ring-color: var(--color-yellowdark-8);
+  }
+}
+
+/* --------------------------------------------
+   Red Rings
+   -------------------------------------------- */
+@utility ring-red-subtle {
+  --tw-ring-color: var(--color-red-6);
+  @variant dark {
+    --tw-ring-color: var(--color-reddark-6);
+  }
+}
+
+@utility ring-red {
+  --tw-ring-color: var(--color-red-7);
+  @variant dark {
+    --tw-ring-color: var(--color-reddark-7);
+  }
+}
+
+@utility ring-red-strong {
+  --tw-ring-color: var(--color-red-8);
+  @variant dark {
+    --tw-ring-color: var(--color-reddark-8);
+  }
+}
+
+/* --------------------------------------------
+   Gray Underlines
+   -------------------------------------------- */
+@utility underline-gray-subtle {
+  text-decoration-color: var(--color-gray-6);
+  @variant dark {
+    text-decoration-color: var(--color-graydark-6);
+  }
+}
+
+@utility underline-gray {
+  text-decoration-color: var(--color-gray-7);
+  @variant dark {
+    text-decoration-color: var(--color-graydark-7);
+  }
+}
+
+@utility underline-gray-strong {
+  text-decoration-color: var(--color-gray-8);
+  @variant dark {
+    text-decoration-color: var(--color-graydark-8);
+  }
+}
+
+/* --------------------------------------------
+   Yellow Underlines
+   -------------------------------------------- */
+@utility underline-yellow-subtle {
+  text-decoration-color: var(--color-yellow-6);
+  @variant dark {
+    text-decoration-color: var(--color-yellowdark-6);
+  }
+}
+
+@utility underline-yellow {
+  text-decoration-color: var(--color-yellow-7);
+  @variant dark {
+    text-decoration-color: var(--color-yellowdark-7);
+  }
+}
+
+@utility underline-yellow-strong {
+  text-decoration-color: var(--color-yellow-8);
+  @variant dark {
+    text-decoration-color: var(--color-yellowdark-8);
+  }
+}
+
+/* --------------------------------------------
+   Red Underlines
+   -------------------------------------------- */
+@utility underline-red-subtle {
+  text-decoration-color: var(--color-red-6);
+  @variant dark {
+    text-decoration-color: var(--color-reddark-6);
+  }
+}
+
+@utility underline-red {
+  text-decoration-color: var(--color-red-7);
+  @variant dark {
+    text-decoration-color: var(--color-reddark-7);
+  }
+}
+
+@utility underline-red-strong {
+  text-decoration-color: var(--color-red-8);
+  @variant dark {
+    text-decoration-color: var(--color-reddark-8);
+  }
+}
+
+/* --------------------------------------------
+   Gray Text
+   -------------------------------------------- */
+@utility text-gray-placeholder {
+  color: var(--color-gray-10);
+  @variant dark {
+    color: var(--color-graydark-10);
+  }
+}
+
+@utility text-gray-muted {
+  color: var(--color-gray-11);
+  @variant dark {
+    color: var(--color-graydark-11);
+  }
+}
+
+@utility text-gray {
+  color: var(--color-gray-12);
+  @variant dark {
+    color: var(--color-graydark-12);
+  }
+}
+
+/* --------------------------------------------
+   Yellow Text
+   -------------------------------------------- */
+@utility text-yellow-placeholder {
+  color: var(--color-yellow-10);
+  @variant dark {
+    color: var(--color-yellowdark-10);
+  }
+}
+
+@utility text-yellow-muted {
+  color: var(--color-yellow-11);
+  @variant dark {
+    color: var(--color-yellowdark-11);
+  }
+}
+
+@utility text-yellow {
+  color: var(--color-yellow-12);
+  @variant dark {
+    color: var(--color-yellowdark-12);
+  }
+}
+
+/* --------------------------------------------
+   Red Text
+   -------------------------------------------- */
+@utility text-red-placeholder {
+  color: var(--color-red-10);
+  @variant dark {
+    color: var(--color-reddark-10);
+  }
+}
+
+@utility text-red-muted {
+  color: var(--color-red-11);
+  @variant dark {
+    color: var(--color-reddark-11);
+  }
+}
+
+@utility text-red {
+  color: var(--color-red-12);
+  @variant dark {
+    color: var(--color-reddark-12);
+  }
+}

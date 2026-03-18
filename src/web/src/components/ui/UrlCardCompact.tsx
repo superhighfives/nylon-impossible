@@ -43,7 +43,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-2 py-1 rounded bg-gray-ui hover:bg-gray-3 transition-colors group max-w-full"
+      className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group max-w-full"
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 shrink-0" />
@@ -57,11 +57,11 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
           }}
         />
       ) : null}
-      <span className="text-sm text-gray-normal truncate group-hover:underline">
+      <span className="text-sm text-gray truncate group-hover:underline">
         {displayTitle}
       </span>
       {isPending && (
-        <span className="text-xs text-gray-dim shrink-0">Fetching...</span>
+        <span className="text-xs text-gray-muted shrink-0">Fetching...</span>
       )}
     </a>
   );

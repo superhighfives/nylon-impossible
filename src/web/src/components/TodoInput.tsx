@@ -32,11 +32,11 @@ export function TodoInput() {
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-tomato-dim">{error}</p>}
-      {feedback && <p className="text-sm text-gray-dim">{feedback}</p>}
+      {error && <p className="text-sm text-red-muted">{error}</p>}
+      {feedback && <p className="text-sm text-gray-muted">{feedback}</p>}
 
       <form onSubmit={handleSubmit}>
-        <div className="relative">
+        <div className="relative bg-gray-surface shadow-base rounded-lg p-4">
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -54,7 +54,7 @@ export function TodoInput() {
           />
           {smartCreate.isPending && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
-              <Loader size="sm" className="text-gray-dim" />
+              <Loader size="sm" className="text-gray-muted" />
             </div>
           )}
         </div>

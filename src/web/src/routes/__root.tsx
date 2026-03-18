@@ -32,7 +32,13 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         name: "theme-color",
-        content: "#0a0a0a",
+        content: "#fdfdf9",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        name: "theme-color",
+        content: "#14120b",
+        media: "(prefers-color-scheme: dark)",
       },
     ],
     links: [
@@ -82,7 +88,7 @@ function RootDocument() {
           }}
         />
       </head>
-      <body className="bg-gray-app text-gray-normal antialiased">
+      <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <Header />
           <Outlet />

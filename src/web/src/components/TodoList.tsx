@@ -56,10 +56,10 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
     <div className="flex items-center gap-1.5 mt-1">
       {hasPriority && (
         <span
-          className={`text-xs px-1.5 py-0.5 rounded ${
+          className={`text-xs px-1.5 py-0.5 rounded-md ${
             todo.priority === "high"
-              ? "bg-tomato-ui text-tomato-dim"
-              : "bg-gray-ui text-gray-dim"
+              ? "bg-yellow-base hover:bg-yellow-hover active:bg-yellow-active text-yellow-muted"
+              : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
           }`}
         >
           {todo.priority === "high" ? "High" : "Low"}
@@ -67,10 +67,10 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
       )}
       {hasDueDate && dueDate && (
         <span
-          className={`text-xs px-1.5 py-0.5 rounded flex items-center gap-1 ${
+          className={`text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
             isOverdue
-              ? "bg-tomato-ui text-tomato-dim"
-              : "bg-gray-ui text-gray-dim"
+              ? "bg-red-base hover:bg-red-hover active:bg-red-active text-red-muted"
+              : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
@@ -107,7 +107,7 @@ function TodoItemContent({
       <div className="flex-1 min-w-0">
         <p
           className={`text-sm leading-snug ${
-            todo.completed ? "line-through text-gray-dim" : "text-gray-normal"
+            todo.completed ? "line-through text-gray-muted" : "text-gray"
           }`}
         >
           {todo.title}
@@ -201,7 +201,7 @@ function SortableTodoItem(
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="pt-1 cursor-grab active:cursor-grabbing text-gray-dim hover:text-gray-normal touch-none"
+          className="pt-1 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -252,13 +252,13 @@ export function TodoList() {
 
   if (isLoading) {
     return (
-      <p className="text-center text-gray-dim text-sm py-12">Loading...</p>
+      <p className="text-center text-gray-muted text-sm py-12">Loading...</p>
     );
   }
 
   if (error) {
     return (
-      <p className="text-center text-tomato-dim text-sm py-12">
+      <p className="text-center text-red-muted text-sm py-12">
         Failed to load todos.
       </p>
     );
@@ -266,7 +266,7 @@ export function TodoList() {
 
   if (!todos || todos.length === 0) {
     return (
-      <p className="text-center text-gray-dim text-sm py-12">No todos yet.</p>
+      <p className="text-center text-gray-muted text-sm py-12">No todos yet.</p>
     );
   }
 
@@ -379,7 +379,7 @@ export function TodoList() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="divide-y divide-neutral-200 dark:divide-neutral-800">
+      <div className="divide-y divide-gray-subtle">
         <SortableContext
           items={displayIncompleteTodos.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
@@ -395,11 +395,11 @@ export function TodoList() {
         <DragOverlay>
           {activeItem ? (
             <div
-              className="py-3 bg-gray-subtle shadow-lg rounded-md opacity-95 pointer-events-none"
+              className="py-3 bg-gray-surface shadow-lg rounded-lg opacity-95 pointer-events-none"
               aria-hidden="true"
             >
               <div className="flex items-start gap-2">
-                <div className="pt-1 cursor-grabbing text-gray-dim">
+                <div className="pt-1 cursor-grabbing text-gray-muted">
                   <GripVertical size={16} />
                 </div>
                 <div className="flex-1 min-w-0">

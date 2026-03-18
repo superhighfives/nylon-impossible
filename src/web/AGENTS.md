@@ -158,16 +158,66 @@ import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui"
 
 Use Radix color scale tokens via Tailwind. Never use raw Tailwind colors like `bg-gray-500` or `text-blue-600`.
 
+Colors are from [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) v2 (imported as `-colors-only.css`). Semantic utilities are in `src/styles/radix-utilities.css`:
+- **gray** — Neutral backgrounds, text, borders
+- **yellow** — Primary accent, brand color (buttons, focus rings, highlights)
+- **red** — Destructive actions, errors
+
 ### Quick Reference
 
 | Purpose | Token | Example Use |
 |---------|-------|-------------|
-| **Page background** | `bg-gray-1` | Root layout background |
-| **Card/surface background** | `bg-gray-subtle` | Cards, inputs |
-| **Elevated background** | `bg-gray-ui` | Modals, dropdowns |
-| **Primary text** | `text-gray-normal` | Body text |
-| **Secondary text** | `text-gray-dim` | Placeholders, hints |
-| **Border** | `ring-gray-6` | Input rings |
-| **Brand/accent** | `bg-indigo-solid` | Primary buttons |
-| **Error** | `bg-tomato-solid` | Destructive actions |
-| **Success** | `text-green-9` | Success states |
+| **Page background** | `bg-gray-app` | Root layout background |
+| **Card/surface background** | `bg-gray-surface` | Cards, inputs |
+| **Interactive background (normal)** | `bg-gray-base` | Button/element base state |
+| **Interactive background (hover)** | `bg-gray-hover` | Explicit hover state |
+| **Interactive background (active)** | `bg-gray-active` | Explicit active/pressed state |
+| **Primary text** | `text-gray` | Body text |
+| **Secondary text** | `text-gray-muted` | Placeholders, hints |
+| **Border** | `ring-gray-subtle` | Input rings |
+| **Brand/accent** | `bg-yellow-solid` | Primary buttons |
+| **Focus ring** | `ring-yellow-strong` | Focus states |
+| **Error** | `bg-red-solid` | Destructive actions |
+| **Error text** | `text-red-muted` | Error messages |
+
+### Semantic Utilities
+
+Hover/active states are **explicit** — compose them in the component:
+
+#### Backgrounds
+| Utility | Step | Use case |
+|---------|------|----------|
+| `bg-{color}-app` | 1 | App background |
+| `bg-{color}-surface` | 2 | Cards, raised surfaces |
+| `bg-{color}-base` | 3 | Component background (normal) |
+| `bg-{color}-hover` | 4 | Component background (hover) |
+| `bg-{color}-active` | 5 | Component background (active) |
+| `bg-{color}-ghost` | transparent | Ghost base |
+| `bg-{color}-ghost-hover` | 3 | Ghost hover |
+| `bg-{color}-ghost-active` | 4 | Ghost active |
+| `bg-{color}-solid` | 9 | Solid accent |
+| `bg-{color}-solid-hover` | 10 | Solid accent hover |
+
+#### Borders / Dividers / Rings / Underlines
+| Utility | Step | Use case |
+|---------|------|----------|
+| `{type}-{color}-subtle` | 6 | Non-interactive, separators |
+| `{type}-{color}` | 7 | Default interactive |
+| `{type}-{color}-strong` | 8 | Emphasis, focus rings |
+
+Where `{type}` is: `border`, `divide`, `ring`, `underline`
+
+#### Text
+| Utility | Step |
+|---------|------|
+| `text-{color}-placeholder` | 10 |
+| `text-{color}-muted` | 11 |
+| `text-{color}` | 12 |
+
+### Custom Shadows
+
+Custom shadow utilities are defined in `src/styles.css`:
+- `shadow-sm` — Subtle elevation
+- `shadow-base` — Default card shadow
+- `shadow-lg` — Modal/dropdown shadow
+- `shadow-yellow` — Yellow glow effect

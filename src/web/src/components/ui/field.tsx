@@ -21,18 +21,18 @@ export function Field({
       {...props}
     >
       {label && (
-        <BaseField.Label className="text-sm font-medium text-gray-normal">
+        <BaseField.Label className="text-sm font-medium text-gray">
           {label}
         </BaseField.Label>
       )}
       {children}
       {description && !error && (
-        <BaseField.Description className="text-xs text-gray-dim">
+        <BaseField.Description className="text-xs text-gray-muted">
           {description}
         </BaseField.Description>
       )}
       {error?.message && (
-        <BaseField.Error className="text-xs text-tomato-dim">
+        <BaseField.Error className="text-xs text-red-muted">
           {error.message}
         </BaseField.Error>
       )}
@@ -51,13 +51,13 @@ export function Textarea({
   ...props
 }: TextareaProps) {
   const variantClasses = {
-    default: "ring-1 ring-gray-6 focus-visible:ring-indigo-8",
-    error: "ring-1 ring-tomato-7 focus-visible:ring-tomato-8",
+    default: "ring-1 ring-gray-subtle focus-visible:ring-yellow-strong",
+    error: "ring-1 ring-red focus-visible:ring-red-strong",
   };
 
   return (
     <textarea
-      className={`flex min-h-[80px] w-full rounded-md bg-gray-subtle px-3 py-2 text-sm text-gray-normal placeholder:text-gray-9 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className ?? ""}`}
+      className={`flex min-h-[80px] w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 ${variantClasses[variant]} ${className ?? ""}`}
       {...props}
     />
   );
