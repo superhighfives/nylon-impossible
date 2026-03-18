@@ -16,6 +16,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
+import { truncateTitle } from "../lib/url-helpers";
 import type { Env } from "../types";
 
 const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
@@ -26,7 +27,7 @@ const syncRequestSchema = z.object({
   changes: z.array(
     z.object({
       id: z.string().uuid(),
-      title: z.string().min(1).max(500).optional(),
+      title: z.string().min(1).optional(),
       description: z.string().max(10000).nullable().optional(),
       completed: z.boolean().optional(),
       position: z.string().optional(),
@@ -158,7 +159,7 @@ export async function syncTodos(c: Context<Env>) {
         await db
           .update(todos)
           .set({
-            title: change.title ?? existing.title,
+            title: change.title ? truncateTitle(change.title) : existing.title,
             description:
               change.description !== undefined
                 ? change.description
@@ -188,7 +189,7 @@ export async function syncTodos(c: Context<Env>) {
         await db.insert(todos).values({
           id: normalizedId,
           userId,
-          title: change.title,
+          title: truncateTitle(change.title),
           description: change.description ?? null,
           completed: change.completed ?? false,
           position: change.position ?? generateKeyBetween(null, null),

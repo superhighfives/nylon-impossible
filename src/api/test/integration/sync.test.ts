@@ -218,4 +218,118 @@ describe("Sync endpoint", () => {
     const res = await syncRequest({ invalid: true });
     expect(res.status).toBe(400);
   });
+
+  // --- Long URL title tests (iOS Share Extension bug fix) ---
+
+  it("accepts and truncates a title longer than 500 chars instead of returning 400", async () => {
+    // Reproduces the bug: iOS Share Extension sets title to "Check: <full URL>"
+    // which can exceed 500 chars for long Google Search URLs.
+    const longTitle =
+      "Check: https://www.google.com/search?client=safari&q=gore+verbinski+movies" +
+      "&hl=en-gb&sxsrf=ANbLn76rl8EWt3s-sRZlDv--tCpL-SRfQ:1773632961047" +
+      "&si=AL3DRZHJoCibURVB0Hlwa-VLMfrQPpzwFnTejTFWQtOOMkUhYejHgfrv" +
+      "x".repeat(600); // pad well past 500 chars
+
+    const now = new Date().toISOString();
+    const res = await syncRequest({
+      changes: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440001",
+          title: longTitle,
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+
+    // Must not reject with 400 — the server should truncate gracefully
+    expect(res.status).toBe(200);
+
+    const body = await res.json<any>();
+    expect(body.todos).toHaveLength(1);
+    expect(body.todos[0].title.length).toBeLessThanOrEqual(500);
+    expect(body.todos[0].title).toMatch(/\.\.\.$/); // truncation marker
+  });
+
+  it("stores a truncated title that still starts with the original prefix", async () => {
+    const prefix = "Check: https://www.example.com/search?q=";
+    const longTitle = prefix + "a".repeat(600);
+    const now = new Date().toISOString();
+
+    await syncRequest({
+      changes: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440002",
+          title: longTitle,
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+
+    // Fetch back via a fresh sync to confirm what was persisted
+    const res = await syncRequest({ changes: [] });
+    const body = await res.json<any>();
+    const todo = body.todos.find(
+      (t: any) => t.id === "550e8400-e29b-41d4-a716-446655440002",
+    );
+    expect(todo).toBeTruthy();
+    expect(todo.title.startsWith(prefix)).toBe(true);
+    expect(todo.title.length).toBeLessThanOrEqual(500);
+  });
+
+  it("updates an existing todo with a long title and truncates it", async () => {
+    const past = new Date("2025-01-01T00:00:00Z").toISOString();
+    const future = new Date("2099-01-01T00:00:00Z").toISOString();
+
+    // Create with a normal title first
+    await syncRequest({
+      changes: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440003",
+          title: "Original short title",
+          completed: false,
+          position: "a0",
+          updatedAt: past,
+        },
+      ],
+    });
+
+    // Update with a title that exceeds 500 chars
+    const longTitle = "Updated: " + "x".repeat(600);
+    const res = await syncRequest({
+      lastSyncedAt: past,
+      changes: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440003",
+          title: longTitle,
+          updatedAt: future,
+        },
+      ],
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json<any>();
+    expect(body.todos[0].title.length).toBeLessThanOrEqual(500);
+    expect(body.todos[0].title.startsWith("Updated: ")).toBe(true);
+  });
+
+  it("still rejects a title that is an empty string", async () => {
+    const now = new Date().toISOString();
+    const res = await syncRequest({
+      changes: [
+        {
+          id: "550e8400-e29b-41d4-a716-446655440004",
+          title: "",
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+    // min(1) validation should still catch empty titles
+    expect(res.status).toBe(400);
+  });
 });

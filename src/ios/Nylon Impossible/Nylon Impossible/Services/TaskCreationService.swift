@@ -9,6 +9,16 @@ import Foundation
 import SwiftData
 
 enum TaskCreationService {
+    /// Generate a short task title from a URL string.
+    /// Returns "Check domain.com" for valid URLs, or the raw string as a fallback.
+    static func titleFromURL(_ urlString: String) -> String {
+        guard let url = URL(string: urlString), let host = url.host else {
+            return urlString
+        }
+        let domain = host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+        return "Check \(domain)"
+    }
+
     /// Create a todo item with the given title
     /// This is the core creation logic used by both the main app and Siri
     @MainActor

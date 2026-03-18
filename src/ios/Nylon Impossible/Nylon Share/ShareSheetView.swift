@@ -22,7 +22,7 @@ struct ShareSheetView: View {
         self.onSave = onSave
         self.onCancel = onCancel
         // Set initial title based on content type
-        _taskTitle = State(initialValue: isURL ? "Check: \(content)" : content)
+        _taskTitle = State(initialValue: isURL ? TaskCreationService.titleFromURL(content) : content)
     }
     
     var body: some View {
