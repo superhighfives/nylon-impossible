@@ -67,15 +67,21 @@ Intentionally **one-way only** (uploads; does not apply remote changes). This av
 
 ### Token persistence
 
-`AuthService.persistUserIdToSharedDefaults()` already writes `currentUserId`. Extend it to also write the Clerk JWT and an expiry timestamp (~50 minutes, conservative against Clerk's 60-minute default):
+`AuthService.persistUserIdToSharedDefaults()` already writes `currentUserId` synchronously. To also persist a refreshed Clerk JWT (and its expiry), you’ll need async behavior — either:
+
+- make `persistUserIdToSharedDefaults()` `async` and update all call sites, or
+- add a new async helper (e.g. `persistAuthTokenToSharedDefaults()`) that is called alongside the existing method.
+
+Use the existing `AuthService.getToken()` API (which wraps `Clerk.shared.auth.getToken()` and returns a `String`) and store that string directly:
 
 ```swift
-let token = try? await Clerk.shared.session?.getToken()
-sharedDefaults?.set(token?.jwt, forKey: "currentAuthToken")
+// Inside an async context in AuthService
+let token = try? await AuthService.shared.getToken()
+sharedDefaults?.set(token, forKey: "currentAuthToken")
 sharedDefaults?.set(Date().addingTimeInterval(50 * 60), forKey: "currentAuthTokenExpiry")
 ```
 
-Call `persistUserIdToSharedDefaults()` on the `.active` scene phase transition (in addition to sign-in) to keep the token fresh.
+Call the (now-async) persistence path on the `.active` scene phase transition (in addition to sign-in) to keep the token fresh.
 
 Clear both keys in `clearUserIdFromSharedDefaults()` on sign-out.
 
