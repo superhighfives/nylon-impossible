@@ -190,7 +190,65 @@ Preview deployments are created per PR and cleaned up on PR close. Preview API U
 
 ## Plans
 
-Implementation plans live in `plans/`. Before starting significant work, check `plans/ready/` for existing specs. When a feature is done, move its plan to `plans/done/`.
+Implementation plans live in the `plans/` directory.
+
+The canonical documentation for:
+
+- the **backlog → ready → done** lifecycle
+- plan file naming conventions
+- the plan template and required sections
+
+is in `plans/README.md`. Refer to that file when creating, updating, or reviewing plans to avoid conflicting sources of truth.
+
+At a high level:
+
+- New work typically starts as a plan in `plans/`.
+- Keep plans up to date as decisions are made and work progresses.
+- Move plans through their lifecycle as described in `plans/README.md`.
+
+For any details beyond this summary (status definitions, examples, and frontmatter structure), always follow `plans/README.md`.
+
+## [next section heading, if any]
+
+
+
+
+
+
+
+
+
+What needs to be solved and why it matters.
+
+## Solution
+
+The chosen approach and why.
+
+## Implementation
+
+### Files to modify
+
+- `path/to/file` — what changes
+
+### Files to create
+
+- `path/to/new-file` — what it does
+
+### Key considerations
+
+- Important constraints, trade-offs, security notes
+
+## Acceptance criteria
+
+- [ ] Observable behaviour that confirms the feature works
+
+## Dependencies
+
+- Related to / Blocked by: other plan filenames
+```
+
+3. Before starting significant work, check `plans/ready/` for an existing spec.
+4. When implementation is complete, move the plan file to `plans/done/` and update its **Status** to `Complete`. Add an **Overview** and **Architecture** section documenting what was actually built and any deviations from the spec.
 
 ## Environment Variables
 
