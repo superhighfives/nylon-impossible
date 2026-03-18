@@ -12,6 +12,8 @@ struct HeaderView: View {
     var syncState: SyncState = .idle
     var todoCount: Int = 0
 
+    @State private var showErrorPopover = false
+
     var body: some View {
         VStack(spacing: 12) {
             // Top bar with sync status and sign out
@@ -75,14 +77,23 @@ struct HeaderView: View {
                     .foregroundStyle(Color.appSubtle)
             }
         case .error(let message):
-            HStack(spacing: 4) {
+            Button {
+                showErrorPopover.toggle()
+            } label: {
                 Image(systemName: "exclamationmark.circle.fill")
-                    .font(.caption)
+                    .font(.system(size: 18))
                     .foregroundStyle(Color.appDanger)
-                Text(message)
-                    .font(.caption)
-                    .foregroundStyle(Color.appDanger)
-                    .lineLimit(1)
+            }
+            .popover(isPresented: $showErrorPopover) {
+                ScrollView {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(Color.appDanger)
+                        .padding()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(minWidth: 280, minHeight: 100, maxHeight: 300)
+                .presentationCompactAdaptation(.popover)
             }
         }
     }
