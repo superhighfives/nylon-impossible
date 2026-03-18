@@ -2,7 +2,6 @@ import { createClerkClient } from "@clerk/backend";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { truncateTitle } from "../lib/url-helpers";
 import {
   and,
   asc,
@@ -17,6 +16,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
+import { truncateTitle } from "../lib/url-helpers";
 import type { Env } from "../types";
 
 const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
