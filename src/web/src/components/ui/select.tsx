@@ -20,7 +20,7 @@ export function Select({
 }: SelectProps) {
   return (
     <BaseSelect.Root items={items} {...props}>
-      <BaseSelect.Trigger className="flex h-9 w-full items-center justify-between rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors">
+      <BaseSelect.Trigger className="flex h-9 w-full items-center justify-between rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base">
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon>
           <ChevronDown className="h-4 w-4 text-gray-muted" />
