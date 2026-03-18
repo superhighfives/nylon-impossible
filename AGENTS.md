@@ -190,33 +190,33 @@ Preview deployments are created per PR and cleaned up on PR close. Preview API U
 
 ## Plans
 
-Implementation plans live in `plans/` and follow a **backlog → ready → done** lifecycle.
+Implementation plans live in the `plans/` directory.
 
-- **`plans/backlog/`** — brief stubs capturing ideas not yet ready for implementation
-- **`plans/ready/`** — fully specced plans ready to implement without further clarification
-- **`plans/done/`** — completed work with architecture decisions and file references documented
+The canonical documentation for:
 
-### File naming
+- the **backlog → ready → done** lifecycle
+- plan file naming conventions
+- the plan template and required sections
 
-```
-YYYY-MM-DD-descriptive-name.md
-```
+is in `plans/README.md`. Refer to that file when creating, updating, or reviewing plans to avoid conflicting sources of truth.
 
-Always use today's date and a kebab-case description. Example: `2026-03-18-ios-siri-background-sync.md`.
+At a high level:
 
-### When writing a plan
+- New work typically starts as a plan in `plans/`.
+- Keep plans up to date as decisions are made and work progresses.
+- Move plans through their lifecycle as described in `plans/README.md`.
 
-1. Place new plans in `plans/ready/` (or `plans/backlog/` if not yet fully specced).
-2. Use this frontmatter and section structure:
+For any details beyond this summary (status definitions, examples, and frontmatter structure), always follow `plans/README.md`.
 
-```markdown
-# Title
+## [next section heading, if any]
 
-**Date:** YYYY-MM-DD
-**Status:** Ready
-**Scope:** Web | API | iOS | (combination)
 
-## Problem
+
+
+
+
+
+
 
 What needs to be solved and why it matters.
 
