@@ -190,7 +190,65 @@ Preview deployments are created per PR and cleaned up on PR close. Preview API U
 
 ## Plans
 
-Implementation plans live in `plans/`. Before starting significant work, check `plans/ready/` for existing specs. When a feature is done, move its plan to `plans/done/`.
+Implementation plans live in `plans/` and follow a **backlog → ready → done** lifecycle.
+
+- **`plans/backlog/`** — brief stubs capturing ideas not yet ready for implementation
+- **`plans/ready/`** — fully specced plans ready to implement without further clarification
+- **`plans/done/`** — completed work with architecture decisions and file references documented
+
+### File naming
+
+```
+YYYY-MM-DD-descriptive-name.md
+```
+
+Always use today's date and a kebab-case description. Example: `2026-03-18-ios-siri-background-sync.md`.
+
+### When writing a plan
+
+1. Place new plans in `plans/ready/` (or `plans/backlog/` if not yet fully specced).
+2. Use this frontmatter and section structure:
+
+```markdown
+# Title
+
+**Date:** YYYY-MM-DD
+**Status:** Ready
+**Scope:** Web | API | iOS | (combination)
+
+## Problem
+
+What needs to be solved and why it matters.
+
+## Solution
+
+The chosen approach and why.
+
+## Implementation
+
+### Files to modify
+
+- `path/to/file` — what changes
+
+### Files to create
+
+- `path/to/new-file` — what it does
+
+### Key considerations
+
+- Important constraints, trade-offs, security notes
+
+## Acceptance criteria
+
+- [ ] Observable behaviour that confirms the feature works
+
+## Dependencies
+
+- Related to / Blocked by: other plan filenames
+```
+
+3. Before starting significant work, check `plans/ready/` for an existing spec.
+4. When implementation is complete, move the plan file to `plans/done/` and update its **Status** to `Complete`. Add an **Overview** and **Architecture** section documenting what was actually built and any deviations from the spec.
 
 ## Environment Variables
 
