@@ -99,7 +99,21 @@ Current state: `Clerk.shared.auth.getToken()` is called on demand — no local t
 
 ---
 
-### 5. Edge Cases
+### 5. URL Metadata SSRF Surface
+
+**File:** `src/api/src/lib/url-metadata.ts`
+
+`fetchUrlMetadata` makes outbound HTTP requests to any URL an authenticated user provides — fetching `<title>`, OG tags, etc. It's behind auth and has a 10s timeout, so it's not a real problem with only a small trusted user pool. But technically, a logged-in user could point it at internal/private URLs (e.g. `http://169.254.169.254/` or internal services).
+
+**Audit checklist:**
+
+- [ ] Confirm whether Cloudflare Workers blocks requests to link-local and private IP ranges by default (it may already be sandboxed at the network level)
+- [ ] If not blocked by default, consider adding an allowlist/denylist for URL schemes and hostnames before fetching (reject `file://`, `ftp://`, link-local ranges, `localhost`, etc.)
+- [ ] Not urgent while the user pool is private/closed — revisit before enabling public signups
+
+---
+
+### 6. Edge Cases
 
 **Account deletion:**
 
