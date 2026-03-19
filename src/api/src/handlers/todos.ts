@@ -162,7 +162,10 @@ export async function updateTodo(c: Context<Env>) {
     updates.position = parsed.data.position;
   }
 
-  await db.update(todos).set(updates).where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
+  await db
+    .update(todos)
+    .set(updates)
+    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
 
