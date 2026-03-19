@@ -91,7 +91,7 @@ function RootDocument() {
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <Header />
-          <div className="pt-20">
+          <div className="pt-header-offset">
             <Outlet />
           </div>
           {!import.meta.env.PROD && <DevEnvironmentIndicator />}
