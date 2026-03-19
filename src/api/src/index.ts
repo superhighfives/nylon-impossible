@@ -17,10 +17,12 @@ export { UserSync } from "./durable-objects/UserSync";
 const app = new Hono<Env>();
 
 // CORS
+const ALLOWED_ORIGINS = /^https:\/\/(www\.)?nylonimpossible\.com$|^https:\/\/(?:api-)?pr-\d+\.nylonimpossible\.com$/;
+
 app.use(
   "*",
   cors({
-    origin: "*",
+    origin: (origin) => (ALLOWED_ORIGINS.test(origin) ? origin : null),
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
