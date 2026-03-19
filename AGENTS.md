@@ -211,8 +211,8 @@ For any details beyond this summary (status definitions, examples, and frontmatt
 
 
 
-- Before starting significant work, check `plans/ready/` for an existing spec.
-- When implementation is complete, move the plan file to `plans/done/` and update its **Status** to `Complete`. Add an **Overview** and **Architecture** section documenting what was actually built and any deviations from the spec.
+3. Before starting significant work, check `plans/ready/` for an existing spec.
+4. When implementation is complete, move the plan file to `plans/done/` and update its **Status** to `Complete`. Add an **Overview** and **Architecture** section documenting what was actually built and any deviations from the spec.
 
 ## Environment Variables
 
