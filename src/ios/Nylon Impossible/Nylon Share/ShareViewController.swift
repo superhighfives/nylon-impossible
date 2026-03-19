@@ -13,7 +13,8 @@ import UniformTypeIdentifiers
 class ShareViewController: UIViewController {
     
     private var sharedURL: String?
-    
+    private var sharedTitle: String?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -26,21 +27,36 @@ class ShareViewController: UIViewController {
             completeWithError()
             return
         }
-        
+
         for item in extensionItems {
             guard let attachments = item.attachments else { continue }
-            
+
+            // Scan all providers first so a URL provider isn't missed because
+            // a plain text provider (e.g. article title from Reeder) appears first.
+            var urlProvider: NSItemProvider?
+            var textProvider: NSItemProvider?
+
             for provider in attachments {
                 if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-                    handleURL(provider: provider)
-                    return
-                } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-                    handleText(provider: provider)
-                    return
+                    urlProvider = provider
+                } else if textProvider == nil,
+                          provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    textProvider = provider
                 }
             }
+
+            if let urlProvider {
+                // Use the item's attributed text (e.g. article title from Reeder) as the
+                // pre-filled task title so the user sees the real title, not just the domain.
+                sharedTitle = item.attributedContentText?.string
+                handleURL(provider: urlProvider)
+                return
+            } else if let textProvider {
+                handleText(provider: textProvider)
+                return
+            }
         }
-        
+
         // No supported content found
         completeWithError()
     }
@@ -79,10 +95,11 @@ class ShareViewController: UIViewController {
         if isURL {
             sharedURL = content
         }
-        
+
         let shareView = ShareSheetView(
             content: content,
             isURL: isURL,
+            prefilledTitle: sharedTitle,
             onSave: { [weak self] title in
                 self?.saveTask(title: title, url: self?.sharedURL)
             },
