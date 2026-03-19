@@ -89,7 +89,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy
+          command: deploy --var ENVIRONMENT:production
 
       - name: Build Web
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
@@ -184,7 +184,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy
+          command: deploy --var ENVIRONMENT:production
           secrets: |
             CLERK_SECRET_KEY
             CLERK_PUBLISHABLE_KEY
