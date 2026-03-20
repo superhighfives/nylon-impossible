@@ -24,6 +24,7 @@ struct TodoEditSheet: View {
     init(
         todo: TodoItem,
         apiService: APIService? = nil,
+        initialUrls: [APITodoUrl] = [],
         onSave: @escaping (String, String?, Date?, TodoPriority?) -> Void,
         onCancel: @escaping () -> Void
     ) {
@@ -31,12 +32,13 @@ struct TodoEditSheet: View {
         self.apiService = apiService
         self.onSave = onSave
         self.onCancel = onCancel
-        
+
         _title = State(initialValue: todo.title)
         _description = State(initialValue: todo.itemDescription ?? "")
         _hasDueDate = State(initialValue: todo.dueDate != nil)
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _priority = State(initialValue: todo.todoPriority)
+        _urls = State(initialValue: initialUrls)
     }
     
     var body: some View {
@@ -86,7 +88,7 @@ struct TodoEditSheet: View {
                 }
                 
                 // Links
-                if isLoadingUrls {
+                if isLoadingUrls && urls.isEmpty {
                     Section {
                         HStack {
                             ProgressView()
