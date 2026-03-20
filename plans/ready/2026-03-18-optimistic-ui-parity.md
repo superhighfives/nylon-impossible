@@ -48,12 +48,10 @@ export function useCreateTodo() {
         urls: [],
       };
 
-      if (previousTodos) {
-        queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
-          optimisticTodo,
-          ...previousTodos,
-        ]);
-      }
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
+        optimisticTodo,
+        ...(previousTodos ?? []),
+      ]);
 
       return { previousTodos };
     },
@@ -129,7 +127,7 @@ if !todo.isSynced {
 }
 ```
 
-No changes to `TodoItemRow`'s public interface needed.
+No changes to `TodoItemRow`'s public interface are needed for this section — the dot is added purely inside the existing view body.
 
 ### 4. iOS: Persist URL metadata to SwiftData
 
@@ -142,7 +140,6 @@ in-memory dict that's lost on app restart. URLs should live in SwiftData alongsi
 @Model
 final class TodoUrl {
     var id: String
-    var todoId: String
     var url: String
     var title: String?
     var itemDescription: String?
@@ -156,7 +153,6 @@ final class TodoUrl {
 
     init(from api: APITodoUrl) {
         id = api.id
-        todoId = api.todoId
         url = api.url
         title = api.title
         itemDescription = api.description
@@ -170,6 +166,9 @@ final class TodoUrl {
     }
 }
 ```
+
+`todoId` is omitted — the parent `TodoItem` is always reachable via the SwiftData relationship,
+so storing a redundant string copy would risk the two falling out of sync.
 
 #### b) Modify `TodoItem.swift`
 
@@ -186,10 +185,19 @@ fifth that replaces URL records for every todo received from the server:
 
 ```swift
 // Step 5: Sync URLs (server is authoritative — replace all for each todo in the response)
+// Build a single lookup map from the IDs already processed in the sync — avoids one
+// FetchDescriptor round-trip per todo in the hot sync path.
+let remoteIds = remoteTodos.compactMap { UUID(uuidString: $0.id) }
+let batchDescriptor = FetchDescriptor<TodoItem>(
+    predicate: #Predicate { remoteIds.contains($0.id) }
+)
+let todoMap = try Dictionary(
+    uniqueKeysWithValues: modelContext.fetch(batchDescriptor).map { ($0.id, $0) }
+)
+
 for remote in remoteTodos {
-    guard let remoteId = UUID(uuidString: remote.id) else { continue }
-    let descriptor = FetchDescriptor<TodoItem>(predicate: #Predicate { $0.id == remoteId })
-    guard let todo = try modelContext.fetch(descriptor).first else { continue }
+    guard let remoteId = UUID(uuidString: remote.id),
+          let todo = todoMap[remoteId] else { continue }
 
     // Delete stale local URLs for this todo
     for url in todo.urls ?? [] { modelContext.delete(url) }
@@ -202,6 +210,9 @@ for remote in remoteTodos {
 ```
 
 This runs inside the same `applySync` call before the existing `try modelContext.save()`.
+The single batch fetch replaces N individual `FetchDescriptor` calls (one per todo), which
+matters on a large list. If Step 1 already fetches all `TodoItem` instances into memory, pass
+that collection in as a `[UUID: TodoItem]` map instead of issuing the batch fetch here.
 
 #### d) Update `SharedModelContainer.swift`
 
@@ -211,12 +222,15 @@ configuration currently only lists `TodoItem.self` — add `TodoUrl.self` alongs
 #### e) Update call sites
 
 - **`ContentView.swift`**: in `todoRow(_:)`, change `urls: syncService.urls(for: todo.id)` to
-  `urls: todo.urls ?? []`
-- **`TodoItemRow.swift`**: change the `urls` parameter from `[APITodoUrl]` to `[TodoUrl]`
-- **`UrlRowCompact.swift`**: change the `url` parameter from `APITodoUrl` to `TodoUrl` and update
-  all property access (fields are the same names; `description` maps to `itemDescription`)
-- **`TodoEditSheet.swift`**: apply the same `[APITodoUrl]` → `[TodoUrl]` change if it displays
-  URL rows
+  `urls: todo.urls?.map { APITodoUrl(from: $0) } ?? []`. This keeps `TodoItemRow`'s public
+  interface unchanged (`[APITodoUrl]`), avoiding a cascade of downstream type changes. Add a
+  convenience `init(from: TodoUrl)` to `APITodoUrl` that maps the stored fields back to the API
+  type (fields are the same names; `itemDescription` maps back to `description`).
+- **`TodoItemRow.swift`**: no change to the `urls` parameter type — it stays `[APITodoUrl]`.
+- **`UrlRowCompact.swift`**: no change to the `url` parameter type — it stays `APITodoUrl`.
+- **`TodoEditSheet.swift`**: no change to URL param type needed (stays `[APITodoUrl]`); update
+  the data source from `syncService.urls(for:)` to `todo.urls?.map { APITodoUrl(from: $0) } ?? []`
+  if it currently displays URL rows
 - **Previews**: update any `modelContainer(for: TodoItem.self, ...)` calls to include `TodoUrl.self`
 - **Tests**: update `SyncServiceTests.swift` — remove assertions on `urlsByTodoId`, add
   assertions that URLs appear on the related `TodoItem` after sync
@@ -232,8 +246,8 @@ configuration currently only lists `TodoItem.self` — add `TodoUrl.self` alongs
 | `src/ios/.../Models/TodoItem.swift` | Add `@Relationship var urls` |
 | `src/ios/.../Services/SyncService.swift` | Remove in-memory dict; persist URLs in `applySync` |
 | `src/ios/.../Services/SharedModelContainer.swift` | Add `TodoUrl.self` to schema |
-| `src/ios/.../Views/Components/TodoItemRow.swift` | Add unsynced dot; change `urls` param type |
-| `src/ios/.../Views/Components/UrlRowCompact.swift` | Change param from `APITodoUrl` to `TodoUrl` |
+| `src/ios/.../Views/Components/TodoItemRow.swift` | Add unsynced dot; `urls` param type unchanged |
+| `src/ios/.../Views/Components/UrlRowCompact.swift` | No change — param stays `APITodoUrl` |
 | `src/ios/.../Views/Components/TodoEditSheet.swift` | Change URL param type if it displays URLs |
 | `src/ios/.../Nylon ImpossibleTests/SyncServiceTests.swift` | Update URL assertions |
 
