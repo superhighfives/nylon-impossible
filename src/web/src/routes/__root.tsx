@@ -91,7 +91,9 @@ function RootDocument() {
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <Header />
-          <Outlet />
+          <div className="pt-header-offset">
+            <Outlet />
+          </div>
           {!import.meta.env.PROD && <DevEnvironmentIndicator />}
           <TanStackDevtools
             config={{

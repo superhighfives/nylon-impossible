@@ -1,6 +1,9 @@
 # Worktrees
 .worktrees/
 
+# Claude Code local settings
+.claude/settings.local.json
+
 # OS
 .DS_Store
 Thumbs.db
@@ -65,3 +68,7 @@ src/ios/**/fastlane/Preview.html
 src/ios/**/fastlane/screenshots
 src/ios/**/fastlane/test_output
 src/ios/**/vendor/bundle
+
+# Claude
+.claude/settings.json
+.claude/settings.*.json
