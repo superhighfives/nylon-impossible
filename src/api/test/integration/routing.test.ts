@@ -16,12 +16,14 @@ describe("API routing", () => {
   });
 
   describe("CORS", () => {
-    it("OPTIONS returns CORS headers", async () => {
+    it("OPTIONS returns CORS headers for allowed origin", async () => {
+      const origin = "https://nylonimpossible.com";
       const res = await SELF.fetch("http://localhost/todos", {
         method: "OPTIONS",
+        headers: { Origin: origin },
       });
       expect(res.status).toBe(204);
-      expect(res.headers.get("Access-Control-Allow-Origin")).toBe("*");
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
       expect(res.headers.get("Access-Control-Allow-Methods")).toContain("GET");
       expect(res.headers.get("Access-Control-Allow-Methods")).toContain("POST");
       expect(res.headers.get("Access-Control-Allow-Methods")).toContain("PUT");
@@ -31,6 +33,23 @@ describe("API routing", () => {
       expect(res.headers.get("Access-Control-Allow-Headers")).toContain(
         "Authorization",
       );
+    });
+
+    it("OPTIONS blocks disallowed origin", async () => {
+      const res = await SELF.fetch("http://localhost/todos", {
+        method: "OPTIONS",
+        headers: { Origin: "https://evil.com" },
+      });
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    });
+
+    it("OPTIONS allows localhost origin in dev", async () => {
+      const origin = "http://localhost:3000";
+      const res = await SELF.fetch("http://localhost/todos", {
+        method: "OPTIONS",
+        headers: { Origin: origin },
+      });
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
     });
   });
 

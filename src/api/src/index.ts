@@ -17,15 +17,22 @@ export { UserSync } from "./durable-objects/UserSync";
 const app = new Hono<Env>();
 
 // CORS
-app.use(
-  "*",
-  cors({
-    origin: "*",
+const ALLOWED_ORIGINS =
+  /^https:\/\/(www\.)?nylonimpossible\.com$|^https:\/\/(?:api-)?pr-\d+\.nylonimpossible\.com$/;
+const LOCALHOST_ORIGIN = /^http:\/\/localhost(:\d+)?$/;
+
+app.use("*", (c, next) => {
+  const isDev = c.env.ENVIRONMENT !== "production";
+  return cors({
+    origin: (origin) => {
+      if (isDev && LOCALHOST_ORIGIN.test(origin)) return origin;
+      return ALLOWED_ORIGINS.test(origin) ? origin : null;
+    },
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
-  }),
-);
+  })(c, next);
+});
 
 // Health check
 app.get("/", (c) => c.text("OK"));
