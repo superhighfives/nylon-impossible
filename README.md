@@ -9,6 +9,8 @@
 
 A cross-platform todo app for web and iOS. Real-time sync via WebSockets, AI-assisted task creation, and Clerk authentication — deployed on Cloudflare Workers.
 
+> **Note:** This is an exploratory project, not a production template. It was built to experiment with Cloudflare's developer platform — specifically Workers AI (for natural language todo parsing), Durable Objects (for WebSocket-based real-time sync), D1 (SQLite at the edge), and the Workers runtime in general. Expect rough edges, opinionated choices, and things that exist because they were interesting to build.
+
 ## Features
 
 - **Real-time sync** across devices via WebSockets and Durable Objects

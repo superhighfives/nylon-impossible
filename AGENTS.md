@@ -208,44 +208,8 @@ At a high level:
 
 For any details beyond this summary (status definitions, examples, and frontmatter structure), always follow `plans/README.md`.
 
-## [next section heading, if any]
 
 
-
-
-
-
-
-
-
-What needs to be solved and why it matters.
-
-## Solution
-
-The chosen approach and why.
-
-## Implementation
-
-### Files to modify
-
-- `path/to/file` — what changes
-
-### Files to create
-
-- `path/to/new-file` — what it does
-
-### Key considerations
-
-- Important constraints, trade-offs, security notes
-
-## Acceptance criteria
-
-- [ ] Observable behaviour that confirms the feature works
-
-## Dependencies
-
-- Related to / Blocked by: other plan filenames
-```
 
 3. Before starting significant work, check `plans/ready/` for an existing spec.
 4. When implementation is complete, move the plan file to `plans/done/` and update its **Status** to `Complete`. Add an **Overview** and **Architecture** section documenting what was actually built and any deviations from the spec.

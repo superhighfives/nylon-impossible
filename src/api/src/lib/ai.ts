@@ -137,9 +137,6 @@ export async function extractTodos(
     },
   )) as AiTextGenerationOutput;
 
-  console.log("=== AI RAW RESPONSE ===");
-  console.log(JSON.stringify(response, null, 2));
-
   // Handle both Workers AI native format and OpenAI-compatible format
   let toolCall: { name: string; arguments: string | object } | null = null;
 
@@ -192,11 +189,6 @@ export async function extractTodos(
     throw new Error("AI did not return extracted todos");
   }
 
-  console.log("=== TOOL CALL FOUND ===");
-  console.log("Tool name:", toolCall.name);
-  console.log("Arguments type:", typeof toolCall.arguments);
-  console.log("Raw arguments:", toolCall.arguments);
-
   if (toolCall.name !== "extract_todos") {
     throw new Error(`Unexpected tool call: ${toolCall.name}`);
   }
@@ -213,12 +205,7 @@ export async function extractTodos(
     throw new Error("Failed to parse AI response");
   }
 
-  console.log("=== PARSED RESPONSE ===");
-  console.log("Todos count:", parsed.todos?.length ?? 0);
-  console.log("Todos:", JSON.stringify(parsed.todos, null, 2));
-
   if (!parsed.todos || parsed.todos.length === 0) {
-    console.log("AI returned empty todos array - falling back to single todo");
     return null;
   }
 
