@@ -9,15 +9,21 @@ vi.mock("@clerk/tanstack-react-start", () => ({
 }));
 
 vi.mock("@tanstack/react-router", () => ({
-  Link: ({ children, to }: { children: ReactNode; to: string }) => (
-    <a href={to}>{children}</a>
+  Link: ({
+    children,
+    to,
+    ...rest
+  }: { children: ReactNode; to: string } & Record<string, unknown>) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
   ),
 }));
 
 describe("Header", () => {
   it("renders 'Nylon Impossible' link", () => {
     render(<Header />);
-    const link = screen.getByText("Nylon Impossible");
+    const link = screen.getByRole("link", { name: "Nylon Impossible" });
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute("href", "/");
   });
