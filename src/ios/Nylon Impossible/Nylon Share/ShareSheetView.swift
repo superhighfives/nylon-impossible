@@ -12,17 +12,20 @@ struct ShareSheetView: View {
     let isURL: Bool
     let onSave: (String) -> Void
     let onCancel: () -> Void
-    
+
     @State private var taskTitle: String = ""
     @FocusState private var isFocused: Bool
-    
-    init(content: String, isURL: Bool, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+
+    init(content: String, isURL: Bool, prefilledTitle: String? = nil, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.content = content
         self.isURL = isURL
         self.onSave = onSave
         self.onCancel = onCancel
-        // Set initial title based on content type
-        _taskTitle = State(initialValue: isURL ? TaskCreationService.titleFromURL(content) : content)
+        // Use the app-provided title (e.g. article title from Reeder) when available;
+        // otherwise fall back to generating a title from the URL or using the text directly.
+        let defaultTitle = isURL ? TaskCreationService.titleFromURL(content) : content
+        let trimmed = prefilledTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+        _taskTitle = State(initialValue: (trimmed?.isEmpty == false ? trimmed! : nil) ?? defaultTitle)
     }
     
     var body: some View {

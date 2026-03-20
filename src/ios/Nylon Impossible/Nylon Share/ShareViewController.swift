@@ -13,7 +13,8 @@ import UniformTypeIdentifiers
 class ShareViewController: UIViewController {
     
     private var sharedURL: String?
-    
+    private var sharedTitle: String?
+
     override func viewDidLoad() {
         super.viewDidLoad()
         
@@ -26,21 +27,45 @@ class ShareViewController: UIViewController {
             completeWithError()
             return
         }
-        
+
         for item in extensionItems {
             guard let attachments = item.attachments else { continue }
-            
+
+            // Scan all providers first so a URL provider isn't missed because
+            // a plain text provider (e.g. article title from Reeder) appears first.
+            var urlProvider: NSItemProvider?
+            var textProvider: NSItemProvider?
+
             for provider in attachments {
                 if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
-                    handleURL(provider: provider)
-                    return
-                } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
-                    handleText(provider: provider)
-                    return
+                    urlProvider = provider
+                } else if textProvider == nil,
+                          provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
+                    textProvider = provider
                 }
             }
+
+            if let urlProvider {
+                // Prefer attributedContentText (e.g. article title from Reeder); fall back to
+                // loading the plain-text provider when attributedContentText is nil or empty.
+                let attributedTitle = item.attributedContentText?.string
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let attributedTitle, !attributedTitle.isEmpty {
+                    sharedTitle = attributedTitle
+                    handleURL(provider: urlProvider)
+                } else if let textProvider {
+                    // Load the text provider first, then present the URL sheet with that title.
+                    handleURLWithTextTitle(urlProvider: urlProvider, textProvider: textProvider)
+                } else {
+                    handleURL(provider: urlProvider)
+                }
+                return
+            } else if let textProvider {
+                handleText(provider: textProvider)
+                return
+            }
         }
-        
+
         // No supported content found
         completeWithError()
     }
@@ -60,6 +85,14 @@ class ShareViewController: UIViewController {
         }
     }
     
+    private func handleURLWithTextTitle(urlProvider: NSItemProvider, textProvider: NSItemProvider) {
+        textProvider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, _ in
+            let title = (item as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            self?.sharedTitle = (title?.isEmpty == false) ? title : nil
+            self?.handleURL(provider: urlProvider)
+        }
+    }
+
     private func handleText(provider: NSItemProvider) {
         provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, error in
             guard let text = item as? String else {
@@ -79,10 +112,11 @@ class ShareViewController: UIViewController {
         if isURL {
             sharedURL = content
         }
-        
+
         let shareView = ShareSheetView(
             content: content,
             isURL: isURL,
+            prefilledTitle: sharedTitle,
             onSave: { [weak self] title in
                 self?.saveTask(title: title, url: self?.sharedURL)
             },
