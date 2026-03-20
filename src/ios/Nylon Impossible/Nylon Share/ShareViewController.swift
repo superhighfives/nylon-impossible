@@ -46,10 +46,19 @@ class ShareViewController: UIViewController {
             }
 
             if let urlProvider {
-                // Use the item's attributed text (e.g. article title from Reeder) as the
-                // pre-filled task title so the user sees the real title, not just the domain.
-                sharedTitle = item.attributedContentText?.string
-                handleURL(provider: urlProvider)
+                // Prefer attributedContentText (e.g. article title from Reeder); fall back to
+                // loading the plain-text provider when attributedContentText is nil or empty.
+                let attributedTitle = item.attributedContentText?.string
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if let attributedTitle, !attributedTitle.isEmpty {
+                    sharedTitle = attributedTitle
+                    handleURL(provider: urlProvider)
+                } else if let textProvider {
+                    // Load the text provider first, then present the URL sheet with that title.
+                    handleURLWithTextTitle(urlProvider: urlProvider, textProvider: textProvider)
+                } else {
+                    handleURL(provider: urlProvider)
+                }
                 return
             } else if let textProvider {
                 handleText(provider: textProvider)
@@ -76,6 +85,14 @@ class ShareViewController: UIViewController {
         }
     }
     
+    private func handleURLWithTextTitle(urlProvider: NSItemProvider, textProvider: NSItemProvider) {
+        textProvider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, _ in
+            let title = (item as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            self?.sharedTitle = (title?.isEmpty == false) ? title : nil
+            self?.handleURL(provider: urlProvider)
+        }
+    }
+
     private func handleText(provider: NSItemProvider) {
         provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, error in
             guard let text = item as? String else {

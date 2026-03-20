@@ -24,7 +24,8 @@ struct ShareSheetView: View {
         // Use the app-provided title (e.g. article title from Reeder) when available;
         // otherwise fall back to generating a title from the URL or using the text directly.
         let defaultTitle = isURL ? TaskCreationService.titleFromURL(content) : content
-        _taskTitle = State(initialValue: prefilledTitle ?? defaultTitle)
+        let trimmed = prefilledTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+        _taskTitle = State(initialValue: (trimmed?.isEmpty == false ? trimmed! : nil) ?? defaultTitle)
     }
     
     var body: some View {
