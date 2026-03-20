@@ -119,6 +119,7 @@ struct TodoItemRow: View {
             TodoEditSheet(
                 todo: todo,
                 apiService: apiService,
+                initialUrls: urls,
                 onSave: { title, description, dueDate, priority in
                     onSave(title, description, dueDate, priority)
                     showingEditSheet = false
