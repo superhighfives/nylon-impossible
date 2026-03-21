@@ -302,9 +302,7 @@ export async function syncTodos(c: Context<Env>) {
     }
 
     if (urlsToFetch.length > 0) {
-      c.executionCtx.waitUntil(
-        fetchAndUpdateUrlMetadata(db, urlsToFetch),
-      );
+      c.executionCtx.waitUntil(fetchAndUpdateUrlMetadata(db, urlsToFetch));
     }
   }
 
