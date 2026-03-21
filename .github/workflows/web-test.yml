@@ -15,6 +15,9 @@ on:
       - "package.json"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: web-test-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
