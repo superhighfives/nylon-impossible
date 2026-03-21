@@ -1,7 +1,7 @@
 # iOS Share Todo
 
 **Date:** 2026-03-20
-**Status:** Backlog
+**Status:** Ready
 
 ## Problem
 
@@ -12,18 +12,18 @@ any other app via the standard iOS Share Sheet.
 ## Proposed solution
 
 Add a share button to the todo detail view (and optionally the todo list row) that invokes
-`UIActivityViewController` with a text representation of the todo. The shared payload should
-include the todo's title, description, due date, and any attached URLs so the recipient has
-full context.
+`ShareLink` with a text representation of the todo. The shared payload should include the todo's
+title, description, due date, and any attached URLs so the recipient has full context.
 
 ## Implementation sketch
 
 ### 1. Share payload
 
-Construct a shareable string from the todo's fields:
+`TodoEditSheet` already receives `urls: [APITodoUrl]` as a parameter. Pass that alongside the
+`TodoItem` into the helper:
 
 ```swift
-func shareText(for todo: TodoItem) -> String {
+func shareText(for todo: TodoItem, urls: [APITodoUrl]) -> String {
     var lines: [String] = [todo.title]
     if let description = todo.itemDescription, !description.isEmpty {
         lines.append(description)
@@ -31,7 +31,7 @@ func shareText(for todo: TodoItem) -> String {
     if let dueDate = todo.dueDate {
         lines.append("Due: \(dueDate.formatted(date: .abbreviated, time: .omitted))")
     }
-    if let urls = todo.urls, !urls.isEmpty {
+    if !urls.isEmpty {
         lines.append(contentsOf: urls.map { $0.url })
     }
     return lines.joined(separator: "\n")
@@ -40,33 +40,36 @@ func shareText(for todo: TodoItem) -> String {
 
 ### 2. Share button
 
-Add a share button to `TodoEditSheet.swift` (toolbar or within the form) that presents
-`ShareLink` (SwiftUI) or wraps `UIActivityViewController` via a `UIViewControllerRepresentable`:
+Add a share button to the toolbar in `TodoEditSheet.swift` using `ShareLink` (available on the
+project's iOS 26.2 deployment target):
 
 ```swift
-// SwiftUI ShareLink (iOS 16+)
-ShareLink(item: shareText(for: todo))
+ShareLink(item: shareText(for: todo, urls: urls))
 ```
+
+`urls` is already available as `@State private var urls: [APITodoUrl]` in `TodoEditSheet`.
 
 ### 3. List row context menu (optional)
 
 Add a "Share" action to the context menu in `TodoItemRow.swift` so users can share directly
-from the list without opening the detail sheet.
+from the list without opening the detail sheet. `TodoItemRow` also receives `urls: [APITodoUrl]`
+already, so the same helper applies.
 
 ## Files to modify
 
 | File | Change |
 |------|--------|
-| `src/ios/.../Views/Components/TodoEditSheet.swift` | Add share button to toolbar |
-| `src/ios/.../Views/Components/TodoItemRow.swift` | Add "Share" context menu action (optional) |
-| `src/ios/.../Helpers/TodoShareHelper.swift` | New helper — `shareText(for:)` |
+| `src/ios/Nylon Impossible/Nylon Impossible/Views/Components/TodoEditSheet.swift` | Add `ShareLink` share button to toolbar |
+| `src/ios/Nylon Impossible/Nylon Impossible/Views/Components/TodoItemRow.swift` | Add "Share" context menu action (optional) |
+| `src/ios/Nylon Impossible/Nylon Impossible/Utils/TodoShareHelper.swift` | New helper — `shareText(for:urls:)` |
 
 ## Acceptance criteria
 
 - [ ] Tapping the share button in the todo detail sheet opens the iOS Share Sheet
 - [ ] The share payload includes the title, description (if set), due date (if set), and any
       attached URLs
-- [ ] Sharing works on iOS 16+ via `ShareLink`
+- [ ] `ShareLink` is used directly (no `UIActivityViewController` wrapper needed — deployment
+      target is iOS 26.2)
 - [ ] No new permissions or entitlements are required
 
 ## Out of scope
@@ -78,4 +81,4 @@ from the list without opening the detail sheet.
 ## Dependencies
 
 - No external dependencies
-- Compatible with the `TodoUrl` SwiftData model introduced in `optimistic-ui-parity`
+- Uses the existing `APITodoUrl` (Codable) URL model; no SwiftData `TodoUrl` type required
