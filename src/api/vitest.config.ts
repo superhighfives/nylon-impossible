@@ -29,6 +29,14 @@ export default defineWorkersConfig(async () => {
     aliases["../lib/ai"] = path.join(__dirname, "test", "__mocks__", "ai.ts");
   }
 
+  // Always mock URL metadata fetching to prevent real HTTP requests in tests
+  aliases["../lib/url-metadata"] = path.join(
+    __dirname,
+    "test",
+    "__mocks__",
+    "url-metadata.ts",
+  );
+
   return {
     resolve: {
       alias: aliases,

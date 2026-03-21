@@ -16,7 +16,8 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
-import { truncateTitle } from "../lib/url-helpers";
+import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
+import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
 
 const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
@@ -84,6 +85,37 @@ function serializeTodo(
   };
 }
 
+/** Fetch metadata for URLs in background and update records */
+async function fetchAndUpdateUrlMetadata(
+  db: ReturnType<typeof getDb>,
+  urls: Array<{ id: string; todoId: string; url: string }>,
+) {
+  await Promise.allSettled(
+    urls.map(async ({ id, url }) => {
+      try {
+        const metadata = await fetchUrlMetadata(url);
+        await db
+          .update(todoUrls)
+          .set({
+            title: metadata.title,
+            description: metadata.description,
+            siteName: metadata.siteName,
+            favicon: metadata.favicon,
+            fetchStatus: "fetched" as const,
+            fetchedAt: new Date(),
+            updatedAt: new Date(),
+          })
+          .where(eq(todoUrls.id, id));
+      } catch {
+        await db
+          .update(todoUrls)
+          .set({ fetchStatus: "failed" as const, updatedAt: new Date() })
+          .where(eq(todoUrls.id, id));
+      }
+    }),
+  );
+}
+
 // POST /todos/sync - Bidirectional sync
 export async function syncTodos(c: Context<Env>) {
   const body = await c.req.json();
@@ -126,6 +158,10 @@ export async function syncTodos(c: Context<Env>) {
       })),
     );
   }
+
+  // Track todos whose descriptions contain URLs that need extracting
+  const urlExtractionNeeded: Array<{ todoId: string; description: string }> =
+    [];
 
   // 1. Apply client changes (with conflict resolution)
   // Normalize UUIDs to lowercase to match web-generated IDs
@@ -175,6 +211,15 @@ export async function syncTodos(c: Context<Env>) {
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
+        if (
+          change.description &&
+          extractUrlsFromText(change.description).length > 0
+        ) {
+          urlExtractionNeeded.push({
+            todoId: normalizedId,
+            description: change.description,
+          });
+        }
       } else {
         conflicts.push({
           id: normalizedId,
@@ -198,7 +243,68 @@ export async function syncTodos(c: Context<Env>) {
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });
+        if (
+          change.description &&
+          extractUrlsFromText(change.description).length > 0
+        ) {
+          urlExtractionNeeded.push({
+            todoId: normalizedId,
+            description: change.description,
+          });
+        }
       }
+    }
+  }
+
+  // 1b. Extract URLs from descriptions (e.g. iOS share sheet stores "URL: https://...")
+  if (urlExtractionNeeded.length > 0) {
+    const now = new Date();
+    const urlsToFetch: Array<{ id: string; todoId: string; url: string }> = [];
+
+    for (const { todoId, description } of urlExtractionNeeded) {
+      const extractedUrls = extractUrlsFromText(description);
+      if (extractedUrls.length === 0) continue;
+
+      // Skip URLs already stored for this todo
+      const existing = await db
+        .select({ url: todoUrls.url })
+        .from(todoUrls)
+        .where(eq(todoUrls.todoId, todoId));
+      const existingSet = new Set(existing.map((r) => r.url));
+      const newUrls = extractedUrls.filter((url) => !existingSet.has(url));
+      if (newUrls.length === 0) continue;
+
+      const urlPositions = generateNKeysBetween(null, null, newUrls.length);
+      const urlRows = newUrls.map((url, i) => {
+        const id = crypto.randomUUID();
+        urlsToFetch.push({ id, todoId, url });
+        return {
+          id,
+          todoId,
+          url,
+          position: urlPositions[i],
+          fetchStatus: "pending" as const,
+          createdAt: now,
+          updatedAt: now,
+        };
+      });
+      await db.insert(todoUrls).values(urlRows);
+
+      // Clear the description now that URLs have been extracted
+      const cleanedDescription = description
+        .replace(/URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*/gi, "")
+        .replace(/https?:\/\/[^\s<>"{}|\\^`[\]]*/gi, "")
+        .trim();
+      await db
+        .update(todos)
+        .set({ description: cleanedDescription || null, updatedAt: now })
+        .where(eq(todos.id, todoId));
+    }
+
+    if (urlsToFetch.length > 0) {
+      c.executionCtx.waitUntil(
+        fetchAndUpdateUrlMetadata(db, urlsToFetch),
+      );
     }
   }
 
