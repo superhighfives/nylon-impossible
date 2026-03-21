@@ -106,7 +106,7 @@ function TodoItemContent({
       </div>
       <div className="flex-1 min-w-0">
         <p
-          className={`text-sm leading-snug ${
+          className={`text-sm leading-snug break-words ${
             todo.completed ? "line-through text-gray-muted" : "text-gray"
           }`}
         >
