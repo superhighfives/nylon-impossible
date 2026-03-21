@@ -141,7 +141,7 @@ Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as repository secrets.
 
 ### App Store Connect
 
-The iOS deploy workflow uses three separate App Store Connect concepts: an **API key** (for authentication), **signing certificates** (for code signing), and **provisioning profiles** (to authorise the app on devices/TestFlight).
+The iOS deploy workflow uses three separate App Store Connect concepts: an **API key** (for authentication), **signing certificates** (for code signing), and **provisioning profiles** (to sign and authorise the app for App Store Connect/TestFlight distribution).
 
 #### 1. App Store Connect API Key
 
