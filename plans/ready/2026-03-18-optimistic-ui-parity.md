@@ -2,6 +2,7 @@
 
 **Date:** 2026-03-18
 **Status:** Ready
+**Last refined:** 2026-03-21 — plan-only corrections to address PR #45 Copilot review: added inverse SwiftData relationship to `TodoUrl`, updated `APITodoUrl(from:)` init signature to pass `todoId` explicitly, fixed `TodoEditSheet.swift` table entry (param type unchanged). No source files modified.
 
 ## Problem
 
@@ -151,6 +152,11 @@ final class TodoUrl {
     var createdAt: Date
     var updatedAt: Date
 
+    // Inverse relationship — required so a standalone TodoUrl can navigate to its parent
+    // without needing a redundant todoId string. SwiftData uses this to maintain referential
+    // integrity; `todo` is nil only transiently (between insert and the relationship being set).
+    @Relationship(inverse: \TodoItem.urls) var todo: TodoItem?
+
     init(from api: APITodoUrl) {
         id = api.id
         url = api.url
@@ -167,8 +173,11 @@ final class TodoUrl {
 }
 ```
 
-`todoId` is omitted — the parent `TodoItem` is always reachable via the SwiftData relationship,
-so storing a redundant string copy would risk the two falling out of sync.
+`todoId` is omitted — the parent `TodoItem` is always reachable via the inverse SwiftData
+relationship (`todoUrl.todo`), so storing a redundant string copy would risk the two falling
+out of sync. The `@Relationship(inverse:)` annotation on `TodoUrl.todo` paired with
+`@Relationship(deleteRule: .cascade) var urls: [TodoUrl]?` on `TodoItem` (step b) gives
+SwiftData full bidirectional navigation without any manual bookkeeping.
 
 #### b) Modify `TodoItem.swift`
 
@@ -222,15 +231,40 @@ configuration currently only lists `TodoItem.self` — add `TodoUrl.self` alongs
 #### e) Update call sites
 
 - **`ContentView.swift`**: in `todoRow(_:)`, change `urls: syncService.urls(for: todo.id)` to
-  `urls: todo.urls?.map { APITodoUrl(from: $0) } ?? []`. This keeps `TodoItemRow`'s public
-  interface unchanged (`[APITodoUrl]`), avoiding a cascade of downstream type changes. Add a
-  convenience `init(from: TodoUrl)` to `APITodoUrl` that maps the stored fields back to the API
-  type (fields are the same names; `itemDescription` maps back to `description`).
+  `urls: todo.urls?.map { APITodoUrl(from: $0, todoId: todo.id.uuidString) } ?? []`. This keeps
+  `TodoItemRow`'s public interface unchanged (`[APITodoUrl]`), avoiding a cascade of downstream
+  type changes. Add a convenience `init(from: TodoUrl, todoId: String)` to `APITodoUrl` that
+  maps the stored fields back to the API type (fields are the same names; `itemDescription` maps
+  back to `description`; `todoId` is passed explicitly because `APITodoUrl.todoId` is
+  non-optional and `TodoUrl` does not store a redundant copy — the caller already has the parent
+  `TodoItem` in scope):
+
+  ```swift
+  extension APITodoUrl {
+      init(from stored: TodoUrl, todoId: String) {
+          self.init(
+              id: stored.id,
+              todoId: todoId,
+              url: stored.url,
+              title: stored.title,
+              description: stored.itemDescription,
+              siteName: stored.siteName,
+              favicon: stored.favicon,
+              position: stored.position,
+              fetchStatus: FetchStatus(rawValue: stored.fetchStatus) ?? .pending,
+              fetchedAt: stored.fetchedAt,
+              createdAt: stored.createdAt,
+              updatedAt: stored.updatedAt
+          )
+      }
+  }
+  ```
 - **`TodoItemRow.swift`**: no change to the `urls` parameter type — it stays `[APITodoUrl]`.
 - **`UrlRowCompact.swift`**: no change to the `url` parameter type — it stays `APITodoUrl`.
-- **`TodoEditSheet.swift`**: no change to URL param type needed (stays `[APITodoUrl]`); update
-  the data source from `syncService.urls(for:)` to `todo.urls?.map { APITodoUrl(from: $0) } ?? []`
-  if it currently displays URL rows
+- **`TodoEditSheet.swift`**: no change to URL param type (stays `[APITodoUrl]`); update the
+  data source from `syncService.urls(for:)` to
+  `todo.urls?.map { APITodoUrl(from: $0, todoId: todo.id.uuidString) } ?? []` if it currently
+  displays URL rows
 - **Previews**: update any `modelContainer(for: TodoItem.self, ...)` calls to include `TodoUrl.self`
 - **Tests**: update `SyncServiceTests.swift` — remove assertions on `urlsByTodoId`, add
   assertions that URLs appear on the related `TodoItem` after sync
@@ -248,7 +282,7 @@ configuration currently only lists `TodoItem.self` — add `TodoUrl.self` alongs
 | `src/ios/.../Services/SharedModelContainer.swift` | Add `TodoUrl.self` to schema |
 | `src/ios/.../Views/Components/TodoItemRow.swift` | Add unsynced dot; `urls` param type unchanged |
 | `src/ios/.../Views/Components/UrlRowCompact.swift` | No change — param stays `APITodoUrl` |
-| `src/ios/.../Views/Components/TodoEditSheet.swift` | Change URL param type if it displays URLs |
+| `src/ios/.../Views/Components/TodoEditSheet.swift` | Update data source from `syncService.urls(for:)` to `todo.urls` map; param type unchanged |
 | `src/ios/.../Nylon ImpossibleTests/SyncServiceTests.swift` | Update URL assertions |
 
 ## Acceptance criteria
