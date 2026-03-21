@@ -15,6 +15,9 @@ on:
       - "package.json"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: web-deploy-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -107,7 +110,10 @@ jobs:
 
   deploy-preview:
     needs: [test]
-    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action != 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -266,7 +272,10 @@ jobs:
             }
 
   cleanup-preview:
-    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.action == 'closed'
+      && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

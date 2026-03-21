@@ -8,6 +8,9 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   test-ai:
     runs-on: ubuntu-latest
@@ -25,9 +28,10 @@ jobs:
           RUN_AI_TESTS: "true"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TEST_FILTER: ${{ github.event.inputs.test_filter }}
         run: |
-          if [ -n "${{ github.event.inputs.test_filter }}" ]; then
-            pnpm --filter @nylon-impossible/api test -- --reporter=verbose "${{ github.event.inputs.test_filter }}"
+          if [ -n "$TEST_FILTER" ]; then
+            pnpm --filter @nylon-impossible/api test -- --reporter=verbose "$TEST_FILTER"
           else
             pnpm --filter @nylon-impossible/api test -- --reporter=verbose
           fi
