@@ -20,3 +20,13 @@ The system needs to support a range of recurrence expressions:
 - Should the next occurrence be created eagerly on completion, or generated lazily on load?
 - How should the iOS app and web UI expose the recurrence picker? The recurrence options mirror what Calendar apps offer — a natural place to follow existing conventions (e.g. iOS Calendar's repeat sheet).
 - Should recurrence interact with the AI smart-create input? e.g. "remind me every Monday to review backlog" → creates a repeating todo.
+
+## Notifications
+
+Repeating todos make notifications more meaningful because there's always a next occurrence to surface. At minimum:
+
+- **App badge** — show a count of todos due today (including repeating instances that have come due). iOS supports this via `UNUserNotificationCenter` / `applicationIconBadgeNumber`; the web can use the [Badging API](https://developer.mozilla.org/en-US/docs/Web/API/Badging_API) (`navigator.setAppBadge(n)`).
+- **Scheduled local notifications** — when a repeating todo is created or its next occurrence is generated, schedule a local notification for the due time. Local notifications avoid needing a push infrastructure for the common case.
+- **Push notifications** — for server-side recurrence (e.g. occurrences generated in the background), a push notification can wake the app and update the badge. Requires APNs integration on iOS and Web Push on the browser.
+
+Badge count should be recomputed whenever todos are synced and cleared when all due items are completed.
