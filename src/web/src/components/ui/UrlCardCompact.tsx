@@ -31,12 +31,11 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
   const displayTitle =
     isPending || isFailed ? hostname : (url.title ?? url.siteName ?? hostname);
 
-  // Favicon: use fetched or Google's favicon service (only if we have a valid hostname)
-  const favicon =
-    url.favicon ??
-    (validHostname
-      ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
-      : null);
+  // Favicon: use fetched URL, falling back to Google's favicon service
+  const googleFaviconUrl = validHostname
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
+    : null;
+  const favicon = url.favicon ?? googleFaviconUrl;
 
   return (
     <a
@@ -53,7 +52,16 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
           alt=""
           className="w-4 h-4 shrink-0"
           onError={(e) => {
-            e.currentTarget.style.display = "none";
+            // If the stored favicon fails, cascade to Google's service
+            if (
+              url.favicon &&
+              googleFaviconUrl &&
+              e.currentTarget.src !== googleFaviconUrl
+            ) {
+              e.currentTarget.src = googleFaviconUrl;
+            } else {
+              e.currentTarget.style.display = "none";
+            }
           }}
         />
       ) : null}
