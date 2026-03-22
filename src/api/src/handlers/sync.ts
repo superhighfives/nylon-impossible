@@ -91,7 +91,8 @@ async function fetchAndUpdateUrlMetadata(
   urls: Array<{ id: string; todoId: string; url: string }>,
 ) {
   await Promise.allSettled(
-    urls.map(async ({ id, url }) => {
+    urls.map(async ({ id, todoId, url }) => {
+      const now = new Date();
       try {
         const metadata = await fetchUrlMetadata(url);
         await db
@@ -102,16 +103,21 @@ async function fetchAndUpdateUrlMetadata(
             siteName: metadata.siteName,
             favicon: metadata.favicon,
             fetchStatus: "fetched" as const,
-            fetchedAt: new Date(),
-            updatedAt: new Date(),
+            fetchedAt: now,
+            updatedAt: now,
           })
           .where(eq(todoUrls.id, id));
       } catch {
         await db
           .update(todoUrls)
-          .set({ fetchStatus: "failed" as const, updatedAt: new Date() })
+          .set({ fetchStatus: "failed" as const, updatedAt: now })
           .where(eq(todoUrls.id, id));
       }
+      // Bump parent todo so clients receive updated URL metadata on next sync
+      await db
+        .update(todos)
+        .set({ updatedAt: now })
+        .where(eq(todos.id, todoId));
     }),
   );
 }
@@ -261,20 +267,50 @@ export async function syncTodos(c: Context<Env>) {
     const now = new Date();
     const urlsToFetch: Array<{ id: string; todoId: string; url: string }> = [];
 
+    // Batch-fetch all existing URLs for all todos in one query
+    const extractionTodoIds = urlExtractionNeeded.map((t) => t.todoId);
+    const existingUrlRows = await db
+      .select({
+        todoId: todoUrls.todoId,
+        url: todoUrls.url,
+        position: todoUrls.position,
+      })
+      .from(todoUrls)
+      .where(inArray(todoUrls.todoId, extractionTodoIds))
+      .orderBy(asc(todoUrls.position));
+
+    // Group by todoId for O(1) lookup
+    const existingByTodo = new Map<
+      string,
+      { urls: Set<string>; lastPosition: string | null }
+    >();
+    for (const row of existingUrlRows) {
+      let entry = existingByTodo.get(row.todoId);
+      if (!entry) {
+        entry = { urls: new Set(), lastPosition: null };
+        existingByTodo.set(row.todoId, entry);
+      }
+      entry.urls.add(row.url);
+      entry.lastPosition = row.position; // rows are ordered, so last wins
+    }
+
     for (const { todoId, description } of urlExtractionNeeded) {
       const extractedUrls = extractUrlsFromText(description);
       if (extractedUrls.length === 0) continue;
 
-      // Skip URLs already stored for this todo
-      const existing = await db
-        .select({ url: todoUrls.url })
-        .from(todoUrls)
-        .where(eq(todoUrls.todoId, todoId));
-      const existingSet = new Set(existing.map((r) => r.url));
-      const newUrls = extractedUrls.filter((url) => !existingSet.has(url));
+      const existing = existingByTodo.get(todoId) ?? {
+        urls: new Set(),
+        lastPosition: null,
+      };
+      const newUrls = extractedUrls.filter((url) => !existing.urls.has(url));
       if (newUrls.length === 0) continue;
 
-      const urlPositions = generateNKeysBetween(null, null, newUrls.length);
+      // Generate positions after the last existing position to avoid collisions
+      const urlPositions = generateNKeysBetween(
+        existing.lastPosition,
+        null,
+        newUrls.length,
+      );
       const urlRows = newUrls.map((url, i) => {
         const id = crypto.randomUUID();
         urlsToFetch.push({ id, todoId, url });
@@ -292,8 +328,11 @@ export async function syncTodos(c: Context<Env>) {
 
       // Clear the description now that URLs have been extracted
       const cleanedDescription = description
-        .replace(/URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*/gi, "")
-        .replace(/https?:\/\/[^\s<>"{}|\\^`[\]]*/gi, "")
+        .replace(
+          /URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi,
+          "",
+        )
+        .replace(/https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi, "")
         .trim();
       await db
         .update(todos)
