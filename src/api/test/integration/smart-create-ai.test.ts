@@ -10,7 +10,7 @@
  * - Valid Cloudflare credentials
  */
 
-import { env, SELF } from "cloudflare:test";
+import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { beforeEach, describe, expect, it } from "vitest";
 import { cleanDb, seedUser } from "../helpers";
