@@ -290,33 +290,33 @@
    Gray Dividers
    -------------------------------------------- */
 @utility divide-gray-subtle {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-gray-6);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-graydark-6);
     }
   }
 }
 
 @utility divide-gray {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-gray-7);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-graydark-7);
     }
   }
 }
 
 @utility divide-gray-strong {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-gray-8);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-graydark-8);
     }
   }
@@ -326,33 +326,33 @@
    Yellow Dividers
    -------------------------------------------- */
 @utility divide-yellow-subtle {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-yellow-6);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-yellowdark-6);
     }
   }
 }
 
 @utility divide-yellow {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-yellow-7);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-yellowdark-7);
     }
   }
 }
 
 @utility divide-yellow-strong {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-yellow-8);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-yellowdark-8);
     }
   }
@@ -362,33 +362,33 @@
    Red Dividers
    -------------------------------------------- */
 @utility divide-red-subtle {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-red-6);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-reddark-6);
     }
   }
 }
 
 @utility divide-red {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-red-7);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-reddark-7);
     }
   }
 }
 
 @utility divide-red-strong {
-  & > * + * {
+  & > :not(:last-child) {
     border-color: var(--color-red-8);
   }
   @variant dark {
-    & > * + * {
+    & > :not(:last-child) {
       border-color: var(--color-reddark-8);
     }
   }
