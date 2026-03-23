@@ -65,6 +65,7 @@ describe("Todos CRUD", () => {
 
     it("includes urls for each todo ordered by position", async () => {
       const createRes = await createTodoViaAPI("Todo with URLs");
+      expect(createRes.status).toBe(201);
       const created = await createRes.json<{ id: string }>();
 
       await seedTodoUrl(created.id, "https://example.com/b", "b0");
@@ -73,6 +74,7 @@ describe("Todos CRUD", () => {
       const res = await SELF.fetch("http://localhost/todos", {
         headers: AUTH_HEADER,
       });
+      expect(res.status).toBe(200);
       const body = await res.json<any[]>();
       expect(body[0].urls).toHaveLength(2);
       expect(body[0].urls[0].url).toBe("https://example.com/a");
