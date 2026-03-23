@@ -90,7 +90,7 @@ describe("useTodos", () => {
     const todos = [makeTodo(), makeTodo({ id: "todo-2", title: "Call mom" })];
     mockGetTodos.mockResolvedValue(todos);
 
-    const { queryClient, Wrapper } = createWrapper();
+    const { Wrapper } = createWrapper();
     const { result } = renderHook(() => useTodos(), {
       wrapper: Wrapper,
     });
