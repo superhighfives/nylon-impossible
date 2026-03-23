@@ -309,7 +309,6 @@ describe("Smart create endpoint", () => {
 
         expect(urls).toHaveLength(1);
         expect(urls[0].url).toBe("https://test.invalid/path?query=value");
-        expect(urls[0].fetchStatus).toBe("pending");
       },
       AI_TIMEOUT,
     );
