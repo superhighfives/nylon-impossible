@@ -51,6 +51,11 @@
     "ios:simulator": "open -a Simulator"
   },
   "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "vite": "^8.0.1"
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "2.4.6",
     "drizzle-kit": "^0.31.8",
