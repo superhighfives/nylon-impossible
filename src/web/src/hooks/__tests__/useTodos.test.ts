@@ -3,13 +3,13 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { TodoWithUrls } from "@/types/database";
 import {
   useCreateTodo,
   useDeleteTodo,
   useTodos,
   useUpdateTodo,
 } from "../useTodos";
-import type { TodoWithUrls } from "@/types/database";
 
 // ---------------------------------------------------------------------------
 // Module mocks
@@ -101,7 +101,7 @@ describe("useTodos", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toHaveLength(2);
-    expect(result.current.data![0].title).toBe("Buy milk");
+    expect(result.current.data?.[0].title).toBe("Buy milk");
   });
 
   it("exposes loading state while fetching", () => {

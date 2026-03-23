@@ -140,7 +140,7 @@ describe("useWebSocketConnection", () => {
     await flushEffects();
 
     expect(lastCreatedWs).not.toBeNull();
-    expect(lastCreatedWs!.url).toBe(
+    expect(lastCreatedWs?.url).toBe(
       "wss://api.example.com/ws?token=test-token",
     );
   });
@@ -164,7 +164,7 @@ describe("useWebSocketConnection", () => {
     await flushEffects();
 
     act(() => {
-      lastCreatedWs!.simulateOpen();
+      lastCreatedWs?.simulateOpen();
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith(
@@ -180,9 +180,9 @@ describe("useWebSocketConnection", () => {
     await flushEffects();
 
     act(() => {
-      lastCreatedWs!.simulateOpen();
+      lastCreatedWs?.simulateOpen();
       invalidateSpy.mockClear(); // reset after onopen call
-      lastCreatedWs!.simulateMessage({ type: "sync" });
+      lastCreatedWs?.simulateMessage({ type: "sync" });
     });
 
     expect(invalidateSpy).toHaveBeenCalledWith(
@@ -198,9 +198,9 @@ describe("useWebSocketConnection", () => {
     await flushEffects();
 
     act(() => {
-      lastCreatedWs!.simulateOpen();
+      lastCreatedWs?.simulateOpen();
       invalidateSpy.mockClear(); // reset after onopen call
-      lastCreatedWs!.simulateMessage({ type: "unknown-event" });
+      lastCreatedWs?.simulateMessage({ type: "unknown-event" });
     });
 
     expect(invalidateSpy).not.toHaveBeenCalled();
@@ -213,8 +213,8 @@ describe("useWebSocketConnection", () => {
 
     expect(() => {
       act(() => {
-        lastCreatedWs!.simulateOpen();
-        lastCreatedWs!.simulateMessage("not { valid json");
+        lastCreatedWs?.simulateOpen();
+        lastCreatedWs?.simulateMessage("not { valid json");
       });
     }).not.toThrow();
   });
@@ -233,7 +233,8 @@ describe("useWebSocketConnection", () => {
       });
 
       expect(lastCreatedWs).not.toBeNull();
-      const firstWs = lastCreatedWs!;
+      if (!lastCreatedWs) throw new Error("lastCreatedWs is null");
+      const firstWs = lastCreatedWs;
 
       act(() => {
         firstWs.simulateOpen();
@@ -263,11 +264,11 @@ describe("useWebSocketConnection", () => {
       await flushEffects();
 
       act(() => {
-        lastCreatedWs!.simulateOpen();
+        lastCreatedWs?.simulateOpen();
         result.current.notifyChanged();
       });
 
-      expect(lastCreatedWs!.send).toHaveBeenCalledWith(
+      expect(lastCreatedWs?.send).toHaveBeenCalledWith(
         JSON.stringify({ type: "changed" }),
       );
     });
@@ -285,7 +286,7 @@ describe("useWebSocketConnection", () => {
         result.current.notifyChanged();
       });
 
-      expect(lastCreatedWs!.send).not.toHaveBeenCalled();
+      expect(lastCreatedWs?.send).not.toHaveBeenCalled();
     });
   });
 
@@ -297,7 +298,8 @@ describe("useWebSocketConnection", () => {
 
     await flushEffects();
 
-    const ws = lastCreatedWs!;
+    if (!lastCreatedWs) throw new Error("lastCreatedWs is null");
+    const ws = lastCreatedWs;
 
     act(() => {
       ws.simulateOpen();
