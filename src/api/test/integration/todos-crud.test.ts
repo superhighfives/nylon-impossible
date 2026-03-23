@@ -1,7 +1,7 @@
 import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { beforeEach, describe, expect, it } from "vitest";
-import { cleanDb, seedUser } from "../helpers";
+import { cleanDb, seedTodoUrl, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -51,6 +51,32 @@ describe("Todos CRUD", () => {
       expect(body).toHaveLength(2);
       expect(body[0].title).toBe("First todo");
       expect(body[1].title).toBe("Second todo");
+    });
+
+    it("includes empty urls array for todos with no urls", async () => {
+      await createTodoViaAPI("No URL todo");
+
+      const res = await SELF.fetch("http://localhost/todos", {
+        headers: AUTH_HEADER,
+      });
+      const body = await res.json<any[]>();
+      expect(body[0].urls).toEqual([]);
+    });
+
+    it("includes urls for each todo ordered by position", async () => {
+      const createRes = await createTodoViaAPI("Todo with URLs");
+      const created = await createRes.json<{ id: string }>();
+
+      await seedTodoUrl(created.id, "https://example.com/b", "b0");
+      await seedTodoUrl(created.id, "https://example.com/a", "a0");
+
+      const res = await SELF.fetch("http://localhost/todos", {
+        headers: AUTH_HEADER,
+      });
+      const body = await res.json<any[]>();
+      expect(body[0].urls).toHaveLength(2);
+      expect(body[0].urls[0].url).toBe("https://example.com/a");
+      expect(body[0].urls[1].url).toBe("https://example.com/b");
     });
   });
 

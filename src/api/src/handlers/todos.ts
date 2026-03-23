@@ -64,25 +64,31 @@ export async function listTodos(c: Context<Env>) {
   const todoIds = userTodos.map((t) => t.id);
   let allUrls: (typeof todoUrls.$inferSelect)[] = [];
   if (todoIds.length > 0) {
-    allUrls = await db
-      .select()
-      .from(todoUrls)
-      .where(inArray(todoUrls.todoId, todoIds))
-      .orderBy(asc(todoUrls.position));
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < todoIds.length; i += CHUNK_SIZE) {
+      const chunkIds = todoIds.slice(i, i + CHUNK_SIZE);
+      const chunkUrls = await db
+        .select()
+        .from(todoUrls)
+        .where(inArray(todoUrls.todoId, chunkIds))
+        .orderBy(asc(todoUrls.position));
+      allUrls = allUrls.concat(chunkUrls);
+    }
   }
 
   const urlsByTodoId = new Map<string, ReturnType<typeof serializeUrl>[]>();
   for (const url of allUrls) {
     const serialized = serializeUrl(url);
-    const existing = urlsByTodoId.get(url.todoId) ?? [];
+    const normalizedTodoId = url.todoId.toLowerCase();
+    const existing = urlsByTodoId.get(normalizedTodoId) ?? [];
     existing.push(serialized);
-    urlsByTodoId.set(url.todoId, existing);
+    urlsByTodoId.set(normalizedTodoId, existing);
   }
 
   return c.json(
     userTodos.map((todo) => ({
       ...serializeTodo(todo),
-      urls: urlsByTodoId.get(todo.id) ?? [],
+      urls: urlsByTodoId.get(todo.id.toLowerCase()) ?? [],
     })),
   );
 }
