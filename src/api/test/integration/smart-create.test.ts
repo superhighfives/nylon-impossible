@@ -503,8 +503,7 @@ describe("Smart create endpoint", () => {
       await smartCreate("First");
 
       // Create second todo
-      const res = await smartCreate("Second");
-      const body = await res.json<{ todos: any[] }>();
+      await smartCreate("Second");
 
       // Get all todos to check positions
       const listRes = await SELF.fetch("http://localhost/todos", {
