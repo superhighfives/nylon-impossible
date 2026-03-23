@@ -72,7 +72,7 @@ export async function listTodos(c: Context<Env>) {
         .from(todoUrls)
         .where(inArray(todoUrls.todoId, chunkIds))
         .orderBy(asc(todoUrls.position));
-      allUrls = allUrls.concat(chunkUrls);
+      allUrls.push(...chunkUrls);
     }
   }
 
