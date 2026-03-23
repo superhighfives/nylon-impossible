@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, eq, getDb, todos, todoUrls } from "../lib/db";
+import { and, asc, eq, getDb, inArray, todos, todoUrls } from "../lib/db";
 import type { Env } from "../types";
 
 // Validation schemas
@@ -61,7 +61,36 @@ export async function listTodos(c: Context<Env>) {
     .where(eq(todos.userId, userId))
     .orderBy(todos.createdAt);
 
-  return c.json(userTodos.map(serializeTodo));
+  const todoIds = userTodos.map((t) => t.id);
+  let allUrls: (typeof todoUrls.$inferSelect)[] = [];
+  if (todoIds.length > 0) {
+    const CHUNK_SIZE = 100;
+    for (let i = 0; i < todoIds.length; i += CHUNK_SIZE) {
+      const chunkIds = todoIds.slice(i, i + CHUNK_SIZE);
+      const chunkUrls = await db
+        .select()
+        .from(todoUrls)
+        .where(inArray(todoUrls.todoId, chunkIds))
+        .orderBy(asc(todoUrls.position));
+      allUrls.push(...chunkUrls);
+    }
+  }
+
+  const urlsByTodoId = new Map<string, ReturnType<typeof serializeUrl>[]>();
+  for (const url of allUrls) {
+    const serialized = serializeUrl(url);
+    const normalizedTodoId = url.todoId.toLowerCase();
+    const existing = urlsByTodoId.get(normalizedTodoId) ?? [];
+    existing.push(serialized);
+    urlsByTodoId.set(normalizedTodoId, existing);
+  }
+
+  return c.json(
+    userTodos.map((todo) => ({
+      ...serializeTodo(todo),
+      urls: urlsByTodoId.get(todo.id.toLowerCase()) ?? [],
+    })),
+  );
 }
 
 // GET /todos/:id - Get a single todo with URLs

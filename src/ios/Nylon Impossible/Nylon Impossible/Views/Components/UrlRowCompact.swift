@@ -47,17 +47,21 @@ struct UrlRowCompact: View {
         return hostname
     }
     
-    private var faviconURL: URL? {
+    private var storedFaviconURL: URL? {
         if let favicon = url.favicon, let faviconUrl = URL(string: favicon) {
             return faviconUrl
         }
+        return nil
+    }
+
+    private var googleFaviconURL: URL? {
         if let host = URL(string: url.url)?.host,
            let encoded = host.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             return URL(string: "https://www.google.com/s2/favicons?domain=\(encoded)&sz=32")
         }
         return nil
     }
-    
+
     var body: some View {
         Link(destination: URL(string: url.url)!) {
             HStack(spacing: 6) {
@@ -67,15 +71,7 @@ struct UrlRowCompact: View {
                         ProgressView()
                             .scaleEffect(0.6)
                     } else {
-                        AsyncImage(url: faviconURL) { image in
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } placeholder: {
-                            Image(systemName: "link")
-                                .foregroundStyle(.secondary)
-                                .font(.system(size: 10))
-                        }
+                        FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
                     }
                 }
                 .frame(width: 14, height: 14)

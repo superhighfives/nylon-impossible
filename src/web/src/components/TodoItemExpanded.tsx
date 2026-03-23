@@ -25,14 +25,23 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
   const isFailed = url.fetchStatus === "failed";
 
   // Show hostname for pending/failed, or full title when fetched
+  let validHostname: string | null = null;
+  try {
+    const parsed = new URL(url.url);
+    if (parsed.hostname) validHostname = parsed.hostname;
+  } catch {
+    // invalid URL — validHostname stays null
+  }
+
   const displayTitle =
     isPending || isFailed
-      ? new URL(url.url).hostname
-      : (url.title ?? url.siteName ?? new URL(url.url).hostname);
+      ? (validHostname ?? url.url)
+      : (url.title ?? url.siteName ?? validHostname ?? url.url);
 
-  const favicon =
-    url.favicon ??
-    `https://www.google.com/s2/favicons?domain=${new URL(url.url).hostname}&sz=32`;
+  const googleFaviconUrl = validHostname
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
+    : null;
+  const favicon = url.favicon ?? googleFaviconUrl;
 
   return (
     <a
@@ -48,16 +57,25 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
           size={16}
           className="w-4 h-4 mt-0.5 shrink-0 text-red-muted"
         />
-      ) : (
+      ) : favicon ? (
         <img
           src={favicon}
           alt=""
           className="w-4 h-4 mt-0.5 shrink-0"
           onError={(e) => {
-            e.currentTarget.style.display = "none";
+            // If the stored favicon fails, cascade to Google's service
+            if (
+              url.favicon &&
+              googleFaviconUrl &&
+              e.currentTarget.src !== googleFaviconUrl
+            ) {
+              e.currentTarget.src = googleFaviconUrl;
+            } else {
+              e.currentTarget.style.display = "none";
+            }
           }}
         />
-      )}
+      ) : null}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray truncate group-hover:underline">
           {displayTitle}

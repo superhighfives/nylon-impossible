@@ -1,8 +1,9 @@
 import path from "node:path";
 import {
-  defineWorkersConfig,
+  cloudflareTest,
   readD1Migrations,
-} from "@cloudflare/vitest-pool-workers/config";
+} from "@cloudflare/vitest-pool-workers";
+import { defineConfig } from "vitest/config";
 
 // Use AI-enabled config when RUN_AI_TESTS=true
 const useAI = process.env.RUN_AI_TESTS === "true";
@@ -10,7 +11,7 @@ const wranglerConfig = useAI
   ? "./wrangler.test-ai.jsonc"
   : "./wrangler.test.jsonc";
 
-export default defineWorkersConfig(async () => {
+export default defineConfig(async () => {
   const migrationsPath = path.join(__dirname, "migrations");
   const migrations = await readD1Migrations(migrationsPath);
 
@@ -24,9 +25,15 @@ export default defineWorkersConfig(async () => {
     ),
   };
 
-  // Mock AI module when not running real AI tests
+  // Mock AI and URL metadata modules when not running real AI tests
   if (!useAI) {
     aliases["../lib/ai"] = path.join(__dirname, "test", "__mocks__", "ai.ts");
+    aliases["../lib/url-metadata"] = path.join(
+      __dirname,
+      "test",
+      "__mocks__",
+      "url-metadata.ts",
+    );
   }
 
   // Always mock URL metadata fetching to prevent real HTTP requests in tests
@@ -38,25 +45,25 @@ export default defineWorkersConfig(async () => {
   );
 
   return {
+    plugins: [
+      cloudflareTest({
+        isolatedStorage: false,
+        singleWorker: true,
+        wrangler: { configPath: wranglerConfig },
+        miniflare: {
+          bindings: {
+            TEST_MIGRATIONS: migrations,
+            CLERK_SECRET_KEY: "sk_test_fake",
+            CLERK_PUBLISHABLE_KEY: "pk_test_fake",
+          },
+        },
+      }),
+    ],
     resolve: {
       alias: aliases,
     },
     test: {
       setupFiles: ["./test/apply-migrations.ts"],
-      poolOptions: {
-        workers: {
-          isolatedStorage: false,
-          singleWorker: true,
-          wrangler: { configPath: wranglerConfig },
-          miniflare: {
-            bindings: {
-              TEST_MIGRATIONS: migrations,
-              CLERK_SECRET_KEY: "sk_test_fake",
-              CLERK_PUBLISHABLE_KEY: "pk_test_fake",
-            },
-          },
-        },
-      },
     },
   };
 });
