@@ -59,6 +59,7 @@ describe("Todos CRUD", () => {
       const res = await SELF.fetch("http://localhost/todos", {
         headers: AUTH_HEADER,
       });
+      expect(res.status).toBe(200);
       const body = await res.json<any[]>();
       expect(body[0].urls).toEqual([]);
     });
