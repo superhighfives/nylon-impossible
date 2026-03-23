@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, eq, getDb, todos, todoUrls } from "../lib/db";
+import { and, asc, eq, getDb, inArray, todos, todoUrls } from "../lib/db";
 import type { Env } from "../types";
 
 // Validation schemas
@@ -61,7 +61,30 @@ export async function listTodos(c: Context<Env>) {
     .where(eq(todos.userId, userId))
     .orderBy(todos.createdAt);
 
-  return c.json(userTodos.map(serializeTodo));
+  const todoIds = userTodos.map((t) => t.id);
+  let allUrls: (typeof todoUrls.$inferSelect)[] = [];
+  if (todoIds.length > 0) {
+    allUrls = await db
+      .select()
+      .from(todoUrls)
+      .where(inArray(todoUrls.todoId, todoIds))
+      .orderBy(asc(todoUrls.position));
+  }
+
+  const urlsByTodoId = new Map<string, ReturnType<typeof serializeUrl>[]>();
+  for (const url of allUrls) {
+    const serialized = serializeUrl(url);
+    const existing = urlsByTodoId.get(url.todoId) ?? [];
+    existing.push(serialized);
+    urlsByTodoId.set(url.todoId, existing);
+  }
+
+  return c.json(
+    userTodos.map((todo) => ({
+      ...serializeTodo(todo),
+      urls: urlsByTodoId.get(todo.id) ?? [],
+    })),
+  );
 }
 
 // GET /todos/:id - Get a single todo with URLs
