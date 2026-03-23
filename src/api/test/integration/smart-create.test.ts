@@ -294,7 +294,7 @@ describe("Smart create endpoint", () => {
     it(
       "stores URL in todoUrls table",
       async () => {
-        const res = await smartCreate("https://example.com/path?query=value");
+        const res = await smartCreate("https://test.invalid/path?query=value");
         expect(res.status).toBe(200);
 
         const body = await res.json<{ todos: any[] }>();
@@ -308,7 +308,7 @@ describe("Smart create endpoint", () => {
           .where(eq(todoUrls.todoId, todoId));
 
         expect(urls).toHaveLength(1);
-        expect(urls[0].url).toBe("https://example.com/path?query=value");
+        expect(urls[0].url).toBe("https://test.invalid/path?query=value");
         expect(urls[0].fetchStatus).toBe("pending");
       },
       AI_TIMEOUT,
