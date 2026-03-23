@@ -5,6 +5,44 @@
 /** Common trailing punctuation that shouldn't be part of URLs */
 const TRAILING_PUNCT = /[.,;:!?)]+$/;
 
+/** URL regex to extract URLs from text */
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+/**
+ * Validate and clean a URL string.
+ * Returns null if the URL is invalid.
+ */
+function cleanUrl(urlString: string): string | null {
+  const cleaned = urlString.replace(TRAILING_PUNCT, "");
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract and validate all URLs from a text string.
+ * Returns unique, validated URLs in order of appearance.
+ */
+export function extractUrlsFromText(text: string): string[] {
+  const rawMatches = text.match(URL_REGEX) ?? [];
+  const seen = new Set<string>();
+  const urls: string[] = [];
+  for (const match of rawMatches) {
+    const cleaned = cleanUrl(match);
+    if (cleaned && !seen.has(cleaned)) {
+      seen.add(cleaned);
+      urls.push(cleaned);
+    }
+  }
+  return urls;
+}
+
 /**
  * Clean a URL string by stripping trailing punctuation.
  * Returns the cleaned URL or the original if cleaning fails.

@@ -1,6 +1,8 @@
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
+import { getDb, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -278,6 +280,103 @@ describe("Sync endpoint", () => {
     expect(todo).toBeTruthy();
     expect(todo.title.startsWith(prefix)).toBe(true);
     expect(todo.title.length).toBeLessThanOrEqual(500);
+  });
+
+  // --- URL extraction from description (iOS share sheet) ---
+
+  it("extracts URLs from description and stores them in todoUrls", async () => {
+    const now = new Date().toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440010";
+
+    const res = await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Check quiche.industries",
+          description: "URL: https://quiche.industries/browser/",
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const db = getDb(env.DB);
+    const urls = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, todoId));
+
+    expect(urls).toHaveLength(1);
+    expect(urls[0].url).toBe("https://quiche.industries/browser/");
+  });
+
+  it("clears the URL from description after extraction", async () => {
+    const now = new Date().toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440011";
+
+    await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Check quiche.industries",
+          description: "URL: https://quiche.industries/browser/",
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+
+    // The description should be cleared since it only contained the URL
+    const res = await syncRequest({ changes: [] });
+    const body = await res.json<any>();
+    const todo = body.todos.find((t: any) => t.id === todoId);
+    expect(todo).toBeTruthy();
+    expect(todo.description).toBeNull();
+  });
+
+  it("does not duplicate URLs already in todoUrls on re-sync", async () => {
+    const now = new Date().toISOString();
+    const later = new Date(Date.now() + 1000).toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440012";
+
+    // First sync — creates the todo and extracts the URL
+    await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Check quiche.industries",
+          description: "URL: https://quiche.industries/browser/",
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+
+    // Second sync — update with same URL in description again
+    await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Check quiche.industries",
+          description: "URL: https://quiche.industries/browser/",
+          completed: false,
+          position: "a0",
+          updatedAt: later,
+        },
+      ],
+    });
+
+    const db = getDb(env.DB);
+    const urls = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, todoId));
+
+    expect(urls).toHaveLength(1);
   });
 
   it("updates an existing todo with a long title and truncates it", async () => {
