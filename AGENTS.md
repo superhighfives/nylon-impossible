@@ -59,7 +59,7 @@ pnpm ios:simulator    # Open iOS Simulator
 
 ### Code Quality
 
-Run these before committing. CI enforces them.
+**Always run these before committing and verify they pass. CI enforces them and PRs will fail if they don't.**
 
 ```bash
 pnpm lint             # Biome linter (web + API)
@@ -73,6 +73,8 @@ Per-project:
 pnpm web:check && pnpm web:typecheck && pnpm web:test
 pnpm api:check && pnpm api:typecheck && pnpm api:test
 ```
+
+> After making any code changes, run `pnpm check` and confirm the output is `No fixes applied` before committing. If it reports errors, fix them first.
 
 ### Database
 

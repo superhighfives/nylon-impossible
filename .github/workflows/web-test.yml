@@ -3,16 +3,8 @@ name: Test Web
 on:
   push:
     branches: [main]
-    paths:
-      - "src/web/**"
-      - "src/api/**"
-      - "package.json"
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    paths:
-      - "src/web/**"
-      - "src/api/**"
-      - "package.json"
   workflow_dispatch:
 
 permissions:
@@ -29,20 +21,41 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+
+      - name: Detect source file changes
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            src:
+              - 'src/web/**'
+              - 'src/api/**'
+              - 'package.json'
+              - '.github/workflows/web-test.yml'
+
       - uses: pnpm/action-setup@v5
+        if: steps.changes.outputs.src == 'true'
+
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.src == 'true'
         with:
           node-version: 22
+
       - run: pnpm install
+        if: steps.changes.outputs.src == 'true'
 
       - name: Lint & typecheck API
+        if: steps.changes.outputs.src == 'true'
         run: pnpm api:check && pnpm api:typecheck
 
       - name: Lint & typecheck Web
+        if: steps.changes.outputs.src == 'true'
         run: pnpm web:check && pnpm web:typecheck
 
       - name: Test API
+        if: steps.changes.outputs.src == 'true'
         run: pnpm --filter @nylon-impossible/api test
 
       - name: Test Web
+        if: steps.changes.outputs.src == 'true'
         run: pnpm --filter @nylon-impossible/web test
