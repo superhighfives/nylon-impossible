@@ -28,10 +28,12 @@ struct FaviconImage: View {
                             .aspectRatio(contentMode: .fit)
                     } placeholder: {
                         Image(systemName: "link")
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                     }
                 default:
                     Image(systemName: "link")
+                        .font(.system(size: 10))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -42,6 +44,7 @@ struct FaviconImage: View {
                     .aspectRatio(contentMode: .fit)
             } placeholder: {
                 Image(systemName: "link")
+                    .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
         }

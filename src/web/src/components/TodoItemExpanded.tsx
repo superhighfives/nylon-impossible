@@ -25,20 +25,21 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
   const isFailed = url.fetchStatus === "failed";
 
   // Show hostname for pending/failed, or full title when fetched
-  let hostname: string;
+  let validHostname: string | null = null;
   try {
-    hostname = new URL(url.url).hostname;
+    const parsed = new URL(url.url);
+    if (parsed.hostname) validHostname = parsed.hostname;
   } catch {
-    hostname = url.url;
+    // invalid URL — validHostname stays null
   }
 
   const displayTitle =
     isPending || isFailed
-      ? hostname
-      : (url.title ?? url.siteName ?? hostname);
+      ? (validHostname ?? url.url)
+      : (url.title ?? url.siteName ?? validHostname ?? url.url);
 
-  const googleFaviconUrl = hostname
-    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostname)}&sz=32`
+  const googleFaviconUrl = validHostname
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
     : null;
   const favicon = url.favicon ?? googleFaviconUrl;
 
@@ -56,9 +57,9 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
           size={16}
           className="w-4 h-4 mt-0.5 shrink-0 text-red-muted"
         />
-      ) : (
+      ) : favicon ? (
         <img
-          src={favicon ?? undefined}
+          src={favicon}
           alt=""
           className="w-4 h-4 mt-0.5 shrink-0"
           onError={(e) => {
@@ -74,7 +75,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
             }
           }}
         />
-      )}
+      ) : null}
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray truncate group-hover:underline">
           {displayTitle}
