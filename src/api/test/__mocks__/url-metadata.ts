@@ -22,7 +22,9 @@ const NULL_METADATA: UrlMetadata = {
   favicon: null,
 };
 
-export const fetchUrlMetadata = vi.fn<[url: string], Promise<UrlMetadata>>();
+export const fetchUrlMetadata = vi.fn<[url: string], Promise<UrlMetadata>>(
+  async () => NULL_METADATA,
+);
 
 /**
  * Configure the mock to return specific metadata.
