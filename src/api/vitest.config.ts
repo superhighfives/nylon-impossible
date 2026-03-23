@@ -25,9 +25,15 @@ export default defineConfig(async () => {
     ),
   };
 
-  // Mock AI module when not running real AI tests
+  // Mock AI and URL metadata modules when not running real AI tests
   if (!useAI) {
     aliases["../lib/ai"] = path.join(__dirname, "test", "__mocks__", "ai.ts");
+    aliases["../lib/url-metadata"] = path.join(
+      __dirname,
+      "test",
+      "__mocks__",
+      "url-metadata.ts",
+    );
   }
 
   return {
