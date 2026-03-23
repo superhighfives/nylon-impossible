@@ -36,7 +36,7 @@ export function TodoInput() {
       {feedback && <p className="text-sm text-gray-muted">{feedback}</p>}
 
       <form onSubmit={handleSubmit}>
-        <div className="relative bg-gray-surface shadow-base rounded-lg p-4">
+        <div className="relative bg-gray-surface shadow-base rounded-lg">
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}

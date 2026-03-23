@@ -91,7 +91,7 @@ function TodoItemContent({
   deletePending,
 }: TodoItemProps) {
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-center gap-3">
       <div className="pt-0.5">
         <Checkbox
           checked={todo.completed}
@@ -201,7 +201,7 @@ function SortableTodoItem(
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="pt-1 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none"
+          className="pt-1.75 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -210,7 +210,7 @@ function SortableTodoItem(
         </button>
         <div className="flex-1 min-w-0">
           <TodoItemContent {...props} />
-          {props.isExpanded && (
+          {props.isExpanded && !isDragging && (
             <ExpandedSection
               todo={props.todo}
               onUpdate={props.onUpdateExpanded}
