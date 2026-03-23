@@ -290,32 +290,32 @@
    Gray Dividers
    -------------------------------------------- */
 @utility divide-gray-subtle {
-  --divide-color: var(--color-gray-6);
-  @variant dark {
-    --divide-color: var(--color-graydark-6);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-gray-6);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-graydark-6);
+    }
   }
 }
 
 @utility divide-gray {
-  --divide-color: var(--color-gray-7);
-  @variant dark {
-    --divide-color: var(--color-graydark-7);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-gray-7);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-graydark-7);
+    }
   }
 }
 
 @utility divide-gray-strong {
-  --divide-color: var(--color-gray-8);
-  @variant dark {
-    --divide-color: var(--color-graydark-8);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-gray-8);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-graydark-8);
+    }
   }
 }
 
@@ -323,32 +323,32 @@
    Yellow Dividers
    -------------------------------------------- */
 @utility divide-yellow-subtle {
-  --divide-color: var(--color-yellow-6);
-  @variant dark {
-    --divide-color: var(--color-yellowdark-6);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-yellow-6);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-yellowdark-6);
+    }
   }
 }
 
 @utility divide-yellow {
-  --divide-color: var(--color-yellow-7);
-  @variant dark {
-    --divide-color: var(--color-yellowdark-7);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-yellow-7);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-yellowdark-7);
+    }
   }
 }
 
 @utility divide-yellow-strong {
-  --divide-color: var(--color-yellow-8);
-  @variant dark {
-    --divide-color: var(--color-yellowdark-8);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-yellow-8);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-yellowdark-8);
+    }
   }
 }
 
@@ -356,32 +356,32 @@
    Red Dividers
    -------------------------------------------- */
 @utility divide-red-subtle {
-  --divide-color: var(--color-red-6);
-  @variant dark {
-    --divide-color: var(--color-reddark-6);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-red-6);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-reddark-6);
+    }
   }
 }
 
 @utility divide-red {
-  --divide-color: var(--color-red-7);
-  @variant dark {
-    --divide-color: var(--color-reddark-7);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-red-7);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-reddark-7);
+    }
   }
 }
 
 @utility divide-red-strong {
-  --divide-color: var(--color-red-8);
-  @variant dark {
-    --divide-color: var(--color-reddark-8);
-  }
   & > * + * {
-    border-color: var(--divide-color);
+    border-color: var(--color-red-8);
+    @variant dark {
+      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+      border-color: var(--color-reddark-8);
+    }
   }
 }
 
