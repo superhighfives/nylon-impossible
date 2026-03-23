@@ -50,7 +50,15 @@
     "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
     "ios:simulator": "open -a Simulator"
   },
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "packageManager": "pnpm@9.15.0",
+  "pnpm": {
+    "overrides": {
+      "vite": "^8.0.1"
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "2.4.6",
     "drizzle-kit": "^0.31.8",
