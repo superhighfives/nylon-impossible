@@ -21,58 +21,41 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Detect source file changes
         id: changes
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "src_changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            BASE="${{ github.event.pull_request.base.sha }}"
-            HEAD="${{ github.event.pull_request.head.sha }}"
-          else
-            BASE="${{ github.event.before }}"
-            HEAD="${{ github.sha }}"
-          fi
-          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
-            echo "src_changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
-          echo "Changed files:"
-          echo "$CHANGED"
-          if echo "$CHANGED" | grep -qE '^(src/web|src/api|package\.json)'; then
-            echo "src_changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "src_changed=false" >> "$GITHUB_OUTPUT"
-          fi
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            src:
+              - 'src/web/**'
+              - 'src/api/**'
+              - 'package.json'
+              - '.github/workflows/web-test.yml'
 
       - uses: pnpm/action-setup@v5
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
 
       - uses: actions/setup-node@v4
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
         with:
           node-version: 22
 
       - run: pnpm install
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
 
       - name: Lint & typecheck API
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
         run: pnpm api:check && pnpm api:typecheck
 
       - name: Lint & typecheck Web
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
         run: pnpm web:check && pnpm web:typecheck
 
       - name: Test API
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
         run: pnpm --filter @nylon-impossible/api test
 
       - name: Test Web
-        if: steps.changes.outputs.src_changed == 'true'
+        if: steps.changes.outputs.src == 'true'
         run: pnpm --filter @nylon-impossible/web test
