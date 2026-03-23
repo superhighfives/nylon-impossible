@@ -75,7 +75,11 @@ function createWrapper() {
   });
 
   function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(QueryClientProvider, { client: queryClient }, children);
+    return createElement(
+      QueryClientProvider,
+      { client: queryClient },
+      children,
+    );
   }
 
   return { queryClient, Wrapper };
@@ -222,7 +226,9 @@ describe("useUpdateTodo", () => {
   it("applies completed flag optimistically", async () => {
     let resolveUpdate!: (v: TodoWithUrls) => void;
     mockUpdateTodo.mockReturnValue(
-      new Promise<TodoWithUrls>((res) => { resolveUpdate = res; }) as never,
+      new Promise<TodoWithUrls>((res) => {
+        resolveUpdate = res;
+      }) as never,
     );
 
     const initialTodo = makeTodo({ completed: false });
@@ -259,7 +265,9 @@ describe("useDeleteTodo", () => {
   it("optimistically removes the todo before the server responds", async () => {
     let resolveDelete!: (v: unknown) => void;
     mockDeleteTodo.mockReturnValue(
-      new Promise((res) => { resolveDelete = res; }) as never,
+      new Promise((res) => {
+        resolveDelete = res;
+      }) as never,
     );
 
     const todos = [
