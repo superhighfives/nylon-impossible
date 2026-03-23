@@ -292,8 +292,9 @@
 @utility divide-gray-subtle {
   & > * + * {
     border-color: var(--color-gray-6);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-graydark-6);
     }
   }
@@ -302,8 +303,9 @@
 @utility divide-gray {
   & > * + * {
     border-color: var(--color-gray-7);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-graydark-7);
     }
   }
@@ -312,8 +314,9 @@
 @utility divide-gray-strong {
   & > * + * {
     border-color: var(--color-gray-8);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-graydark-8);
     }
   }
@@ -325,8 +328,9 @@
 @utility divide-yellow-subtle {
   & > * + * {
     border-color: var(--color-yellow-6);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-yellowdark-6);
     }
   }
@@ -335,8 +339,9 @@
 @utility divide-yellow {
   & > * + * {
     border-color: var(--color-yellow-7);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-yellowdark-7);
     }
   }
@@ -345,8 +350,9 @@
 @utility divide-yellow-strong {
   & > * + * {
     border-color: var(--color-yellow-8);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-yellowdark-8);
     }
   }
@@ -358,8 +364,9 @@
 @utility divide-red-subtle {
   & > * + * {
     border-color: var(--color-red-6);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-reddark-6);
     }
   }
@@ -368,8 +375,9 @@
 @utility divide-red {
   & > * + * {
     border-color: var(--color-red-7);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-reddark-7);
     }
   }
@@ -378,8 +386,9 @@
 @utility divide-red-strong {
   & > * + * {
     border-color: var(--color-red-8);
-    @variant dark {
-      /* biome-ignore lint/suspicious/noDuplicateProperties: dark mode variant intentionally overrides border-color */
+  }
+  @variant dark {
+    & > * + * {
       border-color: var(--color-reddark-8);
     }
   }
