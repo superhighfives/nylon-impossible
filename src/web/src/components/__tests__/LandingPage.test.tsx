@@ -13,16 +13,18 @@ vi.mock("@clerk/tanstack-react-start", () => ({
 }));
 
 describe("LandingPage", () => {
-  it("renders Sign In and Sign Up buttons", () => {
+  it("renders Sign in and Create account buttons", () => {
     render(<LandingPage />);
-    expect(screen.getByText("Sign In")).toBeInTheDocument();
-    expect(screen.getByText("Sign Up")).toBeInTheDocument();
+    expect(screen.getByText("Sign in")).toBeInTheDocument();
+    expect(screen.getByText("Create account")).toBeInTheDocument();
   });
 
   it("renders descriptive text", () => {
     render(<LandingPage />);
     expect(
-      screen.getByText("A todo app to keep you organized."),
+      screen.getByText(
+        "A todo app for web and iOS. Describe what you need to do — AI handles the rest.",
+      ),
     ).toBeInTheDocument();
   });
 });

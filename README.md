@@ -7,16 +7,16 @@
 
 # Nylon Impossible
 
-A cross-platform todo app for web and iOS. Real-time sync via WebSockets, AI-assisted task creation, and Clerk authentication — deployed on Cloudflare Workers.
+A todo app for web and iOS. Describe what you need to do — AI handles the rest.
 
 > **Note:** This is an exploratory project, not a production template. It was built to experiment with Cloudflare's developer platform — specifically Workers AI (for natural language todo parsing), Durable Objects (for WebSocket-based real-time sync), D1 (SQLite at the edge), and the Workers runtime in general. Expect rough edges, opinionated choices, and things that exist because they were interesting to build.
 
 ## Features
 
-- **Real-time sync** across devices via WebSockets and Durable Objects
-- **AI task creation** — plain language input parsed into structured todos with tool calling
-- **iOS native** — SwiftUI app with Siri integration and Share Sheet support
-- **PWA** — installable web app with offline-ready architecture
+- **AI task creation** — type naturally and due dates, priorities, and URLs are parsed automatically using Workers AI
+- **Real-time sync** — changes appear instantly across all devices via WebSockets and Durable Objects
+- **iOS native** — SwiftUI app with Siri integration and Share Sheet support, synced to the same account
+- **Optimistic updates** — keep the UI fast and responsive; changes sync automatically when back online
 - **Cross-platform auth** — Clerk sessions on web, JWT on iOS, same user pool
 
 ## Structure
