@@ -101,7 +101,7 @@ This section covers everything needed to get CI/CD working on a fresh fork or ne
 | `CLOUDFLARE_ACCOUNT_ID` | `web-deploy.yml` | Cloudflare account ID |
 | `CLERK_SECRET_KEY` | `web-deploy.yml` | Clerk secret key (API worker) |
 | `CLERK_PUBLISHABLE_KEY` | `web-deploy.yml` | Clerk publishable key (API worker) |
-| `VITE_CLERK_PUBLISHABLE_KEY` | `web-deploy.yml` | Clerk publishable key (Vite web build) |
+| `VITE_CLERK_PUBLISHABLE_KEY` | `web-deploy.yml`, `marketing.yml` | Clerk publishable key (Vite web build) |
 | `DEVELOPMENT_CERTIFICATE_BASE64` | `ios-deploy.yml` | Apple development cert (.p12), base64 |
 | `DISTRIBUTION_CERTIFICATE_BASE64` | `ios-deploy.yml` | Apple distribution cert (.p12), base64 |
 | `DISTRIBUTION_CERTIFICATE_PASSWORD` | `ios-deploy.yml` | Password protecting both .p12 files |
@@ -113,6 +113,7 @@ This section covers everything needed to get CI/CD working on a fresh fork or ne
 | `ASC_KEY_CONTENT` | `ios-deploy.yml` | App Store Connect API key content (.p8) |
 | `APPLE_ID` | `ios-deploy.yml` | Your Apple ID email address |
 | `TEAM_ID` | `ios-deploy.yml` | Apple Developer Team ID |
+| `SUPERHIGHFIVES_DEPLOY_TOKEN` | `marketing.yml` | GitHub PAT with write access to the superhighfives.com repo |
 
 ---
 
@@ -248,6 +249,17 @@ base64 -i "Nylon_Impossible_AppStore.mobileprovision" | pbcopy
 |--------|-------------|
 | `pnpm deploy` | Deploy web + API to Cloudflare Workers |
 
+### Marketing
+
+| Script | Description |
+|--------|-------------|
+| `pnpm marketing:capture` | Build iOS app, boot simulator, and screenshot web + iOS in light and dark mode |
+| `pnpm marketing:web` | Composite captured PNGs into browser + phone overlays (`assets/marketing/output/`) |
+| `pnpm marketing:publish` | Copy output JPGs to superhighfives.com, commit, and push |
+| `pnpm marketing:all` | Run capture → web → publish in sequence |
+
+`marketing:capture` and `marketing:web` are intentionally separate — once you have good source PNGs you can iterate on the composite layout in [`assets/marketing/manifest.json`](assets/marketing/manifest.json) and re-run `marketing:web` without rebuilding or relaunching the simulator.
+
 All scripts are also available per-package with `web:*`, `api:*`, and `ios:*` prefixes.
 
 ## Plans
@@ -267,6 +279,20 @@ Implementation plans live in [`plans/`](plans/):
 | `lint.yml` | PRs, push to main | Biome + tsc (web, API), SwiftLint (iOS) |
 | `deploy.yml` | Push to main, PRs | Deploy to Cloudflare Workers + preview environments |
 | `testflight.yml` | Manual | Build and upload iOS app to TestFlight |
+| `marketing.yml` | Manual (`workflow_dispatch`) | Capture screenshots, composite, and publish to superhighfives.com |
+
+### Marketing workflow setup
+
+`marketing.yml` requires one additional secret beyond the standard set:
+
+**`SUPERHIGHFIVES_DEPLOY_TOKEN`** — a GitHub fine-grained PAT that lets CI push to the superhighfives.com repo:
+
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**
+2. Name it (e.g. `nylon-impossible-marketing-deploy`)
+3. Under **Repository access**, choose "Only select repositories" → `superhighfives/superhighfives.com`
+4. Under **Permissions → Repository permissions**, set **Contents** to "Read and write"
+5. Generate and copy the token
+6. Add it as a secret at **github.com/superhighfives/nylon-impossible → Settings → Secrets and variables → Actions → New repository secret**, named `SUPERHIGHFIVES_DEPLOY_TOKEN`
 
 ## License
 
