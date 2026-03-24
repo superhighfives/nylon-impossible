@@ -25,13 +25,14 @@
 import { execSync, spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 // ---------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------
 
-const SCRIPT_DIR = dirname(new URL(import.meta.url).pathname);
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WORKSPACE_ROOT = resolve(SCRIPT_DIR, "../..");
 const SOURCE_DIR = join(SCRIPT_DIR, "source");
 const OUTPUT_DIR = join(SCRIPT_DIR, "output");
@@ -85,6 +86,13 @@ const runPublish = flag("--publish") || flag("--all");
 if (!runCapture && !runWeb && !runPublish) {
   console.error(
     "Error: specify at least one of --capture, --web, --publish, or --all"
+  );
+  process.exit(1);
+}
+
+if (runCapture && !process.env.VITE_CLERK_PUBLISHABLE_KEY) {
+  console.error(
+    "Error: VITE_CLERK_PUBLISHABLE_KEY is required for --capture / --all"
   );
   process.exit(1);
 }
@@ -258,9 +266,27 @@ async function captureWebScreenshots(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 async function captureIOSScreenshots(): Promise<void> {
-  const { project, scheme, bundleId, device } = manifest.ios;
+  const { project, scheme, bundleId } = manifest.ios;
   const projectPath = join(WORKSPACE_ROOT, project);
   const derivedDataPath = join("/tmp", "nylon-impossible-marketing-build");
+
+  // Resolve device: env override → manifest value → first available iPhone
+  const deviceOverride = process.env.IOS_DEVICE ?? manifest.ios.device;
+  const availableDevicesJson = execSync(
+    "xcrun simctl list devices available -j",
+    { encoding: "utf8" }
+  );
+  const availableData = JSON.parse(availableDevicesJson) as {
+    devices: Record<string, Array<{ name: string; udid: string; isAvailable: boolean }>>;
+  };
+  const allIphones = Object.values(availableData.devices)
+    .flat()
+    .filter((d) => d.isAvailable && d.name.includes("iPhone"));
+
+  const preferred = allIphones.find((d) => d.name === deviceOverride);
+  const chosen = preferred ?? allIphones[0];
+  if (!chosen) throw new Error("No available iPhone simulator found");
+  const device = chosen.name;
 
   console.log(`  Building iOS app (${scheme}) for simulator…`);
   execSync(
@@ -288,18 +314,7 @@ async function captureIOSScreenshots(): Promise<void> {
   }
   console.log(`  App built`);
 
-  // Find the simulator UDID
-  const udid = execSync(
-    `xcrun simctl list devices available -j | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
-devices = [d for devs in data['devices'].values() for d in devs
-           if d.get('isAvailable') and d['name'] == '${device}']
-print(devices[0]['udid'] if devices else '')
-"`,
-    { encoding: "utf8" }
-  ).trim();
-
+  const udid = chosen.udid;
   if (!udid) throw new Error(`Simulator "${device}" not found`);
 
   console.log(`  Booting simulator: ${device} (${udid})…`);

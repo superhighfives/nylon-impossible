@@ -45,10 +45,6 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install
 
-      - name: Install marketing dependencies
-        run: pnpm install
-        working-directory: assets/marketing
-
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
         working-directory: assets/marketing
