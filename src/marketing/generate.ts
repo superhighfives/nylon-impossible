@@ -350,15 +350,19 @@ async function captureIOSScreenshots(): Promise<void> {
   await sleep(2000); // extra settle time for the window server connection
 
   console.log(`  Booting simulator: ${device} (${udid})…`);
-  spawnSync("xcrun", ["simctl", "boot", udid], { stdio: "pipe" });
-  // bootstatus -b can hang indefinitely in CI — poll simctl list instead
+  // simctl boot normally exits in <1s (boot is async). Timeout at 30s in case
+  // the CoreSimulator daemon is unresponsive.
+  spawnSync("xcrun", ["simctl", "boot", udid], { stdio: "pipe", timeout: 30_000 });
+  console.log("  Waiting for Booted state…");
   const bootDeadline = Date.now() + 120_000;
   while (Date.now() < bootDeadline) {
     const raw = execSync("xcrun simctl list devices -j", { encoding: "utf8" });
     const allDevices = Object.values(
       (JSON.parse(raw) as { devices: Record<string, Array<{ udid: string; state: string }>> }).devices
     ).flat();
-    if (allDevices.find((d) => d.udid === udid && d.state === "Booted")) break;
+    const state = allDevices.find((d) => d.udid === udid)?.state ?? "unknown";
+    console.log(`  Simulator state: ${state}`);
+    if (state === "Booted") break;
     await sleep(2000);
   }
 
