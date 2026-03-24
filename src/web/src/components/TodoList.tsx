@@ -121,7 +121,6 @@ function TodoItemContent({
         )}
         <TodoIndicators todo={todo} />
       </div>
-      {/* TODO: On mobile, replace these buttons with <TodoActionsMenu> (Base UI popover menu) */}
       <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
