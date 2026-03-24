@@ -6,13 +6,16 @@
  *   npx tsx generate.ts [--capture] [--web] [--publish] [--all]
  *
  * Flags:
- *   --capture  Start web dev server + iOS simulator, take screenshots.
- *   --web      Composite source PNGs into website JPGs (@2x + @1x).
- *   --publish  Copy web JPGs to superhighfives.com, commit, and push.
- *   --all      Run capture, web, and publish in sequence.
+ *   --capture      Start web dev server + iOS simulator, take screenshots.
+ *   --capture-web  Web capture only (no iOS simulator).
+ *   --web          Composite source PNGs into website JPGs (@2x + @1x).
+ *   --publish      Copy web JPGs to superhighfives.com, commit, and push.
+ *   --all          Run capture, web, and publish in sequence.
  *
  * Environment:
- *   VITE_CLERK_PUBLISHABLE_KEY  Required for web capture (Clerk initialisation).
+ *   VITE_CLERK_PUBLISHABLE_KEY  Required for web capture (Clerk dev instance publishable key).
+ *   CLERK_SECRET_KEY            Required for web capture (Clerk dev instance secret key).
+ *   CLERK_MARKETING_USER_EMAIL  Required for web capture (email of the Clerk user to sign in as).
  *   SUPERHIGHFIVES_DIR          Path to superhighfives.com repo root.
  *                               Default: ../../pika-workspace/superhighfives.com
  *                               (relative to nylon-impossible workspace root)
@@ -85,21 +88,25 @@ function flag(name: string): boolean {
 }
 
 const runCapture = flag("--capture") || flag("--all");
+const runCaptureWeb = flag("--capture-web");
 const runWeb = flag("--web") || flag("--all");
 const runPublish = flag("--publish") || flag("--all");
 
-if (!runCapture && !runWeb && !runPublish) {
+if (!runCapture && !runCaptureWeb && !runWeb && !runPublish) {
   console.error(
-    "Error: specify at least one of --capture, --web, --publish, or --all"
+    "Error: specify at least one of --capture, --capture-web, --web, --publish, or --all"
   );
   process.exit(1);
 }
 
-if (runCapture && !process.env.VITE_CLERK_PUBLISHABLE_KEY) {
-  console.error(
-    "Error: VITE_CLERK_PUBLISHABLE_KEY is required for --capture / --all"
+if (runCapture || runCaptureWeb) {
+  const missing = ["VITE_CLERK_PUBLISHABLE_KEY", "CLERK_SECRET_KEY", "CLERK_MARKETING_USER_EMAIL"].filter(
+    (k) => !process.env[k]
   );
-  process.exit(1);
+  if (missing.length > 0) {
+    console.error(`Error: missing env vars for --capture / --capture-web / --all: ${missing.join(", ")}`);
+    process.exit(1);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -217,6 +224,8 @@ function makeBrowserChromeSvg(
 // ---------------------------------------------------------------------------
 
 async function captureWebScreenshots(): Promise<void> {
+  const emailAddress = process.env.CLERK_MARKETING_USER_EMAIL as string;
+
   console.log("  Starting web dev server…");
   const server = spawn(
     "pnpm",
@@ -236,9 +245,9 @@ async function captureWebScreenshots(): Promise<void> {
     console.log(`  Dev server ready at ${manifest.web.url}`);
 
     const { chromium } = await import("playwright");
+    const { clerk } = await import("@clerk/testing/playwright");
     const browser = await chromium.launch();
 
-    const previewUrl = `${manifest.web.url}?preview=true`;
     for (const mode of ["light", "dark"] as const) {
       const context = await browser.newContext({
         viewport: manifest.web.viewport,
@@ -247,21 +256,13 @@ async function captureWebScreenshots(): Promise<void> {
       });
       const page = await context.newPage();
 
-      page.on("console", (msg) => {
-        if (msg.type() === "error") console.log(`  [browser] ${msg.text()}`);
-      });
-      page.on("pageerror", (err) => console.log(`  [page error] ${err.message}`));
+      // Navigate first (required before clerk.signIn), then sign in.
+      // clerk.signIn with emailAddress uses CLERK_SECRET_KEY to create a
+      // ticket internally — no manual token fetch needed.
+      await page.goto(manifest.web.url);
+      await clerk.signIn({ page, emailAddress });
 
-      const response = await page.goto(previewUrl);
-      console.log(`  ${previewUrl} → HTTP ${response?.status()}`);
-
-      try {
-        await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
-      } catch {
-        const text = await page.evaluate(() => document.body?.innerText?.slice(0, 300) ?? "(empty)");
-        console.log(`  [page content] ${text}`);
-        throw new Error(`Timed out waiting for preview to render (${mode})`);
-      }
+      await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
       await sleep(500);
 
       const dest = join(SOURCE_DIR, `web-${mode}.png`);
@@ -675,6 +676,10 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
   console.log(`Output: ${OUTPUT_DIR}`);
 
   if (runCapture) await runCaptureStep();
+  if (runCaptureWeb) {
+    mkdirSync(SOURCE_DIR, { recursive: true });
+    await captureWebScreenshots();
+  }
   if (runWeb) await runWebStep();
   if (runPublish) runPublishStep();
 

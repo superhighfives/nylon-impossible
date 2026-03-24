@@ -4,7 +4,11 @@ on:
   workflow_dispatch:
   workflow_call:
     secrets:
-      VITE_CLERK_PUBLISHABLE_KEY:
+      CLERK_DEVELOPMENT_PUBLISHABLE_KEY:
+        required: true
+      CLERK_DEVELOPMENT_SECRET_KEY:
+        required: true
+      CLERK_DEVELOPMENT_USER_EMAIL:
         required: true
       SUPERHIGHFIVES_DEPLOY_TOKEN:
         required: true
@@ -66,9 +70,20 @@ jobs:
             xcodebuild -downloadPlatform iOS
           fi
 
+      - name: Apply D1 migrations and seed marketing data
+        run: |
+          npx wrangler d1 migrations apply nylon-impossible-db --local \
+            --persist-to ../../.wrangler/state
+          npx wrangler d1 execute nylon-impossible-db --local \
+            --persist-to ../../.wrangler/state \
+            --file=../../src/marketing/seed.sql
+        working-directory: src/api
+
       - name: Generate and publish marketing screenshots
         env:
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
+          CLERK_MARKETING_USER_EMAIL: ${{ secrets.CLERK_DEVELOPMENT_USER_EMAIL }}
           SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
         run: npx tsx generate.ts --all
         working-directory: src/marketing
