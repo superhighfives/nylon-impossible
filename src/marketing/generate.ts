@@ -336,16 +336,27 @@ async function captureIOSScreenshots(): Promise<void> {
   const udid = chosen.udid;
   if (!udid) throw new Error(`Simulator "${device}" not found`);
 
+  // Simulator.app must be running before the simulator boots so it can attach
+  // to the framebuffer and initialise screen surfaces. Opening it after boot
+  // means the render pipeline never starts — screenshots time out indefinitely.
+  console.log("  Starting Simulator.app…");
+  spawnSync("open", ["-a", "Simulator"], { stdio: "pipe" });
+  // Poll until the Simulator process is actually running
+  for (let i = 0; i < 30; i++) {
+    const { status } = spawnSync("pgrep", ["-x", "Simulator"], { stdio: "pipe" });
+    if (status === 0) break;
+    await sleep(1000);
+  }
+  await sleep(2000); // extra settle time for the window server connection
+
   console.log(`  Booting simulator: ${device} (${udid})…`);
   spawnSync("xcrun", ["simctl", "boot", udid], { stdio: "pipe" });
-  // bootstatus -b blocks until the simulator is fully booted (more reliable than sleep)
   execSync(`xcrun simctl bootstatus "${udid}" -b`, { stdio: "pipe" });
-  spawnSync("open", ["-a", "Simulator"], { stdio: "pipe" });
 
   console.log("  Installing and launching app…");
   execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe" });
   execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe" });
-  await sleep(6000);
+  await sleep(8000);
 
   for (const mode of ["light", "dark"] as const) {
     execSync(`xcrun simctl ui "${udid}" appearance ${mode}`, { stdio: "pipe" });
