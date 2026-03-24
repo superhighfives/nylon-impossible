@@ -238,7 +238,7 @@ async function captureWebScreenshots(): Promise<void> {
     const { chromium } = await import("playwright");
     const browser = await chromium.launch();
 
-    const previewUrl = `${manifest.web.url}/preview`;
+    const previewUrl = `${manifest.web.url}?preview=true`;
     for (const mode of ["light", "dark"] as const) {
       const context = await browser.newContext({
         viewport: manifest.web.viewport,
