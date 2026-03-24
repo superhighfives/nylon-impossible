@@ -351,7 +351,16 @@ async function captureIOSScreenshots(): Promise<void> {
 
   console.log(`  Booting simulator: ${device} (${udid})…`);
   spawnSync("xcrun", ["simctl", "boot", udid], { stdio: "pipe" });
-  execSync(`xcrun simctl bootstatus "${udid}" -b`, { stdio: "pipe" });
+  // bootstatus -b can hang indefinitely in CI — poll simctl list instead
+  const bootDeadline = Date.now() + 120_000;
+  while (Date.now() < bootDeadline) {
+    const raw = execSync("xcrun simctl list devices -j", { encoding: "utf8" });
+    const allDevices = Object.values(
+      (JSON.parse(raw) as { devices: Record<string, Array<{ udid: string; state: string }>> }).devices
+    ).flat();
+    if (allDevices.find((d) => d.udid === udid && d.state === "Booted")) break;
+    await sleep(2000);
+  }
 
   console.log("  Installing and launching app…");
   execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe" });
