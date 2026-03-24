@@ -245,7 +245,12 @@ async function captureWebScreenshots(): Promise<void> {
     console.log(`  Dev server ready at ${manifest.web.url}`);
 
     const { chromium } = await import("playwright");
-    const { clerk } = await import("@clerk/testing/playwright");
+    const { clerk, clerkSetup } = await import("@clerk/testing/playwright");
+
+    // Derives the Frontend API URL from the publishable key and fetches a
+    // testing token — must be called before any clerk.signIn calls.
+    await clerkSetup({ publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY });
+
     const browser = await chromium.launch();
 
     for (const mode of ["light", "dark"] as const) {
