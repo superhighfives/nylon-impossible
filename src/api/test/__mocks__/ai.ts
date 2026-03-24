@@ -20,9 +20,15 @@ export interface MockTodo {
   dueDate?: string;
 }
 
+interface AIGatewayConfig {
+  accountId: string;
+  gatewayId: string;
+  token: string;
+}
+
 // The actual mock function that will replace extractTodos
 export const extractTodos = vi.fn<
-  [ai: unknown, gatewayId: string, text: string],
+  [config: AIGatewayConfig, text: string],
   Promise<MockTodo[] | null>
 >();
 

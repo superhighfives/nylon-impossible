@@ -32,10 +32,8 @@
       "new_classes": ["UserSync"]
     }
   ],
-  "ai": {
-    "binding": "AI"
-  },
   "vars": {
+    "CF_ACCOUNT_ID": "",
     "AI_GATEWAY_ID": "nylon-impossible",
     "ENVIRONMENT": "development"
   },

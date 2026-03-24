@@ -1,13 +1,12 @@
 /**
- * Optional integration tests that call real Workers AI.
+ * Optional integration tests that call real AI Gateway.
  *
  * These tests are skipped by default to avoid costs and flakiness in CI.
  * Run with: RUN_AI_TESTS=true pnpm api:test
  *
  * Requirements:
- * - AI binding must be configured in wrangler.test.jsonc
- * - AI_GATEWAY_ID must be set
- * - Valid Cloudflare credentials
+ * - CF_ACCOUNT_ID, AI_GATEWAY_ID, AI_GATEWAY_TOKEN must be set
+ * - Valid Cloudflare credentials with AI Gateway access
  */
 
 import { SELF } from "cloudflare:test";

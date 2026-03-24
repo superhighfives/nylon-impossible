@@ -1,5 +1,5 @@
 /**
- * AI-powered todo extraction using Workers AI binding
+ * AI-powered todo extraction using Cloudflare AI Gateway with dynamic routing
  */
 
 interface ExtractedItem {
@@ -14,6 +14,26 @@ interface AIToolCallResponse {
     urls?: string[];
     dueDate?: string;
   }>;
+}
+
+interface OpenAIChatCompletionResponse {
+  choices: Array<{
+    message: {
+      tool_calls?: Array<{
+        type: string;
+        function: {
+          name: string;
+          arguments: string;
+        };
+      }>;
+    };
+  }>;
+}
+
+interface AIGatewayConfig {
+  accountId: string;
+  gatewayId: string;
+  token: string;
 }
 
 const extractTodosTool = {
@@ -105,19 +125,24 @@ Examples (extract ALL of these):
 }
 
 /**
- * Extract structured todos from natural language text using Workers AI via AI Gateway
+ * Extract structured todos from natural language text using AI Gateway dynamic routing
  */
 export async function extractTodos(
-  ai: Ai,
-  gatewayId: string,
+  config: AIGatewayConfig,
   text: string,
 ): Promise<ExtractedItem[] | null> {
-  const model = "@cf/moonshotai/kimi-k2.5" as keyof AiModels;
   const systemPrompt = getSystemPrompt();
 
-  const response = (await ai.run(
-    model,
-    {
+  const url = `https://gateway.ai.cloudflare.com/v1/${config.accountId}/${config.gatewayId}/openai/chat/completions`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "cf-aig-authorization": `Bearer ${config.token}`,
+    },
+    body: JSON.stringify({
+      model: "dynamic/default",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: text },
@@ -128,79 +153,36 @@ export async function extractTodos(
         function: { name: "extract_todos" },
       },
       max_tokens: 16000,
-    },
-    {
-      gateway: {
-        id: gatewayId,
-        skipCache: true,
-      },
-    },
-  )) as AiTextGenerationOutput;
+    }),
+  });
 
-  // Handle both Workers AI native format and OpenAI-compatible format
-  let toolCall: { name: string; arguments: string | object } | null = null;
-
-  // Check for Workers AI native format (top-level tool_calls)
-  if ("tool_calls" in response && response.tool_calls?.length) {
-    const tc = response.tool_calls[0];
-    if (tc?.name && tc.arguments !== undefined) {
-      toolCall = {
-        name: tc.name,
-        arguments: tc.arguments as string | object,
-      };
-    }
-  }
-  // Check for OpenAI-compatible format (choices[0].message.tool_calls)
-  else if (
-    "choices" in response &&
-    Array.isArray(response.choices) &&
-    response.choices.length > 0
-  ) {
-    const firstChoice = response.choices[0];
-    if (
-      firstChoice &&
-      typeof firstChoice === "object" &&
-      "message" in firstChoice &&
-      firstChoice.message &&
-      typeof firstChoice.message === "object" &&
-      "tool_calls" in firstChoice.message &&
-      Array.isArray(firstChoice.message.tool_calls) &&
-      firstChoice.message.tool_calls.length > 0
-    ) {
-      const tc = firstChoice.message.tool_calls[0];
-      if (
-        tc &&
-        typeof tc === "object" &&
-        tc.type === "function" &&
-        tc.function &&
-        tc.function.name === "extract_todos"
-      ) {
-        toolCall = {
-          name: tc.function.name,
-          arguments: tc.function.arguments,
-        };
-      }
-    }
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("AI Gateway error:", res.status, errorText);
+    throw new Error(`AI Gateway request failed: ${res.status}`);
   }
 
-  if (!toolCall) {
+  const response = (await res.json()) as OpenAIChatCompletionResponse;
+
+  // Parse OpenAI-compatible format (choices[0].message.tool_calls)
+  const firstChoice = response.choices?.[0];
+  const toolCalls = firstChoice?.message?.tool_calls;
+
+  if (!toolCalls?.length) {
     console.error("No tool call found in AI response");
-    console.error("Response structure:", Object.keys(response));
     throw new Error("AI did not return extracted todos");
   }
 
-  if (toolCall.name !== "extract_todos") {
-    throw new Error(`Unexpected tool call: ${toolCall.name}`);
+  const tc = toolCalls[0];
+  if (tc.type !== "function" || tc.function.name !== "extract_todos") {
+    throw new Error(`Unexpected tool call: ${tc.function.name}`);
   }
 
   let parsed: AIToolCallResponse;
   try {
-    parsed =
-      typeof toolCall.arguments === "string"
-        ? (JSON.parse(toolCall.arguments) as AIToolCallResponse)
-        : (toolCall.arguments as AIToolCallResponse);
+    parsed = JSON.parse(tc.function.arguments) as AIToolCallResponse;
   } catch (e) {
-    console.error("Failed to parse tool arguments:", toolCall.arguments);
+    console.error("Failed to parse tool arguments:", tc.function.arguments);
     console.error("Parse error:", e);
     throw new Error("Failed to parse AI response");
   }
