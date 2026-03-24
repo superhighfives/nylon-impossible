@@ -238,6 +238,7 @@ async function captureWebScreenshots(): Promise<void> {
     const { chromium } = await import("playwright");
     const browser = await chromium.launch();
 
+    const previewUrl = `${manifest.web.url}/preview`;
     for (const mode of ["light", "dark"] as const) {
       const context = await browser.newContext({
         viewport: manifest.web.viewport,
@@ -245,14 +246,10 @@ async function captureWebScreenshots(): Promise<void> {
         colorScheme: mode,
       });
       const page = await context.newPage();
-      // Intercept API calls and return 401 — we want the unauthenticated
-      // sign-in state without needing the API server running.
-      await page.route("http://localhost:8787/**", (route) =>
-        route.fulfill({ status: 401, body: "{}" })
-      );
-      await page.goto(manifest.web.url);
-      await page.waitForLoadState("networkidle");
-      await sleep(800);
+      await page.goto(previewUrl);
+      // Preview is client-rendered — wait for the todo input to appear.
+      await page.waitForSelector('[aria-label="New todo"]', { timeout: 15_000 });
+      await sleep(500);
 
       const dest = join(SOURCE_DIR, `web-${mode}.png`);
       await page.screenshot({ path: dest, fullPage: false });
@@ -372,9 +369,35 @@ async function captureIOSScreenshots(): Promise<void> {
   }
 
   console.log("  Installing app…");
-  execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe", timeout: 120_000 });
+  let installErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe", timeout: 120_000 });
+      installErr = undefined;
+      break;
+    } catch (err) {
+      installErr = err;
+      console.log(`  install attempt ${attempt} failed, retrying…`);
+      await sleep(5000);
+    }
+  }
+  if (installErr) throw installErr;
+
   console.log("  Launching app…");
-  execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe", timeout: 30_000 });
+  let launchErr: unknown;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe", timeout: 30_000 });
+      launchErr = undefined;
+      break;
+    } catch (err) {
+      launchErr = err;
+      console.log(`  launch attempt ${attempt} failed, retrying…`);
+      await sleep(5000);
+    }
+  }
+  if (launchErr) throw launchErr;
+
   // Bring Simulator.app to the foreground — simctl io screenshot requires the
   // simulator window to be the active app to get screen surfaces in CI.
   spawnSync("osascript", ["-e", 'tell application "Simulator" to activate'], { stdio: "pipe" });
