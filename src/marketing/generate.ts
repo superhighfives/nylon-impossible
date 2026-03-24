@@ -247,8 +247,21 @@ async function captureWebScreenshots(): Promise<void> {
       });
       const page = await context.newPage();
 
-      await page.goto(previewUrl);
-      await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+      page.on("console", (msg) => {
+        if (msg.type() === "error") console.log(`  [browser] ${msg.text()}`);
+      });
+      page.on("pageerror", (err) => console.log(`  [page error] ${err.message}`));
+
+      const response = await page.goto(previewUrl);
+      console.log(`  ${previewUrl} → HTTP ${response?.status()}`);
+
+      try {
+        await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+      } catch {
+        const text = await page.evaluate(() => document.body?.innerText?.slice(0, 300) ?? "(empty)");
+        console.log(`  [page content] ${text}`);
+        throw new Error(`Timed out waiting for preview to render (${mode})`);
+      }
       await sleep(500);
 
       const dest = join(SOURCE_DIR, `web-${mode}.png`);
