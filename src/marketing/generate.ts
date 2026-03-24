@@ -370,6 +370,9 @@ async function captureIOSScreenshots(): Promise<void> {
   execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe", timeout: 120_000 });
   console.log("  Launching app…");
   execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe", timeout: 30_000 });
+  // Bring Simulator.app to the foreground — simctl io screenshot requires the
+  // simulator window to be the active app to get screen surfaces in CI.
+  spawnSync("osascript", ["-e", 'tell application "Simulator" to activate'], { stdio: "pipe" });
   console.log("  Waiting for app to render…");
   await sleep(8000);
 
@@ -377,10 +380,8 @@ async function captureIOSScreenshots(): Promise<void> {
     execSync(`xcrun simctl ui "${udid}" appearance ${mode}`, { stdio: "pipe" });
     await sleep(2000);
     const dest = join(SOURCE_DIR, `ios-${mode}.png`);
-    // Retry screenshot — "Timeout waiting for screen surfaces" can occur in CI
-    // while the simulator's render pipeline is still initialising.
     let lastErr: unknown;
-    for (let attempt = 1; attempt <= 5; attempt++) {
+    for (let attempt = 1; attempt <= 15; attempt++) {
       try {
         execSync(`xcrun simctl io "${udid}" screenshot "${dest}"`, { stdio: "pipe" });
         lastErr = undefined;
@@ -388,7 +389,7 @@ async function captureIOSScreenshots(): Promise<void> {
       } catch (err) {
         lastErr = err;
         console.log(`  screenshot attempt ${attempt} failed, retrying…`);
-        await sleep(3000);
+        await sleep(5000);
       }
     }
     if (lastErr) throw lastErr;
