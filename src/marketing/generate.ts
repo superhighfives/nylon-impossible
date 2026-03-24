@@ -366,9 +366,11 @@ async function captureIOSScreenshots(): Promise<void> {
     await sleep(2000);
   }
 
-  console.log("  Installing and launching app…");
-  execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe" });
-  execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe" });
+  console.log("  Installing app…");
+  execSync(`xcrun simctl install "${udid}" "${appPath}"`, { stdio: "pipe", timeout: 120_000 });
+  console.log("  Launching app…");
+  execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe", timeout: 30_000 });
+  console.log("  Waiting for app to render…");
   await sleep(8000);
 
   for (const mode of ["light", "dark"] as const) {
