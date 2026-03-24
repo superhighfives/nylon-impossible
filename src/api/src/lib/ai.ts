@@ -30,10 +30,17 @@ interface OpenAIChatCompletionResponse {
   }>;
 }
 
-interface AIGatewayConfig {
+export interface AIGatewayConfig {
   accountId: string;
   gatewayId: string;
   token: string;
+}
+
+/**
+ * Check if AI Gateway is properly configured
+ */
+export function isAIGatewayConfigured(config: AIGatewayConfig): boolean {
+  return Boolean(config.accountId && config.gatewayId && config.token);
 }
 
 const extractTodosTool = {

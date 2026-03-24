@@ -1,7 +1,7 @@
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { extractTodos } from "../lib/ai";
+import { extractTodos, isAIGatewayConfigured } from "../lib/ai";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
 import { shouldUseAI } from "../lib/smart-input";
 import {
@@ -61,7 +61,13 @@ export async function smartCreate(c: Context<Env>) {
 
   const firstPosition = firstTodo?.position ?? null;
 
-  if (shouldUseAI(text)) {
+  const aiConfig = {
+    accountId: c.env.CF_ACCOUNT_ID,
+    gatewayId: c.env.AI_GATEWAY_ID,
+    token: c.env.CLOUDFLARE_API_TOKEN,
+  };
+
+  if (shouldUseAI(text) && isAIGatewayConfigured(aiConfig)) {
     // AI path: extract and create multiple todos
     let extracted: Array<{
       title: string;
@@ -70,14 +76,7 @@ export async function smartCreate(c: Context<Env>) {
     }> | null;
 
     try {
-      extracted = await extractTodos(
-        {
-          accountId: c.env.CF_ACCOUNT_ID,
-          gatewayId: c.env.AI_GATEWAY_ID,
-          token: c.env.CLOUDFLARE_API_TOKEN,
-        },
-        text,
-      );
+      extracted = await extractTodos(aiConfig, text);
     } catch (error) {
       // Fallback: create single todo with original text on AI failure
       console.error(

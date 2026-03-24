@@ -5,7 +5,7 @@
  * Run with: RUN_AI_TESTS=true pnpm api:test
  *
  * Requirements:
- * - CF_ACCOUNT_ID, AI_GATEWAY_ID, AI_GATEWAY_TOKEN must be set
+ * - CF_ACCOUNT_ID, AI_GATEWAY_ID, CLOUDFLARE_API_TOKEN must be set
  * - Valid Cloudflare credentials with AI Gateway access
  */
 
