@@ -74,7 +74,7 @@ export async function smartCreate(c: Context<Env>) {
         {
           accountId: c.env.CF_ACCOUNT_ID,
           gatewayId: c.env.AI_GATEWAY_ID,
-          token: c.env.AI_GATEWAY_TOKEN,
+          token: c.env.CLOUDFLARE_API_TOKEN,
         },
         text,
       );
