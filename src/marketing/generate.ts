@@ -296,7 +296,7 @@ async function captureIOSScreenshots(): Promise<void> {
       `-project "${projectPath}"`,
       `-scheme "${scheme}"`,
       `-configuration Debug`,
-      `-destination "platform=iOS Simulator,name=${device}"`,
+      `-destination "platform=iOS Simulator,id=${chosen.udid}"`,
       `-derivedDataPath "${derivedDataPath}"`,
       "-quiet",
     ].join(" "),
