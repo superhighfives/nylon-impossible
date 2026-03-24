@@ -47,7 +47,7 @@ export function LandingPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-gray-muted">
             Nylon Impossible
           </h1>
-          <p className="text-gray-12 leading-relaxed">
+          <p className="text-gray leading-relaxed">
             A todo app for web and iOS. Describe what you need to do — AI
             handles the rest.
           </p>
@@ -73,7 +73,7 @@ export function LandingPage() {
             className="rounded-xl border border-gray-subtle p-4 space-y-1"
           >
             <p className="text-sm font-medium text-gray-muted">{feature.title}</p>
-            <p className="text-sm text-gray-12">{feature.description}</p>
+            <p className="text-sm text-gray">{feature.description}</p>
           </li>
         ))}
       </ul>
