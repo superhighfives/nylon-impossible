@@ -26,6 +26,7 @@ import { execSync, spawn, spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
 import sharp from "sharp";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,9 @@ import sharp from "sharp";
 // ---------------------------------------------------------------------------
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+
+dotenv.config({ path: join(SCRIPT_DIR, ".dev.vars") });
+
 const WORKSPACE_ROOT = resolve(SCRIPT_DIR, "../..");
 const SOURCE_DIR = join(SCRIPT_DIR, "source");
 const OUTPUT_DIR = join(SCRIPT_DIR, "output");
