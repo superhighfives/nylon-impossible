@@ -107,7 +107,7 @@ In `TodoItemContent`, replace the single button div with two conditional divs �
 ## Key considerations
 
 - `@base-ui/react/menu` is already available at the required version — no new dependencies needed.
-- The popover must render in a Portal so it isn't clipped by the `overflow-hidden` on the todo list container.
+- The popover must render in a Portal (matching the Select component) so it isn't clipped by ancestor overflow/scroll containers or other stacking-context constraints.
 - The Delete menu item needs a visual destructive style (red text) to match the existing destructive button variant — check `styles.css` for the appropriate Radix red colour token.
 
 ## Dependencies
