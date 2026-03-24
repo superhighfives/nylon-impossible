@@ -26,7 +26,7 @@
  */
 
 import { execSync, spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -226,6 +226,21 @@ function makeBrowserChromeSvg(
 async function captureWebScreenshots(): Promise<void> {
   const emailAddress = process.env.CLERK_MARKETING_USER_EMAIL as string;
 
+  // Write a temporary .dev.vars so the workerd SSR environment has the Clerk
+  // secrets it needs. In local dev this file already exists (gitignored); in
+  // CI it doesn't, so Clerk middleware would crash without it.
+  const devVarsPath = join(WORKSPACE_ROOT, "src/web/.dev.vars");
+  const devVarsExisted = existsSync(devVarsPath);
+  if (!devVarsExisted) {
+    writeFileSync(
+      devVarsPath,
+      [
+        `VITE_CLERK_PUBLISHABLE_KEY=${process.env.VITE_CLERK_PUBLISHABLE_KEY}`,
+        `CLERK_SECRET_KEY=${process.env.CLERK_SECRET_KEY}`,
+      ].join("\n")
+    );
+  }
+
   console.log("  Starting web dev server…");
   const server = spawn(
     "pnpm",
@@ -280,6 +295,7 @@ async function captureWebScreenshots(): Promise<void> {
   } finally {
     server.kill("SIGTERM");
     await sleep(500);
+    if (!devVarsExisted) unlinkSync(devVarsPath);
   }
 }
 
