@@ -217,19 +217,6 @@ function makeBrowserChromeSvg(
 // ---------------------------------------------------------------------------
 
 async function captureWebScreenshots(): Promise<void> {
-  console.log("  Starting API dev server…");
-  const api = spawn(
-    "pnpm",
-    ["--filter", "@nylon-impossible/api", "dev"],
-    {
-      cwd: WORKSPACE_ROOT,
-      env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"],
-    }
-  );
-  api.stderr?.on("data", () => {});
-  api.stdout?.on("data", () => {});
-
   console.log("  Starting web dev server…");
   const server = spawn(
     "pnpm",
@@ -241,11 +228,10 @@ async function captureWebScreenshots(): Promise<void> {
     }
   );
 
-  server.stderr?.on("data", () => {}); // suppress noise
+  server.stderr?.on("data", () => {});
   server.stdout?.on("data", () => {});
 
   try {
-    await waitForUrl("http://localhost:8787", 60_000);
     await waitForUrl(manifest.web.url, 60_000);
     console.log(`  Dev server ready at ${manifest.web.url}`);
 
@@ -259,6 +245,11 @@ async function captureWebScreenshots(): Promise<void> {
         colorScheme: mode,
       });
       const page = await context.newPage();
+      // Intercept API calls and return 401 — we want the unauthenticated
+      // sign-in state without needing the API server running.
+      await page.route("http://localhost:8787/**", (route) =>
+        route.fulfill({ status: 401, body: "{}" })
+      );
       await page.goto(manifest.web.url);
       await page.waitForLoadState("networkidle");
       await sleep(800);
@@ -272,7 +263,6 @@ async function captureWebScreenshots(): Promise<void> {
     await browser.close();
   } finally {
     server.kill("SIGTERM");
-    api.kill("SIGTERM");
     await sleep(500);
   }
 }
