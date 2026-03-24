@@ -18,7 +18,7 @@ const features = [
       "A SwiftUI app with Siri integration and Share Sheet support, synced to the same account.",
   },
   {
-    title: "Works offline",
+    title: "Optimistic sync",
     description:
       "Optimistic updates keep the UI fast. Changes sync automatically when you're back online.",
   },
@@ -32,10 +32,10 @@ export function LandingPage() {
           <picture>
             <source
               media="(prefers-color-scheme: dark)"
-              srcSet="/logo-inverted-no-background.svg"
+              srcSet="/favicon-dark.svg"
             />
             <img
-              src="/logo-no-background.svg"
+              src="/favicon.svg"
               width={64}
               height={64}
               alt="Nylon Impossible"

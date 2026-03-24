@@ -16,7 +16,7 @@ A todo app for web and iOS. Describe what you need to do — AI handles the rest
 - **AI task creation** — type naturally and due dates, priorities, and URLs are parsed automatically using Workers AI
 - **Real-time sync** — changes appear instantly across all devices via WebSockets and Durable Objects
 - **iOS native** — SwiftUI app with Siri integration and Share Sheet support, synced to the same account
-- **Works offline** — optimistic updates keep the UI fast, changes sync automatically when back online
+- **Optimistic updates** — keep the UI fast and responsive; changes sync automatically when back online
 - **Cross-platform auth** — Clerk sessions on web, JWT on iOS, same user pool
 
 ## Structure
