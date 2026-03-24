@@ -26,7 +26,6 @@ import {
   GripVertical,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { TodoActionsMenu } from "@/components/TodoActionsMenu";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
@@ -122,19 +121,8 @@ function TodoItemContent({
         )}
         <TodoIndicators todo={todo} />
       </div>
-      {/* Mobile: popover menu stub (TODO: implement Base UI Menu) */}
-      <div className="flex sm:hidden">
-        <TodoActionsMenu
-          todoId={todo.id}
-          todoTitle={todo.title}
-          isExpanded={isExpanded}
-          onToggleExpand={onToggleExpand}
-          onDelete={onDelete}
-          deletePending={deletePending}
-        />
-      </div>
-      {/* Desktop: inline edit/delete buttons revealed on row hover */}
-      <div className="hidden sm:flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      {/* TODO: On mobile, replace these buttons with <TodoActionsMenu> (Base UI popover menu) */}
+      <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="sm"
