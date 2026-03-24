@@ -26,7 +26,7 @@ const features = [
 
 export function LandingPage() {
   return (
-    <div className="container max-w-xl mx-auto px-4 py-16 space-y-16">
+    <div className="container max-w-sm mx-auto px-4 py-16 space-y-16">
       <div className="space-y-6 text-center">
         <div className="flex justify-center">
           <picture>
@@ -44,27 +44,29 @@ export function LandingPage() {
           </picture>
         </div>
         <div className="space-y-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-muted">
+          <h1 className="text-2xl font-semibold tracking-tight">
             Nylon Impossible
           </h1>
-          <p className="text-gray leading-relaxed">
+          <p className="text-gray-muted leading-relaxed max-w-xs mx-auto">
             A todo app for web and iOS. Describe what you need to do — AI
             handles the rest.
           </p>
         </div>
-        <div className="flex flex-col gap-3 text-sm max-w-xs mx-auto">
+        <div className="flex flex-col gap-3 text-sm">
           <SignInButton mode="modal">
             <Button variant="primary" size="lg" className="w-full">
               Sign in
             </Button>
           </SignInButton>
           <SignUpButton mode="modal">
-            <Button variant="ghost" size="lg" className="w-full">
+            <Button variant="outline" size="lg" className="w-full">
               Create account
             </Button>
           </SignUpButton>
         </div>
       </div>
+
+      <hr className="border-gray-subtle" />
 
       <ul className="grid gap-4">
         {features.map((feature) => (
@@ -72,8 +74,8 @@ export function LandingPage() {
             key={feature.title}
             className="rounded-xl border border-gray-subtle p-4 space-y-1"
           >
-            <p className="text-sm font-medium text-gray-muted">{feature.title}</p>
-            <p className="text-sm text-gray">{feature.description}</p>
+            <p className="text-sm font-medium">{feature.title}</p>
+            <p className="text-sm text-gray-muted">{feature.description}</p>
           </li>
         ))}
       </ul>
