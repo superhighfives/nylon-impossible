@@ -1,6 +1,5 @@
 import { SignedIn, SignedOut } from "@clerk/tanstack-react-start";
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, useLocation } from "@tanstack/react-router";
 import { AppMock } from "@/components/AppMock";
 import { LandingPage } from "@/components/LandingPage";
 import { TodoInput } from "@/components/TodoInput";
@@ -28,16 +27,8 @@ function SignedInContent() {
 }
 
 function App() {
-  // Preview mode: detected client-side only so SSR isn't affected.
-  // Navigate to /?preview=true to render the self-contained AppMock.
-  const [isPreview, setIsPreview] = useState(false);
-  useEffect(() => {
-    setIsPreview(
-      new URLSearchParams(window.location.search).get("preview") === "true",
-    );
-  }, []);
-
-  if (isPreview) return <AppMock />;
+  const { search } = useLocation();
+  if (new URLSearchParams(search).get("preview") === "true") return <AppMock />;
 
   return (
     <>

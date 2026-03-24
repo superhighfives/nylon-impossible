@@ -247,26 +247,8 @@ async function captureWebScreenshots(): Promise<void> {
       });
       const page = await context.newPage();
 
-      // Log browser console errors to help diagnose render failures.
-      page.on("console", (msg) => {
-        if (msg.type() === "error") console.log(`  [browser error] ${msg.text()}`);
-      });
-      page.on("pageerror", (err) => console.log(`  [page error] ${err.message}`));
-
-      const response = await page.goto(previewUrl);
-      console.log(`  /preview → HTTP ${response?.status()}`);
-
-      // Preview is client-rendered — wait for the todo input to appear.
-      try {
-        await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
-      } catch {
-        // On timeout, dump page text so we can see what actually rendered.
-        const text = await page.evaluate(() => document.body?.innerText ?? "(empty)");
-        console.log(`  [page content] ${text.slice(0, 500)}`);
-        // Take a diagnostic screenshot before throwing.
-        await page.screenshot({ path: join(SOURCE_DIR, `web-${mode}-debug.png`), fullPage: false });
-        throw new Error(`Timed out waiting for /preview to render (${mode})`);
-      }
+      await page.goto(previewUrl);
+      await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
       await sleep(500);
 
       const dest = join(SOURCE_DIR, `web-${mode}.png`);
