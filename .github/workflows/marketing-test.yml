@@ -39,16 +39,6 @@ jobs:
             --file=../../src/marketing/seed.sql
         working-directory: src/api
 
-      - name: Verify secrets are set
-        env:
-          CLERK_DEVELOPMENT_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
-          CLERK_DEVELOPMENT_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
-          CLERK_DEVELOPMENT_USER_EMAIL: ${{ secrets.CLERK_DEVELOPMENT_USER_EMAIL }}
-        run: |
-          [ -n "$CLERK_DEVELOPMENT_PUBLISHABLE_KEY" ] && echo "✓ CLERK_DEVELOPMENT_PUBLISHABLE_KEY" || echo "✗ CLERK_DEVELOPMENT_PUBLISHABLE_KEY is empty"
-          [ -n "$CLERK_DEVELOPMENT_SECRET_KEY" ]      && echo "✓ CLERK_DEVELOPMENT_SECRET_KEY"      || echo "✗ CLERK_DEVELOPMENT_SECRET_KEY is empty"
-          [ -n "$CLERK_DEVELOPMENT_USER_EMAIL" ]      && echo "✓ CLERK_DEVELOPMENT_USER_EMAIL"      || echo "✗ CLERK_DEVELOPMENT_USER_EMAIL is empty"
-
       - name: Capture web screenshots
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
