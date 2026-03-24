@@ -26,10 +26,7 @@
       "new_classes": ["UserSync"]
     }
   ],
-  // AI binding for real AI tests. Requires Cloudflare auth (`wrangler login`).
-  "ai": {
-    "binding": "AI"
-  },
+  // AI Gateway vars for real AI tests. Values injected via vitest.config.ts from env.
   "vars": {
     "AI_GATEWAY_ID": "nylon-impossible"
   },
