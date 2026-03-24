@@ -217,6 +217,19 @@ function makeBrowserChromeSvg(
 // ---------------------------------------------------------------------------
 
 async function captureWebScreenshots(): Promise<void> {
+  console.log("  Starting API dev server…");
+  const api = spawn(
+    "pnpm",
+    ["--filter", "@nylon-impossible/api", "dev"],
+    {
+      cwd: WORKSPACE_ROOT,
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+    }
+  );
+  api.stderr?.on("data", () => {});
+  api.stdout?.on("data", () => {});
+
   console.log("  Starting web dev server…");
   const server = spawn(
     "pnpm",
@@ -232,6 +245,7 @@ async function captureWebScreenshots(): Promise<void> {
   server.stdout?.on("data", () => {});
 
   try {
+    await waitForUrl("http://localhost:8787", 60_000);
     await waitForUrl(manifest.web.url, 60_000);
     console.log(`  Dev server ready at ${manifest.web.url}`);
 
@@ -258,6 +272,7 @@ async function captureWebScreenshots(): Promise<void> {
     await browser.close();
   } finally {
     server.kill("SIGTERM");
+    api.kill("SIGTERM");
     await sleep(500);
   }
 }
@@ -552,6 +567,14 @@ function runPublishStep(): void {
     "nylon-screenshot-light.jpg",
     "nylon-screenshot-dark@2x.jpg",
     "nylon-screenshot-dark.jpg",
+    ...(manifest.composite.png
+      ? [
+          "nylon-screenshot-light@2x.png",
+          "nylon-screenshot-light.png",
+          "nylon-screenshot-dark@2x.png",
+          "nylon-screenshot-dark.png",
+        ]
+      : []),
   ];
 
   const copied: string[] = [];
