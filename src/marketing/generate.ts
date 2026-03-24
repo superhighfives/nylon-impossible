@@ -295,6 +295,7 @@ async function captureWebScreenshots(): Promise<void> {
   } finally {
     server.kill("SIGTERM");
     await sleep(500);
+    try { server.kill("SIGKILL"); } catch { /* already dead */ }
     if (!devVarsExisted) unlinkSync(devVarsPath);
   }
 }
@@ -705,4 +706,5 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
   if (runPublish) runPublishStep();
 
   console.log("\nDone.");
+  process.exit(0);
 })();
