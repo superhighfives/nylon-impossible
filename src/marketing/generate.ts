@@ -271,22 +271,40 @@ async function captureIOSScreenshots(): Promise<void> {
   const projectPath = join(WORKSPACE_ROOT, project);
   const derivedDataPath = join("/tmp", "nylon-impossible-marketing-build");
 
-  // Resolve device: env override → manifest value → first available iPhone
+  // Resolve device using xcodebuild's own destination list — this is the
+  // source of truth for what's actually buildable for this scheme/SDK.
+  // simctl may list simulators whose runtime is below the app's minimum
+  // deployment target, which causes install to fail even after a successful build.
   const deviceOverride = process.env.IOS_DEVICE ?? manifest.ios.device;
-  const availableDevicesJson = execSync(
-    "xcrun simctl list devices available -j",
-    { encoding: "utf8" }
+  const showDestOutput = execSync(
+    [
+      "xcodebuild -showdestinations",
+      `-project "${projectPath}"`,
+      `-scheme "${scheme}"`,
+    ].join(" "),
+    { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
   );
-  const availableData = JSON.parse(availableDevicesJson) as {
-    devices: Record<string, Array<{ name: string; udid: string; isAvailable: boolean }>>;
-  };
-  const allIphones = Object.values(availableData.devices)
-    .flat()
-    .filter((d) => d.isAvailable && d.name.includes("iPhone"));
-
-  const preferred = allIphones.find((d) => d.name === deviceOverride);
-  const chosen = preferred ?? allIphones[0];
-  if (!chosen) throw new Error("No available iPhone simulator found");
+  // Parse lines like: { platform:iOS Simulator, arch:arm64, id:UUID, OS:X.Y, name:Device }
+  const destRegex =
+    /platform:iOS Simulator[^}]*?id:([0-9A-Fa-f-]{36})[^}]*?name:([^,}]+)/g;
+  const iPhoneDestinations: Array<{ udid: string; name: string }> = [];
+  for (
+    let m = destRegex.exec(showDestOutput);
+    m !== null;
+    m = destRegex.exec(showDestOutput)
+  ) {
+    const udid = m[1].trim();
+    const name = m[2].trim();
+    if (name.includes("iPhone") && !iPhoneDestinations.some((d) => d.udid === udid)) {
+      iPhoneDestinations.push({ udid, name });
+    }
+  }
+  if (iPhoneDestinations.length === 0) {
+    throw new Error("No iPhone simulator destinations found for this scheme");
+  }
+  const chosen =
+    iPhoneDestinations.find((d) => d.name === deviceOverride) ??
+    iPhoneDestinations[0];
   const device = chosen.name;
 
   console.log(`  Building iOS app (${scheme}) for simulator…`);
