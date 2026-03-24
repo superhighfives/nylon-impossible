@@ -3,6 +3,11 @@ name: Generate Marketing Screenshots
 on:
   workflow_dispatch:
   workflow_call:
+    secrets:
+      VITE_CLERK_PUBLISHABLE_KEY:
+        required: true
+      SUPERHIGHFIVES_DEPLOY_TOKEN:
+        required: true
 
 permissions:
   contents: read

@@ -260,7 +260,7 @@ async function captureWebScreenshots(): Promise<void> {
 async function captureIOSScreenshots(): Promise<void> {
   const { project, scheme, bundleId, device } = manifest.ios;
   const projectPath = join(WORKSPACE_ROOT, project);
-  const derivedDataPath = join(SOURCE_DIR, "ios-build");
+  const derivedDataPath = join("/tmp", "nylon-impossible-marketing-build");
 
   console.log(`  Building iOS app (${scheme}) for simulator…`);
   execSync(
@@ -381,7 +381,6 @@ async function compositeMarketing(mode: "light" | "dark"): Promise<void> {
     .png()
     .toBuffer();
 
-  const phoneMeta = await sharp(phoneImg).metadata();
   const phoneRadius = Math.round(phonePos.width * 0.13);
   const phoneRounded = await applyRoundedCorners(phoneImg, phoneRadius);
   const { image: phoneShadowed, padLeft: pPadLeft, padTop: pPadTop } =
