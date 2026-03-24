@@ -44,10 +44,10 @@ export function LandingPage() {
           </picture>
         </div>
         <div className="space-y-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-gray-12">
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-muted">
             Nylon Impossible
           </h1>
-          <p className="text-gray-muted leading-relaxed">
+          <p className="text-gray-12 leading-relaxed">
             A todo app for web and iOS. Describe what you need to do — AI
             handles the rest.
           </p>
@@ -72,8 +72,8 @@ export function LandingPage() {
             key={feature.title}
             className="rounded-xl border border-gray-subtle p-4 space-y-1"
           >
-            <p className="text-sm font-medium text-gray-12">{feature.title}</p>
-            <p className="text-sm text-gray-muted">{feature.description}</p>
+            <p className="text-sm font-medium text-gray-muted">{feature.title}</p>
+            <p className="text-sm text-gray-12">{feature.description}</p>
           </li>
         ))}
       </ul>
