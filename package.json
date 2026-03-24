@@ -48,7 +48,11 @@
     "api:check:fix": "pnpm --filter @nylon-impossible/api check:fix",
     "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
     "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
-    "ios:simulator": "open -a Simulator"
+    "ios:simulator": "open -a Simulator",
+    "marketing:capture": "pnpm --filter @nylon-impossible/marketing capture",
+    "marketing:web": "pnpm --filter @nylon-impossible/marketing web",
+    "marketing:publish": "pnpm --filter @nylon-impossible/marketing publish",
+    "marketing:all": "pnpm --filter @nylon-impossible/marketing all"
   },
   "engines": {
     "node": ">=22.12.0"

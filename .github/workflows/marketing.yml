@@ -1,0 +1,74 @@
+name: Generate Marketing Screenshots
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      VITE_CLERK_PUBLISHABLE_KEY:
+        required: true
+      SUPERHIGHFIVES_DEPLOY_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: macos-26
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout nylon-impossible
+        uses: actions/checkout@v6
+
+      - name: Checkout superhighfives.com
+        uses: actions/checkout@v6
+        with:
+          repository: superhighfives/superhighfives.com
+          token: ${{ secrets.SUPERHIGHFIVES_DEPLOY_TOKEN }}
+          path: superhighfives.com
+
+      - name: Configure git for superhighfives.com
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+        working-directory: superhighfives.com
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install workspace dependencies
+        run: pnpm install
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+        working-directory: assets/marketing
+
+      - name: Select Xcode
+        run: xcodebuild -version
+
+      - name: Ensure iOS simulator platform is available
+        run: |
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs
+                     if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "No available iPhone simulator, downloading iOS platform…"
+            xcodebuild -downloadPlatform iOS
+          fi
+
+      - name: Generate and publish marketing screenshots
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
+        run: npx tsx generate.ts --all
+        working-directory: assets/marketing
