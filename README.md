@@ -254,11 +254,11 @@ base64 -i "Nylon_Impossible_AppStore.mobileprovision" | pbcopy
 | Script | Description |
 |--------|-------------|
 | `pnpm marketing:capture` | Build iOS app, boot simulator, and screenshot web + iOS in light and dark mode |
-| `pnpm marketing:web` | Composite captured PNGs into browser + phone overlays (`assets/marketing/output/`) |
+| `pnpm marketing:web` | Composite captured PNGs into browser + phone overlays (`src/marketing/output/`) |
 | `pnpm marketing:publish` | Copy output JPGs to superhighfives.com, commit, and push |
 | `pnpm marketing:all` | Run capture → web → publish in sequence |
 
-`marketing:capture` and `marketing:web` are intentionally separate — once you have good source PNGs you can iterate on the composite layout in [`assets/marketing/manifest.json`](assets/marketing/manifest.json) and re-run `marketing:web` without rebuilding or relaunching the simulator.
+`marketing:capture` and `marketing:web` are intentionally separate — once you have good source PNGs you can iterate on the composite layout in [`src/marketing/manifest.json`](src/marketing/manifest.json) and re-run `marketing:web` without rebuilding or relaunching the simulator.
 
 All scripts are also available per-package with `web:*`, `api:*`, and `ios:*` prefixes.
 

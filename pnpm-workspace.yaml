@@ -2,4 +2,4 @@ packages:
   - "src/shared"
   - "src/web"
   - "src/api"
-  - "assets/marketing"
+  - "src/marketing"

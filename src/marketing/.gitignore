@@ -1,3 +1,4 @@
 source/
 output/
 node_modules/
+.dev.vars

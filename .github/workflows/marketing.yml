@@ -47,7 +47,7 @@ jobs:
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
-        working-directory: assets/marketing
+        working-directory: src/marketing
 
       - name: Select Xcode
         run: xcodebuild -version
@@ -71,4 +71,4 @@ jobs:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
         run: npx tsx generate.ts --all
-        working-directory: assets/marketing
+        working-directory: src/marketing
