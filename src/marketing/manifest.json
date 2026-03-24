@@ -10,9 +10,10 @@
     "viewport": { "width": 880, "height": 600 }
   },
   "composite": {
-    "canvas": { "width": 2400, "height": 1500 },
-    "browser": { "left": 60, "top": 110 },
-    "phone":   { "left": 1600, "top": 338, "width": 380 },
+    "canvas": { "width": 2200, "height": 1500 },
+    "browser": { "left": 60, "top": 60 },
+    "phone":   { "left": 1580, "top": 220, "width": 550 },
+    "png": true,
     "backgrounds": {
       "light": { "r": 253, "g": 253, "b": 249 },
       "dark":  { "r": 20,  "g": 18,  "b": 11  }

@@ -63,6 +63,7 @@ interface Manifest {
     canvas: { width: number; height: number };
     browser: { left: number; top: number };
     phone: { left: number; top: number; width: number };
+    png?: boolean;
     backgrounds: {
       light: { r: number; g: number; b: number };
       dark: { r: number; g: number; b: number };
@@ -197,7 +198,6 @@ function makeBrowserChromeSvg(
   const bg = mode === "light" ? "#fdfdf9" : "#14120b";
   const separator = mode === "light" ? "#e4e4e0" : "#27261a";
   const urlBg = mode === "light" ? "#e8e8e4" : "#201f14";
-  const urlText = mode === "light" ? "#888882" : "#5e5e4e";
 
   const dotY = Math.round(height / 2);
   const cx = Math.round(width / 2);
@@ -208,10 +208,7 @@ function makeBrowserChromeSvg(
     <circle cx="28" cy="${dotY}" r="8" fill="#FF5F56"/>
     <circle cx="52" cy="${dotY}" r="8" fill="#FEBC2E"/>
     <circle cx="76" cy="${dotY}" r="8" fill="#28C840"/>
-    <rect x="${cx - 160}" y="${dotY - 14}" width="320" height="28" rx="14" fill="${urlBg}"/>
-    <text x="${cx}" y="${dotY + 5}" text-anchor="middle"
-      font-family="-apple-system, BlinkMacSystemFont, Helvetica, sans-serif"
-      font-size="14" fill="${urlText}">nylonimpossible.com</text>
+    <rect x="${cx - 240}" y="${dotY - 16}" width="480" height="32" rx="16" fill="${urlBg}"/>
   </svg>`;
 }
 
@@ -444,6 +441,32 @@ async function compositeMarketing(mode: "light" | "dark"): Promise<void> {
     .jpeg({ quality: 95 })
     .toFile(jpg1x);
   console.log(`  → ${jpg1x}`);
+
+  if (manifest.composite.png) {
+    const transparentComposited = await sharp({
+      create: {
+        width: canvas.width,
+        height: canvas.height,
+        channels: 4,
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      },
+    })
+      .composite(composites)
+      .png()
+      .toBuffer();
+
+    const png2x = join(OUTPUT_DIR, `nylon-screenshot-${mode}@2x.png`);
+    const png1x = join(OUTPUT_DIR, `nylon-screenshot-${mode}.png`);
+
+    await sharp(transparentComposited).toFile(png2x);
+    console.log(`  → ${png2x}`);
+
+    await sharp(transparentComposited)
+      .resize(Math.round(canvas.width / 2), Math.round(canvas.height / 2))
+      .png()
+      .toFile(png1x);
+    console.log(`  → ${png1x}`);
+  }
 }
 
 async function runWebStep(): Promise<void> {
