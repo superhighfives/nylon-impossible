@@ -191,6 +191,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
+          wranglerVersion: "3.99.0"
           command: deploy --var ENVIRONMENT:production
           secrets: |
             CLERK_SECRET_KEY
