@@ -1,16 +1,20 @@
 import { useLocation } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { API_URL } from "../lib/config";
 
-function DevEnvironmentIndicatorInner() {
+const isPreviewDeploy = (hostname: string) =>
+  /^pr-\d+\.nylonimpossible\.com$/.test(hostname);
+
+interface Props {
+  origin: string;
+}
+
+export default function DevEnvironmentIndicator({ origin }: Props) {
   const location = useLocation();
-  const [origin, setOrigin] = useState("");
+  const hostname = new URL(origin).hostname;
 
-  useEffect(() => {
-    setOrigin(window.location.origin);
-  }, []);
+  if (import.meta.env.PROD && !isPreviewDeploy(hostname)) return null;
 
-  const currentUrl = `${origin}${location.pathname}${location.searchStr}`;
+  const currentUrl = `${origin}${location.href}`;
 
   return (
     <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-1 rounded-lg bg-surface/90 px-3 py-2 text-xs font-mono text-surface backdrop-blur-sm">
@@ -24,9 +28,4 @@ function DevEnvironmentIndicatorInner() {
       </div>
     </div>
   );
-}
-
-export default function DevEnvironmentIndicator() {
-  if (import.meta.env.PROD) return null;
-  return <DevEnvironmentIndicatorInner />;
 }

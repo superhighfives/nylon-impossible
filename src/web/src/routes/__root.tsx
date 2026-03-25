@@ -8,6 +8,8 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequestUrl } from "@tanstack/react-start/server";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
@@ -19,7 +21,12 @@ interface MyRouterContext {
   queryClient: QueryClient;
 }
 
+const getOrigin = createServerFn({ method: "GET" }).handler(
+  () => getRequestUrl().origin,
+);
+
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  loader: () => getOrigin(),
   notFoundComponent: NotFound,
   errorComponent: ({ reset }) => <ErrorView reset={reset} />,
   head: () => ({
@@ -77,6 +84,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 });
 
 function RootDocument() {
+  const origin = Route.useLoaderData();
+
   return (
     <html lang="en" className="light" suppressHydrationWarning>
       <head>
@@ -104,7 +113,7 @@ function RootDocument() {
           <div className="pt-header-offset">
             <Outlet />
           </div>
-          {!import.meta.env.PROD && <DevEnvironmentIndicator />}
+          <DevEnvironmentIndicator origin={origin} />
           <TanStackDevtools
             config={{
               position: "bottom-right",
