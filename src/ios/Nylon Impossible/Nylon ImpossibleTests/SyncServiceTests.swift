@@ -439,7 +439,7 @@ struct SyncServiceTests {
 
         await service.sync()
 
-        guard let change = api.lastSyncRequest?.changes.first else {
+        guard let request = api.lastSyncRequest, let change = request.changes.first else {
             Issue.record("Expected sync to send a change for the deleted todo")
             return
         }
