@@ -36,7 +36,7 @@ const syncRequestSchema = z.object({
       priority: z.enum(["high", "low"]).nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
-      urls: z.array(z.object({ url: z.string().url() })).optional(),
+      urls: z.array(z.object({ url: z.string().url().max(2048) })).max(10).optional(),
     }),
   ),
 });
@@ -315,7 +315,7 @@ export async function syncTodos(c: Context<Env>) {
 
     for (const { todoId, explicitUrls, title, description } of urlExtractionNeeded) {
       // Prefer explicit URLs sent by client; fall back to regex extraction for old clients
-      const extractedUrls = explicitUrls ?? [
+      const extractedUrls = explicitUrls ? Array.from(new Set(explicitUrls)) : [
         ...new Set([
           ...(title ? extractUrlsFromText(title) : []),
           ...(description ? extractUrlsFromText(description) : []),
