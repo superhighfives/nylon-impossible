@@ -435,8 +435,12 @@ struct SyncServiceTests {
 
         await service.sync()
 
-        let change = api.lastSyncRequest?.changes.first
-        #expect(change?.urls == nil)
+        guard let change = api.lastSyncRequest?.changes.first else {
+            Issue.record("Expected sync to send a change for the deleted todo")
+            return
+        }
+        #expect(change.deleted == true)
+        #expect(change.urls == nil)
     }
 
     @Test("Sets error state when API throws")

@@ -87,7 +87,7 @@ struct SyncRequest: Codable, Sendable {
     let changes: [TodoChange]
 }
 
-struct TodoUrlChange: Codable, Sendable {
+struct TodoUrlChange: Codable, Sendable, Equatable {
     let url: String
 }
 
