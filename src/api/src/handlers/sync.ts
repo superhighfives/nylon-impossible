@@ -238,7 +238,7 @@ export async function syncTodos(c: Context<Env>) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
             title: change.title,
-            description: change.description,
+            description: change.description ?? undefined,
           });
         }
       } else {
@@ -277,7 +277,7 @@ export async function syncTodos(c: Context<Env>) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
             title: change.title,
-            description: change.description,
+            description: change.description ?? undefined,
           });
         }
       }
