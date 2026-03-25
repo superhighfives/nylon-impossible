@@ -10,8 +10,8 @@ import SwiftData
 
 /// Priority levels for todos
 enum TodoPriority: String, Codable, CaseIterable {
-    case high = "high"
-    case low = "low"
+    case high
+    case low
 }
 
 @Model

@@ -75,7 +75,7 @@ enum TaskCreationService {
         // Store URL in pendingUrls — sent explicitly in the sync payload
         // so the server can create the todoUrls record directly without parsing the description
         if !todo.pendingUrls.contains(url) {
-            todo.pendingUrls = todo.pendingUrls + [url]
+            todo.pendingUrls += [url]
         }
         
         return todo

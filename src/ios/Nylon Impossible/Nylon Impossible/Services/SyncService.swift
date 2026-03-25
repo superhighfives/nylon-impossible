@@ -93,7 +93,7 @@ final class SyncService {
         }
 
         do {
-            let _ = try await apiService.smartCreate(text: text)
+            _ = try await apiService.smartCreate(text: text)
             // Sync to pull the created todos into SwiftData
             await sync()
             webSocketService?.notifyChanged()
