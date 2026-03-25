@@ -30,19 +30,6 @@ interface OpenAIChatCompletionResponse {
   }>;
 }
 
-export interface AIGatewayConfig {
-  accountId: string;
-  gatewayId: string;
-  token: string;
-}
-
-/**
- * Check if AI Gateway is properly configured
- */
-export function isAIGatewayConfigured(config: AIGatewayConfig): boolean {
-  return Boolean(config.accountId && config.gatewayId && config.token);
-}
-
 const extractTodosTool = {
   type: "function" as const,
   function: {
@@ -135,20 +122,16 @@ Examples (extract ALL of these):
  * Extract structured todos from natural language text using AI Gateway dynamic routing
  */
 export async function extractTodos(
-  config: AIGatewayConfig,
+  ai: Ai,
   text: string,
 ): Promise<ExtractedItem[] | null> {
   const systemPrompt = getSystemPrompt();
 
-  const url = `https://gateway.ai.cloudflare.com/v1/${config.accountId}/${config.gatewayId}/openai/chat/completions`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "cf-aig-authorization": `Bearer ${config.token}`,
-    },
-    body: JSON.stringify({
+  const res = await ai.gateway("nylon-impossible").run({
+    provider: "compat",
+    endpoint: "chat/completions",
+    headers: {},
+    query: {
       model: "dynamic/default",
       messages: [
         { role: "system", content: systemPrompt },
@@ -160,7 +143,7 @@ export async function extractTodos(
         function: { name: "extract_todos" },
       },
       max_tokens: 16000,
-    }),
+    },
   });
 
   if (!res.ok) {
