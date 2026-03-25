@@ -420,8 +420,12 @@ struct SyncServiceTests {
         let todo = TodoItem(title: "Deleted", userId: "user_test_123", position: "a0")
         todo.isDeleted = true
         todo.isSynced = false
-        todo.pendingUrls = ["https://example.com"]
         context.insert(todo)
+        try context.save()
+
+        // Set pendingUrls after the initial save — setting it alongside isDeleted = true
+        // before save can cause SwiftData to fault on the array property
+        todo.pendingUrls = ["https://example.com"]
         try context.save()
 
         api.syncResponse = SyncResponse(
