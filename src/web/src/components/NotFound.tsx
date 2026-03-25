@@ -25,11 +25,9 @@ export function NotFound() {
           The page you're looking for doesn't exist or has been moved.
         </p>
       </div>
-      <Link to="/">
-        <Button variant="primary" size="lg" className="w-full">
-          Go home
-        </Button>
-      </Link>
+      <Button render={<Link to="/" />} variant="primary" size="lg" className="w-full">
+        Go home
+      </Button>
     </div>
   );
 }

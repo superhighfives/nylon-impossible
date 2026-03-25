@@ -37,11 +37,9 @@ export function ErrorView({ reset }: ErrorViewProps) {
             Try again
           </Button>
         )}
-        <Link to="/">
-          <Button variant="outline" size="lg" className="w-full">
-            Go home
-          </Button>
-        </Link>
+        <Button render={<Link to="/" />} variant="outline" size="lg" className="w-full">
+          Go home
+        </Button>
       </div>
     </div>
   );
