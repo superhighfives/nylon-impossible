@@ -26,7 +26,11 @@ function DevEnvironmentIndicatorInner() {
   );
 }
 
+const isPreviewDeploy = () =>
+  typeof window !== "undefined" &&
+  /^pr-\d+\.nylonimpossible\.com$/.test(window.location.hostname);
+
 export default function DevEnvironmentIndicator() {
-  if (import.meta.env.PROD) return null;
+  if (import.meta.env.PROD && !isPreviewDeploy()) return null;
   return <DevEnvironmentIndicatorInner />;
 }
