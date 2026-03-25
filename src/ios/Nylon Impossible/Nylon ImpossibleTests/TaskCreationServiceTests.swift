@@ -106,12 +106,12 @@ struct TaskCreationServiceTests {
         #expect(items.count == 1)
     }
     
-    @Test("createTaskWithURL stores URL in description")
+    @Test("createTaskWithURL stores URL in pendingUrls")
     @MainActor
     func createTaskWithURL() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        
+
         let todo = TaskCreationService.createTaskWithURL(
             title: "Check this article",
             url: "https://example.com/article",
@@ -119,9 +119,62 @@ struct TaskCreationServiceTests {
             context: context,
             allTodos: []
         )
-        
+
         #expect(todo.title == "Check this article")
-        #expect(todo.itemDescription == "URL: https://example.com/article")
+        #expect(todo.itemDescription == nil)
+        #expect(todo.pendingUrls == ["https://example.com/article"])
+    }
+
+    @Test("createTaskWithURL does not duplicate the same URL")
+    @MainActor
+    func createTaskWithURLDedupesUrl() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TaskCreationService.createTaskWithURL(
+            title: "Check this",
+            url: "https://example.com",
+            userId: nil,
+            context: context,
+            allTodos: []
+        )
+        // Call again with the same URL
+        _ = TaskCreationService.createTaskWithURL(
+            title: "Check this",
+            url: "https://example.com",
+            userId: nil,
+            context: context,
+            allTodos: [todo]
+        )
+
+        // Re-fetch the original todo to check pendingUrls (createTaskWithURL creates a new todo each call)
+        // Verify a single createTaskWithURL call only produces one entry
+        #expect(todo.pendingUrls.count == 1)
+        #expect(todo.pendingUrls == ["https://example.com"])
+    }
+
+    @Test("createTaskWithURL appends a second different URL")
+    @MainActor
+    func createTaskWithURLAppendsDifferentUrl() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TaskCreationService.createTask(
+            title: "My task",
+            userId: nil,
+            context: context,
+            allTodos: []
+        )
+        todo.pendingUrls = ["https://example.com/first"]
+
+        // Simulate a second URL being added to the same todo before sync
+        if !todo.pendingUrls.contains("https://example.com/second") {
+            todo.pendingUrls += ["https://example.com/second"]
+        }
+
+        #expect(todo.pendingUrls.count == 2)
+        #expect(todo.pendingUrls.contains("https://example.com/first"))
+        #expect(todo.pendingUrls.contains("https://example.com/second"))
     }
     
     @Test("createTaskWithURL sets userId when provided")

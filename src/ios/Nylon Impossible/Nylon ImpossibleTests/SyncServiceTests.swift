@@ -325,6 +325,120 @@ struct SyncServiceTests {
         #expect(items.count == 0)
     }
 
+    @Test("Includes pendingUrls as urls in sync payload")
+    @MainActor
+    func includesPendingUrlsInPayload() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Check this", userId: "user_test_123", position: "a0")
+        todo.isSynced = false
+        todo.pendingUrls = ["https://example.com"]
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = SyncResponse(
+            todos: [APITodo(
+                id: todo.id.uuidString.lowercased(),
+                userId: "user_test_123",
+                title: "Check this",
+                description: nil,
+                completed: false,
+                position: "a0",
+                dueDate: nil,
+                priority: nil,
+                createdAt: todo.createdAt,
+                updatedAt: todo.updatedAt,
+                urls: nil
+            )],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        let change = api.lastSyncRequest?.changes.first
+        #expect(change?.urls?.count == 1)
+        #expect(change?.urls?.first?.url == "https://example.com")
+    }
+
+    @Test("Clears pendingUrls after successful sync")
+    @MainActor
+    func clearsPendingUrlsAfterSync() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Check this", userId: "user_test_123", position: "a0")
+        todo.isSynced = false
+        todo.pendingUrls = ["https://example.com"]
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = SyncResponse(
+            todos: [APITodo(
+                id: todo.id.uuidString.lowercased(),
+                userId: "user_test_123",
+                title: "Check this",
+                description: nil,
+                completed: false,
+                position: "a0",
+                dueDate: nil,
+                priority: nil,
+                createdAt: todo.createdAt,
+                updatedAt: todo.updatedAt,
+                urls: nil
+            )],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        let descriptor = FetchDescriptor<TodoItem>()
+        let items = try context.fetch(descriptor)
+        #expect(items.first?.pendingUrls.isEmpty == true)
+    }
+
+    @Test("Does not include urls in payload for deleted todos")
+    @MainActor
+    func doesNotIncludeUrlsForDeletedTodos() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Deleted", userId: "user_test_123", position: "a0")
+        todo.isDeleted = true
+        todo.isSynced = false
+        todo.pendingUrls = ["https://example.com"]
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = SyncResponse(
+            todos: [],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        let change = api.lastSyncRequest?.changes.first
+        #expect(change?.urls == nil)
+    }
+
     @Test("Sets error state when API throws")
     @MainActor
     func setsErrorStateOnAPIFailure() async throws {
