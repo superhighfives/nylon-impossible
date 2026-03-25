@@ -72,11 +72,9 @@ enum TaskCreationService {
             allTodos: allTodos
         )
         
-        // Store URL in the description for now
-        // The server will extract it and fetch metadata on sync
-        if todo.itemDescription == nil {
-            todo.itemDescription = "URL: \(url)"
-        }
+        // Store URL in pendingUrls — sent explicitly in the sync payload
+        // so the server can create the todoUrls record directly without parsing the description
+        todo.pendingUrls = [url]
         
         return todo
     }

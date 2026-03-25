@@ -87,6 +87,10 @@ struct SyncRequest: Codable, Sendable {
     let changes: [TodoChange]
 }
 
+struct TodoUrlChange: Codable, Sendable {
+    let url: String
+}
+
 struct TodoChange: Codable, Sendable {
     let id: String
     let title: String?
@@ -97,6 +101,7 @@ struct TodoChange: Codable, Sendable {
     let priority: String?
     let updatedAt: Date
     let deleted: Bool?
+    let urls: [TodoUrlChange]?
 }
 
 struct SyncResponse: Codable, Sendable {

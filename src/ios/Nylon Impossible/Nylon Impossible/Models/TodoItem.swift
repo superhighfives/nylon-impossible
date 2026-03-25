@@ -28,6 +28,7 @@ final class TodoItem {
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
     var priority: String?         // "high" or "low", stored as String for SwiftData
+    var pendingUrls: [String] = [] // URLs waiting to be synced to server
 
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
@@ -42,6 +43,7 @@ final class TodoItem {
         self.isDeleted = false
         self.dueDate = nil
         self.priority = nil
+        self.pendingUrls = []
     }
     
     /// Mark as modified (for sync tracking)

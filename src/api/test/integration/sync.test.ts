@@ -379,6 +379,40 @@ describe("Sync endpoint", () => {
     expect(urls).toHaveLength(1);
   });
 
+  it("stores URLs sent explicitly in the urls field without touching description", async () => {
+    const now = new Date().toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440015";
+
+    const res = await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Check quiche.industries",
+          description: "A plain description with no URL",
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+          urls: [{ url: "https://quiche.industries/explicit" }],
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const db = getDb(env.DB);
+    const urls = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, todoId));
+
+    expect(urls).toHaveLength(1);
+    expect(urls[0].url).toBe("https://quiche.industries/explicit");
+
+    // Description should be untouched — no regex cleaning on the explicit path
+    const body = await syncRequest({ changes: [] }).then((r) => r.json<any>());
+    const todo = body.todos.find((t: any) => t.id === todoId);
+    expect(todo.description).toBe("A plain description with no URL");
+  });
+
   it("extracts URLs from both title and description when both contain URLs", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440013";
