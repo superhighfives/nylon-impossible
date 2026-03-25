@@ -104,7 +104,7 @@ function RootDocument() {
           <div className="pt-header-offset">
             <Outlet />
           </div>
-          {!import.meta.env.PROD && <DevEnvironmentIndicator />}
+          <DevEnvironmentIndicator />
           <TanStackDevtools
             config={{
               position: "bottom-right",

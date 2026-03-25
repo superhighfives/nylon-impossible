@@ -2,13 +2,22 @@ import { useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { API_URL } from "../lib/config";
 
-function DevEnvironmentIndicatorInner() {
+const isPreviewDeploy = () =>
+  /^pr-\d+\.nylonimpossible\.com$/.test(window.location.hostname);
+
+export default function DevEnvironmentIndicator() {
   const location = useLocation();
   const [origin, setOrigin] = useState("");
+  const [show, setShow] = useState(!import.meta.env.PROD);
 
   useEffect(() => {
     setOrigin(window.location.origin);
+    if (import.meta.env.PROD) {
+      setShow(isPreviewDeploy());
+    }
   }, []);
+
+  if (!show) return null;
 
   const currentUrl = `${origin}${location.pathname}${location.searchStr}`;
 
@@ -24,13 +33,4 @@ function DevEnvironmentIndicatorInner() {
       </div>
     </div>
   );
-}
-
-const isPreviewDeploy = () =>
-  typeof window !== "undefined" &&
-  /^pr-\d+\.nylonimpossible\.com$/.test(window.location.hostname);
-
-export default function DevEnvironmentIndicator() {
-  if (import.meta.env.PROD && !isPreviewDeploy()) return null;
-  return <DevEnvironmentIndicatorInner />;
 }
