@@ -93,7 +93,7 @@ final class SyncService {
         }
 
         do {
-            let _ = try await apiService.smartCreate(text: text)
+            _ = try await apiService.smartCreate(text: text)
             // Sync to pull the created todos into SwiftData
             await sync()
             webSocketService?.notifyChanged()
@@ -235,7 +235,10 @@ final class SyncService {
         let unsyncedItems = try modelContext.fetch(descriptor)
 
         return unsyncedItems.map { todo in
-            TodoChange(
+            let pendingUrlChanges = todo.isDeleted || todo.pendingUrls.isEmpty
+                ? nil
+                : todo.pendingUrls.map { TodoUrlChange(url: $0) }
+            return TodoChange(
                 // Normalize UUID to lowercase to match web-generated IDs in D1
                 id: todo.id.uuidString.lowercased(),
                 title: todo.isDeleted ? nil : todo.title,
@@ -245,7 +248,8 @@ final class SyncService {
                 dueDate: todo.isDeleted ? nil : todo.dueDate,
                 priority: todo.isDeleted ? nil : todo.priority,
                 updatedAt: todo.updatedAt,
-                deleted: todo.isDeleted ? true : nil
+                deleted: todo.isDeleted ? true : nil,
+                urls: pendingUrlChanges
             )
         }
     }
@@ -306,7 +310,7 @@ final class SyncService {
             }
         }
 
-        // Step 2: Mark all local changes as synced
+        // Step 2: Mark all local changes as synced and clear pending URLs
         for changeId in localChangeIds {
             guard let uuid = UUID(uuidString: changeId) else { continue }
             let descriptor = FetchDescriptor<TodoItem>(
@@ -314,6 +318,7 @@ final class SyncService {
             )
             if let todo = try modelContext.fetch(descriptor).first {
                 todo.isSynced = true
+                todo.pendingUrls = []
             }
         }
 

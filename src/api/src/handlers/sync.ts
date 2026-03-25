@@ -36,6 +36,10 @@ const syncRequestSchema = z.object({
       priority: z.enum(["high", "low"]).nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
+      urls: z
+        .array(z.object({ url: z.string().url().max(2048) }))
+        .max(10)
+        .optional(),
     }),
   ),
 });
@@ -165,9 +169,13 @@ export async function syncTodos(c: Context<Env>) {
     );
   }
 
-  // Track todos whose descriptions contain URLs that need extracting
-  const urlExtractionNeeded: Array<{ todoId: string; description: string }> =
-    [];
+  // Track todos that need URLs stored. explicitUrls takes priority over regex extraction.
+  const urlExtractionNeeded: Array<{
+    todoId: string;
+    explicitUrls?: string[];
+    title?: string;
+    description?: string;
+  }> = [];
 
   // 1. Apply client changes (with conflict resolution)
   // Normalize UUIDs to lowercase to match web-generated IDs
@@ -217,13 +225,20 @@ export async function syncTodos(c: Context<Env>) {
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
-        if (
-          change.description &&
-          extractUrlsFromText(change.description).length > 0
+        if (change.urls && change.urls.length > 0) {
+          urlExtractionNeeded.push({
+            todoId: normalizedId,
+            explicitUrls: change.urls.map((u) => u.url),
+          });
+        } else if (
+          (change.description &&
+            extractUrlsFromText(change.description).length > 0) ||
+          (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
-            description: change.description,
+            title: change.title,
+            description: change.description ?? undefined,
           });
         }
       } else {
@@ -249,20 +264,27 @@ export async function syncTodos(c: Context<Env>) {
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });
-        if (
-          change.description &&
-          extractUrlsFromText(change.description).length > 0
+        if (change.urls && change.urls.length > 0) {
+          urlExtractionNeeded.push({
+            todoId: normalizedId,
+            explicitUrls: change.urls.map((u) => u.url),
+          });
+        } else if (
+          (change.description &&
+            extractUrlsFromText(change.description).length > 0) ||
+          (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
-            description: change.description,
+            title: change.title,
+            description: change.description ?? undefined,
           });
         }
       }
     }
   }
 
-  // 1b. Extract URLs from descriptions (e.g. iOS share sheet stores "URL: https://...")
+  // 1b. Extract URLs from titles and descriptions (e.g. iOS share sheet stores "URL: https://...")
   if (urlExtractionNeeded.length > 0) {
     const now = new Date();
     const urlsToFetch: Array<{ id: string; todoId: string; url: string }> = [];
@@ -294,8 +316,21 @@ export async function syncTodos(c: Context<Env>) {
       entry.lastPosition = row.position; // rows are ordered, so last wins
     }
 
-    for (const { todoId, description } of urlExtractionNeeded) {
-      const extractedUrls = extractUrlsFromText(description);
+    for (const {
+      todoId,
+      explicitUrls,
+      title,
+      description,
+    } of urlExtractionNeeded) {
+      // Prefer explicit URLs sent by client; fall back to regex extraction for old clients
+      const extractedUrls = explicitUrls
+        ? Array.from(new Set(explicitUrls))
+        : [
+            ...new Set([
+              ...(title ? extractUrlsFromText(title) : []),
+              ...(description ? extractUrlsFromText(description) : []),
+            ]),
+          ];
       if (extractedUrls.length === 0) continue;
 
       const existing = existingByTodo.get(todoId) ?? {
@@ -326,18 +361,21 @@ export async function syncTodos(c: Context<Env>) {
       });
       await db.insert(todoUrls).values(urlRows);
 
-      // Clear the description now that URLs have been extracted
-      const cleanedDescription = description
-        .replace(
-          /URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi,
-          "",
-        )
-        .replace(/https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi, "")
-        .trim();
-      await db
-        .update(todos)
-        .set({ description: cleanedDescription || null, updatedAt: now })
-        .where(eq(todos.id, todoId));
+      // Only clean the description when using the legacy regex path — explicit URLs
+      // are already stored cleanly and the description needs no modification
+      if (!explicitUrls && description) {
+        const cleanedDescription = description
+          .replace(
+            /URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi,
+            "",
+          )
+          .replace(/https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi, "")
+          .trim();
+        await db
+          .update(todos)
+          .set({ description: cleanedDescription || null, updatedAt: now })
+          .where(eq(todos.id, todoId));
+      }
     }
 
     if (urlsToFetch.length > 0) {
