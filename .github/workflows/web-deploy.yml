@@ -225,6 +225,7 @@ jobs:
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
+          VITE_IS_PREVIEW: true
 
       - name: Deploy preview Web
         if: steps.changes.outputs.web == 'true'
