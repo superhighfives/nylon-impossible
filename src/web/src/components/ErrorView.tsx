@@ -33,11 +33,21 @@ export function ErrorView({ reset }: ErrorViewProps) {
       </div>
       <div className="flex flex-col gap-3">
         {reset && (
-          <Button variant="primary" size="lg" className="w-full" onClick={reset}>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full"
+            onClick={reset}
+          >
             Try again
           </Button>
         )}
-        <Button render={<Link to="/" />} variant="outline" size="lg" className="w-full">
+        <Button
+          render={<Link to="/" />}
+          variant="outline"
+          size="lg"
+          className="w-full"
+        >
           Go home
         </Button>
       </div>

@@ -62,7 +62,7 @@ export async function listTodos(c: Context<Env>) {
     .orderBy(todos.createdAt);
 
   const todoIds = userTodos.map((t) => t.id);
-  let allUrls: (typeof todoUrls.$inferSelect)[] = [];
+  const allUrls: (typeof todoUrls.$inferSelect)[] = [];
   if (todoIds.length > 0) {
     const CHUNK_SIZE = 100;
     for (let i = 0; i < todoIds.length; i += CHUNK_SIZE) {
