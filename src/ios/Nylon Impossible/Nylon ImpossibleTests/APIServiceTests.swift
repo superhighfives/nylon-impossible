@@ -120,7 +120,8 @@ struct APIServiceTests {
             dueDate: nil,
             priority: nil,
             updatedAt: Date(timeIntervalSince1970: 1700000000),
-            deleted: nil
+            deleted: nil,
+            urls: nil
         )
 
         let data = try encoder.encode(change)
