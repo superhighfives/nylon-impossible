@@ -9,7 +9,9 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
+import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
+import { NotFound } from "../components/NotFound";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -18,6 +20,8 @@ interface MyRouterContext {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
+  notFoundComponent: NotFound,
+  errorComponent: ({ reset }) => <ErrorView reset={reset} />,
   head: () => ({
     meta: [
       {
