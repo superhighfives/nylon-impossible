@@ -18,7 +18,9 @@ describe("DevEnvironmentIndicator", () => {
   it("shows in development builds", () => {
     render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
     expect(screen.getByText("api")).toBeInTheDocument();
-    expect(screen.getByText("https://api.nylonimpossible.com")).toBeInTheDocument();
+    expect(
+      screen.getByText("https://api.nylonimpossible.com"),
+    ).toBeInTheDocument();
   });
 
   it("shows the full current URL", () => {

@@ -7,9 +7,9 @@ import {
   Outlet,
   Scripts,
 } from "@tanstack/react-router";
+import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
@@ -21,8 +21,8 @@ interface MyRouterContext {
   queryClient: QueryClient;
 }
 
-const getOrigin = createServerFn({ method: "GET" }).handler(() =>
-  getRequestUrl().origin
+const getOrigin = createServerFn({ method: "GET" }).handler(
+  () => getRequestUrl().origin,
 );
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
