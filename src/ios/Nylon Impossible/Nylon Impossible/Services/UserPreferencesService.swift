@@ -33,18 +33,18 @@ final class UserPreferencesService {
         isLoading = false
     }
 
-    func toggleAI() async {
-        let newValue = !aiEnabled
+    func setAI(enabled: Bool) async {
+        let previousValue = aiEnabled
         // Optimistic update
-        aiEnabled = newValue
+        aiEnabled = enabled
         error = nil
 
         do {
-            let user = try await apiService.updateMe(aiEnabled: newValue)
+            let user = try await apiService.updateMe(aiEnabled: enabled)
             aiEnabled = user.aiEnabled
         } catch {
             // Revert on error
-            aiEnabled = !newValue
+            aiEnabled = previousValue
             self.error = error
             print("Failed to update AI preference: \(error)")
         }

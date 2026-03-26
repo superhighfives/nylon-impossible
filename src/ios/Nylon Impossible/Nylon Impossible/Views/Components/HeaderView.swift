@@ -31,6 +31,7 @@ struct HeaderView: View {
                         .font(.system(size: 18))
                         .foregroundStyle(Color.appStrong)
                 }
+                .accessibilityLabel("Settings")
 
                 if let onSignOut {
                     Button {

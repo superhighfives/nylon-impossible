@@ -15,9 +15,9 @@ struct SettingsView: View {
                 Section {
                     Toggle("Use AI", isOn: Binding(
                         get: { preferencesService.aiEnabled },
-                        set: { _ in
+                        set: { newValue in
                             Task {
-                                await preferencesService.toggleAI()
+                                await preferencesService.setAI(enabled: newValue)
                             }
                         }
                     ))
