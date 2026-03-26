@@ -78,16 +78,30 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increment build number
-        id: build_number
-        run: |
-          CURRENT=$(cat "$GITHUB_WORKSPACE/BUILD_NUMBER")
-          NEXT=$((CURRENT + 1))
-          echo $NEXT > "$GITHUB_WORKSPACE/BUILD_NUMBER"
-          echo "number=$NEXT" >> $GITHUB_OUTPUT
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+          working-directory: src/ios/Nylon Impossible
 
-      - name: Commit build number
+      - name: Get latest TestFlight build number
+        id: build_number
+        working-directory: src/ios/Nylon Impossible
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
         run: |
+          CURRENT=$(bundle exec fastlane run latest_testflight_build_number api_key_path:"" | grep "Result:" | awk '{print $2}')
+          NEXT=$((CURRENT + 1))
+          echo "number=$NEXT" >> $GITHUB_OUTPUT
+          echo "Build number: $NEXT (previous: $CURRENT)"
+
+      - name: Update BUILD_NUMBER file
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo ${{ steps.build_number.outputs.number }} > "$GITHUB_WORKSPACE/BUILD_NUMBER"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add "$GITHUB_WORKSPACE/BUILD_NUMBER"
@@ -152,13 +166,6 @@ jobs:
           path: ${{ runner.temp }}/spm-cache
           key: spm-${{ hashFiles('**/Package.resolved') }}
           restore-keys: spm-
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: true
-          working-directory: src/ios/Nylon Impossible
 
       - name: Build and upload to TestFlight
         env:
