@@ -1,5 +1,6 @@
 import { SignedIn, UserButton } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
+import { AiToggle } from "./AiToggle";
 
 export default function Header() {
   return (
@@ -13,6 +14,7 @@ export default function Header() {
           <img src="/logo192.png" alt="Nylon Impossible" className="size-8" />
         </Link>
         <SignedIn>
+          <AiToggle />
           <UserButton />
         </SignedIn>
       </header>
