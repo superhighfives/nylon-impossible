@@ -1,7 +1,7 @@
 # AI Features
 
 **Date:** 2026-03-25
-**Status:** Ready
+**Status:** In Progress
 
 I want to work through @plans/ready/2026-03-18-optimistic-ui-parity.md, plans/ready/2026-03-18-ios-siri-background-sync.md, and plans/ready/2026-03-13-research-agent.md. My goal is to integrate AI Gateway with Cloudflare so I can better test how AI Gateway works.
 
