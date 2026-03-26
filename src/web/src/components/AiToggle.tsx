@@ -15,9 +15,11 @@ export function AiToggle() {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={user.aiEnabled}
       onClick={handleToggle}
       disabled={updateUser.isPending}
-      className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-gray-muted hover:text-gray transition-colors"
+      className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-gray-muted hover:text-gray transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2"
       title={user.aiEnabled ? "AI is enabled" : "AI is disabled"}
     >
       <span
