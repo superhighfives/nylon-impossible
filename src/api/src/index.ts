@@ -9,6 +9,7 @@ import {
   listTodos,
   updateTodo,
 } from "./handlers/todos";
+import { getMe, updateMe } from "./handlers/users";
 import { authMiddleware, verifyClerkJWT } from "./lib/auth";
 import type { Env } from "./types";
 
@@ -28,7 +29,7 @@ app.use("*", (c, next) => {
       if (isDev && LOCALHOST_ORIGIN.test(origin)) return origin;
       return ALLOWED_ORIGINS.test(origin) ? origin : null;
     },
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })(c, next);
@@ -60,6 +61,9 @@ app.get("/ws", async (c) => {
 app.use("/todos/*", authMiddleware);
 app.use("/todos", authMiddleware);
 
+// Auth middleware for user routes
+app.use("/users/*", authMiddleware);
+
 // Todo routes
 app.post("/todos/smart", smartCreate);
 app.post("/todos/sync", syncTodos);
@@ -68,5 +72,9 @@ app.post("/todos", createTodo);
 app.get("/todos/:id", getTodo);
 app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
+
+// User routes
+app.get("/users/me", getMe);
+app.patch("/users/me", updateMe);
 
 export default app;

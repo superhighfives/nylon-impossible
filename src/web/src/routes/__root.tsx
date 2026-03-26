@@ -1,4 +1,4 @@
-import { ClerkProvider } from "@clerk/tanstack-react-start";
+import { ClerkProvider, SignedIn } from "@clerk/tanstack-react-start";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -10,6 +10,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
+import { AiToggle } from "../components/AiToggle";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
@@ -114,6 +115,9 @@ function RootDocument() {
             <Outlet />
           </div>
           <DevEnvironmentIndicator origin={origin} />
+          <SignedIn>
+            <AiToggle />
+          </SignedIn>
           <TanStackDevtools
             config={{
               position: "bottom-right",

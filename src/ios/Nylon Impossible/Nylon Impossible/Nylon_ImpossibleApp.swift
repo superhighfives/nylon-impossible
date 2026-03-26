@@ -14,6 +14,7 @@ import AppIntents
 struct Nylon_ImpossibleApp: App {
     @State private var authService = AuthService()
     @State private var syncService: SyncService?
+    @State private var preferencesService: UserPreferencesService?
     
     init() {
         Clerk.configure(publishableKey: Config.clerkPublishableKey)
@@ -21,12 +22,14 @@ struct Nylon_ImpossibleApp: App {
     
     var body: some Scene {
         WindowGroup {
-            RootView(syncService: syncService)
+            RootView(syncService: syncService, preferencesService: preferencesService)
                 .environment(Clerk.shared)
                 .environment(authService)
                 .onAppear {
                     if syncService == nil {
+                        let apiService = APIService(authService: authService)
                         syncService = SyncService(authService: authService)
+                        preferencesService = UserPreferencesService(apiService: apiService)
                     }
                 }
                 .task {
@@ -44,6 +47,7 @@ struct RootView: View {
     @Environment(Clerk.self) private var clerk
     @Environment(AuthService.self) private var authService
     var syncService: SyncService?
+    var preferencesService: UserPreferencesService?
 
     @State private var hasTriggeredInitialSync = false
     
@@ -60,9 +64,10 @@ struct RootView: View {
                     ProgressView()
                 }
             } else if isSignedIn {
-                if let syncService {
+                if let syncService, let preferencesService {
                     ContentView()
                         .environment(syncService)
+                        .environment(preferencesService)
                         .onAppear {
                             syncService.setModelContext(modelContext)
                             triggerInitialSync()
@@ -119,6 +124,8 @@ struct RootView: View {
             await syncService.sync()
             // Connect WebSocket for real-time updates
             syncService.connectWebSocket()
+            // Fetch user preferences
+            await preferencesService?.fetchPreferences()
         }
     }
 }

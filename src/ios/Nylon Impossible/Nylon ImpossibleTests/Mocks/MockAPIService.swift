@@ -18,6 +18,19 @@ final class MockAPIService: APIProviding {
     var smartCreateError: Error?
     var lastSmartCreateText: String?
 
+    var getMeResponse: APIUser = APIUser(
+        id: "mock-user-id",
+        email: "test@example.com",
+        aiEnabled: true,
+        createdAt: Date(timeIntervalSince1970: 1735689600),
+        updatedAt: Date(timeIntervalSince1970: 1735689600)
+    )
+    var getMeError: Error?
+
+    var updateMeResponse: APIUser?
+    var updateMeError: Error?
+    var lastUpdateMeAiEnabled: Bool?
+
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse {
         lastSyncRequest = (lastSyncedAt, changes)
         if let error = syncError {
@@ -32,5 +45,26 @@ final class MockAPIService: APIProviding {
             throw error
         }
         return smartCreateResponse
+    }
+
+    func getMe() async throws -> APIUser {
+        if let error = getMeError {
+            throw error
+        }
+        return getMeResponse
+    }
+
+    func updateMe(aiEnabled: Bool) async throws -> APIUser {
+        lastUpdateMeAiEnabled = aiEnabled
+        if let error = updateMeError {
+            throw error
+        }
+        return updateMeResponse ?? APIUser(
+            id: getMeResponse.id,
+            email: getMeResponse.email,
+            aiEnabled: aiEnabled,
+            createdAt: getMeResponse.createdAt,
+            updatedAt: Date()
+        )
     }
 }

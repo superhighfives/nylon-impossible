@@ -9,5 +9,6 @@ export type Env = {
   };
   Variables: {
     userId: string;
+    aiEnabled: boolean;
   };
 };

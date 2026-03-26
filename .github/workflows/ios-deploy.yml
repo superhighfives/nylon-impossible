@@ -6,6 +6,11 @@ on:
     paths:
       - "src/ios/**"
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number (optional - uses preview API if set)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -78,24 +83,6 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Increment build number
-        id: build_number
-        run: |
-          CURRENT=$(cat "$GITHUB_WORKSPACE/BUILD_NUMBER")
-          NEXT=$((CURRENT + 1))
-          echo $NEXT > "$GITHUB_WORKSPACE/BUILD_NUMBER"
-          echo "number=$NEXT" >> $GITHUB_OUTPUT
-
-      - name: Commit build number
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$GITHUB_WORKSPACE/BUILD_NUMBER"
-          git commit -m "Bump build number to ${{ steps.build_number.outputs.number }} [skip ci]"
-          git pull --rebase
-          git push
-        working-directory: ${{ github.workspace }}
-
       - name: Install Apple certificates and provisioning profile
         env:
           DEVELOPMENT_CERTIFICATE_BASE64: ${{ secrets.DEVELOPMENT_CERTIFICATE_BASE64 }}
@@ -153,13 +140,6 @@ jobs:
           key: spm-${{ hashFiles('**/Package.resolved') }}
           restore-keys: spm-
 
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: true
-          working-directory: src/ios/Nylon Impossible
-
       - name: Build and upload to TestFlight
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
@@ -167,9 +147,8 @@ jobs:
           APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
-          BUILD_NUMBER: ${{ steps.build_number.outputs.number }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-          API_BASE_URL: https://api.nylonimpossible.com
+          API_BASE_URL: ${{ inputs.pr_number && format('https://api-pr-{0}.nylonimpossible.com', inputs.pr_number) || 'https://api.nylonimpossible.com' }}
         run: bundle exec fastlane beta --verbose
 
       - name: Clean up keychain
