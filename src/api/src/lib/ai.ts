@@ -127,7 +127,7 @@ export async function extractTodos(
 ): Promise<ExtractedItem[] | null> {
   const systemPrompt = getSystemPrompt();
 
-  const response = (await ai.gateway("nylon-impossible").run({
+  const rawResponse = await ai.gateway("nylon-impossible").run({
     provider: "compat",
     endpoint: "chat/completions",
     headers: {},
@@ -144,9 +144,33 @@ export async function extractTodos(
       },
       max_tokens: 16000,
     },
-  })) as unknown as OpenAIChatCompletionResponse;
+  });
 
-  console.log("AI Gateway response:", JSON.stringify(response, null, 2));
+  console.log("AI Gateway raw response type:", typeof rawResponse);
+  console.log(
+    "AI Gateway raw response constructor:",
+    rawResponse?.constructor?.name,
+  );
+  console.log(
+    "AI Gateway raw response has json?:",
+    typeof (rawResponse as Response).json,
+  );
+
+  // Check if it's a Response object that needs .json()
+  let response: OpenAIChatCompletionResponse;
+  if (typeof (rawResponse as Response).json === "function") {
+    response = await (rawResponse as Response).json();
+    console.log(
+      "AI Gateway parsed response:",
+      JSON.stringify(response, null, 2),
+    );
+  } else {
+    response = rawResponse as unknown as OpenAIChatCompletionResponse;
+    console.log(
+      "AI Gateway direct response:",
+      JSON.stringify(response, null, 2),
+    );
+  }
 
   // Parse OpenAI-compatible format (choices[0].message.tool_calls)
   const firstChoice = response.choices?.[0];
