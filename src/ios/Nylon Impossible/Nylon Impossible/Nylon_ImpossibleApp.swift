@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import ClerkKit
 import AppIntents
+import BackgroundTasks
 
 @main
 struct Nylon_ImpossibleApp: App {
@@ -17,6 +18,49 @@ struct Nylon_ImpossibleApp: App {
     
     init() {
         Clerk.configure(publishableKey: Config.clerkPublishableKey)
+        registerBackgroundTasks()
+    }
+
+    private func registerBackgroundTasks() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: "com.nylonimpossible.backgroundsync",
+            using: nil
+        ) { task in
+            Self.handleBackgroundSync(task: task as! BGAppRefreshTask)
+        }
+    }
+
+    private static func handleBackgroundSync(task: BGAppRefreshTask) {
+        // Schedule the next refresh before doing work, so iOS can wake us again if needed
+        scheduleBackgroundSync()
+
+        let container = SharedModelContainer.shared
+
+        let workTask = Task { @MainActor in
+            let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+            if let defaults = sharedDefaults, let svc = BackgroundSyncService(sharedDefaults: defaults) {
+                do {
+                    try await svc.sync(modelContainer: container)
+                    task.setTaskCompleted(success: true)
+                } catch {
+                    print("[BGTask] Sync error: \(error)")
+                    task.setTaskCompleted(success: false)
+                }
+            } else {
+                task.setTaskCompleted(success: false)
+            }
+        }
+
+        task.expirationHandler = {
+            workTask.cancel()
+            task.setTaskCompleted(success: false)
+        }
+    }
+
+    private static func scheduleBackgroundSync() {
+        let request = BGAppRefreshTaskRequest(identifier: "com.nylonimpossible.backgroundsync")
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        try? BGTaskScheduler.shared.submit(request)
     }
     
     var body: some Scene {
@@ -81,8 +125,10 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
-                // Persist userId to shared UserDefaults for Siri and Share Extension
+                // Persist userId and a fresh auth token to shared UserDefaults for
+                // Siri, Share Extension, and BackgroundSyncService access
                 authService.persistUserIdToSharedDefaults()
+                Task { await authService.persistAuthTokenToSharedDefaults() }
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
             } else {
@@ -97,6 +143,9 @@ struct RootView: View {
             switch newPhase {
             case .active:
                 syncService.connectWebSocket()
+                // Refresh the stored auth token so BackgroundSyncService has a valid
+                // credential for the next ~50 minutes
+                Task { await authService.persistAuthTokenToSharedDefaults() }
             case .background, .inactive:
                 syncService.disconnectWebSocket()
             @unknown default:

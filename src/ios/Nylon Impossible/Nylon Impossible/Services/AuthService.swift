@@ -71,10 +71,21 @@ final class AuthService: AuthProviding {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
         sharedDefaults?.set(userId, forKey: "currentUserId")
     }
-    
+
+    /// Persist a fresh Clerk JWT (with ~50-minute expiry) to shared UserDefaults so
+    /// BackgroundSyncService can authenticate from an App Intent extension or BGTask.
+    func persistAuthTokenToSharedDefaults() async {
+        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+        let token = try? await getToken()
+        sharedDefaults?.set(token, forKey: BackgroundSyncService.authTokenKey)
+        sharedDefaults?.set(Date().addingTimeInterval(50 * 60), forKey: BackgroundSyncService.authTokenExpiryKey)
+    }
+
     /// Clear userId from shared UserDefaults on sign out
     private func clearUserIdFromSharedDefaults() {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
         sharedDefaults?.removeObject(forKey: "currentUserId")
+        sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenKey)
+        sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenExpiryKey)
     }
 }
