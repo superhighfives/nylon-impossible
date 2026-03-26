@@ -127,7 +127,7 @@ struct ContentView: View {
         TodoItemRow(
             todo: todo,
             apiService: syncService.apiService,
-            urls: syncService.urls(for: todo.id),
+            urls: todo.urls?.map { APITodoUrl(from: $0, todoId: todo.id.uuidString) } ?? [],
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: todos)
                 syncService.syncAfterAction()

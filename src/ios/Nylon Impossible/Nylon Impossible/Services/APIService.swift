@@ -68,6 +68,25 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let updatedAt: Date
 }
 
+extension APITodoUrl {
+    init(from stored: TodoUrl, todoId: String) {
+        self.init(
+            id: stored.id,
+            todoId: todoId,
+            url: stored.url,
+            title: stored.title,
+            description: stored.itemDescription,
+            siteName: stored.siteName,
+            favicon: stored.favicon,
+            position: stored.position,
+            fetchStatus: FetchStatus(rawValue: stored.fetchStatus) ?? .pending,
+            fetchedAt: stored.fetchedAt,
+            createdAt: stored.createdAt,
+            updatedAt: stored.updatedAt
+        )
+    }
+}
+
 struct APITodoWithUrls: Codable, Sendable {
     let id: String
     let userId: String

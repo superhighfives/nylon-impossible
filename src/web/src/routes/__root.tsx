@@ -13,6 +13,7 @@ import { getRequestUrl } from "@tanstack/react-start/server";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
+import OfflineBanner from "../components/OfflineBanner";
 import { NotFound } from "../components/NotFound";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
@@ -110,6 +111,7 @@ function RootDocument() {
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <Header />
+          <OfflineBanner />
           <div className="pt-header-offset">
             <Outlet />
           </div>

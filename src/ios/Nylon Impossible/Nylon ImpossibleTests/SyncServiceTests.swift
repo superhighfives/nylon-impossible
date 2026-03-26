@@ -7,7 +7,7 @@ import SwiftData
 struct SyncServiceTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(for: TodoItem.self, configurations: config)
+        return try ModelContainer(for: TodoItem.self, TodoUrl.self, configurations: config)
     }
 
     @Test("Skips sync when not signed in")
@@ -426,6 +426,62 @@ struct SyncServiceTests {
         #expect(pendingUrlChanges(isDeleted: false, pendingUrls: ["https://example.com"]) != nil)
         // Non-deleted todo with no pending URLs → nil
         #expect(pendingUrlChanges(isDeleted: false, pendingUrls: []) == nil)
+    }
+
+    @Test("Persists URL metadata on TodoItem after sync")
+    @MainActor
+    func persistsUrlsOnTodoItem() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let remoteDate = Date(timeIntervalSince1970: 1700000000)
+        let urlDate = Date(timeIntervalSince1970: 1700000100)
+
+        api.syncResponse = SyncResponse(
+            todos: [APITodo(
+                id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                userId: "user_test_123",
+                title: "Task with URL",
+                description: nil,
+                completed: false,
+                position: "a0",
+                dueDate: nil,
+                priority: nil,
+                createdAt: remoteDate,
+                updatedAt: remoteDate,
+                urls: [APITodoUrl(
+                    id: "url-id-1",
+                    todoId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                    url: "https://example.com",
+                    title: "Example",
+                    description: nil,
+                    siteName: "Example Site",
+                    favicon: nil,
+                    position: "a0",
+                    fetchStatus: .fetched,
+                    fetchedAt: urlDate,
+                    createdAt: urlDate,
+                    updatedAt: urlDate
+                )]
+            )],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        // URL should be persisted on the related TodoItem
+        let descriptor = FetchDescriptor<TodoItem>()
+        let items = try context.fetch(descriptor)
+        #expect(items.count == 1)
+        #expect(items[0].urls?.count == 1)
+        #expect(items[0].urls?.first?.url == "https://example.com")
+        #expect(items[0].urls?.first?.title == "Example")
     }
 
     @Test("Sets error state when API throws")

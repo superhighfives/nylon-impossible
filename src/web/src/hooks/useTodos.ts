@@ -21,10 +21,42 @@ export function useTodos() {
 export function useCreateTodo() {
   const queryClient = useQueryClient();
   const { notifyChanged } = useWebSocketSync();
+  const { userId } = useAuth();
 
   return useMutation({
     mutationFn: (input: CreateTodoInput) => createTodo({ data: input }),
-    onSuccess: () => {
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      const optimisticTodo: TodoWithUrls = {
+        id: `temp-${crypto.randomUUID()}`,
+        userId: userId ?? "",
+        title: input.title,
+        description: input.description ?? null,
+        completed: false,
+        position: "a0", // placeholder — replaced when onSettled invalidates
+        dueDate: input.dueDate?.toISOString() ?? null,
+        priority: input.priority ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        urls: [],
+      };
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
+        optimisticTodo,
+        ...(previousTodos ?? []),
+      ]);
+
+      return { previousTodos };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
     },

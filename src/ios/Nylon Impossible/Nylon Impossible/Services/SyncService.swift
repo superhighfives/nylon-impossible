@@ -29,14 +29,6 @@ final class SyncService {
 
     private(set) var state: SyncState = .idle
     private(set) var lastSyncedAt: Date?
-    
-    /// URLs keyed by todo ID, populated from sync response
-    private(set) var urlsByTodoId: [String: [APITodoUrl]] = [:]
-    
-    /// Get URLs for a specific todo
-    func urls(for todoId: UUID) -> [APITodoUrl] {
-        urlsByTodoId[todoId.uuidString.lowercased()] ?? []
-    }
 
     let webSocketService: WebSocketService?
 
@@ -158,17 +150,8 @@ final class SyncService {
                 localChangeIds: localChangeIds,
                 userId: userId
             )
-            
-            // 4. Extract URLs from response and store in memory
-            var newUrlsByTodoId: [String: [APITodoUrl]] = [:]
-            for todo in response.todos {
-                if let urls = todo.urls, !urls.isEmpty {
-                    newUrlsByTodoId[todo.id.lowercased()] = urls
-                }
-            }
-            urlsByTodoId = newUrlsByTodoId
 
-            // 5. Update sync timestamp
+            // 4. Update sync timestamp
             if let syncedAt = ISO8601DateFormatter().date(from: response.syncedAt) {
                 lastSyncedAt = syncedAt
                 UserDefaults.standard.set(syncedAt, forKey: lastSyncedAtKey)
@@ -343,6 +326,30 @@ final class SyncService {
 
         for todo in toDelete {
             modelContext.delete(todo)
+        }
+
+        // Step 5: Sync URLs (server is authoritative — replace all for each todo in the response)
+        // Build a single lookup map from the IDs already processed in the sync — avoids one
+        // FetchDescriptor round-trip per todo in the hot sync path.
+        let remoteUUIDs = remoteTodos.compactMap { UUID(uuidString: $0.id) }
+        let batchDescriptor = FetchDescriptor<TodoItem>(
+            predicate: #Predicate { remoteUUIDs.contains($0.id) }
+        )
+        let todoMap = try Dictionary(
+            uniqueKeysWithValues: modelContext.fetch(batchDescriptor).map { ($0.id, $0) }
+        )
+
+        for remote in remoteTodos {
+            guard let remoteId = UUID(uuidString: remote.id),
+                  let todo = todoMap[remoteId] else { continue }
+
+            // Delete stale local URLs for this todo
+            for url in todo.urls ?? [] { modelContext.delete(url) }
+
+            // Insert fresh URLs from server
+            let newUrls = (remote.urls ?? []).map { TodoUrl(from: $0) }
+            for url in newUrls { modelContext.insert(url) }
+            todo.urls = newUrls
         }
 
         // Single save for the entire operation
