@@ -9,6 +9,7 @@ import Foundation
 @Observable
 final class UserPreferencesService {
     private let apiService: APIService
+    private var updateTask: Task<Void, Never>?
 
     var aiEnabled: Bool = true
     var isLoading: Bool = false
@@ -34,19 +35,31 @@ final class UserPreferencesService {
     }
 
     func setAI(enabled: Bool) async {
+        // Cancel any in-flight update to prevent race conditions
+        updateTask?.cancel()
+
         let previousValue = aiEnabled
         // Optimistic update
         aiEnabled = enabled
         error = nil
 
-        do {
-            let user = try await apiService.updateMe(aiEnabled: enabled)
-            aiEnabled = user.aiEnabled
-        } catch {
-            // Revert on error
-            aiEnabled = previousValue
-            self.error = error
-            print("Failed to update AI preference: \(error)")
+        updateTask = Task {
+            do {
+                let user = try await apiService.updateMe(aiEnabled: enabled)
+                // Only apply if this task wasn't cancelled
+                if !Task.isCancelled {
+                    aiEnabled = user.aiEnabled
+                }
+            } catch {
+                // Only revert if this task wasn't cancelled
+                if !Task.isCancelled {
+                    aiEnabled = previousValue
+                    self.error = error
+                    print("Failed to update AI preference: \(error)")
+                }
+            }
         }
+
+        await updateTask?.value
     }
 }

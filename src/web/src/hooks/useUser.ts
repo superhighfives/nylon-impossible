@@ -16,6 +16,9 @@ async function fetchUser(
   getToken: () => Promise<string | null>,
 ): Promise<User> {
   const token = await getToken();
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
   const response = await fetch(`${API_URL}/users/me`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -32,6 +35,9 @@ async function updateUser(
   getToken: () => Promise<string | null>,
 ): Promise<User> {
   const token = await getToken();
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
   const response = await fetch(`${API_URL}/users/me`, {
     method: "PATCH",
     headers: {

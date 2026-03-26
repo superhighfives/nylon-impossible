@@ -40,7 +40,12 @@ export async function getMe(c: Context<Env>) {
 
 // PATCH /users/me
 export async function updateMe(c: Context<Env>) {
-  const body = await c.req.json();
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
   const parsed = updatePreferencesSchema.safeParse(body);
 
   if (!parsed.success) {
