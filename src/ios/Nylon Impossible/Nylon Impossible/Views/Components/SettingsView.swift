@@ -21,6 +21,12 @@ struct SettingsView: View {
                             }
                         }
                     ))
+                    
+                    if let error = preferencesService.error {
+                        Text(error.localizedDescription)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 } header: {
                     Text("AI Features")
                 } footer: {
