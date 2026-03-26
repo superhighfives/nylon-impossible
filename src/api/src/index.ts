@@ -29,7 +29,7 @@ app.use("*", (c, next) => {
       if (isDev && LOCALHOST_ORIGIN.test(origin)) return origin;
       return ALLOWED_ORIGINS.test(origin) ? origin : null;
     },
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],
     maxAge: 86400,
   })(c, next);
