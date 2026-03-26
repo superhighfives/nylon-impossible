@@ -127,7 +127,7 @@ export async function extractTodos(
 ): Promise<ExtractedItem[] | null> {
   const systemPrompt = getSystemPrompt();
 
-  const res = await ai.gateway("nylon-impossible").run({
+  const response = (await ai.gateway("nylon-impossible").run({
     provider: "compat",
     endpoint: "chat/completions",
     headers: {},
@@ -144,15 +144,7 @@ export async function extractTodos(
       },
       max_tokens: 16000,
     },
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text();
-    console.error("AI Gateway error:", res.status, errorText);
-    throw new Error(`AI Gateway request failed: ${res.status}`);
-  }
-
-  const response = (await res.json()) as OpenAIChatCompletionResponse;
+  })) as unknown as OpenAIChatCompletionResponse;
 
   // Parse OpenAI-compatible format (choices[0].message.tool_calls)
   const firstChoice = response.choices?.[0];

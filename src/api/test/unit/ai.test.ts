@@ -3,6 +3,7 @@ import { extractTodos } from "../../src/lib/ai";
 
 /**
  * Creates a mock AI binding that returns the given tool call arguments.
+ * The binding returns parsed data directly, not a Response object.
  */
 function createMockAi(responseOrError: object | string | Error) {
   const run = vi.fn().mockImplementation(async () => {
@@ -12,28 +13,23 @@ function createMockAi(responseOrError: object | string | Error) {
 
     const args = responseOrError;
     return {
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          choices: [
-            {
-              message: {
-                tool_calls: [
-                  {
-                    type: "function",
-                    function: {
-                      name: "extract_todos",
-                      arguments:
-                        typeof args === "string" ? args : JSON.stringify(args),
-                    },
-                  },
-                ],
+      choices: [
+        {
+          message: {
+            tool_calls: [
+              {
+                type: "function",
+                function: {
+                  name: "extract_todos",
+                  arguments:
+                    typeof args === "string" ? args : JSON.stringify(args),
+                },
               },
-            },
-          ],
-        }),
-      text: () => Promise.resolve(""),
-    } as Response;
+            ],
+          },
+        },
+      ],
+    };
   });
 
   const gateway = vi.fn().mockReturnValue({ run });
@@ -43,14 +39,10 @@ function createMockAi(responseOrError: object | string | Error) {
 
 /**
  * Creates a mock AI binding that returns a custom response structure.
+ * The binding returns parsed data directly, not a Response object.
  */
-function createMockAiWithResponse(response: object, ok = true, status = 200) {
-  const run = vi.fn().mockResolvedValue({
-    ok,
-    status,
-    json: () => Promise.resolve(response),
-    text: () => Promise.resolve(JSON.stringify(response)),
-  } as Response);
+function createMockAiWithResponse(response: object) {
+  const run = vi.fn().mockResolvedValue(response);
 
   const gateway = vi.fn().mockReturnValue({ run });
 
@@ -134,21 +126,6 @@ describe("extractTodos", () => {
   });
 
   describe("error handling", () => {
-    it("throws when gateway returns non-ok status", async () => {
-      const run = vi.fn().mockResolvedValue({
-        ok: false,
-        status: 500,
-        text: () => Promise.resolve("Internal Server Error"),
-      } as Response);
-
-      const gateway = vi.fn().mockReturnValue({ run });
-      const ai = { gateway, run } as unknown as Ai;
-
-      await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
-        "AI Gateway request failed: 500",
-      );
-    });
-
     it("throws when response has no tool_calls", async () => {
       const ai = createMockAiWithResponse({
         choices: [{ message: { content: "I can help you with that!" } }],
@@ -209,35 +186,12 @@ describe("extractTodos", () => {
     });
 
     it("calls run with correct provider and endpoint", async () => {
-      const run = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            choices: [
-              {
-                message: {
-                  tool_calls: [
-                    {
-                      type: "function",
-                      function: {
-                        name: "extract_todos",
-                        arguments: JSON.stringify({
-                          todos: [{ title: "Buy milk" }],
-                        }),
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          }),
-      } as Response);
-
-      const gateway = vi.fn().mockReturnValue({ run });
-      const ai = { gateway } as unknown as Ai;
+      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
 
       await extractTodos(ai, "Buy milk");
 
+      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
+      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
       expect(run).toHaveBeenCalledWith(
         expect.objectContaining({
           provider: "compat",
@@ -247,35 +201,12 @@ describe("extractTodos", () => {
     });
 
     it("includes user text in messages", async () => {
-      const run = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            choices: [
-              {
-                message: {
-                  tool_calls: [
-                    {
-                      type: "function",
-                      function: {
-                        name: "extract_todos",
-                        arguments: JSON.stringify({
-                          todos: [{ title: "Buy milk" }],
-                        }),
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          }),
-      } as Response);
-
-      const gateway = vi.fn().mockReturnValue({ run });
-      const ai = { gateway } as unknown as Ai;
+      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
 
       await extractTodos(ai, "Buy milk and eggs");
 
+      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
+      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
       const call = run.mock.calls[0][0];
       expect(call.query.messages).toContainEqual({
         role: "user",
@@ -284,35 +215,12 @@ describe("extractTodos", () => {
     });
 
     it("includes tools in request body", async () => {
-      const run = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            choices: [
-              {
-                message: {
-                  tool_calls: [
-                    {
-                      type: "function",
-                      function: {
-                        name: "extract_todos",
-                        arguments: JSON.stringify({
-                          todos: [{ title: "Buy milk" }],
-                        }),
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          }),
-      } as Response);
-
-      const gateway = vi.fn().mockReturnValue({ run });
-      const ai = { gateway } as unknown as Ai;
+      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
 
       await extractTodos(ai, "Buy milk");
 
+      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
+      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
       const call = run.mock.calls[0][0];
       expect(call.query.tools).toBeDefined();
       expect(call.query.tools[0].function.name).toBe("extract_todos");
@@ -323,35 +231,12 @@ describe("extractTodos", () => {
     });
 
     it("uses dynamic/default model", async () => {
-      const run = vi.fn().mockResolvedValue({
-        ok: true,
-        json: () =>
-          Promise.resolve({
-            choices: [
-              {
-                message: {
-                  tool_calls: [
-                    {
-                      type: "function",
-                      function: {
-                        name: "extract_todos",
-                        arguments: JSON.stringify({
-                          todos: [{ title: "Buy milk" }],
-                        }),
-                      },
-                    },
-                  ],
-                },
-              },
-            ],
-          }),
-      } as Response);
-
-      const gateway = vi.fn().mockReturnValue({ run });
-      const ai = { gateway } as unknown as Ai;
+      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
 
       await extractTodos(ai, "Buy milk");
 
+      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
+      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
       const call = run.mock.calls[0][0];
       expect(call.query.model).toBe("dynamic/default");
     });
