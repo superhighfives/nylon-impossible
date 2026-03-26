@@ -6,6 +6,11 @@ on:
     paths:
       - "src/ios/**"
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number (optional - uses preview API if set)"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -143,7 +148,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-          API_BASE_URL: https://api.nylonimpossible.com
+          API_BASE_URL: ${{ inputs.pr_number && format('https://api-pr-{0}.nylonimpossible.com', inputs.pr_number) || 'https://api.nylonimpossible.com' }}
         run: bundle exec fastlane beta --verbose
 
       - name: Clean up keychain
