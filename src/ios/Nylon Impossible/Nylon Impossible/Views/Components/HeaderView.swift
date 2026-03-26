@@ -13,6 +13,7 @@ struct HeaderView: View {
     var todoCount: Int = 0
 
     @State private var showErrorPopover = false
+    @State private var showSettings = false
 
     var body: some View {
         VStack(spacing: 12) {
@@ -22,6 +23,14 @@ struct HeaderView: View {
                 syncStatusView
 
                 Spacer()
+
+                Button {
+                    showSettings = true
+                } label: {
+                    Image(systemName: "gear")
+                        .font(.system(size: 18))
+                        .foregroundStyle(Color.appStrong)
+                }
 
                 if let onSignOut {
                     Button {
@@ -34,6 +43,9 @@ struct HeaderView: View {
                 }
             }
             .frame(height: 24)
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
 
             // Title and count
             VStack(alignment: .leading, spacing: 4) {
