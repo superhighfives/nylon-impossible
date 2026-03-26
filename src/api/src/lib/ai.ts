@@ -146,30 +146,24 @@ export async function extractTodos(
     },
   });
 
-  console.log("AI Gateway raw response type:", typeof rawResponse);
-  console.log(
-    "AI Gateway raw response constructor:",
-    rawResponse?.constructor?.name,
-  );
-  console.log(
-    "AI Gateway raw response has json?:",
-    typeof (rawResponse as Response).json,
-  );
+  const res = rawResponse as Response;
+  console.log("AI Gateway response status:", res.status);
+  console.log("AI Gateway response ok:", res.ok);
 
-  // Check if it's a Response object that needs .json()
+  const text = await res.text();
+  console.log("AI Gateway response text:", text);
+
+  if (!res.ok) {
+    console.error("AI Gateway error:", res.status, text);
+    throw new Error(`AI Gateway request failed: ${res.status}`);
+  }
+
   let response: OpenAIChatCompletionResponse;
-  if (typeof (rawResponse as Response).json === "function") {
-    response = await (rawResponse as Response).json();
-    console.log(
-      "AI Gateway parsed response:",
-      JSON.stringify(response, null, 2),
-    );
-  } else {
-    response = rawResponse as unknown as OpenAIChatCompletionResponse;
-    console.log(
-      "AI Gateway direct response:",
-      JSON.stringify(response, null, 2),
-    );
+  try {
+    response = JSON.parse(text) as OpenAIChatCompletionResponse;
+  } catch {
+    console.error("Failed to parse AI Gateway response as JSON");
+    throw new Error("AI Gateway returned invalid JSON");
   }
 
   // Parse OpenAI-compatible format (choices[0].message.tool_calls)
