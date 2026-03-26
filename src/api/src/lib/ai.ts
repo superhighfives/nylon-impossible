@@ -8,23 +8,15 @@ interface ExtractedItem {
   dueDate?: string; // ISO date string YYYY-MM-DD
 }
 
-interface AIToolCallResponse {
-  todos: Array<{
-    title: string;
-    urls?: string[];
-    dueDate?: string;
-  }>;
-}
-
-interface OpenAIChatCompletionResponse {
-  choices: Array<{
-    message: {
-      tool_calls?: Array<{
-        type: string;
-        function: {
-          name: string;
-          arguments: string;
-        };
+interface WorkersAIToolCallResponse {
+  response: string | null;
+  tool_calls?: Array<{
+    name: string;
+    arguments: {
+      todos: Array<{
+        title: string;
+        urls?: string[];
+        dueDate?: string;
       }>;
     };
   }>;
@@ -119,7 +111,7 @@ Examples (extract ALL of these):
 }
 
 /**
- * Extract structured todos from natural language text using AI Gateway dynamic routing
+ * Extract structured todos from natural language text using Workers AI with AI Gateway
  */
 export async function extractTodos(
   ai: Ai,
@@ -127,12 +119,10 @@ export async function extractTodos(
 ): Promise<ExtractedItem[] | null> {
   const systemPrompt = getSystemPrompt();
 
-  const rawResponse = await ai.gateway("nylon-impossible").run({
-    provider: "compat",
-    endpoint: "chat/completions",
-    headers: {},
-    query: {
-      model: "dynamic/default",
+  // Model added recently, types not yet updated
+  const response = await ai.run(
+    "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
+    {
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: text },
@@ -144,31 +134,17 @@ export async function extractTodos(
       },
       max_tokens: 16000,
     },
-  });
+    {
+      gateway: {
+        id: "nylon-impossible",
+      },
+    },
+  );
 
-  const res = rawResponse as Response;
-  console.log("AI Gateway response status:", res.status);
-  console.log("AI Gateway response ok:", res.ok);
+  console.log("Workers AI response:", JSON.stringify(response, null, 2));
 
-  const text = await res.text();
-  console.log("AI Gateway response text:", text);
-
-  if (!res.ok) {
-    console.error("AI Gateway error:", res.status, text);
-    throw new Error(`AI Gateway request failed: ${res.status}`);
-  }
-
-  let response: OpenAIChatCompletionResponse;
-  try {
-    response = JSON.parse(text) as OpenAIChatCompletionResponse;
-  } catch {
-    console.error("Failed to parse AI Gateway response as JSON");
-    throw new Error("AI Gateway returned invalid JSON");
-  }
-
-  // Parse OpenAI-compatible format (choices[0].message.tool_calls)
-  const firstChoice = response.choices?.[0];
-  const toolCalls = firstChoice?.message?.tool_calls;
+  const toolResponse = response as unknown as WorkersAIToolCallResponse;
+  const toolCalls = toolResponse.tool_calls;
 
   if (!toolCalls?.length) {
     console.error("No tool call found in AI response");
@@ -176,18 +152,12 @@ export async function extractTodos(
   }
 
   const tc = toolCalls[0];
-  if (tc.type !== "function" || tc.function.name !== "extract_todos") {
-    throw new Error(`Unexpected tool call: ${tc.function.name}`);
+  if (tc.name !== "extract_todos") {
+    throw new Error(`Unexpected tool call: ${tc.name}`);
   }
 
-  let parsed: AIToolCallResponse;
-  try {
-    parsed = JSON.parse(tc.function.arguments) as AIToolCallResponse;
-  } catch (e) {
-    console.error("Failed to parse tool arguments:", tc.function.arguments);
-    console.error("Parse error:", e);
-    throw new Error("Failed to parse AI response");
-  }
+  // Workers AI returns arguments already parsed, not as JSON string
+  const parsed = tc.arguments;
 
   if (!parsed.todos || parsed.todos.length === 0) {
     return null;

@@ -16,8 +16,8 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@nylon-impossible/shared": "workspace:*",
     "@clerk/backend": "^1.27.0",
+    "@nylon-impossible/shared": "workspace:*",
     "drizzle-orm": "^0.45.0",
     "fractional-indexing": "^3.2.0",
     "hono": "^4.12.3",
@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.13.3",
-    "@cloudflare/workers-types": "^4.20251202.0",
+    "@cloudflare/workers-types": "^4.20260317.1",
     "typescript": "^5.7.2",
     "vitest": "^4.1.0",
     "wrangler": "^4.40.3"

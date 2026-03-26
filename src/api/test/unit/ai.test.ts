@@ -1,52 +1,39 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { extractTodos } from "../../src/lib/ai";
 
 /**
- * Creates a mock AI binding that returns the given tool call arguments.
- * The binding returns parsed data directly, not a Response object.
+ * Creates a mock AI binding that returns the given tool call response.
+ * Workers AI returns tool_calls directly with arguments already parsed.
  */
-function createMockAi(responseOrError: object | string | Error) {
+function createMockAi(
+  toolCallArgs:
+    | { todos: Array<{ title: string; urls?: string[]; dueDate?: string }> }
+    | Error,
+) {
   const run = vi.fn().mockImplementation(async () => {
-    if (responseOrError instanceof Error) {
-      throw responseOrError;
+    if (toolCallArgs instanceof Error) {
+      throw toolCallArgs;
     }
-
-    const args = responseOrError;
     return {
-      choices: [
+      response: null,
+      tool_calls: [
         {
-          message: {
-            tool_calls: [
-              {
-                type: "function",
-                function: {
-                  name: "extract_todos",
-                  arguments:
-                    typeof args === "string" ? args : JSON.stringify(args),
-                },
-              },
-            ],
-          },
+          name: "extract_todos",
+          arguments: toolCallArgs,
         },
       ],
     };
   });
 
-  const gateway = vi.fn().mockReturnValue({ run });
-
-  return { gateway, run } as unknown as Ai;
+  return { run } as unknown as Ai;
 }
 
 /**
  * Creates a mock AI binding that returns a custom response structure.
- * The binding returns parsed data directly, not a Response object.
  */
 function createMockAiWithResponse(response: object) {
   const run = vi.fn().mockResolvedValue(response);
-
-  const gateway = vi.fn().mockReturnValue({ run });
-
-  return { gateway, run } as unknown as Ai;
+  return { run } as unknown as Ai;
 }
 
 describe("extractTodos", () => {
@@ -128,7 +115,7 @@ describe("extractTodos", () => {
   describe("error handling", () => {
     it("throws when response has no tool_calls", async () => {
       const ai = createMockAiWithResponse({
-        choices: [{ message: { content: "I can help you with that!" } }],
+        response: "I can help you with that!",
       });
 
       await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
@@ -138,7 +125,8 @@ describe("extractTodos", () => {
 
     it("throws when tool_calls is an empty array", async () => {
       const ai = createMockAiWithResponse({
-        choices: [{ message: { tool_calls: [] } }],
+        response: null,
+        tool_calls: [],
       });
 
       await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
@@ -148,16 +136,11 @@ describe("extractTodos", () => {
 
     it("throws when tool call has a wrong name", async () => {
       const ai = createMockAiWithResponse({
-        choices: [
+        response: null,
+        tool_calls: [
           {
-            message: {
-              tool_calls: [
-                {
-                  type: "function",
-                  function: { name: "wrong_tool", arguments: "{}" },
-                },
-              ],
-            },
+            name: "wrong_tool",
+            arguments: {},
           },
         ],
       });
@@ -166,79 +149,43 @@ describe("extractTodos", () => {
         "Unexpected tool call: wrong_tool",
       );
     });
-
-    it("throws when arguments JSON string is malformed", async () => {
-      const ai = createMockAi("{ bad json }");
-
-      await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
-        "Failed to parse AI response",
-      );
-    });
   });
 
   describe("request format", () => {
-    it("calls gateway with correct gateway name", async () => {
+    it("calls ai.run with correct model and gateway", async () => {
       const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
 
       await extractTodos(ai, "Buy milk");
 
-      expect(ai.gateway).toHaveBeenCalledWith("nylon-impossible");
-    });
-
-    it("calls run with correct provider and endpoint", async () => {
-      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
-
-      await extractTodos(ai, "Buy milk");
-
-      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
-      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
-      expect(run).toHaveBeenCalledWith(
+      expect(ai.run).toHaveBeenCalledWith(
+        "@cf/moonshotai/kimi-k2.5",
         expect.objectContaining({
-          provider: "compat",
-          endpoint: "chat/completions",
+          messages: expect.arrayContaining([
+            expect.objectContaining({ role: "user", content: "Buy milk" }),
+          ]),
+          tools: expect.any(Array),
+          tool_choice: expect.objectContaining({
+            type: "function",
+            function: { name: "extract_todos" },
+          }),
+        }),
+        expect.objectContaining({
+          gateway: { id: "nylon-impossible" },
         }),
       );
     });
 
-    it("includes user text in messages", async () => {
-      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
-
-      await extractTodos(ai, "Buy milk and eggs");
-
-      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
-      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
-      const call = run.mock.calls[0][0];
-      expect(call.query.messages).toContainEqual({
-        role: "user",
-        content: "Buy milk and eggs",
-      });
-    });
-
-    it("includes tools in request body", async () => {
+    it("includes system prompt in messages", async () => {
       const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
 
       await extractTodos(ai, "Buy milk");
 
-      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
-      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
-      const call = run.mock.calls[0][0];
-      expect(call.query.tools).toBeDefined();
-      expect(call.query.tools[0].function.name).toBe("extract_todos");
-      expect(call.query.tool_choice).toEqual({
-        type: "function",
-        function: { name: "extract_todos" },
-      });
-    });
-
-    it("uses dynamic/default model", async () => {
-      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
-
-      await extractTodos(ai, "Buy milk");
-
-      const gateway = ai.gateway as ReturnType<typeof vi.fn>;
-      const run = gateway.mock.results[0].value.run as ReturnType<typeof vi.fn>;
-      const call = run.mock.calls[0][0];
-      expect(call.query.model).toBe("dynamic/default");
+      const call = (ai.run as ReturnType<typeof vi.fn>).mock.calls[0];
+      const inputs = call[1];
+      expect(inputs.messages[0].role).toBe("system");
+      expect(inputs.messages[0].content).toContain(
+        "extracts actionable todo items",
+      );
     });
   });
 });
