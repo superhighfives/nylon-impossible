@@ -201,8 +201,6 @@ export async function extractTodos(
     },
   );
 
-  console.log("Workers AI response:", JSON.stringify(response, null, 2));
-
   const tc = extractToolCall(response);
 
   if (!tc) {
