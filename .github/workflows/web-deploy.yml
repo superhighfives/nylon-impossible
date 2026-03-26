@@ -98,8 +98,14 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-      # D1 migrations are applied manually via: pnpm db:migrate:remote
-      # To enable auto-migrations, add D1 edit permission to CLOUDFLARE_API_TOKEN
+      - name: Apply D1 migrations
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.api == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/api
+          command: d1 migrations apply nylon-impossible-db --remote
 
       - name: Build Web
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
@@ -200,7 +206,14 @@ jobs:
           workingDirectory: src/api
           command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      # D1 migrations are applied manually via: pnpm db:migrate:remote
+      - name: Apply D1 migrations
+        if: steps.changes.outputs.api == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/api
+          command: d1 migrations apply nylon-impossible-db --remote
 
       - name: Set preview API secrets
         if: steps.changes.outputs.api == 'true'
