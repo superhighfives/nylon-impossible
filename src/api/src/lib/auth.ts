@@ -1,6 +1,7 @@
 import { verifyToken } from "@clerk/backend";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
+import { eq, getDb, users } from "./db";
 
 export interface AuthResult {
   userId: string;
@@ -42,5 +43,17 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   c.set("userId", auth.userId);
+
+  // Load user preferences
+  const db = getDb(c.env.DB);
+  const user = await db
+    .select({ aiEnabled: users.aiEnabled })
+    .from(users)
+    .where(eq(users.id, auth.userId))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  c.set("aiEnabled", user?.aiEnabled ?? true);
+
   await next();
 });
