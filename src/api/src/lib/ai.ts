@@ -8,18 +8,38 @@ interface ExtractedItem {
   dueDate?: string; // ISO date string YYYY-MM-DD
 }
 
+// Native Workers AI tool call format
 interface WorkersAIToolCallResponse {
   response: string | null;
   tool_calls?: Array<{
     name: string;
-    arguments: {
-      todos: Array<{
-        title: string;
-        urls?: string[];
-        dueDate?: string;
+    arguments: Record<string, unknown> | string;
+  }>;
+}
+
+// OpenAI-compatible chat completions format (returned by some models via Workers AI)
+interface OpenAICompatToolCallResponse {
+  choices?: Array<{
+    message?: {
+      tool_calls?: Array<{
+        function?: {
+          name: string;
+          arguments: string;
+        };
       }>;
     };
   }>;
+}
+
+interface ParsedToolCall {
+  name: string;
+  arguments: {
+    todos: Array<{
+      title: string;
+      urls?: string[];
+      dueDate?: string;
+    }>;
+  };
 }
 
 const extractTodosTool = {
@@ -111,6 +131,46 @@ Examples (extract ALL of these):
 }
 
 /**
+ * Normalize a raw Workers AI response into a single tool call, handling both
+ * the native Workers AI format (top-level tool_calls) and the OpenAI-compatible
+ * chat completions format (choices[0].message.tool_calls).
+ */
+function extractToolCall(response: unknown): ParsedToolCall | null {
+  // Native Workers AI format
+  const native = response as WorkersAIToolCallResponse;
+  if (native.tool_calls?.length) {
+    const tc = native.tool_calls[0];
+    return {
+      name: tc.name,
+      arguments: parseArguments(tc.arguments),
+    };
+  }
+
+  // OpenAI-compatible chat completions format
+  const openai = response as OpenAICompatToolCallResponse;
+  const toolCalls = openai.choices?.[0]?.message?.tool_calls;
+  if (toolCalls?.length) {
+    const fn = toolCalls[0].function;
+    if (!fn) return null;
+    return {
+      name: fn.name,
+      arguments: parseArguments(fn.arguments),
+    };
+  }
+
+  return null;
+}
+
+function parseArguments(
+  args: Record<string, unknown> | string | unknown,
+): ParsedToolCall["arguments"] {
+  if (typeof args === "string") {
+    return JSON.parse(args.trim());
+  }
+  return args as ParsedToolCall["arguments"];
+}
+
+/**
  * Extract structured todos from natural language text using Workers AI with AI Gateway
  */
 export async function extractTodos(
@@ -143,20 +203,17 @@ export async function extractTodos(
 
   console.log("Workers AI response:", JSON.stringify(response, null, 2));
 
-  const toolResponse = response as unknown as WorkersAIToolCallResponse;
-  const toolCalls = toolResponse.tool_calls;
+  const tc = extractToolCall(response);
 
-  if (!toolCalls?.length) {
+  if (!tc) {
     console.error("No tool call found in AI response");
     throw new Error("AI did not return extracted todos");
   }
 
-  const tc = toolCalls[0];
   if (tc.name !== "extract_todos") {
     throw new Error(`Unexpected tool call: ${tc.name}`);
   }
 
-  // Workers AI returns arguments already parsed, not as JSON string
   const parsed = tc.arguments;
 
   if (!parsed.todos || parsed.todos.length === 0) {
