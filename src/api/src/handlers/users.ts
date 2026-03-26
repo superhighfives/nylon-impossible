@@ -59,7 +59,10 @@ export async function updateMe(c: Context<Env>) {
     return c.json({ error: "No valid fields to update" }, 400);
   }
 
-  await db.update(users).set(updates).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({ ...updates, updatedAt: new Date() })
+    .where(eq(users.id, userId));
 
   // Fetch updated user
   const user = await db
