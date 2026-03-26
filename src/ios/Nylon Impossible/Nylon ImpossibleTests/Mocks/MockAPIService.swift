@@ -22,8 +22,8 @@ final class MockAPIService: APIProviding {
         id: "mock-user-id",
         email: "test@example.com",
         aiEnabled: true,
-        createdAt: "2025-01-01T00:00:00.000Z",
-        updatedAt: "2025-01-01T00:00:00.000Z"
+        createdAt: Date(timeIntervalSince1970: 1735689600),
+        updatedAt: Date(timeIntervalSince1970: 1735689600)
     )
     var getMeError: Error?
 
@@ -64,7 +64,7 @@ final class MockAPIService: APIProviding {
             email: getMeResponse.email,
             aiEnabled: aiEnabled,
             createdAt: getMeResponse.createdAt,
-            updatedAt: "2025-01-01T00:00:01.000Z"
+            updatedAt: Date()
         )
     }
 }
