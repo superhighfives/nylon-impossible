@@ -105,13 +105,23 @@ function TodoItemContent({
         />
       </div>
       <div className="flex-1 min-w-0">
-        <p
-          className={`text-sm leading-snug break-words ${
-            todo.completed ? "line-through text-gray-muted" : "text-gray"
-          }`}
-        >
-          {todo.title}
-        </p>
+        <div className="flex items-center gap-2">
+          <p
+            className={`text-sm leading-snug break-words ${
+              todo.completed ? "line-through text-gray-muted" : "text-gray"
+            }`}
+          >
+            {todo.title}
+          </p>
+          {(todo.aiStatus === "pending" || todo.aiStatus === "processing") && (
+            <span
+              className="text-gray-muted text-xs animate-pulse"
+              title="AI is processing..."
+            >
+              ...
+            </span>
+          )}
+        </div>
         {todo.urls && todo.urls.length > 0 && (
           <div className="flex flex-col gap-1 mt-1.5">
             {todo.urls.map((url) => (

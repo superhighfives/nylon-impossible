@@ -20,6 +20,9 @@ export interface UpdateTodoInput {
 /** Fetch status for URL metadata */
 export type FetchStatus = "pending" | "fetched" | "failed";
 
+/** AI processing status for todos */
+export type AiStatus = "pending" | "processing" | "complete" | "failed";
+
 /** Serialized URL metadata from the API */
 export interface SerializedTodoUrl {
   id: string;
@@ -46,6 +49,7 @@ export interface TodoWithUrls {
   position: string;
   dueDate: string | null;
   priority: "high" | "low" | null;
+  aiStatus: AiStatus | null;
   createdAt: string;
   updatedAt: string;
   urls: SerializedTodoUrl[];

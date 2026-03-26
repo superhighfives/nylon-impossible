@@ -51,6 +51,7 @@ function serializeTodoWithUrls(todo: Todo, urls: TodoUrl[]): TodoWithUrls {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    aiStatus: todo.aiStatus ?? null,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     urls: urls.map(serializeUrl),
