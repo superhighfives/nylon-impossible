@@ -146,6 +146,8 @@ export async function extractTodos(
     },
   })) as unknown as OpenAIChatCompletionResponse;
 
+  console.log("AI Gateway response:", JSON.stringify(response, null, 2));
+
   // Parse OpenAI-compatible format (choices[0].message.tool_calls)
   const firstChoice = response.choices?.[0];
   const toolCalls = firstChoice?.message?.tool_calls;
