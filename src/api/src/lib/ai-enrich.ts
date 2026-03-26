@@ -66,7 +66,7 @@ export async function enrichTodoWithAI(
 
     // Handle URLs if extracted
     if (enrichment.urls && enrichment.urls.length > 0) {
-      await insertAndFetchUrls(db, todoId, enrichment.urls, env, userId);
+      await insertAndFetchUrls(db, todoId, enrichment.urls);
     }
 
     // Notify clients to refresh
@@ -90,8 +90,6 @@ async function insertAndFetchUrls(
   db: ReturnType<typeof getDb>,
   todoId: string,
   urls: string[],
-  env: { USER_SYNC: DurableObjectNamespace },
-  userId: string,
 ): Promise<void> {
   const now = new Date();
   const urlPositions = generateNKeysBetween(null, null, urls.length);
