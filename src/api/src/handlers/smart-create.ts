@@ -70,7 +70,7 @@ export async function smartCreate(c: Context<Env>) {
     }> | null;
 
     try {
-      extracted = await extractTodos(c.env.AI, c.env.AI_GATEWAY_ID, text);
+      extracted = await extractTodos(c.env.AI, text);
     } catch (error) {
       // Fallback: create single todo with original text on AI failure
       console.error(

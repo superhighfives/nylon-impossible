@@ -92,7 +92,11 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production
+          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          secrets: |
+            CLOUDFLARE_API_TOKEN
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Build Web
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
@@ -191,7 +195,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production
+          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set preview API secrets
         if: steps.changes.outputs.api == 'true'
@@ -199,6 +203,7 @@ jobs:
         run: |
           printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler secret put CLERK_SECRET_KEY
           printf '%s' "$CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler secret put CLERK_PUBLISHABLE_KEY
+          printf '%s' "$CLOUDFLARE_API_TOKEN" | pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
@@ -220,6 +225,7 @@ jobs:
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_API_BASE_URL: ${{ steps.changes.outputs.api == 'true' && format('https://api-pr-{0}.nylonimpossible.com', github.event.pull_request.number) || 'https://api.nylonimpossible.com' }}
+          VITE_IS_PREVIEW: true
 
       - name: Deploy preview Web
         if: steps.changes.outputs.web == 'true'

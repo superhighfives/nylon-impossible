@@ -1,5 +1,5 @@
 /**
- * AI-powered todo extraction using Workers AI binding
+ * AI-powered todo extraction using Cloudflare AI Gateway with dynamic routing
  */
 
 interface ExtractedItem {
@@ -8,11 +8,17 @@ interface ExtractedItem {
   dueDate?: string; // ISO date string YYYY-MM-DD
 }
 
-interface AIToolCallResponse {
-  todos: Array<{
-    title: string;
-    urls?: string[];
-    dueDate?: string;
+interface WorkersAIToolCallResponse {
+  response: string | null;
+  tool_calls?: Array<{
+    name: string;
+    arguments: {
+      todos: Array<{
+        title: string;
+        urls?: string[];
+        dueDate?: string;
+      }>;
+    };
   }>;
 }
 
@@ -105,18 +111,17 @@ Examples (extract ALL of these):
 }
 
 /**
- * Extract structured todos from natural language text using Workers AI via AI Gateway
+ * Extract structured todos from natural language text using Workers AI with AI Gateway
  */
 export async function extractTodos(
   ai: Ai,
-  gatewayId: string,
   text: string,
 ): Promise<ExtractedItem[] | null> {
-  const model = "@cf/moonshotai/kimi-k2.5" as keyof AiModels;
   const systemPrompt = getSystemPrompt();
 
-  const response = (await ai.run(
-    model,
+  // Model added recently, types not yet updated
+  const response = await ai.run(
+    "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
     {
       messages: [
         { role: "system", content: systemPrompt },
@@ -131,79 +136,28 @@ export async function extractTodos(
     },
     {
       gateway: {
-        id: gatewayId,
-        skipCache: true,
+        id: "nylon-impossible",
       },
     },
-  )) as AiTextGenerationOutput;
+  );
 
-  // Handle both Workers AI native format and OpenAI-compatible format
-  let toolCall: { name: string; arguments: string | object } | null = null;
+  console.log("Workers AI response:", JSON.stringify(response, null, 2));
 
-  // Check for Workers AI native format (top-level tool_calls)
-  if ("tool_calls" in response && response.tool_calls?.length) {
-    const tc = response.tool_calls[0];
-    if (tc?.name && tc.arguments !== undefined) {
-      toolCall = {
-        name: tc.name,
-        arguments: tc.arguments as string | object,
-      };
-    }
-  }
-  // Check for OpenAI-compatible format (choices[0].message.tool_calls)
-  else if (
-    "choices" in response &&
-    Array.isArray(response.choices) &&
-    response.choices.length > 0
-  ) {
-    const firstChoice = response.choices[0];
-    if (
-      firstChoice &&
-      typeof firstChoice === "object" &&
-      "message" in firstChoice &&
-      firstChoice.message &&
-      typeof firstChoice.message === "object" &&
-      "tool_calls" in firstChoice.message &&
-      Array.isArray(firstChoice.message.tool_calls) &&
-      firstChoice.message.tool_calls.length > 0
-    ) {
-      const tc = firstChoice.message.tool_calls[0];
-      if (
-        tc &&
-        typeof tc === "object" &&
-        tc.type === "function" &&
-        tc.function &&
-        tc.function.name === "extract_todos"
-      ) {
-        toolCall = {
-          name: tc.function.name,
-          arguments: tc.function.arguments,
-        };
-      }
-    }
-  }
+  const toolResponse = response as unknown as WorkersAIToolCallResponse;
+  const toolCalls = toolResponse.tool_calls;
 
-  if (!toolCall) {
+  if (!toolCalls?.length) {
     console.error("No tool call found in AI response");
-    console.error("Response structure:", Object.keys(response));
     throw new Error("AI did not return extracted todos");
   }
 
-  if (toolCall.name !== "extract_todos") {
-    throw new Error(`Unexpected tool call: ${toolCall.name}`);
+  const tc = toolCalls[0];
+  if (tc.name !== "extract_todos") {
+    throw new Error(`Unexpected tool call: ${tc.name}`);
   }
 
-  let parsed: AIToolCallResponse;
-  try {
-    parsed =
-      typeof toolCall.arguments === "string"
-        ? (JSON.parse(toolCall.arguments) as AIToolCallResponse)
-        : (toolCall.arguments as AIToolCallResponse);
-  } catch (e) {
-    console.error("Failed to parse tool arguments:", toolCall.arguments);
-    console.error("Parse error:", e);
-    throw new Error("Failed to parse AI response");
-  }
+  // Workers AI returns arguments already parsed, not as JSON string
+  const parsed = tc.arguments;
 
   if (!parsed.todos || parsed.todos.length === 0) {
     return null;

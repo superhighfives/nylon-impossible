@@ -1,3 +1,3 @@
-# Clerk Authentication
-VITE_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
+# Clerk Authentication (required)
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...

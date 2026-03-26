@@ -26,7 +26,12 @@
       "new_classes": ["UserSync"]
     }
   ],
-  // AI binding excluded for fast tests. Use RUN_AI_TESTS=true for AI tests.
+  // AI Gateway vars for mocked tests. Actual values not needed since extractTodos is mocked.
+  "vars": {
+    "CF_ACCOUNT_ID": "test-account",
+    "AI_GATEWAY_ID": "test-gateway",
+    "CLOUDFLARE_API_TOKEN": "test-token"
+  },
   "observability": {
     "enabled": true
   }

@@ -102,6 +102,9 @@ This section covers everything needed to get CI/CD working on a fresh fork or ne
 | `CLERK_SECRET_KEY` | `web-deploy.yml` | Clerk secret key (API worker) |
 | `CLERK_PUBLISHABLE_KEY` | `web-deploy.yml` | Clerk publishable key (API worker) |
 | `VITE_CLERK_PUBLISHABLE_KEY` | `web-deploy.yml`, `marketing.yml` | Clerk publishable key (Vite web build) |
+| `CLERK_DEVELOPMENT_PUBLISHABLE_KEY` | `marketing.yml` | Clerk development publishable key (marketing screenshots) |
+| `CLERK_DEVELOPMENT_SECRET_KEY` | `marketing.yml` | Clerk development secret key (marketing screenshots) |
+| `CLERK_DEVELOPMENT_USER_EMAIL` | `marketing.yml` | Clerk development user email (marketing screenshots) |
 | `DEVELOPMENT_CERTIFICATE_BASE64` | `ios-deploy.yml` | Apple development cert (.p12), base64 |
 | `DISTRIBUTION_CERTIFICATE_BASE64` | `ios-deploy.yml` | Apple distribution cert (.p12), base64 |
 | `DISTRIBUTION_CERTIFICATE_PASSWORD` | `ios-deploy.yml` | Password protecting both .p12 files |

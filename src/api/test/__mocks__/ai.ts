@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import type { AIGatewayConfig } from "../../src/lib/ai";
 
 /**
  * Mock for src/lib/ai.ts - provides deterministic AI responses for testing.
@@ -22,9 +23,12 @@ export interface MockTodo {
 
 // The actual mock function that will replace extractTodos
 export const extractTodos = vi.fn<
-  [ai: unknown, gatewayId: string, text: string],
+  [config: AIGatewayConfig, text: string],
   Promise<MockTodo[] | null>
 >();
+
+// Re-export the real isAIGatewayConfigured function
+export { isAIGatewayConfigured } from "../../src/lib/ai";
 
 /**
  * Configure the mock to return specific todos.
