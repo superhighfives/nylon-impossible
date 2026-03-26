@@ -141,12 +141,28 @@ struct SmartCreateTodo: Codable, Sendable {
     let updatedAt: Date
 }
 
+// MARK: - User Models
+
+struct APIUser: Codable, Sendable {
+    let id: String
+    let email: String
+    let aiEnabled: Bool
+    let createdAt: Date
+    let updatedAt: Date
+}
+
+struct UpdateUserRequest: Codable, Sendable {
+    let aiEnabled: Bool?
+}
+
 // MARK: - API Protocol
 
 @MainActor
 protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
     func smartCreate(text: String) async throws -> SmartCreateResponse
+    func getMe() async throws -> APIUser
+    func updateMe(aiEnabled: Bool) async throws -> APIUser
 }
 
 // MARK: - API Service
@@ -254,6 +270,16 @@ final class APIService: APIProviding {
         let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
 
+    // MARK: - User Preferences
+
+    func getMe() async throws -> APIUser {
+        return try await get(path: "/users/me")
+    }
+
+    func updateMe(aiEnabled: Bool) async throws -> APIUser {
+        return try await patch(path: "/users/me", body: UpdateUserRequest(aiEnabled: aiEnabled))
+    }
+
     // MARK: - HTTP Methods
 
     private func get<T: Decodable>(path: String) async throws -> T {
@@ -277,6 +303,13 @@ final class APIService: APIProviding {
 
     private func delete<T: Decodable>(path: String) async throws -> T {
         let request = try await buildRequest(path: path, method: "DELETE")
+        return try await execute(request)
+    }
+
+    private func patch<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
+        var request = try await buildRequest(path: path, method: "PATCH")
+        request.httpBody = try encoder.encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await execute(request)
     }
 
