@@ -41,5 +41,10 @@ struct SettingsView: View {
 }
 
 #Preview {
+    @Previewable @State var preferencesService = UserPreferencesService(
+        apiService: APIService(authService: AuthService())
+    )
+    
     SettingsView()
+        .environment(preferencesService)
 }
