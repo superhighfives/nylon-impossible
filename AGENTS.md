@@ -25,6 +25,7 @@ nylon-impossible/
 ├── plans/
 │   ├── ready/        # Plans ready to implement
 │   ├── backlog/      # Ideas for future work
+│   ├── in-progress/  # Plans currently being worked on
 │   └── done/         # Completed plans
 ├── scripts/          # Shell scripts (db reset, backup)
 ├── package.json      # Root pnpm workspace
@@ -196,7 +197,7 @@ Implementation plans live in the `plans/` directory.
 
 The canonical documentation for:
 
-- the **backlog → ready → done** lifecycle
+- the **backlog → ready → in-progress → done** lifecycle
 - plan file naming conventions
 - the plan template and required sections
 
@@ -205,6 +206,7 @@ is in `plans/README.md`. Refer to that file when creating, updating, or reviewin
 At a high level:
 
 - New work typically starts as a plan in `plans/`.
+- Move plans to `in-progress/` when you begin implementation.
 - Keep plans up to date as decisions are made and work progresses.
 - Move plans through their lifecycle as described in `plans/README.md`.
 

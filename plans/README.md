@@ -1,6 +1,6 @@
 # Plans
 
-This directory contains project plans organized by status. Plans move through three stages: **backlog** → **ready** → **done**.
+This directory contains project plans organized by status. Plans move through four stages: **backlog** → **ready** → **in-progress** → **done**.
 
 ## Directory Structure
 
@@ -8,6 +8,7 @@ This directory contains project plans organized by status. Plans move through th
 plans/
 ├── backlog/     # Stubs and ideas not yet ready for work
 ├── ready/       # Fully specced plans ready for an agent to implement
+├── in-progress/ # Plans currently being worked on
 ├── done/        # Completed work with full documentation
 └── assets/      # Supporting files (images, diagrams, etc.)
 ```
@@ -60,6 +61,20 @@ Fully specced plans that an agent can pick up and implement without further clar
 - Technical considerations
 - Dependencies
 
+**When to move to in-progress:** When you start implementing the plan.
+
+### In Progress
+
+Location: `in-progress/`
+
+Plans actively being implemented.
+
+**Characteristics:**
+- Moved from `ready/` when work begins
+- Status header updated to `In Progress`
+- May include implementation notes as work progresses
+- Helps track what's currently being worked on
+
 **When to move to done:** When the work is implemented and tested.
 
 ### Done
@@ -80,7 +95,7 @@ Documentation of completed work.
 
 1. **Create** a stub in `backlog/` when you have an idea
 2. **Flesh out** the backlog item into a full spec and move it to `ready/`
-3. **Implement** the ready plan
+3. **Move to in-progress** when you start implementation
 4. **Document** the completed work in `done/`
 
 ## Template
