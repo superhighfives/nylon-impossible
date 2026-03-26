@@ -61,7 +61,8 @@ export async function smartCreate(c: Context<Env>) {
 
   const firstPosition = firstTodo?.position ?? null;
 
-  if (shouldUseAI(text)) {
+  const aiEnabled = c.get("aiEnabled");
+  if (aiEnabled && shouldUseAI(text)) {
     // AI path: extract and create multiple todos
     let extracted: Array<{
       title: string;
