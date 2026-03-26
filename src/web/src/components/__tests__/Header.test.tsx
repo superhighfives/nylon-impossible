@@ -6,6 +6,12 @@ import Header from "../Header";
 vi.mock("@clerk/tanstack-react-start", () => ({
   SignedIn: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   UserButton: () => <div data-testid="user-button" />,
+  useAuth: () => ({ getToken: () => Promise.resolve("mock-token") }),
+}));
+
+vi.mock("@/hooks/useUser", () => ({
+  useUser: () => ({ data: null, isLoading: true }),
+  useUpdateUser: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
