@@ -29,7 +29,7 @@ import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
-import { Button, Checkbox, UrlCardCompact } from "./ui";
+import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
 
 interface TodoItemProps {
   todo: TodoWithUrls;
@@ -115,10 +115,10 @@ function TodoItemContent({
           </p>
           {(todo.aiStatus === "pending" || todo.aiStatus === "processing") && (
             <output
-              className="text-gray-muted text-xs animate-pulse"
+              className="flex items-center gap-1 text-gray-muted text-xs"
               aria-label="AI is processing"
             >
-              <span aria-hidden="true">...</span>
+              <Loader size="sm" />
             </output>
           )}
         </div>
