@@ -72,9 +72,12 @@ function createInitialTodo(text: string): {
     })
     .filter((url): url is string => url !== null);
 
+  // Deduplicate URLs
+  const uniqueUrls = Array.from(new Set(urls));
+
   return {
     title: truncateTitle(text),
-    urls: urls.length > 0 ? urls : undefined,
+    urls: uniqueUrls.length > 0 ? uniqueUrls : undefined,
   };
 }
 

@@ -42,6 +42,7 @@ export async function enrichTodoWithAI(
         .update(todos)
         .set({ aiStatus: "complete", updatedAt: new Date() })
         .where(eq(todos.id, todoId));
+      await notifySync(env, userId);
       return;
     }
 
@@ -64,13 +65,15 @@ export async function enrichTodoWithAI(
 
     await db.update(todos).set(updates).where(eq(todos.id, todoId));
 
+    // Notify clients that core AI enrichment (status/title/dueDate) is complete
+    await notifySync(env, userId);
+
     // Handle URLs if extracted
     if (enrichment.urls && enrichment.urls.length > 0) {
       await insertAndFetchUrls(db, todoId, enrichment.urls);
+      // Notify again once URL metadata is ready
+      await notifySync(env, userId);
     }
-
-    // Notify clients to refresh
-    await notifySync(env, userId);
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);
     await db

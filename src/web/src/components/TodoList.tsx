@@ -114,12 +114,12 @@ function TodoItemContent({
             {todo.title}
           </p>
           {(todo.aiStatus === "pending" || todo.aiStatus === "processing") && (
-            <span
+            <output
               className="text-gray-muted text-xs animate-pulse"
-              title="AI is processing..."
+              aria-label="AI is processing"
             >
-              ...
-            </span>
+              <span aria-hidden="true">...</span>
+            </output>
           )}
         </div>
         {todo.urls && todo.urls.length > 0 && (

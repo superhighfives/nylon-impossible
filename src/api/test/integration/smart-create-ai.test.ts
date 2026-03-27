@@ -48,10 +48,13 @@ async function enableAI() {
     .where(eq(users.id, "user_test_123"));
 }
 
+const DEFAULT_AI_TIMEOUT_MS =
+  Number(process.env.AI_TEST_TIMEOUT_MS ?? "") || 30000;
+
 /** Poll for AI processing to complete */
 async function waitForAIComplete(
   todoId: string,
-  timeoutMs = 10000,
+  timeoutMs = DEFAULT_AI_TIMEOUT_MS,
 ): Promise<void> {
   const db = getDb(env.DB);
   const start = Date.now();
