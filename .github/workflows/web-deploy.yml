@@ -85,6 +85,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Apply D1 migrations
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.api == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/api
+          command: d1 migrations apply nylon-impossible-db --remote
+
       - name: Deploy API
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.api == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -97,15 +106,6 @@ jobs:
             CLOUDFLARE_API_TOKEN
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      - name: Apply D1 migrations
-        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.api == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: src/api
-          command: d1 migrations apply nylon-impossible-db --remote
 
       - name: Build Web
         if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.web == 'true'
@@ -197,15 +197,6 @@ jobs:
             config.routes = [{ pattern: domain, custom_domain: true }];
             fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
 
-      - name: Deploy preview API
-        if: steps.changes.outputs.api == 'true'
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Apply D1 migrations
         if: steps.changes.outputs.api == 'true'
         uses: cloudflare/wrangler-action@v3
@@ -214,6 +205,15 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
           command: d1 migrations apply nylon-impossible-db --remote
+
+      - name: Deploy preview API
+        if: steps.changes.outputs.api == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: src/api
+          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set preview API secrets
         if: steps.changes.outputs.api == 'true'
