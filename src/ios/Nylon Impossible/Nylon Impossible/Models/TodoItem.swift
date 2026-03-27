@@ -14,6 +14,14 @@ enum TodoPriority: String, Codable, CaseIterable {
     case low
 }
 
+/// AI processing status for todos
+enum TodoAIStatus: String, Codable, CaseIterable {
+    case pending
+    case processing
+    case complete
+    case failed
+}
+
 @Model
 final class TodoItem {
     var id: UUID
@@ -28,6 +36,7 @@ final class TodoItem {
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
     var priority: String?         // "high" or "low", stored as String for SwiftData
+    var aiStatus: String?         // AI processing status: pending, processing, complete, failed
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
 
@@ -44,6 +53,7 @@ final class TodoItem {
         self.isDeleted = false
         self.dueDate = nil
         self.priority = nil
+        self.aiStatus = nil
         self.pendingUrls = []
     }
     
@@ -68,5 +78,21 @@ final class TodoItem {
     var isOverdue: Bool {
         guard let dueDate = dueDate, !isCompleted else { return false }
         return dueDate < Date()
+    }
+    
+    /// Get AI status as enum
+    var todoAIStatus: TodoAIStatus? {
+        get {
+            guard let aiStatus = aiStatus else { return nil }
+            return TodoAIStatus(rawValue: aiStatus)
+        }
+        set {
+            aiStatus = newValue?.rawValue
+        }
+    }
+    
+    /// Check if AI is currently processing this todo
+    var isAIProcessing: Bool {
+        todoAIStatus == .pending || todoAIStatus == .processing
     }
 }

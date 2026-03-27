@@ -273,6 +273,7 @@ final class SyncService {
                     local.position = remote.position ?? local.position
                     local.dueDate = remote.dueDate
                     local.priority = remote.priority
+                    local.aiStatus = remote.aiStatus?.rawValue
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
@@ -285,6 +286,7 @@ final class SyncService {
                 todo.isCompleted = remote.completed
                 todo.dueDate = remote.dueDate
                 todo.priority = remote.priority
+                todo.aiStatus = remote.aiStatus?.rawValue
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
                 todo.isSynced = true
