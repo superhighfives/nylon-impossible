@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import ClerkKit
 import AppIntents
+import BackgroundTasks
 
 @main
 struct Nylon_ImpossibleApp: App {
@@ -18,6 +19,59 @@ struct Nylon_ImpossibleApp: App {
     
     init() {
         Clerk.configure(publishableKey: Config.clerkPublishableKey)
+        registerBackgroundTasks()
+    }
+
+    private func registerBackgroundTasks() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: BackgroundSyncService.backgroundSyncTaskIdentifier,
+            using: nil
+        ) { task in
+            Self.handleBackgroundSync(task: task)
+        }
+    }
+
+    private static func handleBackgroundSync(task: BGTask) {
+        guard let appRefreshTask = task as? BGAppRefreshTask else {
+            task.setTaskCompleted(success: false)
+            return
+        }
+
+        // Schedule the next refresh before doing work, so iOS can wake us again if needed
+        scheduleBackgroundSync()
+
+        let container = SharedModelContainer.shared
+        let completion = BGTaskCompletionGuard(task: appRefreshTask)
+
+        let workTask = Task { @MainActor in
+            let sharedDefaults = UserDefaults(suiteName: BackgroundSyncService.appGroupSuiteName)
+            if let defaults = sharedDefaults, let svc = BackgroundSyncService(sharedDefaults: defaults) {
+                do {
+                    try await svc.sync(modelContainer: container)
+                    completion.complete(success: true)
+                } catch {
+                    print("[BGTask] Sync error: \(error)")
+                    completion.complete(success: false)
+                }
+            } else {
+                completion.complete(success: false)
+            }
+        }
+
+        appRefreshTask.expirationHandler = {
+            workTask.cancel()
+            completion.complete(success: false)
+        }
+    }
+
+    private static func scheduleBackgroundSync() {
+        let request = BGAppRefreshTaskRequest(identifier: BackgroundSyncService.backgroundSyncTaskIdentifier)
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("[BGTask] Failed to schedule background sync: \(error)")
+        }
     }
     
     var body: some Scene {
@@ -86,8 +140,10 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
-                // Persist userId to shared UserDefaults for Siri and Share Extension
+                // Persist userId and a fresh auth token to shared UserDefaults for
+                // Siri, Share Extension, and BackgroundSyncService access
                 authService.persistUserIdToSharedDefaults()
+                Task { await authService.persistAuthTokenToSharedDefaults() }
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
             } else {
@@ -102,6 +158,9 @@ struct RootView: View {
             switch newPhase {
             case .active:
                 syncService.connectWebSocket()
+                // Refresh the stored auth token so BackgroundSyncService has a valid
+                // credential for the next ~50 minutes
+                Task { await authService.persistAuthTokenToSharedDefaults() }
             case .background, .inactive:
                 syncService.disconnectWebSocket()
             @unknown default:
@@ -114,9 +173,9 @@ struct RootView: View {
         guard !hasTriggeredInitialSync else { return }
         guard isSignedIn else { return }
         guard let syncService else { return }
-        
+
         hasTriggeredInitialSync = true
-        
+
         Task {
             // First, migrate any existing local todos
             await syncService.migrateLocalTodos()
@@ -126,6 +185,28 @@ struct RootView: View {
             syncService.connectWebSocket()
             // Fetch user preferences
             await preferencesService?.fetchPreferences()
+        }
+    }
+}
+
+// MARK: - Private Helpers
+
+/// Ensures BGTask.setTaskCompleted(success:) is called exactly once, even if both the
+/// worker task and the expiration handler fire concurrently.
+private final class BGTaskCompletionGuard: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isComplete = false
+    private let task: BGAppRefreshTask
+
+    init(task: BGAppRefreshTask) {
+        self.task = task
+    }
+
+    func complete(success: Bool) {
+        lock.withLock {
+            guard !isComplete else { return }
+            isComplete = true
+            task.setTaskCompleted(success: success)
         }
     }
 }

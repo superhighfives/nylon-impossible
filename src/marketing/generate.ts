@@ -438,7 +438,7 @@ async function captureIOSScreenshots(): Promise<void> {
   // simulator window to be the active app to get screen surfaces in CI.
   spawnSync("osascript", ["-e", 'tell application "Simulator" to activate'], { stdio: "pipe" });
   console.log("  Waiting for app to render…");
-  await sleep(8000);
+  await sleep(15000);
 
   for (const mode of ["light", "dark"] as const) {
     execSync(`xcrun simctl ui "${udid}" appearance ${mode}`, { stdio: "pipe" });

@@ -21,12 +21,63 @@ export function useTodos() {
 export function useCreateTodo() {
   const queryClient = useQueryClient();
   const { notifyChanged } = useWebSocketSync();
+  const { userId } = useAuth();
 
   return useMutation({
     mutationFn: (input: CreateTodoInput) => createTodo({ data: input }),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      const optimisticTodo: TodoWithUrls = {
+        id: `temp-${crypto.randomUUID()}`,
+        userId: userId ?? "",
+        title: input.title,
+        description: input.description ?? null,
+        completed: false,
+        position: "a0", // placeholder — replaced when onSettled invalidates
+        dueDate: input.dueDate?.toISOString() ?? null,
+        priority: input.priority ?? null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        urls: [],
+      };
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
+        optimisticTodo,
+        ...(previousTodos ?? []),
+      ]);
+
+      return { previousTodos, optimisticId: optimisticTodo.id };
+    },
+    onError: (_err, _variables, context) => {
+      if (!context) {
+        return;
+      }
+
+      if (context.previousTodos !== undefined) {
+        // Restore the previous cache state when it existed
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+        return;
+      }
+
+      if (context.optimisticId) {
+        // No previous cache: remove the optimistic entry we added
+        queryClient.setQueryData<TodoWithUrls[] | undefined>(
+          TODOS_QUERY_KEY,
+          (current) =>
+            current?.filter((todo) => todo.id !== context.optimisticId) ??
+            current,
+        );
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      // Only notify other clients when the create actually succeeded
       notifyChanged();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
     },
   });
 }

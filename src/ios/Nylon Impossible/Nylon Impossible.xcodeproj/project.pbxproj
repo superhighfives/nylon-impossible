@@ -54,6 +54,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Models/TodoItem.swift,
+				Models/TodoUrl.swift,
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
 				Utils/FractionalIndexing.swift,

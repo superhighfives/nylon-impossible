@@ -70,12 +70,19 @@ struct TodoItemRow: View {
                                 .font(.system(size: 14, weight: .bold))
                                 .foregroundStyle(priority == .high ? Color.red : Color.gray)
                         }
-                        
+
                         Text(todo.title)
                             .font(.system(size: 16))
                             .foregroundStyle(todo.isCompleted ? Color.appSubtle : Color.appDefault)
                             .strikethrough(todo.isCompleted, color: Color.appSubtle)
                             .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
+
+                        Spacer()
+                        if !todo.isSynced {
+                            Circle()
+                                .fill(Color.appSubtle)
+                                .frame(width: 6, height: 6)
+                        }
                     }
                     
                     // Due date indicator

@@ -7,7 +7,7 @@ import SwiftData
 struct TodoViewModelTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(for: TodoItem.self, configurations: config)
+        return try ModelContainer(for: TodoItem.self, TodoUrl.self, configurations: config)
     }
 
     @Test("canAddTask is false when text is empty")
