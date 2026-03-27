@@ -1,20 +1,22 @@
 /**
  * Background AI enrichment for todos
  *
- * Takes an existing todo and enriches it with AI-extracted data:
- * - Cleaner title (action-oriented)
- * - Extracted URLs
+ * Takes an existing todo and enriches it with AI-extracted metadata:
+ * - URLs extracted and removed from title
  * - Due date from natural language
+ * - Priority if mentioned
+ *
+ * Does NOT rephrase or rewrite the title - only removes URLs.
  */
 
 import { generateNKeysBetween } from "fractional-indexing";
-import { extractTodos } from "./ai";
+import { enrichTodo } from "./ai";
 import { eq, type getDb, todos, todoUrls } from "./db";
 import { truncateTitle } from "./url-helpers";
 import { fetchUrlMetadata } from "./url-metadata";
 
 /**
- * Enrich a todo with AI-extracted data in the background.
+ * Enrich a todo with AI-extracted metadata in the background.
  * Updates the todo in place and notifies connected clients.
  */
 export async function enrichTodoWithAI(
@@ -34,10 +36,10 @@ export async function enrichTodoWithAI(
     .where(eq(todos.id, todoId));
 
   try {
-    const extracted = await extractTodos(ai, originalText);
+    const enrichment = await enrichTodo(ai, originalText);
 
     // If AI returned nothing useful, mark complete and exit
-    if (!extracted || extracted.length === 0) {
+    if (!enrichment) {
       await db
         .update(todos)
         .set({ aiStatus: "complete", updatedAt: new Date() })
@@ -46,16 +48,14 @@ export async function enrichTodoWithAI(
       return;
     }
 
-    // Use the first extracted item (we no longer support multi-todo extraction)
-    const enrichment = extracted[0];
     const updates: Partial<typeof todos.$inferSelect> = {
       aiStatus: "complete",
       updatedAt: new Date(),
     };
 
-    // Update title if AI provided a cleaner one
+    // Update title if URLs were removed (title changed)
     if (enrichment.title && enrichment.title !== originalText) {
-      updates.title = truncateTitle(enrichment.title);
+      updates.title = truncateTitle(enrichment.title.trim());
     }
 
     // Update due date if extracted
@@ -63,9 +63,14 @@ export async function enrichTodoWithAI(
       updates.dueDate = new Date(enrichment.dueDate);
     }
 
+    // Update priority if extracted
+    if (enrichment.priority) {
+      updates.priority = enrichment.priority;
+    }
+
     await db.update(todos).set(updates).where(eq(todos.id, todoId));
 
-    // Notify clients that core AI enrichment (status/title/dueDate) is complete
+    // Notify clients that core AI enrichment is complete
     await notifySync(env, userId);
 
     // Handle URLs if extracted

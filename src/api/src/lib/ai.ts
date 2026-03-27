@@ -1,11 +1,19 @@
 /**
- * AI-powered todo extraction using Cloudflare AI Gateway with dynamic routing
+ * AI-powered todo enrichment using Cloudflare AI Gateway
+ *
+ * This module ONLY extracts metadata from todo text:
+ * - URLs/domains (removed from title, returned separately)
+ * - Due dates from natural language
+ * - Priority if mentioned
+ *
+ * It does NOT rephrase or rewrite the title - only cleans out URLs.
  */
 
-interface ExtractedItem {
-  title: string;
+export interface TodoEnrichment {
+  title: string; // Original title with URLs removed
   urls?: string[];
   dueDate?: string; // ISO date string YYYY-MM-DD
+  priority?: "high" | "low";
 }
 
 // Native Workers AI tool call format
@@ -33,55 +41,44 @@ interface OpenAICompatToolCallResponse {
 
 interface ParsedToolCall {
   name: string;
-  arguments: {
-    todos: Array<{
-      title: string;
-      urls?: string[];
-      dueDate?: string;
-    }>;
-  };
+  arguments: TodoEnrichment;
 }
 
-const extractTodosTool = {
+const enrichTodoTool = {
   type: "function" as const,
   function: {
-    name: "extract_todos",
+    name: "enrich_todo",
     description:
-      "Extract all actionable tasks, errands, or to-do items from the user's text. Convert any task-like statements into clear todo items with action verbs. If the user mentions things they need to do, buy, call, complete, schedule, or handle - extract them. Also extract any URLs mentioned and convert relative dates to ISO format. Return them in the todos array. If there are truly no actionable items, return an empty array.",
+      "Extract metadata from a todo item. Find URLs/domains and remove them from the title. Extract due dates and priority. Do NOT rephrase or rewrite the title - only remove URLs from it.",
     parameters: {
       type: "object",
       properties: {
-        todos: {
+        title: {
+          type: "string",
+          description:
+            "The original title with URLs/domains removed. Do NOT rephrase, reword, or change the meaning. Only remove the URL text. Example: 'Check out google.com tomorrow' becomes 'Check out tomorrow'",
+        },
+        urls: {
           type: "array",
           description:
-            "List of extracted todo items. Always populate this with any actionable tasks found in the text. Be liberal in what you consider actionable.",
+            "Extract ANY website, domain, or URL mentioned. Be aggressive - if something looks like a domain (e.g., 'google.com', 'github.com/user', 'example.org'), extract it. Always add 'https://' prefix if missing.",
           items: {
-            type: "object",
-            properties: {
-              title: {
-                type: "string",
-                description:
-                  "Concise action item starting with a verb. Do NOT include raw URLs in the title - describe the action instead (e.g., 'Check Google' not 'check https://google.com')",
-              },
-              urls: {
-                type: "array",
-                description:
-                  "Extract ANY website, domain, or URL mentioned. Be aggressive - if something looks like a domain (e.g., 'google.com', 'github.com/user', 'example.org'), extract it. Always add 'https://' prefix if missing. Examples: 'check google.com' → 'https://google.com', 'look at docs.api.com/guide' → 'https://docs.api.com/guide'",
-                items: {
-                  type: "string",
-                },
-              },
-              dueDate: {
-                type: "string",
-                description:
-                  "Due date in ISO format (YYYY-MM-DD). Convert relative dates like 'tomorrow', 'next week', 'Friday' to absolute ISO dates based on today's date provided in the system prompt",
-              },
-            },
-            required: ["title"],
+            type: "string",
           },
         },
+        dueDate: {
+          type: "string",
+          description:
+            "Due date in ISO format (YYYY-MM-DD). Convert relative dates like 'tomorrow', 'next week', 'Friday' to absolute ISO dates based on today's date.",
+        },
+        priority: {
+          type: "string",
+          enum: ["high", "low"],
+          description:
+            "Extract priority if mentioned. Look for words like 'urgent', 'important', 'high priority', 'asap' (high) or 'low priority', 'whenever', 'not urgent' (low).",
+        },
       },
-      required: ["todos"],
+      required: ["title"],
     },
   },
 };
@@ -89,48 +86,29 @@ const extractTodosTool = {
 function getSystemPrompt(): string {
   const today = new Date().toISOString().split("T")[0];
 
-  return `You are a helpful assistant that extracts actionable todo items from text.
+  return `You are a metadata extractor for todo items. Today's date is: ${today}
 
-Today's date is: ${today}
+Your ONLY job is to extract metadata from the user's text:
+1. URLs/domains - find them and remove them from the title
+2. Due dates - convert relative dates to ISO format
+3. Priority - if mentioned
 
-IMPORTANT: You MUST always call the extract_todos tool with your findings. Never respond with plain text - always use the tool.
+CRITICAL RULES:
+- Do NOT rephrase, reword, or rewrite the title
+- Do NOT change the meaning or intent of the title
+- ONLY remove URLs/domains from the title text
+- Keep everything else in the title exactly as written
 
-Your job is to intelligently parse the user's text and extract ANY actionable tasks you find. The text may contain a mix of actionable items, random thoughts, lists, or conversational filler - your task is to identify and extract only the actionable parts.
+Examples:
+- "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
+- "Check out https://example.com/page tomorrow" → { title: "Check out tomorrow", urls: ["https://example.com/page"], dueDate: "${today}" }
+- "Buy milk" → { title: "Buy milk" } (no changes needed)
+- "Urgent: call mom" → { title: "Urgent: call mom", priority: "high" }
+- "github.com/user/repo review this" → { title: "review this", urls: ["https://github.com/user/repo"] }
+- "Low priority fix the bug" → { title: "Low priority fix the bug", priority: "low" }
+- "Meeting next Friday" → { title: "Meeting next Friday", dueDate: "[next Friday's date]" }
 
-Key principles:
-- Be LIBERAL: If something sounds like a task, errand, reminder, or thing someone needs to do, extract it
-- Handle mixed content: Text can contain both actionable and non-actionable items - only extract the actionable ones
-- "Tell X to do Y" counts as a task for the user (they need to communicate the request)
-- Partial matches are fine - extract what you can even if surrounded by irrelevant content
-- ALWAYS EXTRACT URLs: If a domain or URL appears ANYWHERE in the text, ALWAYS create a todo for it. This is critical - even "hello google.com" should become a todo like "Check Google" with url ["https://google.com"]. URLs are always actionable.
-- Convert dates: Convert relative dates (tomorrow, next week, Friday, in 3 days) to ISO format YYYY-MM-DD based on today's date
-
-Look for mentions of:
-- Buying, purchasing, getting, or picking up things
-- Calling, emailing, texting, or contacting people
-- Completing, finishing, or doing work
-- Scheduling, booking, or making appointments
-- Reminders or things not to forget
-- Time words like "later", "tomorrow", "soon", "next week"
-- URLs and domains (google.com, example.org, github.com/user/repo) - ALWAYS extract these as todos
-
-Examples (extract ALL of these):
-- "need to buy milk" -> { title: "Buy milk" }
-- "should email the team" -> { title: "Email team" }
-- "call mom later" -> { title: "Call mom" }
-- "pick up dry cleaning tomorrow" -> { title: "Pick up dry cleaning", dueDate: "[tomorrow's date in YYYY-MM-DD]" }
-- "don't forget to water plants" -> { title: "Water plants" }
-- "finish the report by Friday" -> { title: "Finish report", dueDate: "[Friday's date in YYYY-MM-DD]" }
-- "check https://google.com tomorrow" -> { title: "Check Google", urls: ["https://google.com"], dueDate: "[tomorrow's date]" }
-- "review https://github.com/user/repo/pull/123" -> { title: "Review pull request", urls: ["https://github.com/user/repo/pull/123"] }
-- "read article at https://example.com/post next week" -> { title: "Read article", urls: ["https://example.com/post"], dueDate: "[next week's date]" }
-- "buy milk and eggs" -> [{ title: "Buy milk" }, { title: "Buy eggs" }]
-- "call john about the project and email the team" -> [{ title: "Call John about project" }, { title: "Email team" }]
-- "puppies, kittens, other stuff also tell mum to get milk" -> { title: "Tell mum to get milk" }
-- "random thoughts: need to call dentist" -> { title: "Call dentist" }
-- "hello google.com" -> { title: "Check Google", urls: ["https://google.com"] } (URLs are ALWAYS extracted)
-- "google.com" -> { title: "Check Google", urls: ["https://google.com"] } (bare domain = todo)
-- "look at docs.example.com/guide" -> { title: "Look at docs", urls: ["https://docs.example.com/guide"] }`;
+Always call the enrich_todo tool with your findings.`;
 }
 
 /**
@@ -174,12 +152,13 @@ function parseArguments(
 }
 
 /**
- * Extract structured todos from natural language text using Workers AI with AI Gateway
+ * Enrich a todo with extracted metadata (URLs, due date, priority).
+ * Does NOT rephrase the title - only removes URLs from it.
  */
-export async function extractTodos(
+export async function enrichTodo(
   ai: Ai,
   text: string,
-): Promise<ExtractedItem[] | null> {
+): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
 
   // Model added recently, types not yet updated
@@ -190,12 +169,12 @@ export async function extractTodos(
         { role: "system", content: systemPrompt },
         { role: "user", content: text },
       ],
-      tools: [extractTodosTool],
+      tools: [enrichTodoTool],
       tool_choice: {
         type: "function",
-        function: { name: "extract_todos" },
+        function: { name: "enrich_todo" },
       },
-      max_tokens: 16000,
+      max_tokens: 4000,
     },
     {
       gateway: {
@@ -208,27 +187,24 @@ export async function extractTodos(
 
   if (!tc) {
     console.error("No tool call found in AI response");
-    throw new Error("AI did not return extracted todos");
+    throw new Error("AI did not return enrichment");
   }
 
-  if (tc.name !== "extract_todos") {
+  if (tc.name !== "enrich_todo") {
     throw new Error(`Unexpected tool call: ${tc.name}`);
   }
 
-  const parsed = tc.arguments;
+  const enrichment = tc.arguments;
 
-  if (!parsed.todos || parsed.todos.length === 0) {
+  // If nothing was extracted (no URLs, no date, no priority), return null
+  const hasEnrichment =
+    (enrichment.urls && enrichment.urls.length > 0) ||
+    enrichment.dueDate ||
+    enrichment.priority;
+
+  if (!hasEnrichment && enrichment.title === text) {
     return null;
   }
 
-  return parsed.todos.map((todo) => {
-    const item: ExtractedItem = { title: todo.title };
-    if (todo.urls && todo.urls.length > 0) {
-      item.urls = todo.urls;
-    }
-    if (todo.dueDate) {
-      item.dueDate = todo.dueDate;
-    }
-    return item;
-  });
+  return enrichment;
 }
