@@ -13,8 +13,8 @@ import { getRequestUrl } from "@tanstack/react-start/server";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
-import OfflineBanner from "../components/OfflineBanner";
 import { NotFound } from "../components/NotFound";
+import OfflineBanner from "../components/OfflineBanner";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
