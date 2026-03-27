@@ -20,12 +20,11 @@ export default function OfflineBanner() {
   if (isOnline) return null;
 
   return (
-    <div
-      role="status"
+    <output
       aria-live="polite"
-      className="w-full bg-yellow-base px-4 py-2 text-center text-sm font-medium text-yellow"
+      className="block w-full bg-yellow-base px-4 py-2 text-center text-sm font-medium text-yellow"
     >
       You're offline — changes will sync when you reconnect.
-    </div>
+    </output>
   );
 }
