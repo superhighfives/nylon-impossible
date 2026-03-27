@@ -339,7 +339,7 @@ final class SyncService {
 
             let remoteUrls = remote.urls ?? []
             let remoteUrlIds = Set(remoteUrls.map { $0.id })
-            let existingById = Dictionary(uniqueKeysWithValues: todo.urls.map { ($0.id, $0) })
+            let existingById = todo.urls.reduce(into: [:]) { dict, url in dict[url.id] = url }
 
             // Delete URLs no longer present on the server
             for url in todo.urls where !remoteUrlIds.contains(url.id) {
