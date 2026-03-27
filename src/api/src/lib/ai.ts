@@ -66,7 +66,7 @@ const extractTodosTool = {
               urls: {
                 type: "array",
                 description:
-                  "Any URLs mentioned in relation to this task. Extract full URLs including protocol (http:// or https://)",
+                  "Any URLs or domains mentioned in relation to this task. If a bare domain is mentioned (e.g., 'google.com'), add 'https://' prefix. Always return full URLs with protocol.",
                 items: {
                   type: "string",
                 },
