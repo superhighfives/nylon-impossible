@@ -1,66 +1,120 @@
 # Research Agent for Todos
 
-**Date:** 2026-03-13
-**Status:** Ready
-**Scope:** API + Web (iOS later)
+**Date:** 2026-03-13  
+**Updated:** 2026-03-27  
+**Status:** Ready  
+**Scope:** API + Web (iOS out of scope for this plan)
 
 ## Overview
 
-Turn todos into research agents. When a user creates a todo with research intent ("Dogs ages vs human ages", "Best practices for React Server Components"), the system automatically researches the topic in the background and attaches findings to the todo.
+When a todo has research intent ("Dogs ages vs human ages", "Best practices for React Server Components", "Book dinner at San Jalisco"), the system automatically researches the topic in the background and attaches a 2-3 sentence summary with numbered citations to the todo. Research runs after creation via `waitUntil`, same pattern as the existing AI enrichment.
 
-## Core Behavior
+## What triggers research
 
-- **Trigger**: AI detects research intent during todo extraction (questions, "look up", "how to", comparisons, venue names)
-- **Output**: Brief 2-3 sentence summary with numbered citations [1], [2] linking to source URLs; or structured location data for venue todos
-- **Runs on**: Cloudflare Workers AI (`@cf/moonshotai/kimi-k2.5` with thinking + search)
-- **UX**: Optimistic - todo appears immediately, "Researching..." indicator, results appear via WebSocket
+| Input | Research? | Type |
+|-------|-----------|------|
+| "Feed dog" | No | — |
+| "Buy groceries" | No | — |
+| "Dogs ages vs human ages" | Yes | `general` |
+| "Best practices for React Server Components" | Yes | `general` |
+| "How does OAuth work" | Yes | `general` |
+| "Book dinner at San Jalisco" | Yes | `location` |
+| "Drinks at The Rusty Nail" | Yes | `location` |
 
-### Research Types
+## What research produces
 
-The AI classifies each researchable todo into a **research type** which shapes the output format:
-
-| Type | Description |
-|------|-------------|
-| `general` | Default — summary + citations |
-| `location` | Venue/place — structured location data + Google Maps link |
-
-### What Triggers Research
-
-| Input | Research? | Type | Why |
-|-------|-----------|------|-----|
-| "Feed dog" | No | — | Action item |
-| "Buy groceries" | No | — | Action item |
-| "Dogs ages vs human ages" | Yes | `general` | Comparison/question |
-| "Look up white chocolate recipe" | Yes | `general` | Explicit research intent |
-| "Best practices for React Server Components" | Yes | `general` | Information seeking |
-| "How does OAuth work" | Yes | `general` | Question |
-| "Book dinner at San Jalisco" | Yes | `location` | Venue reference |
-| "Drinks at The Rusty Nail" | Yes | `location` | Venue reference |
-| "Check out that new ramen place on Main St" | Yes | `location` | Venue reference |
-
-### What Research Produces
-
-Brief 2-3 sentence summary with citations:
-
-> Dogs age faster than humans, but the "7 years" rule is a myth - it varies by breed and size. [1] Small breeds generally live longer than large breeds, with a 1-year-old dog roughly equivalent to a 15-year-old human. [2]
-
-Citations [1], [2] link to source URLs displayed as cards below the summary.
+A 2-3 sentence summary with numbered citations [1][2] linking to source URLs shown as cards. For location todos, sources are the venue website + Google Maps.
 
 ---
 
-## Data Model
+## Phase 1: Update `TodoEnrichment` shape
 
-### New Table: `todoResearch`
+### Current shape (in `src/api/src/lib/ai.ts`)
+
+```ts
+export interface TodoEnrichment {
+  title: string;
+  urls?: string[];
+  dueDate?: string;
+  priority?: "high" | "low";
+}
+```
+
+### New shape
+
+```ts
+export interface TodoEnrichment {
+  title: string;
+  urls?: string[];
+  dueDate?: string;
+  priority?: "high" | "low";
+  research?: {
+    type: "general" | "location";
+  };
+}
+```
+
+The presence of `research` is the signal — no separate `needsResearch` boolean needed.
+
+### Tool definition changes
+
+Add to `enrichTodoTool.parameters.properties`:
+
+```ts
+research: {
+  type: "object",
+  description: "Set when the todo has research intent - questions, comparisons, 'look up', venue references. Do NOT set for plain action items ('buy milk', 'call mom').",
+  properties: {
+    type: {
+      type: "string",
+      enum: ["general", "location"],
+      description: "'location' for venue/place todos (restaurants, bars, cafes). 'general' for everything else."
+    }
+  },
+  required: ["type"]
+}
+```
+
+### System prompt additions
+
+Add research detection examples to the prompt:
+
+```
+- "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" } }
+- "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" } }
+- "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" } }
+- "Buy milk" → { title: "Buy milk" } (no research - plain action)
+- "Call mom" → { title: "Call mom" } (no research - plain action)
+```
+
+### Update `hasEnrichment` check in `enrichTodo`
+
+```ts
+const hasEnrichment =
+  (enrichment.urls && enrichment.urls.length > 0) ||
+  enrichment.dueDate ||
+  enrichment.priority ||
+  enrichment.research; // add this
+```
+
+### Update tests in `src/api/test/unit/ai.test.ts`
+
+---
+
+## Phase 2: Data model
+
+### Migration 1: `todo_research` table
 
 ```sql
 CREATE TABLE todo_research (
   id TEXT PRIMARY KEY NOT NULL,
   todo_id TEXT NOT NULL UNIQUE,
-  status TEXT DEFAULT 'pending' NOT NULL, -- 'pending' | 'completed' | 'failed'
-  summary TEXT, -- markdown with [1], [2] references
+  status TEXT NOT NULL DEFAULT 'pending', -- 'pending' | 'completed' | 'failed'
+  research_type TEXT NOT NULL DEFAULT 'general', -- 'general' | 'location'
+  summary TEXT,
   researched_at INTEGER,
-  created_at INTEGER DEFAULT (unixepoch()) NOT NULL,
-  updated_at INTEGER DEFAULT (unixepoch()) NOT NULL,
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
   FOREIGN KEY (todo_id) REFERENCES todos(id) ON DELETE CASCADE
 );
 
@@ -68,333 +122,261 @@ CREATE INDEX idx_todo_research_todo_id ON todo_research(todo_id);
 CREATE INDEX idx_todo_research_status ON todo_research(status);
 ```
 
-### Modified: `todoUrls`
+### Migration 2: `research_id` on `todo_urls`
 
 ```sql
 ALTER TABLE todo_urls ADD COLUMN research_id TEXT REFERENCES todo_research(id) ON DELETE CASCADE;
 CREATE INDEX idx_todo_urls_research_id ON todo_urls(research_id);
 ```
 
-### Relationships
-
-- URLs with `researchId` → research sources (display with citation number)
-- URLs without `researchId` → user/extracted URLs (display as today)
-- One `todoResearch` per todo (1:1, enforced by unique constraint)
-- Re-research: delete old `todoResearch` (cascades to source URLs), create fresh
-
----
-
-## API Changes
-
-### Remove `shouldUseAI`
-
-Delete `src/api/src/lib/smart-input.ts`. All input goes through AI extraction.
-
-### Update `extractTodos` Response
-
-```ts
-// Current
-interface ExtractedItem {
-  title: string;
-  urls?: string[];
-  dueDate?: string;
-}
-
-// New
-interface ExtractedItem {
-  title: string;
-  urls?: string[];
-  dueDate?: string;
-  needsResearch?: boolean;
-  researchType?: 'general' | 'location'; // only set when needsResearch: true
-}
-```
-
-Update the AI prompt to detect research intent, return `needsResearch: true` for items that should be researched, and set `researchType: 'location'` when the todo references a venue (restaurant, bar, café, venue, etc.).
-
-### Update `POST /todos/smart`
-
-```ts
-// Pseudocode
-const extracted = await extractTodos(ai, text);
-
-for (const item of extracted) {
-  const todo = await createTodo(item);
-  
-  if (item.needsResearch) {
-    const research = await createTodoResearch(todo.id, 'pending');
-    
-    // Background research
-    c.executionCtx.waitUntil(
-      executeResearch(todo.id, todo.title, research.id)
-    );
-  }
-}
-
-return optimisticResponse(todos);
-```
-
-### New: Research Execution
-
-Research times out after 60 seconds if no response.
-
-```ts
-async function executeResearch(todoId: string, query: string, researchId: string) {
-  try {
-    // 1. Call Workers AI with web search (60s timeout)
-    const result = await ai.run('@cf/moonshotai/kimi-k2.5', {
-      messages: [{ role: 'user', content: `Research: ${query}` }],
-      // Model has built-in thinking + search capabilities
-    });
-    
-    // 2. Parse response into summary + sources
-    const { summary, sources } = parseResearchResponse(result);
-    
-    // 3. Insert source URLs
-    for (const [index, url] of sources.entries()) {
-      await insertTodoUrl({
-        todoId,
-        researchId,
-        url,
-        position: generatePosition(index),
-        fetchStatus: 'pending'
-      });
-      // Kick off metadata fetch for each URL
-      waitUntil(fetchUrlMetadata(urlId));
-    }
-    
-    // 4. Update research record
-    await updateTodoResearch(researchId, {
-      status: 'completed',
-      summary,
-      researchedAt: new Date()
-    });
-    
-    // 5. Broadcast sync
-    await broadcastSync(userId);
-    
-  } catch (error) {
-    await updateTodoResearch(researchId, { status: 'failed' });
-    await broadcastSync(userId);
-  }
-}
-```
-
-### Location Research Execution
-
-When `researchType === 'location'`, the research query is enriched with the user's location (if set in their profile) to find the right venue. The output format is the **same as general research** — a summary with citations [1], [2] — but the source URLs are the venue's website and Google Maps link rather than reference articles.
-
-```ts
-async function executeLocationResearch(todoId: string, query: string, researchId: string, userLocation?: string) {
-  const searchQuery = userLocation
-    ? `${query} near ${userLocation}`
-    : query;
-
-  const result = await ai.run('@cf/moonshotai/kimi-k2.5', {
-    messages: [{
-      role: 'user',
-      content: `Find the business: "${searchQuery}". Write 1-2 sentences describing what it is and where it is. Cite [1] as the venue's website and [2] as the Google Maps link. Return sources as: [website URL, Google Maps URL].`
-    }],
-  });
-
-  // Parsed the same way as general research
-  const { summary, sources } = parseResearchResponse(result);
-  // sources[0] = website, sources[1] = Google Maps URL
-
-  for (const [index, url] of sources.entries()) {
-    await insertTodoUrl({ todoId, researchId, url, position: generatePosition(index), fetchStatus: 'pending' });
-    waitUntil(fetchUrlMetadata(urlId));
-  }
-
-  await updateTodoResearch(researchId, { status: 'completed', summary, researchedAt: new Date() });
-}
-```
-
-No additional columns needed on `todoResearch` — location data is carried entirely through the existing summary + URL card system.
-
-### User Profile: Location
-
-Add an optional `location` field to the user profile to bias location searches locally:
+### Migration 3: `location` on `users`
 
 ```sql
-ALTER TABLE users ADD COLUMN location TEXT; -- e.g. "Los Angeles, CA"
+ALTER TABLE users ADD COLUMN location TEXT;
 ```
 
-- Displayed as a simple text input in profile/settings ("Your location")
-- Used as context when building location research queries (`near ${user.location}`)
-- Not required — location research still works without it, just less precise
+### Drizzle schema updates (`src/shared/src/schema.ts`)
 
-### Update Sync Endpoint
-
-Include research data in response:
-
-```ts
-// In serializeTodo or as separate join
-{
-  id: todo.id,
-  title: todo.title,
-  // ... existing fields ...
-  research: todo.research ? {
-    id: todo.research.id,
-    status: todo.research.status,
-    summary: todo.research.summary,
-    researchedAt: todo.research.researchedAt?.toISOString() ?? null,
-  } : null,
-  urls: [
-    // Existing URL serialization, now includes researchId
-    { id, url, title, researchId, ... }
-  ]
-}
-```
+Add `todoResearch` table, add `researchId` to `todoUrls`, add `location` to `users`.
 
 ---
 
-## Web UI
+## Phase 3: Research execution
 
-### Expanded Todo View — General Research
+### New file: `src/api/src/lib/research.ts`
 
-```
-┌─────────────────────────────────────────┐
-│ ☐ Dogs ages vs human ages               │
-├─────────────────────────────────────────┤
-│ Notes                                   │
-│ [editable textarea, always available]   │
-├─────────────────────────────────────────┤
-│ Research                    ↻ Refresh   │
-│ ─────────────────────────────────────── │
-│ Dogs age faster than humans, but the    │
-│ "7 years" rule is a myth. Small breeds  │
-│ live longer than large breeds. [1][2]   │
-│                                         │
-│ Sources                                 │
-│ [1] 🌐 AKC - Dog Age Calculator         │
-│ [2] 🌐 PetMD - How Dogs Age             │
-└─────────────────────────────────────────┘
+```ts
+export async function executeResearch(
+  db, ai, env, todoId, userId, query, researchType, researchId, userLocation?
+): Promise<void>
 ```
 
-### Expanded Todo View — Location Research
+**General research flow:**
+1. Call `@cf/moonshotai/kimi-k2.5` with thinking + web search enabled, 60s timeout
+2. Parse response: extract summary text + source URLs from citations
+3. Insert source URLs into `todoUrls` with `researchId` set
+4. Fetch URL metadata for each source in background
+5. Update `todoResearch` → `status: "completed"`, `summary`, `researchedAt`
+6. Notify sync
 
-Same layout as general research — the summary names the place and its address/character, and citations link to the venue's website and Google Maps. No special rendering needed; existing URL card components handle both.
+**Location research flow:**
+Same as general, but prompt instructs the model to:
+- Find the specific venue
+- Write summary with address/description
+- Return `[1]` = venue website, `[2]` = Google Maps URL
+- If `userLocation` is set, use `"${query} near ${userLocation}"` as search context
 
+**On failure:**
+Update `todoResearch` → `status: "failed"`, notify sync.
+
+### Update `src/api/src/lib/ai-enrich.ts`
+
+After existing enrichment completes, check `enrichment.research`:
+
+```ts
+if (enrichment.research) {
+  const research = await db.insert(todoResearch).values({
+    id: crypto.randomUUID(),
+    todoId,
+    researchType: enrichment.research.type,
+    status: "pending",
+    createdAt: now,
+    updatedAt: now,
+  }).returning().then(r => r[0]);
+
+  // Dispatch research in background (it runs after enrichment completes)
+  await executeResearch(db, ai, env, todoId, userId, originalText, enrichment.research.type, research.id, userLocation);
+}
 ```
-┌─────────────────────────────────────────┐
-│ ☐ Book dinner at San Jalisco            │
-├─────────────────────────────────────────┤
-│ Notes                                   │
-│ [editable textarea, always available]   │
-├─────────────────────────────────────────┤
-│ Research                    ↻ Refresh   │
-│ ─────────────────────────────────────── │
-│ San Jalisco is a beloved Mexican        │
-│ restaurant at 3 E Olympic Blvd, LA,    │
-│ known for birria and handmade           │
-│ tortillas. [1][2]                       │
-│                                         │
-│ Sources                                 │
-│ [1] 🌐 sanjalisco.com                   │
-│ [2] 🗺  Google Maps — San Jalisco       │
-└─────────────────────────────────────────┘
+
+Note: `executeResearch` is awaited inside `waitUntil` — it's still background from the client's perspective since `enrichTodoWithAI` itself is in a `waitUntil`.
+
+---
+
+## Phase 4: API changes
+
+### Update `POST /users/me` (PATCH handler)
+
+Accept and persist `location` field:
+
+```ts
+const updateUserSchema = z.object({
+  aiEnabled: z.boolean().optional(),
+  location: z.string().max(200).nullable().optional(),
+});
 ```
 
-### Research Section States
+### Update sync endpoint (`src/api/src/handlers/sync.ts`)
+
+`serializeTodo` needs to include research data. This requires a join or separate query.
+
+```ts
+// serializeTodo gets a research param
+function serializeTodo(todo, urls, research) {
+  return {
+    ...existing fields...,
+    research: research ? {
+      id: research.id,
+      status: research.status,
+      researchType: research.researchType,
+      summary: research.summary,
+      researchedAt: research.researchedAt?.toISOString() ?? null,
+    } : null,
+    urls, // now includes researchId per URL
+  };
+}
+```
+
+`serializeUrl` needs to include `researchId`.
+
+The sync query needs to LEFT JOIN `todo_research`.
+
+### Pass `userLocation` to enrichment
+
+In `smart-create.ts`, fetch the user's `location` from the DB and pass it to `enrichTodoWithAI`. Thread it through to `executeResearch`.
+
+---
+
+## Phase 5: Web types and server functions
+
+### `src/web/src/types/database.ts`
+
+```ts
+export type ResearchStatus = "pending" | "completed" | "failed";
+export type ResearchType = "general" | "location";
+
+export interface SerializedResearch {
+  id: string;
+  status: ResearchStatus;
+  researchType: ResearchType;
+  summary: string | null;
+  researchedAt: string | null;
+}
+
+// Update SerializedTodoUrl
+export interface SerializedTodoUrl {
+  // ...existing fields...
+  researchId: string | null; // add
+}
+
+// Update TodoWithUrls
+export interface TodoWithUrls {
+  // ...existing fields...
+  research: SerializedResearch | null; // add
+}
+```
+
+### `src/web/src/server/todos.ts`
+
+Update `serializeTodoWithUrls` to accept and serialize research. Update `getTodos` to fetch research records and join them.
+
+---
+
+## Phase 6: Web UI
+
+### Settings modal — `src/web/src/components/SettingsModal.tsx`
+
+Uses `@base-ui/react/dialog` (already installed at v1.3.0).
+
+Triggered from the Header (e.g., a settings icon button alongside the `UserButton`).
+
+Contains a single field for now: **Location** — plain text input, placeholder "e.g. Los Angeles, CA". Saved via PATCH `/users/me`. Displayed below a brief explanation: "Used to find local venues when researching location todos."
+
+```tsx
+import { Dialog } from "@base-ui/react/dialog";
+
+export function SettingsModal() {
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger render={<Button variant="ghost" size="sm" shape="square" aria-label="Settings"><Settings size={16} /></Button>} />
+      <Dialog.Portal>
+        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-[70]" />
+        <Dialog.Popup className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-gray-surface rounded-xl shadow-lg p-6 space-y-4">
+            <Dialog.Title>Settings</Dialog.Title>
+            {/* Location field */}
+            <Field label="Your location" description="Used to find local venues when researching location todos.">
+              <Input placeholder="e.g. Los Angeles, CA" ... />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <Dialog.Close render={<Button variant="ghost">Cancel</Button>} />
+              <Button variant="primary" onClick={handleSave}>Save</Button>
+            </div>
+          </div>
+        </Dialog.Popup>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+```
+
+Add the trigger button to `Header.tsx` alongside the existing `UserButton` (signed-in only).
+
+### `ResearchSection` component — `src/web/src/components/ResearchSection.tsx`
+
+Renders inside `TodoItemExpanded` above the URLs section.
 
 | State | Display |
 |-------|---------|
-| No research | Section hidden |
-| Pending | "Researching..." + spinner, no refresh button |
-| Completed | Summary + numbered source cards + refresh button |
-| Failed | "Research failed" + retry button |
+| No research | Hidden |
+| Pending | "Researching..." + gray spinner, no refresh |
+| Completed | Summary text with `[1]`, `[2]` inline + source URL cards with citation prefix |
+| Failed | "Research failed." + "Try again" button |
 
-### Main List View
+Source URL cards reuse the existing `UrlCard` component (already in `TodoItemExpanded.tsx`) but with a `[N]` citation badge prefix. Only URLs with `researchId` matching this research record are shown in the Research section; user/extracted URLs continue to show in the existing Links section.
 
-- Show small "Researching..." indicator badge when `research.status === 'pending'`
-- No research content in compact view (expanded only)
+Refresh button (completed state): calls re-research endpoint.
 
-### Source Cards
+### Re-research
 
-Source URLs display with citation number prefix:
+New server function `reresearchTodo(todoId)` → calls `POST /todos/:id/research` which is idempotent: deletes existing `todoResearch` record (cascading to source URLs) and creates a fresh pending one, kicking off background research again.
 
-```tsx
-<div className="flex items-center gap-2">
-  <span className="text-xs text-gray-dim">[{index + 1}]</span>
-  <UrlCard url={url} />
-</div>
-```
+### List view indicator
 
-### Re-research Flow
+Update `TodoList.tsx`: when `todo.research?.status === "pending"`, show a spinner next to the title (same treatment as `aiStatus`).
 
-1. User clicks "Refresh" button
-2. Delete existing `todoResearch` record (cascades to source URLs)
-3. Create new `todoResearch` with `status: 'pending'`
-4. Kick off background research
-5. UI updates to pending state via sync
+### `TodoItemExpanded` update
+
+Add `<ResearchSection research={todo.research} researchUrls={...} todoId={todo.id} />` between the save button and the Links section.
 
 ---
 
-## Implementation Phases
+## Phase 7: API tests
 
-### Phase 1: Data Model
-
-- [ ] Create migration for `todoResearch` table
-- [ ] Create migration to add `researchId` to `todoUrls`
-- [ ] Update Drizzle schema in `@nylon/db`
-- [ ] Run migrations locally and verify
-
-### Phase 2: AI Integration
-
-- [ ] Update `extractTodos` prompt to return `needsResearch` and `researchType` (`general` | `location`)
-- [ ] Create `executeResearch` function (dispatches to general or location handler)
-- [ ] Integrate Workers AI web search
-- [ ] Parse AI response into summary + source URLs
-- [ ] Handle citation formatting [1], [2]
-- [ ] Location prompt: instruct AI to use [1] = website, [2] = Google Maps URL
-- [ ] Pass user `location` profile field as context when `researchType === 'location'`
-
-### Phase 3: API Changes
-
-- [ ] Remove `shouldUseAI` and fast path
-- [ ] Update `smartCreate` to always call AI
-- [ ] Create `todoResearch` record when `needsResearch: true`
-- [ ] Execute research in background via `waitUntil`
-- [ ] Update sync endpoint to include research data
-- [ ] Add re-research endpoint or handle via sync
-- [ ] Add `location` field to user profile (schema + API)
-
-### Phase 4: Web UI
-
-- [ ] Add research types to `SerializedTodo`
-- [ ] Create `ResearchSection` component
-- [ ] Implement pending/completed/failed states
-- [ ] Create source cards with citation numbers (shared for general + location)
-- [ ] Add "Researching..." indicator to list view
-- [ ] Add refresh button and re-research flow
-- [ ] Update `TodoItemExpanded` to show research section
-- [ ] Add location field to user profile settings UI
-
-### Phase 5: Polish
-
-- [ ] Error handling and retry logic
-- [ ] WebSocket broadcast on research completion
-- [ ] Loading states and transitions
-- [ ] Test edge cases (empty results, AI failures, long queries)
+Update `src/api/test/integration/smart-create.test.ts` and `src/api/test/integration/smart-create-ai.test.ts` to cover:
+- `enrichment.research` returned from mock AI triggers `todoResearch` creation
+- Research appears in sync response
+- Re-research endpoint deletes and recreates
 
 ---
 
-## Out of Scope
+## Migrations (in order)
 
-- iOS support (follow-up work)
-- Manual research trigger (add if users request)
-- Research history/versioning (replace only)
-- Editing research summary (read-only)
-- Research on existing todos (new todos only, plus re-research)
+1. `0004_add_todo_research.sql` — new `todo_research` table
+2. `0005_add_research_id_to_todo_urls.sql` — `research_id` column on `todo_urls`
+3. `0006_add_user_location.sql` — `location` column on `users`
 
 ---
 
-## Configuration
+## Out of scope
 
-| Setting | Value |
-|---------|-------|
-| AI Model | `@cf/moonshotai/kimi-k2.5` (thinking + search) |
-| Research Timeout | 60 seconds |
-| Rate Limiting | None (single user for now) |
-| Location bias | Optional `users.location` text field (e.g. "Los Angeles, CA") |
+- iOS (follow-up plan)
+- Manual research trigger on existing todos (re-research only)
+- Research history/versioning
+- Editing the summary
+- Rate limiting
+
+---
+
+## Acceptance criteria
+
+- [ ] `enrichTodo` returns `research: { type }` for questions, comparisons, and venue references
+- [ ] `enrichTodo` does NOT return `research` for plain action items
+- [ ] `todoResearch` record created when `enrichment.research` is set
+- [ ] Research summary and source URLs appear in sync response
+- [ ] Web expanded todo shows Research section with pending/completed/failed states
+- [ ] Source URLs show citation prefix `[N]` and are visually separate from user URLs
+- [ ] Refresh button triggers re-research
+- [ ] Settings modal opens from Header, saves location via PATCH `/users/me`
+- [ ] Location is used as context in location research queries
+- [ ] All existing tests pass; new tests cover research flow
