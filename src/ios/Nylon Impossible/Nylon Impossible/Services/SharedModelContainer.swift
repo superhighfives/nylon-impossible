@@ -10,7 +10,7 @@ import SwiftData
 
 enum SharedModelContainer {
     static let shared: ModelContainer = {
-        let schema = Schema([TodoItem.self])
+        let schema = Schema([TodoItem.self, TodoUrl.self])
         
         // Use App Group container for shared access
         let appGroupURL = FileManager.default.containerURL(

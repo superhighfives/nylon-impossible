@@ -15,6 +15,7 @@ import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
 import { NotFound } from "../components/NotFound";
+import OfflineBanner from "../components/OfflineBanner";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -111,6 +112,7 @@ function RootDocument() {
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <Header />
+          <OfflineBanner />
           <div className="pt-header-offset">
             <Outlet />
           </div>

@@ -29,6 +29,7 @@ final class TodoItem {
     var dueDate: Date?            // Optional due date
     var priority: String?         // "high" or "low", stored as String for SwiftData
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
+    @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
 
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()

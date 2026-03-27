@@ -127,7 +127,7 @@ struct ContentView: View {
         TodoItemRow(
             todo: todo,
             apiService: syncService.apiService,
-            urls: syncService.urls(for: todo.id),
+            urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: todos)
                 syncService.syncAfterAction()
@@ -155,7 +155,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: TodoItem.self, inMemory: true)
+        .modelContainer(for: [TodoItem.self, TodoUrl.self], inMemory: true)
         .environment(AuthService())
         .environment(SyncService(authService: AuthService()))
 }
