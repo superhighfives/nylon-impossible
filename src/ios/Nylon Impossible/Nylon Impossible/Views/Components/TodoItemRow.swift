@@ -63,7 +63,7 @@ struct TodoItemRow: View {
                 showingEditSheet = true
             }) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Title row with priority indicator
+                    // Title row with priority indicator and AI status
                     HStack(spacing: 6) {
                         if let priority = todo.todoPriority {
                             Text(priority == .high ? "!" : "")
@@ -76,6 +76,14 @@ struct TodoItemRow: View {
                             .foregroundStyle(todo.isCompleted ? Color.appSubtle : Color.appDefault)
                             .strikethrough(todo.isCompleted, color: Color.appSubtle)
                             .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
+                        
+                        // AI processing indicator
+                        if todo.isAIProcessing {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .tint(Color.appSubtle)
+                                .accessibilityLabel("AI is processing")
+                        }
 
                         Spacer()
                         if !todo.isSynced {

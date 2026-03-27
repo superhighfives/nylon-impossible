@@ -51,7 +51,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       className="flex items-start gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group"
     >
       {isPending ? (
-        <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0" />
+        <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
       ) : isFailed ? (
         <AlertCircle
           size={16}

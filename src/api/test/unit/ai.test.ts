@@ -1,15 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { extractTodos } from "../../src/lib/ai";
+import { enrichTodo, type TodoEnrichment } from "../../src/lib/ai";
 
 /**
  * Creates a mock AI binding that returns the given tool call response.
  * Workers AI returns tool_calls directly with arguments already parsed.
  */
-function createMockAi(
-  toolCallArgs:
-    | { todos: Array<{ title: string; urls?: string[]; dueDate?: string }> }
-    | Error,
-) {
+function createMockAi(toolCallArgs: TodoEnrichment | Error) {
   const run = vi.fn().mockImplementation(async () => {
     if (toolCallArgs instanceof Error) {
       throw toolCallArgs;
@@ -18,7 +14,7 @@ function createMockAi(
       response: null,
       tool_calls: [
         {
-          name: "extract_todos",
+          name: "enrich_todo",
           arguments: toolCallArgs,
         },
       ],
@@ -36,79 +32,85 @@ function createMockAiWithResponse(response: object) {
   return { run } as unknown as Ai;
 }
 
-describe("extractTodos", () => {
+describe("enrichTodo", () => {
   describe("successful responses", () => {
-    it("parses a single todo", async () => {
-      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
+    it("returns title unchanged when no enrichment needed", async () => {
+      const ai = createMockAi({ title: "Buy milk" });
 
-      const result = await extractTodos(ai, "Buy milk");
-      expect(result).toHaveLength(1);
-      expect(result![0].title).toBe("Buy milk");
-    });
-
-    it("extracts urls from a todo item", async () => {
-      const ai = createMockAi({
-        todos: [
-          {
-            title: "Review pull request",
-            urls: ["https://github.com/user/repo/pull/1"],
-          },
-        ],
-      });
-
-      const result = await extractTodos(ai, "Review PR");
-      expect(result![0].urls).toEqual(["https://github.com/user/repo/pull/1"]);
-    });
-
-    it("extracts dueDate from a todo item", async () => {
-      const ai = createMockAi({
-        todos: [{ title: "Finish report", dueDate: "2026-03-28" }],
-      });
-
-      const result = await extractTodos(ai, "Finish report by Friday");
-      expect(result![0].dueDate).toBe("2026-03-28");
-    });
-
-    it("returns null when todos array is empty", async () => {
-      const ai = createMockAi({ todos: [] });
-
-      const result = await extractTodos(ai, "random text");
+      const result = await enrichTodo(ai, "Buy milk");
+      // No enrichment (same title, no urls/date/priority) returns null
       expect(result).toBeNull();
     });
 
-    it("maps multiple todos from a single response", async () => {
+    it("extracts urls and removes them from title", async () => {
       const ai = createMockAi({
-        todos: [
-          { title: "Buy milk" },
-          { title: "Call mom" },
-          { title: "Pick up dry cleaning", dueDate: "2026-03-23" },
-        ],
+        title: "Check this out",
+        urls: ["https://example.com"],
       });
 
-      const result = await extractTodos(
+      const result = await enrichTodo(ai, "Check this out https://example.com");
+      expect(result).not.toBeNull();
+      expect(result!.title).toBe("Check this out");
+      expect(result!.urls).toEqual(["https://example.com"]);
+    });
+
+    it("extracts bare domains with https prefix", async () => {
+      const ai = createMockAi({
+        title: "Hello",
+        urls: ["https://google.com"],
+      });
+
+      const result = await enrichTodo(ai, "Hello google.com");
+      expect(result!.title).toBe("Hello");
+      expect(result!.urls).toEqual(["https://google.com"]);
+    });
+
+    it("extracts dueDate from natural language", async () => {
+      const ai = createMockAi({
+        title: "Finish report",
+        dueDate: "2026-03-28",
+      });
+
+      const result = await enrichTodo(ai, "Finish report tomorrow");
+      expect(result!.dueDate).toBe("2026-03-28");
+    });
+
+    it("extracts high priority", async () => {
+      const ai = createMockAi({
+        title: "Urgent: call mom",
+        priority: "high",
+      });
+
+      const result = await enrichTodo(ai, "Urgent: call mom");
+      expect(result!.priority).toBe("high");
+    });
+
+    it("extracts low priority", async () => {
+      const ai = createMockAi({
+        title: "Low priority fix the bug",
+        priority: "low",
+      });
+
+      const result = await enrichTodo(ai, "Low priority fix the bug");
+      expect(result!.priority).toBe("low");
+    });
+
+    it("extracts multiple metadata fields at once", async () => {
+      const ai = createMockAi({
+        title: "Review this tomorrow",
+        urls: ["https://github.com/user/repo/pull/1"],
+        dueDate: "2026-03-28",
+        priority: "high",
+      });
+
+      const result = await enrichTodo(
         ai,
-        "Buy milk, call mom, pick up dry cleaning tomorrow",
+        "Review https://github.com/user/repo/pull/1 tomorrow urgent",
       );
-      expect(result).toHaveLength(3);
-      expect(result![0].title).toBe("Buy milk");
-      expect(result![1].title).toBe("Call mom");
-      expect(result![2].dueDate).toBe("2026-03-23");
-    });
-
-    it("omits urls property when AI returns empty urls array", async () => {
-      const ai = createMockAi({
-        todos: [{ title: "Task without URL", urls: [] }],
-      });
-
-      const result = await extractTodos(ai, "Task without URL");
-      expect(result![0].urls).toBeUndefined();
-    });
-
-    it("omits dueDate property when AI does not return one", async () => {
-      const ai = createMockAi({ todos: [{ title: "No date task" }] });
-
-      const result = await extractTodos(ai, "No date task");
-      expect(result![0].dueDate).toBeUndefined();
+      expect(result!.title).toBe("Review this tomorrow");
+      expect(result!.urls).toEqual(["https://github.com/user/repo/pull/1"]);
+      expect(result!.dueDate).toBe("2026-03-28");
+      expect(result!.priority).toBe("high");
     });
   });
 
@@ -118,8 +120,8 @@ describe("extractTodos", () => {
         response: "I can help you with that!",
       });
 
-      await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
-        "AI did not return extracted todos",
+      await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
+        "AI did not return enrichment",
       );
     });
 
@@ -129,8 +131,8 @@ describe("extractTodos", () => {
         tool_calls: [],
       });
 
-      await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
-        "AI did not return extracted todos",
+      await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
+        "AI did not return enrichment",
       );
     });
 
@@ -145,7 +147,7 @@ describe("extractTodos", () => {
         ],
       });
 
-      await expect(extractTodos(ai, "Buy milk")).rejects.toThrow(
+      await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
         "Unexpected tool call: wrong_tool",
       );
     });
@@ -153,20 +155,26 @@ describe("extractTodos", () => {
 
   describe("request format", () => {
     it("calls ai.run with correct model and gateway", async () => {
-      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
+      const ai = createMockAi({
+        title: "Buy milk",
+        urls: ["https://example.com"],
+      });
 
-      await extractTodos(ai, "Buy milk");
+      await enrichTodo(ai, "Buy milk https://example.com");
 
       expect(ai.run).toHaveBeenCalledWith(
         "@cf/moonshotai/kimi-k2.5",
         expect.objectContaining({
           messages: expect.arrayContaining([
-            expect.objectContaining({ role: "user", content: "Buy milk" }),
+            expect.objectContaining({
+              role: "user",
+              content: "Buy milk https://example.com",
+            }),
           ]),
           tools: expect.any(Array),
           tool_choice: expect.objectContaining({
             type: "function",
-            function: { name: "extract_todos" },
+            function: { name: "enrich_todo" },
           }),
         }),
         expect.objectContaining({
@@ -176,16 +184,17 @@ describe("extractTodos", () => {
     });
 
     it("includes system prompt in messages", async () => {
-      const ai = createMockAi({ todos: [{ title: "Buy milk" }] });
+      const ai = createMockAi({
+        title: "Buy milk",
+        urls: ["https://example.com"],
+      });
 
-      await extractTodos(ai, "Buy milk");
+      await enrichTodo(ai, "Buy milk https://example.com");
 
       const call = (ai.run as ReturnType<typeof vi.fn>).mock.calls[0];
       const inputs = call[1];
       expect(inputs.messages[0].role).toBe("system");
-      expect(inputs.messages[0].content).toContain(
-        "extracts actionable todo items",
-      );
+      expect(inputs.messages[0].content).toContain("metadata extractor");
     });
   });
 });

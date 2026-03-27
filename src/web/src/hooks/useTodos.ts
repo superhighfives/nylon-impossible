@@ -39,6 +39,7 @@ export function useCreateTodo() {
         position: "a0", // placeholder — replaced when onSettled invalidates
         dueDate: input.dueDate?.toISOString() ?? null,
         priority: input.priority ?? null,
+        aiStatus: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         urls: [],

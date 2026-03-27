@@ -1,9 +1,8 @@
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { extractTodos } from "../lib/ai";
+import { enrichTodoWithAI } from "../lib/ai-enrich";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
-import { shouldUseAI } from "../lib/smart-input";
 import {
   cleanUrlString,
   createFallbackFromUrl,
@@ -26,8 +25,59 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
+  };
+}
+
+/** URL regex to extract URLs from text */
+const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+
+/** Common trailing punctuation that shouldn't be part of URLs */
+const TRAILING_PUNCT = /[.,;:!?)]+$/;
+
+/**
+ * Create initial todo data from input text.
+ * Handles URL-only input specially by extracting domain for title.
+ */
+function createInitialTodo(text: string): {
+  title: string;
+  urls?: string[];
+} {
+  // Check if input is primarily a URL (URL takes up >80% of the text)
+  const urlMatch = text.match(URL_REGEX);
+  if (urlMatch && urlMatch[0].length > text.length * 0.8) {
+    const cleanedUrl = cleanUrlString(urlMatch[0]);
+    const fallback = createFallbackFromUrl(cleanedUrl);
+    if (fallback) {
+      return { title: fallback.title, urls: [fallback.url] };
+    }
+  }
+
+  // Extract any URLs from text
+  const rawMatches = text.match(URL_REGEX) ?? [];
+  const urls = rawMatches
+    .map((url) => {
+      const cleaned = url.replace(TRAILING_PUNCT, "");
+      try {
+        const parsed = new URL(cleaned);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          return parsed.href;
+        }
+      } catch {
+        // Invalid URL, skip
+      }
+      return null;
+    })
+    .filter((url): url is string => url !== null);
+
+  // Deduplicate URLs
+  const uniqueUrls = Array.from(new Set(urls));
+
+  return {
+    title: truncateTitle(text),
+    urls: uniqueUrls.length > 0 ? uniqueUrls : undefined,
   };
 }
 
@@ -42,15 +92,15 @@ export async function smartCreate(c: Context<Env>) {
 
   const text = parsed.data.text.trim();
 
-  // Reject whitespace-only input
   if (text.length === 0) {
     return c.json({ error: "Text is required" }, 400);
   }
 
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
+  const aiEnabled = c.get("aiEnabled");
 
-  // Get the lowest position so new todos are prepended at the start
+  // Get the lowest position so new todo is prepended at the start
   const firstTodo = await db
     .select({ position: todos.position })
     .from(todos)
@@ -59,260 +109,86 @@ export async function smartCreate(c: Context<Env>) {
     .limit(1)
     .then((rows) => rows[0]);
 
-  const firstPosition = firstTodo?.position ?? null;
-
-  const aiEnabled = c.get("aiEnabled");
-  if (aiEnabled && shouldUseAI(text)) {
-    // AI path: extract and create multiple todos
-    let extracted: Array<{
-      title: string;
-      urls?: string[];
-      dueDate?: string;
-    }> | null;
-
-    try {
-      extracted = await extractTodos(c.env.AI, text);
-    } catch (error) {
-      // Fallback: create single todo with original text on AI failure
-      console.error(
-        "AI extraction failed, falling back to single todo:",
-        error,
-      );
-      return createAndReturn(
-        db,
-        c,
-        userId,
-        [createFallbackItem(text)],
-        firstPosition,
-      );
-    }
-
-    // If AI returned null or empty, fall back to single todo
-    if (!extracted || extracted.length === 0) {
-      return createAndReturn(
-        db,
-        c,
-        userId,
-        [createFallbackItem(text)],
-        firstPosition,
-      );
-    }
-
-    return createAndReturn(db, c, userId, extracted, firstPosition, true);
-  }
-
-  // Fast path: create single todo directly
-  return createAndReturn(
-    db,
-    c,
-    userId,
-    [createFallbackItem(text)],
-    firstPosition,
-  );
-}
-
-interface ExtractedItem {
-  title: string;
-  urls?: string[];
-  dueDate?: string;
-}
-
-/** URL regex to extract URLs from text */
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
-
-/**
- * Create a fallback item from text when AI is unavailable or fails.
- * Handles long URLs by extracting the domain for the title and storing the full URL.
- */
-function createFallbackItem(text: string): ExtractedItem {
-  // Check if input is primarily a URL (URL takes up >80% of the text)
-  const urlMatch = text.match(URL_REGEX);
-  if (urlMatch && urlMatch[0].length > text.length * 0.8) {
-    // Clean trailing punctuation before processing (regex can match trailing . or ))
-    const cleanedUrl = cleanUrlString(urlMatch[0]);
-    const fallback = createFallbackFromUrl(cleanedUrl);
-    if (fallback) {
-      return { title: fallback.title, urls: [fallback.url] };
-    }
-  }
-  // Regular fallback - truncate if needed
-  return { title: truncateTitle(text) };
-}
-
-/** Common trailing punctuation that shouldn't be part of URLs */
-const TRAILING_PUNCT = /[.,;:!?)]+$/;
-
-/**
- * Validate and clean a URL string.
- * Returns null if the URL is invalid.
- */
-function cleanUrl(urlString: string): string | null {
-  // Strip common trailing punctuation
-  const cleaned = urlString.replace(TRAILING_PUNCT, "");
-  try {
-    const parsed = new URL(cleaned);
-    // Only allow http/https
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    return parsed.href;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Extract URLs from title text as a fallback when AI misses them.
- * Merges with any AI-extracted URLs, deduplicating.
- */
-function ensureUrlsExtracted(item: ExtractedItem): ExtractedItem {
-  const rawMatches = item.title.match(URL_REGEX) ?? [];
-  const urlsInTitle = rawMatches
-    .map(cleanUrl)
-    .filter((url): url is string => url !== null);
-
-  if (urlsInTitle.length === 0 && !item.urls?.length) {
-    return item;
-  }
-
-  // Validate existing URLs too
-  const validExisting = (item.urls ?? [])
-    .map(cleanUrl)
-    .filter((url): url is string => url !== null);
-
-  // Merge with existing URLs, avoiding duplicates
-  const existingUrls = new Set(validExisting);
-  const allUrls = [...existingUrls];
-
-  for (const url of urlsInTitle) {
-    if (!existingUrls.has(url)) {
-      allUrls.push(url);
-      existingUrls.add(url);
-    }
-  }
-
-  return {
-    ...item,
-    urls: allUrls.length > 0 ? allUrls : undefined,
-  };
-}
-
-/** Batch-insert todos, fetch them back in one query, and return the response. */
-async function createAndReturn(
-  db: ReturnType<typeof getDb>,
-  c: Context<Env>,
-  userId: string,
-  items: ExtractedItem[],
-  firstPosition: string | null,
-  ai = false,
-) {
-  const now = new Date();
-  const ids: string[] = [];
-
-  // Ensure URLs are extracted from titles (fallback for when AI misses them)
-  const itemsWithUrls = items.map(ensureUrlsExtracted);
-
-  // Generate N positions before the first existing todo
-  const positions = generateNKeysBetween(
+  const position = generateNKeysBetween(
     null,
-    firstPosition,
-    itemsWithUrls.length,
-  );
+    firstTodo?.position ?? null,
+    1,
+  )[0];
+  const now = new Date();
 
-  // Build all values up-front so we can batch the insert
-  // Safety truncation ensures titles never exceed 500 chars (AI may return longer)
-  const rows = itemsWithUrls.map((item, i) => {
-    const id = crypto.randomUUID();
-    ids.push(id);
-    return {
-      id,
-      userId,
-      title: truncateTitle(item.title),
-      completed: false as const,
-      position: positions[i],
-      dueDate: item.dueDate ? new Date(item.dueDate) : null,
-      createdAt: now,
-      updatedAt: now,
-    };
+  // Create initial todo data
+  const initial = createInitialTodo(text);
+  const todoId = crypto.randomUUID();
+
+  // Insert todo immediately - this is the fast path
+  await db.insert(todos).values({
+    id: todoId,
+    userId,
+    title: initial.title,
+    completed: false,
+    position,
+    aiStatus: aiEnabled ? "pending" : null,
+    createdAt: now,
+    updatedAt: now,
   });
 
-  // Single batch insert
-  await db.insert(todos).values(rows);
-
-  // Collect URLs to insert and fetch metadata for
-  const urlsToInsert: Array<{
-    id: string;
-    todoId: string;
-    url: string;
-    position: string;
-  }> = [];
-
-  itemsWithUrls.forEach((item, i) => {
-    if (item.urls && item.urls.length > 0) {
-      const todoId = ids[i];
-      const urlPositions = generateNKeysBetween(null, null, item.urls.length);
-      item.urls.forEach((url, j) => {
-        urlsToInsert.push({
-          id: crypto.randomUUID(),
-          todoId,
-          url,
-          position: urlPositions[j],
-        });
-      });
-    }
-  });
-
-  // Insert URL records if any
-  if (urlsToInsert.length > 0) {
+  // Insert any extracted URLs
+  if (initial.urls && initial.urls.length > 0) {
+    const urlPositions = generateNKeysBetween(null, null, initial.urls.length);
     await db.insert(todoUrls).values(
-      urlsToInsert.map((u) => ({
-        id: u.id,
-        todoId: u.todoId,
-        url: u.url,
-        position: u.position,
+      initial.urls.map((url, i) => ({
+        id: crypto.randomUUID(),
+        todoId,
+        url,
+        position: urlPositions[i],
         fetchStatus: "pending" as const,
         createdAt: now,
         updatedAt: now,
       })),
     );
 
-    // Fetch metadata in background and update records
+    // Fetch URL metadata in background
     c.executionCtx.waitUntil(
-      fetchAndUpdateUrlMetadata(db, urlsToInsert, c.env, userId),
+      fetchUrlMetadataBackground(db, todoId, c.env, userId),
     );
   }
 
-  // Single select to retrieve all created todos (preserves insertion order)
+  // If AI is enabled, enrich in background
+  if (aiEnabled) {
+    c.executionCtx.waitUntil(
+      enrichTodoWithAI(db, c.env.AI, c.env, todoId, userId, text),
+    );
+  }
+
+  // Fetch the created todo to return
   const created = await db
     .select()
     .from(todos)
-    .where(eq(todos.userId, userId))
-    .then((all) => {
-      const idSet = new Set(ids);
-      return all.filter((t) => idSet.has(t.id));
-    });
-
-  // Sort to match insertion order
-  const idOrder = new Map(ids.map((id, i) => [id, i]));
-  created.sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0));
+    .where(eq(todos.id, todoId))
+    .then((rows) => rows[0]);
 
   await notifySync(c.env, userId);
 
-  return c.json({ todos: created.map(serializeTodo), ai });
+  return c.json({ todos: [serializeTodo(created)], ai: aiEnabled });
 }
 
-/** Fetch metadata for URLs in background and update records */
-async function fetchAndUpdateUrlMetadata(
+/** Fetch metadata for URLs in background */
+async function fetchUrlMetadataBackground(
   db: ReturnType<typeof getDb>,
-  urls: Array<{ id: string; todoId: string; url: string }>,
+  todoId: string,
   env: { USER_SYNC: DurableObjectNamespace },
   userId: string,
-) {
-  const results = await Promise.allSettled(
-    urls.map(async ({ id, url }) => {
+): Promise<void> {
+  // Get the URL records we just created
+  const urlRecords = await db
+    .select()
+    .from(todoUrls)
+    .where(eq(todoUrls.todoId, todoId));
+
+  await Promise.allSettled(
+    urlRecords.map(async (record) => {
       try {
-        const metadata = await fetchUrlMetadata(url);
-        // Update with fetched metadata and mark as fetched
+        const metadata = await fetchUrlMetadata(record.url);
         await db
           .update(todoUrls)
           .set({
@@ -324,33 +200,21 @@ async function fetchAndUpdateUrlMetadata(
             fetchedAt: new Date(),
             updatedAt: new Date(),
           })
-          .where(eq(todoUrls.id, id));
-        return { id, metadata };
+          .where(eq(todoUrls.id, record.id));
       } catch (error) {
-        // Mark as failed on error
+        console.error(`Failed to fetch metadata for ${record.url}:`, error);
         await db
           .update(todoUrls)
           .set({
             fetchStatus: "failed" as const,
             updatedAt: new Date(),
           })
-          .where(eq(todoUrls.id, id));
-        throw error;
+          .where(eq(todoUrls.id, record.id));
       }
     }),
   );
 
-  // Log any failures for debugging
-  results.forEach((result, i) => {
-    if (result.status === "rejected") {
-      console.error(
-        `Failed to fetch metadata for ${urls[i].url}:`,
-        result.reason,
-      );
-    }
-  });
-
-  // Notify clients that metadata has been updated
+  // Notify clients that metadata is ready
   await notifySync(env, userId);
 }
 
@@ -358,12 +222,12 @@ async function fetchAndUpdateUrlMetadata(
 async function notifySync(
   env: { USER_SYNC: DurableObjectNamespace },
   userId: string,
-) {
+): Promise<void> {
   try {
     const id = env.USER_SYNC.idFromName(userId);
     const stub = env.USER_SYNC.get(id);
     await stub.fetch(new Request("http://internal/notify", { method: "POST" }));
   } catch {
-    // Non-critical — clients will sync on next poll
+    // Non-critical
   }
 }

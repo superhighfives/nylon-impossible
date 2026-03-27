@@ -83,6 +83,7 @@ function serializeTodo(
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     urls,

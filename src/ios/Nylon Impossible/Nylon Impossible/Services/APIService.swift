@@ -41,6 +41,7 @@ struct APITodo: Codable, Sendable {
     let position: String?
     let dueDate: Date?
     let priority: String?
+    let aiStatus: AIStatus?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
@@ -50,6 +51,14 @@ struct APITodo: Codable, Sendable {
 enum FetchStatus: String, Codable, Sendable {
     case pending
     case fetched
+    case failed
+}
+
+/// AI processing status for todos
+enum AIStatus: String, Codable, Sendable {
+    case pending
+    case processing
+    case complete
     case failed
 }
 
@@ -77,6 +86,7 @@ struct APITodoWithUrls: Codable, Sendable {
     let position: String?
     let dueDate: Date?
     let priority: String?
+    let aiStatus: AIStatus?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]
@@ -137,6 +147,7 @@ struct SmartCreateTodo: Codable, Sendable {
     let position: String?
     let dueDate: Date?
     let priority: String?
+    let aiStatus: AIStatus?
     let createdAt: Date
     let updatedAt: Date
 }

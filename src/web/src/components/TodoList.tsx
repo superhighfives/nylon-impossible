@@ -29,7 +29,7 @@ import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
-import { Button, Checkbox, UrlCardCompact } from "./ui";
+import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
 
 interface TodoItemProps {
   todo: TodoWithUrls;
@@ -105,13 +105,23 @@ function TodoItemContent({
         />
       </div>
       <div className="flex-1 min-w-0">
-        <p
-          className={`text-sm leading-snug break-words ${
-            todo.completed ? "line-through text-gray-muted" : "text-gray"
-          }`}
-        >
-          {todo.title}
-        </p>
+        <div className="flex items-center gap-2">
+          <p
+            className={`text-sm leading-snug break-words ${
+              todo.completed ? "line-through text-gray-muted" : "text-gray"
+            }`}
+          >
+            {todo.title}
+          </p>
+          {(todo.aiStatus === "pending" || todo.aiStatus === "processing") && (
+            <output
+              className="flex items-center gap-1 text-gray-muted text-xs"
+              aria-label="AI is processing"
+            >
+              <Loader size="sm" className="text-gray-8 dark:text-graydark-8" />
+            </output>
+          )}
+        </div>
         {todo.urls && todo.urls.length > 0 && (
           <div className="flex flex-col gap-1 mt-1.5">
             {todo.urls.map((url) => (

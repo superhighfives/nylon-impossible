@@ -7,11 +7,20 @@
  * Requirements:
  * - CF_ACCOUNT_ID, AI_GATEWAY_ID, CLOUDFLARE_API_TOKEN must be set
  * - Valid Cloudflare credentials with AI Gateway access
+ *
+ * Note: With post-creation AI processing, AI enrichment happens asynchronously
+ * after the initial response. These tests verify that:
+ * 1. Initial todo is created immediately with aiStatus: "pending"
+ * 2. AI enrichment updates the todo in the background
+ *
+ * To test the enrichment, we poll for status changes.
  */
 
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
+import { getDb, todos, users } from "../../src/lib/db";
 import { cleanDb, seedUser } from "../helpers";
 
 const RUN_AI_TESTS = process.env.RUN_AI_TESTS === "true";
@@ -31,27 +40,74 @@ async function smartCreate(text: string) {
   });
 }
 
+async function enableAI() {
+  const db = getDb(env.DB);
+  await db
+    .update(users)
+    .set({ aiEnabled: true })
+    .where(eq(users.id, "user_test_123"));
+}
+
+const DEFAULT_AI_TIMEOUT_MS =
+  Number(process.env.AI_TEST_TIMEOUT_MS ?? "") || 30000;
+
+/** Poll for AI processing to complete */
+async function waitForAIComplete(
+  todoId: string,
+  timeoutMs = DEFAULT_AI_TIMEOUT_MS,
+): Promise<void> {
+  const db = getDb(env.DB);
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const [todo] = await db
+      .select({ aiStatus: todos.aiStatus })
+      .from(todos)
+      .where(eq(todos.id, todoId));
+
+    if (todo?.aiStatus === "complete" || todo?.aiStatus === "failed") {
+      return;
+    }
+
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  throw new Error(`AI processing did not complete within ${timeoutMs}ms`);
+}
+
 describe.skipIf(!RUN_AI_TESTS)("Smart create with real AI", () => {
   beforeEach(async () => {
     await cleanDb();
     mockVerifyToken.mockReset();
     mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
     await seedUser();
+    await enableAI();
   });
 
-  it("extracts multiple todos from natural language", async () => {
-    const res = await smartCreate("buy milk and call mom");
+  it("creates todo immediately and enriches in background", async () => {
+    const res = await smartCreate("buy milk and call mom tomorrow");
     expect(res.status).toBe(200);
 
     const body = await res.json<{ todos: any[]; ai: boolean }>();
     expect(body.ai).toBe(true);
-    expect(body.todos.length).toBeGreaterThanOrEqual(2);
+    expect(body.todos).toHaveLength(1);
+    // Initial response has the raw text
+    expect(body.todos[0].title).toBe("buy milk and call mom tomorrow");
+    expect(body.todos[0].aiStatus).toBe("pending");
 
-    const titles = body.todos.map((t) => t.title.toLowerCase());
-    expect(titles.some((t) => t.includes("milk"))).toBe(true);
-    expect(titles.some((t) => t.includes("mom") || t.includes("call"))).toBe(
-      true,
-    );
+    // Wait for AI to process
+    await waitForAIComplete(body.todos[0].id);
+
+    // Check the enriched todo
+    const db = getDb(env.DB);
+    const [enriched] = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.id, body.todos[0].id));
+
+    expect(enriched.aiStatus).toBe("complete");
+    // AI should have improved the title (exact result depends on model)
+    expect(enriched.title.length).toBeLessThanOrEqual(500);
   });
 
   it("extracts URL and creates clean title", async () => {
@@ -60,70 +116,42 @@ describe.skipIf(!RUN_AI_TESTS)("Smart create with real AI", () => {
 
     const body = await res.json<{ todos: any[]; ai: boolean }>();
     expect(body.ai).toBe(true);
-    expect(body.todos).toHaveLength(1);
+    expect(body.todos[0].aiStatus).toBe("pending");
 
+    await waitForAIComplete(body.todos[0].id);
+
+    const db = getDb(env.DB);
+    const [enriched] = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.id, body.todos[0].id));
+
+    expect(enriched.aiStatus).toBe("complete");
     // AI should create clean title without raw URL
-    expect(body.todos[0].title).not.toContain("https://");
-    expect(
-      body.todos[0].title.toLowerCase().includes("github") ||
-        body.todos[0].title.toLowerCase().includes("repo") ||
-        body.todos[0].title.toLowerCase().includes("check"),
-    ).toBe(true);
+    expect(enriched.title).not.toContain("https://");
   });
 
-  it("extracts todos from numbered list", async () => {
-    const res = await smartCreate(
-      "1. Buy groceries\n2. Call dentist\n3. Finish report",
-    );
-    expect(res.status).toBe(200);
-
-    const body = await res.json<{ todos: any[]; ai: boolean }>();
-    expect(body.ai).toBe(true);
-    expect(body.todos.length).toBe(3);
-  });
-
-  it("handles mixed actionable and non-actionable content", async () => {
-    const res = await smartCreate(
-      "The weather is nice today. Also I need to call the dentist about my appointment.",
-    );
-    expect(res.status).toBe(200);
-
-    const body = await res.json<{ todos: any[]; ai: boolean }>();
-    expect(body.ai).toBe(true);
-    // Should extract the actionable item, not the weather comment
-    expect(body.todos.length).toBeGreaterThanOrEqual(1);
-    const titles = body.todos.map((t) => t.title.toLowerCase());
-    expect(
-      titles.some((t) => t.includes("dentist") || t.includes("call")),
-    ).toBe(true);
-  });
-
-  it("converts relative date to ISO format", async () => {
+  it("extracts due date from natural language", async () => {
     const res = await smartCreate("call mom tomorrow");
     expect(res.status).toBe(200);
 
     const body = await res.json<{ todos: any[]; ai: boolean }>();
     expect(body.ai).toBe(true);
-    expect(body.todos.length).toBeGreaterThanOrEqual(1);
 
-    // Check if dueDate was set (AI may or may not parse "tomorrow")
-    const todoWithDate = body.todos.find((t) => t.dueDate !== null);
-    if (todoWithDate) {
-      // Should be a valid ISO date string
-      expect(new Date(todoWithDate.dueDate).toString()).not.toBe(
-        "Invalid Date",
-      );
+    await waitForAIComplete(body.todos[0].id);
+
+    const db = getDb(env.DB);
+    const [enriched] = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.id, body.todos[0].id));
+
+    expect(enriched.aiStatus).toBe("complete");
+    // AI may or may not extract the date
+    if (enriched.dueDate) {
+      // Should be a valid date
+      expect(enriched.dueDate instanceof Date).toBe(true);
     }
-  });
-
-  it("handles comma-separated items", async () => {
-    const res = await smartCreate("buy milk, eggs, and bread");
-    expect(res.status).toBe(200);
-
-    const body = await res.json<{ todos: any[]; ai: boolean }>();
-    expect(body.ai).toBe(true);
-    // AI might create separate todos or one combined todo
-    expect(body.todos.length).toBeGreaterThanOrEqual(1);
   });
 
   it("respects title length limit even with AI", async () => {
@@ -135,9 +163,18 @@ describe.skipIf(!RUN_AI_TESTS)("Smart create with real AI", () => {
     expect(res.status).toBe(200);
 
     const body = await res.json<{ todos: any[] }>();
-    // All titles should be within the 500 char limit
-    for (const todo of body.todos) {
-      expect(todo.title.length).toBeLessThanOrEqual(500);
-    }
+    // Initial creation truncates
+    expect(body.todos[0].title.length).toBeLessThanOrEqual(500);
+
+    await waitForAIComplete(body.todos[0].id);
+
+    const db = getDb(env.DB);
+    const [enriched] = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.id, body.todos[0].id));
+
+    // Enriched title should also be within the limit
+    expect(enriched.title.length).toBeLessThanOrEqual(500);
   });
 });

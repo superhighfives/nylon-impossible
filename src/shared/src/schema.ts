@@ -52,6 +52,9 @@ export const todos = sqliteTable(
       .notNull()
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
+    aiStatus: text("ai_status", {
+      enum: ["pending", "processing", "complete", "failed"],
+    }),
   },
   (table) => [
     index("idx_todos_user_id").on(table.userId),
