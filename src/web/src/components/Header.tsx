@@ -5,7 +5,7 @@ import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 export default function Header() {
   const { isOnline } = useOnlineStatus();
   // When offline, push header down to make room for the offline banner (~40px)
-  const topClass = isOnline === false ? "top-14" : "top-4";
+  const topClass = isOnline === false ? "top-12" : "top-4";
 
   return (
     <div
