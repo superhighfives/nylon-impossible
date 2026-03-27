@@ -16,6 +16,7 @@ export const users = sqliteTable(
     aiEnabled: integer("ai_enabled", { mode: "boolean" })
       .notNull()
       .default(true),
+    location: text("location"), // Used to bias location research queries
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -106,6 +107,43 @@ export const todoLists = sqliteTable(
   ],
 );
 
+// Todo research results
+export const todoResearch = sqliteTable(
+  "todo_research",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    todoId: text("todo_id")
+      .notNull()
+      .unique()
+      .references(() => todos.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["pending", "completed", "failed"],
+    })
+      .notNull()
+      .default("pending"),
+    researchType: text("research_type", {
+      enum: ["general", "location"],
+    })
+      .notNull()
+      .default("general"),
+    summary: text("summary"),
+    researchedAt: integer("researched_at", { mode: "timestamp" }),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`)
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("idx_todo_research_todo_id").on(table.todoId),
+    index("idx_todo_research_status").on(table.status),
+  ],
+);
+
 // Todo URLs with fetched metadata
 export const todoUrls = sqliteTable(
   "todo_urls",
@@ -116,6 +154,9 @@ export const todoUrls = sqliteTable(
     todoId: text("todo_id")
       .notNull()
       .references(() => todos.id, { onDelete: "cascade" }),
+    researchId: text("research_id").references(() => todoResearch.id, {
+      onDelete: "cascade",
+    }), // If set, this URL is a research source
     url: text("url").notNull(),
     title: text("title"),
     description: text("description"),
@@ -136,7 +177,10 @@ export const todoUrls = sqliteTable(
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("idx_todo_urls_todo").on(table.todoId)],
+  (table) => [
+    index("idx_todo_urls_todo").on(table.todoId),
+    index("idx_todo_urls_research_id").on(table.researchId),
+  ],
 );
 
 // Relations (for relational query API)
@@ -152,6 +196,7 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
   }),
   todoLists: many(todoLists),
   todoUrls: many(todoUrls),
+  research: one(todoResearch),
 }));
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -173,10 +218,25 @@ export const todoListsRelations = relations(todoLists, ({ one }) => ({
   }),
 }));
 
+export const todoResearchRelations = relations(
+  todoResearch,
+  ({ one, many }) => ({
+    todo: one(todos, {
+      fields: [todoResearch.todoId],
+      references: [todos.id],
+    }),
+    urls: many(todoUrls),
+  }),
+);
+
 export const todoUrlsRelations = relations(todoUrls, ({ one }) => ({
   todo: one(todos, {
     fields: [todoUrls.todoId],
     references: [todos.id],
+  }),
+  research: one(todoResearch, {
+    fields: [todoUrls.researchId],
+    references: [todoResearch.id],
   }),
 }));
 
@@ -189,5 +249,7 @@ export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
 export type TodoList = typeof todoLists.$inferSelect;
 export type NewTodoList = typeof todoLists.$inferInsert;
+export type TodoResearch = typeof todoResearch.$inferSelect;
+export type NewTodoResearch = typeof todoResearch.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
