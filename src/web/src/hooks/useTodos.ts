@@ -49,16 +49,35 @@ export function useCreateTodo() {
         ...(previousTodos ?? []),
       ]);
 
-      return { previousTodos };
+      return { previousTodos, optimisticId: optimisticTodo.id };
     },
     onError: (_err, _variables, context) => {
-      if (context?.previousTodos) {
-        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      if (!context) {
+        return;
       }
+
+      if (context.previousTodos !== undefined) {
+        // Restore the previous cache state when it existed
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+        return;
+      }
+
+      if (context.optimisticId) {
+        // No previous cache: remove the optimistic entry we added
+        queryClient.setQueryData<TodoWithUrls[] | undefined>(
+          TODOS_QUERY_KEY,
+          (current) =>
+            current?.filter((todo) => todo.id !== context.optimisticId) ??
+            current,
+        );
+      }
+    },
+    onSuccess: () => {
+      // Only notify other clients when the create actually succeeded
+      notifyChanged();
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
     },
   });
 }

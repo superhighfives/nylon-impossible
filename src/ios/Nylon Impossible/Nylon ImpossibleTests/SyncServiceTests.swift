@@ -479,9 +479,9 @@ struct SyncServiceTests {
         let descriptor = FetchDescriptor<TodoItem>()
         let items = try context.fetch(descriptor)
         #expect(items.count == 1)
-        #expect(items[0].urls?.count == 1)
-        #expect(items[0].urls?.first?.url == "https://example.com")
-        #expect(items[0].urls?.first?.title == "Example")
+        #expect(items[0].urls.count == 1)
+        #expect(items[0].urls.first?.url == "https://example.com")
+        #expect(items[0].urls.first?.title == "Example")
     }
 
     @Test("Sets error state when API throws")

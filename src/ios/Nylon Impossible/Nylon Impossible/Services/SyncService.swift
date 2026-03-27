@@ -336,7 +336,7 @@ final class SyncService {
             predicate: #Predicate { remoteUUIDs.contains($0.id) }
         )
         let todoMap = try Dictionary(
-            uniqueKeysWithValues: modelContext.fetch(batchDescriptor).map { ($0.id, $0) }
+            uniqueKeysWithValues: try modelContext.fetch(batchDescriptor).map { ($0.id, $0) }
         )
 
         for remote in remoteTodos {
@@ -344,7 +344,7 @@ final class SyncService {
                   let todo = todoMap[remoteId] else { continue }
 
             // Delete stale local URLs for this todo
-            for url in todo.urls ?? [] { modelContext.delete(url) }
+            for url in todo.urls { modelContext.delete(url) }
 
             // Insert fresh URLs from server
             let newUrls = (remote.urls ?? []).map { TodoUrl(from: $0) }
