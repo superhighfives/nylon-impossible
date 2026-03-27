@@ -5,19 +5,22 @@
  * - URLs extracted and removed from title
  * - Due date from natural language
  * - Priority if mentioned
+ * - Research intent detection (triggers background research)
  *
  * Does NOT rephrase or rewrite the title - only removes URLs.
  */
 
 import { generateNKeysBetween } from "fractional-indexing";
 import { enrichTodo } from "./ai";
-import { eq, type getDb, todos, todoUrls } from "./db";
+import { eq, type getDb, todoResearch, todos, todoUrls } from "./db";
+import { executeResearch } from "./research";
 import { truncateTitle } from "./url-helpers";
 import { fetchUrlMetadata } from "./url-metadata";
 
 /**
  * Enrich a todo with AI-extracted metadata in the background.
  * Updates the todo in place and notifies connected clients.
+ * If research intent is detected, creates a research record and executes research.
  */
 export async function enrichTodoWithAI(
   db: ReturnType<typeof getDb>,
@@ -26,6 +29,7 @@ export async function enrichTodoWithAI(
   todoId: string,
   userId: string,
   originalText: string,
+  userLocation?: string | null,
 ): Promise<void> {
   const now = new Date();
 
@@ -78,6 +82,36 @@ export async function enrichTodoWithAI(
       await insertAndFetchUrls(db, todoId, enrichment.urls);
       // Notify again once URL metadata is ready
       await notifySync(env, userId);
+    }
+
+    // Handle research if detected
+    if (enrichment.research) {
+      const now = new Date();
+      const research = await db
+        .insert(todoResearch)
+        .values({
+          id: crypto.randomUUID(),
+          todoId,
+          researchType: enrichment.research.type,
+          status: "pending",
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning()
+        .then((r) => r[0]);
+
+      // Execute research (runs in same waitUntil context)
+      await executeResearch(
+        db,
+        ai,
+        env,
+        todoId,
+        userId,
+        originalText,
+        enrichment.research.type,
+        research.id,
+        userLocation,
+      );
     }
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);

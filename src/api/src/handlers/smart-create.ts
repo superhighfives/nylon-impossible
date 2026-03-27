@@ -2,7 +2,7 @@ import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { enrichTodoWithAI } from "../lib/ai-enrich";
-import { eq, getDb, todos, todoUrls } from "../lib/db";
+import { eq, getDb, todos, todoUrls, users } from "../lib/db";
 import {
   cleanUrlString,
   createFallbackFromUrl,
@@ -155,8 +155,23 @@ export async function smartCreate(c: Context<Env>) {
 
   // If AI is enabled, enrich in background
   if (aiEnabled) {
+    // Fetch user's location for location research context
+    const user = await db
+      .select({ location: users.location })
+      .from(users)
+      .where(eq(users.id, userId))
+      .then((rows) => rows[0]);
+
     c.executionCtx.waitUntil(
-      enrichTodoWithAI(db, c.env.AI, c.env, todoId, userId, text),
+      enrichTodoWithAI(
+        db,
+        c.env.AI,
+        c.env,
+        todoId,
+        userId,
+        text,
+        user?.location,
+      ),
     );
   }
 
