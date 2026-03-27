@@ -1,8 +1,16 @@
 # iOS Siri Background Sync
 
 **Date:** 2026-03-18
-**Status:** Ready
+**Status:** Complete
+**Completed:** 2026-03-26
+**PR:** #92
 **Scope:** iOS
+
+## Overview
+
+Implemented as specced. `BackgroundSyncService.swift` added as a lightweight, dependency-free struct that reads credentials from shared App Group UserDefaults and POSTs unsynced todos to the API. `AddTaskIntent` now attempts an immediate sync after task creation and schedules a `BGAppRefreshTask` as fallback. `BGTaskScheduler` registration and handling added to `Nylon_ImpossibleApp.swift`. `AuthService` updated to persist the Clerk JWT (with a 50-minute expiry window) to shared UserDefaults on foreground and sign-in, and clears it on sign-out. `BGTaskSchedulerPermittedIdentifiers` added to `Info.plist`.
+
+---
 
 ## Problem
 

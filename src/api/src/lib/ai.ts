@@ -14,6 +14,9 @@ export interface TodoEnrichment {
   urls?: string[];
   dueDate?: string; // ISO date string YYYY-MM-DD
   priority?: "high" | "low";
+  research?: {
+    type: "general" | "location";
+  };
 }
 
 // Native Workers AI tool call format
@@ -77,6 +80,20 @@ const enrichTodoTool = {
           description:
             "Extract priority if mentioned. Look for words like 'urgent', 'important', 'high priority', 'asap' (high) or 'low priority', 'whenever', 'not urgent' (low).",
         },
+        research: {
+          type: "object",
+          description:
+            "Set when the todo has research intent - questions, comparisons, 'look up', 'how to', venue/place references. Do NOT set for plain action items ('buy milk', 'call mom').",
+          properties: {
+            type: {
+              type: "string",
+              enum: ["general", "location"],
+              description:
+                "'location' for venue/place todos (restaurants, bars, cafes, shops, specific addresses). 'general' for everything else (questions, comparisons, how-to, research topics).",
+            },
+          },
+          required: ["type"],
+        },
       },
       required: ["title"],
     },
@@ -92,6 +109,7 @@ Your ONLY job is to extract metadata from the user's text:
 1. URLs/domains - find them and remove them from the title
 2. Due dates - convert relative dates to ISO format
 3. Priority - if mentioned
+4. Research intent - questions, comparisons, "look up", "how to", venue references
 
 CRITICAL RULES:
 - Do NOT rephrase, reword, or rewrite the title
@@ -99,14 +117,26 @@ CRITICAL RULES:
 - ONLY remove URLs/domains from the title text
 - Keep everything else in the title exactly as written
 
+RESEARCH DETECTION:
+- Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
+- Set research.type = "location" for venue/place todos (restaurants, bars, cafes, shops, addresses)
+- Do NOT set research for plain action items (buy, call, email, fix, etc.)
+
 Examples:
 - "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
 - "Check out https://example.com/page tomorrow" → { title: "Check out tomorrow", urls: ["https://example.com/page"], dueDate: "${today}" }
-- "Buy milk" → { title: "Buy milk" } (no changes needed)
-- "Urgent: call mom" → { title: "Urgent: call mom", priority: "high" }
+- "Buy milk" → { title: "Buy milk" } (no research - plain action)
+- "Urgent: call mom" → { title: "Urgent: call mom", priority: "high" } (no research - plain action)
 - "github.com/user/repo review this" → { title: "review this", urls: ["https://github.com/user/repo"] }
-- "Low priority fix the bug" → { title: "Low priority fix the bug", priority: "low" }
+- "Low priority fix the bug" → { title: "Low priority fix the bug", priority: "low" } (no research - plain action)
 - "Meeting next Friday" → { title: "Meeting next Friday", dueDate: "[next Friday's date]" }
+- "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" } }
+- "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" } }
+- "Best practices for React Server Components" → { title: "Best practices for React Server Components", research: { type: "general" } }
+- "Look up white chocolate recipe" → { title: "Look up white chocolate recipe", research: { type: "general" } }
+- "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" } }
+- "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" } }
+- "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" } }
 
 Always call the enrich_todo tool with your findings.`;
 }
@@ -196,11 +226,12 @@ export async function enrichTodo(
 
   const enrichment = tc.arguments;
 
-  // If nothing was extracted (no URLs, no date, no priority), return null
+  // If nothing was extracted (no URLs, no date, no priority, no research), return null
   const hasEnrichment =
     (enrichment.urls && enrichment.urls.length > 0) ||
     enrichment.dueDate ||
-    enrichment.priority;
+    enrichment.priority ||
+    enrichment.research;
 
   if (!hasEnrichment && enrichment.title === text) {
     return null;

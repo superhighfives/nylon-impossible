@@ -1,8 +1,21 @@
 # Optimistic UI Parity
 
 **Date:** 2026-03-18
-**Status:** Ready
+**Status:** Complete
+**Completed:** 2026-03-26
+**PR:** #93
 **Last refined:** 2026-03-21 — plan-only corrections to address PR #45 Copilot review: added inverse SwiftData relationship to `TodoUrl`, updated `APITodoUrl(from:)` init signature to pass `todoId` explicitly, fixed `TodoEditSheet.swift` table entry (param type unchanged). No source files modified.
+
+## Overview
+
+All four changes from the plan were implemented as specced:
+
+- Web optimistic create: `onMutate`/`onError`/`onSettled` added to `useCreateTodo` in `useTodos.ts`.
+- Web offline banner: new `OfflineBanner.tsx` rendered in `__root.tsx` after `<Header />`.
+- iOS per-item unsynced indicator: small dot in `TodoItemRow.swift` when `isSynced == false`.
+- iOS URL persistence: new `TodoUrl` SwiftData model with inverse relationship to `TodoItem`; `SyncService` replaced in-memory `urlsByTodoId` dict with SwiftData persistence. `TodoUrl+APIConversion.swift` added for the `APITodoUrl(from:todoId:)` convenience init.
+
+---
 
 ## Problem
 

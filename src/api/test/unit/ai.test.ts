@@ -112,6 +112,66 @@ describe("enrichTodo", () => {
       expect(result!.dueDate).toBe("2026-03-28");
       expect(result!.priority).toBe("high");
     });
+
+    it("detects general research intent for questions", async () => {
+      const ai = createMockAi({
+        title: "How does OAuth work",
+        research: { type: "general" },
+      });
+
+      const result = await enrichTodo(ai, "How does OAuth work");
+      expect(result).not.toBeNull();
+      expect(result!.title).toBe("How does OAuth work");
+      expect(result!.research).toEqual({ type: "general" });
+    });
+
+    it("detects general research intent for comparisons", async () => {
+      const ai = createMockAi({
+        title: "Dogs ages vs human ages",
+        research: { type: "general" },
+      });
+
+      const result = await enrichTodo(ai, "Dogs ages vs human ages");
+      expect(result!.research).toEqual({ type: "general" });
+    });
+
+    it("detects location research intent for venues", async () => {
+      const ai = createMockAi({
+        title: "Book dinner at San Jalisco",
+        research: { type: "location" },
+      });
+
+      const result = await enrichTodo(ai, "Book dinner at San Jalisco");
+      expect(result!.research).toEqual({ type: "location" });
+    });
+
+    it("does not set research for plain action items", async () => {
+      const ai = createMockAi({
+        title: "Buy milk",
+      });
+
+      const result = await enrichTodo(ai, "Buy milk");
+      // No enrichment at all, returns null
+      expect(result).toBeNull();
+    });
+
+    it("returns research-only enrichment (no URLs, date, or priority)", async () => {
+      const ai = createMockAi({
+        title: "Best practices for React Server Components",
+        research: { type: "general" },
+      });
+
+      const result = await enrichTodo(
+        ai,
+        "Best practices for React Server Components",
+      );
+      // Research alone is sufficient to return non-null
+      expect(result).not.toBeNull();
+      expect(result!.research).toEqual({ type: "general" });
+      expect(result!.urls).toBeUndefined();
+      expect(result!.dueDate).toBeUndefined();
+      expect(result!.priority).toBeUndefined();
+    });
   });
 
   describe("error handling", () => {
