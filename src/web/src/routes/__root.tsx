@@ -16,6 +16,10 @@ import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
+import {
+  OnlineStatusContext,
+  useOnlineStatusValue,
+} from "../hooks/useOnlineStatus";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import appCss from "../styles.css?url";
 
@@ -87,6 +91,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
 
 function RootDocument() {
   const origin = Route.useLoaderData();
+  const onlineStatus = useOnlineStatusValue();
 
   return (
     <html lang="en" className="light" suppressHydrationWarning>
@@ -111,15 +116,17 @@ function RootDocument() {
       </head>
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
-          <Header />
-          <OfflineBanner />
-          <div className="pt-header-offset">
-            <Outlet />
-          </div>
-          <DevEnvironmentIndicator origin={origin} />
-          <SignedIn>
-            <AiToggle />
-          </SignedIn>
+          <OnlineStatusContext.Provider value={onlineStatus}>
+            <OfflineBanner />
+            <Header />
+            <div className="pt-header-offset">
+              <Outlet />
+            </div>
+            <DevEnvironmentIndicator origin={origin} />
+            <SignedIn>
+              <AiToggle />
+            </SignedIn>
+          </OnlineStatusContext.Provider>
           <TanStackDevtools
             config={{
               position: "bottom-right",

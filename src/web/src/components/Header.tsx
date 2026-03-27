@@ -1,9 +1,16 @@
 import { SignedIn, UserButton } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
 export default function Header() {
+  const { isOnline } = useOnlineStatus();
+  // When offline, push header down to make room for the offline banner (~40px)
+  const topClass = isOnline === false ? "top-14" : "top-4";
+
   return (
-    <div className="fixed top-4 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+    <div
+      className={`fixed ${topClass} left-0 right-0 z-50 flex justify-center px-4 pointer-events-none transition-[top] duration-200`}
+    >
       <header className="pointer-events-auto flex items-center -space-x-2 rounded-full bg-gray-1/80 dark:bg-graydark-2/85 backdrop-blur-xl border border-gray-subtle shadow-lg p-1">
         <Link
           to="/"
