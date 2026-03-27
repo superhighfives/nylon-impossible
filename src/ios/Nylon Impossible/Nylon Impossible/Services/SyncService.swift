@@ -329,19 +329,13 @@ final class SyncService {
         }
 
         // Step 5: Sync URLs (server is authoritative — replace all for each todo in the response)
-        // Build a single lookup map from the IDs already processed in the sync — avoids one
-        // FetchDescriptor round-trip per todo in the hot sync path.
-        let remoteUUIDs = remoteTodos.compactMap { UUID(uuidString: $0.id) }
-        let batchDescriptor = FetchDescriptor<TodoItem>(
-            predicate: #Predicate { remoteUUIDs.contains($0.id) }
-        )
-        let todoMap = try Dictionary(
-            uniqueKeysWithValues: try modelContext.fetch(batchDescriptor).map { ($0.id, $0) }
-        )
-
         for remote in remoteTodos {
-            guard let remoteId = UUID(uuidString: remote.id),
-                  let todo = todoMap[remoteId] else { continue }
+            guard let remoteId = UUID(uuidString: remote.id) else { continue }
+
+            let itemDescriptor = FetchDescriptor<TodoItem>(
+                predicate: #Predicate { $0.id == remoteId }
+            )
+            guard let todo = try modelContext.fetch(itemDescriptor).first else { continue }
 
             // Delete stale local URLs for this todo
             for url in todo.urls { modelContext.delete(url) }
