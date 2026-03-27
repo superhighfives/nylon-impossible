@@ -330,7 +330,7 @@ final class SyncService {
             modelContext.delete(todo)
         }
 
-        // Step 5: Sync URLs (server is authoritative — replace all for each todo in the response)
+        // Step 5: Sync URLs (server is authoritative — upsert to avoid momentary disappearance)
         for remote in remoteTodos {
             guard let remoteId = UUID(uuidString: remote.id) else { continue }
 
@@ -339,13 +339,34 @@ final class SyncService {
             )
             guard let todo = try modelContext.fetch(itemDescriptor).first else { continue }
 
-            // Delete stale local URLs for this todo
-            for url in todo.urls { modelContext.delete(url) }
+            let remoteUrls = remote.urls ?? []
+            let remoteUrlIds = Set(remoteUrls.map { $0.id })
+            let existingById = todo.urls.reduce(into: [:]) { dict, url in dict[url.id] = url }
 
-            // Insert fresh URLs from server
-            let newUrls = (remote.urls ?? []).map { TodoUrl(from: $0) }
-            for url in newUrls { modelContext.insert(url) }
-            todo.urls = newUrls
+            // Delete URLs no longer present on the server
+            for url in todo.urls where !remoteUrlIds.contains(url.id) {
+                modelContext.delete(url)
+            }
+
+            // Update existing URLs in place, insert new ones
+            var updatedUrls: [TodoUrl] = []
+            for remoteUrl in remoteUrls {
+                if let existing = existingById[remoteUrl.id] {
+                    existing.title = remoteUrl.title
+                    existing.itemDescription = remoteUrl.description
+                    existing.siteName = remoteUrl.siteName
+                    existing.favicon = remoteUrl.favicon
+                    existing.fetchStatus = remoteUrl.fetchStatus.rawValue
+                    existing.fetchedAt = remoteUrl.fetchedAt
+                    existing.updatedAt = remoteUrl.updatedAt
+                    updatedUrls.append(existing)
+                } else {
+                    let newUrl = TodoUrl(from: remoteUrl)
+                    modelContext.insert(newUrl)
+                    updatedUrls.append(newUrl)
+                }
+            }
+            todo.urls = updatedUrls
         }
 
         // Single save for the entire operation
