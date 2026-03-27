@@ -83,6 +83,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt,
                 urls: nil
@@ -130,6 +131,7 @@ struct SyncServiceTests {
                 position: "b0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: remoteDate,
                 updatedAt: remoteDate,
                 urls: nil
@@ -182,6 +184,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: localDate,
                 updatedAt: remoteDate,
                 urls: nil
@@ -231,6 +234,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: remoteDate,
                 updatedAt: remoteDate,
                 urls: nil
@@ -274,6 +278,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt,
                 urls: nil
@@ -349,6 +354,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt,
                 urls: nil
@@ -391,6 +397,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: todo.createdAt,
                 updatedAt: todo.updatedAt,
                 urls: nil
@@ -449,6 +456,7 @@ struct SyncServiceTests {
                 position: "a0",
                 dueDate: nil,
                 priority: nil,
+                aiStatus: nil,
                 createdAt: remoteDate,
                 updatedAt: remoteDate,
                 urls: [APITodoUrl(
