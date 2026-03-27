@@ -60,8 +60,12 @@ struct AddTaskIntent: AppIntent {
     }
 
     private func scheduleBackgroundSync() {
-        let request = BGAppRefreshTaskRequest(identifier: "com.nylonimpossible.backgroundsync")
+        let request = BGAppRefreshTaskRequest(identifier: BackgroundSyncService.backgroundSyncTaskIdentifier)
         request.earliestBeginDate = nil
-        try? BGTaskScheduler.shared.submit(request)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("[AddTaskIntent] Failed to schedule BGAppRefreshTask: \(error)")
+        }
     }
 }

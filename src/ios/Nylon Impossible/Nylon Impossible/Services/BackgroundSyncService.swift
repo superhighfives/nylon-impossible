@@ -16,8 +16,9 @@ struct BackgroundSyncService {
     static let appGroupSuiteName = "group.com.superhighfives.Nylon-Impossible"
     static let authTokenKey = "currentAuthToken"
     static let authTokenExpiryKey = "currentAuthTokenExpiry"
+    static let backgroundSyncTaskIdentifier = "com.nylonimpossible.backgroundsync"
 
-    private let apiBaseURL: String
+    private let apiBaseURL: URL
     private let authToken: String
     private let userId: String
 
@@ -30,45 +31,51 @@ struct BackgroundSyncService {
             expiry > Date()
         else { return nil }
 
-        self.apiBaseURL = Config.apiBaseURL.absoluteString
+        self.apiBaseURL = Config.apiBaseURL
         self.authToken = token
         self.userId = userId
     }
 
     /// Upload all unsynced items for the current user to the server.
     /// Marks items as synced on a 2xx response.
-    @MainActor
+    ///
+    /// SwiftData fetch/save runs on the main actor; the HTTP request runs off-main
+    /// to avoid blocking UI or risking watchdog termination.
     func sync(modelContainer: ModelContainer) async throws {
-        let context = ModelContext(modelContainer)
+        // Capture as local so the closure can capture a plain String (Sendable)
+        let userId = self.userId
 
-        // 1. Fetch unsynced items for userId
-        let descriptor = FetchDescriptor<TodoItem>(
-            predicate: #Predicate { $0.userId == userId && !$0.isSynced }
-        )
-        let unsyncedItems = try context.fetch(descriptor)
-
-        guard !unsyncedItems.isEmpty else { return }
-
-        let changes: [TodoChange] = unsyncedItems.map { todo in
-            let pendingUrlChanges = todo.isDeleted || todo.pendingUrls.isEmpty
-                ? nil
-                : todo.pendingUrls.map { TodoUrlChange(url: $0) }
-            return TodoChange(
-                id: todo.id.uuidString.lowercased(),
-                title: todo.isDeleted ? nil : todo.title,
-                description: todo.isDeleted ? nil : todo.itemDescription,
-                completed: todo.isDeleted ? nil : todo.isCompleted,
-                position: todo.isDeleted ? nil : todo.position,
-                dueDate: todo.isDeleted ? nil : todo.dueDate,
-                priority: todo.isDeleted ? nil : todo.priority,
-                updatedAt: todo.updatedAt,
-                deleted: todo.isDeleted ? true : nil,
-                urls: pendingUrlChanges
+        // 1. Fetch unsynced items and build the payload on the main actor
+        let (changes, itemIDs): ([TodoChange], [PersistentIdentifier]) = try await MainActor.run {
+            let context = ModelContext(modelContainer)
+            let descriptor = FetchDescriptor<TodoItem>(
+                predicate: #Predicate { $0.userId == userId && !$0.isSynced }
             )
+            let unsyncedItems = try context.fetch(descriptor)
+            let changeList = unsyncedItems.map { todo in
+                let pendingUrlChanges = todo.isDeleted || todo.pendingUrls.isEmpty
+                    ? nil
+                    : todo.pendingUrls.map { TodoUrlChange(url: $0) }
+                return TodoChange(
+                    id: todo.id.uuidString.lowercased(),
+                    title: todo.isDeleted ? nil : todo.title,
+                    description: todo.isDeleted ? nil : todo.itemDescription,
+                    completed: todo.isDeleted ? nil : todo.isCompleted,
+                    position: todo.isDeleted ? nil : todo.position,
+                    dueDate: todo.isDeleted ? nil : todo.dueDate,
+                    priority: todo.isDeleted ? nil : todo.priority,
+                    updatedAt: todo.updatedAt,
+                    deleted: todo.isDeleted ? true : nil,
+                    urls: pendingUrlChanges
+                )
+            }
+            return (changeList, unsyncedItems.map { $0.persistentModelID })
         }
 
-        // 2. POST to /todos/sync with Bearer token
-        guard let url = URL(string: "\(apiBaseURL)/todos/sync") else { return }
+        guard !changes.isEmpty else { return }
+
+        // 2. POST to /todos/sync — runs off the main actor
+        let url = apiBaseURL.appendingPathComponent("todos/sync")
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
@@ -86,11 +93,16 @@ struct BackgroundSyncService {
             throw APIError.invalidResponse
         }
 
-        // 3. Mark items isSynced = true on 2xx
-        for item in unsyncedItems {
-            item.isSynced = true
-            item.pendingUrls = []
+        // 3. Mark items as synced on the main actor
+        try await MainActor.run {
+            let context = ModelContext(modelContainer)
+            for id in itemIDs {
+                if let item = context.model(for: id) as? TodoItem {
+                    item.isSynced = true
+                    item.pendingUrls = []
+                }
+            }
+            try context.save()
         }
-        try context.save()
     }
 }

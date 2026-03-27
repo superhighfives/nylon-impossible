@@ -74,11 +74,19 @@ final class AuthService: AuthProviding {
 
     /// Persist a fresh Clerk JWT (with ~50-minute expiry) to shared UserDefaults so
     /// BackgroundSyncService can authenticate from an App Intent extension or BGTask.
+    /// Only writes when a token is successfully fetched to avoid an incoherent state
+    /// (e.g. a nil token paired with a future expiry date).
     func persistAuthTokenToSharedDefaults() async {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
-        let token = try? await getToken()
-        sharedDefaults?.set(token, forKey: BackgroundSyncService.authTokenKey)
-        sharedDefaults?.set(Date().addingTimeInterval(50 * 60), forKey: BackgroundSyncService.authTokenExpiryKey)
+        do {
+            let token = try await getToken()
+            sharedDefaults?.set(token, forKey: BackgroundSyncService.authTokenKey)
+            sharedDefaults?.set(Date().addingTimeInterval(50 * 60), forKey: BackgroundSyncService.authTokenExpiryKey)
+        } catch {
+            // Leave any existing token/expiry intact — a stale-but-valid token is
+            // better than writing a nil token with a fresh expiry.
+            print("[AuthService] Failed to persist auth token to shared defaults: \(error)")
+        }
     }
 
     /// Clear userId from shared UserDefaults on sign out
