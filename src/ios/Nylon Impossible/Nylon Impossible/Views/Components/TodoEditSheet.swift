@@ -144,10 +144,13 @@ struct TodoEditSheet: View {
     
     private func loadUrls() async {
         guard let apiService = apiService else { return }
-        
+
+        // Only fetch from API if there are pending URLs that the server may have resolved
+        guard urls.contains(where: { $0.fetchStatus == .pending }) else { return }
+
         isLoadingUrls = true
         defer { isLoadingUrls = false }
-        
+
         do {
             let todoWithUrls = try await apiService.getTodo(id: todo.id)
             urls = todoWithUrls.urls
