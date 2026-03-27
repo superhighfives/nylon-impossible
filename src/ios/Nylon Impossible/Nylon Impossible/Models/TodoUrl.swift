@@ -27,36 +27,21 @@ final class TodoUrl {
     // integrity; `todo` is nil only transiently (between insert and the relationship being set).
     @Relationship(inverse: \TodoItem.urls) var todo: TodoItem?
 
-    init(from api: APITodoUrl) {
-        id = api.id
-        url = api.url
-        title = api.title
-        itemDescription = api.description
-        siteName = api.siteName
-        favicon = api.favicon
-        position = api.position
-        fetchStatus = api.fetchStatus.rawValue
-        fetchedAt = api.fetchedAt
-        createdAt = api.createdAt
-        updatedAt = api.updatedAt
-    }
-}
-
-extension APITodoUrl {
-    init(from stored: TodoUrl, todoId: String) {
-        self.init(
-            id: stored.id,
-            todoId: todoId,
-            url: stored.url,
-            title: stored.title,
-            description: stored.itemDescription,
-            siteName: stored.siteName,
-            favicon: stored.favicon,
-            position: stored.position,
-            fetchStatus: FetchStatus(rawValue: stored.fetchStatus) ?? .pending,
-            fetchedAt: stored.fetchedAt,
-            createdAt: stored.createdAt,
-            updatedAt: stored.updatedAt
-        )
+    init(
+        id: String, url: String, title: String?, itemDescription: String?,
+        siteName: String?, favicon: String?, position: String, fetchStatus: String,
+        fetchedAt: Date?, createdAt: Date, updatedAt: Date
+    ) {
+        self.id = id
+        self.url = url
+        self.title = title
+        self.itemDescription = itemDescription
+        self.siteName = siteName
+        self.favicon = favicon
+        self.position = position
+        self.fetchStatus = fetchStatus
+        self.fetchedAt = fetchedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
