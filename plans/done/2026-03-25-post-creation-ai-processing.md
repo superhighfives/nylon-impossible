@@ -1,5 +1,30 @@
 # Post-Creation AI Processing Implementation Plan
 
+**Status:** Complete
+**Completed:** 2026-03-27
+**PR:** #94
+
+## Overview
+
+Moved AI processing to happen asynchronously after todo creation using `waitUntil`, making todo creation instant. AI now only extracts metadata (URLs, due dates, priority) without rephrasing titles.
+
+## Architecture
+
+- Todos created immediately with original text
+- `aiStatus` column tracks processing state: `pending` → `processing` → `complete`/`failed`
+- Background AI enrichment via `waitUntil`:
+  - Extracts URLs/domains and removes them from title
+  - Extracts due dates from natural language
+  - Extracts priority if mentioned
+- WebSocket notifies clients to sync when enrichment completes
+- Web and iOS show subtle loading indicator during processing
+
+**Tech Stack:** Hono, Cloudflare Workers (`waitUntil`), Drizzle ORM, Workers AI
+
+---
+
+## Original Plan
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move AI processing to happen AFTER todo creation, making the fast path immediate and AI enrichment asynchronous.
