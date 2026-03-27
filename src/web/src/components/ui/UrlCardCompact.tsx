@@ -45,7 +45,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
       className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group max-w-full"
     >
       {isPending ? (
-        <Loader size="sm" className="w-4 h-4 shrink-0" />
+        <Loader size="sm" className="w-4 h-4 shrink-0 text-gray-muted" />
       ) : favicon ? (
         <img
           src={favicon}

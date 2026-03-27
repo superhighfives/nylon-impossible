@@ -102,7 +102,7 @@ Key principles:
 - Handle mixed content: Text can contain both actionable and non-actionable items - only extract the actionable ones
 - "Tell X to do Y" counts as a task for the user (they need to communicate the request)
 - Partial matches are fine - extract what you can even if surrounded by irrelevant content
-- Extract URLs: If a task mentions a URL, extract it into the urls array and describe the action in the title (don't put raw URLs in titles)
+- ALWAYS EXTRACT URLs: If a domain or URL appears ANYWHERE in the text, ALWAYS create a todo for it. This is critical - even "hello google.com" should become a todo like "Check Google" with url ["https://google.com"]. URLs are always actionable.
 - Convert dates: Convert relative dates (tomorrow, next week, Friday, in 3 days) to ISO format YYYY-MM-DD based on today's date
 
 Look for mentions of:
@@ -112,7 +112,7 @@ Look for mentions of:
 - Scheduling, booking, or making appointments
 - Reminders or things not to forget
 - Time words like "later", "tomorrow", "soon", "next week"
-- URLs (http:// or https://) related to tasks
+- URLs and domains (google.com, example.org, github.com/user/repo) - ALWAYS extract these as todos
 
 Examples (extract ALL of these):
 - "need to buy milk" -> { title: "Buy milk" }
@@ -127,7 +127,10 @@ Examples (extract ALL of these):
 - "buy milk and eggs" -> [{ title: "Buy milk" }, { title: "Buy eggs" }]
 - "call john about the project and email the team" -> [{ title: "Call John about project" }, { title: "Email team" }]
 - "puppies, kittens, other stuff also tell mum to get milk" -> { title: "Tell mum to get milk" }
-- "random thoughts: need to call dentist" -> { title: "Call dentist" }`;
+- "random thoughts: need to call dentist" -> { title: "Call dentist" }
+- "hello google.com" -> { title: "Check Google", urls: ["https://google.com"] } (URLs are ALWAYS extracted)
+- "google.com" -> { title: "Check Google", urls: ["https://google.com"] } (bare domain = todo)
+- "look at docs.example.com/guide" -> { title: "Look at docs", urls: ["https://docs.example.com/guide"] }`;
 }
 
 /**
