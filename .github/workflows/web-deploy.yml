@@ -159,6 +159,9 @@ jobs:
             const config = JSON.parse(stripped);
             config.name = name;
             config.routes = [{ pattern: domain, custom_domain: true }];
+            // Preview workers produce to the shared queue but don't register as
+            // consumers — Cloudflare only allows one consumer per queue.
+            if (config.queues) delete config.queues.consumers;
             fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
 
       - name: Rewrite Web wrangler config for preview
