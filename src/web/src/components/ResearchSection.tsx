@@ -124,7 +124,7 @@ function SourceCard({
         />
       ) : null}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray truncate group-hover:underline">
+        <p className="text-sm font-medium text-gray-muted truncate group-hover:underline">
           {displayTitle}
         </p>
         <p className="text-xs text-gray-muted mt-0.5 truncate">{url.url}</p>
