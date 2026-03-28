@@ -22,6 +22,20 @@ async function getApiError(response: Response): Promise<string | undefined> {
 
 const TODOS_QUERY_KEY = ["todos"];
 
+// Research older than this threshold is considered stale — stop polling for it.
+const STALE_RESEARCH_MS = 2 * 60 * 1000;
+
+export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
+  return todos.some((todo) => {
+    if (todo.aiStatus === "pending" || todo.aiStatus === "processing") return true;
+    if (todo.research?.status === "pending") {
+      const age = Date.now() - new Date(todo.research.createdAt).getTime();
+      return age < STALE_RESEARCH_MS;
+    }
+    return false;
+  });
+}
+
 export function useTodos() {
   return useQuery<TodoWithUrls[]>({
     queryKey: TODOS_QUERY_KEY,
@@ -29,13 +43,7 @@ export function useTodos() {
     refetchInterval: (query) => {
       const data = query.state.data;
       if (!data) return false;
-      const hasPendingWork = data.some(
-        (todo) =>
-          todo.aiStatus === "pending" ||
-          todo.aiStatus === "processing" ||
-          todo.research?.status === "pending",
-      );
-      return hasPendingWork ? 3000 : false;
+      return hasPendingNonStaleWork(data) ? 3000 : false;
     },
   });
 }
