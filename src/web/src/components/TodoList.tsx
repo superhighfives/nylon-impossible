@@ -98,10 +98,8 @@ function TodoItemContent({
   todo,
   isExpanded,
   onToggle,
-  onDelete,
   onToggleExpand,
   updatePending,
-  deletePending,
 }: TodoItemProps) {
   return (
     <div className="flex items-center gap-3">
