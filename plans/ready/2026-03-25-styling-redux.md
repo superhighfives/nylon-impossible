@@ -13,4 +13,4 @@
 ## Web
 
 - [ ] Make completed tasks smaller and make the checkbox a subtle gray
-- [ ] Add a + button when the user starts typing (bottom-right position), with padding to prevent text overlapping it
+- [ ] Add a + button when the user starts typing in the text area (in the bottom-right position), with padding to prevent text overlapping it

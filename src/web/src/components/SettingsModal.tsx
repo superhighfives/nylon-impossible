@@ -55,8 +55,7 @@ export function SettingsModal() {
   };
 
   const hasChanges =
-    location.trim() !== (user?.location ?? "") ||
-    aiEnabled !== user?.aiEnabled;
+    location.trim() !== (user?.location ?? "") || aiEnabled !== user?.aiEnabled;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -103,19 +102,28 @@ export function SettingsModal() {
                 </Field>
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-1">
-                    <span className="text-sm font-medium text-gray">AI features</span>
-                    <p className="text-xs text-gray-muted">When enabled, AI helps enrich todos by doing research tasks, pulling out metadata, and finding locations.</p>
+                    <span className="text-sm font-medium text-gray">
+                      AI features
+                    </span>
+                    <p className="text-xs text-gray-muted">
+                      When enabled, AI helps enrich todos by doing research
+                      tasks, pulling out metadata, and finding locations.
+                    </p>
                   </div>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={aiEnabled}
-                    aria-label={aiEnabled ? "Disable AI features" : "Enable AI features"}
+                    aria-label={
+                      aiEnabled ? "Disable AI features" : "Enable AI features"
+                    }
                     onClick={() => setAiEnabled(!aiEnabled)}
                     disabled={updateUser.isPending}
                     className={`shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${aiEnabled ? "bg-yellow-solid" : "bg-gray-base"}`}
                   >
-                    <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`} />
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
+                    />
                   </button>
                 </div>
               </>
