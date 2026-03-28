@@ -40,7 +40,15 @@ export function SettingsModal() {
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
             { headers: { "Accept-Language": "en" } },
           );
-          const data = await res.json();
+          const data = (await res.json()) as {
+            address?: {
+              city?: string;
+              town?: string;
+              village?: string;
+              state?: string;
+              country?: string;
+            };
+          };
           const { city, town, village, state, country } = data.address ?? {};
           const place = city || town || village || "";
           const region = state || country || "";
