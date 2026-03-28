@@ -9,9 +9,8 @@ import { generateNKeysBetween } from "fractional-indexing";
 import { eq, type getDb, todoResearch, todoUrls } from "./db";
 import { fetchUrlMetadata } from "./url-metadata";
 
-// Queue consumer has its own execution budget. The kimi-k2.5 model can take
-// up to ~80s for research queries, so give it 120s before we give up.
-const RESEARCH_TIMEOUT_MS = 120_000;
+// Queue consumer has its own execution budget — 5 minutes before we give up.
+const RESEARCH_TIMEOUT_MS = 5 * 60 * 1_000;
 
 interface ResearchResult {
   summary: string;
