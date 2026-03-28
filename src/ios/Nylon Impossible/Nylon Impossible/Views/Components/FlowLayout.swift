@@ -35,9 +35,14 @@ struct FlowLayout: Layout {
         var rowHeight: CGFloat = 0
         var totalHeight: CGFloat = 0
         var maxRowWidth: CGFloat = 0
-        
+
         for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
+            // Constrain each chip to the available width so long text truncates
+            // rather than overflowing the container
+            let constrainedProposal = maxWidth < .infinity
+                ? ProposedViewSize(width: maxWidth, height: nil)
+                : .unspecified
+            let size = subview.sizeThatFits(constrainedProposal)
             
             // Check if we need to wrap to next row
             if currentX + size.width > maxWidth && currentX > 0 {

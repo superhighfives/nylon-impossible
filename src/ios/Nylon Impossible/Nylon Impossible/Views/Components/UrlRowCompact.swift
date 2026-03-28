@@ -95,7 +95,6 @@ struct UrlRowCompact: View {
                     .fill(Color.appLine.opacity(0.3))
             )
         }
-        .frame(maxWidth: 220)
         .buttonStyle(.plain)
     }
 }

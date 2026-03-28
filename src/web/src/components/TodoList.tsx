@@ -112,7 +112,7 @@ function TodoItemContent({
           disabled={updatePending}
           className={
             todo.completed
-              ? "data-checked:!bg-gray-8 data-checked:!border-gray-8 dark:data-checked:!bg-graydark-8 dark:data-checked:!border-graydark-8"
+              ? "data-checked:!bg-gray-solid data-checked:!border-gray-strong"
               : ""
           }
           aria-label={
