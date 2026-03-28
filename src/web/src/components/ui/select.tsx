@@ -20,7 +20,7 @@ export function Select({
 }: SelectProps) {
   return (
     <BaseSelect.Root items={items} {...props}>
-      <BaseSelect.Trigger className="flex h-9 w-full items-center justify-between rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base">
+      <BaseSelect.Trigger className="flex h-9 w-full items-center justify-between rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base">
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon>
           <ChevronDown className="h-4 w-4 text-gray-muted" />
@@ -34,7 +34,7 @@ export function Select({
                 <BaseSelect.Item
                   key={item.value}
                   value={item.value}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-gray outline-none hover:bg-gray-4 focus:bg-gray-4 data-disabled:pointer-events-none data-disabled:opacity-50 data-selected:bg-gray-5"
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-gray outline-none hover:bg-gray-hover focus:bg-gray-hover data-disabled:pointer-events-none data-disabled:opacity-50 data-selected:bg-gray-active"
                 >
                   <BaseSelect.ItemIndicator className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
                     <Check className="h-4 w-4" />

@@ -262,6 +262,13 @@
   }
 }
 
+@utility border-yellow-solid {
+  border-color: var(--color-yellow-9);
+  @variant dark {
+    border-color: var(--color-yellowdark-9);
+  }
+}
+
 /* --------------------------------------------
    Red Borders
    -------------------------------------------- */
@@ -607,5 +614,15 @@
   color: var(--color-red-12);
   @variant dark {
     color: var(--color-reddark-12);
+  }
+}
+
+/* --------------------------------------------
+   Ring Offset
+   -------------------------------------------- */
+@utility ring-offset-gray-app {
+  --tw-ring-offset-color: var(--color-gray-1);
+  @variant dark {
+    --tw-ring-offset-color: var(--color-graydark-1);
   }
 }

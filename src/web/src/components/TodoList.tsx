@@ -132,7 +132,7 @@ function TodoItemContent({
               className="flex items-center gap-1 text-gray-muted text-xs"
               aria-label="AI is processing"
             >
-              <Loader size="sm" className="text-gray-8 dark:text-graydark-8" />
+              <Loader size="sm" className="text-gray-muted" />
             </output>
           )}
         </div>
