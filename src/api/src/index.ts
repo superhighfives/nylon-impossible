@@ -104,4 +104,4 @@ export default {
       message.ack();
     }
   },
-} satisfies ExportedHandler<Env["Bindings"]>;
+} satisfies ExportedHandler<Env["Bindings"], ResearchJobMessage>;

@@ -184,7 +184,7 @@ function parseArguments(
 const ENRICH_TIMEOUT_MS = 30_000;
 
 function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let timeoutId: number | null = null;
   const timeout = new Promise<never>((_, reject) => {
     timeoutId = setTimeout(
       () => reject(new Error("Enrichment timed out")),
