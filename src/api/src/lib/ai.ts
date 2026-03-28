@@ -181,6 +181,15 @@ function parseArguments(
   return args as ParsedToolCall["arguments"];
 }
 
+const ENRICH_TIMEOUT_MS = 30_000;
+
+function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error("Enrichment timed out")), timeoutMs);
+  });
+  return Promise.race([promise, timeout]);
+}
+
 /**
  * Enrich a todo with extracted metadata (URLs, due date, priority).
  * Does NOT rephrase the title - only removes URLs from it.
@@ -192,25 +201,28 @@ export async function enrichTodo(
   const systemPrompt = getSystemPrompt();
 
   // Model added recently, types not yet updated
-  const response = await ai.run(
-    "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-    {
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text },
-      ],
-      tools: [enrichTodoTool],
-      tool_choice: {
-        type: "function",
-        function: { name: "enrich_todo" },
+  const response = await runWithTimeout(
+    ai.run(
+      "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text },
+        ],
+        tools: [enrichTodoTool],
+        tool_choice: {
+          type: "function",
+          function: { name: "enrich_todo" },
+        },
+        max_tokens: 4000,
       },
-      max_tokens: 4000,
-    },
-    {
-      gateway: {
-        id: "nylon-impossible",
+      {
+        gateway: {
+          id: "nylon-impossible",
+        },
       },
-    },
+    ),
+    ENRICH_TIMEOUT_MS,
   );
 
   const tc = extractToolCall(response);

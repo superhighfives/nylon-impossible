@@ -26,6 +26,17 @@ export function useTodos() {
   return useQuery<TodoWithUrls[]>({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      const hasPendingWork = data.some(
+        (todo) =>
+          todo.aiStatus === "pending" ||
+          todo.aiStatus === "processing" ||
+          todo.research?.status === "pending",
+      );
+      return hasPendingWork ? 3000 : false;
+    },
   });
 }
 
