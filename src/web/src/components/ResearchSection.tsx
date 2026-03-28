@@ -1,5 +1,5 @@
 import { AlertCircle, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
-import { useReresearch } from "@/hooks/useTodos";
+import { STALE_RESEARCH_MS, useReresearch } from "@/hooks/useTodos";
 import type { SerializedResearch, SerializedTodoUrl } from "@/types/database";
 import { Button, Loader } from "./ui";
 
@@ -146,7 +146,7 @@ export function ResearchSection({
     // was likely killed before it could mark the record as failed. Surface a
     // retryable error so the user isn't stuck on an infinite spinner.
     const isStale =
-      Date.now() - new Date(research.createdAt).getTime() > 2 * 60 * 1000;
+      Date.now() - new Date(research.createdAt).getTime() > STALE_RESEARCH_MS;
 
     if (isStale) {
       return (

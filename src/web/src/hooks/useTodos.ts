@@ -23,7 +23,7 @@ async function getApiError(response: Response): Promise<string | undefined> {
 const TODOS_QUERY_KEY = ["todos"];
 
 // Research older than this threshold is considered stale — stop polling for it.
-const STALE_RESEARCH_MS = 2 * 60 * 1000;
+export const STALE_RESEARCH_MS = 2 * 60 * 1000;
 
 export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
   return todos.some((todo) => {
