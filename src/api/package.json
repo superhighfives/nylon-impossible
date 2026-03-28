@@ -16,7 +16,7 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "@clerk/backend": "^1.27.0",
+    "@clerk/backend": "^3.2.3",
     "@nylon-impossible/shared": "workspace:*",
     "drizzle-orm": "^0.45.0",
     "fractional-indexing": "^3.2.0",
