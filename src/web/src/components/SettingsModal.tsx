@@ -1,8 +1,21 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
+import { z } from "zod";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
 import { Button, Field, Input } from "./ui";
+
+const NominatimSchema = z.object({
+  address: z
+    .object({
+      city: z.string().optional(),
+      town: z.string().optional(),
+      village: z.string().optional(),
+      state: z.string().optional(),
+      country: z.string().optional(),
+    })
+    .optional(),
+});
 
 export function SettingsModal() {
   const { data: user, isLoading: isLoadingUser } = useUser();
@@ -40,15 +53,7 @@ export function SettingsModal() {
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
             { headers: { "Accept-Language": "en" } },
           );
-          const data = (await res.json()) as {
-            address?: {
-              city?: string;
-              town?: string;
-              village?: string;
-              state?: string;
-              country?: string;
-            };
-          };
+          const data = NominatimSchema.parse(await res.json());
           const { city, town, village, state, country } = data.address ?? {};
           const place = city || town || village || "";
           const region = state || country || "";
