@@ -140,9 +140,9 @@ struct ContentView: View {
         .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { oldY, newY in
             let delta = newY - oldY
             if delta > 10 {
-                inputBarVisible = false
+                if inputBarVisible { inputBarVisible = false }
             } else if delta < -10 {
-                inputBarVisible = true
+                if !inputBarVisible { inputBarVisible = true }
             }
         }
     }

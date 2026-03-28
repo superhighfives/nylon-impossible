@@ -18,11 +18,15 @@ struct FlowLayout: Layout {
     
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         let result = calculateLayout(proposal: proposal, subviews: subviews)
-        
+        let maxWidth = proposal.width ?? .infinity
+        let constrainedProposal = maxWidth < .infinity
+            ? ProposedViewSize(width: maxWidth, height: nil)
+            : .unspecified
+
         for (index, position) in result.positions.enumerated() {
             subviews[index].place(
                 at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: .unspecified
+                proposal: constrainedProposal
             )
         }
     }
