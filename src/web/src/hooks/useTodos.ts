@@ -10,7 +10,10 @@ import type {
   UpdateTodoInput,
 } from "@/types/database";
 
-const ApiErrorSchema = z.object({ error: z.string() }).optional().catch(undefined);
+const ApiErrorSchema = z
+  .object({ error: z.string() })
+  .optional()
+  .catch(undefined);
 
 async function getApiError(response: Response): Promise<string | undefined> {
   const body = await response.json().catch(() => undefined);
