@@ -13,9 +13,9 @@
 import { generateNKeysBetween } from "fractional-indexing";
 import { enrichTodo } from "./ai";
 import { eq, type getDb, todoResearch, todos, todoUrls } from "./db";
-import { executeResearch } from "./research";
 import { truncateTitle } from "./url-helpers";
 import { fetchUrlMetadata } from "./url-metadata";
+import type { ResearchJobMessage } from "../types";
 
 /**
  * Enrich a todo with AI-extracted metadata in the background.
@@ -25,7 +25,7 @@ import { fetchUrlMetadata } from "./url-metadata";
 export async function enrichTodoWithAI(
   db: ReturnType<typeof getDb>,
   ai: Ai,
-  env: { USER_SYNC: DurableObjectNamespace },
+  env: { USER_SYNC: DurableObjectNamespace; RESEARCH_QUEUE: Queue<ResearchJobMessage> },
   todoId: string,
   userId: string,
   originalText: string,
@@ -103,18 +103,16 @@ export async function enrichTodoWithAI(
       // Notify so clients can show pending research state before long-running work
       await notifySync(env, userId);
 
-      // Execute research (runs in same waitUntil context)
-      await executeResearch(
-        db,
-        ai,
-        env,
+      // Enqueue research job — runs in a separate Worker invocation with its own
+      // execution budget, not constrained by this waitUntil lifetime
+      await env.RESEARCH_QUEUE.send({
         todoId,
         userId,
-        originalText,
-        enrichment.research.type,
-        research.id,
-        userLocation,
-      );
+        query: originalText,
+        researchType: enrichment.research.type,
+        researchId: research.id,
+        userLocation: userLocation ?? null,
+      });
     }
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);

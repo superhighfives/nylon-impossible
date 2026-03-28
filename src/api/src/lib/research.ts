@@ -9,10 +9,9 @@ import { generateNKeysBetween } from "fractional-indexing";
 import { eq, type getDb, todoResearch, todoUrls } from "./db";
 import { fetchUrlMetadata } from "./url-metadata";
 
-// Keep this well under the Worker's waitUntil duration limit so the catch
-// block has time to mark the research as "failed" before the Worker is killed.
-// enrichTodo (30s) + research (20s) + buffer = ~55s total, which fits safely.
-const RESEARCH_TIMEOUT_MS = 20_000;
+// Queue consumer has its own execution budget — no longer sharing with enrichTodo.
+// 25s gives headroom for DB writes and notifySync after the AI call returns.
+const RESEARCH_TIMEOUT_MS = 25_000;
 
 interface ResearchResult {
   summary: string;
