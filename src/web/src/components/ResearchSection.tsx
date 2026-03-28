@@ -142,6 +142,36 @@ export function ResearchSection({
   const reresearch = useReresearch();
 
   if (research.status === "pending") {
+    // If research has been pending for more than 2 minutes, the background Worker
+    // was likely killed before it could mark the record as failed. Surface a
+    // retryable error so the user isn't stuck on an infinite spinner.
+    const isStale =
+      Date.now() - new Date(research.createdAt).getTime() > 2 * 60 * 1000;
+
+    if (isStale) {
+      return (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
+            <Sparkles size={12} />
+            Research
+          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-red-muted">Research timed out.</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => reresearch.mutate(todoId)}
+              disabled={reresearch.isPending}
+              loading={reresearch.isPending}
+            >
+              <RefreshCw size={14} className="mr-1" />
+              Try again
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-2">
         <p className="text-xs font-medium text-gray-muted flex items-center gap-1">

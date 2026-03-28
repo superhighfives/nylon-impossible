@@ -36,6 +36,7 @@ export interface SerializedResearch {
   researchType: ResearchType;
   summary: string | null;
   researchedAt: string | null;
+  createdAt: string;
 }
 
 /** Serialized URL metadata from the API */
