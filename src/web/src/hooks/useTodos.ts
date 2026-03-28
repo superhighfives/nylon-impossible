@@ -27,7 +27,8 @@ const STALE_RESEARCH_MS = 2 * 60 * 1000;
 
 export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
   return todos.some((todo) => {
-    if (todo.aiStatus === "pending" || todo.aiStatus === "processing") return true;
+    if (todo.aiStatus === "pending" || todo.aiStatus === "processing")
+      return true;
     if (todo.research?.status === "pending") {
       const age = Date.now() - new Date(todo.research.createdAt).getTime();
       return age < STALE_RESEARCH_MS;

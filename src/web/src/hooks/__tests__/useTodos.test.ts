@@ -159,11 +159,15 @@ describe("hasPendingNonStaleWork", () => {
   });
 
   it("returns true when a todo has aiStatus 'pending'", () => {
-    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "pending" })])).toBe(true);
+    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "pending" })])).toBe(
+      true,
+    );
   });
 
   it("returns true when a todo has aiStatus 'processing'", () => {
-    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "processing" })])).toBe(true);
+    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "processing" })])).toBe(
+      true,
+    );
   });
 
   it("returns true when a todo has pending research created less than 2 minutes ago", () => {

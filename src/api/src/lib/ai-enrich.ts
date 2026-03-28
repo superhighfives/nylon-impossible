@@ -11,11 +11,11 @@
  */
 
 import { generateNKeysBetween } from "fractional-indexing";
+import type { ResearchJobMessage } from "../types";
 import { enrichTodo } from "./ai";
 import { eq, type getDb, todoResearch, todos, todoUrls } from "./db";
 import { truncateTitle } from "./url-helpers";
 import { fetchUrlMetadata } from "./url-metadata";
-import type { ResearchJobMessage } from "../types";
 
 /**
  * Enrich a todo with AI-extracted metadata in the background.
@@ -25,7 +25,10 @@ import type { ResearchJobMessage } from "../types";
 export async function enrichTodoWithAI(
   db: ReturnType<typeof getDb>,
   ai: Ai,
-  env: { USER_SYNC: DurableObjectNamespace; RESEARCH_QUEUE: Queue<ResearchJobMessage> },
+  env: {
+    USER_SYNC: DurableObjectNamespace;
+    RESEARCH_QUEUE: Queue<ResearchJobMessage>;
+  },
   todoId: string,
   userId: string,
   originalText: string,
