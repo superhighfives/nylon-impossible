@@ -9,9 +9,8 @@
 - [ ] Allow dictation on the input
 - [ ] Make the hit box for the input bigger (4px on all sides, entire area tappable)
 - [ ] Move the input to a floating fixed position at the bottom with liquid glass styling — scrolling down hides it, scrolling up brings it back (like Safari)
-- [ ] Investigate why the favicon isn't displaying on iOS like it does on web
 
 ## Web
 
 - [ ] Make completed tasks smaller and make the checkbox a subtle gray
-- [ ] Add a + button when the user starts typing (bottom-right position), with padding to prevent text overlapping it
+- [ ] Add a + button when the user starts typing in the text area (in the bottom-right position), with padding to prevent text overlapping it
