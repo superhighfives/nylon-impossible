@@ -38,6 +38,16 @@ export async function executeResearch(
         : await executeGeneralResearch(ai, query);
 
     // Insert source URLs with researchId
+    let urlRecords: {
+      id: string;
+      todoId: string;
+      researchId: string;
+      url: string;
+      position: string;
+      fetchStatus: "pending";
+      createdAt: Date;
+      updatedAt: Date;
+    }[] = [];
     if (result.sources.length > 0) {
       const now = new Date();
       const urlPositions = generateNKeysBetween(
@@ -46,7 +56,7 @@ export async function executeResearch(
         result.sources.length,
       );
 
-      const urlRecords = result.sources.map((url, i) => ({
+      urlRecords = result.sources.map((url, i) => ({
         id: crypto.randomUUID(),
         todoId,
         researchId,
@@ -58,8 +68,24 @@ export async function executeResearch(
       }));
 
       await db.insert(todoUrls).values(urlRecords);
+    }
 
-      // Fetch metadata for each source URL in background
+    // Mark research as completed immediately so clients can show results
+    await db
+      .update(todoResearch)
+      .set({
+        status: "completed",
+        summary: result.summary,
+        researchedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(todoResearch.id, researchId));
+
+    // Notify clients that research is complete (summary + URLs available)
+    await notifySync(env, userId);
+
+    // Fetch URL metadata in background (non-blocking for UI)
+    if (urlRecords.length > 0) {
       await Promise.allSettled(
         urlRecords.map(async (record) => {
           try {
@@ -88,21 +114,10 @@ export async function executeResearch(
           }
         }),
       );
+
+      // Notify again once URL metadata is ready
+      await notifySync(env, userId);
     }
-
-    // Update research record as completed
-    await db
-      .update(todoResearch)
-      .set({
-        status: "completed",
-        summary: result.summary,
-        researchedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(todoResearch.id, researchId));
-
-    // Notify clients
-    await notifySync(env, userId);
   } catch (error) {
     console.error("Research failed for todo:", todoId, error);
 

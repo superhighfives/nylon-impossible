@@ -2,11 +2,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodoWithUrls } from "@/types/database";
 import {
   useCreateTodo,
   useDeleteTodo,
+  useReresearch,
   useTodos,
   useUpdateTodo,
 } from "../useTodos";
@@ -312,5 +313,80 @@ describe("useDeleteTodo", () => {
     const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
     expect(cached).toHaveLength(2);
     expect(cached?.[0]?.id).toBe("todo-1");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useReresearch
+// ---------------------------------------------------------------------------
+
+describe("useReresearch", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("calls the research endpoint and invalidates queries on success", async () => {
+    const mockFetch = vi.mocked(global.fetch);
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          id: "research-1",
+          status: "pending",
+          researchType: "general",
+        }),
+    } as Response);
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useReresearch(), { wrapper: Wrapper });
+
+    result.current.mutate("todo-1");
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/todos/todo-1/research"),
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("throws an error when response is not ok", async () => {
+    const mockFetch = vi.mocked(global.fetch);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: () => Promise.resolve({ error: "Todo not found" }),
+    } as Response);
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useReresearch(), { wrapper: Wrapper });
+
+    result.current.mutate("nonexistent-todo");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe("Todo not found");
+  });
+
+  it("uses fallback error message when response has no error field", async () => {
+    const mockFetch = vi.mocked(global.fetch);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({}),
+    } as Response);
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useReresearch(), { wrapper: Wrapper });
+
+    result.current.mutate("todo-1");
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe("Request failed (500)");
   });
 });

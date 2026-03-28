@@ -100,6 +100,9 @@ export async function enrichTodoWithAI(
         .returning()
         .then((r) => r[0]);
 
+      // Notify so clients can show pending research state before long-running work
+      await notifySync(env, userId);
+
       // Execute research (runs in same waitUntil context)
       await executeResearch(
         db,

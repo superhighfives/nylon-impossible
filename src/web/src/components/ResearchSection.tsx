@@ -11,7 +11,7 @@ interface ResearchSectionProps {
 
 /**
  * Format summary text with clickable citation links.
- * Converts [1], [2], etc. into links that scroll to / highlight the corresponding source.
+ * Converts [1], [2], etc. into links that open the corresponding source URL in a new tab.
  */
 function formatSummaryWithCitations(
   summary: string,

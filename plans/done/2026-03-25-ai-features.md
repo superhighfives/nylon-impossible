@@ -23,4 +23,4 @@ All items from this plan were completed across several PRs on the `feature/post-
 - **iOS Siri background sync** (PR #92): See `plans/done/2026-03-18-ios-siri-background-sync.md`.
 - **plans/in-progress folder + lifecycle docs** (PR #91): `plans/in-progress/` created, `AGENTS.md` and `plans/README.md` updated with the backlog → ready → in-progress → done lifecycle.
 
-The research agent (`2026-03-13-research-agent.md`) was not tackled as part of this work and remains in `plans/ready/`.
+The research agent (`2026-03-13-research-agent.md`) was implemented separately in PR #98 and the plan has moved to `plans/in-progress/`.
