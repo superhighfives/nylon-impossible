@@ -1,5 +1,6 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { API_URL } from "@/lib/config";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
@@ -8,6 +9,13 @@ import type {
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
+
+const ApiErrorSchema = z.object({ error: z.string() }).optional().catch(undefined);
+
+async function getApiError(response: Response): Promise<string | undefined> {
+  const body = await response.json().catch(() => undefined);
+  return ApiErrorSchema.parse(body)?.error;
+}
 
 const TODOS_QUERY_KEY = ["todos"];
 
@@ -195,11 +203,8 @@ export function useTodoWithUrls(todoId: string | null) {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(
-          (error as { error?: string } | null)?.error ??
-            `Request failed (${response.status})`,
-        );
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
       }
 
       return response.json();
@@ -236,11 +241,8 @@ export function useSmartCreate() {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(
-          (error as { error?: string } | null)?.error ??
-            `Request failed (${response.status})`,
-        );
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
       }
 
       return response.json();
@@ -272,11 +274,8 @@ export function useReresearch() {
       });
 
       if (!response.ok) {
-        const error = await response.json().catch(() => null);
-        throw new Error(
-          (error as { error?: string } | null)?.error ??
-            `Request failed (${response.status})`,
-        );
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
       }
 
       return response.json();
