@@ -14,3 +14,4 @@
 
 - [ ] Make completed tasks smaller and make the checkbox a subtle gray
 - [ ] Add a + button when the user starts typing in the text area (in the bottom-right position), with padding to prevent text overlapping it
+- [ ] Move delete into the todo item, and just have a single icon (no "edit") that expands and collapses the todo
