@@ -1,4 +1,11 @@
-import { AlertCircle, Calendar, ExternalLink, Link2, X } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  ExternalLink,
+  Link2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { ResearchSection } from "./ResearchSection";
@@ -13,6 +20,8 @@ interface TodoItemExpandedProps {
     priority?: "high" | "low" | null;
   }) => void;
   isUpdating: boolean;
+  onDelete: (id: string) => void;
+  deletePending: boolean;
 }
 
 function formatDate(isoString: string | null): string {
@@ -107,6 +116,8 @@ export function TodoItemExpanded({
   todo,
   onUpdate,
   isUpdating,
+  onDelete,
+  deletePending,
 }: TodoItemExpandedProps) {
   // Local state for form fields
   const [title, setTitle] = useState(todo.title);
@@ -261,8 +272,20 @@ export function TodoItemExpanded({
         </div>
       </div>
 
-      {/* Save button */}
-      <div className="flex justify-end pt-2">
+      {/* Save / Delete row */}
+      <div className="flex items-center justify-between pt-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={() => onDelete(todo.id)}
+          disabled={deletePending}
+          aria-label={`Delete "${todo.title}"`}
+          className="text-red-muted hover:text-red hover:bg-red-base"
+        >
+          <Trash2 size={14} />
+          Delete
+        </Button>
         <Button
           variant="primary"
           size="sm"

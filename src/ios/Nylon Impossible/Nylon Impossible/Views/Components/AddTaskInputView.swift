@@ -16,46 +16,54 @@ struct AddTaskInputView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            TextField("Add a new task...", text: $text)
+            TextField("Add a new task...", text: $text, axis: .vertical)
                 .font(.system(size: 16))
                 .foregroundStyle(Color.appDefault)
                 .focused($isFocused)
+                .lineLimit(1...4)
                 .onSubmit {
                     if canAdd {
                         onAdd()
                     }
                 }
-                .padding(.leading, 20)
-                .padding(.trailing, 56)
-                .padding(.vertical, 18)
+                // Dictation is enabled by default on iOS TextField; keyboardType
+                // defaults to .default which allows the dictation mic key
+                .padding(.leading, 24)
+                .padding(.trailing, canAdd ? 60 : 24)
+                .padding(.vertical, 22)
 
-            Spacer()
+            Spacer(minLength: 0)
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.appElevated)
                 .stroke(Color.appLine, lineWidth: 0.5)
         )
-        .overlay(alignment: .trailing) {
-            Button(action: {
-                onAdd()
-                isFocused = false
-            }) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.appBrand)
-                        .frame(width: 40, height: 40)
-
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.appBrandForeground)
-                }
-            }
-            .opacity(canAdd ? 1.0 : 0.4)
-            .disabled(!canAdd)
-            .padding(.trailing, 8)
-            .animation(.easeInOut(duration: 0.2), value: canAdd)
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture {
+            isFocused = true
         }
+        .overlay(alignment: .trailing) {
+            if canAdd {
+                Button(action: {
+                    onAdd()
+                    isFocused = false
+                }) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.appBrand)
+                            .frame(width: 40, height: 40)
+
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(Color.appBrandForeground)
+                    }
+                }
+                .padding(.trailing, 8)
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: canAdd)
     }
 }
 

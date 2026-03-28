@@ -1,6 +1,7 @@
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
-import { Loader, Textarea } from "./ui";
+import { Button, Loader, Textarea } from "./ui";
 
 export function TodoInput() {
   const [text, setText] = useState("");
@@ -44,7 +45,7 @@ export function TodoInput() {
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}
-            className="w-full resize-none min-h-0"
+            className={`w-full resize-none min-h-0 transition-[padding] ${text.trim() ? "pb-12" : ""}`}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -52,11 +53,22 @@ export function TodoInput() {
               }
             }}
           />
-          {smartCreate.isPending && (
-            <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          {smartCreate.isPending ? (
+            <div className="absolute right-3 bottom-3">
               <Loader size="sm" className="text-gray-muted" />
             </div>
-          )}
+          ) : text.trim() ? (
+            <Button
+              type="submit"
+              variant="primary"
+              size="xs"
+              shape="square"
+              className="absolute right-2 bottom-2"
+              aria-label="Add todo"
+            >
+              <Plus size={14} />
+            </Button>
+          ) : null}
         </div>
       </form>
     </div>

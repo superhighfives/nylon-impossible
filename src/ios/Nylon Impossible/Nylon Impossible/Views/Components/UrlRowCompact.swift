@@ -80,6 +80,7 @@ struct UrlRowCompact: View {
                     .font(.system(size: 12))
                     .foregroundStyle(Color.appSubtle)
                     .lineLimit(1)
+                    .truncationMode(.middle)
                 
                 if isPending {
                     Text("Fetching...")

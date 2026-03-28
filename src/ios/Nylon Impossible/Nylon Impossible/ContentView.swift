@@ -15,12 +15,15 @@ struct ContentView: View {
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
 
+    /// Whether the floating input bar is visible (hide on scroll down, show on scroll up)
+    @State private var inputBarVisible: Bool = true
+
     private var sortedTodosList: [TodoItem] {
         viewModel.sortedTodos(from: todos)
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             GradientBackground()
 
             VStack(spacing: 24) {
@@ -32,6 +35,22 @@ struct ContentView: View {
                     todoCount: sortedTodosList.filter { !$0.isCompleted }.count
                 )
 
+                // Task list or empty state
+                if sortedTodosList.isEmpty {
+                    ScrollView {
+                        EmptyStateView()
+                            .transition(.opacity)
+                            .frame(maxWidth: .infinity)
+                            .padding(.bottom, 100)
+                    }
+                } else {
+                    taskListView
+                }
+            }
+            .padding(.horizontal, 16)
+
+            // Floating input bar — liquid glass, hides on scroll down, shows on scroll up
+            VStack(spacing: 0) {
                 AddTaskInputView(
                     text: $viewModel.newTaskText,
                     canAdd: viewModel.canAddTask
@@ -47,19 +66,14 @@ struct ContentView: View {
                         )
                     }
                 }
-
-                // Task list or empty state
-                if sortedTodosList.isEmpty {
-                    ScrollView {
-                        EmptyStateView()
-                            .transition(.opacity)
-                            .frame(maxWidth: .infinity)
-                    }
-                } else {
-                    taskListView
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, 16)
+            .background(.ultraThinMaterial)
+            .offset(y: inputBarVisible ? 0 : 120)
+            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: inputBarVisible)
+            .ignoresSafeArea(edges: .bottom)
         }
         .animation(.easeInOut(duration: 0.3), value: sortedTodosList.count)
         .refreshable {
@@ -120,6 +134,17 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+        // Extra bottom padding so content clears the floating input bar
+        .contentMargins(.bottom, 100, for: .scrollContent)
+        // Detect scroll direction to show/hide the floating input bar
+        .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { oldY, newY in
+            let delta = newY - oldY
+            if delta > 10 {
+                if inputBarVisible { inputBarVisible = false }
+            } else if delta < -10 {
+                if !inputBarVisible { inputBarVisible = true }
+            }
+        }
     }
 
     @ViewBuilder

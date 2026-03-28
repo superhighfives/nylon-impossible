@@ -57,7 +57,7 @@ export function Textarea({
 
   return (
     <textarea
-      className={`flex min-h-[80px] w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base ${variantClasses[variant]} ${className ?? ""}`}
+      className={`flex min-h-[80px] w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base ${variantClasses[variant]} ${className ?? ""}`}
       {...props}
     />
   );

@@ -10,6 +10,7 @@ export interface CheckboxProps
   label?: string;
   indeterminate?: boolean;
   checked?: boolean;
+  variant?: "default" | "subtle";
 }
 
 export function Checkbox({
@@ -17,11 +18,17 @@ export function Checkbox({
   label,
   indeterminate,
   checked,
+  variant = "default",
   id: providedId,
   ...props
 }: CheckboxProps) {
   const generatedId = useId();
   const id = providedId ?? generatedId;
+
+  const checkedStyle =
+    variant === "subtle"
+      ? "data-checked:bg-gray-solid data-checked:border-gray-strong data-checked:text-gray-muted data-indeterminate:bg-gray-solid data-indeterminate:border-gray-strong data-indeterminate:text-gray-muted"
+      : "data-checked:bg-yellow-solid data-checked:border-yellow-solid data-checked:text-gray data-indeterminate:bg-yellow-solid data-indeterminate:border-yellow-solid data-indeterminate:text-gray";
 
   return (
     <div className="inline-flex items-center gap-2">
@@ -31,10 +38,9 @@ export function Checkbox({
         indeterminate={indeterminate}
         className={`
           h-4 w-4 shrink-0 rounded-md border border-gray bg-gray-surface cursor-pointer
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app
           disabled:cursor-not-allowed disabled:opacity-50
-          data-checked:bg-yellow-9 data-checked:border-yellow-9 data-checked:text-gray-12 dark:data-checked:bg-yellowdark-9 dark:data-checked:border-yellowdark-9
-          data-indeterminate:bg-yellow-9 data-indeterminate:border-yellow-9 data-indeterminate:text-gray-12 dark:data-indeterminate:bg-yellowdark-9 dark:data-indeterminate:border-yellowdark-9
+          ${checkedStyle}
           transition-colors
           ${className ?? ""}
         `}
