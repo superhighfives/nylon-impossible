@@ -42,6 +42,7 @@ export function useCreateTodo() {
         aiStatus: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        research: null,
         urls: [],
       };
 
@@ -232,6 +233,42 @@ export function useSmartCreate() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(
+          (error as { error?: string } | null)?.error ??
+            `Request failed (${response.status})`,
+        );
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
+ * Hook to trigger re-research for a todo.
+ * Deletes existing research and kicks off a fresh research run.
+ */
+export function useReresearch() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/research`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {

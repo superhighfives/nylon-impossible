@@ -121,6 +121,17 @@ function TodoItemContent({
               <Loader size="sm" className="text-gray-8 dark:text-graydark-8" />
             </output>
           )}
+          {todo.research?.status === "pending" && (
+            <output
+              className="flex items-center gap-1 text-gray-muted text-xs"
+              aria-label="Researching"
+            >
+              <Loader
+                size="sm"
+                className="text-yellow-8 dark:text-yellowdark-8"
+              />
+            </output>
+          )}
         </div>
         {todo.urls && todo.urls.length > 0 && (
           <div className="flex flex-col gap-1 mt-1.5">

@@ -11,7 +11,9 @@ import {
   inArray,
   lists,
   type Todo,
+  type TodoResearch,
   type TodoUrl,
+  todoResearch,
   todos,
   todoUrls,
   users,
@@ -56,6 +58,7 @@ function serializeUrl(url: TodoUrl) {
   return {
     id: url.id.toLowerCase(),
     todoId: url.todoId.toLowerCase(),
+    researchId: url.researchId?.toLowerCase() ?? null,
     url: url.url,
     title: url.title,
     description: url.description,
@@ -69,10 +72,23 @@ function serializeUrl(url: TodoUrl) {
   };
 }
 
+// Serialize research data
+function serializeResearch(research: TodoResearch | null) {
+  if (!research) return null;
+  return {
+    id: research.id.toLowerCase(),
+    status: research.status,
+    researchType: research.researchType,
+    summary: research.summary,
+    researchedAt: research.researchedAt?.toISOString() ?? null,
+  };
+}
+
 // Serialize a todo with explicit ISO8601 dates and lowercase ID
 function serializeTodo(
   todo: typeof todos.$inferSelect,
   urls: ReturnType<typeof serializeUrl>[] = [],
+  research: TodoResearch | null = null,
 ) {
   return {
     id: todo.id.toLowerCase(),
@@ -86,6 +102,7 @@ function serializeTodo(
     aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
+    research: serializeResearch(research),
     urls,
   };
 }
@@ -403,12 +420,19 @@ export async function syncTodos(c: Context<Env>) {
   // 3. Fetch all URLs for the returned todos
   const todoIds = serverTodos.map((t) => t.id);
   let allUrls: TodoUrl[] = [];
+  let allResearch: TodoResearch[] = [];
   if (todoIds.length > 0) {
-    allUrls = await db
-      .select()
-      .from(todoUrls)
-      .where(inArray(todoUrls.todoId, todoIds))
-      .orderBy(asc(todoUrls.position));
+    [allUrls, allResearch] = await Promise.all([
+      db
+        .select()
+        .from(todoUrls)
+        .where(inArray(todoUrls.todoId, todoIds))
+        .orderBy(asc(todoUrls.position)),
+      db
+        .select()
+        .from(todoResearch)
+        .where(inArray(todoResearch.todoId, todoIds)),
+    ]);
   }
 
   // Group URLs by todoId
@@ -420,9 +444,19 @@ export async function syncTodos(c: Context<Env>) {
     urlsByTodoId.set(url.todoId, existing);
   }
 
+  // Index research by todoId
+  const researchByTodoId = new Map<string, TodoResearch>();
+  for (const research of allResearch) {
+    researchByTodoId.set(research.todoId, research);
+  }
+
   return c.json({
     todos: serverTodos.map((todo) =>
-      serializeTodo(todo, urlsByTodoId.get(todo.id) ?? []),
+      serializeTodo(
+        todo,
+        urlsByTodoId.get(todo.id) ?? [],
+        researchByTodoId.get(todo.id) ?? null,
+      ),
     ),
     syncedAt: syncedAt.toISOString(),
     conflicts,

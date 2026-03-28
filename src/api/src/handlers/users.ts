@@ -5,6 +5,7 @@ import type { Env } from "../types";
 
 const updatePreferencesSchema = z.object({
   aiEnabled: z.boolean().optional(),
+  location: z.string().max(200).nullable().optional(),
 });
 
 // GET /users/me
@@ -17,6 +18,7 @@ export async function getMe(c: Context<Env>) {
       id: users.id,
       email: users.email,
       aiEnabled: users.aiEnabled,
+      location: users.location,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -33,6 +35,7 @@ export async function getMe(c: Context<Env>) {
     id: user.id,
     email: user.email,
     aiEnabled: user.aiEnabled,
+    location: user.location,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });
@@ -55,9 +58,12 @@ export async function updateMe(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  const updates: Partial<{ aiEnabled: boolean }> = {};
+  const updates: Partial<{ aiEnabled: boolean; location: string | null }> = {};
   if (parsed.data.aiEnabled !== undefined) {
     updates.aiEnabled = parsed.data.aiEnabled;
+  }
+  if (parsed.data.location !== undefined) {
+    updates.location = parsed.data.location;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -75,6 +81,7 @@ export async function updateMe(c: Context<Env>) {
       id: users.id,
       email: users.email,
       aiEnabled: users.aiEnabled,
+      location: users.location,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -91,6 +98,7 @@ export async function updateMe(c: Context<Env>) {
     id: user.id,
     email: user.email,
     aiEnabled: user.aiEnabled,
+    location: user.location,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });

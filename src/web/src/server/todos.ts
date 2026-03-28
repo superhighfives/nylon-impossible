@@ -11,12 +11,13 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
-import type { Todo, TodoUrl } from "@/lib/schema";
-import { todos, todoUrls } from "@/lib/schema";
+import type { Todo, TodoResearch, TodoUrl } from "@/lib/schema";
+import { todoResearch, todos, todoUrls } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import { createTodoSchema, updateTodoSchema } from "@/lib/validation";
 import type {
   CreateTodoInput,
+  SerializedResearch,
   SerializedTodoUrl,
   TodoWithUrls,
   UpdateTodoInput,
@@ -27,6 +28,7 @@ function serializeUrl(url: TodoUrl): SerializedTodoUrl {
   return {
     id: url.id,
     todoId: url.todoId,
+    researchId: url.researchId,
     url: url.url,
     title: url.title,
     description: url.description,
@@ -40,8 +42,23 @@ function serializeUrl(url: TodoUrl): SerializedTodoUrl {
   };
 }
 
-/** Serialize a todo with URLs for JSON response */
-function serializeTodoWithUrls(todo: Todo, urls: TodoUrl[]): TodoWithUrls {
+/** Serialize research data for JSON response */
+function serializeResearch(research: TodoResearch): SerializedResearch {
+  return {
+    id: research.id,
+    status: research.status,
+    researchType: research.researchType,
+    summary: research.summary,
+    researchedAt: research.researchedAt?.toISOString() ?? null,
+  };
+}
+
+/** Serialize a todo with URLs and research for JSON response */
+function serializeTodoWithUrls(
+  todo: Todo,
+  urls: TodoUrl[],
+  research: TodoResearch | null,
+): TodoWithUrls {
   return {
     id: todo.id,
     userId: todo.userId,
@@ -54,6 +71,7 @@ function serializeTodoWithUrls(todo: Todo, urls: TodoUrl[]): TodoWithUrls {
     aiStatus: todo.aiStatus ?? null,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
+    research: research ? serializeResearch(research) : null,
     urls: urls.map(serializeUrl),
   };
 }
@@ -79,23 +97,32 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
           }),
       });
 
-      // Fetch all URLs for the user's todos
+      // Fetch all URLs and research for the user's todos
       const todoIds = userTodos.map((t) => t.id);
       let allUrls: TodoUrl[] = [];
+      let allResearch: TodoResearch[] = [];
       if (todoIds.length > 0) {
-        allUrls = yield* Effect.tryPromise({
+        const [urls, research] = yield* Effect.tryPromise({
           try: () =>
-            db
-              .select()
-              .from(todoUrls)
-              .where(inArray(todoUrls.todoId, todoIds))
-              .orderBy(asc(todoUrls.position)),
+            Promise.all([
+              db
+                .select()
+                .from(todoUrls)
+                .where(inArray(todoUrls.todoId, todoIds))
+                .orderBy(asc(todoUrls.position)),
+              db
+                .select()
+                .from(todoResearch)
+                .where(inArray(todoResearch.todoId, todoIds)),
+            ]),
           catch: (error) =>
             new DatabaseError({
-              operation: "getTodoUrls",
+              operation: "getTodoUrlsAndResearch",
               cause: error,
             }),
         });
+        allUrls = urls;
+        allResearch = research;
       }
 
       // Group URLs by todoId
@@ -106,13 +133,23 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         urlsByTodoId.set(url.todoId, existing);
       }
 
+      // Index research by todoId
+      const researchByTodoId = new Map<string, TodoResearch>();
+      for (const research of allResearch) {
+        researchByTodoId.set(research.todoId, research);
+      }
+
       yield* Effect.log(
         `Fetched ${userTodos.length} todos for user ${user.id}`,
       );
 
-      // Return todos with their URLs
+      // Return todos with their URLs and research
       return userTodos.map((todo) =>
-        serializeTodoWithUrls(todo, urlsByTodoId.get(todo.id) ?? []),
+        serializeTodoWithUrls(
+          todo,
+          urlsByTodoId.get(todo.id) ?? [],
+          researchByTodoId.get(todo.id) ?? null,
+        ),
       );
     }),
   );

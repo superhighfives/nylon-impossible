@@ -1,6 +1,7 @@
 import { AlertCircle, Calendar, ExternalLink, Link2, X } from "lucide-react";
 import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
+import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 
 interface TodoItemExpandedProps {
@@ -273,17 +274,30 @@ export function TodoItemExpanded({
         </Button>
       </div>
 
-      {/* URLs */}
-      {todo.urls && todo.urls.length > 0 && (
+      {/* Research Section */}
+      {todo.research && (
+        <ResearchSection
+          todoId={todo.id}
+          research={todo.research}
+          researchUrls={todo.urls.filter(
+            (url) => url.researchId === todo.research?.id,
+          )}
+        />
+      )}
+
+      {/* URLs (user-provided, not research sources) */}
+      {todo.urls && todo.urls.filter((url) => !url.researchId).length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
             <Link2 size={12} />
-            Links ({todo.urls.length})
+            Links ({todo.urls.filter((url) => !url.researchId).length})
           </p>
           <div className="space-y-2">
-            {todo.urls.map((url) => (
-              <UrlCard key={url.id} url={url} />
-            ))}
+            {todo.urls
+              .filter((url) => !url.researchId)
+              .map((url) => (
+                <UrlCard key={url.id} url={url} />
+              ))}
           </div>
         </div>
       )}

@@ -25,6 +25,7 @@ export async function seedTodoUrl(
 
 export async function cleanDb() {
   await env.DB.exec("DELETE FROM todo_urls");
+  await env.DB.exec("DELETE FROM todo_research");
   await env.DB.exec("DELETE FROM todos");
   await env.DB.exec("DELETE FROM users");
 }

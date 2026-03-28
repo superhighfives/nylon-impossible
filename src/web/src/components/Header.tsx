@@ -1,6 +1,7 @@
 import { SignedIn, UserButton } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { SettingsModal } from "./SettingsModal";
 
 export default function Header() {
   const { isOnline } = useOnlineStatus();
@@ -20,6 +21,7 @@ export default function Header() {
           <img src="/logo192.png" alt="Nylon Impossible" className="size-8" />
         </Link>
         <SignedIn>
+          <SettingsModal />
           <UserButton />
         </SignedIn>
       </header>
