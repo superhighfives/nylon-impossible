@@ -42,16 +42,16 @@ struct TodoItemRow: View {
                             todo.isCompleted ? Color.clear : Color.appLine,
                             lineWidth: 2.5
                         )
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
 
                     if todo.isCompleted {
                         Circle()
-                            .fill(Color.appBrand)
-                            .frame(width: 32, height: 32)
+                            .fill(Color.appSubtle.opacity(0.4))
+                            .frame(width: 28, height: 28)
 
                         Image(systemName: "checkmark")
-                            .font(.system(size: 16, weight: .bold))
-                            .foregroundStyle(Color.appBrandForeground)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(Color.appSubtle)
                             .scaleEffect(checkmarkScale)
                     }
                 }
@@ -72,7 +72,7 @@ struct TodoItemRow: View {
                         }
 
                         Text(todo.title)
-                            .font(.system(size: 16))
+                            .font(.system(size: todo.isCompleted ? 13 : 16))
                             .foregroundStyle(todo.isCompleted ? Color.appSubtle : Color.appDefault)
                             .strikethrough(todo.isCompleted, color: Color.appSubtle)
                             .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
@@ -111,6 +111,7 @@ struct TodoItemRow: View {
                                 UrlRowCompact(url: url)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

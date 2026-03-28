@@ -41,6 +41,19 @@ interface TodoItemProps {
   deletePending: boolean;
 }
 
+interface ExpandedSectionProps {
+  todo: TodoWithUrls;
+  onUpdate: (updates: {
+    title?: string;
+    description?: string | null;
+    dueDate?: Date | null;
+    priority?: "high" | "low" | null;
+  }) => void;
+  isUpdating: boolean;
+  onDelete: (id: string) => void;
+  deletePending: boolean;
+}
+
 /** Indicator badges for due date and priority */
 function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   const hasDueDate = !!todo.dueDate;
@@ -97,6 +110,11 @@ function TodoItemContent({
           checked={todo.completed}
           onCheckedChange={() => onToggle(todo.id, todo.completed)}
           disabled={updatePending}
+          className={
+            todo.completed
+              ? "data-checked:!bg-gray-8 data-checked:!border-gray-8 dark:data-checked:!bg-graydark-8 dark:data-checked:!border-graydark-8"
+              : ""
+          }
           aria-label={
             todo.completed
               ? `Mark "${todo.title}" as not completed`
@@ -107,8 +125,10 @@ function TodoItemContent({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p
-            className={`text-sm leading-snug break-words ${
-              todo.completed ? "line-through text-gray-muted" : "text-gray"
+            className={`leading-snug break-words ${
+              todo.completed
+                ? "text-xs line-through text-gray-muted"
+                : "text-sm text-gray"
             }`}
           >
             {todo.title}
@@ -131,30 +151,16 @@ function TodoItemContent({
         )}
         <TodoIndicators todo={todo} />
       </div>
-      <div className="flex gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="sm"
+          shape="square"
           type="button"
           onClick={() => onToggleExpand(todo.id)}
           aria-label={isExpanded ? "Collapse details" : "Expand details"}
         >
-          Edit
-          {isExpanded ? (
-            <ChevronUp size={14} className="ml-1" />
-          ) : (
-            <ChevronDown size={14} className="ml-1" />
-          )}
-        </Button>
-        <Button
-          variant="destructive"
-          size="sm"
-          type="button"
-          onClick={() => onDelete(todo.id)}
-          disabled={deletePending}
-          aria-label={`Delete "${todo.title}"`}
-        >
-          Delete
+          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </Button>
       </div>
     </div>
@@ -166,18 +172,17 @@ function ExpandedSection({
   todo,
   onUpdate,
   isUpdating,
-}: {
-  todo: TodoWithUrls;
-  onUpdate: (updates: {
-    title?: string;
-    description?: string | null;
-    dueDate?: Date | null;
-    priority?: "high" | "low" | null;
-  }) => void;
-  isUpdating: boolean;
-}) {
+  onDelete,
+  deletePending,
+}: ExpandedSectionProps) {
   return (
-    <TodoItemExpanded todo={todo} onUpdate={onUpdate} isUpdating={isUpdating} />
+    <TodoItemExpanded
+      todo={todo}
+      onUpdate={onUpdate}
+      isUpdating={isUpdating}
+      onDelete={onDelete}
+      deletePending={deletePending}
+    />
   );
 }
 
@@ -225,6 +230,8 @@ function SortableTodoItem(
               todo={props.todo}
               onUpdate={props.onUpdateExpanded}
               isUpdating={props.updatePending}
+              onDelete={props.onDelete}
+              deletePending={props.deletePending}
             />
           )}
         </div>
@@ -427,6 +434,8 @@ export function TodoList() {
                 todo={todo}
                 onUpdate={handleUpdateExpanded(todo.id)}
                 isUpdating={updateTodo.isPending}
+                onDelete={handleDelete}
+                deletePending={deleteTodo.isPending}
               />
             )}
           </div>
