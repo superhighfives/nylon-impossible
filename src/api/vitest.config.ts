@@ -63,7 +63,6 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             CLERK_SECRET_KEY: "sk_test_fake",
             CLERK_PUBLISHABLE_KEY: "pk_test_fake",
-            RESEARCH_QUEUE: { send: async () => {} },
             ...aiBindings,
           },
         },
