@@ -158,12 +158,29 @@ struct APIUser: Codable, Sendable {
     let id: String
     let email: String
     let aiEnabled: Bool
+    let location: String?
     let createdAt: Date
     let updatedAt: Date
 }
 
-struct UpdateUserRequest: Codable, Sendable {
+struct UpdateUserRequest: Encodable, Sendable {
     let aiEnabled: Bool?
+    // Double optional: nil = omit field, .some(nil) = send null, .some(value) = send value
+    let location: String??
+
+    enum CodingKeys: String, CodingKey {
+        case aiEnabled, location
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let aiEnabled {
+            try container.encode(aiEnabled, forKey: .aiEnabled)
+        }
+        if case .some(let loc) = location {
+            try container.encode(loc, forKey: .location)
+        }
+    }
 }
 
 // MARK: - API Protocol
@@ -173,7 +190,7 @@ protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
     func smartCreate(text: String) async throws -> SmartCreateResponse
     func getMe() async throws -> APIUser
-    func updateMe(aiEnabled: Bool) async throws -> APIUser
+    func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
 }
 
 // MARK: - API Service
@@ -287,8 +304,8 @@ final class APIService: APIProviding {
         return try await get(path: "/users/me")
     }
 
-    func updateMe(aiEnabled: Bool) async throws -> APIUser {
-        return try await patch(path: "/users/me", body: UpdateUserRequest(aiEnabled: aiEnabled))
+    func updateMe(_ request: UpdateUserRequest) async throws -> APIUser {
+        return try await patch(path: "/users/me", body: request)
     }
 
     // MARK: - HTTP Methods

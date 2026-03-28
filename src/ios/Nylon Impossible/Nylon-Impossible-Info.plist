@@ -12,6 +12,8 @@
 	<string>$(API_BASE_URL)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Nylon uses your location to fill in your location setting automatically.</string>
 	<key>NSSiriUsageDescription</key>
 	<string>Siri helps you add tasks to Nylon with your voice.</string>
 	<key>INAlternativeAppNames</key>

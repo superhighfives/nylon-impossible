@@ -234,12 +234,17 @@ function parseResearchResponse(response: unknown): ResearchResult {
 
   if (typeof response === "string") {
     text = response;
-  } else if (
-    response &&
-    typeof response === "object" &&
-    "response" in response
-  ) {
-    text = (response as { response?: string }).response ?? undefined;
+  } else if (response && typeof response === "object") {
+    if ("response" in response) {
+      // Workers AI native format
+      text = (response as { response?: string }).response ?? undefined;
+    } else if ("choices" in response) {
+      // OpenAI-compatible format (returned by kimi-k2.5)
+      const r = response as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      text = r.choices?.[0]?.message?.content ?? undefined;
+    }
   }
 
   if (!text) {

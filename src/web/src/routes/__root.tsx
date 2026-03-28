@@ -10,12 +10,12 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
-import { AiToggle } from "../components/AiToggle";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
+import { SettingsModal } from "../components/SettingsModal";
 import {
   OnlineStatusContext,
   useOnlineStatusValue,
@@ -124,7 +124,7 @@ function RootDocument() {
             </div>
             <DevEnvironmentIndicator origin={origin} />
             <SignedIn>
-              <AiToggle />
+              <SettingsModal />
             </SignedIn>
           </OnlineStatusContext.Provider>
           <TanStackDevtools

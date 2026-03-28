@@ -22,6 +22,7 @@ final class MockAPIService: APIProviding {
         id: "mock-user-id",
         email: "test@example.com",
         aiEnabled: true,
+        location: nil,
         createdAt: Date(timeIntervalSince1970: 1735689600),
         updatedAt: Date(timeIntervalSince1970: 1735689600)
     )
@@ -29,7 +30,7 @@ final class MockAPIService: APIProviding {
 
     var updateMeResponse: APIUser?
     var updateMeError: Error?
-    var lastUpdateMeAiEnabled: Bool?
+    var lastUpdateMeRequest: UpdateUserRequest?
 
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse {
         lastSyncRequest = (lastSyncedAt, changes)
@@ -54,15 +55,22 @@ final class MockAPIService: APIProviding {
         return getMeResponse
     }
 
-    func updateMe(aiEnabled: Bool) async throws -> APIUser {
-        lastUpdateMeAiEnabled = aiEnabled
+    func updateMe(_ request: UpdateUserRequest) async throws -> APIUser {
+        lastUpdateMeRequest = request
         if let error = updateMeError {
             throw error
+        }
+        let newLocation: String?
+        if case .some(let loc) = request.location {
+            newLocation = loc
+        } else {
+            newLocation = getMeResponse.location
         }
         return updateMeResponse ?? APIUser(
             id: getMeResponse.id,
             email: getMeResponse.email,
-            aiEnabled: aiEnabled,
+            aiEnabled: request.aiEnabled ?? getMeResponse.aiEnabled,
+            location: newLocation,
             createdAt: getMeResponse.createdAt,
             updatedAt: Date()
         )
