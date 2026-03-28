@@ -286,15 +286,17 @@ function parseResearchResponse(response: unknown): ResearchResult {
 /**
  * Run a promise with a timeout
  */
-async function runWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
+function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: number | null = null;
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("Research timed out")), timeoutMs);
+    timeoutId = setTimeout(
+      () => reject(new Error("Research timed out")),
+      timeoutMs,
+    );
   });
-
-  return Promise.race([promise, timeout]);
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timeoutId);
+  });
 }
 
 /**
