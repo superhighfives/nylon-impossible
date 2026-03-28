@@ -108,11 +108,7 @@ function TodoItemContent({
           checked={todo.completed}
           onCheckedChange={() => onToggle(todo.id, todo.completed)}
           disabled={updatePending}
-          className={
-            todo.completed
-              ? "data-checked:!bg-gray-solid data-checked:!border-gray-strong"
-              : ""
-          }
+          variant={todo.completed ? "subtle" : "default"}
           aria-label={
             todo.completed
               ? `Mark "${todo.title}" as not completed`
