@@ -39,8 +39,20 @@ export async function executeResearch(
         ? await executeLocationResearch(ai, query, userLocation, gatewayId)
         : await executeGeneralResearch(ai, query, gatewayId);
 
-    // Deduplicate sources returned by the AI
-    const uniqueSources = Array.from(new Set(result.sources));
+    // Deduplicate sources returned by the AI, normalizing URLs so
+    // "https://google.com" and "https://google.com/" are treated as the same.
+    const seen = new Set<string>();
+    const uniqueSources = result.sources.filter((url) => {
+      let key = url;
+      try {
+        key = new URL(url).href;
+      } catch {
+        // keep raw url as key
+      }
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     // Insert source URLs with researchId
     let urlRecords: {

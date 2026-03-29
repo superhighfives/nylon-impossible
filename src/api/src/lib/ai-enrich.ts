@@ -156,13 +156,21 @@ async function insertAndFetchUrls(
   todoId: string,
   urls: string[],
 ): Promise<void> {
-  // Skip URLs that are already stored for this todo (e.g. extracted during initial create)
+  // Skip URLs that are already stored for this todo (e.g. extracted during initial create).
+  // Normalize via new URL().href so "https://google.com" and "https://google.com/" compare equal.
+  const normalize = (url: string) => {
+    try {
+      return new URL(url).href;
+    } catch {
+      return url;
+    }
+  };
   const existing = await db
     .select({ url: todoUrls.url })
     .from(todoUrls)
     .where(eq(todoUrls.todoId, todoId));
-  const existingUrls = new Set(existing.map((r) => r.url));
-  const newUrls = urls.filter((url) => !existingUrls.has(url));
+  const existingUrls = new Set(existing.map((r) => normalize(r.url)));
+  const newUrls = urls.filter((url) => !existingUrls.has(normalize(url)));
 
   if (newUrls.length === 0) return;
 
