@@ -1,5 +1,5 @@
-import { and, eq, getDb, todoResearch, todos } from "../lib/db";
 import type { Context } from "hono";
+import { and, eq, getDb, todoResearch, todos } from "../lib/db";
 import type { Env } from "../types";
 
 /**
@@ -31,10 +31,7 @@ export async function cancelResearch(c: Context<Env>) {
     .update(todoResearch)
     .set({ status: "failed", updatedAt: new Date() })
     .where(
-      and(
-        eq(todoResearch.todoId, todoId),
-        eq(todoResearch.status, "pending"),
-      ),
+      and(eq(todoResearch.todoId, todoId), eq(todoResearch.status, "pending")),
     );
 
   // Notify clients of the status change
