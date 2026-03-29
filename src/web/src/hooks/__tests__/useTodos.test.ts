@@ -139,7 +139,7 @@ function makeResearch(
 describe("hasPendingNonStaleWork", () => {
   const now = new Date("2026-01-01T00:10:00.000Z").getTime();
   const recent = new Date("2026-01-01T00:09:00.000Z").toISOString(); // 1 min ago
-  const stale = new Date("2026-01-01T00:07:00.000Z").toISOString(); // 3 min ago
+  const stale = new Date("2026-01-01T00:03:00.000Z").toISOString(); // 7 min ago
 
   beforeEach(() => {
     vi.useFakeTimers();
