@@ -19,7 +19,9 @@ struct TodoEditSheet: View {
     @State private var dueDate: Date
     @State private var priority: TodoPriority?
     @State private var urls: [APITodoUrl] = []
+    @State private var research: APIResearch? = nil
     @State private var isLoadingUrls: Bool = false
+    @State private var isReresearching: Bool = false
     
     init(
         todo: TodoItem,
@@ -39,6 +41,14 @@ struct TodoEditSheet: View {
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _priority = State(initialValue: todo.todoPriority)
         _urls = State(initialValue: initialUrls)
+        _research = State(initialValue: todo.researchStatus != nil ? APIResearch(
+            id: todo.researchId ?? "",
+            status: todo.researchStatus ?? "pending",
+            researchType: todo.researchType ?? "general",
+            summary: todo.researchSummary,
+            researchedAt: todo.researchedAt,
+            createdAt: todo.researchCreatedAt ?? Date()
+        ) : nil)
     }
     
     var body: some View {
@@ -87,7 +97,18 @@ struct TodoEditSheet: View {
                     Text("Priority")
                 }
                 
-                // Links
+                // Research
+                if let research {
+                    ResearchSection(
+                        todo: researchTodoProxy(research: research),
+                        researchUrls: urls.filter { $0.researchId != nil },
+                        onReresearch: { await reresearch() },
+                        onCancelResearch: { await cancelResearch() }
+                    )
+                }
+
+                // Links (non-research URLs only)
+                let regularUrls = urls.filter { $0.researchId == nil }
                 if isLoadingUrls && urls.isEmpty {
                     Section {
                         HStack {
@@ -99,13 +120,13 @@ struct TodoEditSheet: View {
                     } header: {
                         Text("Links")
                     }
-                } else if !urls.isEmpty {
+                } else if !regularUrls.isEmpty {
                     Section {
-                        ForEach(urls) { url in
+                        ForEach(regularUrls) { url in
                             UrlRow(url: url)
                         }
                     } header: {
-                        Text("Links (\(urls.count))")
+                        Text("Links (\(regularUrls.count))")
                     }
                 }
             }
@@ -142,11 +163,48 @@ struct TodoEditSheet: View {
         onSave(trimmedTitle, descriptionValue, dueDateValue, priority)
     }
     
+    /// Build a lightweight TodoItem proxy that ResearchSection can read research state from.
+    private func researchTodoProxy(research: APIResearch) -> TodoItem {
+        let proxy = TodoItem(title: todo.title)
+        proxy.researchId = research.id
+        proxy.researchStatus = research.status
+        proxy.researchType = research.researchType
+        proxy.researchSummary = research.summary
+        proxy.researchedAt = research.researchedAt
+        proxy.researchCreatedAt = research.createdAt
+        return proxy
+    }
+
+    private func reresearch() async {
+        guard let apiService else { return }
+        isReresearching = true
+        defer { isReresearching = false }
+        do {
+            try await apiService.reresearch(todoId: todo.id.uuidString.lowercased())
+            // Mark research as pending again immediately for responsive UI
+            research = research.map { APIResearch(
+                id: $0.id, status: "pending", researchType: $0.researchType,
+                summary: $0.summary, researchedAt: $0.researchedAt, createdAt: Date()
+            )}
+            // Reload todo detail to pick up new research record
+            await loadUrls()
+        } catch {
+            print("[Research] Re-research error: \(error)")
+        }
+    }
+
+    private func cancelResearch() async {
+        // Cancellation is handled server-side; just re-sync after a brief delay
+        await loadUrls()
+    }
+
     private func loadUrls() async {
         guard let apiService = apiService else { return }
 
-        // Only fetch from API if there are pending URLs that the server may have resolved
-        guard urls.contains(where: { $0.fetchStatus == .pending }) else { return }
+        // Fetch if there are pending URLs or pending research that may have resolved
+        let hasPendingUrls = urls.contains(where: { $0.fetchStatus == .pending })
+        let hasPendingResearch = research?.status == "pending"
+        guard hasPendingUrls || hasPendingResearch || isReresearching else { return }
 
         isLoadingUrls = true
         defer { isLoadingUrls = false }
@@ -154,9 +212,10 @@ struct TodoEditSheet: View {
         do {
             let todoWithUrls = try await apiService.getTodo(id: todo.id)
             urls = todoWithUrls.urls
+            research = todoWithUrls.research
         } catch {
-            // Silently fail - URLs are supplementary info
-            print("Failed to load URLs: \(error)")
+            // Silently fail - URLs and research are supplementary info
+            print("Failed to load todo detail: \(error)")
         }
     }
 }

@@ -32,6 +32,15 @@ enum APIError: Error, LocalizedError {
 
 // MARK: - API Models
 
+struct APIResearch: Codable, Sendable {
+    let id: String
+    let status: String        // "pending" | "completed" | "failed"
+    let researchType: String  // "general" | "location"
+    let summary: String?
+    let researchedAt: Date?
+    let createdAt: Date
+}
+
 struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
@@ -45,6 +54,7 @@ struct APITodo: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
+    let research: APIResearch?
 }
 
 /// Fetch status for URL metadata
@@ -65,6 +75,7 @@ enum AIStatus: String, Codable, Sendable {
 struct APITodoUrl: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
+    let researchId: String?
     let url: String
     let title: String?
     let description: String?
@@ -90,6 +101,7 @@ struct APITodoWithUrls: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]
+    let research: APIResearch?
 }
 
 struct SyncRequest: Codable, Sendable {
@@ -191,6 +203,7 @@ protocol APIProviding: Sendable {
     func smartCreate(text: String) async throws -> SmartCreateResponse
     func getMe() async throws -> APIUser
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
+    func reresearch(todoId: String) async throws
 }
 
 // MARK: - API Service
@@ -298,6 +311,13 @@ final class APIService: APIProviding {
         let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
 
+    // MARK: - Research
+
+    func reresearch(todoId: String) async throws {
+        struct ReresearchResponse: Decodable { let id: String }
+        let _: ReresearchResponse = try await post(path: "/todos/\(todoId)/research", body: EmptyBody())
+    }
+
     // MARK: - User Preferences
 
     func getMe() async throws -> APIUser {
@@ -383,6 +403,8 @@ final class APIService: APIProviding {
 }
 
 // MARK: - Helper Types
+
+private struct EmptyBody: Encodable {}
 
 private struct EmptyResponse: Decodable {
     let success: Bool?
