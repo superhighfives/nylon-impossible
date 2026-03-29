@@ -84,7 +84,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --var ENVIRONMENT:production --var CF_AI_GATEWAY_ID:nylon-impossible --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           secrets: |
             CLOUDFLARE_API_TOKEN
         env:
@@ -215,7 +215,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --var ENVIRONMENT:production --var CF_AI_GATEWAY_ID:nylon-impossible --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set preview API secrets
         if: steps.changes.outputs.api == 'true'
