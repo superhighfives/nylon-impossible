@@ -9,7 +9,8 @@ import { generateNKeysBetween } from "fractional-indexing";
 import { eq, type getDb, todoResearch, todoUrls } from "./db";
 import { fetchUrlMetadata } from "./url-metadata";
 
-const RESEARCH_TIMEOUT_MS = 60_000;
+// Queue consumer has its own execution budget — 5 minutes before we give up.
+const RESEARCH_TIMEOUT_MS = 5 * 60 * 1_000;
 
 interface ResearchResult {
   summary: string;
@@ -23,7 +24,7 @@ interface ResearchResult {
 export async function executeResearch(
   db: ReturnType<typeof getDb>,
   ai: Ai,
-  env: { USER_SYNC: DurableObjectNamespace },
+  env: { USER_SYNC: DurableObjectNamespace; CF_AI_GATEWAY_ID?: string },
   todoId: string,
   userId: string,
   query: string,
@@ -32,10 +33,26 @@ export async function executeResearch(
   userLocation?: string | null,
 ): Promise<void> {
   try {
+    const gatewayId = env.CF_AI_GATEWAY_ID;
     const result =
       researchType === "location"
-        ? await executeLocationResearch(ai, query, userLocation)
-        : await executeGeneralResearch(ai, query);
+        ? await executeLocationResearch(ai, query, userLocation, gatewayId)
+        : await executeGeneralResearch(ai, query, gatewayId);
+
+    // Deduplicate sources returned by the AI, normalizing URLs so
+    // "https://google.com" and "https://google.com/" are treated as the same.
+    const seen = new Set<string>();
+    const uniqueSources = result.sources.filter((url) => {
+      let key = url;
+      try {
+        key = new URL(url).href;
+      } catch {
+        // keep raw url as key
+      }
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     // Insert source URLs with researchId
     let urlRecords: {
@@ -48,15 +65,15 @@ export async function executeResearch(
       createdAt: Date;
       updatedAt: Date;
     }[] = [];
-    if (result.sources.length > 0) {
+    if (uniqueSources.length > 0) {
       const now = new Date();
       const urlPositions = generateNKeysBetween(
         null,
         null,
-        result.sources.length,
+        uniqueSources.length,
       );
 
-      urlRecords = result.sources.map((url, i) => ({
+      urlRecords = uniqueSources.map((url, i) => ({
         id: crypto.randomUUID(),
         todoId,
         researchId,
@@ -68,6 +85,17 @@ export async function executeResearch(
       }));
 
       await db.insert(todoUrls).values(urlRecords);
+    }
+
+    // Check if research was cancelled while the AI was running
+    const [current] = await db
+      .select({ status: todoResearch.status })
+      .from(todoResearch)
+      .where(eq(todoResearch.id, researchId));
+
+    if (current?.status !== "pending") {
+      // Research was cancelled or already in a terminal state — discard results
+      return;
     }
 
     // Mark research as completed immediately so clients can show results
@@ -139,6 +167,7 @@ export async function executeResearch(
 async function executeGeneralResearch(
   ai: Ai,
   query: string,
+  gatewayId?: string,
 ): Promise<ResearchResult> {
   const prompt = `Research the following topic and provide a brief 2-3 sentence summary with numbered citations.
 
@@ -165,11 +194,7 @@ Only return valid JSON, no other text.`;
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
       },
-      {
-        gateway: {
-          id: "nylon-impossible",
-        },
-      },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
   );
@@ -184,6 +209,7 @@ async function executeLocationResearch(
   ai: Ai,
   query: string,
   userLocation?: string | null,
+  gatewayId?: string,
 ): Promise<ResearchResult> {
   const searchQuery = userLocation ? `${query} near ${userLocation}` : query;
 
@@ -213,11 +239,7 @@ Only return valid JSON, no other text.`;
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
       },
-      {
-        gateway: {
-          id: "nylon-impossible",
-        },
-      },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
   );
@@ -284,15 +306,17 @@ function parseResearchResponse(response: unknown): ResearchResult {
 /**
  * Run a promise with a timeout
  */
-async function runWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
+function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: number | null = null;
   const timeout = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error("Research timed out")), timeoutMs);
+    timeoutId = setTimeout(
+      () => reject(new Error("Research timed out")),
+      timeoutMs,
+    );
   });
-
-  return Promise.race([promise, timeout]);
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timeoutId);
+  });
 }
 
 /**

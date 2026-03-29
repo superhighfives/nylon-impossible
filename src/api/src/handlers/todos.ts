@@ -1,7 +1,17 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, asc, eq, getDb, inArray, todos, todoUrls } from "../lib/db";
-import type { Env } from "../types";
+import {
+  and,
+  asc,
+  eq,
+  getDb,
+  inArray,
+  todoResearch,
+  todos,
+  todoUrls,
+  users,
+} from "../lib/db";
+import type { Env, ResearchJobMessage } from "../types";
 
 // Validation schemas
 const createTodoSchema = z.object({
@@ -11,8 +21,11 @@ const createTodoSchema = z.object({
 
 const updateTodoSchema = z.object({
   title: z.string().min(1).max(500).optional(),
+  description: z.string().nullable().optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),
+  dueDate: z.coerce.date().nullable().optional(),
+  priority: z.enum(["high", "low"]).nullable().optional(),
   updatedAt: z.coerce.date().optional(),
 });
 
@@ -181,15 +194,16 @@ export async function updateTodo(c: Context<Env>) {
     updatedAt: parsed.data.updatedAt ?? new Date(),
   };
 
-  if (parsed.data.title !== undefined) {
-    updates.title = parsed.data.title;
-  }
-  if (parsed.data.completed !== undefined) {
+  if (parsed.data.title !== undefined) updates.title = parsed.data.title;
+  if (parsed.data.description !== undefined)
+    updates.description = parsed.data.description;
+  if (parsed.data.completed !== undefined)
     updates.completed = parsed.data.completed;
-  }
-  if (parsed.data.position !== undefined) {
+  if (parsed.data.position !== undefined)
     updates.position = parsed.data.position;
-  }
+  if (parsed.data.dueDate !== undefined) updates.dueDate = parsed.data.dueDate;
+  if (parsed.data.priority !== undefined)
+    updates.priority = parsed.data.priority;
 
   await db
     .update(todos)
@@ -197,6 +211,59 @@ export async function updateTodo(c: Context<Env>) {
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
+
+  // Re-fire research when the title or description changes and research already exists
+  const titleChanged =
+    parsed.data.title !== undefined && parsed.data.title !== existing.title;
+  const descriptionChanged =
+    parsed.data.description !== undefined &&
+    parsed.data.description !== existing.description;
+
+  if (titleChanged || descriptionChanged) {
+    const [research] = await db
+      .select({ id: todoResearch.id, researchType: todoResearch.researchType })
+      .from(todoResearch)
+      .where(eq(todoResearch.todoId, todoId));
+
+    if (research) {
+      await db.delete(todoUrls).where(eq(todoUrls.researchId, research.id));
+      await db.delete(todoResearch).where(eq(todoResearch.id, research.id));
+
+      const newResearchId = crypto.randomUUID();
+      const now = new Date();
+      await db.insert(todoResearch).values({
+        id: newResearchId,
+        todoId,
+        researchType: research.researchType,
+        status: "pending",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const [user] = await db
+        .select({ location: users.location })
+        .from(users)
+        .where(eq(users.id, userId));
+
+      const newTitle = parsed.data.title ?? existing.title;
+      const newDesc =
+        parsed.data.description !== undefined
+          ? parsed.data.description
+          : existing.description;
+      const query = newDesc?.trim()
+        ? `${newTitle}: ${newDesc.trim()}`
+        : newTitle;
+
+      await c.env.RESEARCH_QUEUE.send({
+        todoId,
+        userId,
+        query,
+        researchType: research.researchType,
+        researchId: newResearchId,
+        userLocation: user?.location ?? null,
+      } satisfies ResearchJobMessage);
+    }
+  }
 
   return c.json(serializeTodo(updated));
 }
@@ -219,6 +286,15 @@ export async function deleteTodo(c: Context<Env>) {
   if (!existing) {
     return c.json({ error: "Todo not found" }, 404);
   }
+
+  // Cancel any pending research so the queue consumer exits cleanly via the
+  // cancel guard rather than hitting a FK violation when the todo is gone.
+  await db
+    .update(todoResearch)
+    .set({ status: "failed", updatedAt: new Date() })
+    .where(
+      and(eq(todoResearch.todoId, todoId), eq(todoResearch.status, "pending")),
+    );
 
   await db.delete(todos).where(eq(todos.id, todoId));
 

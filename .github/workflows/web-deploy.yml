@@ -144,6 +144,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Ensure preview research queue exists
+        if: steps.changes.outputs.api == 'true'
+        working-directory: src/api
+        run: pnpm exec wrangler queues create nylon-impossible-research-preview 2>&1 || true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Rewrite API wrangler config for preview
         if: steps.changes.outputs.api == 'true'
         uses: actions/github-script@v8
@@ -159,6 +167,19 @@ jobs:
             const config = JSON.parse(stripped);
             config.name = name;
             config.routes = [{ pattern: domain, custom_domain: true }];
+            // Point all queue bindings to the shared preview queue so the preview
+            // Worker registers its own consumer (Cloudflare allows one consumer per
+            // queue, so preview can't share the production queue).
+            // The DLQ is omitted from preview to avoid needing a second queue to exist.
+            const previewQueue = 'nylon-impossible-research-preview';
+            if (config.queues) {
+              if (config.queues.producers) {
+                config.queues.producers = config.queues.producers.map(p => ({ ...p, queue: previewQueue }));
+              }
+              if (config.queues.consumers) {
+                config.queues.consumers = config.queues.consumers.map(({ dead_letter_queue, ...c }) => ({ ...c, queue: previewQueue }));
+              }
+            }
             fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
 
       - name: Rewrite Web wrangler config for preview

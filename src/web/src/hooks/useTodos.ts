@@ -22,10 +22,33 @@ async function getApiError(response: Response): Promise<string | undefined> {
 
 const TODOS_QUERY_KEY = ["todos"];
 
+// Must match RESEARCH_TIMEOUT_MS in src/api/src/lib/research.ts.
+export const STALE_RESEARCH_MS = 5 * 60 * 1_000;
+
+// Show cancel + retry buttons after this long while research is pending.
+export const SHOW_RETRY_MS = 30 * 1_000;
+
+export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
+  return todos.some((todo) => {
+    if (todo.aiStatus === "pending" || todo.aiStatus === "processing")
+      return true;
+    if (todo.research?.status === "pending") {
+      const age = Date.now() - new Date(todo.research.createdAt).getTime();
+      return age < STALE_RESEARCH_MS;
+    }
+    return false;
+  });
+}
+
 export function useTodos() {
   return useQuery<TodoWithUrls[]>({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return false;
+      return hasPendingNonStaleWork(data) ? 3000 : false;
+    },
   });
 }
 
@@ -286,6 +309,38 @@ export function useReresearch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
+    },
+  });
+}
+
+/**
+ * Hook to cancel pending research for a todo.
+ * Marks research as failed so the user isn't stuck on a spinner.
+ * The queue worker checks for cancellation before writing results.
+ */
+export function useCancelResearch() {
+  const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/research`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
     },
   });
 }

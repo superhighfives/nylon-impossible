@@ -214,7 +214,7 @@ describe("enrichTodo", () => {
   });
 
   describe("request format", () => {
-    it("calls ai.run with correct model and gateway", async () => {
+    it("calls ai.run with correct model (no gateway when gatewayId not provided)", async () => {
       const ai = createMockAi({
         title: "Buy milk",
         urls: ["https://example.com"],
@@ -237,9 +237,22 @@ describe("enrichTodo", () => {
             function: { name: "enrich_todo" },
           }),
         }),
-        expect.objectContaining({
-          gateway: { id: "nylon-impossible" },
-        }),
+        {},
+      );
+    });
+
+    it("passes gateway option when gatewayId is provided", async () => {
+      const ai = createMockAi({
+        title: "Buy milk",
+        urls: ["https://example.com"],
+      });
+
+      await enrichTodo(ai, "Buy milk https://example.com", "my-gateway");
+
+      expect(ai.run).toHaveBeenCalledWith(
+        "@cf/moonshotai/kimi-k2.5",
+        expect.any(Object),
+        { gateway: { id: "my-gateway" } },
       );
     });
 

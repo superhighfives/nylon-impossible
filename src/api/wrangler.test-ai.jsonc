@@ -26,6 +26,11 @@
       "new_classes": ["UserSync"]
     }
   ],
+  "queues": {
+    "producers": [
+      { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" }
+    ]
+  },
   // AI Gateway vars for real AI tests. Values injected via vitest.config.ts from env.
   "vars": {
     "AI_GATEWAY_ID": "nylon-impossible"

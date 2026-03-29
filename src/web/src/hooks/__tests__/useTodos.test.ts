@@ -5,6 +5,7 @@ import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodoWithUrls } from "@/types/database";
 import {
+  hasPendingNonStaleWork,
   useCreateTodo,
   useDeleteTodo,
   useReresearch,
@@ -114,6 +115,82 @@ describe("useTodos", () => {
     const { result } = renderHook(() => useTodos(), { wrapper: Wrapper });
 
     expect(result.current.isPending).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// hasPendingNonStaleWork (refetchInterval helper)
+// ---------------------------------------------------------------------------
+
+function makeResearch(
+  status: "pending" | "completed" | "failed",
+  createdAt: string,
+): NonNullable<TodoWithUrls["research"]> {
+  return {
+    id: "research-1",
+    status,
+    researchType: "general",
+    summary: null,
+    researchedAt: null,
+    createdAt,
+  };
+}
+
+describe("hasPendingNonStaleWork", () => {
+  const now = new Date("2026-01-01T00:10:00.000Z").getTime();
+  const recent = new Date("2026-01-01T00:09:00.000Z").toISOString(); // 1 min ago
+  const stale = new Date("2026-01-01T00:03:00.000Z").toISOString(); // 7 min ago
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("returns false for an empty list", () => {
+    expect(hasPendingNonStaleWork([])).toBe(false);
+  });
+
+  it("returns false when all todos are complete with no pending work", () => {
+    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: null })])).toBe(false);
+  });
+
+  it("returns true when a todo has aiStatus 'pending'", () => {
+    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "pending" })])).toBe(
+      true,
+    );
+  });
+
+  it("returns true when a todo has aiStatus 'processing'", () => {
+    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "processing" })])).toBe(
+      true,
+    );
+  });
+
+  it("returns true when a todo has pending research created less than 2 minutes ago", () => {
+    const todo = makeTodo({ research: makeResearch("pending", recent) });
+    expect(hasPendingNonStaleWork([todo])).toBe(true);
+  });
+
+  it("returns false when pending research is older than 2 minutes", () => {
+    const todo = makeTodo({ research: makeResearch("pending", stale) });
+    expect(hasPendingNonStaleWork([todo])).toBe(false);
+  });
+
+  it("returns false when research is completed regardless of age", () => {
+    const todo = makeTodo({ research: makeResearch("completed", recent) });
+    expect(hasPendingNonStaleWork([todo])).toBe(false);
+  });
+
+  it("returns true when at least one todo has active pending work", () => {
+    const todos = [
+      makeTodo({ aiStatus: null }),
+      makeTodo({ id: "todo-2", aiStatus: "processing" }),
+    ];
+    expect(hasPendingNonStaleWork(todos)).toBe(true);
   });
 });
 

@@ -8,8 +8,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
-import { executeResearch } from "../lib/research";
-import type { Env } from "../types";
+import type { Env, ResearchJobMessage } from "../types";
 
 /**
  * POST /todos/:id/research
@@ -81,20 +80,15 @@ export async function reresearchTodo(c: Context<Env>) {
     .from(users)
     .where(eq(users.id, userId));
 
-  // Execute research in background
-  c.executionCtx.waitUntil(
-    executeResearch(
-      db,
-      c.env.AI,
-      c.env,
-      todoId,
-      userId,
-      todo.title,
-      researchType,
-      newResearchId,
-      user?.location,
-    ),
-  );
+  // Enqueue research job — runs in a separate Worker invocation
+  await c.env.RESEARCH_QUEUE.send({
+    todoId,
+    userId,
+    query: todo.title,
+    researchType,
+    researchId: newResearchId,
+    userLocation: user?.location ?? null,
+  } satisfies ResearchJobMessage);
 
   return c.json({
     id: newResearchId,
