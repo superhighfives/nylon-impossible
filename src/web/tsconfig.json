@@ -37,7 +37,6 @@
     /* Development */
     "sourceMap": true,
 
-    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
