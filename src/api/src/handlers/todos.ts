@@ -199,9 +199,11 @@ export async function updateTodo(c: Context<Env>) {
     updates.description = parsed.data.description;
   if (parsed.data.completed !== undefined)
     updates.completed = parsed.data.completed;
-  if (parsed.data.position !== undefined) updates.position = parsed.data.position;
+  if (parsed.data.position !== undefined)
+    updates.position = parsed.data.position;
   if (parsed.data.dueDate !== undefined) updates.dueDate = parsed.data.dueDate;
-  if (parsed.data.priority !== undefined) updates.priority = parsed.data.priority;
+  if (parsed.data.priority !== undefined)
+    updates.priority = parsed.data.priority;
 
   await db
     .update(todos)
@@ -291,10 +293,7 @@ export async function deleteTodo(c: Context<Env>) {
     .update(todoResearch)
     .set({ status: "failed", updatedAt: new Date() })
     .where(
-      and(
-        eq(todoResearch.todoId, todoId),
-        eq(todoResearch.status, "pending"),
-      ),
+      and(eq(todoResearch.todoId, todoId), eq(todoResearch.status, "pending")),
     );
 
   await db.delete(todos).where(eq(todos.id, todoId));
