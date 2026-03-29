@@ -22,8 +22,11 @@ async function getApiError(response: Response): Promise<string | undefined> {
 
 const TODOS_QUERY_KEY = ["todos"];
 
-// Research older than this threshold is considered stale — stop polling for it.
-export const STALE_RESEARCH_MS = 2 * 60 * 1000;
+// Must match RESEARCH_TIMEOUT_MS in src/api/src/lib/research.ts.
+export const STALE_RESEARCH_MS = 5 * 60 * 1_000;
+
+// Show cancel + retry buttons after this long while research is pending.
+export const SHOW_RETRY_MS = 30 * 1_000;
 
 export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
   return todos.some((todo) => {
@@ -306,6 +309,38 @@ export function useReresearch() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
+    },
+  });
+}
+
+/**
+ * Hook to cancel pending research for a todo.
+ * Marks research as failed so the user isn't stuck on a spinner.
+ * The queue worker checks for cancellation before writing results.
+ */
+export function useCancelResearch() {
+  const queryClient = useQueryClient();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/research`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
     },
   });
 }

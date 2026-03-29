@@ -28,6 +28,7 @@ export async function enrichTodoWithAI(
   env: {
     USER_SYNC: DurableObjectNamespace;
     RESEARCH_QUEUE: Queue<ResearchJobMessage>;
+    CF_AI_GATEWAY_ID?: string;
   },
   todoId: string,
   userId: string,
@@ -43,7 +44,7 @@ export async function enrichTodoWithAI(
     .where(eq(todos.id, todoId));
 
   try {
-    const enrichment = await enrichTodo(ai, originalText);
+    const enrichment = await enrichTodo(ai, originalText, env.CF_AI_GATEWAY_ID);
 
     // If AI returned nothing useful, mark complete and exit
     if (!enrichment) {
@@ -62,7 +63,25 @@ export async function enrichTodoWithAI(
 
     // Update title if URLs were removed (title changed)
     if (enrichment.title && enrichment.title !== originalText) {
-      updates.title = truncateTitle(enrichment.title.trim());
+      let cleanTitle = enrichment.title.trim();
+      // If stripping URLs leaves only a single word, append the primary domain
+      // so "Research https://google.com" → "Research google.com" instead of just "Research"
+      if (
+        cleanTitle.split(/\s+/).filter(Boolean).length === 1 &&
+        enrichment.urls &&
+        enrichment.urls.length > 0
+      ) {
+        try {
+          const domain = new URL(enrichment.urls[0]).hostname.replace(
+            /^www\./,
+            "",
+          );
+          cleanTitle = `${cleanTitle} ${domain}`;
+        } catch {
+          // Invalid URL, skip domain append
+        }
+      }
+      updates.title = truncateTitle(cleanTitle);
     }
 
     // Update due date if extracted
@@ -137,10 +156,20 @@ async function insertAndFetchUrls(
   todoId: string,
   urls: string[],
 ): Promise<void> {
-  const now = new Date();
-  const urlPositions = generateNKeysBetween(null, null, urls.length);
+  // Skip URLs that are already stored for this todo (e.g. extracted during initial create)
+  const existing = await db
+    .select({ url: todoUrls.url })
+    .from(todoUrls)
+    .where(eq(todoUrls.todoId, todoId));
+  const existingUrls = new Set(existing.map((r) => r.url));
+  const newUrls = urls.filter((url) => !existingUrls.has(url));
 
-  const urlRecords = urls.map((url, i) => ({
+  if (newUrls.length === 0) return;
+
+  const now = new Date();
+  const urlPositions = generateNKeysBetween(null, null, newUrls.length);
+
+  const urlRecords = newUrls.map((url, i) => ({
     id: crypto.randomUUID(),
     todoId,
     url,

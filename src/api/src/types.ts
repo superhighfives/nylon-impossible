@@ -16,6 +16,7 @@ export type Env = {
     CLERK_SECRET_KEY: string;
     CLERK_PUBLISHABLE_KEY: string;
     ENVIRONMENT?: string;
+    CF_AI_GATEWAY_ID?: string;
   };
   Variables: {
     userId: string;

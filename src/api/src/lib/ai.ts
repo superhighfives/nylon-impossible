@@ -116,6 +116,7 @@ CRITICAL RULES:
 - Do NOT change the meaning or intent of the title
 - ONLY remove URLs/domains from the title text
 - Keep everything else in the title exactly as written
+- Exception: when removing a URL/domain leaves ONLY a single generic word (e.g. "Research", "Check", "Look"), keep the domain name in the title (e.g. "Research https://google.com" → title: "Research google.com")
 
 RESEARCH DETECTION:
 - Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
@@ -124,6 +125,7 @@ RESEARCH DETECTION:
 
 Examples:
 - "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
+- "Research https://google.com" → { title: "Research google.com", urls: ["https://google.com"] }
 - "Check out https://example.com/page tomorrow" → { title: "Check out tomorrow", urls: ["https://example.com/page"], dueDate: "${today}" }
 - "Buy milk" → { title: "Buy milk" } (no research - plain action)
 - "Urgent: call mom" → { title: "Urgent: call mom", priority: "high" } (no research - plain action)
@@ -203,6 +205,7 @@ function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 export async function enrichTodo(
   ai: Ai,
   text: string,
+  gatewayId?: string,
 ): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
 
@@ -222,11 +225,7 @@ export async function enrichTodo(
         },
         max_tokens: 4000,
       },
-      {
-        gateway: {
-          id: "nylon-impossible",
-        },
-      },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     ENRICH_TIMEOUT_MS,
   );

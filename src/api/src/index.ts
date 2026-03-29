@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { cancelResearch } from "./handlers/cancel-research";
 import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
@@ -76,6 +77,7 @@ app.get("/todos/:id", getTodo);
 app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
 app.post("/todos/:id/research", reresearchTodo);
+app.delete("/todos/:id/research", cancelResearch);
 
 // User routes
 app.get("/users/me", getMe);

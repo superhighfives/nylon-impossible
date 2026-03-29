@@ -24,7 +24,7 @@ interface ResearchResult {
 export async function executeResearch(
   db: ReturnType<typeof getDb>,
   ai: Ai,
-  env: { USER_SYNC: DurableObjectNamespace },
+  env: { USER_SYNC: DurableObjectNamespace; CF_AI_GATEWAY_ID?: string },
   todoId: string,
   userId: string,
   query: string,
@@ -33,10 +33,14 @@ export async function executeResearch(
   userLocation?: string | null,
 ): Promise<void> {
   try {
+    const gatewayId = env.CF_AI_GATEWAY_ID;
     const result =
       researchType === "location"
-        ? await executeLocationResearch(ai, query, userLocation)
-        : await executeGeneralResearch(ai, query);
+        ? await executeLocationResearch(ai, query, userLocation, gatewayId)
+        : await executeGeneralResearch(ai, query, gatewayId);
+
+    // Deduplicate sources returned by the AI
+    const uniqueSources = Array.from(new Set(result.sources));
 
     // Insert source URLs with researchId
     let urlRecords: {
@@ -49,15 +53,15 @@ export async function executeResearch(
       createdAt: Date;
       updatedAt: Date;
     }[] = [];
-    if (result.sources.length > 0) {
+    if (uniqueSources.length > 0) {
       const now = new Date();
       const urlPositions = generateNKeysBetween(
         null,
         null,
-        result.sources.length,
+        uniqueSources.length,
       );
 
-      urlRecords = result.sources.map((url, i) => ({
+      urlRecords = uniqueSources.map((url, i) => ({
         id: crypto.randomUUID(),
         todoId,
         researchId,
@@ -69,6 +73,17 @@ export async function executeResearch(
       }));
 
       await db.insert(todoUrls).values(urlRecords);
+    }
+
+    // Check if research was cancelled while the AI was running
+    const [current] = await db
+      .select({ status: todoResearch.status })
+      .from(todoResearch)
+      .where(eq(todoResearch.id, researchId));
+
+    if (current?.status !== "pending") {
+      // Research was cancelled or already in a terminal state — discard results
+      return;
     }
 
     // Mark research as completed immediately so clients can show results
@@ -140,6 +155,7 @@ export async function executeResearch(
 async function executeGeneralResearch(
   ai: Ai,
   query: string,
+  gatewayId?: string,
 ): Promise<ResearchResult> {
   const prompt = `Research the following topic and provide a brief 2-3 sentence summary with numbered citations.
 
@@ -166,11 +182,7 @@ Only return valid JSON, no other text.`;
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
       },
-      {
-        gateway: {
-          id: "nylon-impossible",
-        },
-      },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
   );
@@ -185,6 +197,7 @@ async function executeLocationResearch(
   ai: Ai,
   query: string,
   userLocation?: string | null,
+  gatewayId?: string,
 ): Promise<ResearchResult> {
   const searchQuery = userLocation ? `${query} near ${userLocation}` : query;
 
@@ -214,11 +227,7 @@ Only return valid JSON, no other text.`;
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
       },
-      {
-        gateway: {
-          id: "nylon-impossible",
-        },
-      },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
   );

@@ -1,5 +1,10 @@
 import { AlertCircle, ExternalLink, RefreshCw, Sparkles } from "lucide-react";
-import { STALE_RESEARCH_MS, useReresearch } from "@/hooks/useTodos";
+import {
+  SHOW_RETRY_MS,
+  STALE_RESEARCH_MS,
+  useCancelResearch,
+  useReresearch,
+} from "@/hooks/useTodos";
 import type { SerializedResearch, SerializedTodoUrl } from "@/types/database";
 import { Button, Loader } from "./ui";
 
@@ -140,13 +145,12 @@ export function ResearchSection({
   researchUrls,
 }: ResearchSectionProps) {
   const reresearch = useReresearch();
+  const cancelResearch = useCancelResearch();
 
   if (research.status === "pending") {
-    // If research has been pending for more than 2 minutes, the background Worker
-    // was likely killed before it could mark the record as failed. Surface a
-    // retryable error so the user isn't stuck on an infinite spinner.
-    const isStale =
-      Date.now() - new Date(research.createdAt).getTime() > STALE_RESEARCH_MS;
+    const age = Date.now() - new Date(research.createdAt).getTime();
+    const isStale = age > STALE_RESEARCH_MS;
+    const showRetry = age > SHOW_RETRY_MS;
 
     if (isStale) {
       return (
@@ -178,9 +182,34 @@ export function ResearchSection({
           <Sparkles size={12} />
           Research
         </p>
-        <div className="flex items-center gap-2 text-sm text-gray-muted">
-          <Loader size="sm" />
-          <span>Researching...</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm text-gray-muted">
+            <Loader size="sm" />
+            <span>Researching...</span>
+          </div>
+          {showRetry && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => cancelResearch.mutate(todoId)}
+                disabled={cancelResearch.isPending || reresearch.isPending}
+                loading={cancelResearch.isPending}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => reresearch.mutate(todoId)}
+                disabled={reresearch.isPending || cancelResearch.isPending}
+                loading={reresearch.isPending}
+              >
+                <RefreshCw size={14} className="mr-1" />
+                Try again
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     );
