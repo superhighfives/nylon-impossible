@@ -47,7 +47,8 @@
     ]
   },
   "vars": {
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
+    "CF_AI_GATEWAY_ID": "nylon-impossible"
   },
   "observability": {
     "enabled": true
