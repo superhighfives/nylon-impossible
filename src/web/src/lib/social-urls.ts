@@ -10,6 +10,8 @@ export interface SocialUrlInfo {
   platform: SocialPlatform;
   /** Whether this is a specific post/tweet vs a profile/channel page */
   isPost: boolean;
+  /** Hostname of the parsed URL, reused to avoid double-parsing in components */
+  hostname: string;
 }
 
 const TWITTER_HOSTS = new Set(["twitter.com", "x.com", "www.twitter.com", "www.x.com"]);
@@ -29,25 +31,30 @@ export function getSocialUrlInfo(urlString: string): SocialUrlInfo | null {
   }
 
   const host = parsed.hostname.toLowerCase();
+  const path = parsed.pathname;
 
   if (TWITTER_HOSTS.has(host)) {
-    // Tweet: /user/status/id
-    const isTweet = /^\/[^/]+\/status\/\d+/.test(parsed.pathname);
-    return { platform: "twitter", isPost: isTweet };
+    // Standard tweet:       /user/status/id
+    // Canonical/i forms:    /i/status/id  and  /i/web/status/id
+    const isTweet =
+      /^\/[^/]+\/status\/\d+/.test(path) ||
+      /^\/i\/(web\/)?status\/\d+/.test(path);
+    return { platform: "twitter", isPost: isTweet, hostname: host };
   }
 
   if (INSTAGRAM_HOSTS.has(host)) {
     // Post: /p/id or /reel/id
-    const isPost = /^\/(p|reel)\//.test(parsed.pathname);
-    return { platform: "instagram", isPost };
+    const isPost = /^\/(p|reel)\//.test(path);
+    return { platform: "instagram", isPost, hostname: host };
   }
 
   if (YOUTUBE_HOSTS.has(host)) {
-    // Video: /watch?v= or youtu.be/id
+    // Video: /watch?v=  or  youtu.be/<id>  or  /shorts/<id>
     const isVideo =
-      (parsed.hostname === "youtu.be" && parsed.pathname.length > 1) ||
-      parsed.searchParams.has("v");
-    return { platform: "youtube", isPost: isVideo };
+      (host === "youtu.be" && path.length > 1) ||
+      parsed.searchParams.has("v") ||
+      /^\/shorts\//.test(path);
+    return { platform: "youtube", isPost: isVideo, hostname: host };
   }
 
   return null;

@@ -155,10 +155,11 @@ export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
 
   const favicon = extractFavicon(html, url);
 
-  const image =
+  const rawImage =
     extractMeta(html, "og:image") ??
     extractMeta(html, "twitter:image") ??
     extractMeta(html, "twitter:image:src");
+  const image = rawImage ? (resolveUrl(rawImage, url) ?? rawImage) : null;
 
   return { title, description, siteName, favicon, image };
 }

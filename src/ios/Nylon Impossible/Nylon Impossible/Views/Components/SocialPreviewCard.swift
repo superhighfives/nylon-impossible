@@ -30,8 +30,11 @@ func socialUrlInfo(for urlString: String) -> SocialUrlInfo? {
     let path = parsed.path
 
     if twitterHosts.contains(host) {
-        // Tweet: /user/status/id
-        let isTweet = path.range(of: #"^/[^/]+/status/\d+"#, options: .regularExpression) != nil
+        // Standard tweet: /user/status/id
+        // Canonical /i forms: /i/status/id and /i/web/status/id
+        let isTweet =
+            path.range(of: #"^/[^/]+/status/\d+"#, options: .regularExpression) != nil ||
+            path.range(of: #"^/i/(web/)?status/\d+"#, options: .regularExpression) != nil
         return SocialUrlInfo(platform: .twitter, isPost: isTweet)
     }
 
@@ -41,8 +44,9 @@ func socialUrlInfo(for urlString: String) -> SocialUrlInfo? {
     }
 
     if youtubeHosts.contains(host) {
-        let isVideo = host == "youtu.be" && path.count > 1
+        let isVideo = (host == "youtu.be" && path.count > 1)
             || URLComponents(string: urlString)?.queryItems?.contains(where: { $0.name == "v" }) == true
+            || path.hasPrefix("/shorts/")
         return SocialUrlInfo(platform: .youtube, isPost: isVideo)
     }
 
@@ -50,22 +54,6 @@ func socialUrlInfo(for urlString: String) -> SocialUrlInfo? {
 }
 
 // MARK: - Platform badge views
-
-private struct XLogoShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        // X logo path (Twitter/X bird replaced with X mark)
-        // Approximation of the official X logo at 24x24
-        var path = Path()
-        let w = rect.width, h = rect.height
-        // Based on the official SVG path scaled to rect
-        path.move(to: CGPoint(x: w * 0.760, y: h * 0.094))
-        path.addLine(to: CGPoint(x: w * 0.898, y: h * 0.094))
-        path.addLine(to: CGPoint(x: w * 0.597, y: h * 0.438))
-        path.addLine(to: CGPoint(x: w * 0.951, y: h * 0.562 + h * 0.407))
-        // Simplified: use a text fallback — handled in the view below
-        return path
-    }
-}
 
 struct PlatformBadgeView: View {
     let platform: SocialPlatform
@@ -107,32 +95,26 @@ struct SocialPreviewCard: View {
     /// Parse "Name (@handle) on X" → (name, "@handle")
     private var parsedAuthor: (name: String, handle: String?)? {
         guard let title = url.title else { return nil }
-        if let range = title.range(of: #"^(.+?)\s+\(@([^)]+)\)"#, options: .regularExpression) {
-            let full = String(title[range])
-            // Extract via NSRegularExpression for capture groups
-            if let match = try? NSRegularExpression(pattern: #"^(.+?)\s+\(@([^)]+)\)"#)
-                .firstMatch(in: full, range: NSRange(full.startIndex..., in: full)) {
-                let nameRange = Range(match.range(at: 1), in: full)
-                let handleRange = Range(match.range(at: 2), in: full)
-                let name = nameRange.map { String(full[$0]) }
-                let handle = handleRange.map { "@\(full[$0])" }
-                return (name ?? title, handle)
-            }
+        if let match = try? NSRegularExpression(pattern: #"^(.+?)\s+\(@([^)]+)\)"#)
+            .firstMatch(in: title, range: NSRange(title.startIndex..., in: title)) {
+            let nameRange = Range(match.range(at: 1), in: title)
+            let handleRange = Range(match.range(at: 2), in: title)
+            let name = nameRange.map { String(title[$0]) }
+            let handle = handleRange.map { "@\(title[$0])" }
+            return (name ?? title, handle)
         }
         return (title, nil)
     }
 
     var body: some View {
-        guard let social = social else { return AnyView(EmptyView()) }
+        if let social, let destination = URL(string: url.url) {
+            let author = parsedAuthor
+            let displayName = author?.name ?? url.siteName ?? URL(string: url.url)?.host ?? url.url
+            let handle = author?.handle
+            let bodyText = url.description
+            let imageURL = url.image.flatMap { URL(string: $0) }
 
-        let author = parsedAuthor
-        let displayName = author?.name ?? url.siteName ?? URL(string: url.url)?.host ?? url.url
-        let handle = author?.handle
-        let bodyText = url.description
-        let imageURL = url.image.flatMap { URL(string: $0) }
-
-        return AnyView(
-            Link(destination: URL(string: url.url)!) {
+            Link(destination: destination) {
                 VStack(alignment: .leading, spacing: 0) {
                     // Header row
                     HStack(spacing: 10) {
@@ -216,7 +198,7 @@ struct SocialPreviewCard: View {
                 )
             }
             .buttonStyle(.plain)
-        )
+        }
     }
 }
 
@@ -241,10 +223,8 @@ struct SocialPreviewCardCompact: View {
     }
 
     var body: some View {
-        guard let social = social else { return AnyView(EmptyView()) }
-
-        return AnyView(
-            Link(destination: URL(string: url.url)!) {
+        if let social, let destination = URL(string: url.url) {
+            Link(destination: destination) {
                 HStack(spacing: 6) {
                     PlatformBadgeView(platform: social.platform)
                         .frame(width: 14, height: 14)
@@ -263,7 +243,7 @@ struct SocialPreviewCardCompact: View {
                 )
             }
             .buttonStyle(.plain)
-        )
+        }
     }
 }
 

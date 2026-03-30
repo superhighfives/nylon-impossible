@@ -70,7 +70,7 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
   const social = getSocialUrlInfo(url.url);
   if (!social) return null;
 
-  const { platform, isPost } = social;
+  const { platform, isPost, hostname } = social;
 
   // Parse author info out of the og:title, e.g. "Name (@handle) on X"
   // or "Name (@handle)" for profiles.
@@ -86,7 +86,7 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
     }
   }
 
-  const displayTitle = authorName ?? url.siteName ?? new URL(url.url).hostname;
+  const displayTitle = authorName ?? url.siteName ?? hostname;
   const bodyText = url.description;
 
   return (
@@ -103,6 +103,8 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
           <img
             src={url.image}
             alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
             className="w-8 h-8 rounded-full shrink-0 object-cover"
             onError={(e) => {
               e.currentTarget.style.display = "none";
@@ -136,6 +138,8 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
         <img
           src={url.image}
           alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
           className="w-full max-h-40 object-cover"
           onError={(e) => {
             e.currentTarget.style.display = "none";
@@ -160,7 +164,7 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
     const match = url.title.match(/^(.+?)\s+\(@([^)]+)\)/);
     authorName = match ? match[1].trim() : url.title;
   }
-  const displayTitle = authorName ?? url.siteName ?? new URL(url.url).hostname;
+  const displayTitle = authorName ?? url.siteName ?? social.hostname;
 
   return (
     <a
