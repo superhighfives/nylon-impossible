@@ -33,8 +33,8 @@ enum TaskCreationService {
         // Generate position before the first incomplete todo so the new task appears at the top
         let firstPosition = allTodos
             .filter { !$0.isDeleted && !$0.isCompleted }
-            .sorted { $0.position < $1.position }
-            .first?.position
+            .min { $0.position < $1.position }?
+            .position
 
         let position = generateKeyBetween(nil, firstPosition)
         
