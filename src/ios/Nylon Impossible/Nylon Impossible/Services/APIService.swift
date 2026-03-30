@@ -55,6 +55,28 @@ struct APITodo: Codable, Sendable {
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
     let research: APIResearch?
+
+    init(
+        id: String, userId: String, title: String, description: String? = nil,
+        completed: Bool, position: String? = nil, dueDate: Date? = nil,
+        priority: String? = nil, aiStatus: AIStatus? = nil,
+        createdAt: Date, updatedAt: Date,
+        urls: [APITodoUrl]? = nil, research: APIResearch? = nil
+    ) {
+        self.id = id
+        self.userId = userId
+        self.title = title
+        self.description = description
+        self.completed = completed
+        self.position = position
+        self.dueDate = dueDate
+        self.priority = priority
+        self.aiStatus = aiStatus
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.urls = urls
+        self.research = research
+    }
 }
 
 /// Fetch status for URL metadata
@@ -75,7 +97,7 @@ enum AIStatus: String, Codable, Sendable {
 struct APITodoUrl: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
-    let researchId: String?
+    let researchId: String?  // Non-nil when URL is a research citation source
     let url: String
     let title: String?
     let description: String?
@@ -86,6 +108,27 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let fetchedAt: Date?
     let createdAt: Date
     let updatedAt: Date
+
+    init(
+        id: String, todoId: String, researchId: String? = nil, url: String,
+        title: String?, description: String?, siteName: String?, favicon: String?,
+        position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
+        createdAt: Date, updatedAt: Date
+    ) {
+        self.id = id
+        self.todoId = todoId
+        self.researchId = researchId
+        self.url = url
+        self.title = title
+        self.description = description
+        self.siteName = siteName
+        self.favicon = favicon
+        self.position = position
+        self.fetchStatus = fetchStatus
+        self.fetchedAt = fetchedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 struct APITodoWithUrls: Codable, Sendable {
@@ -102,6 +145,28 @@ struct APITodoWithUrls: Codable, Sendable {
     let updatedAt: Date
     let urls: [APITodoUrl]
     let research: APIResearch?
+
+    init(
+        id: String, userId: String, title: String, description: String? = nil,
+        completed: Bool, position: String? = nil, dueDate: Date? = nil,
+        priority: String? = nil, aiStatus: AIStatus? = nil,
+        createdAt: Date, updatedAt: Date,
+        urls: [APITodoUrl] = [], research: APIResearch? = nil
+    ) {
+        self.id = id
+        self.userId = userId
+        self.title = title
+        self.description = description
+        self.completed = completed
+        self.position = position
+        self.dueDate = dueDate
+        self.priority = priority
+        self.aiStatus = aiStatus
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.urls = urls
+        self.research = research
+    }
 }
 
 struct SyncRequest: Codable, Sendable {
