@@ -1,7 +1,7 @@
-import type { SerializedTodoUrl } from "@/types/database";
 import { getSocialUrlInfo } from "@/lib/social-urls";
-import { SocialPreviewCardCompact } from "./SocialPreviewCard";
+import type { SerializedTodoUrl } from "@/types/database";
 import { Loader } from "./loader";
+import { SocialPreviewCardCompact } from "./SocialPreviewCard";
 
 /** Pending URLs older than this are treated as failed (worker likely restarted) */
 const STALE_PENDING_THRESHOLD_MS = 30_000;

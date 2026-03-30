@@ -14,9 +14,19 @@ export interface SocialUrlInfo {
   hostname: string;
 }
 
-const TWITTER_HOSTS = new Set(["twitter.com", "x.com", "www.twitter.com", "www.x.com"]);
+const TWITTER_HOSTS = new Set([
+  "twitter.com",
+  "x.com",
+  "www.twitter.com",
+  "www.x.com",
+]);
 const INSTAGRAM_HOSTS = new Set(["instagram.com", "www.instagram.com"]);
-const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "youtu.be", "m.youtube.com"]);
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "youtu.be",
+  "m.youtube.com",
+]);
 
 /**
  * Detect whether a URL is from a known social platform.

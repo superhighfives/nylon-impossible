@@ -7,11 +7,11 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { getSocialUrlInfo } from "@/lib/social-urls";
-import { SocialPreviewCard } from "./ui/SocialPreviewCard";
+import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
+import { SocialPreviewCard } from "./ui/SocialPreviewCard";
 
 interface TodoItemExpandedProps {
   todo: TodoWithUrls;

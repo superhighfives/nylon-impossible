@@ -1,5 +1,5 @@
-import type { SerializedTodoUrl } from "@/types/database";
 import { getSocialUrlInfo } from "@/lib/social-urls";
+import type { SerializedTodoUrl } from "@/types/database";
 
 interface SocialPreviewCardProps {
   url: SerializedTodoUrl;
@@ -47,7 +47,11 @@ function YouTubeLogo({ className }: { className?: string }) {
   );
 }
 
-function PlatformBadge({ platform }: { platform: "twitter" | "instagram" | "youtube" }) {
+function PlatformBadge({
+  platform,
+}: {
+  platform: "twitter" | "instagram" | "youtube";
+}) {
   if (platform === "twitter") {
     return <XLogo className="w-3.5 h-3.5 text-gray shrink-0" />;
   }
