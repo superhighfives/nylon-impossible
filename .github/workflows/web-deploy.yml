@@ -108,6 +108,7 @@ jobs:
       github.event_name == 'pull_request'
       && github.event.action != 'closed'
       && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -127,11 +128,9 @@ jobs:
             api:
               - 'src/api/**'
               - 'package.json'
-              - '.github/workflows/web-deploy.yml'
             web:
               - 'src/web/**'
               - 'package.json'
-              - '.github/workflows/web-deploy.yml'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v5
