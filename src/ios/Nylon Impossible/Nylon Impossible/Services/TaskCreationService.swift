@@ -30,13 +30,13 @@ enum TaskCreationService {
     ) -> TodoItem {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         
-        // Generate position after the last todo
-        let lastPosition = allTodos
-            .filter { !$0.isDeleted }
+        // Generate position before the first incomplete todo so the new task appears at the top
+        let firstPosition = allTodos
+            .filter { !$0.isDeleted && !$0.isCompleted }
             .sorted { $0.position < $1.position }
-            .last?.position
-        
-        let position = generateKeyBetween(lastPosition, nil)
+            .first?.position
+
+        let position = generateKeyBetween(nil, firstPosition)
         
         let todo = TodoItem(
             title: trimmedTitle,
