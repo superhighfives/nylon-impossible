@@ -28,7 +28,7 @@
     /* Type Safety (Effect recommended) */
     "skipLibCheck": true,
     "strict": true,
-"noUnusedLocals": true,
+    "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,

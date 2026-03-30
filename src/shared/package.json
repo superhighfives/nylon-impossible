@@ -12,6 +12,6 @@
     "drizzle-orm": "^0.45.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^6.0.2"
   }
 }
