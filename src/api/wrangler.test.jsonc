@@ -26,6 +26,11 @@
       "new_classes": ["UserSync"]
     }
   ],
+  "queues": {
+    "producers": [
+      { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" }
+    ]
+  },
   // AI Gateway vars for mocked tests. Actual values not needed since extractTodos is mocked.
   "vars": {
     "CF_ACCOUNT_ID": "test-account",

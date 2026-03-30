@@ -116,6 +116,7 @@ CRITICAL RULES:
 - Do NOT change the meaning or intent of the title
 - ONLY remove URLs/domains from the title text
 - Keep everything else in the title exactly as written
+- Exception: when removing a URL/domain leaves ONLY a single generic word (e.g. "Research", "Check", "Look"), keep the domain name in the title (e.g. "Research https://google.com" → title: "Research google.com")
 
 RESEARCH DETECTION:
 - Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
@@ -124,6 +125,7 @@ RESEARCH DETECTION:
 
 Examples:
 - "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
+- "Research https://google.com" → { title: "Research google.com", urls: ["https://google.com"] }
 - "Check out https://example.com/page tomorrow" → { title: "Check out tomorrow", urls: ["https://example.com/page"], dueDate: "${today}" }
 - "Buy milk" → { title: "Buy milk" } (no research - plain action)
 - "Urgent: call mom" → { title: "Urgent: call mom", priority: "high" } (no research - plain action)
@@ -181,6 +183,21 @@ function parseArguments(
   return args as ParsedToolCall["arguments"];
 }
 
+const ENRICH_TIMEOUT_MS = 30_000;
+
+function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: number | null = null;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(
+      () => reject(new Error("Enrichment timed out")),
+      timeoutMs,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    clearTimeout(timeoutId);
+  });
+}
+
 /**
  * Enrich a todo with extracted metadata (URLs, due date, priority).
  * Does NOT rephrase the title - only removes URLs from it.
@@ -188,29 +205,29 @@ function parseArguments(
 export async function enrichTodo(
   ai: Ai,
   text: string,
+  gatewayId?: string,
 ): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
 
   // Model added recently, types not yet updated
-  const response = await ai.run(
-    "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-    {
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: text },
-      ],
-      tools: [enrichTodoTool],
-      tool_choice: {
-        type: "function",
-        function: { name: "enrich_todo" },
+  const response = await runWithTimeout(
+    ai.run(
+      "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
+      {
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: text },
+        ],
+        tools: [enrichTodoTool],
+        tool_choice: {
+          type: "function",
+          function: { name: "enrich_todo" },
+        },
+        max_tokens: 4000,
       },
-      max_tokens: 4000,
-    },
-    {
-      gateway: {
-        id: "nylon-impossible",
-      },
-    },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
+    ),
+    ENRICH_TIMEOUT_MS,
   );
 
   const tc = extractToolCall(response);

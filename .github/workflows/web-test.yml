@@ -36,7 +36,7 @@ jobs:
       - uses: pnpm/action-setup@v5
         if: steps.changes.outputs.src == 'true'
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         if: steps.changes.outputs.src == 'true'
         with:
           node-version: 22

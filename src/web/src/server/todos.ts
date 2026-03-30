@@ -50,6 +50,7 @@ function serializeResearch(research: TodoResearch): SerializedResearch {
     researchType: research.researchType,
     summary: research.summary,
     researchedAt: research.researchedAt?.toISOString() ?? null,
+    createdAt: research.createdAt.toISOString(),
   };
 }
 

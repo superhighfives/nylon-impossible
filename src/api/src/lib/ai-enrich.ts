@@ -11,9 +11,9 @@
  */
 
 import { generateNKeysBetween } from "fractional-indexing";
+import type { ResearchJobMessage } from "../types";
 import { enrichTodo } from "./ai";
 import { eq, type getDb, todoResearch, todos, todoUrls } from "./db";
-import { executeResearch } from "./research";
 import { truncateTitle } from "./url-helpers";
 import { fetchUrlMetadata } from "./url-metadata";
 
@@ -25,7 +25,11 @@ import { fetchUrlMetadata } from "./url-metadata";
 export async function enrichTodoWithAI(
   db: ReturnType<typeof getDb>,
   ai: Ai,
-  env: { USER_SYNC: DurableObjectNamespace },
+  env: {
+    USER_SYNC: DurableObjectNamespace;
+    RESEARCH_QUEUE: Queue<ResearchJobMessage>;
+    CF_AI_GATEWAY_ID?: string;
+  },
   todoId: string,
   userId: string,
   originalText: string,
@@ -40,7 +44,7 @@ export async function enrichTodoWithAI(
     .where(eq(todos.id, todoId));
 
   try {
-    const enrichment = await enrichTodo(ai, originalText);
+    const enrichment = await enrichTodo(ai, originalText, env.CF_AI_GATEWAY_ID);
 
     // If AI returned nothing useful, mark complete and exit
     if (!enrichment) {
@@ -59,7 +63,25 @@ export async function enrichTodoWithAI(
 
     // Update title if URLs were removed (title changed)
     if (enrichment.title && enrichment.title !== originalText) {
-      updates.title = truncateTitle(enrichment.title.trim());
+      let cleanTitle = enrichment.title.trim();
+      // If stripping URLs leaves only a single word, append the primary domain
+      // so "Research https://google.com" → "Research google.com" instead of just "Research"
+      if (
+        cleanTitle.split(/\s+/).filter(Boolean).length === 1 &&
+        enrichment.urls &&
+        enrichment.urls.length > 0
+      ) {
+        try {
+          const domain = new URL(enrichment.urls[0]).hostname.replace(
+            /^www\./,
+            "",
+          );
+          cleanTitle = `${cleanTitle} ${domain}`;
+        } catch {
+          // Invalid URL, skip domain append
+        }
+      }
+      updates.title = truncateTitle(cleanTitle);
     }
 
     // Update due date if extracted
@@ -103,18 +125,16 @@ export async function enrichTodoWithAI(
       // Notify so clients can show pending research state before long-running work
       await notifySync(env, userId);
 
-      // Execute research (runs in same waitUntil context)
-      await executeResearch(
-        db,
-        ai,
-        env,
+      // Enqueue research job — runs in a separate Worker invocation with its own
+      // execution budget, not constrained by this waitUntil lifetime
+      await env.RESEARCH_QUEUE.send({
         todoId,
         userId,
-        originalText,
-        enrichment.research.type,
-        research.id,
-        userLocation,
-      );
+        query: originalText,
+        researchType: enrichment.research.type,
+        researchId: research.id,
+        userLocation: userLocation ?? null,
+      });
     }
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);
@@ -136,10 +156,28 @@ async function insertAndFetchUrls(
   todoId: string,
   urls: string[],
 ): Promise<void> {
-  const now = new Date();
-  const urlPositions = generateNKeysBetween(null, null, urls.length);
+  // Skip URLs that are already stored for this todo (e.g. extracted during initial create).
+  // Normalize via new URL().href so "https://google.com" and "https://google.com/" compare equal.
+  const normalize = (url: string) => {
+    try {
+      return new URL(url).href;
+    } catch {
+      return url;
+    }
+  };
+  const existing = await db
+    .select({ url: todoUrls.url })
+    .from(todoUrls)
+    .where(eq(todoUrls.todoId, todoId));
+  const existingUrls = new Set(existing.map((r) => normalize(r.url)));
+  const newUrls = urls.filter((url) => !existingUrls.has(normalize(url)));
 
-  const urlRecords = urls.map((url, i) => ({
+  if (newUrls.length === 0) return;
+
+  const now = new Date();
+  const urlPositions = generateNKeysBetween(null, null, newUrls.length);
+
+  const urlRecords = newUrls.map((url, i) => ({
     id: crypto.randomUUID(),
     todoId,
     url,

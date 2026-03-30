@@ -32,8 +32,23 @@
       "new_classes": ["UserSync"]
     }
   ],
+  "queues": {
+    "producers": [
+      { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" }
+    ],
+    "consumers": [
+      {
+        "queue": "nylon-impossible-research",
+        "max_batch_size": 1,
+        "max_batch_timeout": 0,
+        "max_retries": 2,
+        "dead_letter_queue": "nylon-impossible-research-dlq"
+      }
+    ]
+  },
   "vars": {
-    "ENVIRONMENT": "development"
+    "ENVIRONMENT": "development",
+    "CF_AI_GATEWAY_ID": "nylon-impossible"
   },
   "observability": {
     "enabled": true

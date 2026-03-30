@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { cancelResearch } from "./handlers/cancel-research";
 import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
@@ -12,7 +13,9 @@ import {
 } from "./handlers/todos";
 import { getMe, updateMe } from "./handlers/users";
 import { authMiddleware, verifyClerkJWT } from "./lib/auth";
-import type { Env } from "./types";
+import { getDb } from "./lib/db";
+import { executeResearch } from "./lib/research";
+import type { Env, ResearchJobMessage } from "./types";
 
 export { UserSync } from "./durable-objects/UserSync";
 
@@ -74,9 +77,33 @@ app.get("/todos/:id", getTodo);
 app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
 app.post("/todos/:id/research", reresearchTodo);
+app.delete("/todos/:id/research", cancelResearch);
 
 // User routes
 app.get("/users/me", getMe);
 app.patch("/users/me", updateMe);
 
-export default app;
+export default {
+  fetch: app.fetch,
+  async queue(
+    batch: MessageBatch<ResearchJobMessage>,
+    env: Env["Bindings"],
+  ): Promise<void> {
+    const db = getDb(env.DB);
+    for (const message of batch.messages) {
+      const job = message.body;
+      await executeResearch(
+        db,
+        env.AI,
+        env,
+        job.todoId,
+        job.userId,
+        job.query,
+        job.researchType,
+        job.researchId,
+        job.userLocation,
+      );
+      message.ack();
+    }
+  },
+} satisfies ExportedHandler<Env["Bindings"], ResearchJobMessage>;
