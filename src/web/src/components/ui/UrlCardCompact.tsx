@@ -1,4 +1,6 @@
 import type { SerializedTodoUrl } from "@/types/database";
+import { getSocialUrlInfo } from "@/lib/social-urls";
+import { SocialPreviewCardCompact } from "./SocialPreviewCard";
 import { Loader } from "./loader";
 
 /** Pending URLs older than this are treated as failed (worker likely restarted) */
@@ -9,6 +11,11 @@ interface UrlCardCompactProps {
 }
 
 export function UrlCardCompact({ url }: UrlCardCompactProps) {
+  // Use rich social card for fetched social URLs
+  if (url.fetchStatus === "fetched" && getSocialUrlInfo(url.url)) {
+    return <SocialPreviewCardCompact url={url} />;
+  }
+
   // Treat stale pending URLs as failed (fetch likely lost due to worker restart)
   const isStale =
     url.fetchStatus === "pending" &&

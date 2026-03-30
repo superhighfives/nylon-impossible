@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
+import { getSocialUrlInfo } from "@/lib/social-urls";
+import { SocialPreviewCard } from "./ui/SocialPreviewCard";
 import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 
@@ -31,6 +33,11 @@ function formatDate(isoString: string | null): string {
 }
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
+  // Use rich social card for fetched social URLs
+  if (url.fetchStatus === "fetched" && getSocialUrlInfo(url.url)) {
+    return <SocialPreviewCard url={url} />;
+  }
+
   const isPending = url.fetchStatus === "pending";
   const isFailed = url.fetchStatus === "failed";
 

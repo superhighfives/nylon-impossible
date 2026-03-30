@@ -467,6 +467,7 @@ struct SyncServiceTests {
                     description: nil,
                     siteName: "Example Site",
                     favicon: nil,
+                    image: nil,
                     position: "a0",
                     fetchStatus: .fetched,
                     fetchedAt: urlDate,

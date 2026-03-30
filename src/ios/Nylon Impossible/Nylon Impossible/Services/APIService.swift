@@ -70,6 +70,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let description: String?
     let siteName: String?
     let favicon: String?
+    let image: String?
     let position: String
     let fetchStatus: FetchStatus
     let fetchedAt: Date?
