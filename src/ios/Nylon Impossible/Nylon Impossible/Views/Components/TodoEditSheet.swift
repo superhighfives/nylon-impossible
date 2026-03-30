@@ -41,14 +41,20 @@ struct TodoEditSheet: View {
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _priority = State(initialValue: todo.todoPriority)
         _urls = State(initialValue: initialUrls)
-        _research = State(initialValue: todo.researchStatus != nil ? APIResearch(
-            id: todo.researchId ?? "",
-            status: todo.researchStatus ?? "pending",
-            researchType: todo.researchType ?? "general",
-            summary: todo.researchSummary,
-            researchedAt: todo.researchedAt,
-            createdAt: todo.researchCreatedAt ?? Date()
-        ) : nil)
+        let initialResearch: APIResearch?
+        if let researchId = todo.researchId {
+            initialResearch = APIResearch(
+                id: researchId,
+                status: todo.researchStatus ?? "pending",
+                researchType: todo.researchType ?? "general",
+                summary: todo.researchSummary,
+                researchedAt: todo.researchedAt,
+                createdAt: todo.researchCreatedAt ?? Date()
+            )
+        } else {
+            initialResearch = nil
+        }
+        _research = State(initialValue: initialResearch)
     }
     
     var body: some View {
@@ -100,7 +106,7 @@ struct TodoEditSheet: View {
                 // Research
                 if let research {
                     ResearchSection(
-                        todo: researchTodoProxy(research: research),
+                        research: research,
                         researchUrls: urls.filter { $0.researchId != nil },
                         onReresearch: { await reresearch() },
                         onCancelResearch: { await cancelResearch() }
@@ -163,18 +169,6 @@ struct TodoEditSheet: View {
         onSave(trimmedTitle, descriptionValue, dueDateValue, priority)
     }
     
-    /// Build a lightweight TodoItem proxy that ResearchSection can read research state from.
-    private func researchTodoProxy(research: APIResearch) -> TodoItem {
-        let proxy = TodoItem(title: todo.title)
-        proxy.researchId = research.id
-        proxy.researchStatus = research.status
-        proxy.researchType = research.researchType
-        proxy.researchSummary = research.summary
-        proxy.researchedAt = research.researchedAt
-        proxy.researchCreatedAt = research.createdAt
-        return proxy
-    }
-
     private func reresearch() async {
         guard let apiService else { return }
         isReresearching = true
@@ -194,17 +188,27 @@ struct TodoEditSheet: View {
     }
 
     private func cancelResearch() async {
-        // Cancellation is handled server-side; just re-sync after a brief delay
+        guard let apiService else { return }
+        do {
+            try await apiService.cancelResearch(todoId: todo.id.uuidString.lowercased())
+        } catch {
+            print("[Research] Cancel research error: \(error)")
+        }
         await loadUrls()
     }
 
     private func loadUrls() async {
         guard let apiService = apiService else { return }
 
-        // Fetch if there are pending URLs or pending research that may have resolved
+        // Fetch if this is the first load (no URLs yet, or research exists but its
+        // source URLs haven't arrived yet), or if there are pending items to resolve.
         let hasPendingUrls = urls.contains(where: { $0.fetchStatus == .pending })
         let hasPendingResearch = research?.status == "pending"
-        guard hasPendingUrls || hasPendingResearch || isReresearching else { return }
+        let needsInitialLoad: Bool = urls.isEmpty || {
+            guard let researchId = research?.id else { return false }
+            return !urls.contains(where: { $0.researchId == researchId })
+        }()
+        guard needsInitialLoad || hasPendingUrls || hasPendingResearch || isReresearching else { return }
 
         isLoadingUrls = true
         defer { isLoadingUrls = false }

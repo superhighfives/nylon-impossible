@@ -16,7 +16,7 @@ private let staleThreshold: TimeInterval = 300        // 5 minutes
 // MARK: - ResearchSection
 
 struct ResearchSection: View {
-    let todo: TodoItem
+    let research: APIResearch
     let researchUrls: [APITodoUrl]
     var onReresearch: () async -> Void
     var onCancelResearch: () async -> Void
@@ -25,12 +25,9 @@ struct ResearchSection: View {
     @State private var isCancelling = false
     @State private var now = Date()
 
-    // Tick every second while research is pending to keep staleness checks live
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
-
     var body: some View {
         Section {
-            switch todo.researchStatus {
+            switch research.status {
             case "pending":
                 pendingView
             case "failed":
@@ -47,15 +44,21 @@ struct ResearchSection: View {
                 Text("Research")
             }
         }
-        .onReceive(timer) { _ in
-            if todo.isResearchPending { now = Date() }
+        // Only tick the clock while research is actually pending; cancel automatically
+        // when status changes so no timer runs for completed/failed research.
+        .task(id: research.status) {
+            guard research.status == "pending" else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                now = Date()
+            }
         }
     }
 
     // MARK: - Pending
 
     private var pendingAge: TimeInterval {
-        todo.researchCreatedAt.map { now.timeIntervalSince($0) } ?? 0
+        now.timeIntervalSince(research.createdAt)
     }
 
     @ViewBuilder
@@ -104,7 +107,7 @@ struct ResearchSection: View {
 
     @ViewBuilder
     private var completedView: some View {
-        if let summary = todo.researchSummary {
+        if let summary = research.summary {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Spacer()
@@ -236,14 +239,15 @@ struct ResearchSourceCard: View {
 
     private var isPending: Bool { url.fetchStatus == .pending }
     private var isFailed: Bool { url.fetchStatus == .failed }
+    private var destinationURL: URL? { URL(string: url.url) }
 
     private var displayTitle: String {
         if isPending || isFailed {
-            return URL(string: url.url)?.host ?? url.url
+            return destinationURL?.host ?? url.url
         }
         if let t = url.title, !t.isEmpty { return t }
         if let s = url.siteName, !s.isEmpty { return s }
-        return URL(string: url.url)?.host ?? url.url
+        return destinationURL?.host ?? url.url
     }
 
     private var storedFaviconURL: URL? {
@@ -251,74 +255,82 @@ struct ResearchSourceCard: View {
     }
 
     private var googleFaviconURL: URL? {
-        guard let host = URL(string: url.url)?.host,
+        guard let host = destinationURL?.host,
               let encoded = host.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
         else { return nil }
         return URL(string: "https://www.google.com/s2/favicons?domain=\(encoded)&sz=32")
     }
 
     var body: some View {
-        Link(destination: URL(string: url.url)!) {
-            HStack(spacing: 10) {
-                // Citation badge
-                Text("[\(citationNumber)]")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.yellow)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color.yellow.opacity(0.15))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+        let cardContent = HStack(spacing: 10) {
+            // Citation badge
+            Text("[\(citationNumber)]")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.yellow)
+                .padding(.horizontal, 5)
+                .padding(.vertical, 2)
+                .background(Color.yellow.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
 
-                // Icon
-                Group {
-                    if isPending {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                    } else if isFailed {
-                        Image(systemName: "exclamationmark.circle")
-                            .foregroundStyle(.red)
-                    } else {
-                        FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
-                    }
+            // Icon
+            Group {
+                if isPending {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                } else if isFailed {
+                    Image(systemName: "exclamationmark.circle")
+                        .foregroundStyle(.red)
+                } else {
+                    FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
                 }
-                .frame(width: 16, height: 16)
+            }
+            .frame(width: 16, height: 16)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(displayTitle)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                    Text(url.url)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-
-                Spacer()
-
-                Image(systemName: "arrow.up.right")
+            VStack(alignment: .leading, spacing: 2) {
+                Text(displayTitle)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(url.url)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
-            .padding(10)
-            .background(Color.appElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            Spacer()
+
+            Image(systemName: "arrow.up.right")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
-        .buttonStyle(.plain)
+        .padding(10)
+        .background(Color.appElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+        if let dest = destinationURL {
+            Link(destination: dest) { cardContent }
+                .buttonStyle(.plain)
+        } else {
+            cardContent
+        }
     }
 }
 
 // MARK: - Preview
 
 #Preview {
-    let todo = TodoItem(title: "How do dogs age compared to humans?")
-    todo.researchStatus = "completed"
-    todo.researchSummary = "Dogs age roughly 7 times faster than humans in their early years [1]. The ratio varies by breed and size, with larger dogs aging faster [2]. A 1-year-old dog is approximately equivalent to a 15-year-old human [1]."
-
+    let research = APIResearch(
+        id: "r1",
+        status: "completed",
+        researchType: "general",
+        summary: "Dogs age roughly 7 times faster than humans in their early years [1]. The ratio varies by breed and size, with larger dogs aging faster [2]. A 1-year-old dog is approximately equivalent to a 15-year-old human [1].",
+        researchedAt: Date(),
+        createdAt: Date()
+    )
     let url1 = APITodoUrl(
-        id: "u1", todoId: todo.id.uuidString, researchId: "r1",
+        id: "u1", todoId: "todo-1", researchId: "r1",
         url: "https://www.akc.org/expert-advice/health/how-do-dogs-age/",
         title: "How Do Dogs Age? - American Kennel Club",
         description: nil, siteName: "AKC", favicon: nil,
@@ -326,7 +338,7 @@ struct ResearchSourceCard: View {
         createdAt: Date(), updatedAt: Date()
     )
     let url2 = APITodoUrl(
-        id: "u2", todoId: todo.id.uuidString, researchId: "r1",
+        id: "u2", todoId: "todo-1", researchId: "r1",
         url: "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7093975/",
         title: "A DNA methylation atlas of normal human cell types",
         description: nil, siteName: "PubMed", favicon: nil,
@@ -336,7 +348,7 @@ struct ResearchSourceCard: View {
 
     return Form {
         ResearchSection(
-            todo: todo,
+            research: research,
             researchUrls: [url1, url2],
             onReresearch: {},
             onCancelResearch: {}

@@ -269,6 +269,7 @@ protocol APIProviding: Sendable {
     func getMe() async throws -> APIUser
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func reresearch(todoId: String) async throws
+    func cancelResearch(todoId: String) async throws
 }
 
 // MARK: - API Service
@@ -381,6 +382,10 @@ final class APIService: APIProviding {
     func reresearch(todoId: String) async throws {
         struct ReresearchResponse: Decodable { let id: String }
         let _: ReresearchResponse = try await post(path: "/todos/\(todoId)/research", body: EmptyBody())
+    }
+
+    func cancelResearch(todoId: String) async throws {
+        let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/research")
     }
 
     // MARK: - User Preferences
