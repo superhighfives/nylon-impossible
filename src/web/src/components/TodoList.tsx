@@ -50,7 +50,7 @@ interface ExpandedSectionProps {
   todo: TodoWithUrls;
   onUpdate: (updates: {
     title?: string;
-    description?: string | null;
+    notes?: string | null;
     dueDate?: Date | null;
     priority?: "high" | "low" | null;
   }) => void;
@@ -202,7 +202,7 @@ function SortableTodoItem(
   props: TodoItemProps & {
     onUpdateExpanded: (updates: {
       title?: string;
-      description?: string | null;
+      notes?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
     }) => void;
@@ -328,7 +328,7 @@ export function TodoList() {
     (id: string) =>
     (updates: {
       title?: string;
-      description?: string | null;
+      notes?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
     }) => {

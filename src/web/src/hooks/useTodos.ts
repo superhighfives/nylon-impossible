@@ -68,7 +68,7 @@ export function useCreateTodo() {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
         title: input.title,
-        description: input.description ?? null,
+        notes: input.notes ?? null,
         completed: false,
         position: "a0", // placeholder — replaced when onSettled invalidates
         dueDate: input.dueDate?.toISOString() ?? null,
@@ -143,8 +143,8 @@ export function useUpdateTodo() {
             return {
               ...todo,
               ...(input.title !== undefined && { title: input.title }),
-              ...(input.description !== undefined && {
-                description: input.description,
+              ...(input.notes !== undefined && {
+                notes: input.notes,
               }),
               ...(input.completed !== undefined && {
                 completed: input.completed,

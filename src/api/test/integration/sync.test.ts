@@ -282,9 +282,9 @@ describe("Sync endpoint", () => {
     expect(todo.title.length).toBeLessThanOrEqual(500);
   });
 
-  // --- URL extraction from description (iOS share sheet) ---
+  // --- URL extraction from notes (iOS share sheet) ---
 
-  it("extracts URLs from description and stores them in todoUrls", async () => {
+  it("extracts URLs from notes and stores them in todoUrls", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440010";
 
@@ -293,7 +293,7 @@ describe("Sync endpoint", () => {
         {
           id: todoId,
           title: "Check quiche.industries",
-          description: "URL: https://quiche.industries/browser/",
+          notes: "URL: https://quiche.industries/browser/",
           completed: false,
           position: "a0",
           updatedAt: now,
@@ -312,7 +312,7 @@ describe("Sync endpoint", () => {
     expect(urls[0].url).toBe("https://quiche.industries/browser/");
   });
 
-  it("clears the URL from description after extraction", async () => {
+  it("clears the URL from notes after extraction", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440011";
 
@@ -321,7 +321,7 @@ describe("Sync endpoint", () => {
         {
           id: todoId,
           title: "Check quiche.industries",
-          description: "URL: https://quiche.industries/browser/",
+          notes: "URL: https://quiche.industries/browser/",
           completed: false,
           position: "a0",
           updatedAt: now,
@@ -329,12 +329,12 @@ describe("Sync endpoint", () => {
       ],
     });
 
-    // The description should be cleared since it only contained the URL
+    // The notes should be cleared since it only contained the URL
     const res = await syncRequest({ changes: [] });
     const body = await res.json<any>();
     const todo = body.todos.find((t: any) => t.id === todoId);
     expect(todo).toBeTruthy();
-    expect(todo.description).toBeNull();
+    expect(todo.notes).toBeNull();
   });
 
   it("does not duplicate URLs already in todoUrls on re-sync", async () => {
@@ -348,7 +348,7 @@ describe("Sync endpoint", () => {
         {
           id: todoId,
           title: "Check quiche.industries",
-          description: "URL: https://quiche.industries/browser/",
+          notes: "URL: https://quiche.industries/browser/",
           completed: false,
           position: "a0",
           updatedAt: now,
@@ -356,13 +356,13 @@ describe("Sync endpoint", () => {
       ],
     });
 
-    // Second sync — update with same URL in description again
+    // Second sync — update with same URL in notes again
     await syncRequest({
       changes: [
         {
           id: todoId,
           title: "Check quiche.industries",
-          description: "URL: https://quiche.industries/browser/",
+          notes: "URL: https://quiche.industries/browser/",
           completed: false,
           position: "a0",
           updatedAt: later,
@@ -379,7 +379,7 @@ describe("Sync endpoint", () => {
     expect(urls).toHaveLength(1);
   });
 
-  it("stores URLs sent explicitly in the urls field without touching description", async () => {
+  it("stores URLs sent explicitly in the urls field without touching notes", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440015";
 
@@ -388,7 +388,7 @@ describe("Sync endpoint", () => {
         {
           id: todoId,
           title: "Check quiche.industries",
-          description: "A plain description with no URL",
+          notes: "A plain note with no URL",
           completed: false,
           position: "a0",
           updatedAt: now,
@@ -407,13 +407,13 @@ describe("Sync endpoint", () => {
     expect(urls).toHaveLength(1);
     expect(urls[0].url).toBe("https://quiche.industries/explicit");
 
-    // Description should be untouched — no regex cleaning on the explicit path
+    // Notes should be untouched — no regex cleaning on the explicit path
     const body = await syncRequest({ changes: [] }).then((r) => r.json<any>());
     const todo = body.todos.find((t: any) => t.id === todoId);
-    expect(todo.description).toBe("A plain description with no URL");
+    expect(todo.notes).toBe("A plain note with no URL");
   });
 
-  it("extracts URLs from both title and description when both contain URLs", async () => {
+  it("extracts URLs from both title and notes when both contain URLs", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440013";
 
@@ -422,7 +422,7 @@ describe("Sync endpoint", () => {
         {
           id: todoId,
           title: "Check https://quiche.industries/title-url",
-          description: "URL: https://quiche.industries/description-url",
+          notes: "URL: https://quiche.industries/description-url",
           completed: false,
           position: "a0",
           updatedAt: now,
@@ -440,7 +440,7 @@ describe("Sync endpoint", () => {
     const extractedUrls = urls.map((u) => u.url).sort();
     expect(extractedUrls).toHaveLength(2);
     expect(extractedUrls).toContain("https://quiche.industries/title-url");
-    expect(extractedUrls).toContain("https://quiche.industries/description-url");
+    expect(extractedUrls).toContain("https://quiche.industries/description-url"); // url extracted from notes
   });
 
   it("extracts URLs from title when only the title contains a URL", async () => {

@@ -121,7 +121,7 @@ struct TaskCreationServiceTests {
         )
 
         #expect(todo.title == "Check this article")
-        #expect(todo.itemDescription == nil)
+        #expect(todo.itemNotes == nil)
         #expect(todo.pendingUrls == ["https://example.com/article"])
     }
 

@@ -31,7 +31,7 @@ const syncRequestSchema = z.object({
     z.object({
       id: z.string().uuid(),
       title: z.string().min(1).optional(),
-      description: z.string().max(10000).nullable().optional(),
+      notes: z.string().max(10000).nullable().optional(),
       completed: z.boolean().optional(),
       position: z.string().optional(),
       dueDate: z.coerce.date().nullable().optional(),
@@ -94,7 +94,7 @@ function serializeTodo(
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     title: todo.title,
-    description: todo.description,
+    notes: todo.notes,
     completed: todo.completed,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
@@ -192,7 +192,7 @@ export async function syncTodos(c: Context<Env>) {
     todoId: string;
     explicitUrls?: string[];
     title?: string;
-    description?: string;
+    description?: string; // legacy: maps to notes field for URL extraction
   }> = [];
 
   // 1. Apply client changes (with conflict resolution)
@@ -228,10 +228,10 @@ export async function syncTodos(c: Context<Env>) {
           .update(todos)
           .set({
             title: change.title ? truncateTitle(change.title) : existing.title,
-            description:
-              change.description !== undefined
-                ? change.description
-                : existing.description,
+            notes:
+              change.notes !== undefined
+                ? change.notes
+                : existing.notes,
             completed: change.completed ?? existing.completed,
             position: change.position ?? existing.position,
             dueDate:
@@ -249,14 +249,14 @@ export async function syncTodos(c: Context<Env>) {
             explicitUrls: change.urls.map((u) => u.url),
           });
         } else if (
-          (change.description &&
-            extractUrlsFromText(change.description).length > 0) ||
+          (change.notes &&
+            extractUrlsFromText(change.notes).length > 0) ||
           (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
             title: change.title,
-            description: change.description ?? undefined,
+            description: change.notes ?? undefined,
           });
         }
       } else {
@@ -274,7 +274,7 @@ export async function syncTodos(c: Context<Env>) {
           id: normalizedId,
           userId,
           title: truncateTitle(change.title),
-          description: change.description ?? null,
+          notes: change.notes ?? null,
           completed: change.completed ?? false,
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
@@ -288,14 +288,14 @@ export async function syncTodos(c: Context<Env>) {
             explicitUrls: change.urls.map((u) => u.url),
           });
         } else if (
-          (change.description &&
-            extractUrlsFromText(change.description).length > 0) ||
+          (change.notes &&
+            extractUrlsFromText(change.notes).length > 0) ||
           (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
             title: change.title,
-            description: change.description ?? undefined,
+            description: change.notes ?? undefined,
           });
         }
       }
@@ -379,10 +379,10 @@ export async function syncTodos(c: Context<Env>) {
       });
       await db.insert(todoUrls).values(urlRows);
 
-      // Only clean the description when using the legacy regex path — explicit URLs
-      // are already stored cleanly and the description needs no modification
+      // Only clean the notes when using the legacy regex path — explicit URLs
+      // are already stored cleanly and the notes field needs no modification
       if (!explicitUrls && description) {
-        const cleanedDescription = description
+        const cleanedNotes = description
           .replace(
             /URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi,
             "",
@@ -391,7 +391,7 @@ export async function syncTodos(c: Context<Env>) {
           .trim();
         await db
           .update(todos)
-          .set({ description: cleanedDescription || null, updatedAt: now })
+          .set({ notes: cleanedNotes || null, updatedAt: now })
           .where(eq(todos.id, todoId));
       }
     }

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { getSocialUrlInfo } from "@/lib/social-urls";
+import { useUser } from "@/hooks/useUser";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
@@ -17,7 +18,7 @@ interface TodoItemExpandedProps {
   todo: TodoWithUrls;
   onUpdate: (updates: {
     title?: string;
-    description?: string | null;
+    notes?: string | null;
     dueDate?: Date | null;
     priority?: "high" | "low" | null;
   }) => void;
@@ -126,9 +127,11 @@ export function TodoItemExpanded({
   onDelete,
   deletePending,
 }: TodoItemExpandedProps) {
+  const { data: user } = useUser();
+
   // Local state for form fields
   const [title, setTitle] = useState(todo.title);
-  const [description, setDescription] = useState(todo.description ?? "");
+  const [notes, setNotes] = useState(todo.notes ?? "");
   const [dueDate, setDueDate] = useState(formatDate(todo.dueDate));
   const [priority, setPriority] = useState<"high" | "low" | "none">(
     todo.priority ?? "none",
@@ -137,7 +140,7 @@ export function TodoItemExpanded({
   // Check if there are unsaved changes
   const hasChanges =
     title.trim() !== todo.title ||
-    description.trim() !== (todo.description ?? "") ||
+    notes.trim() !== (todo.notes ?? "") ||
     dueDate !== formatDate(todo.dueDate) ||
     priority !== (todo.priority ?? "none");
 
@@ -146,7 +149,7 @@ export function TodoItemExpanded({
   const handleSave = () => {
     const updates: {
       title?: string;
-      description?: string | null;
+      notes?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
     } = {};
@@ -156,9 +159,9 @@ export function TodoItemExpanded({
       updates.title = trimmedTitle;
     }
 
-    const trimmedDesc = description.trim();
-    if (trimmedDesc !== (todo.description ?? "")) {
-      updates.description = trimmedDesc || null;
+    const trimmedNotes = notes.trim();
+    if (trimmedNotes !== (todo.notes ?? "")) {
+      updates.notes = trimmedNotes || null;
     }
 
     if (dueDate !== formatDate(todo.dueDate)) {
@@ -204,19 +207,26 @@ export function TodoItemExpanded({
         />
       </div>
 
-      {/* Description */}
+      {/* Notes */}
       <div className="space-y-1.5">
-        <label
-          htmlFor={`desc-${todo.id}`}
-          className="text-xs font-medium text-gray-muted"
-        >
-          Description
-        </label>
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor={`notes-${todo.id}`}
+            className="text-xs font-medium text-gray-muted"
+          >
+            Notes
+          </label>
+          {user?.aiEnabled && (
+            <span className="text-xs text-gray-muted italic">
+              Not used by AI
+            </span>
+          )}
+        </div>
         <Textarea
-          id={`desc-${todo.id}`}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Add a description..."
+          id={`notes-${todo.id}`}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Add a note..."
           className="resize-y"
           disabled={isUpdating}
         />

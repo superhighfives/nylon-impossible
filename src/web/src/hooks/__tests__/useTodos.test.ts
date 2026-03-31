@@ -52,7 +52,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     id: "todo-1",
     userId: "user-1",
     title: "Buy milk",
-    description: null,
+    notes: null,
     completed: false,
     position: "a0",
     dueDate: null,

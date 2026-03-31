@@ -76,12 +76,12 @@ final class TodoViewModel {
     func updateTodo(
         _ todo: TodoItem,
         title: String,
-        description: String?,
+        notes: String?,
         dueDate: Date?,
         priority: TodoPriority?
     ) {
         todo.title = title
-        todo.itemDescription = description
+        todo.itemNotes = notes
         todo.dueDate = dueDate
         todo.todoPriority = priority
         todo.markModified()

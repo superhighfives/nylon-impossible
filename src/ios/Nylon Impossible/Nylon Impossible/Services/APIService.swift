@@ -45,7 +45,7 @@ struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
-    let description: String?
+    let notes: String?
     let completed: Bool
     let position: String?
     let dueDate: Date?
@@ -137,7 +137,7 @@ struct APITodoWithUrls: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
-    let description: String?
+    let notes: String?
     let completed: Bool
     let position: String?
     let dueDate: Date?
@@ -183,7 +183,7 @@ struct TodoUrlChange: Codable, Sendable, Equatable {
 struct TodoChange: Codable, Sendable {
     let id: String
     let title: String?
-    let description: String?
+    let notes: String?
     let completed: Bool?
     let position: String?
     let dueDate: Date?
@@ -221,7 +221,7 @@ struct SmartCreateTodo: Codable, Sendable {
     let id: String
     let userId: String
     let title: String
-    let description: String?
+    let notes: String?
     let completed: Bool
     let position: String?
     let dueDate: Date?

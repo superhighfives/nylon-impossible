@@ -59,7 +59,7 @@ struct BackgroundSyncService {
                 return TodoChange(
                     id: todo.id.uuidString.lowercased(),
                     title: todo.isDeleted ? nil : todo.title,
-                    description: todo.isDeleted ? nil : todo.itemDescription,
+                    notes: todo.isDeleted ? nil : todo.itemNotes,
                     completed: todo.isDeleted ? nil : todo.isCompleted,
                     position: todo.isDeleted ? nil : todo.position,
                     dueDate: todo.isDeleted ? nil : todo.dueDate,
