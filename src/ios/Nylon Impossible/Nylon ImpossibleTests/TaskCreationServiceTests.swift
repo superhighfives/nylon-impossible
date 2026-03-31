@@ -58,12 +58,12 @@ struct TaskCreationServiceTests {
         #expect(todo.userId == "user_123")
     }
     
-    @Test("createTask generates position after last todo")
+    @Test("createTask generates position before existing todos")
     @MainActor
     func createTaskGeneratesPosition() throws {
         let container = try makeContainer()
         let context = container.mainContext
-        
+
         // Create first todo
         let first = TaskCreationService.createTask(
             title: "First",
@@ -71,11 +71,11 @@ struct TaskCreationServiceTests {
             context: context,
             allTodos: []
         )
-        
+
         // Fetch all todos to pass to second createTask
         let descriptor = FetchDescriptor<TodoItem>()
         let allTodos = try context.fetch(descriptor)
-        
+
         // Create second todo
         let second = TaskCreationService.createTask(
             title: "Second",
@@ -83,9 +83,9 @@ struct TaskCreationServiceTests {
             context: context,
             allTodos: allTodos
         )
-        
-        // Second should have position after first
-        #expect(second.position > first.position)
+
+        // Second should have position before first (new tasks go to the top)
+        #expect(second.position < first.position)
     }
     
     @Test("createTask inserts into context")
