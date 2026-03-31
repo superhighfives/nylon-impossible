@@ -277,6 +277,13 @@ final class SyncService {
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
+                // Always update research fields — they change independently of updatedAt
+                local.researchId = remote.research?.id
+                local.researchStatus = remote.research?.status
+                local.researchType = remote.research?.researchType
+                local.researchSummary = remote.research?.summary
+                local.researchedAt = remote.research?.researchedAt
+                local.researchCreatedAt = remote.research?.createdAt
                 // If local is newer, it will be synced on next sync
             } else {
                 // New remote item - create locally
@@ -287,6 +294,12 @@ final class SyncService {
                 todo.dueDate = remote.dueDate
                 todo.priority = remote.priority
                 todo.aiStatus = remote.aiStatus?.rawValue
+                todo.researchId = remote.research?.id
+                todo.researchStatus = remote.research?.status
+                todo.researchType = remote.research?.researchType
+                todo.researchSummary = remote.research?.summary
+                todo.researchedAt = remote.research?.researchedAt
+                todo.researchCreatedAt = remote.research?.createdAt
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
                 todo.isSynced = true
@@ -352,6 +365,7 @@ final class SyncService {
             var updatedUrls: [TodoUrl] = []
             for remoteUrl in remoteUrls {
                 if let existing = existingById[remoteUrl.id] {
+                    existing.researchId = remoteUrl.researchId
                     existing.title = remoteUrl.title
                     existing.itemDescription = remoteUrl.description
                     existing.siteName = remoteUrl.siteName

@@ -11,6 +11,7 @@ extension TodoUrl {
     convenience init(from api: APITodoUrl) {
         self.init(
             id: api.id,
+            researchId: api.researchId,
             url: api.url,
             title: api.title,
             itemDescription: api.description,
@@ -30,6 +31,7 @@ extension APITodoUrl {
         self.init(
             id: stored.id,
             todoId: todoId,
+            researchId: stored.researchId,
             url: stored.url,
             title: stored.title,
             description: stored.itemDescription,
