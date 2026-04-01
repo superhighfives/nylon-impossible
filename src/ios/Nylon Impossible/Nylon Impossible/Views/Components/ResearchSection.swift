@@ -346,7 +346,7 @@ struct ResearchSourceCard: View {
         createdAt: Date(), updatedAt: Date()
     )
 
-    return Form {
+    Form {
         ResearchSection(
             research: research,
             researchUrls: [url1, url2],
