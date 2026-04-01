@@ -312,6 +312,42 @@ describe("Sync endpoint", () => {
     expect(urls[0].url).toBe("https://quiche.industries/browser/");
   });
 
+  it("accepts legacy description field and maps it to notes", async () => {
+    const now = new Date().toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440020";
+
+    // Older clients send `description` instead of `notes`
+    const res = await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Legacy client task",
+          description: "URL: https://quiche.industries/legacy/",
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const db = getDb(env.DB);
+    const urls = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, todoId));
+
+    // URL should be extracted from the legacy description field
+    expect(urls).toHaveLength(1);
+    expect(urls[0].url).toBe("https://quiche.industries/legacy/");
+
+    // notes should be cleared since description only contained the URL
+    const body = await syncRequest({ changes: [] }).then((r) => r.json<any>());
+    const todo = body.todos.find((t: any) => t.id === todoId);
+    expect(todo).toBeTruthy();
+    expect(todo.notes).toBeNull();
+  });
+
   it("clears the URL from notes after extraction", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440011";

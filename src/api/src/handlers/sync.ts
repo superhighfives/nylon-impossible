@@ -32,6 +32,7 @@ const syncRequestSchema = z.object({
       id: z.string().uuid(),
       title: z.string().min(1).optional(),
       notes: z.string().max(10000).nullable().optional(),
+      description: z.string().max(10000).nullable().optional(), // legacy alias for notes
       completed: z.boolean().optional(),
       position: z.string().optional(),
       dueDate: z.coerce.date().nullable().optional(),
@@ -199,6 +200,8 @@ export async function syncTodos(c: Context<Env>) {
   // Normalize UUIDs to lowercase to match web-generated IDs
   for (const change of changes) {
     const normalizedId = change.id.toLowerCase();
+    // Prefer `notes`; fall back to legacy `description` for older clients
+    const effectiveNotes = change.notes !== undefined ? change.notes : change.description;
 
     const [existing] = await db
       .select()
@@ -229,8 +232,8 @@ export async function syncTodos(c: Context<Env>) {
           .set({
             title: change.title ? truncateTitle(change.title) : existing.title,
             notes:
-              change.notes !== undefined
-                ? change.notes
+              effectiveNotes !== undefined
+                ? effectiveNotes
                 : existing.notes,
             completed: change.completed ?? existing.completed,
             position: change.position ?? existing.position,
@@ -249,14 +252,14 @@ export async function syncTodos(c: Context<Env>) {
             explicitUrls: change.urls.map((u) => u.url),
           });
         } else if (
-          (change.notes &&
-            extractUrlsFromText(change.notes).length > 0) ||
+          (effectiveNotes &&
+            extractUrlsFromText(effectiveNotes).length > 0) ||
           (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
             title: change.title,
-            description: change.notes ?? undefined,
+            description: effectiveNotes ?? undefined,
           });
         }
       } else {
@@ -274,7 +277,7 @@ export async function syncTodos(c: Context<Env>) {
           id: normalizedId,
           userId,
           title: truncateTitle(change.title),
-          notes: change.notes ?? null,
+          notes: effectiveNotes ?? null,
           completed: change.completed ?? false,
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
@@ -288,14 +291,14 @@ export async function syncTodos(c: Context<Env>) {
             explicitUrls: change.urls.map((u) => u.url),
           });
         } else if (
-          (change.notes &&
-            extractUrlsFromText(change.notes).length > 0) ||
+          (effectiveNotes &&
+            extractUrlsFromText(effectiveNotes).length > 0) ||
           (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
             title: change.title,
-            description: change.notes ?? undefined,
+            description: effectiveNotes ?? undefined,
           });
         }
       }
