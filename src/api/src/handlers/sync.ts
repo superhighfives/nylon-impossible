@@ -125,6 +125,7 @@ async function fetchAndUpdateUrlMetadata(
             description: metadata.description,
             siteName: metadata.siteName,
             favicon: metadata.favicon,
+            image: metadata.image ?? null,
             fetchStatus: "fetched" as const,
             fetchedAt: now,
             updatedAt: now,
