@@ -75,4 +75,24 @@ final class MockAPIService: APIProviding {
             updatedAt: Date()
         )
     }
+
+    var reresearchError: Error?
+    var lastReresearchTodoId: String?
+
+    func reresearch(todoId: String) async throws {
+        lastReresearchTodoId = todoId
+        if let error = reresearchError {
+            throw error
+        }
+    }
+
+    var cancelResearchError: Error?
+    var lastCancelResearchTodoId: String?
+
+    func cancelResearch(todoId: String) async throws {
+        lastCancelResearchTodoId = todoId
+        if let error = cancelResearchError {
+            throw error
+        }
+    }
 }

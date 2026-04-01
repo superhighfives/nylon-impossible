@@ -19,7 +19,9 @@ struct TodoEditSheet: View {
     @State private var dueDate: Date
     @State private var priority: TodoPriority?
     @State private var urls: [APITodoUrl] = []
+    @State private var research: APIResearch? = nil
     @State private var isLoadingUrls: Bool = false
+    @State private var isReresearching: Bool = false
     
     init(
         todo: TodoItem,
@@ -39,6 +41,20 @@ struct TodoEditSheet: View {
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _priority = State(initialValue: todo.todoPriority)
         _urls = State(initialValue: initialUrls)
+        let initialResearch: APIResearch?
+        if let researchId = todo.researchId {
+            initialResearch = APIResearch(
+                id: researchId,
+                status: todo.researchStatus ?? "pending",
+                researchType: todo.researchType ?? "general",
+                summary: todo.researchSummary,
+                researchedAt: todo.researchedAt,
+                createdAt: todo.researchCreatedAt ?? Date()
+            )
+        } else {
+            initialResearch = nil
+        }
+        _research = State(initialValue: initialResearch)
     }
     
     var body: some View {
@@ -87,7 +103,18 @@ struct TodoEditSheet: View {
                     Text("Priority")
                 }
                 
-                // Links
+                // Research
+                if let research {
+                    ResearchSection(
+                        research: research,
+                        researchUrls: urls.filter { $0.researchId != nil },
+                        onReresearch: { await reresearch() },
+                        onCancelResearch: { await cancelResearch() }
+                    )
+                }
+
+                // Links (non-research URLs only)
+                let regularUrls = urls.filter { $0.researchId == nil }
                 if isLoadingUrls && urls.isEmpty {
                     Section {
                         HStack {
@@ -99,13 +126,13 @@ struct TodoEditSheet: View {
                     } header: {
                         Text("Links")
                     }
-                } else if !urls.isEmpty {
+                } else if !regularUrls.isEmpty {
                     Section {
-                        ForEach(urls) { url in
+                        ForEach(regularUrls) { url in
                             UrlRow(url: url)
                         }
                     } header: {
-                        Text("Links (\(urls.count))")
+                        Text("Links (\(regularUrls.count))")
                     }
                 }
             }
@@ -142,11 +169,46 @@ struct TodoEditSheet: View {
         onSave(trimmedTitle, descriptionValue, dueDateValue, priority)
     }
     
+    private func reresearch() async {
+        guard let apiService else { return }
+        isReresearching = true
+        defer { isReresearching = false }
+        do {
+            try await apiService.reresearch(todoId: todo.id.uuidString.lowercased())
+            // Mark research as pending again immediately for responsive UI
+            research = research.map { APIResearch(
+                id: $0.id, status: "pending", researchType: $0.researchType,
+                summary: $0.summary, researchedAt: $0.researchedAt, createdAt: Date()
+            )}
+            // Reload todo detail to pick up new research record
+            await loadUrls()
+        } catch {
+            print("[Research] Re-research error: \(error)")
+        }
+    }
+
+    private func cancelResearch() async {
+        guard let apiService else { return }
+        do {
+            try await apiService.cancelResearch(todoId: todo.id.uuidString.lowercased())
+        } catch {
+            print("[Research] Cancel research error: \(error)")
+        }
+        await loadUrls()
+    }
+
     private func loadUrls() async {
         guard let apiService = apiService else { return }
 
-        // Only fetch from API if there are pending URLs that the server may have resolved
-        guard urls.contains(where: { $0.fetchStatus == .pending }) else { return }
+        // Fetch if this is the first load (no URLs yet, or research exists but its
+        // source URLs haven't arrived yet), or if there are pending items to resolve.
+        let hasPendingUrls = urls.contains(where: { $0.fetchStatus == .pending })
+        let hasPendingResearch = research?.status == "pending"
+        let needsInitialLoad: Bool = urls.isEmpty || {
+            guard let researchId = research?.id else { return false }
+            return !urls.contains(where: { $0.researchId == researchId })
+        }()
+        guard needsInitialLoad || hasPendingUrls || hasPendingResearch || isReresearching else { return }
 
         isLoadingUrls = true
         defer { isLoadingUrls = false }
@@ -154,9 +216,10 @@ struct TodoEditSheet: View {
         do {
             let todoWithUrls = try await apiService.getTodo(id: todo.id)
             urls = todoWithUrls.urls
+            research = todoWithUrls.research
         } catch {
-            // Silently fail - URLs are supplementary info
-            print("Failed to load URLs: \(error)")
+            // Silently fail - URLs and research are supplementary info
+            print("Failed to load todo detail: \(error)")
         }
     }
 }
@@ -213,63 +276,68 @@ struct UrlRow: View {
     }
 
     var body: some View {
-        Link(destination: URL(string: url.url)!) {
-            HStack(spacing: 12) {
-                // Icon: spinner for pending, error for failed, favicon otherwise
-                Group {
-                    if isPending {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else if isFailed {
-                        Image(systemName: "exclamationmark.circle")
-                            .foregroundStyle(.red)
-                    } else {
-                        FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
-                    }
-                }
-                .frame(width: 20, height: 20)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text(displayTitle)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        
+        // Use rich social preview card for fetched social URLs
+        if !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+            SocialPreviewCard(url: url)
+        } else {
+            Link(destination: URL(string: url.url)!) {
+                HStack(spacing: 12) {
+                    // Icon: spinner for pending, error for failed, favicon otherwise
+                    Group {
                         if isPending {
-                            Text("Fetching...")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            ProgressView()
+                                .scaleEffect(0.7)
                         } else if isFailed {
-                            Text("Failed to fetch")
-                                .font(.caption2)
+                            Image(systemName: "exclamationmark.circle")
                                 .foregroundStyle(.red)
+                        } else {
+                            FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
                         }
                     }
-                    
-                    if !isPending && !isFailed, let description = url.description, !description.isEmpty {
-                        Text(description)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                    .frame(width: 20, height: 20)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(displayTitle)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+
+                            if isPending {
+                                Text("Fetching...")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } else if isFailed {
+                                Text("Failed to fetch")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+
+                        if !isPending && !isFailed, let description = url.description, !description.isEmpty {
+                            Text(description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+
+                        Text(url.url)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
                     }
-                    
-                    Text(url.url)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                
-                Spacer()
-                
-                Image(systemName: "arrow.up.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 

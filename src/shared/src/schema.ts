@@ -162,6 +162,7 @@ export const todoUrls = sqliteTable(
     description: text("description"),
     siteName: text("site_name"),
     favicon: text("favicon"),
+    image: text("image"),
     position: text("position").notNull().default("a0"),
     fetchStatus: text("fetch_status", {
       enum: ["pending", "fetched", "failed"],

@@ -11,11 +11,13 @@ extension TodoUrl {
     convenience init(from api: APITodoUrl) {
         self.init(
             id: api.id,
+            researchId: api.researchId,
             url: api.url,
             title: api.title,
             itemDescription: api.description,
             siteName: api.siteName,
             favicon: api.favicon,
+            image: api.image,
             position: api.position,
             fetchStatus: api.fetchStatus.rawValue,
             fetchedAt: api.fetchedAt,
@@ -30,11 +32,13 @@ extension APITodoUrl {
         self.init(
             id: stored.id,
             todoId: todoId,
+            researchId: stored.researchId,
             url: stored.url,
             title: stored.title,
             description: stored.itemDescription,
             siteName: stored.siteName,
             favicon: stored.favicon,
+            image: stored.image,
             position: stored.position,
             fetchStatus: FetchStatus(rawValue: stored.fetchStatus) ?? .pending,
             fetchedAt: stored.fetchedAt,

@@ -63,39 +63,44 @@ struct UrlRowCompact: View {
     }
 
     var body: some View {
-        Link(destination: URL(string: url.url)!) {
-            HStack(spacing: 6) {
-                // Icon: spinner for pending, favicon otherwise (no error icon for compact)
-                Group {
+        // Use rich social chip for fetched social URLs
+        if !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+            SocialPreviewCardCompact(url: url)
+        } else {
+            Link(destination: URL(string: url.url)!) {
+                HStack(spacing: 6) {
+                    // Icon: spinner for pending, favicon otherwise (no error icon for compact)
+                    Group {
+                        if isPending {
+                            ProgressView()
+                                .scaleEffect(0.6)
+                        } else {
+                            FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
+                        }
+                    }
+                    .frame(width: 14, height: 14)
+
+                    Text(displayTitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.appSubtle)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+
                     if isPending {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                    } else {
-                        FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
+                        Text("Fetching...")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .frame(width: 14, height: 14)
-                
-                Text(displayTitle)
-                    .font(.system(size: 12))
-                    .foregroundStyle(Color.appSubtle)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                
-                if isPending {
-                    Text("Fetching...")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
-                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.appLine.opacity(0.3))
+                )
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.appLine.opacity(0.3))
-            )
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 
@@ -110,13 +115,14 @@ struct UrlRowCompact: View {
             description: nil,
             siteName: nil,
             favicon: nil,
+            image: nil,
             position: "a0",
             fetchStatus: .pending,
             fetchedAt: nil,
             createdAt: Date(),
             updatedAt: Date()
         ))
-        
+
         // Simulated fetched URL
         UrlRowCompact(url: APITodoUrl(
             id: "2",
@@ -126,6 +132,7 @@ struct UrlRowCompact: View {
             description: nil,
             siteName: "Hacker News",
             favicon: "https://news.ycombinator.com/favicon.ico",
+            image: nil,
             position: "a1",
             fetchStatus: .fetched,
             fetchedAt: Date(),

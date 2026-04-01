@@ -37,6 +37,12 @@ final class TodoItem {
     var dueDate: Date?            // Optional due date
     var priority: String?         // "high" or "low", stored as String for SwiftData
     var aiStatus: String?         // AI processing status: pending, processing, complete, failed
+    var researchId: String?           // Research record ID from server
+    var researchStatus: String?       // "pending" | "completed" | "failed"
+    var researchType: String?         // "general" | "location"
+    var researchSummary: String?
+    var researchedAt: Date?
+    var researchCreatedAt: Date?      // When research was started (for stale detection)
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
 
@@ -54,6 +60,12 @@ final class TodoItem {
         self.dueDate = nil
         self.priority = nil
         self.aiStatus = nil
+        self.researchId = nil
+        self.researchStatus = nil
+        self.researchType = nil
+        self.researchSummary = nil
+        self.researchedAt = nil
+        self.researchCreatedAt = nil
         self.pendingUrls = []
     }
     
@@ -94,5 +106,16 @@ final class TodoItem {
     /// Check if AI is currently processing this todo
     var isAIProcessing: Bool {
         todoAIStatus == .pending || todoAIStatus == .processing
+    }
+
+    /// Check if research is currently pending
+    var isResearchPending: Bool {
+        researchStatus == "pending"
+    }
+
+    /// How long (in seconds) the current research record has been alive
+    var researchAge: TimeInterval? {
+        guard let createdAt = researchCreatedAt else { return nil }
+        return Date().timeIntervalSince(createdAt)
     }
 }
