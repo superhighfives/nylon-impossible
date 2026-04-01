@@ -65,6 +65,7 @@ enum AIStatus: String, Codable, Sendable {
 struct APITodoUrl: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
+    let researchId: String?  // Non-nil when URL is a research citation source
     let url: String
     let title: String?
     let description: String?
@@ -76,6 +77,28 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let fetchedAt: Date?
     let createdAt: Date
     let updatedAt: Date
+
+    init(
+        id: String, todoId: String, researchId: String? = nil, url: String,
+        title: String?, description: String?, siteName: String?, favicon: String?,
+        image: String?, position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
+        createdAt: Date, updatedAt: Date
+    ) {
+        self.id = id
+        self.todoId = todoId
+        self.researchId = researchId
+        self.url = url
+        self.title = title
+        self.description = description
+        self.siteName = siteName
+        self.favicon = favicon
+        self.image = image
+        self.position = position
+        self.fetchStatus = fetchStatus
+        self.fetchedAt = fetchedAt
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 struct APITodoWithUrls: Codable, Sendable {
