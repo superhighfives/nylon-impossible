@@ -7,8 +7,8 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { getSocialUrlInfo } from "@/lib/social-urls";
 import { useUser } from "@/hooks/useUser";
+import { getSocialUrlInfo } from "@/lib/social-urls";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
