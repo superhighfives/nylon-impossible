@@ -228,8 +228,7 @@ export async function syncTodos(c: Context<Env>) {
           .update(todos)
           .set({
             title: change.title ? truncateTitle(change.title) : existing.title,
-            notes:
-              change.notes !== undefined ? change.notes : existing.notes,
+            notes: change.notes !== undefined ? change.notes : existing.notes,
             completed: change.completed ?? existing.completed,
             position: change.position ?? existing.position,
             dueDate:
@@ -330,12 +329,7 @@ export async function syncTodos(c: Context<Env>) {
       entry.lastPosition = row.position; // rows are ordered, so last wins
     }
 
-    for (const {
-      todoId,
-      explicitUrls,
-      title,
-      notes,
-    } of urlExtractionNeeded) {
+    for (const { todoId, explicitUrls, title, notes } of urlExtractionNeeded) {
       const extractedUrls = explicitUrls
         ? Array.from(new Set(explicitUrls))
         : [
