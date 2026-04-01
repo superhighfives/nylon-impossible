@@ -201,7 +201,8 @@ export async function syncTodos(c: Context<Env>) {
   for (const change of changes) {
     const normalizedId = change.id.toLowerCase();
     // Prefer `notes`; fall back to legacy `description` for older clients
-    const effectiveNotes = change.notes !== undefined ? change.notes : change.description;
+    const effectiveNotes =
+      change.notes !== undefined ? change.notes : change.description;
 
     const [existing] = await db
       .select()
@@ -232,9 +233,7 @@ export async function syncTodos(c: Context<Env>) {
           .set({
             title: change.title ? truncateTitle(change.title) : existing.title,
             notes:
-              effectiveNotes !== undefined
-                ? effectiveNotes
-                : existing.notes,
+              effectiveNotes !== undefined ? effectiveNotes : existing.notes,
             completed: change.completed ?? existing.completed,
             position: change.position ?? existing.position,
             dueDate:
@@ -252,8 +251,7 @@ export async function syncTodos(c: Context<Env>) {
             explicitUrls: change.urls.map((u) => u.url),
           });
         } else if (
-          (effectiveNotes &&
-            extractUrlsFromText(effectiveNotes).length > 0) ||
+          (effectiveNotes && extractUrlsFromText(effectiveNotes).length > 0) ||
           (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({
@@ -291,8 +289,7 @@ export async function syncTodos(c: Context<Env>) {
             explicitUrls: change.urls.map((u) => u.url),
           });
         } else if (
-          (effectiveNotes &&
-            extractUrlsFromText(effectiveNotes).length > 0) ||
+          (effectiveNotes && extractUrlsFromText(effectiveNotes).length > 0) ||
           (change.title && extractUrlsFromText(change.title).length > 0)
         ) {
           urlExtractionNeeded.push({

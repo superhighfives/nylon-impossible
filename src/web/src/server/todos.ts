@@ -255,8 +255,7 @@ export const updateTodo = createServerFn({ method: "POST" })
         // Build update object dynamically
         const updates: Record<string, unknown> = {};
         if (validated.title !== undefined) updates.title = validated.title;
-        if (validated.notes !== undefined)
-          updates.notes = validated.notes;
+        if (validated.notes !== undefined) updates.notes = validated.notes;
         if (validated.completed !== undefined)
           updates.completed = validated.completed;
         if (validated.position !== undefined)

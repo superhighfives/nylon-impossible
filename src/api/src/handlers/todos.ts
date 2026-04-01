@@ -197,8 +197,7 @@ export async function updateTodo(c: Context<Env>) {
   };
 
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
-  if (parsed.data.notes !== undefined)
-    updates.notes = parsed.data.notes;
+  if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes;
   if (parsed.data.completed !== undefined)
     updates.completed = parsed.data.completed;
   if (parsed.data.position !== undefined)
