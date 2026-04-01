@@ -462,6 +462,7 @@ struct SyncServiceTests {
                 urls: [APITodoUrl(
                     id: "url-id-1",
                     todoId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                    researchId: nil,
                     url: "https://example.com",
                     title: "Example",
                     description: nil,

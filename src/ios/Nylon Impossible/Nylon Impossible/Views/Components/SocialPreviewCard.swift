@@ -257,6 +257,7 @@ struct SocialPreviewCardCompact: View {
             SocialPreviewCard(url: APITodoUrl(
                 id: "1",
                 todoId: "todo1",
+                researchId: nil,
                 url: "https://x.com/bcherny",
                 title: "Boris Cherny (@bcherny) on X",
                 description: "Software engineer. Working on Claude Code at @Anthropic.",
@@ -273,6 +274,7 @@ struct SocialPreviewCardCompact: View {
             SocialPreviewCard(url: APITodoUrl(
                 id: "2",
                 todoId: "todo1",
+                researchId: nil,
                 url: "https://x.com/user/status/123456789",
                 title: "Boris Cherny (@bcherny) on X",
                 description: "Just shipped something cool. Check it out!",
@@ -292,6 +294,7 @@ struct SocialPreviewCardCompact: View {
             SocialPreviewCardCompact(url: APITodoUrl(
                 id: "3",
                 todoId: "todo1",
+                researchId: nil,
                 url: "https://x.com/bcherny",
                 title: "Boris Cherny (@bcherny) on X",
                 description: nil,
