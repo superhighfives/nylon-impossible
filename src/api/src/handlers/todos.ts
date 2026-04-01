@@ -50,11 +50,13 @@ function serializeUrl(url: typeof todoUrls.$inferSelect) {
   return {
     id: url.id.toLowerCase(),
     todoId: url.todoId.toLowerCase(),
+    researchId: url.researchId,
     url: url.url,
     title: url.title,
     description: url.description,
     siteName: url.siteName,
     favicon: url.favicon,
+    image: url.image,
     position: url.position,
     fetchStatus: url.fetchStatus,
     fetchedAt: url.fetchedAt?.toISOString() ?? null,

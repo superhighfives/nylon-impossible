@@ -211,6 +211,7 @@ async function fetchUrlMetadataBackground(
             description: metadata.description,
             siteName: metadata.siteName,
             favicon: metadata.favicon,
+            image: metadata.image,
             fetchStatus: "fetched" as const,
             fetchedAt: new Date(),
             updatedAt: new Date(),

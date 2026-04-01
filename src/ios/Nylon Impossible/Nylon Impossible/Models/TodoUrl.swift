@@ -17,6 +17,7 @@ final class TodoUrl {
     var itemDescription: String?
     var siteName: String?
     var favicon: String?
+    var image: String?
     var position: String
     var fetchStatus: String      // "pending" | "fetched" | "failed"
     var fetchedAt: Date?
@@ -30,8 +31,8 @@ final class TodoUrl {
 
     init(
         id: String, researchId: String? = nil, url: String, title: String?, itemDescription: String?,
-        siteName: String?, favicon: String?, position: String, fetchStatus: String,
-        fetchedAt: Date?, createdAt: Date, updatedAt: Date
+        siteName: String?, favicon: String?, image: String?, position: String,
+        fetchStatus: String, fetchedAt: Date?, createdAt: Date, updatedAt: Date
     ) {
         self.id = id
         self.researchId = researchId
@@ -40,6 +41,7 @@ final class TodoUrl {
         self.itemDescription = itemDescription
         self.siteName = siteName
         self.favicon = favicon
+        self.image = image
         self.position = position
         self.fetchStatus = fetchStatus
         self.fetchedAt = fetchedAt

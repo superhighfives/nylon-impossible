@@ -49,6 +49,7 @@ export interface SerializedTodoUrl {
   description: string | null;
   siteName: string | null;
   favicon: string | null;
+  image: string | null;
   position: string;
   fetchStatus: FetchStatus;
   fetchedAt: string | null;

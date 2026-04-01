@@ -103,6 +103,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let description: String?
     let siteName: String?
     let favicon: String?
+    let image: String?
     let position: String
     let fetchStatus: FetchStatus
     let fetchedAt: Date?
@@ -112,7 +113,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     init(
         id: String, todoId: String, researchId: String? = nil, url: String,
         title: String?, description: String?, siteName: String?, favicon: String?,
-        position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
+        image: String? = nil, position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
         createdAt: Date, updatedAt: Date
     ) {
         self.id = id
@@ -123,6 +124,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
         self.description = description
         self.siteName = siteName
         self.favicon = favicon
+        self.image = image
         self.position = position
         self.fetchStatus = fetchStatus
         self.fetchedAt = fetchedAt

@@ -10,6 +10,7 @@ export interface UrlMetadata {
   description: string | null;
   siteName: string | null;
   favicon: string | null;
+  image: string | null;
 }
 
 const NULL_METADATA: UrlMetadata = {
@@ -17,6 +18,7 @@ const NULL_METADATA: UrlMetadata = {
   description: null,
   siteName: null,
   favicon: null,
+  image: null,
 };
 
 /**
@@ -153,5 +155,11 @@ export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
 
   const favicon = extractFavicon(html, url);
 
-  return { title, description, siteName, favicon };
+  const rawImage =
+    extractMeta(html, "og:image") ??
+    extractMeta(html, "twitter:image") ??
+    extractMeta(html, "twitter:image:src");
+  const image = rawImage ? (resolveUrl(rawImage, url) ?? rawImage) : null;
+
+  return { title, description, siteName, favicon, image };
 }

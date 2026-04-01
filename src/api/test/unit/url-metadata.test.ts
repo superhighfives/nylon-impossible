@@ -77,6 +77,7 @@ const NULL_METADATA = {
   description: null,
   siteName: null,
   favicon: null,
+  image: null,
 };
 
 describe("fetchUrlMetadata", () => {

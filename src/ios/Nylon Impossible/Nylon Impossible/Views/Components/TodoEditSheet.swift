@@ -276,63 +276,68 @@ struct UrlRow: View {
     }
 
     var body: some View {
-        Link(destination: URL(string: url.url)!) {
-            HStack(spacing: 12) {
-                // Icon: spinner for pending, error for failed, favicon otherwise
-                Group {
-                    if isPending {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                    } else if isFailed {
-                        Image(systemName: "exclamationmark.circle")
-                            .foregroundStyle(.red)
-                    } else {
-                        FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
-                    }
-                }
-                .frame(width: 20, height: 20)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 4) {
-                        Text(displayTitle)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                        
+        // Use rich social preview card for fetched social URLs
+        if !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+            SocialPreviewCard(url: url)
+        } else {
+            Link(destination: URL(string: url.url)!) {
+                HStack(spacing: 12) {
+                    // Icon: spinner for pending, error for failed, favicon otherwise
+                    Group {
                         if isPending {
-                            Text("Fetching...")
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
+                            ProgressView()
+                                .scaleEffect(0.7)
                         } else if isFailed {
-                            Text("Failed to fetch")
-                                .font(.caption2)
+                            Image(systemName: "exclamationmark.circle")
                                 .foregroundStyle(.red)
+                        } else {
+                            FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
                         }
                     }
-                    
-                    if !isPending && !isFailed, let description = url.description, !description.isEmpty {
-                        Text(description)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(2)
+                    .frame(width: 20, height: 20)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 4) {
+                            Text(displayTitle)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+
+                            if isPending {
+                                Text("Fetching...")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            } else if isFailed {
+                                Text("Failed to fetch")
+                                    .font(.caption2)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+
+                        if !isPending && !isFailed, let description = url.description, !description.isEmpty {
+                            Text(description)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+
+                        Text(url.url)
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                            .lineLimit(1)
                     }
-                    
-                    Text(url.url)
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
+
+                    Spacer()
+
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                
-                Spacer()
-                
-                Image(systemName: "arrow.up.right")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
     }
 }
 
