@@ -57,7 +57,7 @@ struct APITodo: Codable, Sendable {
     let research: APIResearch?
 
     init(
-        id: String, userId: String, title: String, description: String? = nil,
+        id: String, userId: String, title: String, notes: String? = nil,
         completed: Bool, position: String? = nil, dueDate: Date? = nil,
         priority: String? = nil, aiStatus: AIStatus? = nil,
         createdAt: Date, updatedAt: Date,
@@ -66,7 +66,7 @@ struct APITodo: Codable, Sendable {
         self.id = id
         self.userId = userId
         self.title = title
-        self.description = description
+        self.notes = notes
         self.completed = completed
         self.position = position
         self.dueDate = dueDate
@@ -149,7 +149,7 @@ struct APITodoWithUrls: Codable, Sendable {
     let research: APIResearch?
 
     init(
-        id: String, userId: String, title: String, description: String? = nil,
+        id: String, userId: String, title: String, notes: String? = nil,
         completed: Bool, position: String? = nil, dueDate: Date? = nil,
         priority: String? = nil, aiStatus: AIStatus? = nil,
         createdAt: Date, updatedAt: Date,
@@ -158,7 +158,7 @@ struct APITodoWithUrls: Codable, Sendable {
         self.id = id
         self.userId = userId
         self.title = title
-        self.description = description
+        self.notes = notes
         self.completed = completed
         self.position = position
         self.dueDate = dueDate
