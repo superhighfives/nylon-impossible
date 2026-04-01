@@ -85,6 +85,14 @@ struct TodoItemRow: View {
                                 .accessibilityLabel("AI is processing")
                         }
 
+                        // Research pending indicator
+                        if !todo.isAIProcessing && todo.isResearchPending {
+                            ProgressView()
+                                .scaleEffect(0.7)
+                                .tint(Color.yellow)
+                                .accessibilityLabel("Researching")
+                        }
+
                         Spacer()
                         if !todo.isSynced {
                             Circle()

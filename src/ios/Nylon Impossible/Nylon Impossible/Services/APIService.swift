@@ -32,6 +32,15 @@ enum APIError: Error, LocalizedError {
 
 // MARK: - API Models
 
+struct APIResearch: Codable, Sendable {
+    let id: String
+    let status: String        // "pending" | "completed" | "failed"
+    let researchType: String  // "general" | "location"
+    let summary: String?
+    let researchedAt: Date?
+    let createdAt: Date
+}
+
 struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
@@ -45,6 +54,29 @@ struct APITodo: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
+    let research: APIResearch?
+
+    init(
+        id: String, userId: String, title: String, description: String? = nil,
+        completed: Bool, position: String? = nil, dueDate: Date? = nil,
+        priority: String? = nil, aiStatus: AIStatus? = nil,
+        createdAt: Date, updatedAt: Date,
+        urls: [APITodoUrl]? = nil, research: APIResearch? = nil
+    ) {
+        self.id = id
+        self.userId = userId
+        self.title = title
+        self.description = description
+        self.completed = completed
+        self.position = position
+        self.dueDate = dueDate
+        self.priority = priority
+        self.aiStatus = aiStatus
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.urls = urls
+        self.research = research
+    }
 }
 
 /// Fetch status for URL metadata
@@ -114,6 +146,29 @@ struct APITodoWithUrls: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]
+    let research: APIResearch?
+
+    init(
+        id: String, userId: String, title: String, description: String? = nil,
+        completed: Bool, position: String? = nil, dueDate: Date? = nil,
+        priority: String? = nil, aiStatus: AIStatus? = nil,
+        createdAt: Date, updatedAt: Date,
+        urls: [APITodoUrl] = [], research: APIResearch? = nil
+    ) {
+        self.id = id
+        self.userId = userId
+        self.title = title
+        self.description = description
+        self.completed = completed
+        self.position = position
+        self.dueDate = dueDate
+        self.priority = priority
+        self.aiStatus = aiStatus
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.urls = urls
+        self.research = research
+    }
 }
 
 struct SyncRequest: Codable, Sendable {
@@ -215,6 +270,8 @@ protocol APIProviding: Sendable {
     func smartCreate(text: String) async throws -> SmartCreateResponse
     func getMe() async throws -> APIUser
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
+    func reresearch(todoId: String) async throws
+    func cancelResearch(todoId: String) async throws
 }
 
 // MARK: - API Service
@@ -322,6 +379,17 @@ final class APIService: APIProviding {
         let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
 
+    // MARK: - Research
+
+    func reresearch(todoId: String) async throws {
+        struct ReresearchResponse: Decodable { let id: String }
+        let _: ReresearchResponse = try await post(path: "/todos/\(todoId)/research", body: EmptyBody())
+    }
+
+    func cancelResearch(todoId: String) async throws {
+        let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/research")
+    }
+
     // MARK: - User Preferences
 
     func getMe() async throws -> APIUser {
@@ -407,6 +475,8 @@ final class APIService: APIProviding {
 }
 
 // MARK: - Helper Types
+
+private struct EmptyBody: Encodable {}
 
 private struct EmptyResponse: Decodable {
     let success: Bool?
