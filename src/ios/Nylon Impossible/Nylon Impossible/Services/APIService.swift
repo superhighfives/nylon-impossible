@@ -113,7 +113,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     init(
         id: String, todoId: String, researchId: String? = nil, url: String,
         title: String?, description: String?, siteName: String?, favicon: String?,
-        image: String?, position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
+        image: String? = nil, position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
         createdAt: Date, updatedAt: Date
     ) {
         self.id = id
