@@ -144,8 +144,8 @@ struct TodoItemRow: View {
                 todo: todo,
                 apiService: apiService,
                 initialUrls: urls,
-                onSave: { title, description, dueDate, priority in
-                    onSave(title, description, dueDate, priority)
+                onSave: { title, notes, dueDate, priority in
+                    onSave(title, notes, dueDate, priority)
                     showingEditSheet = false
                 },
                 onCancel: {

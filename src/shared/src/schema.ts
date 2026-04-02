@@ -43,7 +43,7 @@ export const todos = sqliteTable(
       .notNull()
       .default(false),
     position: text("position").notNull().default("a0"),
-    description: text("description"),
+    notes: text("notes"),
     dueDate: integer("due_date", { mode: "timestamp" }),
     priority: text("priority", { enum: ["high", "low"] }),
     createdAt: integer("created_at", { mode: "timestamp" })

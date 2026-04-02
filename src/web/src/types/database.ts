@@ -3,14 +3,14 @@ export type { List, Todo, TodoList, TodoUrl, User } from "@/lib/schema";
 
 export interface CreateTodoInput {
   title: string;
-  description?: string | null;
+  notes?: string | null;
   dueDate?: Date | null;
   priority?: "high" | "low" | null;
 }
 
 export interface UpdateTodoInput {
   title?: string;
-  description?: string | null;
+  notes?: string | null;
   completed?: boolean;
   position?: string;
   dueDate?: Date | null;
@@ -62,7 +62,7 @@ export interface TodoWithUrls {
   id: string;
   userId: string;
   title: string;
-  description: string | null;
+  notes: string | null;
   completed: boolean;
   position: string;
   dueDate: string | null;

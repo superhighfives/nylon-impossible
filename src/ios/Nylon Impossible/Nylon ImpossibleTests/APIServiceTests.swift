@@ -114,7 +114,7 @@ struct APIServiceTests {
         let change = TodoChange(
             id: "abc-123",
             title: nil,
-            description: nil,
+            notes: nil,
             completed: true,
             position: nil,
             dueDate: nil,

@@ -20,7 +20,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     title: todo.title,
-    description: todo.description,
+    notes: todo.notes,
     completed: todo.completed,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,

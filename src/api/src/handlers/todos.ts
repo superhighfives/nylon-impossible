@@ -21,7 +21,7 @@ const createTodoSchema = z.object({
 
 const updateTodoSchema = z.object({
   title: z.string().min(1).max(500).optional(),
-  description: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),
   dueDate: z.coerce.date().nullable().optional(),
@@ -35,7 +35,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     title: todo.title,
-    description: todo.description,
+    notes: todo.notes,
     completed: todo.completed,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
@@ -197,8 +197,7 @@ export async function updateTodo(c: Context<Env>) {
   };
 
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
-  if (parsed.data.description !== undefined)
-    updates.description = parsed.data.description;
+  if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes;
   if (parsed.data.completed !== undefined)
     updates.completed = parsed.data.completed;
   if (parsed.data.position !== undefined)
@@ -214,14 +213,11 @@ export async function updateTodo(c: Context<Env>) {
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
 
-  // Re-fire research when the title or description changes and research already exists
+  // Re-fire research when the title changes and research already exists
   const titleChanged =
     parsed.data.title !== undefined && parsed.data.title !== existing.title;
-  const descriptionChanged =
-    parsed.data.description !== undefined &&
-    parsed.data.description !== existing.description;
 
-  if (titleChanged || descriptionChanged) {
+  if (titleChanged) {
     const [research] = await db
       .select({ id: todoResearch.id, researchType: todoResearch.researchType })
       .from(todoResearch)
@@ -247,14 +243,7 @@ export async function updateTodo(c: Context<Env>) {
         .from(users)
         .where(eq(users.id, userId));
 
-      const newTitle = parsed.data.title ?? existing.title;
-      const newDesc =
-        parsed.data.description !== undefined
-          ? parsed.data.description
-          : existing.description;
-      const query = newDesc?.trim()
-        ? `${newTitle}: ${newDesc.trim()}`
-        : newTitle;
+      const query = parsed.data.title ?? existing.title;
 
       await c.env.RESEARCH_QUEUE.send({
         todoId,

@@ -225,7 +225,7 @@ final class SyncService {
                 // Normalize UUID to lowercase to match web-generated IDs in D1
                 id: todo.id.uuidString.lowercased(),
                 title: todo.isDeleted ? nil : todo.title,
-                description: todo.isDeleted ? nil : todo.itemDescription,
+                notes: todo.isDeleted ? nil : todo.itemNotes,
                 completed: todo.isDeleted ? nil : todo.isCompleted,
                 position: todo.isDeleted ? nil : todo.position,
                 dueDate: todo.isDeleted ? nil : todo.dueDate,
@@ -268,7 +268,7 @@ final class SyncService {
                 // Conflict: compare updatedAt, last write wins
                 if remote.updatedAt > local.updatedAt {
                     local.title = remote.title
-                    local.itemDescription = remote.description
+                    local.itemNotes = remote.notes
                     local.isCompleted = remote.completed
                     local.position = remote.position ?? local.position
                     local.dueDate = remote.dueDate
@@ -289,7 +289,7 @@ final class SyncService {
                 // New remote item - create locally
                 let todo = TodoItem(title: remote.title, userId: userId, position: remote.position ?? "a0")
                 todo.id = remoteId
-                todo.itemDescription = remote.description
+                todo.itemNotes = remote.notes
                 todo.isCompleted = remote.completed
                 todo.dueDate = remote.dueDate
                 todo.priority = remote.priority

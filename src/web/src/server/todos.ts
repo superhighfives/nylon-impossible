@@ -65,7 +65,7 @@ function serializeTodoWithUrls(
     id: todo.id,
     userId: todo.userId,
     title: todo.title,
-    description: todo.description,
+    notes: todo.notes,
     completed: todo.completed,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
@@ -209,7 +209,7 @@ export const createTodo = createServerFn({ method: "POST" })
               .values({
                 userId: user.id,
                 title: validated.title,
-                description: validated.description ?? null,
+                notes: validated.notes ?? null,
                 position,
                 completed: false,
                 dueDate: validated.dueDate ?? null,
@@ -255,8 +255,7 @@ export const updateTodo = createServerFn({ method: "POST" })
         // Build update object dynamically
         const updates: Record<string, unknown> = {};
         if (validated.title !== undefined) updates.title = validated.title;
-        if (validated.description !== undefined)
-          updates.description = validated.description;
+        if (validated.notes !== undefined) updates.notes = validated.notes;
         if (validated.completed !== undefined)
           updates.completed = validated.completed;
         if (validated.position !== undefined)

@@ -12,9 +12,10 @@ struct TodoEditSheet: View {
     let apiService: APIService?
     var onSave: (String, String?, Date?, TodoPriority?) -> Void
     var onCancel: () -> Void
-    
+
+    @Environment(UserPreferencesService.self) private var preferencesService
     @State private var title: String
-    @State private var description: String
+    @State private var notes: String
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var priority: TodoPriority?
@@ -22,7 +23,8 @@ struct TodoEditSheet: View {
     @State private var research: APIResearch? = nil
     @State private var isLoadingUrls: Bool = false
     @State private var isReresearching: Bool = false
-    
+
+
     init(
         todo: TodoItem,
         apiService: APIService? = nil,
@@ -36,7 +38,7 @@ struct TodoEditSheet: View {
         self.onCancel = onCancel
 
         _title = State(initialValue: todo.title)
-        _description = State(initialValue: todo.itemDescription ?? "")
+        _notes = State(initialValue: todo.itemNotes ?? "")
         _hasDueDate = State(initialValue: todo.dueDate != nil)
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _priority = State(initialValue: todo.todoPriority)
@@ -68,12 +70,20 @@ struct TodoEditSheet: View {
                     Text("Title")
                 }
                 
-                // Description
+                // Notes
                 Section {
-                    TextField("Add a description...", text: $description, axis: .vertical)
+                    TextField("Add a note...", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 } header: {
-                    Text("Description")
+                    HStack {
+                        Text("Notes")
+                        Spacer()
+                        if preferencesService.aiEnabled {
+                            Text("Not used by AI")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
                 
                 // Due Date
@@ -161,12 +171,12 @@ struct TodoEditSheet: View {
     private func saveChanges() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
-        
-        let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
-        let descriptionValue = trimmedDescription.isEmpty ? nil : trimmedDescription
+
+        let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        let notesValue = trimmedNotes.isEmpty ? nil : trimmedNotes
         let dueDateValue = hasDueDate ? dueDate : nil
-        
-        onSave(trimmedTitle, descriptionValue, dueDateValue, priority)
+
+        onSave(trimmedTitle, notesValue, dueDateValue, priority)
     }
     
     private func reresearch() async {
@@ -345,7 +355,7 @@ struct UrlRow: View {
     TodoEditSheet(
         todo: {
             let item = TodoItem(title: "Buy groceries")
-            item.itemDescription = "Get milk, eggs, and bread"
+            item.itemNotes = "Get milk, eggs, and bread"
             item.dueDate = Date().addingTimeInterval(86400) // Tomorrow
             item.priority = "high"
             return item
@@ -353,4 +363,5 @@ struct UrlRow: View {
         onSave: { _, _, _, _ in },
         onCancel: {}
     )
+    .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))
 }

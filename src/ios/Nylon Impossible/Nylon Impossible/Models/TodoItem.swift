@@ -27,7 +27,7 @@ final class TodoItem {
     var id: UUID
     var userId: String?           // Clerk user ID (nil for local-only todos)
     var title: String
-    var itemDescription: String?  // Optional description
+    var itemNotes: String?  // Optional notes
     var isCompleted: Bool
     var createdAt: Date
     var updatedAt: Date           // For sync conflict resolution
@@ -50,7 +50,7 @@ final class TodoItem {
         self.id = UUID()
         self.userId = userId
         self.title = title
-        self.itemDescription = nil
+        self.itemNotes = nil
         self.isCompleted = false
         self.position = position
         self.createdAt = Date()
