@@ -134,13 +134,13 @@ struct APIServiceTests {
 
     @Test("APIError has correct descriptions")
     func apiErrorDescriptions() {
-        let unauthorized = APIError.unauthorized
+        let unauthorized = APIError.unauthorized(url: "https://api.example.com/test")
         #expect(unauthorized.errorDescription?.contains("Not authorized") == true)
 
-        let invalidResponse = APIError.invalidResponse
+        let invalidResponse = APIError.invalidResponse(url: "https://api.example.com/test")
         #expect(invalidResponse.errorDescription?.contains("Invalid") == true)
 
-        let serverError = APIError.serverError(500, "Internal error")
+        let serverError = APIError.serverError(500, "Internal error", url: "https://api.example.com/test")
         #expect(serverError.errorDescription?.contains("500") == true)
         #expect(serverError.errorDescription?.contains("Internal error") == true)
     }

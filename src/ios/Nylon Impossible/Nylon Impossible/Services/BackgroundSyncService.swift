@@ -90,7 +90,7 @@ struct BackgroundSyncService {
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.invalidResponse
+            throw APIError.invalidResponse(url: request.url?.absoluteString ?? "unknown")
         }
 
         // 3. Mark items as synced on the main actor

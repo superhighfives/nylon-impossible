@@ -499,7 +499,7 @@ struct SyncServiceTests {
     func setsErrorStateOnAPIFailure() async throws {
         let auth = MockAuthService()
         let api = MockAPIService()
-        api.syncError = APIError.networkError(URLError(.notConnectedToInternet))
+        api.syncError = APIError.networkError(URLError(.notConnectedToInternet), url: "https://api.example.com/todos/sync")
 
         let container = try makeContainer()
         let context = container.mainContext
