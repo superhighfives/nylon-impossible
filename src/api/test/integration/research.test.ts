@@ -111,6 +111,8 @@ describe("Research functionality", () => {
       expect(todo.research.researchType).toBe("general");
       expect(todo.research.summary).toContain("OAuth");
       expect(todo.research.researchedAt).toBeTruthy();
+      expect(todo.research.createdAt).toBeTruthy();
+      expect(todo.research.updatedAt).toBeTruthy();
 
       // URLs should include researchId
       expect(todo.urls).toHaveLength(2);
@@ -171,6 +173,8 @@ describe("Research functionality", () => {
       expect(body.todos[0].research).toBeTruthy();
       expect(body.todos[0].research.status).toBe("pending");
       expect(body.todos[0].research.summary).toBeNull();
+      expect(body.todos[0].research.createdAt).toBeTruthy();
+      expect(body.todos[0].research.updatedAt).toBeTruthy();
     });
   });
 
