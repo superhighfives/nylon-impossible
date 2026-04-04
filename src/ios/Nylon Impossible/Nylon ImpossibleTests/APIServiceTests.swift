@@ -164,4 +164,25 @@ struct APIServiceTests {
         #expect(decodingError.errorDescription?.contains("status: 200") == true)
         #expect(decodingError.errorDescription?.contains("{\"unexpected\": true}") == true)
     }
+
+    @Test("APIError.decodingError description includes status code and body preview")
+    func decodingErrorBodyPreview() {
+        // execute() truncates the raw data to 500 bytes before storing; simulate that here
+        let fullBody = String(repeating: "x", count: 600)
+        let truncatedBody = String(fullBody.prefix(500))
+
+        let decodingErr = APIError.decodingError(
+            DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "bad data")),
+            url: "https://api.example.com/todos",
+            statusCode: 422,
+            responseBody: truncatedBody
+        )
+
+        let description = decodingErr.errorDescription ?? ""
+        #expect(description.contains("422") == true)
+        // The 500-char body preview should appear verbatim in the description
+        #expect(description.contains(truncatedBody) == true)
+        // The untruncated 600-char body should not appear
+        #expect(description.contains(fullBody) == false)
+    }
 }
