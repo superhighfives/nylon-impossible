@@ -8,24 +8,24 @@
 import Foundation
 
 enum APIError: Error, LocalizedError {
-    case unauthorized
-    case networkError(Error)
-    case invalidResponse
-    case serverError(Int, String?)
-    case decodingError(Error)
+    case unauthorized(url: String)
+    case networkError(Error, url: String)
+    case invalidResponse(url: String)
+    case serverError(Int, String?, url: String)
+    case decodingError(Error, url: String, statusCode: Int, responseBody: String)
 
     var errorDescription: String? {
         switch self {
-        case .unauthorized:
-            return "Not authorized. Please sign in again."
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .invalidResponse:
-            return "Invalid response from server"
-        case .serverError(let code, let message):
-            return "Server error (\(code)): \(message ?? "Unknown")"
-        case .decodingError(let error):
-            return "Failed to decode response: \(error.localizedDescription)"
+        case .unauthorized(let url):
+            return "Not authorized. Please sign in again. [URL: \(url)]"
+        case .networkError(let error, let url):
+            return "Network error: \(error.localizedDescription) [URL: \(url)]"
+        case .invalidResponse(let url):
+            return "Invalid response from server [URL: \(url)]"
+        case .serverError(let code, let message, let url):
+            return "Server error (\(code)): \(message ?? "Unknown") [URL: \(url)]"
+        case .decodingError(let error, let url, let statusCode, let responseBody):
+            return "Failed to decode response: \(error.localizedDescription) [URL: \(url), status: \(statusCode), body: \(responseBody)]"
         }
     }
 }
@@ -445,31 +445,36 @@ final class APIService: APIProviding {
     }
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let url = request.url?.absoluteString ?? "unknown"
         let data: Data
         let response: URLResponse
 
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            throw APIError.networkError(error)
+            throw APIError.networkError(error, url: url)
         }
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
+            throw APIError.invalidResponse(url: url)
         }
 
-        switch httpResponse.statusCode {
+        let statusCode = httpResponse.statusCode
+
+        switch statusCode {
         case 200...299:
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
-                throw APIError.decodingError(error)
+                let prefix = data.prefix(500)
+                let body = String(data: prefix, encoding: .utf8) ?? "<non-UTF8 data, \(data.count) bytes>"
+                throw APIError.decodingError(error, url: url, statusCode: statusCode, responseBody: body)
             }
         case 401:
-            throw APIError.unauthorized
+            throw APIError.unauthorized(url: url)
         default:
             let message = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
-            throw APIError.serverError(httpResponse.statusCode, message)
+            throw APIError.serverError(statusCode, message, url: url)
         }
     }
 }
