@@ -25,7 +25,7 @@ enum APIError: Error, LocalizedError {
         case .serverError(let code, let message, let url):
             return "Server error (\(code)): \(message ?? "Unknown") [URL: \(url)]"
         case .decodingError(let error, let url, let statusCode, let responseBody):
-            return "Failed to decode response: \(error.localizedDescription) [URL: \(url), status: \(statusCode), body: \(responseBody.prefix(500))]"
+            return "Failed to decode response: \(error.localizedDescription) [URL: \(url), status: \(statusCode), body: \(responseBody)]"
         }
     }
 }
@@ -466,7 +466,8 @@ final class APIService: APIProviding {
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
-                let body = String(data: data, encoding: .utf8) ?? "<non-UTF8 data, \(data.count) bytes>"
+                let prefix = data.prefix(500)
+                let body = String(data: prefix, encoding: .utf8) ?? "<non-UTF8 data, \(data.count) bytes>"
                 throw APIError.decodingError(error, url: url, statusCode: statusCode, responseBody: body)
             }
         case 401:
