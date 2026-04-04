@@ -132,16 +132,36 @@ struct APIServiceTests {
         #expect(json["completed"] as? Bool == true)
     }
 
-    @Test("APIError has correct descriptions")
+    @Test("APIError has correct descriptions with URL context")
     func apiErrorDescriptions() {
-        let unauthorized = APIError.unauthorized(url: "https://api.example.com/test")
+        let testURL = "https://api.example.com/test"
+
+        let unauthorized = APIError.unauthorized(url: testURL)
         #expect(unauthorized.errorDescription?.contains("Not authorized") == true)
+        #expect(unauthorized.errorDescription?.contains(testURL) == true)
 
-        let invalidResponse = APIError.invalidResponse(url: "https://api.example.com/test")
+        let invalidResponse = APIError.invalidResponse(url: testURL)
         #expect(invalidResponse.errorDescription?.contains("Invalid") == true)
+        #expect(invalidResponse.errorDescription?.contains(testURL) == true)
 
-        let serverError = APIError.serverError(500, "Internal error", url: "https://api.example.com/test")
+        let serverError = APIError.serverError(500, "Internal error", url: testURL)
         #expect(serverError.errorDescription?.contains("500") == true)
         #expect(serverError.errorDescription?.contains("Internal error") == true)
+        #expect(serverError.errorDescription?.contains(testURL) == true)
+
+        let networkError = APIError.networkError(URLError(.notConnectedToInternet), url: testURL)
+        #expect(networkError.errorDescription?.contains("Network error") == true)
+        #expect(networkError.errorDescription?.contains(testURL) == true)
+
+        let decodingError = APIError.decodingError(
+            DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "test")),
+            url: testURL,
+            statusCode: 200,
+            responseBody: "{\"unexpected\": true}"
+        )
+        #expect(decodingError.errorDescription?.contains("Failed to decode") == true)
+        #expect(decodingError.errorDescription?.contains(testURL) == true)
+        #expect(decodingError.errorDescription?.contains("status: 200") == true)
+        #expect(decodingError.errorDescription?.contains("{\"unexpected\": true}") == true)
     }
 }
