@@ -17,13 +17,41 @@ private final class LocationHelper {
         defer { isLocating = false }
 
         let manager = CLLocationManager()
+        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
+            // Wait for the user to respond to the authorization prompt
+            for await event in CLLocationUpdate.updates {
+                // The first event after requesting authorization reflects the user's choice
+                _ = event
+                break
+            }
         }
 
-        guard let update = try? await CLLocationUpdate.updates
-            .first(where: { $0.location != nil }),
-            let location = update.location else {
+        guard manager.authorizationStatus == .authorizedWhenInUse
+                || manager.authorizationStatus == .authorizedAlways else {
+            return nil
+        }
+
+        // Race the location stream against a 10-second timeout
+        guard let location = await withTaskGroup(of: CLLocation?.self, returning: CLLocation?.self, body: { group in
+            group.addTask {
+                guard let update = try? await CLLocationUpdate.updates
+                    .first(where: { $0.location != nil }),
+                    let location = update.location else {
+                    return nil
+                }
+                return location
+            }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(10))
+                return nil
+            }
+            let result = await group.next() ?? nil
+            group.cancelAll()
+            return result
+        }) else {
             return nil
         }
 
