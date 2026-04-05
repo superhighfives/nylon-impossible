@@ -49,7 +49,7 @@ struct HeaderView: View {
                     }
                 }
             }
-            .frame(height: 24)
+            .frame(height: 36)
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(preferencesService)
