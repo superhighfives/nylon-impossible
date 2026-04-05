@@ -23,11 +23,12 @@ struct BackgroundSyncService {
     private let userId: String
 
     /// Returns nil if credentials are missing or expired.
+    /// Reads the JWT from the Keychain and the userId from shared UserDefaults.
     init?(sharedDefaults: UserDefaults) {
         guard
-            let token = sharedDefaults.string(forKey: BackgroundSyncService.authTokenKey),
+            let token = KeychainHelper.loadString(forKey: BackgroundSyncService.authTokenKey),
             let userId = sharedDefaults.string(forKey: "currentUserId"),
-            let expiry = sharedDefaults.object(forKey: BackgroundSyncService.authTokenExpiryKey) as? Date,
+            let expiry = KeychainHelper.loadDate(forKey: BackgroundSyncService.authTokenExpiryKey),
             expiry > Date()
         else { return nil }
 
