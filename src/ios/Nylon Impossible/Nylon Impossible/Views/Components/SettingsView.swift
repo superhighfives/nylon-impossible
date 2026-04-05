@@ -4,71 +4,43 @@
 //
 
 import CoreLocation
+import MapKit
 import SwiftUI
 
 @Observable
 @MainActor
-private final class LocationHelper: NSObject, CLLocationManagerDelegate {
-    private let manager = CLLocationManager()
+private final class LocationHelper {
     var isLocating = false
-    var onResult: ((String) -> Void)?
 
-    override init() {
-        super.init()
-        manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyKilometer
-    }
-
-    func request(onResult: @escaping (String) -> Void) {
-        self.onResult = onResult
+    func request() async -> String? {
         isLocating = true
-        switch manager.authorizationStatus {
-        case .notDetermined:
+        defer { isLocating = false }
+
+        let manager = CLLocationManager()
+        if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
-        case .authorizedWhenInUse, .authorizedAlways:
-            manager.requestLocation()
-        default:
-            isLocating = false
         }
+
+        guard let update = try? await CLLocationUpdate.updates
+            .first(where: { $0.location != nil }),
+            let location = update.location else {
+            return nil
+        }
+
+        return await reverseGeocode(location)
     }
 
-    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        Task { @MainActor in
-            switch manager.authorizationStatus {
-            case .authorizedWhenInUse, .authorizedAlways:
-                manager.requestLocation()
-            default:
-                self.isLocating = false
-            }
+    private func reverseGeocode(_ location: CLLocation) async -> String? {
+        let request = MKReverseGeocodingRequest(coordinate: location.coordinate)
+        guard let placemarks = try? await request.placemarks,
+              let placemark = placemarks.first else {
+            return nil
         }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.first else {
-            Task { @MainActor in self.isLocating = false }
-            return
-        }
-        let geocoder = CLGeocoder()
-        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, _ in
-            Task { @MainActor in
-                if let placemark = placemarks?.first {
-                    let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
-                        .compactMap { $0 }
-                        .filter { !$0.isEmpty }
-                    let result = parts.joined(separator: ", ")
-                    if !result.isEmpty {
-                        self?.onResult?(result)
-                    }
-                }
-                self?.isLocating = false
-            }
-        }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        Task { @MainActor in
-            self.isLocating = false
-        }
+        let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        let result = parts.joined(separator: ", ")
+        return result.isEmpty ? nil : result
     }
 }
 
@@ -109,9 +81,11 @@ struct SettingsView: View {
                             Task { await preferencesService.setLocation(locationText) }
                         }
                     Button {
-                        locationHelper.request { result in
-                            locationText = result
-                            Task { await preferencesService.setLocation(result) }
+                        Task {
+                            if let result = await locationHelper.request() {
+                                locationText = result
+                                await preferencesService.setLocation(result)
+                            }
                         }
                     } label: {
                         HStack {
