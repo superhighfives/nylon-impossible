@@ -14,7 +14,6 @@ struct TodoItemRow: View {
     var onToggle: () -> Void
     var onSave: (String, String?, Date?, TodoPriority?) -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
     @State private var checkmarkScale: CGFloat = 1.0
     @State private var showingEditSheet = false
 
@@ -128,15 +127,7 @@ struct TodoItemRow: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(Color.appElevated)
-        )
-        .shadow(
-            color: colorScheme == .dark ? Color.clear : Color.black.opacity(0.08),
-            radius: 4,
-            y: 2
-        )
+        .glassEffect(.regular, in: .rect(cornerRadius: 14))
         .opacity(todo.isCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
         .sheet(isPresented: $showingEditSheet) {
