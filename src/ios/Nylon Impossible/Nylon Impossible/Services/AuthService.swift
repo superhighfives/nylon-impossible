@@ -113,10 +113,15 @@ final class AuthService: AuthProviding {
         }
     }
 
-    /// Clear userId from shared UserDefaults and auth token from Keychain on sign out
+    /// Clear userId from shared UserDefaults and auth token from Keychain on sign out.
+    /// Also removes legacy UserDefaults token entries for users who haven't migrated yet.
     private func clearUserIdFromSharedDefaults() {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
         sharedDefaults?.removeObject(forKey: "currentUserId")
+        // Clear legacy UserDefaults token entries (pre-Keychain migration)
+        sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenKey)
+        sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenExpiryKey)
+        // Clear Keychain entries
         KeychainHelper.delete(key: BackgroundSyncService.authTokenKey)
         KeychainHelper.delete(key: BackgroundSyncService.authTokenExpiryKey)
     }

@@ -23,31 +23,45 @@ enum KeychainError: Error, LocalizedError {
 }
 
 enum KeychainHelper {
-    private static let accessGroup = "$(AppIdentifierPrefix)com.superhighfives.Nylon-Impossible.shared"
+    /// Shared service name used by the main app and extensions.
+    /// The actual access-group scoping is handled by the `keychain-access-groups`
+    /// entitlement — no need to hardcode `kSecAttrAccessGroup` in Swift, which would
+    /// require a runtime-expanded team ID prefix.
+    private static let service = "com.superhighfives.Nylon-Impossible.shared"
 
     static func save(key: String, data: Data) throws {
-        // Delete any existing item first to avoid errSecDuplicateItem
-        delete(key: key)
-
-        let query: [String: Any] = [
+        let searchQuery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key,
-            kSecAttrAccessGroup as String: accessGroup,
+        ]
+
+        let attributes: [String: Any] = [
             kSecValueData as String: data,
             kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
         ]
 
-        let status = SecItemAdd(query as CFDictionary, nil)
-        guard status == errSecSuccess else {
-            throw KeychainError.saveFailed(status: status)
+        // Try updating an existing item first (atomic — old value preserved on failure)
+        let updateStatus = SecItemUpdate(searchQuery as CFDictionary, attributes as CFDictionary)
+
+        if updateStatus == errSecItemNotFound {
+            // No existing item — add a new one
+            var addQuery = searchQuery
+            addQuery.merge(attributes) { _, new in new }
+            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
+            guard addStatus == errSecSuccess else {
+                throw KeychainError.saveFailed(status: addStatus)
+            }
+        } else if updateStatus != errSecSuccess {
+            throw KeychainError.saveFailed(status: updateStatus)
         }
     }
 
     static func load(key: String) -> Data? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key,
-            kSecAttrAccessGroup as String: accessGroup,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
         ]
@@ -61,8 +75,8 @@ enum KeychainHelper {
     static func delete(key: String) {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key,
-            kSecAttrAccessGroup as String: accessGroup,
         ]
 
         SecItemDelete(query as CFDictionary)
@@ -91,7 +105,7 @@ enum KeychainHelper {
     static func loadDate(forKey key: String) -> Date? {
         guard let data = load(key: key),
               data.count == MemoryLayout<TimeInterval>.size else { return nil }
-        let timestamp = data.withUnsafeBytes { $0.load(as: TimeInterval.self) }
+        let timestamp = data.withUnsafeBytes { $0.loadUnaligned(as: TimeInterval.self) }
         return Date(timeIntervalSince1970: timestamp)
     }
 }
