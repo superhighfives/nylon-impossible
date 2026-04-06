@@ -59,16 +59,22 @@ private final class LocationHelper {
     }
 
     private func reverseGeocode(_ location: CLLocation) async -> String? {
-        guard let request = MKReverseGeocodingRequest(location: location),
-              let mapItems = try? await request.mapItems,
-              let placemark = mapItems.first?.placemark else {
+        guard let request = MKReverseGeocodingRequest(location: location) else {
             return nil
         }
-        let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-        let result = parts.joined(separator: ", ")
-        return result.isEmpty ? nil : result
+        do {
+            let mapItems = try await request.mapItems
+            guard let placemark = mapItems.first?.placemark else {
+                return nil
+            }
+            let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+            let result = parts.joined(separator: ", ")
+            return result.isEmpty ? nil : result
+        } catch {
+            return nil
+        }
     }
 }
 
