@@ -34,7 +34,7 @@ struct AddTaskInputView: View {
 
             Spacer(minLength: 0)
         }
-        .glassEffect(.regular.interactive, in: .rect(cornerRadius: 16))
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
         .contentShape(RoundedRectangle(cornerRadius: 16))
         .onTapGesture {
             isFocused = true
