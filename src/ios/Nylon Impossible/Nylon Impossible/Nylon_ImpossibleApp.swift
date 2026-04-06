@@ -140,10 +140,12 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
-                // Persist userId and a fresh auth token to shared UserDefaults for
-                // Siri, Share Extension, and BackgroundSyncService access
+                // Migrate any existing UserDefaults token to Keychain (one-time)
+                authService.migrateAuthTokenFromUserDefaultsToKeychain()
+                // Persist userId to shared UserDefaults and a fresh auth token to
+                // the Keychain for Siri, Share Extension, and BackgroundSyncService
                 authService.persistUserIdToSharedDefaults()
-                Task { await authService.persistAuthTokenToSharedDefaults() }
+                Task { await authService.persistAuthTokenToKeychain() }
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
             } else {
@@ -160,7 +162,7 @@ struct RootView: View {
                 syncService.connectWebSocket()
                 // Refresh the stored auth token so BackgroundSyncService has a valid
                 // credential for the next ~50 minutes
-                Task { await authService.persistAuthTokenToSharedDefaults() }
+                Task { await authService.persistAuthTokenToKeychain() }
             case .background, .inactive:
                 syncService.disconnectWebSocket()
             @unknown default:

@@ -72,28 +72,57 @@ final class AuthService: AuthProviding {
         sharedDefaults?.set(userId, forKey: "currentUserId")
     }
 
-    /// Persist a fresh Clerk JWT (with ~50-minute expiry) to shared UserDefaults so
+    /// Persist a fresh Clerk JWT (with ~50-minute expiry) to the Keychain so
     /// BackgroundSyncService can authenticate from an App Intent extension or BGTask.
     /// Only writes when a token is successfully fetched to avoid an incoherent state
     /// (e.g. a nil token paired with a future expiry date).
-    func persistAuthTokenToSharedDefaults() async {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+    func persistAuthTokenToKeychain() async {
         do {
             let token = try await getToken()
-            sharedDefaults?.set(token, forKey: BackgroundSyncService.authTokenKey)
-            sharedDefaults?.set(Date().addingTimeInterval(50 * 60), forKey: BackgroundSyncService.authTokenExpiryKey)
+            try KeychainHelper.saveString(token, forKey: BackgroundSyncService.authTokenKey)
+            try KeychainHelper.saveDate(Date().addingTimeInterval(50 * 60), forKey: BackgroundSyncService.authTokenExpiryKey)
         } catch {
             // Leave any existing token/expiry intact — a stale-but-valid token is
             // better than writing a nil token with a fresh expiry.
-            print("[AuthService] Failed to persist auth token to shared defaults: \(error)")
+            print("[AuthService] Failed to persist auth token to Keychain: \(error)")
         }
     }
 
-    /// Clear userId from shared UserDefaults on sign out
+    /// One-time migration: copy JWT from UserDefaults to Keychain, then remove the
+    /// UserDefaults entries. No-op if the token is already in the Keychain or missing
+    /// from UserDefaults.
+    func migrateAuthTokenFromUserDefaultsToKeychain() {
+        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+
+        // Skip if Keychain already has a token
+        guard KeychainHelper.loadString(forKey: BackgroundSyncService.authTokenKey) == nil else { return }
+
+        guard
+            let token = sharedDefaults?.string(forKey: BackgroundSyncService.authTokenKey),
+            let expiry = sharedDefaults?.object(forKey: BackgroundSyncService.authTokenExpiryKey) as? Date
+        else { return }
+
+        do {
+            try KeychainHelper.saveString(token, forKey: BackgroundSyncService.authTokenKey)
+            try KeychainHelper.saveDate(expiry, forKey: BackgroundSyncService.authTokenExpiryKey)
+            // Clean up old UserDefaults entries after successful migration
+            sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenKey)
+            sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenExpiryKey)
+        } catch {
+            print("[AuthService] Keychain migration failed: \(error)")
+        }
+    }
+
+    /// Clear userId from shared UserDefaults and auth token from Keychain on sign out.
+    /// Also removes legacy UserDefaults token entries for users who haven't migrated yet.
     private func clearUserIdFromSharedDefaults() {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
         sharedDefaults?.removeObject(forKey: "currentUserId")
+        // Clear legacy UserDefaults token entries (pre-Keychain migration)
         sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenKey)
         sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenExpiryKey)
+        // Clear Keychain entries
+        KeychainHelper.delete(key: BackgroundSyncService.authTokenKey)
+        KeychainHelper.delete(key: BackgroundSyncService.authTokenExpiryKey)
     }
 }
