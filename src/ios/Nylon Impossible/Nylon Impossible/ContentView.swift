@@ -70,7 +70,7 @@ struct ContentView: View {
                 .padding(.top, 12)
                 .padding(.bottom, 8)
             }
-            .glassEffect(in: .rect(cornerRadius: 24, style: .continuous))
+            .glassEffect(in: .rect(cornerRadius: 24))
             .offset(y: inputBarVisible ? 0 : 120)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: inputBarVisible)
             .ignoresSafeArea(edges: .bottom)
