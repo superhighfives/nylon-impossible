@@ -18,30 +18,16 @@ private final class LocationHelper {
 
         let manager = CLLocationManager()
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
-
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
         }
 
-        // Get a single location update with a 10-second timeout
-        let locationTask = Task<CLLocation?, Never> {
-            do {
-                for try await update in CLLocationUpdate.updates {
-                    if let location = update.location {
-                        return location
-                    }
-                }
-            } catch {}
+        guard let update = try? await CLLocationUpdate.updates
+            .first(where: { $0.location != nil }),
+            let location = update?.location else {
             return nil
         }
-        let timeoutTask = Task<Void, Never> {
-            try? await Task.sleep(for: .seconds(10))
-            locationTask.cancel()
-        }
-        let location = await locationTask.value
-        timeoutTask.cancel()
 
-        guard let location else { return nil }
         return await reverseGeocode(location)
     }
 
@@ -49,21 +35,8 @@ private final class LocationHelper {
         guard let request = MKReverseGeocodingRequest(location: location) else {
             return nil
         }
-        let mapItems: [MKMapItem]
-        do {
-            mapItems = try await withCheckedThrowingContinuation { continuation in
-                request.getMapItems { items, error in
-                    if let error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume(returning: items)
-                    }
-                }
-            }
-        } catch {
-            return nil
-        }
-        guard let placemark = mapItems.first?.placemark else {
+        guard let mapItems = try? await request.mapItems,
+              let placemark = mapItems.first?.placemark else {
             return nil
         }
         let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
