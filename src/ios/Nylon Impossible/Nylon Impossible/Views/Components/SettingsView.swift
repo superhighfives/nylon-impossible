@@ -59,9 +59,9 @@ private final class LocationHelper {
     }
 
     private func reverseGeocode(_ location: CLLocation) async -> String? {
-        let request = MKReverseGeocodingRequest(coordinate: location.coordinate)
-        guard let placemarks = try? await request.placemarks,
-              let placemark = placemarks.first else {
+        let request = MKReverseGeocodingRequest(location: location)
+        guard let mapItems = try? await request.mapItems,
+              let placemark = mapItems.first?.placemark else {
             return nil
         }
         let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
