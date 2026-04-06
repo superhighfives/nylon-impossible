@@ -23,24 +23,23 @@ private final class LocationHelper {
             manager.requestWhenInUseAuthorization()
         }
 
-        let location: CLLocation? = await withTaskGroup(of: CLLocation?.self) { group in
-            group.addTask {
-                do {
-                    for try await update in CLLocationUpdate.updates {
-                        if let location = update.location {
-                            return location
-                        }
+        // Get a single location update with a 10-second timeout
+        let locationTask = Task<CLLocation?, Never> {
+            do {
+                for try await update in CLLocationUpdate.updates {
+                    if let location = update.location {
+                        return location
                     }
-                } catch {}
-                return nil
-            }
-            group.addTask {
-                try? await Task.sleep(for: .seconds(10))
-                return nil
-            }
-            defer { group.cancelAll() }
-            return await group.next() ?? nil
+                }
+            } catch {}
+            return nil
         }
+        let timeoutTask = Task<Void, Never> {
+            try? await Task.sleep(for: .seconds(10))
+            locationTask.cancel()
+        }
+        let location = await locationTask.value
+        timeoutTask.cancel()
 
         guard let location else { return nil }
         return await reverseGeocode(location)
