@@ -22,14 +22,12 @@ private final class LocationHelper {
         }
 
         var location: CLLocation?
-        do {
-            for try await update in CLLocationUpdate.updates {
-                if let loc = update.location {
-                    location = loc
-                    break
-                }
+        for await update in CLLocationUpdate.updates {
+            if let loc = update.location {
+                location = loc
+                break
             }
-        } catch {}
+        }
         guard let location else { return nil }
 
         return await reverseGeocode(location)
