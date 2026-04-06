@@ -8,42 +8,67 @@ import SwiftUI
 
 @Observable
 @MainActor
-private final class LocationHelper {
+private final class LocationHelper: NSObject, CLLocationManagerDelegate {
+    private let manager = CLLocationManager()
     var isLocating = false
+    var onResult: ((String) -> Void)?
 
-    func request() async -> String? {
-        isLocating = true
-        defer { isLocating = false }
-
-        let manager = CLLocationManager()
+    override init() {
+        super.init()
+        manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyKilometer
-        if manager.authorizationStatus == .notDetermined {
-            manager.requestWhenInUseAuthorization()
-        }
-
-        var location: CLLocation?
-        for await update in CLLocationUpdate.updates {
-            if let loc = update.location {
-                location = loc
-                break
-            }
-        }
-        guard let location else { return nil }
-
-        return await reverseGeocode(location)
     }
 
-    private func reverseGeocode(_ location: CLLocation) async -> String? {
-        let geocoder = CLGeocoder()
-        guard let placemarks = try? await geocoder.reverseGeocodeLocation(location),
-              let placemark = placemarks.first else {
-            return nil
+    func request(onResult: @escaping (String) -> Void) {
+        self.onResult = onResult
+        isLocating = true
+        switch manager.authorizationStatus {
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
+            manager.requestLocation()
+        default:
+            isLocating = false
         }
-        let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
-            .compactMap { $0 }
-            .filter { !$0.isEmpty }
-        let result = parts.joined(separator: ", ")
-        return result.isEmpty ? nil : result
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            switch manager.authorizationStatus {
+            case .authorizedWhenInUse, .authorizedAlways:
+                manager.requestLocation()
+            default:
+                self.isLocating = false
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.first else {
+            Task { @MainActor in self.isLocating = false }
+            return
+        }
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, _ in
+            Task { @MainActor in
+                if let placemark = placemarks?.first {
+                    let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
+                        .compactMap { $0 }
+                        .filter { !$0.isEmpty }
+                    let result = parts.joined(separator: ", ")
+                    if !result.isEmpty {
+                        self?.onResult?(result)
+                    }
+                }
+                self?.isLocating = false
+            }
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            self.isLocating = false
+        }
     }
 }
 
@@ -84,11 +109,9 @@ struct SettingsView: View {
                             Task { await preferencesService.setLocation(locationText) }
                         }
                     Button {
-                        Task {
-                            if let result = await locationHelper.request() {
-                                locationText = result
-                                await preferencesService.setLocation(result)
-                            }
+                        locationHelper.request { result in
+                            locationText = result
+                            Task { await preferencesService.setLocation(result) }
                         }
                     } label: {
                         HStack {
