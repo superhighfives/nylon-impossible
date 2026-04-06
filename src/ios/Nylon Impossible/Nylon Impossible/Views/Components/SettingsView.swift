@@ -22,11 +22,12 @@ private final class LocationHelper {
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
             // Wait for the user to respond to the authorization prompt
-            for await event in CLLocationUpdate.updates {
-                // The first event after requesting authorization reflects the user's choice
-                _ = event
-                break
-            }
+            do {
+                for try await event in CLLocationUpdate.updates {
+                    _ = event
+                    break
+                }
+            } catch {}
         }
 
         guard manager.authorizationStatus == .authorizedWhenInUse
