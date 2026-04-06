@@ -21,41 +21,25 @@ private final class LocationHelper {
 
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
-            // Wait for the user to respond to the authorization prompt
-            do {
-                for try await event in CLLocationUpdate.updates {
-                    _ = event
-                    break
-                }
-            } catch {}
         }
 
-        guard manager.authorizationStatus == .authorizedWhenInUse
-                || manager.authorizationStatus == .authorizedAlways else {
-            return nil
-        }
-
-        // Race the location stream against a 10-second timeout
-        guard let location = await withTaskGroup(of: CLLocation?.self, returning: CLLocation?.self, body: { group in
+        let location: CLLocation? = await withTaskGroup(of: CLLocation?.self) { group in
             group.addTask {
                 guard let update = try? await CLLocationUpdate.updates
-                    .first(where: { $0.location != nil }),
-                    let location = update.location else {
+                    .first(where: { $0.location != nil }) else {
                     return nil
                 }
-                return location
+                return update.location
             }
             group.addTask {
                 try? await Task.sleep(for: .seconds(10))
                 return nil
             }
-            let result = await group.next() ?? nil
-            group.cancelAll()
-            return result
-        }) else {
-            return nil
+            defer { group.cancelAll() }
+            return await group.next() ?? nil
         }
 
+        guard let location else { return nil }
         return await reverseGeocode(location)
     }
 
@@ -63,19 +47,28 @@ private final class LocationHelper {
         guard let request = MKReverseGeocodingRequest(location: location) else {
             return nil
         }
+        let mapItems: [MKMapItem]
         do {
-            let mapItems = try await request.mapItems
-            guard let placemark = mapItems.first?.placemark else {
-                return nil
+            mapItems = try await withCheckedThrowingContinuation { continuation in
+                request.getMapItems { items, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(returning: items)
+                    }
+                }
             }
-            let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
-                .compactMap { $0 }
-                .filter { !$0.isEmpty }
-            let result = parts.joined(separator: ", ")
-            return result.isEmpty ? nil : result
         } catch {
             return nil
         }
+        guard let placemark = mapItems.first?.placemark else {
+            return nil
+        }
+        let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        let result = parts.joined(separator: ", ")
+        return result.isEmpty ? nil : result
     }
 }
 
