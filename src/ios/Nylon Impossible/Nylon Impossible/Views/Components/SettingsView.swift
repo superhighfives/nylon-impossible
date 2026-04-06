@@ -25,11 +25,14 @@ private final class LocationHelper {
 
         let location: CLLocation? = await withTaskGroup(of: CLLocation?.self) { group in
             group.addTask {
-                guard let update = try? await CLLocationUpdate.updates
-                    .first(where: { $0.location != nil }) else {
-                    return nil
-                }
-                return update.location
+                do {
+                    for try await update in CLLocationUpdate.updates {
+                        if let location = update.location {
+                            return location
+                        }
+                    }
+                } catch {}
+                return nil
             }
             group.addTask {
                 try? await Task.sleep(for: .seconds(10))
