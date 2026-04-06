@@ -21,11 +21,16 @@ private final class LocationHelper {
             manager.requestWhenInUseAuthorization()
         }
 
-        guard let update = try? await CLLocationUpdate.updates
-            .first(where: { $0.location != nil }),
-            let location = update?.location else {
-            return nil
-        }
+        var location: CLLocation?
+        do {
+            for try await update in CLLocationUpdate.updates {
+                if let loc = update.location {
+                    location = loc
+                    break
+                }
+            }
+        } catch {}
+        guard let location else { return nil }
 
         return await reverseGeocode(location)
     }
