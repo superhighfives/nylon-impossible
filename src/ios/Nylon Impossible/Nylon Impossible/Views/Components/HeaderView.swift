@@ -32,6 +32,8 @@ struct HeaderView: View {
                     Image(systemName: "gear")
                         .font(.system(size: 18))
                         .foregroundStyle(Color.appStrong)
+                        .frame(width: 36, height: 36)
+                        .glassEffect(.regular, in: .circle)
                 }
                 .accessibilityLabel("Settings")
 
@@ -42,10 +44,12 @@ struct HeaderView: View {
                         Image(systemName: "rectangle.portrait.and.arrow.right")
                             .font(.system(size: 18))
                             .foregroundStyle(Color.appStrong)
+                            .frame(width: 36, height: 36)
+                            .glassEffect(.regular, in: .circle)
                     }
                 }
             }
-            .frame(height: 24)
+            .frame(height: 36)
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(preferencesService)

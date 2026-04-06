@@ -34,11 +34,7 @@ struct AddTaskInputView: View {
 
             Spacer(minLength: 0)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.appElevated)
-                .stroke(Color.appLine, lineWidth: 0.5)
-        )
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
         .contentShape(RoundedRectangle(cornerRadius: 16))
         .onTapGesture {
             isFocused = true
@@ -49,15 +45,12 @@ struct AddTaskInputView: View {
                     onAdd()
                     isFocused = false
                 }) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color.appBrand)
-                            .frame(width: 40, height: 40)
-
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Color.appBrandForeground)
-                    }
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(Color.appBrandForeground)
+                        .frame(width: 40, height: 40)
+                        .background(Color.appBrand)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 14))
                 }
                 .padding(.trailing, 8)
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
