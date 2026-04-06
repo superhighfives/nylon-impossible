@@ -4,7 +4,6 @@
 //
 
 import CoreLocation
-import MapKit
 import SwiftUI
 
 @Observable
@@ -32,11 +31,9 @@ private final class LocationHelper {
     }
 
     private func reverseGeocode(_ location: CLLocation) async -> String? {
-        guard let request = MKReverseGeocodingRequest(location: location) else {
-            return nil
-        }
-        guard let mapItems = try? await request.mapItems,
-              let placemark = mapItems.first?.placemark else {
+        let geocoder = CLGeocoder()
+        guard let placemarks = try? await geocoder.reverseGeocodeLocation(location),
+              let placemark = placemarks.first else {
             return nil
         }
         let parts = [placemark.locality, placemark.administrativeArea ?? placemark.country]
