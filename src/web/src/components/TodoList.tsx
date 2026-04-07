@@ -34,6 +34,7 @@ import {
   useUpdateTodo,
 } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
+import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
 
 interface TodoItemProps {
@@ -104,7 +105,9 @@ function TodoItemContent({
   isExpanded,
   onToggle,
   onToggleExpand,
+  onDelete,
   updatePending,
+  deletePending,
 }: TodoItemProps) {
   return (
     <div className="flex items-start gap-3">
@@ -163,7 +166,20 @@ function TodoItemContent({
         )}
         <TodoIndicators todo={todo} />
       </div>
-      <div className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+      {/* Mobile: popover actions menu */}
+      <div className="flex sm:hidden">
+        <TodoActionsMenu
+          todoId={todo.id}
+          todoTitle={todo.title}
+          isExpanded={isExpanded}
+          onToggleExpand={onToggleExpand}
+          onDelete={onDelete}
+          deletePending={deletePending}
+        />
+      </div>
+
+      {/* Desktop: inline button revealed on hover */}
+      <div className="hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
           size="sm"
