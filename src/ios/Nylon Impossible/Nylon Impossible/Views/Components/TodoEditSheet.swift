@@ -157,7 +157,11 @@ struct TodoEditSheet: View {
                         onCancel()
                     }
                 }
-                
+
+                ToolbarItem(placement: .primaryAction) {
+                    ShareLink(item: shareText(for: todo, urls: urls))
+                }
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         saveChanges()
