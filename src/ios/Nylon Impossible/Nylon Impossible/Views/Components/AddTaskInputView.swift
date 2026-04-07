@@ -34,6 +34,10 @@ struct AddTaskInputView: View {
 
             Spacer(minLength: 0)
         }
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(Color.black.opacity(0.3))
+        )
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
