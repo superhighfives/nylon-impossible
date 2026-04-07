@@ -28,14 +28,18 @@ struct AddTaskInputView: View {
                 }
                 // Dictation is enabled by default on iOS TextField; keyboardType
                 // defaults to .default which allows the dictation mic key
-                .padding(.leading, 24)
-                .padding(.trailing, canAdd ? 60 : 24)
-                .padding(.vertical, 22)
+                .padding(.leading, 16)
+                .padding(.trailing, canAdd ? 52 : 16)
+                .padding(.vertical, 12)
 
             Spacer(minLength: 0)
         }
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 16))
-        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 14))
         .onTapGesture {
             isFocused = true
         }
@@ -46,13 +50,13 @@ struct AddTaskInputView: View {
                     isFocused = false
                 }) {
                     Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(Color.appBrandForeground)
-                        .frame(width: 40, height: 40)
+                        .frame(width: 34, height: 34)
                         .background(Color.appBrand)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+                        .glassEffect(.regular, in: .rect(cornerRadius: 10))
                 }
-                .padding(.trailing, 8)
+                .padding(.trailing, 6)
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
