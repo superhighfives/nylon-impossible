@@ -37,7 +37,7 @@ struct AddTaskInputView: View {
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
         .overlay(
             RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 0.5)
+                .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 0.5)
         )
         .contentShape(RoundedRectangle(cornerRadius: 14))
         .onTapGesture {
