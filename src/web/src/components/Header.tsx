@@ -1,4 +1,4 @@
-import { SignedIn, UserButton } from "@clerk/tanstack-react-start";
+import { Show, UserButton } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 
@@ -19,9 +19,9 @@ export default function Header() {
         >
           <img src="/logo192.png" alt="Nylon Impossible" className="size-8" />
         </Link>
-        <SignedIn>
+        <Show when="signed-in">
           <UserButton />
-        </SignedIn>
+        </Show>
       </header>
     </div>
   );

@@ -5,7 +5,7 @@ import { renderWithProviders } from "@/test/helpers";
 import Header from "../Header";
 
 vi.mock("@clerk/tanstack-react-start", () => ({
-  SignedIn: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Show: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   UserButton: () => <div data-testid="user-button" />,
   useAuth: () => ({
     getToken: vi.fn().mockResolvedValue("test-token"),
