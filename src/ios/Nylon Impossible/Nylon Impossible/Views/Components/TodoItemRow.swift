@@ -130,6 +130,9 @@ struct TodoItemRow: View {
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
         .opacity(todo.isCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
+        .contextMenu {
+            ShareLink(item: shareText(for: todo, urls: urls))
+        }
         .sheet(isPresented: $showingEditSheet) {
             TodoEditSheet(
                 todo: todo,
