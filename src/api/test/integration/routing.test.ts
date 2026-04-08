@@ -89,6 +89,31 @@ describe("API routing", () => {
     });
   });
 
+  describe("WebSocket auth", () => {
+    it("GET /ws without token returns 401", async () => {
+      mockVerifyToken.mockRejectedValue(new Error("No token"));
+
+      const res = await SELF.fetch("http://localhost/ws", {
+        headers: { Upgrade: "websocket" },
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it("GET /ws with invalid token returns 401", async () => {
+      mockVerifyToken.mockRejectedValue(new Error("Invalid token"));
+
+      const res = await SELF.fetch("http://localhost/ws?token=bad-token", {
+        headers: { Upgrade: "websocket" },
+      });
+      expect(res.status).toBe(401);
+    });
+
+    it("GET /ws without upgrade header returns 400", async () => {
+      const res = await SELF.fetch("http://localhost/ws?token=valid-token");
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe("404 handling", () => {
     it("GET /unknown returns 404", async () => {
       const res = await SELF.fetch("http://localhost/unknown");
