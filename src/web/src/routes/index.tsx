@@ -1,4 +1,4 @@
-import { SignedIn, SignedOut } from "@clerk/tanstack-react-start";
+import { Show } from "@clerk/tanstack-react-start";
 import { createFileRoute } from "@tanstack/react-router";
 import { LandingPage } from "@/components/LandingPage";
 import { TodoInput } from "@/components/TodoInput";
@@ -28,13 +28,13 @@ function SignedInContent() {
 function App() {
   return (
     <>
-      <SignedOut>
+      <Show when="signed-out">
         <LandingPage />
-      </SignedOut>
+      </Show>
 
-      <SignedIn>
+      <Show when="signed-in">
         <SignedInContent />
-      </SignedIn>
+      </Show>
     </>
   );
 }
