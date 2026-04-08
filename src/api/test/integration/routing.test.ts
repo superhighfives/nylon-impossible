@@ -91,8 +91,6 @@ describe("API routing", () => {
 
   describe("WebSocket auth", () => {
     it("GET /ws without token returns 401", async () => {
-      mockVerifyToken.mockRejectedValue(new Error("No token"));
-
       const res = await SELF.fetch("http://localhost/ws", {
         headers: { Upgrade: "websocket" },
       });

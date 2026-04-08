@@ -199,6 +199,7 @@ describe("Todos CRUD", () => {
   describe("GET /todos/:id", () => {
     it("returns a todo with urls", async () => {
       const createRes = await createTodoViaAPI("My todo");
+      expect(createRes.status).toBe(201);
       const created = await createRes.json<any>();
 
       const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
@@ -220,6 +221,7 @@ describe("Todos CRUD", () => {
 
     it("returns 404 for another user's todo", async () => {
       const createRes = await createTodoViaAPI("My todo");
+      expect(createRes.status).toBe(201);
       const created = await createRes.json<any>();
 
       // Switch to different user
@@ -267,6 +269,7 @@ describe("Todos CRUD", () => {
 
     it("returns 404 for another user's todo", async () => {
       const createRes = await createTodoViaAPI("My todo");
+      expect(createRes.status).toBe(201);
       const created = await createRes.json<any>();
 
       // Switch to different user
@@ -292,12 +295,14 @@ describe("Todos CRUD", () => {
   describe("cross-user isolation", () => {
     it("GET /todos only returns the authenticated user's todos", async () => {
       // Create todo as user_test_123
-      await createTodoViaAPI("User A todo");
+      const createResA = await createTodoViaAPI("User A todo");
+      expect(createResA.status).toBe(201);
 
       // Switch to user B and create a todo
       mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
       await seedUser("user_other", "other@example.com");
-      await createTodoViaAPI("User B todo");
+      const createResB = await createTodoViaAPI("User B todo");
+      expect(createResB.status).toBe(201);
 
       // User B should only see their own todo
       const resB = await SELF.fetch("http://localhost/todos", {
