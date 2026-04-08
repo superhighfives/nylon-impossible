@@ -1,5 +1,5 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, MoreHorizontal, Trash2 } from "lucide-react";
 import { Button } from "./ui";
 
 interface TodoActionsMenuProps {
@@ -44,8 +44,8 @@ export function TodoActionsMenu({
               className={`${menuItemBase} text-gray`}
               onClick={() => onToggleExpand(todoId)}
             >
-              <Pencil size={14} />
-              {isExpanded ? "Close" : "Edit"}
+              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              {isExpanded ? "Collapse details" : "Expand details"}
             </BaseMenu.Item>
             <BaseMenu.Item
               className={`${menuItemBase} text-red-muted`}
