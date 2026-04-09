@@ -196,6 +196,45 @@ describe("Todos CRUD", () => {
     });
   });
 
+  describe("GET /todos/:id", () => {
+    it("returns a todo with urls", async () => {
+      const createRes = await createTodoViaAPI("My todo");
+      expect(createRes.status).toBe(201);
+      const created = await createRes.json<any>();
+
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        headers: AUTH_HEADER,
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      expect(body.title).toBe("My todo");
+      expect(body.urls).toEqual([]);
+    });
+
+    it("returns 404 for non-existent todo", async () => {
+      const res = await SELF.fetch(
+        "http://localhost/todos/550e8400-e29b-41d4-a716-446655440000",
+        { headers: AUTH_HEADER },
+      );
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 404 for another user's todo", async () => {
+      const createRes = await createTodoViaAPI("My todo");
+      expect(createRes.status).toBe(201);
+      const created = await createRes.json<any>();
+
+      // Switch to different user
+      mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
+      await seedUser("user_other", "other@example.com");
+
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        headers: AUTH_HEADER,
+      });
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe("DELETE /todos/:id", () => {
     it("deletes a todo", async () => {
       const createRes = await createTodoViaAPI("Delete me");
@@ -226,6 +265,61 @@ describe("Todos CRUD", () => {
         },
       );
       expect(res.status).toBe(404);
+    });
+
+    it("returns 404 for another user's todo", async () => {
+      const createRes = await createTodoViaAPI("My todo");
+      expect(createRes.status).toBe(201);
+      const created = await createRes.json<any>();
+
+      // Switch to different user
+      mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
+      await seedUser("user_other", "other@example.com");
+
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "DELETE",
+        headers: AUTH_HEADER,
+      });
+      expect(res.status).toBe(404);
+
+      // Verify todo still exists for original user
+      mockVerifyToken.mockResolvedValue({ sub: "user_test_123" } as any);
+      const listRes = await SELF.fetch("http://localhost/todos", {
+        headers: AUTH_HEADER,
+      });
+      const todos = await listRes.json<any[]>();
+      expect(todos).toHaveLength(1);
+    });
+  });
+
+  describe("cross-user isolation", () => {
+    it("GET /todos only returns the authenticated user's todos", async () => {
+      // Create todo as user_test_123
+      const createResA = await createTodoViaAPI("User A todo");
+      expect(createResA.status).toBe(201);
+
+      // Switch to user B and create a todo
+      mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
+      await seedUser("user_other", "other@example.com");
+      const createResB = await createTodoViaAPI("User B todo");
+      expect(createResB.status).toBe(201);
+
+      // User B should only see their own todo
+      const resB = await SELF.fetch("http://localhost/todos", {
+        headers: AUTH_HEADER,
+      });
+      const todosB = await resB.json<any[]>();
+      expect(todosB).toHaveLength(1);
+      expect(todosB[0].title).toBe("User B todo");
+
+      // Switch back to user A
+      mockVerifyToken.mockResolvedValue({ sub: "user_test_123" } as any);
+      const resA = await SELF.fetch("http://localhost/todos", {
+        headers: AUTH_HEADER,
+      });
+      const todosA = await resA.json<any[]>();
+      expect(todosA).toHaveLength(1);
+      expect(todosA[0].title).toBe("User A todo");
     });
   });
 

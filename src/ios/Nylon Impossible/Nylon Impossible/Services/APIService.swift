@@ -471,6 +471,7 @@ final class APIService: APIProviding {
                 throw APIError.decodingError(error, url: url, statusCode: statusCode, responseBody: body)
             }
         case 401:
+            await authService.signOut()
             throw APIError.unauthorized(url: url)
         default:
             let message = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
