@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { API_URL } from "@/lib/config";
+import { Sentry } from "@/lib/sentry";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type {
   CreateTodoInput,
@@ -88,6 +89,7 @@ export function useCreateTodo() {
       return { previousTodos, optimisticId: optimisticTodo.id };
     },
     onError: (_err, _variables, context) => {
+      Sentry.captureException(_err, { tags: { mutation: "createTodo" } });
       if (!context) {
         return;
       }
@@ -162,6 +164,7 @@ export function useUpdateTodo() {
       return { previousTodos };
     },
     onError: (_err, _variables, context) => {
+      Sentry.captureException(_err, { tags: { mutation: "updateTodo" } });
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
@@ -199,6 +202,7 @@ export function useDeleteTodo() {
       return { previousTodos };
     },
     onError: (_err, _variables, context) => {
+      Sentry.captureException(_err, { tags: { mutation: "deleteTodo" } });
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);

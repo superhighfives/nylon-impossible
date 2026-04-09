@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import {
   and,
@@ -89,6 +90,13 @@ export async function reresearchTodo(c: Context<Env>) {
     researchId: newResearchId,
     userLocation: user?.location ?? null,
   } satisfies ResearchJobMessage);
+
+  Sentry.addBreadcrumb({
+    category: "research",
+    message: "research.triggered",
+    data: { type: researchType },
+    level: "info",
+  });
 
   return c.json({
     id: newResearchId,

@@ -5,6 +5,7 @@
  * then stores a summary with numbered citations linking to source URLs.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import { eq, type getDb, todoResearch, todoUrls } from "./db";
 import { fetchUrlMetadata } from "./url-metadata";
@@ -109,6 +110,13 @@ export async function executeResearch(
       })
       .where(eq(todoResearch.id, researchId));
 
+    Sentry.addBreadcrumb({
+      category: "research",
+      message: "research.completed",
+      data: { type: researchType },
+      level: "info",
+    });
+
     // Notify clients that research is complete (summary + URLs available)
     await notifySync(env, userId);
 
@@ -131,7 +139,9 @@ export async function executeResearch(
               })
               .where(eq(todoUrls.id, record.id));
           } catch (error) {
-            console.error(`Failed to fetch metadata for ${record.url}:`, error);
+            Sentry.captureException(error, {
+              tags: { area: "url-metadata" },
+            });
             await db
               .update(todoUrls)
               .set({
@@ -147,7 +157,16 @@ export async function executeResearch(
       await notifySync(env, userId);
     }
   } catch (error) {
-    console.error("Research failed for todo:", todoId, error);
+    Sentry.captureException(error, {
+      tags: { area: "research" },
+      extra: { researchType },
+    });
+
+    Sentry.addBreadcrumb({
+      category: "research",
+      message: "research.failed",
+      level: "error",
+    });
 
     await db
       .update(todoResearch)

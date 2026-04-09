@@ -8,6 +8,7 @@ import {
   useRef,
 } from "react";
 import { WS_URL } from "@/lib/config";
+import { Sentry } from "@/lib/sentry";
 
 const TODOS_QUERY_KEY = ["todos"];
 
@@ -68,8 +69,10 @@ export function useWebSocketConnection(): WebSocketSync {
             if (data.type === "sync") {
               queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
             }
-          } catch {
-            // Invalid JSON, ignore
+          } catch (error) {
+            Sentry.captureException(error, {
+              tags: { area: "websocket", event: "parse-error" },
+            });
           }
         };
 

@@ -27,6 +27,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@nylon-impossible/shared": "workspace:*",
+    "@sentry/react": "^10.47.0",
+    "@sentry/vite-plugin": "^5.2.0",
     "@tailwindcss/vite": "^4.0.6",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query": "^5.66.5",

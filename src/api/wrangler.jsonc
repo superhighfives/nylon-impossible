@@ -56,4 +56,5 @@
   "ai": {
     "binding": "AI"
   }
+  // Note: SENTRY_DSN should be configured as a secret via `wrangler secret put SENTRY_DSN`
 }

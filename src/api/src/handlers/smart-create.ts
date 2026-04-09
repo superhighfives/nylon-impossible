@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -182,6 +183,13 @@ export async function smartCreate(c: Context<Env>) {
     .where(eq(todos.id, todoId))
     .then((rows) => rows[0]);
 
+  Sentry.addBreadcrumb({
+    category: "todo",
+    message: "todo.created",
+    data: { method: "smart" },
+    level: "info",
+  });
+
   await notifySync(c.env, userId);
 
   return c.json({ todos: [serializeTodo(created)], ai: aiEnabled });
@@ -218,7 +226,9 @@ async function fetchUrlMetadataBackground(
           })
           .where(eq(todoUrls.id, record.id));
       } catch (error) {
-        console.error(`Failed to fetch metadata for ${record.url}:`, error);
+        Sentry.captureException(error, {
+          tags: { area: "url-metadata" },
+        });
         await db
           .update(todoUrls)
           .set({
