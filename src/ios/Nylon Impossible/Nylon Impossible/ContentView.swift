@@ -15,9 +15,6 @@ struct ContentView: View {
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
 
-    /// Whether the floating input bar is visible (hide on scroll down, show on scroll up)
-    @State private var inputBarVisible: Bool = true
-
     private var sortedTodosList: [TodoItem] {
         viewModel.sortedTodos(from: todos)
     }
@@ -49,7 +46,7 @@ struct ContentView: View {
             }
             .padding(.horizontal, 16)
 
-            // Floating input bar — liquid glass, hides on scroll down, shows on scroll up
+            // Floating input bar — liquid glass, always fixed to bottom
             VStack(spacing: 0) {
                 AddTaskInputView(
                     text: $viewModel.newTaskText,
@@ -70,8 +67,6 @@ struct ContentView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
             }
-            .offset(y: inputBarVisible ? 0 : 120)
-            .animation(.spring(response: 0.35, dampingFraction: 0.8), value: inputBarVisible)
             .ignoresSafeArea(edges: .bottom)
         }
         .animation(.easeInOut(duration: 0.3), value: sortedTodosList.count)
@@ -135,15 +130,6 @@ struct ContentView: View {
         .scrollDismissesKeyboard(.interactively)
         // Extra bottom padding so content clears the floating input bar
         .contentMargins(.bottom, 100, for: .scrollContent)
-        // Detect scroll direction to show/hide the floating input bar
-        .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { oldY, newY in
-            let delta = newY - oldY
-            if delta > 10 {
-                if inputBarVisible { inputBarVisible = false }
-            } else if delta < -10 {
-                if !inputBarVisible { inputBarVisible = true }
-            }
-        }
     }
 
     @ViewBuilder
