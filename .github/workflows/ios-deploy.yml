@@ -160,7 +160,7 @@ jobs:
           SENTRY_PROJECT: ${{ secrets.SENTRY_IOS_PROJECT }}
         run: |
           brew install getsentry/tools/sentry-cli
-          ARCHIVE_PATH=$(find /tmp -name "NylonImpossible.xcarchive" -maxdepth 1 2>/dev/null | head -1)
+          ARCHIVE_PATH=$(find /tmp -maxdepth 1 -name "NylonImpossible.xcarchive" 2>/dev/null | head -1)
           if [ -n "$ARCHIVE_PATH" ]; then
             sentry-cli debug-files upload --include-sources "$ARCHIVE_PATH/dSYMs"
           fi

@@ -11,7 +11,7 @@ const isRemote = process.env.REMOTE_BINDINGS === 'true'
 
 const config = defineConfig({
   build: {
-    sourcemap: true,
+    sourcemap: "hidden",
   },
   plugins: [
     devtools(),

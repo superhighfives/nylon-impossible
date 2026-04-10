@@ -157,15 +157,15 @@ export async function executeResearch(
       await notifySync(env, userId);
     }
   } catch (error) {
-    Sentry.captureException(error, {
-      tags: { area: "research" },
-      extra: { researchType },
-    });
-
     Sentry.addBreadcrumb({
       category: "research",
       message: "research.failed",
       level: "error",
+    });
+
+    Sentry.captureException(error, {
+      tags: { area: "research" },
+      extra: { researchType },
     });
 
     await db

@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react";
 
 export function initSentry() {
+  if (typeof window === "undefined") return;
   if (!import.meta.env.VITE_SENTRY_DSN) return;
 
   Sentry.init({
