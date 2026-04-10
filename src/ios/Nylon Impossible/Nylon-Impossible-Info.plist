@@ -10,6 +10,8 @@
 	<string>Nylon</string>
 	<key>APIBaseURL</key>
 	<string>$(API_BASE_URL)</string>
+	<key>SentryDSN</key>
+	<string>$(SENTRY_DSN)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>

@@ -16,6 +16,15 @@ enum Config {
     static let clerkPublishableKey = "pk_live_Y2xlcmsubnlsb25pbXBvc3NpYmxlLmNvbSQ"
     #endif
 
+    // MARK: - Sentry
+    // DSN read from Info.plist (set via SENTRY_DSN build setting). Empty or missing = Sentry disabled.
+    static let sentryDSN: String? = {
+        guard let dsn = Bundle.main.infoDictionary?["SentryDSN"] as? String,
+              !dsn.isEmpty,
+              !dsn.hasPrefix("$(") else { return nil }
+        return dsn
+    }()
+
     // MARK: - API
     // Simulator uses localhost for local dev.
     // Device reads from Info.plist (set via API_BASE_URL build setting), defaulting to production.

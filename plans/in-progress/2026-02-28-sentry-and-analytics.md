@@ -240,33 +240,33 @@ Sentry.addBreadcrumb({
 
 ### Phase 1: API Worker
 
-- [ ] Add `@sentry/cloudflare` to `src/api/package.json`
-- [ ] Wrap Hono app in `Sentry.withSentry()` in `src/api/src/index.ts`
-- [ ] Add `SENTRY_DSN` and `ENVIRONMENT` as wrangler secrets
-- [ ] Add `Sentry.setUser()` in `authMiddleware`
-- [ ] Replace `console.error()` in `smart-create.ts` with `Sentry.captureException()`
-- [ ] Wrap Durable Object WS error handlers
+- [x] Add `@sentry/cloudflare` to `src/api/package.json`
+- [x] Wrap Hono app in `Sentry.withSentry()` in `src/api/src/index.ts`
+- [x] Add `SENTRY_DSN` and `ENVIRONMENT` as wrangler secrets
+- [x] Add `Sentry.setUser()` in `authMiddleware`
+- [x] Replace `console.error()` in `smart-create.ts` with `Sentry.captureException()`
+- [x] Wrap Durable Object WS error handlers
 
 ### Phase 2: Web App
 
-- [ ] Add `@sentry/react` to `src/web/package.json`
-- [ ] Create `src/web/src/lib/sentry.ts`
-- [ ] Init in `__root.tsx`, add error boundary
-- [ ] Add user context after auth
-- [ ] Instrument `useTodos.ts` mutations and `useWebSocket.ts`
-- [ ] Add `VITE_SENTRY_DSN` to env config and `.env.example`
-- [ ] Add `@sentry/vite-plugin` for source map upload
+- [x] Add `@sentry/react` to `src/web/package.json`
+- [x] Create `src/web/src/lib/sentry.ts`
+- [x] Init in `__root.tsx`, add error boundary
+- [x] Add user context after auth
+- [x] Instrument `useTodos.ts` mutations and `useWebSocket.ts`
+- [x] Add `VITE_SENTRY_DSN` to env config and `.env.example`
+- [x] Add `@sentry/vite-plugin` for source map upload
 
 ### Phase 3: iOS
 
-- [ ] Add `sentry-cocoa` via SPM
-- [ ] Init in app entry point
-- [ ] Set/clear user on auth state changes
-- [ ] Capture known error paths in `AuthService.swift`
-- [ ] Configure dSYM upload in CI
+- [x] Add `sentry-cocoa` via SPM
+- [x] Init in app entry point
+- [x] Set/clear user on auth state changes
+- [x] Capture known error paths in `AuthService.swift`
+- [x] Configure dSYM upload in CI
 
 ### Phase 4: Analytics Events
 
-- [ ] Define final event list and properties (no PII review)
-- [ ] Instrument key user actions across web and API
+- [x] Define final event list and properties (no PII review)
+- [x] Instrument key user actions across web and API
 - [ ] Verify events appear in Sentry dashboard

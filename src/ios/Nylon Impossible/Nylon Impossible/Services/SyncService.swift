@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Sentry
 import SwiftData
 
 enum SyncState: Equatable {
@@ -90,6 +91,9 @@ final class SyncService {
             await sync()
             webSocketService?.notifyChanged()
         } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "smart-create", key: "area")
+            }
             print("[SmartCreate] Error: \(error), falling back to local creation")
             // Fallback: create single local todo
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -168,6 +172,9 @@ final class SyncService {
             state = .success(Date())
 
         } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "sync", key: "area")
+            }
             print("[Sync] Error: \(error)")
             state = .error(error.localizedDescription)
         }
@@ -202,6 +209,9 @@ final class SyncService {
             await sync()
 
         } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "migration", key: "area")
+            }
             print("Migration error: \(error)")
         }
     }

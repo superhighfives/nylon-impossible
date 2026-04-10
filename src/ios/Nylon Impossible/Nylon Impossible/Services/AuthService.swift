@@ -7,6 +7,7 @@
 
 import Foundation
 import ClerkKit
+import Sentry
 
 enum AuthError: Error, LocalizedError {
     case notAuthenticated
@@ -84,6 +85,10 @@ final class AuthService: AuthProviding {
         } catch {
             // Leave any existing token/expiry intact — a stale-but-valid token is
             // better than writing a nil token with a fresh expiry.
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "auth", key: "area")
+                scope.setTag(value: "token-persist", key: "event")
+            }
             print("[AuthService] Failed to persist auth token to Keychain: \(error)")
         }
     }
