@@ -1,7 +1,7 @@
 # iOS 26 Location Modernisation
 
 **Date:** 2026-03-28
-**Status:** Ready
+**Status:** Complete
 **Scope:** iOS
 
 ## Problem
