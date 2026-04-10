@@ -32,12 +32,12 @@ export function TodoInput() {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 todo-input-wrapper">
       {error && <p className="text-sm text-red-muted">{error}</p>}
       {feedback && <p className="text-sm text-gray-muted">{feedback}</p>}
 
       <form onSubmit={handleSubmit}>
-        <div className="relative bg-gray-surface shadow-base rounded-lg">
+        <div className="todo-input-container relative bg-gray-surface shadow-base rounded-lg">
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
