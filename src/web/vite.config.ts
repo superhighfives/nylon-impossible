@@ -31,7 +31,7 @@ const config = defineConfig({
     ...(process.env.SENTRY_AUTH_TOKEN
       ? [sentryVitePlugin({
           org: process.env.SENTRY_ORG,
-          project: process.env.SENTRY_PROJECT,
+          project: process.env.SENTRY_WEB_PROJECT,
           authToken: process.env.SENTRY_AUTH_TOKEN,
         })]
       : []),
