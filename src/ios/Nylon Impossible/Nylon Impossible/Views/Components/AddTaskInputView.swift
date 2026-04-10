@@ -34,12 +34,12 @@ struct AddTaskInputView: View {
 
             Spacer(minLength: 0)
         }
-        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 14))
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: 22)
                 .strokeBorder(Color(.separator).opacity(0.5), lineWidth: 0.5)
         )
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .contentShape(RoundedRectangle(cornerRadius: 22))
         .onTapGesture {
             isFocused = true
         }
