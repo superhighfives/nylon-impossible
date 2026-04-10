@@ -1,5 +1,5 @@
-import * as Sentry from "@sentry/cloudflare";
 import { verifyToken } from "@clerk/backend";
+import * as Sentry from "@sentry/cloudflare";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
 import { eq, getDb, users } from "./db";

@@ -1,5 +1,5 @@
-import * as Sentry from "@sentry/cloudflare";
 import { DurableObject } from "cloudflare:workers";
+import * as Sentry from "@sentry/cloudflare";
 
 export class UserSync extends DurableObject {
   async fetch(request: Request): Promise<Response> {

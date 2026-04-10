@@ -22,7 +22,7 @@ import {
   useOnlineStatusValue,
 } from "../hooks/useOnlineStatus";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
-import { Sentry, initSentry } from "../lib/sentry";
+import { initSentry, Sentry } from "../lib/sentry";
 import appCss from "../styles.css?url";
 
 initSentry();
@@ -133,18 +133,20 @@ function RootDocument() {
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
           <SentryUserSync />
-          <Sentry.ErrorBoundary fallback={({ resetError }) => <ErrorView reset={resetError} />}>
-          <OnlineStatusContext.Provider value={onlineStatus}>
-            <OfflineBanner />
-            <Header />
-            <div className="pt-header-offset">
-              <Outlet />
-            </div>
-            <DevEnvironmentIndicator origin={origin} />
-            <Show when="signed-in">
-              <SettingsModal />
-            </Show>
-          </OnlineStatusContext.Provider>
+          <Sentry.ErrorBoundary
+            fallback={({ resetError }) => <ErrorView reset={resetError} />}
+          >
+            <OnlineStatusContext.Provider value={onlineStatus}>
+              <OfflineBanner />
+              <Header />
+              <div className="pt-header-offset">
+                <Outlet />
+              </div>
+              <DevEnvironmentIndicator origin={origin} />
+              <Show when="signed-in">
+                <SettingsModal />
+              </Show>
+            </OnlineStatusContext.Provider>
           </Sentry.ErrorBoundary>
           <TanStackDevtools
             config={{
