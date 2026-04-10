@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Sentry
 
 enum APIError: Error, LocalizedError {
     case unauthorized(url: String)
@@ -452,6 +453,10 @@ final class APIService: APIProviding {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "network", key: "area")
+                scope.setExtra(value: url, key: "endpoint")
+            }
             throw APIError.networkError(error, url: url)
         }
 
@@ -468,6 +473,11 @@ final class APIService: APIProviding {
             } catch {
                 let prefix = data.prefix(500)
                 let body = String(data: prefix, encoding: .utf8) ?? "<non-UTF8 data, \(data.count) bytes>"
+                SentrySDK.capture(error: error) { scope in
+                    scope.setTag(value: "decoding", key: "area")
+                    scope.setExtra(value: url, key: "endpoint")
+                    scope.setExtra(value: statusCode, key: "statusCode")
+                }
                 throw APIError.decodingError(error, url: url, statusCode: statusCode, responseBody: body)
             }
         case 401:
@@ -475,7 +485,12 @@ final class APIService: APIProviding {
             throw APIError.unauthorized(url: url)
         default:
             let message = try? JSONDecoder().decode(ErrorResponse.self, from: data).error
-            throw APIError.serverError(statusCode, message, url: url)
+            let apiError = APIError.serverError(statusCode, message, url: url)
+            SentrySDK.capture(error: apiError) { scope in
+                scope.setTag(value: "server", key: "area")
+                scope.setExtra(value: statusCode, key: "statusCode")
+            }
+            throw apiError
         }
     }
 }

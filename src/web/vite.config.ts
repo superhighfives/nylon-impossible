@@ -5,10 +5,14 @@ import viteReact from '@vitejs/plugin-react'
 import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 const isRemote = process.env.REMOTE_BINDINGS === 'true'
 
 const config = defineConfig({
+  build: {
+    sourcemap: "hidden",
+  },
   plugins: [
     devtools(),
     cloudflare({
@@ -23,6 +27,14 @@ const config = defineConfig({
     tailwindcss(),
     tanstackStart(),
     viteReact(),
+    // Upload source maps to Sentry on production builds
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [sentryVitePlugin({
+          org: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_WEB_PROJECT,
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+        })]
+      : []),
   ],
   optimizeDeps: {
     include: ["cookie"],

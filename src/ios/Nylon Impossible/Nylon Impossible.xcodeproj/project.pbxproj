@@ -10,6 +10,7 @@
 		23ABA4082F593570004D3D1A /* Nylon Share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 23ABA3FE2F593570004D3D1A /* Nylon Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A52F493BDB00D8344D /* ClerkKit */; };
 		23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A72F493BDB00D8344D /* ClerkKitUI */; };
+		AA0000012FA800000000SE01 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000022FA800000000SE02 /* Sentry */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -108,6 +109,7 @@
 			files = (
 				23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */,
 				23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */,
+				AA0000012FA800000000SE01 /* Sentry in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,6 +189,7 @@
 			packageProductDependencies = (
 				23E768A52F493BDB00D8344D /* ClerkKit */,
 				23E768A72F493BDB00D8344D /* ClerkKitUI */,
+				AA0000022FA800000000SE02 /* Sentry */,
 			);
 			productName = "Nylon Impossible";
 			productReference = 23C2980D2F1AD043007315F3 /* Nylon Impossible.app */;
@@ -246,6 +249,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */,
+				AA0000032FA800000000SE03 /* XCRemoteSwiftPackageReference "sentry-cocoa" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 23C2980E2F1AD043007315F3 /* Products */;
@@ -660,6 +664,14 @@
 				minimumVersion = 1.0.1;
 			};
 		};
+		AA0000032FA800000000SE03 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/getsentry/sentry-cocoa";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -672,6 +684,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */;
 			productName = ClerkKitUI;
+		};
+		AA0000022FA800000000SE02 /* Sentry */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AA0000032FA800000000SE03 /* XCRemoteSwiftPackageReference "sentry-cocoa" */;
+			productName = Sentry;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

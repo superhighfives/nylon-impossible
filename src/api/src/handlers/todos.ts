@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import {
@@ -163,6 +164,13 @@ export async function createTodo(c: Context<Env>) {
 
   const [newTodo] = await db.select().from(todos).where(eq(todos.id, id));
 
+  Sentry.addBreadcrumb({
+    category: "todo",
+    message: "todo.created",
+    data: { method: "manual" },
+    level: "info",
+  });
+
   return c.json(serializeTodo(newTodo), 201);
 }
 
@@ -288,6 +296,12 @@ export async function deleteTodo(c: Context<Env>) {
     );
 
   await db.delete(todos).where(eq(todos.id, todoId));
+
+  Sentry.addBreadcrumb({
+    category: "todo",
+    message: "todo.deleted",
+    level: "info",
+  });
 
   return c.json({ success: true });
 }

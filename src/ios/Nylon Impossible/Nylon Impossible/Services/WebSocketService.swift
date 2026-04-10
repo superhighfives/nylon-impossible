@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Sentry
 
 @Observable
 @MainActor
@@ -77,6 +78,10 @@ final class WebSocketService {
 
             receiveLoop()
         } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "websocket", key: "area")
+                scope.setTag(value: "connect", key: "event")
+            }
             print("[WebSocket] Connect error: \(error)")
             scheduleReconnect()
         }
@@ -92,6 +97,10 @@ final class WebSocketService {
                     self.handleMessage(message)
                     self.receiveLoop()
                 case .failure(let error):
+                    SentrySDK.capture(error: error) { scope in
+                        scope.setTag(value: "websocket", key: "area")
+                        scope.setTag(value: "receive", key: "event")
+                    }
                     print("[WebSocket] Receive error: \(error)")
                     self.handleDisconnect()
                 }

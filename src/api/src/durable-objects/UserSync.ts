@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import * as Sentry from "@sentry/cloudflare";
 
 export class UserSync extends DurableObject {
   async fetch(request: Request): Promise<Response> {
@@ -46,8 +47,10 @@ export class UserSync extends DurableObject {
           }
         }
       }
-    } catch {
-      // Invalid JSON, ignore
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { area: "websocket", event: "malformed-message" },
+      });
     }
   }
 
@@ -59,7 +62,10 @@ export class UserSync extends DurableObject {
     }
   }
 
-  async webSocketError(ws: WebSocket, _error: unknown) {
+  async webSocketError(ws: WebSocket, error: unknown) {
+    Sentry.captureException(error, {
+      tags: { area: "websocket", event: "connection-error" },
+    });
     try {
       ws.close(1011, "WebSocket error");
     } catch {

@@ -1,4 +1,4 @@
-import { ClerkProvider, Show } from "@clerk/tanstack-react-start";
+import { ClerkProvider, Show, useUser } from "@clerk/tanstack-react-start";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -10,6 +10,7 @@ import {
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequestUrl } from "@tanstack/react-start/server";
+import { useEffect } from "react";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
@@ -21,7 +22,10 @@ import {
   useOnlineStatusValue,
 } from "../hooks/useOnlineStatus";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { initSentry, Sentry } from "../lib/sentry";
 import appCss from "../styles.css?url";
+
+initSentry();
 
 interface MyRouterContext {
   queryClient: QueryClient;
@@ -89,6 +93,18 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: RootDocument,
 });
 
+function SentryUserSync() {
+  const { user } = useUser();
+  useEffect(() => {
+    if (user?.id) {
+      Sentry.setUser({ id: user.id });
+    } else {
+      Sentry.setUser(null);
+    }
+  }, [user?.id]);
+  return null;
+}
+
 function RootDocument() {
   const origin = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
@@ -116,17 +132,22 @@ function RootDocument() {
       </head>
       <body className="bg-gray-app text-gray antialiased">
         <ClerkProvider>
-          <OnlineStatusContext.Provider value={onlineStatus}>
-            <OfflineBanner />
-            <Header />
-            <div className="pt-header-offset">
-              <Outlet />
-            </div>
-            <DevEnvironmentIndicator origin={origin} />
-            <Show when="signed-in">
-              <SettingsModal />
-            </Show>
-          </OnlineStatusContext.Provider>
+          <SentryUserSync />
+          <Sentry.ErrorBoundary
+            fallback={({ resetError }) => <ErrorView reset={resetError} />}
+          >
+            <OnlineStatusContext.Provider value={onlineStatus}>
+              <OfflineBanner />
+              <Header />
+              <div className="pt-header-offset">
+                <Outlet />
+              </div>
+              <DevEnvironmentIndicator origin={origin} />
+              <Show when="signed-in">
+                <SettingsModal />
+              </Show>
+            </OnlineStatusContext.Provider>
+          </Sentry.ErrorBoundary>
           <TanStackDevtools
             config={{
               position: "bottom-right",

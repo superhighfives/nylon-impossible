@@ -1,4 +1,5 @@
 import { verifyToken } from "@clerk/backend";
+import * as Sentry from "@sentry/cloudflare";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
 import { eq, getDb, users } from "./db";
@@ -43,6 +44,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   }
 
   c.set("userId", auth.userId);
+  Sentry.setUser({ id: auth.userId });
 
   // Load user preferences
   const db = getDb(c.env.DB);

@@ -10,6 +10,7 @@ import SwiftData
 import ClerkKit
 import AppIntents
 import BackgroundTasks
+import Sentry
 
 @main
 struct Nylon_ImpossibleApp: App {
@@ -19,7 +20,22 @@ struct Nylon_ImpossibleApp: App {
     
     init() {
         Clerk.configure(publishableKey: Config.clerkPublishableKey)
+        Self.initSentry()
         registerBackgroundTasks()
+    }
+
+    private static func initSentry() {
+        guard let dsn = Config.sentryDSN else { return }
+
+        SentrySDK.start { options in
+            options.dsn = dsn
+            options.environment = "production"
+            options.tracesSampleRate = 0.1
+            options.enableAutoPerformanceTracing = true
+            // Privacy: don't attach screenshots or view hierarchy
+            options.attachScreenshot = false
+            options.attachViewHierarchy = false
+        }
     }
 
     private func registerBackgroundTasks() {
@@ -50,6 +66,9 @@ struct Nylon_ImpossibleApp: App {
                     try await svc.sync(modelContainer: container)
                     completion.complete(success: true)
                 } catch {
+                    SentrySDK.capture(error: error) { scope in
+                        scope.setTag(value: "background-sync", key: "area")
+                    }
                     print("[BGTask] Sync error: \(error)")
                     completion.complete(success: false)
                 }
@@ -140,6 +159,11 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
+                // Set Sentry user context (opaque ID only — no PII)
+                if let userId = authService.userId {
+                    let sentryUser = Sentry.User(userId: userId)
+                    SentrySDK.setUser(sentryUser)
+                }
                 // Migrate any existing UserDefaults token to Keychain (one-time)
                 authService.migrateAuthTokenFromUserDefaultsToKeychain()
                 // Persist userId to shared UserDefaults and a fresh auth token to
@@ -149,6 +173,8 @@ struct RootView: View {
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
             } else {
+                // Clear Sentry user on sign out
+                SentrySDK.setUser(nil)
                 // Reset sync on sign out
                 syncService?.reset()
                 hasTriggeredInitialSync = false

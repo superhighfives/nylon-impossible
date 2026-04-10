@@ -149,7 +149,21 @@ jobs:
           TEAM_ID: ${{ secrets.TEAM_ID }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
           API_BASE_URL: ${{ inputs.pr_number && format('https://api-pr-{0}.nylonimpossible.com', inputs.pr_number) || 'https://api.nylonimpossible.com' }}
+          SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
         run: bundle exec fastlane beta --verbose
+
+      - name: Upload dSYMs to Sentry
+        if: ${{ secrets.SENTRY_AUTH_TOKEN != '' }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_IOS_PROJECT }}
+        run: |
+          brew install getsentry/tools/sentry-cli
+          ARCHIVE_PATH=$(find /tmp -maxdepth 1 -name "NylonImpossible.xcarchive" 2>/dev/null | head -1)
+          if [ -n "$ARCHIVE_PATH" ]; then
+            sentry-cli debug-files upload --include-sources "$ARCHIVE_PATH/dSYMs"
+          fi
 
       - name: Clean up keychain
         if: always()
