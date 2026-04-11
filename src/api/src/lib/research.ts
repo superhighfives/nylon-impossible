@@ -186,7 +186,9 @@ export async function executeResearch(
  */
 function parseUserLocation(
   location?: string | null,
-): { type: "approximate"; approximate: { city?: string; region?: string } } | undefined {
+):
+  | { type: "approximate"; approximate: { city?: string; region?: string } }
+  | undefined {
   if (!location) return undefined;
   const parts = location.split(",").map((s) => s.trim());
   return {
