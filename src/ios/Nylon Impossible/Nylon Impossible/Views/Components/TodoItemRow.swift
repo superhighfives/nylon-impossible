@@ -17,6 +17,10 @@ struct TodoItemRow: View {
     @State private var checkmarkScale: CGFloat = 1.0
     @State private var showingEditSheet = false
 
+    private var nonResearchUrls: [APITodoUrl] {
+        urls.filter { $0.researchId == nil }
+    }
+
     var body: some View {
         HStack(spacing: 16) {
             // Checkbox
@@ -111,14 +115,25 @@ struct TodoItemRow: View {
                         .foregroundStyle(todo.isOverdue ? Color.red : Color.appSubtle)
                     }
                     
-                    // URL cards (compact)
-                    if !urls.isEmpty {
-                        FlowLayout(spacing: 6) {
-                            ForEach(urls) { url in
-                                UrlRowCompact(url: url)
+                    // URL cards (compact) — hide research URLs, limit to 2 visible
+                    if !nonResearchUrls.isEmpty {
+                        if todo.isCompleted {
+                            Text("+\(nonResearchUrls.count) \(nonResearchUrls.count == 1 ? "link" : "links")")
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.appSubtle)
+                        } else {
+                            FlowLayout(spacing: 6) {
+                                ForEach(Array(nonResearchUrls.prefix(2))) { url in
+                                    UrlRowCompact(url: url)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            if nonResearchUrls.count > 2 {
+                                Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(Color.appSubtle)
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

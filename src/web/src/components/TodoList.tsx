@@ -162,15 +162,26 @@ function TodoItemContent({
             {todo.research.summary.replace(/\[\d+\]/g, "")}
           </p>
         )}
-        {todo.urls && todo.urls.filter((url) => !url.researchId).length > 0 && (
-          <div className="flex flex-col gap-1 mt-1.5">
-            {todo.urls
-              .filter((url) => !url.researchId)
-              .map((url) => (
-                <UrlCardCompact key={url.id} url={url} />
-              ))}
-          </div>
-        )}
+        {todo.urls && (() => {
+          const nonResearchUrls = todo.urls.filter((url) => !url.researchId);
+          if (nonResearchUrls.length === 0) return null;
+          const overflow = nonResearchUrls.length - 2;
+          return (
+            <div className="flex flex-col gap-1 mt-1.5">
+              {todo.completed ? null : (
+                nonResearchUrls.slice(0, 2).map((url) => (
+                  <UrlCardCompact key={url.id} url={url} />
+                ))
+              )}
+              {(todo.completed ? nonResearchUrls.length > 0 : overflow > 0) && (
+                <span className="text-xs text-gray-muted">
+                  +{todo.completed ? nonResearchUrls.length : overflow}{" "}
+                  {(todo.completed ? nonResearchUrls.length : overflow) === 1 ? "link" : "links"}
+                </span>
+              )}
+            </div>
+          );
+        })()}
         <TodoIndicators todo={todo} />
       </div>
       {/* Mobile: popover actions menu */}

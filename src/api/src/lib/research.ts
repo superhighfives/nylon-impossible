@@ -38,7 +38,7 @@ export async function executeResearch(
     const result =
       researchType === "location"
         ? await executeLocationResearch(ai, query, userLocation, gatewayId)
-        : await executeGeneralResearch(ai, query, gatewayId);
+        : await executeGeneralResearch(ai, query, userLocation, gatewayId);
 
     // Deduplicate sources returned by the AI, normalizing URLs so
     // "https://google.com" and "https://google.com/" are treated as the same.
@@ -181,31 +181,47 @@ export async function executeResearch(
 }
 
 /**
+ * Parse a user location string (e.g., "Los Angeles, CA") into the
+ * WebSearchUserLocation format expected by Workers AI.
+ */
+function parseUserLocation(
+  location?: string | null,
+): { type: "approximate"; approximate: { city?: string; region?: string } } | undefined {
+  if (!location) return undefined;
+  const parts = location.split(",").map((s) => s.trim());
+  return {
+    type: "approximate",
+    approximate: {
+      city: parts[0] || undefined,
+      region: parts[1] || undefined,
+    },
+  };
+}
+
+/**
  * Execute general research (questions, comparisons, how-to topics)
  */
 async function executeGeneralResearch(
   ai: Ai,
   query: string,
+  userLocation?: string | null,
   gatewayId?: string,
 ): Promise<ResearchResult> {
-  const prompt = `Provide a brief, informative summary about the following topic based on your knowledge.
+  const prompt = `Research the following topic and provide a brief 2-3 sentence summary with numbered citations.
 
 Topic: "${query}"
 
 Instructions:
-1. Write a concise 2-3 sentence summary of the key facts about this topic
-2. Use numbered citations [1], [2], etc. to reference authoritative sources
-3. For source URLs, ONLY provide well-known top-level pages you are confident exist, such as:
-   - Wikipedia articles (e.g., "https://en.wikipedia.org/wiki/Topic_Name")
-   - Official organization homepages (e.g., "https://www.example.org")
-4. Do NOT fabricate or guess specific URL paths, query parameters, or deep links
-5. It is better to provide fewer reliable sources than many broken ones
-6. Limit to 3-5 sources maximum
+1. Search for reliable, current information about this topic
+2. Write a concise 2-3 sentence summary of the key findings
+3. Use numbered citations [1], [2], etc. to reference your sources
+4. Include only URLs from your search results — do not guess or fabricate URLs
+5. Limit to 3-5 sources maximum
 
 Format your response as JSON:
 {
   "summary": "Your 2-3 sentence summary with [1], [2] citations inline.",
-  "sources": ["https://en.wikipedia.org/wiki/Example", "https://www.example.org"]
+  "sources": ["https://source1.com/article", "https://source2.com/page"]
 }
 
 Only return valid JSON, no other text.`;
@@ -216,7 +232,11 @@ Only return valid JSON, no other text.`;
       {
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
-      },
+        web_search_options: {
+          search_context_size: "high",
+          user_location: parseUserLocation(userLocation),
+        },
+      } as Record<string, unknown>,
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
@@ -236,23 +256,21 @@ async function executeLocationResearch(
 ): Promise<ResearchResult> {
   const searchQuery = userLocation ? `${query} near ${userLocation}` : query;
 
-  const prompt = `Provide a brief summary about this venue or location based on your knowledge.
+  const prompt = `Find information about this venue/location and provide a brief summary.
 
 Query: "${searchQuery}"
 
 Instructions:
-1. Write 1-2 sentences describing what this place is and where it's located
-2. Use numbered citations [1], [2] to reference sources
-3. For source URLs, ONLY provide pages you are confident exist:
-   - The venue's official homepage (e.g., "https://www.venuename.com") — only if you are certain it exists
-   - A Google Maps search link (e.g., "https://www.google.com/maps/search/Venue+Name")
-4. Do NOT fabricate or guess specific URL paths — use only top-level domains or simple search URLs
-5. It is better to provide fewer reliable sources than many broken ones
+1. Search for this specific venue/place
+2. Write 1-2 sentences describing what it is and where it's located
+3. Use [1] to cite the venue's official website (if found)
+4. Use [2] to cite a maps or review link (if found)
+5. Include only URLs from your search results — do not guess or fabricate URLs
 
 Format your response as JSON:
 {
   "summary": "Brief description of the venue with [1] and [2] citations.",
-  "sources": ["https://www.venuename.com", "https://www.google.com/maps/search/Venue+Name"]
+  "sources": ["https://venue-website.com", "https://maps.google.com/..."]
 }
 
 Only return valid JSON, no other text.`;
@@ -263,7 +281,11 @@ Only return valid JSON, no other text.`;
       {
         messages: [{ role: "user", content: prompt }],
         max_tokens: 4000,
-      },
+        web_search_options: {
+          search_context_size: "high",
+          user_location: parseUserLocation(userLocation),
+        },
+      } as Record<string, unknown>,
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
