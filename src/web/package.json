@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260404.1",
-    "@effect/language-service": "^0.81.0",
+    "@effect/language-service": "^0.85.1",
     "@tanstack/devtools-vite": "^0.6.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.9.1",
