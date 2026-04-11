@@ -445,7 +445,7 @@ final class APIService: APIProviding {
         return request
     }
 
-    private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
+    private func execute<T: Decodable>(_ request: URLRequest, isRetry: Bool = false) async throws -> T {
         let url = request.url?.absoluteString ?? "unknown"
         let data: Data
         let response: URLResponse
@@ -481,6 +481,16 @@ final class APIService: APIProviding {
                 throw APIError.decodingError(error, url: url, statusCode: statusCode, responseBody: body)
             }
         case 401:
+            // On first 401, refresh the token and retry once. This avoids a
+            // race condition where the Clerk JWT isn't fully ready right after
+            // sign-in, which would otherwise immediately sign the user out.
+            if !isRetry {
+                if let freshToken = try? await authService.getToken() {
+                    var retryRequest = request
+                    retryRequest.setValue("Bearer \(freshToken)", forHTTPHeaderField: "Authorization")
+                    return try await execute(retryRequest, isRetry: true)
+                }
+            }
             await authService.signOut()
             throw APIError.unauthorized(url: url)
         default:
