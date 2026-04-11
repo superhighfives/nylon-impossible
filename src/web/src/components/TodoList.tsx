@@ -157,13 +157,21 @@ function TodoItemContent({
               </output>
             )}
         </div>
-        {todo.urls && todo.urls.length > 0 && (
-          <div className="flex flex-col gap-1 mt-1.5">
-            {todo.urls.map((url) => (
-              <UrlCardCompact key={url.id} url={url} />
-            ))}
-          </div>
+        {todo.research?.status === "completed" && todo.research.summary && (
+          <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
+            {todo.research.summary.replace(/\[\d+\]/g, "")}
+          </p>
         )}
+        {todo.urls &&
+          todo.urls.filter((url) => !url.researchId).length > 0 && (
+            <div className="flex flex-col gap-1 mt-1.5">
+              {todo.urls
+                .filter((url) => !url.researchId)
+                .map((url) => (
+                  <UrlCardCompact key={url.id} url={url} />
+                ))}
+            </div>
+          )}
         <TodoIndicators todo={todo} />
       </div>
       {/* Mobile: popover actions menu */}
