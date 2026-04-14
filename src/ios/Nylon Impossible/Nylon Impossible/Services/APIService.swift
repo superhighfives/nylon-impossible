@@ -481,11 +481,23 @@ final class APIService: APIProviding {
                 throw APIError.decodingError(error, url: url, statusCode: statusCode, responseBody: body)
             }
         case 401:
-            // On first 401, refresh the token and retry once. This avoids a
-            // race condition where the Clerk JWT isn't fully ready right after
+            // On first 401, try to refresh the token and retry once. This avoids
+            // a race condition where the Clerk JWT isn't fully ready right after
             // sign-in, which would otherwise immediately sign the user out.
             if !isRetry {
-                if let freshToken = try? await authService.getToken() {
+                let freshToken: String?
+                do {
+                    freshToken = try await authService.getToken()
+                } catch is CancellationError {
+                    // Let cancellation propagate — don't retry or sign out.
+                    throw CancellationError()
+                } catch {
+                    // Token refresh failed for a non-cancellation reason; treat
+                    // as an unrecoverable auth state and fall through to sign-out.
+                    freshToken = nil
+                }
+
+                if let freshToken {
                     var retryRequest = request
                     retryRequest.setValue("Bearer \(freshToken)", forHTTPHeaderField: "Authorization")
                     return try await execute(retryRequest, isRetry: true)
