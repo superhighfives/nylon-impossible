@@ -19,6 +19,25 @@ interface ResearchResult {
 }
 
 /**
+ * Workers AI options for kimi-k2.5 with web_search_options.
+ * The @cloudflare/workers-types package types `web_search_options` for
+ * ChatCompletions-compatible models, but the `ai.run` signature is narrowed
+ * per model. We declare the exact shape we need so callers get compile-time
+ * checks on our options.
+ */
+interface ChatCompletionsWithSearchOptions {
+  messages: Array<{ role: string; content: string }>;
+  max_tokens?: number;
+  web_search_options?: {
+    search_context_size?: "low" | "medium" | "high";
+    user_location?: {
+      type: "approximate";
+      approximate: { city?: string; region?: string; country?: string };
+    };
+  };
+}
+
+/**
  * Execute research for a todo in the background.
  * Updates the todoResearch record with results and inserts source URLs.
  */
@@ -228,17 +247,19 @@ Format your response as JSON:
 
 Only return valid JSON, no other text.`;
 
+  const options: ChatCompletionsWithSearchOptions = {
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 4000,
+    web_search_options: {
+      search_context_size: "high",
+      user_location: parseUserLocation(userLocation),
+    },
+  };
+
   const response = await runWithTimeout(
     ai.run(
       "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-      {
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
-        web_search_options: {
-          search_context_size: "high",
-          user_location: parseUserLocation(userLocation),
-        },
-      } as Record<string, unknown>,
+      options as unknown as Parameters<typeof ai.run>[1],
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
@@ -277,17 +298,19 @@ Format your response as JSON:
 
 Only return valid JSON, no other text.`;
 
+  const options: ChatCompletionsWithSearchOptions = {
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 4000,
+    web_search_options: {
+      search_context_size: "high",
+      user_location: parseUserLocation(userLocation),
+    },
+  };
+
   const response = await runWithTimeout(
     ai.run(
       "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-      {
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
-        web_search_options: {
-          search_context_size: "high",
-          user_location: parseUserLocation(userLocation),
-        },
-      } as Record<string, unknown>,
+      options as unknown as Parameters<typeof ai.run>[1],
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
@@ -299,27 +322,30 @@ Only return valid JSON, no other text.`;
 /**
  * Check whether a URL looks plausible (not obviously hallucinated).
  * Rejects URLs with telltale signs of LLM fabrication like encoded spaces
- * in the path, fake Google search result parameters, or excessive path depth.
+ * in the path or fake Google search result parameters.
  */
-function isPlausibleUrl(url: string): boolean {
+export function isPlausibleUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
 
     // Reject URLs with encoded spaces in the pathname — a strong sign of fabrication
     // (e.g., google.com/kittens%20with%20long%20hair/search)
-    if (/%20/.test(parsed.pathname) || /\+/.test(parsed.pathname)) {
+    if (/%20/.test(parsed.pathname)) {
       return false;
     }
 
-    // Reject google.com deep links (except simple Maps search URLs) — the model
-    // loves to fabricate Google search result URLs with fake params like ved=, ei=, etc.
-    if (
+    // Google host handling: allow Maps URLs, reject other deep links with query
+    // params because the model often fabricates search result URLs with fake
+    // params like ved=, ei=, etc.
+    const isGoogleHost =
       parsed.hostname === "google.com" ||
-      parsed.hostname === "www.google.com"
-    ) {
-      // Allow simple Google Maps search URLs
-      if (parsed.pathname.startsWith("/maps/search/")) return true;
-      // Reject everything else (search results, image searches, etc.)
+      parsed.hostname === "www.google.com" ||
+      parsed.hostname === "maps.google.com";
+
+    if (isGoogleHost) {
+      // Allow any /maps/ path (place, dir, search, etc.)
+      if (parsed.pathname.startsWith("/maps/")) return true;
+      // Reject other Google URLs with query params (search results, images, etc.)
       if (parsed.search.length > 0) return false;
     }
 
