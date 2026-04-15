@@ -33,7 +33,7 @@ jobs:
               - 'package.json'
               - '.github/workflows/web-test.yml'
 
-      - uses: pnpm/action-setup@v5
+      - uses: pnpm/action-setup@v6
         if: steps.changes.outputs.src == 'true'
 
       - uses: actions/setup-node@v6
