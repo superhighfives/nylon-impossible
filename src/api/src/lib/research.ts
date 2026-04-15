@@ -19,6 +19,25 @@ interface ResearchResult {
 }
 
 /**
+ * Workers AI options for kimi-k2.5 with web_search_options.
+ * The @cloudflare/workers-types package types `web_search_options` for
+ * ChatCompletions-compatible models, but the `ai.run` signature is narrowed
+ * per model. We declare the exact shape we need so callers get compile-time
+ * checks on our options.
+ */
+interface ChatCompletionsWithSearchOptions {
+  messages: Array<{ role: string; content: string }>;
+  max_tokens?: number;
+  web_search_options?: {
+    search_context_size?: "low" | "medium" | "high";
+    user_location?: {
+      type: "approximate";
+      approximate: { city?: string; region?: string; country?: string };
+    };
+  };
+}
+
+/**
  * Execute research for a todo in the background.
  * Updates the todoResearch record with results and inserts source URLs.
  */
@@ -38,7 +57,7 @@ export async function executeResearch(
     const result =
       researchType === "location"
         ? await executeLocationResearch(ai, query, userLocation, gatewayId)
-        : await executeGeneralResearch(ai, query, gatewayId);
+        : await executeGeneralResearch(ai, query, userLocation, gatewayId);
 
     // Deduplicate sources returned by the AI, normalizing URLs so
     // "https://google.com" and "https://google.com/" are treated as the same.
@@ -181,11 +200,32 @@ export async function executeResearch(
 }
 
 /**
+ * Parse a user location string (e.g., "Los Angeles, CA") into the
+ * WebSearchUserLocation format expected by Workers AI.
+ */
+function parseUserLocation(
+  location?: string | null,
+):
+  | { type: "approximate"; approximate: { city?: string; region?: string } }
+  | undefined {
+  if (!location) return undefined;
+  const parts = location.split(",").map((s) => s.trim());
+  return {
+    type: "approximate",
+    approximate: {
+      city: parts[0] || undefined,
+      region: parts[1] || undefined,
+    },
+  };
+}
+
+/**
  * Execute general research (questions, comparisons, how-to topics)
  */
 async function executeGeneralResearch(
   ai: Ai,
   query: string,
+  userLocation?: string | null,
   gatewayId?: string,
 ): Promise<ResearchResult> {
   const prompt = `Research the following topic and provide a brief 2-3 sentence summary with numbered citations.
@@ -196,23 +236,30 @@ Instructions:
 1. Search for reliable, current information about this topic
 2. Write a concise 2-3 sentence summary of the key findings
 3. Use numbered citations [1], [2], etc. to reference your sources
-4. Return the source URLs in order
+4. Include only URLs from your search results — do not guess or fabricate URLs
+5. Limit to 3-5 sources maximum
 
 Format your response as JSON:
 {
   "summary": "Your 2-3 sentence summary with [1], [2] citations inline.",
-  "sources": ["https://source1.com", "https://source2.com"]
+  "sources": ["https://source1.com/article", "https://source2.com/page"]
 }
 
 Only return valid JSON, no other text.`;
 
+  const options: ChatCompletionsWithSearchOptions = {
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 4000,
+    web_search_options: {
+      search_context_size: "high",
+      user_location: parseUserLocation(userLocation),
+    },
+  };
+
   const response = await runWithTimeout(
     ai.run(
       "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-      {
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
-      },
+      options as unknown as Parameters<typeof ai.run>[1],
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
@@ -239,9 +286,9 @@ Query: "${searchQuery}"
 Instructions:
 1. Search for this specific venue/place
 2. Write 1-2 sentences describing what it is and where it's located
-3. Use [1] to cite the venue's official website (if available)
-4. Use [2] to cite the Google Maps link
-5. Return the source URLs in order
+3. Use [1] to cite the venue's official website (if found)
+4. Use [2] to cite a maps or review link (if found)
+5. Include only URLs from your search results — do not guess or fabricate URLs
 
 Format your response as JSON:
 {
@@ -251,19 +298,61 @@ Format your response as JSON:
 
 Only return valid JSON, no other text.`;
 
+  const options: ChatCompletionsWithSearchOptions = {
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: 4000,
+    web_search_options: {
+      search_context_size: "high",
+      user_location: parseUserLocation(userLocation),
+    },
+  };
+
   const response = await runWithTimeout(
     ai.run(
       "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-      {
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 4000,
-      },
+      options as unknown as Parameters<typeof ai.run>[1],
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,
   );
 
   return parseResearchResponse(response);
+}
+
+/**
+ * Check whether a URL looks plausible (not obviously hallucinated).
+ * Rejects URLs with telltale signs of LLM fabrication like encoded spaces
+ * in the path or fake Google search result parameters.
+ */
+export function isPlausibleUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+
+    // Reject URLs with encoded spaces in the pathname — a strong sign of fabrication
+    // (e.g., google.com/kittens%20with%20long%20hair/search)
+    if (/%20/.test(parsed.pathname)) {
+      return false;
+    }
+
+    // Google host handling: allow Maps URLs, reject other deep links with query
+    // params because the model often fabricates search result URLs with fake
+    // params like ved=, ei=, etc.
+    const isGoogleHost =
+      parsed.hostname === "google.com" ||
+      parsed.hostname === "www.google.com" ||
+      parsed.hostname === "maps.google.com";
+
+    if (isGoogleHost) {
+      // Allow any /maps/ path (place, dir, search, etc.)
+      if (parsed.pathname.startsWith("/maps/")) return true;
+      // Reject other Google URLs with query params (search results, images, etc.)
+      if (parsed.search.length > 0) return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -305,13 +394,14 @@ function parseResearchResponse(response: unknown): ResearchResult {
 
   try {
     const parsed = JSON.parse(jsonMatch[0]);
+    const rawSources = Array.isArray(parsed.sources)
+      ? parsed.sources.filter(
+          (s: unknown) => typeof s === "string" && s.startsWith("http"),
+        )
+      : [];
     return {
       summary: parsed.summary ?? text.trim(),
-      sources: Array.isArray(parsed.sources)
-        ? parsed.sources.filter(
-            (s: unknown) => typeof s === "string" && s.startsWith("http"),
-          )
-        : [],
+      sources: rawSources.filter((url: string) => isPlausibleUrl(url)),
     };
   } catch {
     // JSON parse failed, use raw text

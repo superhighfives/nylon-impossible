@@ -157,13 +157,38 @@ function TodoItemContent({
               </output>
             )}
         </div>
-        {todo.urls && todo.urls.length > 0 && (
-          <div className="flex flex-col gap-1 mt-1.5">
-            {todo.urls.map((url) => (
-              <UrlCardCompact key={url.id} url={url} />
-            ))}
-          </div>
-        )}
+        {!isExpanded &&
+          todo.research?.status === "completed" &&
+          todo.research.summary && (
+            <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
+              {todo.research.summary.replace(/\[\d+\]/g, "")}
+            </p>
+          )}
+        {todo.urls &&
+          (() => {
+            const nonResearchUrls = todo.urls.filter((url) => !url.researchId);
+            if (nonResearchUrls.length === 0) return null;
+            const overflow = nonResearchUrls.length - 2;
+            return (
+              <div className="flex flex-col gap-1 mt-1.5">
+                {todo.completed
+                  ? null
+                  : nonResearchUrls
+                      .slice(0, 2)
+                      .map((url) => <UrlCardCompact key={url.id} url={url} />)}
+                {(todo.completed
+                  ? nonResearchUrls.length > 0
+                  : overflow > 0) && (
+                  <span className="text-xs text-gray-muted">
+                    +{todo.completed ? nonResearchUrls.length : overflow}{" "}
+                    {(todo.completed ? nonResearchUrls.length : overflow) === 1
+                      ? "link"
+                      : "links"}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         <TodoIndicators todo={todo} />
       </div>
       {/* Mobile: popover actions menu */}
