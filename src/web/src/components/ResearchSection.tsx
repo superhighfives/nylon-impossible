@@ -98,7 +98,7 @@ function SourceCard({
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-lg bg-gray-base hover:bg-gray-hover transition-colors group"
+      className="flex items-start gap-3 p-3 rounded-lg bg-gray-base hover:bg-gray-hover transition-colors group/link"
     >
       <span className="text-xs font-semibold text-yellow-11 dark:text-yellowdark-11 bg-yellow-base px-1.5 py-0.5 rounded shrink-0">
         [{citationNumber}]
@@ -129,7 +129,7 @@ function SourceCard({
         />
       ) : null}
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-muted truncate group-hover:underline">
+        <p className="text-sm font-medium text-gray-muted truncate group-hover/link:underline">
           {displayTitle}
         </p>
         <p className="text-xs text-gray-muted mt-0.5 truncate">{url.url}</p>

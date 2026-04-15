@@ -98,7 +98,7 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex flex-col rounded-xl border border-gray-line bg-gray-surface shadow-sm hover:shadow-base transition-shadow overflow-hidden group"
+      className="flex flex-col rounded-xl border border-gray-line bg-gray-surface shadow-sm hover:shadow-base transition-shadow overflow-hidden group/link"
     >
       {/* Header row */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
@@ -117,7 +117,7 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
         ) : null}
 
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-gray truncate group-hover:underline leading-tight">
+          <p className="text-sm font-semibold text-gray truncate group-hover/link:underline leading-tight">
             {displayTitle}
           </p>
           {authorHandle && (
@@ -175,10 +175,10 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group max-w-full"
+      className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group/link max-w-full"
     >
       <PlatformBadge platform={social.platform} />
-      <span className="text-sm text-gray truncate group-hover:underline">
+      <span className="text-sm text-gray truncate group-hover/link:underline">
         {displayTitle}
       </span>
     </a>
