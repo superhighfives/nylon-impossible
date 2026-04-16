@@ -74,12 +74,17 @@ export async function executeResearch(
       return true;
     });
 
+    // Cap sources to the prompt-requested maximum (5). The model may return
+    // more, and each source triggers a HEAD check + metadata fetch.
+    const MAX_SOURCES = 5;
+    const cappedSources = uniqueSources.slice(0, MAX_SOURCES);
+
     // Verify each URL is actually reachable before persisting it. The AI
     // sometimes returns URLs that look plausible but 404 or don't resolve,
     // so we drop those now rather than storing them and marking them
     // "failed" during metadata fetch (which leaves dead links in the UI).
     const reachabilityChecks = await Promise.all(
-      uniqueSources.map(async (url) => ({
+      cappedSources.map(async (url) => ({
         url,
         reachable: await isUrlReachable(url),
       })),
@@ -341,8 +346,9 @@ const REACHABILITY_TIMEOUT_MS = 5_000;
  * Verify that a URL actually resolves to content, not a 404 / NXDOMAIN.
  * Issues a HEAD request first (cheap, no body), falling back to a
  * Range-limited GET if the server rejects HEAD with 405/501. Redirects
- * are followed. Any network error, timeout, or non-2xx/3xx response
- * counts as unreachable.
+ * are followed automatically by fetch, so the final response is always
+ * the terminal status (typically 2xx). Any network error, timeout, or
+ * non-2xx response counts as unreachable.
  *
  * Used to filter out URLs the AI returned but that don't exist — either
  * stale links from web-search results or fabricated ones that slipped past
