@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { isPlausibleUrl } from "../../src/lib/research";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { isPlausibleUrl, isUrlReachable } from "../../src/lib/research";
 
 describe("isPlausibleUrl", () => {
   describe("accepts plausible URLs", () => {
@@ -85,5 +85,92 @@ describe("isPlausibleUrl", () => {
     it("rejects empty string", () => {
       expect(isPlausibleUrl("")).toBe(false);
     });
+  });
+});
+
+describe("isUrlReachable", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts a URL that returns 200 to HEAD", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await isUrlReachable("https://example.com")).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][1].method).toBe("HEAD");
+  });
+
+  it("accepts redirect chains that resolve to 2xx", async () => {
+    // redirect: "follow" means the caller sees only the final response,
+    // so a 301→200 chain surfaces as status 200.
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await isUrlReachable("https://short.ly/xyz")).toBe(true);
+  });
+
+  it("rejects URLs that return 404", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 404 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await isUrlReachable("https://example.com/missing")).toBe(false);
+  });
+
+  it("rejects URLs that return 500", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue({ ok: false, status: 500 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await isUrlReachable("https://example.com")).toBe(false);
+  });
+
+  it("falls back to GET when server rejects HEAD with 405", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 405 })
+      .mockResolvedValueOnce({ ok: true, status: 200 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await isUrlReachable("https://example.com")).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0][1].method).toBe("HEAD");
+    expect(fetchMock.mock.calls[1][1].method).toBe("GET");
+    expect(fetchMock.mock.calls[1][1].headers.Range).toBe("bytes=0-0");
+  });
+
+  it("accepts 206 Partial Content from the GET fallback", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 501 })
+      .mockResolvedValueOnce({ ok: false, status: 206 });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await isUrlReachable("https://example.com")).toBe(true);
+  });
+
+  it("rejects URLs that throw a network error", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("fetch failed")),
+    );
+
+    expect(await isUrlReachable("https://does-not-exist.invalid")).toBe(
+      false,
+    );
+  });
+
+  it("rejects URLs that time out", async () => {
+    // AbortSignal.timeout surfaces as an AbortError / DOMException.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new DOMException("timeout", "AbortError")),
+    );
+
+    expect(await isUrlReachable("https://slow.example.com")).toBe(false);
   });
 });

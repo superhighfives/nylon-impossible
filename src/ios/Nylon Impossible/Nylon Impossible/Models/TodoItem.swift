@@ -103,9 +103,12 @@ final class TodoItem {
         }
     }
     
-    /// Check if AI is currently processing this todo
+    /// Check if AI is currently processing this todo.
+    /// Considered stale after 60 seconds (2x the 30s enrichment timeout)
+    /// so the spinner auto-hides if the server failed to update the status.
     var isAIProcessing: Bool {
-        todoAIStatus == .pending || todoAIStatus == .processing
+        guard todoAIStatus == .pending || todoAIStatus == .processing else { return false }
+        return Date().timeIntervalSince(createdAt) < 60
     }
 
     /// Check if research is currently pending

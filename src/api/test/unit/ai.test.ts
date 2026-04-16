@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { enrichTodo, type TodoEnrichment } from "../../src/lib/ai";
+import {
+  enrichTodo,
+  type TodoEnrichment,
+  urlMentionedInText,
+} from "../../src/lib/ai";
 
 /**
  * Creates a mock AI binding that returns the given tool call response.
@@ -174,6 +178,97 @@ describe("enrichTodo", () => {
     });
   });
 
+  describe("hallucinated URL filtering", () => {
+    it("drops invented domains for topic-only input", async () => {
+      // Simulates the model hallucinating domains from the topic even though
+      // no URL was ever mentioned (real-world regression: "Research back pain
+      // remedies" → ["backpainremedies.com", "painremedies.com", ...]).
+      const ai = createMockAi({
+        title: "Research back pain remedies",
+        urls: [
+          "https://backpainremedies.com",
+          "https://painremedies.com",
+          "https://remedies.com",
+          "https://backpain.com",
+        ],
+        research: { type: "general" },
+      });
+
+      const result = await enrichTodo(ai, "Research back pain remedies");
+      expect(result).not.toBeNull();
+      // All URLs should be filtered out — none of those hostnames appear
+      // in the input text.
+      expect(result!.urls).toBeUndefined();
+      expect(result!.research).toEqual({ type: "general" });
+    });
+
+    it("keeps URLs whose hostname appears in the text", async () => {
+      const ai = createMockAi({
+        title: "Hello",
+        urls: ["https://google.com"],
+      });
+
+      const result = await enrichTodo(ai, "Hello google.com");
+      expect(result!.urls).toEqual(["https://google.com"]);
+    });
+
+    it("keeps some and drops others in a mixed list", async () => {
+      const ai = createMockAi({
+        title: "Compare with",
+        urls: [
+          "https://github.com/user/repo",
+          "https://comparisonsite.com", // invented
+        ],
+      });
+
+      const result = await enrichTodo(
+        ai,
+        "Compare github.com/user/repo with",
+      );
+      expect(result!.urls).toEqual(["https://github.com/user/repo"]);
+    });
+
+    it("accepts www-prefixed hostnames when user typed the bare domain", async () => {
+      const ai = createMockAi({
+        title: "Check out",
+        urls: ["https://www.example.com"],
+      });
+
+      const result = await enrichTodo(ai, "Check out example.com");
+      expect(result!.urls).toEqual(["https://www.example.com"]);
+    });
+
+    it("restores the original title when every URL is filtered out", async () => {
+      // The model "cleaned" a fake URL from the title — without restoring
+      // the title we'd end up with just "Research" which is worse than
+      // the original "Research back pain remedies".
+      // Include research so the enrichment is non-null and we can assert
+      // on the restored title.
+      const ai = createMockAi({
+        title: "Research",
+        urls: ["https://backpainremedies.com"],
+        research: { type: "general" },
+      });
+
+      const result = await enrichTodo(ai, "Research back pain remedies");
+      expect(result).not.toBeNull();
+      expect(result!.title).toBe("Research back pain remedies");
+      expect(result!.urls).toBeUndefined();
+    });
+
+    it("returns null when only hallucinated URLs were extracted from plain text", async () => {
+      // No research, no date, no priority, and all urls filtered — equivalent
+      // to the model returning nothing useful.
+      const ai = createMockAi({
+        title: "Back pain remedies",
+        urls: ["https://backpainremedies.com"],
+      });
+
+      const result = await enrichTodo(ai, "Back pain remedies");
+      expect(result).toBeNull();
+    });
+  });
+
   describe("error handling", () => {
     it("throws when response has no tool_calls", async () => {
       const ai = createMockAiWithResponse({
@@ -269,5 +364,58 @@ describe("enrichTodo", () => {
       expect(inputs.messages[0].role).toBe("system");
       expect(inputs.messages[0].content).toContain("metadata extractor");
     });
+  });
+});
+
+describe("urlMentionedInText", () => {
+  it("accepts URLs whose hostname appears in text", () => {
+    expect(urlMentionedInText("https://google.com", "Hello google.com")).toBe(
+      true,
+    );
+  });
+
+  it("accepts URLs with a path when hostname is in text", () => {
+    expect(
+      urlMentionedInText(
+        "https://github.com/user/repo",
+        "Review github.com/user/repo tomorrow",
+      ),
+    ).toBe(true);
+  });
+
+  it("is case insensitive", () => {
+    expect(urlMentionedInText("https://GOOGLE.com", "check google.com")).toBe(
+      true,
+    );
+    expect(urlMentionedInText("https://google.com", "Check GOOGLE.COM")).toBe(
+      true,
+    );
+  });
+
+  it("accepts www. URLs when text has bare domain", () => {
+    expect(
+      urlMentionedInText("https://www.example.com", "see example.com"),
+    ).toBe(true);
+  });
+
+  it("rejects URLs invented from a topic", () => {
+    expect(
+      urlMentionedInText(
+        "https://backpainremedies.com",
+        "Research back pain remedies",
+      ),
+    ).toBe(false);
+  });
+
+  it("rejects partial-word matches as hostnames", () => {
+    // "pain.com" is NOT mentioned; the presence of the word "pain" is not
+    // sufficient — the full hostname must appear.
+    expect(
+      urlMentionedInText("https://pain.com", "Research back pain remedies"),
+    ).toBe(false);
+  });
+
+  it("rejects malformed URLs", () => {
+    expect(urlMentionedInText("not-a-url", "anything")).toBe(false);
   });
 });

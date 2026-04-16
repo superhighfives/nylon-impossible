@@ -64,7 +64,7 @@ const enrichTodoTool = {
         urls: {
           type: "array",
           description:
-            "Extract ANY website, domain, or URL mentioned. Be aggressive - if something looks like a domain (e.g., 'google.com', 'github.com/user', 'example.org'), extract it. Always add 'https://' prefix if missing.",
+            "Extract URLs and domains that LITERALLY appear in the user's text. A domain or URL must match a sequence of characters in the input (e.g., 'google.com', 'github.com/user', 'example.org'). Never invent, guess, or fabricate URLs based on the topic — if the text is about a concept (e.g., 'back pain remedies') but contains no URL, return an empty array. Always add 'https://' prefix if missing.",
           items: {
             type: "string",
           },
@@ -117,6 +117,7 @@ CRITICAL RULES:
 - ONLY remove URLs/domains from the title text
 - Keep everything else in the title exactly as written
 - Exception: when removing a URL/domain leaves ONLY a single generic word (e.g. "Research", "Check", "Look"), keep the domain name in the title (e.g. "Research https://google.com" → title: "Research google.com")
+- NEVER invent, guess, or fabricate URLs based on the topic. Only return URLs that literally appear in the user's text. If the text describes a concept without mentioning a URL (e.g. "Research back pain remedies", "Look up white chocolate recipe"), the urls array MUST be empty.
 
 RESEARCH DETECTION:
 - Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
@@ -135,7 +136,8 @@ Examples:
 - "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" } }
 - "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" } }
 - "Best practices for React Server Components" → { title: "Best practices for React Server Components", research: { type: "general" } }
-- "Look up white chocolate recipe" → { title: "Look up white chocolate recipe", research: { type: "general" } }
+- "Look up white chocolate recipe" → { title: "Look up white chocolate recipe", research: { type: "general" } } (no urls — topic only, no URL in text)
+- "Research back pain remedies" → { title: "Research back pain remedies", research: { type: "general" } } (no urls — do NOT invent domains like "backpainremedies.com")
 - "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" } }
 - "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" } }
 - "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" } }
@@ -184,6 +186,34 @@ function parseArguments(
 }
 
 const ENRICH_TIMEOUT_MS = 30_000;
+
+/**
+ * Verify that a URL extracted by the LLM actually corresponds to something
+ * the user mentioned. Defensive filter against hallucinations — even with
+ * strict prompting, the model sometimes invents domains from a topic
+ * (e.g., "Research back pain remedies" → "backpainremedies.com").
+ *
+ * A URL is considered mentioned if its hostname (with an optional "www."
+ * prefix stripped) appears as a substring of the input text, case-insensitive.
+ * This correctly accepts URLs the user typed (e.g., "Hello google.com"
+ * where hostname "google.com" appears literally) while rejecting invented
+ * domains (e.g., "backpainremedies.com" never appears in "Research back
+ * pain remedies" because of the spaces).
+ */
+export function urlMentionedInText(url: string, text: string): boolean {
+  let hostname: string;
+  try {
+    hostname = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes(hostname)) return true;
+  // Also accept the bare domain without the www. prefix (user may have
+  // typed "example.com" even though the LLM returned "www.example.com").
+  const bare = hostname.replace(/^www\./, "");
+  return bare !== hostname && lowerText.includes(bare);
+}
 
 function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timeoutId: number | null = null;
@@ -242,6 +272,34 @@ export async function enrichTodo(
   }
 
   const enrichment = tc.arguments;
+
+  // Defensive filter: drop URLs the model invented from the topic. Even with
+  // the prompt telling it not to fabricate, the model sometimes guesses
+  // domains that aren't in the input (e.g., "Research back pain remedies"
+  // → "backpainremedies.com"). Keep only URLs whose hostname is mentioned.
+  if (Array.isArray(enrichment.urls) && enrichment.urls.length > 0) {
+    const originalCount = enrichment.urls.length;
+    enrichment.urls = enrichment.urls.filter(
+      (url): url is string =>
+        typeof url === "string" && urlMentionedInText(url, text),
+    );
+    const droppedAll = enrichment.urls.length === 0;
+    if (droppedAll) {
+      delete enrichment.urls;
+    }
+    // If all extracted URLs were hallucinated, the model may also have
+    // "cleaned" them out of the title — restore the original text so we
+    // don't end up with a truncated title (e.g. "Research" from
+    // "Research back pain remedies").
+    if (
+      droppedAll &&
+      originalCount > 0 &&
+      enrichment.title &&
+      enrichment.title !== text
+    ) {
+      enrichment.title = text;
+    }
+  }
 
   // If nothing was extracted (no URLs, no date, no priority, no research), return null
   const hasEnrichment =
