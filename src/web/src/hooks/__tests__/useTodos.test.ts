@@ -138,7 +138,8 @@ function makeResearch(
 
 describe("hasPendingNonStaleWork", () => {
   const now = new Date("2026-01-01T00:10:00.000Z").getTime();
-  const recent = new Date("2026-01-01T00:09:00.000Z").toISOString(); // 1 min ago
+  const justNow = new Date("2026-01-01T00:09:50.000Z").toISOString(); // 10s ago (within STALE_AI_MS)
+  const recent = new Date("2026-01-01T00:09:00.000Z").toISOString(); // 1 min ago (within STALE_RESEARCH_MS)
   const stale = new Date("2026-01-01T00:03:00.000Z").toISOString(); // 7 min ago
 
   beforeEach(() => {
@@ -158,16 +159,28 @@ describe("hasPendingNonStaleWork", () => {
     expect(hasPendingNonStaleWork([makeTodo({ aiStatus: null })])).toBe(false);
   });
 
-  it("returns true when a todo has aiStatus 'pending'", () => {
-    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "pending" })])).toBe(
-      true,
-    );
+  it("returns true when a todo has aiStatus 'pending' and was created recently", () => {
+    expect(
+      hasPendingNonStaleWork([
+        makeTodo({ aiStatus: "pending", createdAt: justNow }),
+      ]),
+    ).toBe(true);
   });
 
-  it("returns true when a todo has aiStatus 'processing'", () => {
-    expect(hasPendingNonStaleWork([makeTodo({ aiStatus: "processing" })])).toBe(
-      true,
-    );
+  it("returns true when a todo has aiStatus 'processing' and was created recently", () => {
+    expect(
+      hasPendingNonStaleWork([
+        makeTodo({ aiStatus: "processing", createdAt: justNow }),
+      ]),
+    ).toBe(true);
+  });
+
+  it("returns false when aiStatus is stuck for longer than the staleness window", () => {
+    expect(
+      hasPendingNonStaleWork([
+        makeTodo({ aiStatus: "processing", createdAt: stale }),
+      ]),
+    ).toBe(false);
   });
 
   it("returns true when a todo has pending research created less than 2 minutes ago", () => {
@@ -188,7 +201,7 @@ describe("hasPendingNonStaleWork", () => {
   it("returns true when at least one todo has active pending work", () => {
     const todos = [
       makeTodo({ aiStatus: null }),
-      makeTodo({ id: "todo-2", aiStatus: "processing" }),
+      makeTodo({ id: "todo-2", aiStatus: "processing", createdAt: justNow }),
     ];
     expect(hasPendingNonStaleWork(todos)).toBe(true);
   });

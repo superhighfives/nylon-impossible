@@ -26,13 +26,19 @@ const TODOS_QUERY_KEY = ["todos"];
 // Must match RESEARCH_TIMEOUT_MS in src/api/src/lib/research.ts.
 export const STALE_RESEARCH_MS = 5 * 60 * 1_000;
 
+// AI enrichment has a 30s timeout (ENRICH_TIMEOUT_MS in ai.ts). Double it so
+// we don't hide the spinner while a legitimate enrichment is still running.
+export const STALE_AI_MS = 60 * 1_000;
+
 // Show cancel + retry buttons after this long while research is pending.
 export const SHOW_RETRY_MS = 30 * 1_000;
 
 export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
   return todos.some((todo) => {
-    if (todo.aiStatus === "pending" || todo.aiStatus === "processing")
-      return true;
+    if (todo.aiStatus === "pending" || todo.aiStatus === "processing") {
+      const age = Date.now() - new Date(todo.createdAt).getTime();
+      return age < STALE_AI_MS;
+    }
     if (todo.research?.status === "pending") {
       const age = Date.now() - new Date(todo.research.createdAt).getTime();
       return age < STALE_RESEARCH_MS;

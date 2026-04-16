@@ -28,6 +28,7 @@ import {
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import {
+  STALE_AI_MS,
   STALE_RESEARCH_MS,
   useDeleteTodo,
   useTodos,
@@ -135,14 +136,15 @@ function TodoItemContent({
           >
             {todo.title}
           </p>
-          {(todo.aiStatus === "pending" || todo.aiStatus === "processing") && (
-            <output
-              className="flex items-center gap-1 text-gray-muted text-xs"
-              aria-label="AI is processing"
-            >
-              <Loader size="sm" className="text-gray-muted" />
-            </output>
-          )}
+          {(todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
+            Date.now() - new Date(todo.createdAt).getTime() < STALE_AI_MS && (
+              <output
+                className="flex items-center gap-1 text-gray-muted text-xs"
+                aria-label="AI is processing"
+              >
+                <Loader size="sm" className="text-gray-muted" />
+              </output>
+            )}
           {todo.research?.status === "pending" &&
             Date.now() - new Date(todo.research.createdAt).getTime() <
               STALE_RESEARCH_MS && (
