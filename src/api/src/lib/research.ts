@@ -74,6 +74,20 @@ export async function executeResearch(
       return true;
     });
 
+    // Verify each URL is actually reachable before persisting it. The AI
+    // sometimes returns URLs that look plausible but 404 or don't resolve,
+    // so we drop those now rather than storing them and marking them
+    // "failed" during metadata fetch (which leaves dead links in the UI).
+    const reachabilityChecks = await Promise.all(
+      uniqueSources.map(async (url) => ({
+        url,
+        reachable: await isUrlReachable(url),
+      })),
+    );
+    const reachableSources = reachabilityChecks
+      .filter((r) => r.reachable)
+      .map((r) => r.url);
+
     // Insert source URLs with researchId
     let urlRecords: {
       id: string;
@@ -85,15 +99,15 @@ export async function executeResearch(
       createdAt: Date;
       updatedAt: Date;
     }[] = [];
-    if (uniqueSources.length > 0) {
+    if (reachableSources.length > 0) {
       const now = new Date();
       const urlPositions = generateNKeysBetween(
         null,
         null,
-        uniqueSources.length,
+        reachableSources.length,
       );
 
-      urlRecords = uniqueSources.map((url, i) => ({
+      urlRecords = reachableSources.map((url, i) => ({
         id: crypto.randomUUID(),
         todoId,
         researchId,
@@ -317,6 +331,49 @@ Only return valid JSON, no other text.`;
   );
 
   return parseResearchResponse(response);
+}
+
+// How long each reachability check is allowed to take. Short so a single
+// dead URL can't stall the whole pipeline — we run them in parallel anyway.
+const REACHABILITY_TIMEOUT_MS = 5_000;
+
+/**
+ * Verify that a URL actually resolves to content, not a 404 / NXDOMAIN.
+ * Issues a HEAD request first (cheap, no body), falling back to a
+ * Range-limited GET if the server rejects HEAD with 405/501. Redirects
+ * are followed. Any network error, timeout, or non-2xx/3xx response
+ * counts as unreachable.
+ *
+ * Used to filter out URLs the AI returned but that don't exist — either
+ * stale links from web-search results or fabricated ones that slipped past
+ * the `isPlausibleUrl` heuristics.
+ */
+export async function isUrlReachable(url: string): Promise<boolean> {
+  const doFetch = (method: "HEAD" | "GET") =>
+    fetch(url, {
+      method,
+      headers: {
+        "User-Agent": "NylonBot/1.0",
+        // Range request keeps the GET fallback cheap — we only need the
+        // status code, not the body.
+        ...(method === "GET" ? { Range: "bytes=0-0" } : {}),
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(REACHABILITY_TIMEOUT_MS),
+    });
+
+  try {
+    let response = await doFetch("HEAD");
+    // Some servers refuse HEAD — retry once with GET before giving up.
+    if (response.status === 405 || response.status === 501) {
+      response = await doFetch("GET");
+    }
+    // response.ok covers 200-299; 206 is Partial Content from Range GET.
+    return response.ok || response.status === 206;
+  } catch {
+    // Network error, DNS failure, TLS error, or timeout — treat as dead.
+    return false;
+  }
 }
 
 /**
