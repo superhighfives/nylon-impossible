@@ -1,12 +1,11 @@
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
+import { messageFromError, toast } from "@/lib/toast";
 import { Button, Loader, Textarea } from "./ui";
 
 export function TodoInput() {
   const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<string | null>(null);
 
   const smartCreate = useSmartCreate();
 
@@ -14,28 +13,21 @@ export function TodoInput() {
     e.preventDefault();
     if (!text.trim() || smartCreate.isPending) return;
 
-    setError(null);
-    setFeedback(null);
-
     smartCreate.mutate(text.trim(), {
       onSuccess: (result) => {
         setText("");
         if (result.todos.length > 1) {
-          setFeedback(`Added ${result.todos.length} items`);
-          setTimeout(() => setFeedback(null), 3000);
+          toast.success(`Added ${result.todos.length} items`);
         }
       },
       onError: (err) => {
-        setError(err instanceof Error ? err.message : "Failed to create todo");
+        toast.error(messageFromError(err, "Couldn't add todo"));
       },
     });
   };
 
   return (
     <div className="space-y-2 todo-input-wrapper">
-      {error && <p className="text-sm text-red-muted">{error}</p>}
-      {feedback && <p className="text-sm text-gray-muted">{feedback}</p>}
-
       <form onSubmit={handleSubmit}>
         <div className="todo-input-container relative bg-gray-surface shadow-base rounded-lg">
           <Textarea
