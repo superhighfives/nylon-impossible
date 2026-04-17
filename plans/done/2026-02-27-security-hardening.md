@@ -1,8 +1,8 @@
 # Security Hardening
 
-**Date:** 2026-02-27
-**Status:** Complete
-**Scope:** API + Web + iOS
+**Date**: 2026-02-27
+**Status**: Complete
+**Scope**: API + Web + iOS
 
 ## Overview
 
