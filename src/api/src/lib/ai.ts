@@ -242,7 +242,7 @@ export async function enrichTodo(
   // Model added recently, types not yet updated
   const response = await runWithTimeout(
     ai.run(
-      "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
+      "@cf/zai-org/glm-5.1" as Parameters<typeof ai.run>[0],
       {
         messages: [
           { role: "system", content: systemPrompt },
