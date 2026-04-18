@@ -176,6 +176,23 @@ function extractToolCall(response: unknown): ParsedToolCall | null {
   return null;
 }
 
+// Summarize the top-level shape of a Workers AI response for diagnostics —
+// keys only, no user content, so it's safe to log and include in error
+// messages. Helps identify when a model returns a different envelope than
+// expected (e.g. a new model that doesn't speak the tool-call protocol).
+function describeResponseShape(response: unknown): string {
+  if (response === null || response === undefined) return String(response);
+  if (typeof response !== "object") return typeof response;
+  const keys = Object.keys(response as Record<string, unknown>);
+  const obj = response as Record<string, unknown>;
+  const hints: string[] = [];
+  if (typeof obj.response === "string") hints.push("response:string");
+  if (Array.isArray(obj.tool_calls))
+    hints.push(`tool_calls:${obj.tool_calls.length}`);
+  if (Array.isArray(obj.choices)) hints.push(`choices:${obj.choices.length}`);
+  return `{${keys.join(",")}}${hints.length ? ` (${hints.join(",")})` : ""}`;
+}
+
 function parseArguments(
   args: Record<string, unknown> | string | unknown,
 ): ParsedToolCall["arguments"] {
@@ -263,8 +280,9 @@ export async function enrichTodo(
   const tc = extractToolCall(response);
 
   if (!tc) {
-    console.error("No tool call found in AI response");
-    throw new Error("AI did not return enrichment");
+    const shape = describeResponseShape(response);
+    console.error("No tool call found in AI response", shape);
+    throw new Error(`AI did not return enrichment (shape: ${shape})`);
   }
 
   if (tc.name !== "enrich_todo") {
