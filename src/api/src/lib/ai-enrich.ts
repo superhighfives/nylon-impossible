@@ -10,6 +10,7 @@
  * Does NOT rephrase or rewrite the title - only removes URLs.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { ResearchJobMessage } from "../types";
 import { enrichTodo } from "./ai";
@@ -138,6 +139,10 @@ export async function enrichTodoWithAI(
     }
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);
+    Sentry.captureException(error, {
+      tags: { area: "ai-enrich" },
+      extra: { todoId },
+    });
     await db
       .update(todos)
       .set({ aiStatus: "failed", updatedAt: new Date() })
