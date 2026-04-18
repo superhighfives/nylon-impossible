@@ -18,6 +18,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
+import { apiValidationError } from "../lib/errors";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
@@ -154,7 +155,7 @@ export async function syncTodos(c: Context<Env>) {
   const parsed = syncRequestSchema.safeParse(body);
 
   if (!parsed.success) {
-    return c.json({ error: parsed.error.message }, 400);
+    return apiValidationError(c, parsed.error);
   }
 
   const { lastSyncedAt, changes } = parsed.data;

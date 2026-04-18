@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
 import { eq, getDb, users } from "./db";
+import { apiError } from "./errors";
 
 export interface AuthResult {
   userId: string;
@@ -40,7 +41,7 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   );
 
   if (!auth) {
-    return c.json({ error: "Unauthorized" }, 401);
+    return apiError(c, "unauthorized");
   }
 
   c.set("userId", auth.userId);
