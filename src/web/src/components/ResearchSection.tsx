@@ -5,6 +5,7 @@ import {
   useCancelResearch,
   useReresearch,
 } from "@/hooks/useTodos";
+import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
 import type { SerializedResearch, SerializedTodoUrl } from "@/types/database";
 import { Button, Loader } from "./ui";
 
@@ -72,26 +73,8 @@ function SourceCard({
   url: SerializedTodoUrl;
   citationNumber: number;
 }) {
-  const isPending = url.fetchStatus === "pending";
-  const isFailed = url.fetchStatus === "failed";
-
-  let validHostname: string | null = null;
-  try {
-    const parsed = new URL(url.url);
-    if (parsed.hostname) validHostname = parsed.hostname;
-  } catch {
-    // invalid URL
-  }
-
-  const displayTitle =
-    isPending || isFailed
-      ? (validHostname ?? url.url)
-      : (url.title ?? url.siteName ?? validHostname ?? url.url);
-
-  const googleFaviconUrl = validHostname
-    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
-    : null;
-  const favicon = url.favicon ?? googleFaviconUrl;
+  const { isPending, isFailed, favicon, googleFaviconUrl, displayTitle } =
+    getUrlDisplay(url);
 
   return (
     <a
@@ -115,17 +98,7 @@ function SourceCard({
           src={favicon}
           alt=""
           className="w-4 h-4 mt-0.5 shrink-0"
-          onError={(e) => {
-            if (
-              url.favicon &&
-              googleFaviconUrl &&
-              e.currentTarget.src !== googleFaviconUrl
-            ) {
-              e.currentTarget.src = googleFaviconUrl;
-            } else {
-              e.currentTarget.style.display = "none";
-            }
-          }}
+          onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
       <div className="flex-1 min-w-0">

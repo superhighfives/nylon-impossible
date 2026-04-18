@@ -1,4 +1,5 @@
 import { getSocialUrlInfo } from "@/lib/social-urls";
+import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
 import type { SerializedTodoUrl } from "@/types/database";
 import { Loader } from "./loader";
 import { SocialPreviewCardCompact } from "./SocialPreviewCard";
@@ -16,33 +17,12 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
     return <SocialPreviewCardCompact url={url} />;
   }
 
-  // Treat stale pending URLs as failed (fetch likely lost due to worker restart)
   const isStale =
     url.fetchStatus === "pending" &&
     Date.now() - new Date(url.createdAt).getTime() > STALE_PENDING_THRESHOLD_MS;
+  const { favicon, googleFaviconUrl, displayTitle } = getUrlDisplay(url);
+  // Treat stale pending URLs as failed (fetch likely lost due to worker restart)
   const isPending = url.fetchStatus === "pending" && !isStale;
-  const isFailed = url.fetchStatus === "failed" || isStale;
-
-  // Extract hostname for pending/failed states and favicon fallback
-  let hostname: string;
-  let validHostname: string | null = null;
-  try {
-    const parsed = new URL(url.url);
-    hostname = parsed.hostname;
-    validHostname = parsed.hostname;
-  } catch {
-    hostname = url.url;
-  }
-
-  // Use fetched title, or fall back to hostname
-  const displayTitle =
-    isPending || isFailed ? hostname : (url.title ?? url.siteName ?? hostname);
-
-  // Favicon: use fetched URL, falling back to Google's favicon service
-  const googleFaviconUrl = validHostname
-    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
-    : null;
-  const favicon = url.favicon ?? googleFaviconUrl;
 
   return (
     <a
@@ -58,18 +38,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
           src={favicon}
           alt=""
           className="w-4 h-4 shrink-0"
-          onError={(e) => {
-            // If the stored favicon fails, cascade to Google's service
-            if (
-              url.favicon &&
-              googleFaviconUrl &&
-              e.currentTarget.src !== googleFaviconUrl
-            ) {
-              e.currentTarget.src = googleFaviconUrl;
-            } else {
-              e.currentTarget.style.display = "none";
-            }
-          }}
+          onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
       <span className="text-sm text-gray truncate group-hover/link:underline">
