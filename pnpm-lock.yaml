@@ -165,8 +165,8 @@ importers:
         specifier: ^0.45.0
         version: 0.45.1(@cloudflare/workers-types@4.20260415.1)(@opentelemetry/api@1.9.1)
       effect:
-        specifier: ^3.19.13
-        version: 3.21.0
+        specifier: ^3.21.1
+        version: 3.21.1
       fractional-indexing:
         specifier: ^3.2.0
         version: 3.2.0
@@ -2546,8 +2546,8 @@ packages:
       sqlite3:
         optional: true
 
-  effect@3.21.0:
-    resolution: {integrity: sha512-PPN80qRokCd1f015IANNhrwOnLO7GrrMQfk4/lnZRE/8j7UPWrNNjPV0uBrZutI/nHzernbW+J0hdqQysHiSnQ==}
+  effect@3.21.1:
+    resolution: {integrity: sha512-bA3TsBd0mByThuCnE6FQqS+L3DLazk4UbE9jp0CqVfIjQl5DKi8sAe93O/ZKeF7clL65fJxcsVGiAKYXdnHByA==}
 
   electron-to-chromium@1.5.321:
     resolution: {integrity: sha512-L2C7Q279W2D/J4PLZLk7sebOILDSWos7bMsMNN06rK482umHUrh/3lM8G7IlHFOYip2oAg5nha1rCMxr/rs6ZQ==}
@@ -5377,7 +5377,7 @@ snapshots:
       '@cloudflare/workers-types': 4.20260415.1
       '@opentelemetry/api': 1.9.1
 
-  effect@3.21.0:
+  effect@3.21.1:
     dependencies:
       '@standard-schema/spec': 1.1.0
       fast-check: 3.23.2
