@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@clerk/testing": "^2.0.8",
-    "dotenv": "^16.0.0",
+    "dotenv": "^17.4.2",
     "playwright": "^1.49.0",
     "sharp": "^0.33.0"
   },
