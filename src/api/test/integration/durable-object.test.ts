@@ -1,6 +1,17 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
+async function waitForLength<T>(
+  arr: T[],
+  length: number,
+  timeoutMs = 1_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (arr.length < length && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
+}
+
 describe("UserSync Durable Object", () => {
   it("upgrades to WebSocket", async () => {
     const id = env.USER_SYNC.idFromName("test-upgrade");
@@ -43,8 +54,7 @@ describe("UserSync Durable Object", () => {
     // Trigger notify
     await stub.fetch("http://localhost/notify", { method: "POST" });
 
-    // Give the event loop a tick
-    await new Promise((r) => setTimeout(r, 50));
+    await waitForLength(messages, 1);
 
     expect(messages).toHaveLength(1);
     expect(JSON.parse(messages[0])).toEqual({ type: "sync" });
@@ -82,8 +92,7 @@ describe("UserSync Durable Object", () => {
     // Client 1 sends "changed"
     ws1.send(JSON.stringify({ type: "changed" }));
 
-    // Give the event loop time
-    await new Promise((r) => setTimeout(r, 50));
+    await waitForLength(messages2, 1);
 
     // Client 1 should NOT receive the broadcast
     expect(messages1).toHaveLength(0);
