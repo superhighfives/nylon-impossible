@@ -1,8 +1,6 @@
 import { Toast } from "@base-ui/react/toast";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
-import { toastManager } from "@/lib/toast";
-
-type ToastType = "success" | "error" | "info";
+import { type ToastType, toastManager } from "@/lib/toast";
 
 const TYPE_STYLES: Record<
   ToastType,

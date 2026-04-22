@@ -18,7 +18,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
-import { apiValidationError } from "../lib/errors";
+import { apiValidationError, readJsonBody } from "../lib/errors";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
@@ -151,8 +151,9 @@ async function fetchAndUpdateUrlMetadata(
 
 // POST /todos/sync - Bidirectional sync
 export async function syncTodos(c: Context<Env>) {
-  const body = await c.req.json();
-  const parsed = syncRequestSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = syncRequestSchema.safeParse(json.body);
 
   if (!parsed.success) {
     return apiValidationError(c, parsed.error);

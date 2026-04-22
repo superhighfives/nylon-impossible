@@ -3,7 +3,7 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod/v4";
 
 /**
- * Catalog of user-facing API errors. Each entry is a tuple of (status, message)
+ * Catalog of user-facing API errors. Each entry is an object with `{ status, message }`
  * keyed by a stable machine-readable code. Handlers reach for `apiError(c, code)`
  * instead of hard-coding strings so copy stays consistent and tests assert on a
  * single source of truth.
@@ -61,4 +61,22 @@ export function apiValidationError(c: Context, error: z.ZodError) {
     message: error.issues[0]?.message ?? API_ERRORS.validation_failed.message,
     details: error.issues,
   });
+}
+
+type JsonBodyResult =
+  | { ok: true; body: unknown }
+  | { ok: false; response: ReturnType<typeof apiError> };
+
+/**
+ * Parse a JSON request body. On failure, returns a ready-to-return
+ * `invalid_json` response so handlers stay on the typed-error envelope instead
+ * of letting a parse error bubble up as a 500.
+ */
+export async function readJsonBody(c: Context): Promise<JsonBodyResult> {
+  try {
+    const body = await c.req.json();
+    return { ok: true, body };
+  } catch {
+    return { ok: false, response: apiError(c, "invalid_json") };
+  }
 }

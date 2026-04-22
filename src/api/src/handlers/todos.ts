@@ -12,7 +12,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
-import { apiError, apiValidationError } from "../lib/errors";
+import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env, ResearchJobMessage } from "../types";
 
 // Validation schemas
@@ -142,8 +142,9 @@ export async function getTodo(c: Context<Env>) {
 
 // POST /todos - Create a new todo
 export async function createTodo(c: Context<Env>) {
-  const body = await c.req.json();
-  const parsed = createTodoSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = createTodoSchema.safeParse(json.body);
 
   if (!parsed.success) {
     return apiValidationError(c, parsed.error);
@@ -181,8 +182,9 @@ export async function updateTodo(c: Context<Env>) {
   if (!todoId) {
     return apiError(c, "todo_id_required");
   }
-  const body = await c.req.json();
-  const parsed = updateTodoSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = updateTodoSchema.safeParse(json.body);
 
   if (!parsed.success) {
     return apiValidationError(c, parsed.error);

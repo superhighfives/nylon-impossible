@@ -1,12 +1,26 @@
 import { Hono } from "hono";
 import { z } from "zod/v4";
 import { describe, expect, it } from "vitest";
-import { API_ERRORS, apiError, apiValidationError } from "../../src/lib/errors";
+import {
+  API_ERRORS,
+  apiError,
+  apiValidationError,
+  readJsonBody,
+} from "../../src/lib/errors";
 
 function makeApp(handler: (c: Parameters<Parameters<Hono["get"]>[1]>[0]) => unknown) {
   const app = new Hono();
   // biome-ignore lint/suspicious/noExplicitAny: test shim for handler
   app.get("/test", handler as any);
+  return app;
+}
+
+function makePostApp(
+  handler: (c: Parameters<Parameters<Hono["post"]>[1]>[0]) => unknown,
+) {
+  const app = new Hono();
+  // biome-ignore lint/suspicious/noExplicitAny: test shim for handler
+  app.post("/test", handler as any);
   return app;
 }
 
@@ -62,5 +76,40 @@ describe("apiValidationError", () => {
     expect(body.error).toBe("Title is required");
     expect(Array.isArray(body.details)).toBe(true);
     expect(body.details.length).toBeGreaterThan(0);
+  });
+});
+
+describe("readJsonBody", () => {
+  it("returns the parsed body when the request is valid JSON", async () => {
+    const app = makePostApp(async (c) => {
+      const result = await readJsonBody(c);
+      if (!result.ok) return result.response;
+      return c.json({ body: result.body });
+    });
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hello: "world" }),
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ body: { hello: "world" } });
+  });
+
+  it("returns an invalid_json error response for malformed bodies", async () => {
+    const app = makePostApp(async (c) => {
+      const result = await readJsonBody(c);
+      if (!result.ok) return result.response;
+      return c.json({ body: result.body });
+    });
+    const res = await app.request("/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{not json",
+    });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: API_ERRORS.invalid_json.message,
+      code: "invalid_json",
+    });
   });
 });

@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { eq, getDb, users } from "../lib/db";
-import { apiError, apiValidationError } from "../lib/errors";
+import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
 const updatePreferencesSchema = z.object({
@@ -44,13 +44,9 @@ export async function getMe(c: Context<Env>) {
 
 // PATCH /users/me
 export async function updateMe(c: Context<Env>) {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return apiError(c, "invalid_json");
-  }
-  const parsed = updatePreferencesSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = updatePreferencesSchema.safeParse(json.body);
 
   if (!parsed.success) {
     return apiValidationError(c, parsed.error);

@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { z } from "zod/v4";
 import { enrichTodoWithAI } from "../lib/ai-enrich";
 import { eq, getDb, todos, todoUrls, users } from "../lib/db";
-import { apiError, apiValidationError } from "../lib/errors";
+import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import {
   cleanUrlString,
   createFallbackFromUrl,
@@ -85,8 +85,9 @@ function createInitialTodo(text: string): {
 
 // POST /todos/smart
 export async function smartCreate(c: Context<Env>) {
-  const body = await c.req.json();
-  const parsed = smartCreateSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = smartCreateSchema.safeParse(json.body);
 
   if (!parsed.success) {
     return apiValidationError(c, parsed.error);
