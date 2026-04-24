@@ -33,7 +33,7 @@ export function AiToggle() {
           }`}
         >
           <span
-            className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+            className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${
               user.aiEnabled ? "translate-x-3.5" : "translate-x-0.5"
             }`}
           />

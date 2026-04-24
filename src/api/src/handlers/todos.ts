@@ -12,6 +12,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
+import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env, ResearchJobMessage } from "../types";
 
 // Validation schemas
@@ -113,7 +114,7 @@ export async function listTodos(c: Context<Env>) {
 export async function getTodo(c: Context<Env>) {
   const todoId = c.req.param("id")?.toLowerCase();
   if (!todoId) {
-    return c.json({ error: "Todo ID required" }, 400);
+    return apiError(c, "todo_id_required");
   }
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
@@ -124,7 +125,7 @@ export async function getTodo(c: Context<Env>) {
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   if (!todo) {
-    return c.json({ error: "Todo not found" }, 404);
+    return apiError(c, "todo_not_found");
   }
 
   const urls = await db
@@ -141,11 +142,12 @@ export async function getTodo(c: Context<Env>) {
 
 // POST /todos - Create a new todo
 export async function createTodo(c: Context<Env>) {
-  const body = await c.req.json();
-  const parsed = createTodoSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = createTodoSchema.safeParse(json.body);
 
   if (!parsed.success) {
-    return c.json({ error: parsed.error.message }, 400);
+    return apiValidationError(c, parsed.error);
   }
 
   const db = getDb(c.env.DB);
@@ -178,13 +180,14 @@ export async function createTodo(c: Context<Env>) {
 export async function updateTodo(c: Context<Env>) {
   const todoId = c.req.param("id");
   if (!todoId) {
-    return c.json({ error: "Todo ID required" }, 400);
+    return apiError(c, "todo_id_required");
   }
-  const body = await c.req.json();
-  const parsed = updateTodoSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = updateTodoSchema.safeParse(json.body);
 
   if (!parsed.success) {
-    return c.json({ error: parsed.error.message }, 400);
+    return apiValidationError(c, parsed.error);
   }
 
   const db = getDb(c.env.DB);
@@ -197,7 +200,7 @@ export async function updateTodo(c: Context<Env>) {
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   if (!existing) {
-    return c.json({ error: "Todo not found" }, 404);
+    return apiError(c, "todo_not_found");
   }
 
   const updates: Record<string, unknown> = {
@@ -271,7 +274,7 @@ export async function updateTodo(c: Context<Env>) {
 export async function deleteTodo(c: Context<Env>) {
   const todoId = c.req.param("id");
   if (!todoId) {
-    return c.json({ error: "Todo ID required" }, 400);
+    return apiError(c, "todo_id_required");
   }
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
@@ -283,7 +286,7 @@ export async function deleteTodo(c: Context<Env>) {
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   if (!existing) {
-    return c.json({ error: "Todo not found" }, 404);
+    return apiError(c, "todo_not_found");
   }
 
   // Cancel any pending research so the queue consumer exits cleanly via the

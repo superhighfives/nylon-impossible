@@ -24,6 +24,8 @@ import {
   ChevronDown,
   ChevronUp,
   GripVertical,
+  Inbox,
+  RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
@@ -295,8 +297,81 @@ function SortableTodoItem(
   );
 }
 
+function TodoSkeleton() {
+  return (
+    <output
+      className="block divide-y divide-gray-subtle"
+      aria-label="Loading todos"
+    >
+      {[72, 56, 80].map((width) => (
+        <div key={width} className="py-3 flex items-start gap-3 animate-pulse">
+          <div className="pt-0.5">
+            <div className="h-4 w-4 rounded bg-gray-base" />
+          </div>
+          <div className="flex-1 space-y-2">
+            <div
+              className="h-3 rounded bg-gray-base"
+              style={{ width: `${width}%` }}
+            />
+            <div className="h-2.5 rounded bg-gray-base w-1/3" />
+          </div>
+        </div>
+      ))}
+    </output>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="flex flex-col items-center text-center py-16 px-4">
+      <div className="w-12 h-12 rounded-full bg-gray-base flex items-center justify-center text-gray-muted mb-4">
+        <Inbox size={20} aria-hidden="true" />
+      </div>
+      <h2 className="text-sm font-medium text-gray">Nothing to do yet</h2>
+      <p className="text-xs text-gray-muted mt-1 max-w-xs">
+        Add a todo above to get started. Try &ldquo;Buy groceries
+        tomorrow&rdquo; or paste a link to research.
+      </p>
+    </div>
+  );
+}
+
+function ErrorState({
+  onRetry,
+  isRetrying,
+}: {
+  onRetry: () => void;
+  isRetrying: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center py-16 px-4">
+      <div className="w-12 h-12 rounded-full bg-red-base flex items-center justify-center text-red-muted mb-4">
+        <AlertCircle size={20} aria-hidden="true" />
+      </div>
+      <h2 className="text-sm font-medium text-gray">
+        Couldn&apos;t load todos
+      </h2>
+      <p className="text-xs text-gray-muted mt-1 max-w-xs">
+        Something went wrong fetching your list. Check your connection and try
+        again.
+      </p>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={onRetry}
+        loading={isRetrying}
+        disabled={isRetrying}
+        className="mt-4"
+      >
+        <RefreshCw size={14} />
+        Try again
+      </Button>
+    </div>
+  );
+}
+
 export function TodoList() {
-  const { data: todos, isLoading, error } = useTodos();
+  const { data: todos, isLoading, error, refetch, isFetching } = useTodos();
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -323,23 +398,15 @@ export function TodoList() {
   }, [todos]);
 
   if (isLoading) {
-    return (
-      <p className="text-center text-gray-muted text-sm py-12">Loading...</p>
-    );
+    return <TodoSkeleton />;
   }
 
   if (error) {
-    return (
-      <p className="text-center text-red-muted text-sm py-12">
-        Failed to load todos.
-      </p>
-    );
+    return <ErrorState onRetry={() => refetch()} isRetrying={isFetching} />;
   }
 
   if (!todos || todos.length === 0) {
-    return (
-      <p className="text-center text-gray-muted text-sm py-12">No todos yet.</p>
-    );
+    return <EmptyState />;
   }
 
   const handleToggle = (id: string, completed: boolean) => {

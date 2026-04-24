@@ -4,6 +4,7 @@ import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
+import { messageFromError, toast } from "@/lib/toast";
 import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type {
   CreateTodoInput,
@@ -96,6 +97,7 @@ export function useCreateTodo() {
     },
     onError: (_err, _variables, context) => {
       Sentry.captureException(_err, { tags: { mutation: "createTodo" } });
+      toast.error(messageFromError(_err, "Couldn't add todo"));
       if (!context) {
         return;
       }
@@ -171,6 +173,7 @@ export function useUpdateTodo() {
     },
     onError: (_err, _variables, context) => {
       Sentry.captureException(_err, { tags: { mutation: "updateTodo" } });
+      toast.error(messageFromError(_err, "Couldn't save changes"));
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
@@ -209,6 +212,7 @@ export function useDeleteTodo() {
     },
     onError: (_err, _variables, context) => {
       Sentry.captureException(_err, { tags: { mutation: "deleteTodo" } });
+      toast.error(messageFromError(_err, "Couldn't delete todo"));
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
@@ -320,6 +324,10 @@ export function useReresearch() {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
     },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "reresearch" } });
+      toast.error(messageFromError(err, "Couldn't start research"));
+    },
   });
 }
 
@@ -351,6 +359,10 @@ export function useCancelResearch() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+    },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "cancelResearch" } });
+      toast.error(messageFromError(err, "Couldn't cancel research"));
     },
   });
 }
