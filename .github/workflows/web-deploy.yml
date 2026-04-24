@@ -90,6 +90,10 @@ jobs:
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_WEB_PROJECT: ${{ secrets.SENTRY_WEB_PROJECT }}
 
       - name: Deploy Web
         working-directory: src/web
@@ -218,8 +222,12 @@ jobs:
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_API_BASE_URL: https://api-pr-${{ github.event.pull_request.number }}.nylonimpossible.com
           VITE_IS_PREVIEW: true
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_WEB_PROJECT: ${{ secrets.SENTRY_WEB_PROJECT }}
 
       - name: Deploy preview Web
         working-directory: src/web
