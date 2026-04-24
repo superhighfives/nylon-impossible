@@ -1,22 +1,15 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-// Resolves when `ws` receives its next message, or rejects if none arrives
-// within `timeoutMs`. Lets tests wait deterministically for a broadcast
-// instead of sleeping a fixed duration that's flaky under load.
-function nextMessage(ws: WebSocket, timeoutMs = 2000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      ws.removeEventListener("message", onMessage);
-      reject(new Error(`No message received within ${timeoutMs}ms`));
-    }, timeoutMs);
-    const onMessage = (e: MessageEvent) => {
-      clearTimeout(timer);
-      ws.removeEventListener("message", onMessage);
-      resolve(e.data as string);
-    };
-    ws.addEventListener("message", onMessage);
-  });
+async function waitForLength<T>(
+  arr: T[],
+  length: number,
+  timeoutMs = 1_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (arr.length < length && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 10));
+  }
 }
 
 describe("UserSync Durable Object", () => {
@@ -53,12 +46,18 @@ describe("UserSync Durable Object", () => {
     const ws = wsRes.webSocket!;
     ws.accept();
 
-    const received = nextMessage(ws);
+    const messages: string[] = [];
+    ws.addEventListener("message", (e) => {
+      messages.push(e.data as string);
+    });
 
     // Trigger notify
     await stub.fetch("http://localhost/notify", { method: "POST" });
 
-    expect(JSON.parse(await received)).toEqual({ type: "sync" });
+    await waitForLength(messages, 1);
+
+    expect(messages).toHaveLength(1);
+    expect(JSON.parse(messages[0])).toEqual({ type: "sync" });
 
     ws.close();
   });
@@ -80,25 +79,26 @@ describe("UserSync Durable Object", () => {
     const ws2 = wsRes2.webSocket!;
     ws2.accept();
 
-    // Track anything ws1 receives — it should stay empty, since the sender
-    // is excluded from their own broadcast.
     const messages1: string[] = [];
+    const messages2: string[] = [];
+
     ws1.addEventListener("message", (e) => {
       messages1.push(e.data as string);
     });
-
-    const ws2Received = nextMessage(ws2);
+    ws2.addEventListener("message", (e) => {
+      messages2.push(e.data as string);
+    });
 
     // Client 1 sends "changed"
     ws1.send(JSON.stringify({ type: "changed" }));
 
-    // Client 2 should receive the broadcast
-    expect(JSON.parse(await ws2Received)).toEqual({ type: "sync" });
+    await waitForLength(messages2, 1);
 
-    // Client 1 should NOT have received it. By the time ws2 got the
-    // broadcast, the DO has already delivered to everyone it's going to,
-    // so checking ws1 here is deterministic.
+    // Client 1 should NOT receive the broadcast
     expect(messages1).toHaveLength(0);
+    // Client 2 SHOULD receive the broadcast
+    expect(messages2).toHaveLength(1);
+    expect(JSON.parse(messages2[0])).toEqual({ type: "sync" });
 
     ws1.close();
     ws2.close();

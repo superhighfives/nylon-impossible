@@ -5,6 +5,7 @@ import {
   useCancelResearch,
   useReresearch,
 } from "@/hooks/useTodos";
+import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
 import type { SerializedResearch, SerializedTodoUrl } from "@/types/database";
 import { Button, Loader } from "./ui";
 
@@ -72,26 +73,8 @@ function SourceCard({
   url: SerializedTodoUrl;
   citationNumber: number;
 }) {
-  const isPending = url.fetchStatus === "pending";
-  const isFailed = url.fetchStatus === "failed";
-
-  let validHostname: string | null = null;
-  try {
-    const parsed = new URL(url.url);
-    if (parsed.hostname) validHostname = parsed.hostname;
-  } catch {
-    // invalid URL
-  }
-
-  const displayTitle =
-    isPending || isFailed
-      ? (validHostname ?? url.url)
-      : (url.title ?? url.siteName ?? validHostname ?? url.url);
-
-  const googleFaviconUrl = validHostname
-    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(validHostname)}&sz=32`
-    : null;
-  const favicon = url.favicon ?? googleFaviconUrl;
+  const { isPending, isFailed, favicon, googleFaviconUrl, displayTitle } =
+    getUrlDisplay(url);
 
   return (
     <a
@@ -115,17 +98,7 @@ function SourceCard({
           src={favicon}
           alt=""
           className="w-4 h-4 mt-0.5 shrink-0"
-          onError={(e) => {
-            if (
-              url.favicon &&
-              googleFaviconUrl &&
-              e.currentTarget.src !== googleFaviconUrl
-            ) {
-              e.currentTarget.src = googleFaviconUrl;
-            } else {
-              e.currentTarget.style.display = "none";
-            }
-          }}
+          onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
       <div className="flex-1 min-w-0">
@@ -139,6 +112,29 @@ function SourceCard({
   );
 }
 
+function ResearchFrame({
+  children,
+  action,
+  spacing = "space-y-2",
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+  spacing?: string;
+}) {
+  return (
+    <div className={spacing}>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
+          <Sparkles size={12} />
+          Research
+        </p>
+        {action}
+      </div>
+      {children}
+    </div>
+  );
+}
+
 export function ResearchSection({
   todoId,
   research,
@@ -147,6 +143,19 @@ export function ResearchSection({
   const reresearch = useReresearch();
   const cancelResearch = useCancelResearch();
 
+  const retryButton = (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => reresearch.mutate(todoId)}
+      disabled={reresearch.isPending || cancelResearch.isPending}
+      loading={reresearch.isPending}
+    >
+      <RefreshCw size={14} className="mr-1" />
+      Try again
+    </Button>
+  );
+
   if (research.status === "pending") {
     const age = Date.now() - new Date(research.createdAt).getTime();
     const isStale = age > STALE_RESEARCH_MS;
@@ -154,40 +163,16 @@ export function ResearchSection({
 
     if (isStale) {
       return (
-        <div className="space-y-2">
-          <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
-            <Sparkles size={12} />
-            Research
-          </p>
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-red-muted">Research timed out.</p>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => reresearch.mutate(todoId)}
-              disabled={reresearch.isPending}
-              loading={reresearch.isPending}
-            >
-              <RefreshCw size={14} className="mr-1" />
-              Try again
-            </Button>
-          </div>
-        </div>
+        <ResearchFrame action={retryButton}>
+          <p className="text-sm text-red-muted">Research timed out.</p>
+        </ResearchFrame>
       );
     }
 
     return (
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
-          <Sparkles size={12} />
-          Research
-        </p>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm text-gray-muted">
-            <Loader size="sm" />
-            <span>Researching...</span>
-          </div>
-          {showRetry && (
+      <ResearchFrame
+        action={
+          showRetry ? (
             <div className="flex items-center gap-1">
               <Button
                 variant="ghost"
@@ -198,55 +183,35 @@ export function ResearchSection({
               >
                 Cancel
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => reresearch.mutate(todoId)}
-                disabled={reresearch.isPending || cancelResearch.isPending}
-                loading={reresearch.isPending}
-              >
-                <RefreshCw size={14} className="mr-1" />
-                Try again
-              </Button>
+              {retryButton}
             </div>
-          )}
+          ) : null
+        }
+      >
+        <div className="flex items-center gap-2 text-sm text-gray-muted">
+          <Loader size="sm" />
+          <span>Researching...</span>
         </div>
-      </div>
+      </ResearchFrame>
     );
   }
 
   if (research.status === "failed") {
     return (
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
-          <Sparkles size={12} />
-          Research
-        </p>
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-red-muted">Research failed.</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => reresearch.mutate(todoId)}
-            disabled={reresearch.isPending}
-            loading={reresearch.isPending}
-          >
-            <RefreshCw size={14} className="mr-1" />
-            Try again
-          </Button>
-        </div>
-      </div>
+      <ResearchFrame action={retryButton}>
+        <p className="text-sm text-red-muted">Research failed.</p>
+      </ResearchFrame>
     );
   }
 
   // Completed
+  const hasSummary = Boolean(research.summary);
+  const hasSources = researchUrls.length > 0;
+
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
-          <Sparkles size={12} />
-          Research
-        </p>
+    <ResearchFrame
+      spacing="space-y-3"
+      action={
         <Button
           variant="ghost"
           size="xs"
@@ -259,21 +224,27 @@ export function ResearchSection({
             className={reresearch.isPending ? "animate-spin" : ""}
           />
         </Button>
-      </div>
-
-      {research.summary && (
+      }
+    >
+      {hasSummary && research.summary ? (
         <p className="text-sm text-gray leading-relaxed">
           {formatSummaryWithCitations(research.summary, researchUrls)}
         </p>
-      )}
+      ) : null}
 
-      {researchUrls.length > 0 && (
+      {hasSources ? (
         <div className="space-y-2">
           {researchUrls.map((url, index) => (
             <SourceCard key={url.id} url={url} citationNumber={index + 1} />
           ))}
         </div>
-      )}
-    </div>
+      ) : null}
+
+      {!hasSummary && !hasSources ? (
+        <p className="text-sm text-gray-muted">
+          No relevant sources found for this todo.
+        </p>
+      ) : null}
+    </ResearchFrame>
   );
 }

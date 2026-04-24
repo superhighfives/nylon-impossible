@@ -17,6 +17,7 @@ import Header from "../components/Header";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
 import { SettingsModal } from "../components/SettingsModal";
+import { Toaster } from "../components/ui";
 import {
   OnlineStatusContext,
   useOnlineStatusValue,
@@ -146,6 +147,7 @@ function RootDocument() {
               <Show when="signed-in">
                 <SettingsModal />
               </Show>
+              <Toaster />
             </OnlineStatusContext.Provider>
           </Sentry.ErrorBoundary>
           <TanStackDevtools

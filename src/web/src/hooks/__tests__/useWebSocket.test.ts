@@ -83,6 +83,13 @@ vi.mock("@/lib/config", () => ({
   WS_URL: "wss://api.example.com/ws",
 }));
 
+const captureExceptionMock = vi.fn();
+vi.mock("@/lib/sentry", () => ({
+  Sentry: {
+    captureException: (...args: unknown[]) => captureExceptionMock(...args),
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Helper: flush microtasks / async effects
 // ---------------------------------------------------------------------------
@@ -126,6 +133,7 @@ describe("useWebSocketConnection", () => {
     lastCreatedWs = null;
     mockIsSignedIn = true;
     mockGetToken.mockResolvedValue("test-token");
+    captureExceptionMock.mockReset();
     vi.stubGlobal("WebSocket", MockWebSocket);
   });
 
@@ -217,6 +225,45 @@ describe("useWebSocketConnection", () => {
         lastCreatedWs?.simulateMessage("not { valid json");
       });
     }).not.toThrow();
+  });
+
+  it("captures token-fetch failures to Sentry and schedules a retry", async () => {
+    vi.useFakeTimers();
+
+    try {
+      mockGetToken
+        .mockRejectedValueOnce(new Error("clerk down"))
+        .mockResolvedValueOnce("recovered-token");
+
+      const { Wrapper } = createWrapper();
+      renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(lastCreatedWs).toBeNull();
+      expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+      const [err, ctx] = captureExceptionMock.mock.calls[0];
+      expect((err as Error).message).toBe("clerk down");
+      expect(ctx).toEqual(
+        expect.objectContaining({
+          tags: { area: "websocket", event: "token-fetch-failed" },
+        }),
+      );
+
+      // Advance past the initial 1s retry delay — the second getToken call resolves.
+      await act(async () => {
+        vi.advanceTimersByTime(1100);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(lastCreatedWs).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("schedules a reconnect after the connection closes", async () => {

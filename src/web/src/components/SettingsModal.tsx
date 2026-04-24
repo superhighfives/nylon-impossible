@@ -3,7 +3,8 @@ import { MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
-import { Button, Field, Input } from "./ui";
+import { messageFromError, toast } from "@/lib/toast";
+import { Button, Field, Input, Loader } from "./ui";
 
 const NominatimSchema = z.object({
   address: z
@@ -39,12 +40,18 @@ export function SettingsModal() {
       { location: trimmedLocation || null, aiEnabled },
       {
         onSuccess: () => setOpen(false),
+        onError: (err) => {
+          toast.error(messageFromError(err, "Couldn't save settings"));
+        },
       },
     );
   };
 
   const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      toast.error("Location isn't available in this browser");
+      return;
+    }
     setIsLocating(true);
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
@@ -57,13 +64,21 @@ export function SettingsModal() {
           const { city, town, village, state, country } = data.address ?? {};
           const place = city || town || village || "";
           const region = state || country || "";
-          setLocation([place, region].filter(Boolean).join(", "));
-        } catch {
-          // silently fail
+          const label = [place, region].filter(Boolean).join(", ");
+          if (label) {
+            setLocation(label);
+          } else {
+            toast.error("Couldn't figure out your location");
+          }
+        } catch (err) {
+          toast.error(messageFromError(err, "Couldn't look up your location"));
         }
         setIsLocating(false);
       },
-      () => setIsLocating(false),
+      () => {
+        setIsLocating(false);
+        toast.error("Couldn't access your location");
+      },
     );
   };
 
@@ -90,7 +105,13 @@ export function SettingsModal() {
               Settings
             </Dialog.Title>
             {isLoadingUser ? (
-              <p className="text-sm text-gray-muted">Loading...</p>
+              <div
+                className="flex items-center gap-2 text-sm text-gray-muted py-2"
+                aria-live="polite"
+              >
+                <Loader size="sm" />
+                <span>Loading settings…</span>
+              </div>
             ) : (
               <>
                 <Field
@@ -135,7 +156,7 @@ export function SettingsModal() {
                     className={`shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${aiEnabled ? "bg-yellow-solid" : "bg-gray-base"}`}
                   >
                     <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
+                      className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
                     />
                   </button>
                 </div>
