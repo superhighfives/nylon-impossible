@@ -6,7 +6,9 @@ export function initSentry() {
 
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
-    environment: import.meta.env.VITE_IS_PREVIEW ? "preview" : import.meta.env.MODE,
+    environment: import.meta.env.VITE_IS_PREVIEW
+      ? "preview"
+      : import.meta.env.MODE,
     integrations: [
       Sentry.browserTracingIntegration(),
       Sentry.replayIntegration({
