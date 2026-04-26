@@ -73,7 +73,7 @@ export function TodoInput() {
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}
-            className={`w-full resize-none min-h-0 transition-[padding] ${trimmed ? "pb-12" : ""}`}
+            className={`w-full resize-none min-h-0 rounded-2xl transition-[padding] ${trimmed ? "pb-12" : ""}`}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

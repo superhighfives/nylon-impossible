@@ -246,7 +246,7 @@ Interactive elements should have a minimum hit area of 44×44px (WCAG) or at lea
 ### Tailwind Example
 
 ```tsx
-<button className="relative size-5 after:absolute after:top-1/2 after:left-1/2 after:size-10 after:-translate-1/2">
+<button className="relative size-5 after:absolute after:top-1/2 after:left-1/2 after:size-10 after:-translate-x-1/2 after:-translate-y-1/2">
   <CheckIcon />
 </button>
 ```
