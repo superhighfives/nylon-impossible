@@ -39,6 +39,7 @@ platform :ios do
       "CURRENT_PROJECT_VERSION=#{build_number}",
       "API_BASE_URL=#{ENV['API_BASE_URL'] || 'https://api.nylonimpossible.com'}",
       "SENTRY_DSN=#{ENV['SENTRY_DSN'] || ''}",
+      "IS_TESTFLIGHT=YES",
       "-allowProvisioningUpdates",
       "-authenticationKeyID", key_id,
       "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_API_ISSUER_ID"],

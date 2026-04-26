@@ -27,13 +27,14 @@ enum Config {
 
     // Sentry environment tag.
     // - DEBUG builds → "development" (Xcode runs on simulator/device)
-    // - TestFlight (sandbox receipt) → "preview"
+    // - TestFlight (Fastlane sets IS_TESTFLIGHT=YES via Info.plist) → "preview"
     // - App Store → "production"
     static let sentryEnvironment: String = {
         #if DEBUG
         return "development"
         #else
-        if Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt" {
+        if let flag = Bundle.main.infoDictionary?["IsTestFlight"] as? String,
+           flag == "YES" {
             return "preview"
         }
         return "production"
