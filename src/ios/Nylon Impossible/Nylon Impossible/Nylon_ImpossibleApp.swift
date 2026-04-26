@@ -29,7 +29,7 @@ struct Nylon_ImpossibleApp: App {
 
         SentrySDK.start { options in
             options.dsn = dsn
-            options.environment = "production"
+            options.environment = Config.sentryEnvironment
             options.tracesSampleRate = 0.1
             options.enableAutoPerformanceTracing = true
             // Privacy: don't attach screenshots or view hierarchy
