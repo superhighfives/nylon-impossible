@@ -1,0 +1,162 @@
+name: Deploy to App Store
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: macos-26
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: src/ios/Nylon Impossible
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: SwiftLint
+        run: |
+          brew install swiftlint
+          swiftlint
+
+      - name: Select Xcode
+        run: |
+          xcodebuild -version
+
+      - name: Run tests
+        run: |
+          xcrun simctl list runtimes
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "No available iPhone simulator found, downloading iOS platform..."
+            xcodebuild -downloadPlatform iOS
+            DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
+            ")
+          fi
+          echo "Running tests on: $DEVICE"
+          xcodebuild test \
+            -project "Nylon Impossible.xcodeproj" \
+            -scheme "Nylon Impossible" \
+            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -resultBundlePath TestResults \
+            -quiet
+
+  deploy:
+    needs: [test]
+    runs-on: macos-26
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: src/ios/Nylon Impossible
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Apple certificates and provisioning profile
+        env:
+          DEVELOPMENT_CERTIFICATE_BASE64: ${{ secrets.DEVELOPMENT_CERTIFICATE_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
+          SHARE_EXTENSION_PROFILE_BASE64: ${{ secrets.SHARE_EXTENSION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          DEV_CERTIFICATE_PATH=$RUNNER_TEMP/development.p12
+          DIST_CERTIFICATE_PATH=$RUNNER_TEMP/distribution.p12
+          PROFILE_PATH=$RUNNER_TEMP/profile.mobileprovision
+          SHARE_PROFILE_PATH=$RUNNER_TEMP/share_profile.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo "$DEVELOPMENT_CERTIFICATE_BASE64" | base64 --decode > $DEV_CERTIFICATE_PATH
+          echo "$DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > $DIST_CERTIFICATE_PATH
+          echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode > $PROFILE_PATH
+          echo "$SHARE_EXTENSION_PROFILE_BASE64" | base64 --decode > $SHARE_PROFILE_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import both certificates (same password)
+          security import $DEV_CERTIFICATE_PATH -P "$DISTRIBUTION_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security import $DIST_CERTIFICATE_PATH -P "$DISTRIBUTION_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          # Debug: list signing identities in keychain
+          echo "=== Signing identities in keychain ==="
+          security find-identity -v -p codesigning $KEYCHAIN_PATH
+
+          # Install provisioning profiles with their UUIDs as filenames
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+
+          PROFILE_UUID=$(grep -a -o '[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}' $PROFILE_PATH | head -1)
+          echo "Installing main app profile with UUID: $PROFILE_UUID"
+          cp $PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$PROFILE_UUID.mobileprovision
+
+          SHARE_PROFILE_UUID=$(grep -a -o '[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}' $SHARE_PROFILE_PATH | head -1)
+          echo "Installing share extension profile with UUID: $SHARE_PROFILE_UUID"
+          cp $SHARE_PROFILE_PATH ~/Library/MobileDevice/Provisioning\ Profiles/$SHARE_PROFILE_UUID.mobileprovision
+
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Cache SPM packages
+        uses: actions/cache@v5
+        with:
+          path: ${{ runner.temp }}/spm-cache
+          key: spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: spm-
+
+      - name: Build and upload to App Store Connect
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
+          API_BASE_URL: https://api.nylonimpossible.com
+          SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
+        run: bundle exec fastlane release --verbose
+
+      - name: Upload dSYMs to Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_IOS_PROJECT }}
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        run: |
+          brew install getsentry/tools/sentry-cli
+          ARCHIVE_PATH=$(find /tmp -maxdepth 1 -name "NylonImpossible.xcarchive" 2>/dev/null | head -1)
+          if [ -n "$ARCHIVE_PATH" ]; then
+            sentry-cli debug-files upload --include-sources "$ARCHIVE_PATH/dSYMs"
+          fi
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
