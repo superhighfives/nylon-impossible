@@ -3,6 +3,17 @@ default_platform(:ios)
 platform :ios do
   desc "Build and upload to TestFlight"
   lane :beta do
+    build_and_upload(is_testflight: true)
+  end
+
+  desc "Build and upload to App Store Connect (does not submit for review)"
+  lane :release do
+    build_and_upload(is_testflight: false)
+  end
+
+  private_lane :build_and_upload do |options|
+    is_testflight = options[:is_testflight]
+
     api_key = app_store_connect_api_key(
       key_id: ENV["APP_STORE_CONNECT_API_KEY_ID"],
       issuer_id: ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
@@ -11,7 +22,8 @@ platform :ios do
       in_house: false
     )
 
-    # Get next build number from TestFlight (always increment from latest)
+    # Get next build number from TestFlight (always increment from latest).
+    # TestFlight and App Store share the build-number namespace per app version.
     current = latest_testflight_build_number(api_key: api_key, app_identifier: "com.superhighfives.Nylon-Impossible")
     build_number = (current + 1).to_s
     UI.message("Build number: #{build_number} (previous: #{current})")
@@ -39,7 +51,7 @@ platform :ios do
       "CURRENT_PROJECT_VERSION=#{build_number}",
       "API_BASE_URL=#{ENV['API_BASE_URL'] || 'https://api.nylonimpossible.com'}",
       "SENTRY_DSN=#{ENV['SENTRY_DSN'] || ''}",
-      "IS_TESTFLIGHT=YES",
+      "IS_TESTFLIGHT=#{is_testflight ? 'YES' : 'NO'}",
       "-allowProvisioningUpdates",
       "-authenticationKeyID", key_id,
       "-authenticationKeyIssuerID", ENV["APP_STORE_CONNECT_API_ISSUER_ID"],
@@ -82,12 +94,25 @@ platform :ios do
       "-exportPath", export_path
     )
 
-    # Step 3: Upload to TestFlight
+    # Step 3: Upload
     ipa_path = Dir.glob(File.join(export_path, "*.ipa")).first
-    upload_to_testflight(
-      api_key: api_key,
-      ipa: ipa_path,
-      skip_waiting_for_build_processing: true
-    )
+    if is_testflight
+      upload_to_testflight(
+        api_key: api_key,
+        ipa: ipa_path,
+        skip_waiting_for_build_processing: true
+      )
+    else
+      # Upload binary only — promote to release manually from App Store Connect
+      # after smoke-testing in TestFlight.
+      upload_to_app_store(
+        api_key: api_key,
+        ipa: ipa_path,
+        skip_metadata: true,
+        skip_screenshots: true,
+        submit_for_review: false,
+        precheck_include_in_app_purchases: false
+      )
+    end
   end
 end
