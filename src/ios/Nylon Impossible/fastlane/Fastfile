@@ -96,6 +96,9 @@ platform :ios do
 
     # Step 3: Upload
     ipa_path = Dir.glob(File.join(export_path, "*.ipa")).first
+    unless ipa_path && File.exist?(ipa_path)
+      UI.user_error!("No IPA found in #{export_path} — archive export likely failed")
+    end
     if is_testflight
       upload_to_testflight(
         api_key: api_key,

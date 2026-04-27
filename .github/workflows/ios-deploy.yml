@@ -160,9 +160,17 @@ jobs:
         if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
         run: |
           brew install getsentry/tools/sentry-cli
-          ARCHIVE_PATH=$(find /tmp -maxdepth 1 -name "NylonImpossible.xcarchive" 2>/dev/null | head -1)
+          ARCHIVE_PATH=""
+          for SEARCH_DIR in "${TMPDIR:-/tmp}" /tmp; do
+            if [ -d "$SEARCH_DIR" ]; then
+              ARCHIVE_PATH=$(find "$SEARCH_DIR" -maxdepth 1 -name "NylonImpossible.xcarchive" 2>/dev/null | head -1)
+              [ -n "$ARCHIVE_PATH" ] && break
+            fi
+          done
           if [ -n "$ARCHIVE_PATH" ]; then
             sentry-cli debug-files upload --include-sources "$ARCHIVE_PATH/dSYMs"
+          else
+            echo "::warning::No xcarchive found; skipping dSYM upload"
           fi
 
       - name: Clean up keychain
