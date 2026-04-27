@@ -253,6 +253,7 @@ export async function enrichTodo(
   ai: Ai,
   text: string,
   gatewayId?: string,
+  debug = false,
 ): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
 
@@ -291,17 +292,18 @@ export async function enrichTodo(
 
   const enrichment = tc.arguments;
 
-  // Temporary diagnostic: report which fields the model populated. PII-free
-  // (keys and booleans only, no titles or URLs). Remove once glm-5.1 behavior
-  // is verified.
-  console.log("AI enrichment returned", {
-    keys: Object.keys(enrichment ?? {}),
-    hasUrls: Array.isArray(enrichment?.urls) && enrichment.urls.length > 0,
-    hasDueDate: Boolean(enrichment?.dueDate),
-    hasPriority: Boolean(enrichment?.priority),
-    hasResearch: Boolean(enrichment?.research),
-    titleChanged: enrichment?.title !== text,
-  });
+  // Diagnostic for unfamiliar models: report which fields the model populated.
+  // PII-free (keys and booleans only). Off by default; opt in with LOG_AI_DEBUG.
+  if (debug) {
+    console.log("AI enrichment returned", {
+      keys: Object.keys(enrichment ?? {}),
+      hasUrls: Array.isArray(enrichment?.urls) && enrichment.urls.length > 0,
+      hasDueDate: Boolean(enrichment?.dueDate),
+      hasPriority: Boolean(enrichment?.priority),
+      hasResearch: Boolean(enrichment?.research),
+      titleChanged: enrichment?.title !== text,
+    });
+  }
 
   // Defensive filter: drop URLs the model invented from the topic. Even with
   // the prompt telling it not to fabricate, the model sometimes guesses

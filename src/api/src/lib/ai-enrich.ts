@@ -30,6 +30,7 @@ export async function enrichTodoWithAI(
     USER_SYNC: DurableObjectNamespace;
     RESEARCH_QUEUE: Queue<ResearchJobMessage>;
     CF_AI_GATEWAY_ID?: string;
+    LOG_AI_DEBUG?: string;
   },
   todoId: string,
   userId: string,
@@ -45,7 +46,12 @@ export async function enrichTodoWithAI(
     .where(eq(todos.id, todoId));
 
   try {
-    const enrichment = await enrichTodo(ai, originalText, env.CF_AI_GATEWAY_ID);
+    const enrichment = await enrichTodo(
+      ai,
+      originalText,
+      env.CF_AI_GATEWAY_ID,
+      env.LOG_AI_DEBUG === "true",
+    );
 
     // If AI returned nothing useful, mark complete and exit
     if (!enrichment) {
