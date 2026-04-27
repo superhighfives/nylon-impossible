@@ -48,6 +48,17 @@ export function useWebSocketConnection(): WebSocketSync {
 
     if (!isSignedIn) return;
 
+    function scheduleReconnect() {
+      if (!mountedRef.current) return;
+      reconnectTimerRef.current = setTimeout(() => {
+        reconnectDelayRef.current = Math.min(
+          reconnectDelayRef.current * 2,
+          MAX_RECONNECT_DELAY,
+        );
+        connect();
+      }, reconnectDelayRef.current);
+    }
+
     async function connect() {
       if (!mountedRef.current) return;
 
@@ -78,15 +89,7 @@ export function useWebSocketConnection(): WebSocketSync {
 
         ws.onclose = () => {
           wsRef.current = null;
-          if (mountedRef.current) {
-            reconnectTimerRef.current = setTimeout(() => {
-              reconnectDelayRef.current = Math.min(
-                reconnectDelayRef.current * 2,
-                MAX_RECONNECT_DELAY,
-              );
-              connect();
-            }, reconnectDelayRef.current);
-          }
+          scheduleReconnect();
         };
 
         ws.onerror = () => {
@@ -94,14 +97,13 @@ export function useWebSocketConnection(): WebSocketSync {
         };
 
         wsRef.current = ws;
-      } catch {
-        // Token fetch failed, retry
-        if (mountedRef.current) {
-          reconnectTimerRef.current = setTimeout(
-            connect,
-            reconnectDelayRef.current,
-          );
-        }
+      } catch (error) {
+        // Token fetch failed — log once per attempt and back off so we don't
+        // hammer Clerk while auth is unavailable.
+        Sentry.captureException(error, {
+          tags: { area: "websocket", event: "token-fetch-failed" },
+        });
+        scheduleReconnect();
       }
     }
 

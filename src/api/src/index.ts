@@ -15,6 +15,7 @@ import {
 import { getMe, updateMe } from "./handlers/users";
 import { authMiddleware, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
+import { apiError } from "./lib/errors";
 import { executeResearch } from "./lib/research";
 import type { Env, ResearchJobMessage } from "./types";
 
@@ -47,14 +48,14 @@ app.get("/health", (c) => c.text("OK"));
 // WebSocket upgrade — auth via query param
 app.get("/ws", async (c) => {
   if (c.req.header("Upgrade") !== "websocket") {
-    return c.json({ error: "Expected WebSocket upgrade" }, 400);
+    return apiError(c, "websocket_upgrade_required");
   }
 
   const token = c.req.query("token");
   const auth = await verifyClerkJWT(token ? `Bearer ${token}` : null, c.env);
 
   if (!auth) {
-    return c.json({ error: "Unauthorized" }, 401);
+    return apiError(c, "unauthorized");
   }
 
   const id = c.env.USER_SYNC.idFromName(auth.userId);

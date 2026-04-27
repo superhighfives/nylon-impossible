@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 import { and, eq, getDb, todoResearch, todos } from "../lib/db";
+import { apiError } from "../lib/errors";
 import type { Env } from "../types";
 
 /**
@@ -12,7 +13,7 @@ import type { Env } from "../types";
 export async function cancelResearch(c: Context<Env>) {
   const idParam = c.req.param("id");
   if (!idParam) {
-    return c.json({ error: "Todo ID required" }, 400);
+    return apiError(c, "todo_id_required");
   }
   const todoId = idParam.toLowerCase();
   const userId = c.get("userId");
@@ -24,7 +25,7 @@ export async function cancelResearch(c: Context<Env>) {
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
   if (!todo) {
-    return c.json({ error: "Todo not found" }, 404);
+    return apiError(c, "todo_not_found");
   }
 
   await db

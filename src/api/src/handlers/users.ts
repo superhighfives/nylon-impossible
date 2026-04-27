@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { eq, getDb, users } from "../lib/db";
+import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
 const updatePreferencesSchema = z.object({
@@ -28,7 +29,7 @@ export async function getMe(c: Context<Env>) {
     .then((rows) => rows[0]);
 
   if (!user) {
-    return c.json({ error: "User not found" }, 404);
+    return apiError(c, "user_not_found");
   }
 
   return c.json({
@@ -43,16 +44,12 @@ export async function getMe(c: Context<Env>) {
 
 // PATCH /users/me
 export async function updateMe(c: Context<Env>) {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400);
-  }
-  const parsed = updatePreferencesSchema.safeParse(body);
+  const json = await readJsonBody(c);
+  if (!json.ok) return json.response;
+  const parsed = updatePreferencesSchema.safeParse(json.body);
 
   if (!parsed.success) {
-    return c.json({ error: parsed.error.message }, 400);
+    return apiValidationError(c, parsed.error);
   }
 
   const db = getDb(c.env.DB);
@@ -67,7 +64,7 @@ export async function updateMe(c: Context<Env>) {
   }
 
   if (Object.keys(updates).length === 0) {
-    return c.json({ error: "No valid fields to update" }, 400);
+    return apiError(c, "no_valid_fields");
   }
 
   await db
@@ -91,7 +88,7 @@ export async function updateMe(c: Context<Env>) {
     .then((rows) => rows[0]);
 
   if (!user) {
-    return c.json({ error: "User not found" }, 404);
+    return apiError(c, "user_not_found");
   }
 
   return c.json({
