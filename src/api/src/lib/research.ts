@@ -19,7 +19,7 @@ interface ResearchResult {
 }
 
 /**
- * Workers AI options for glm-5.1 with web_search_options.
+ * Workers AI options for kimi-k2.6 with web_search_options.
  * The @cloudflare/workers-types package types `web_search_options` for
  * ChatCompletions-compatible models, but the `ai.run` signature is narrowed
  * per model. We declare the exact shape we need so callers get compile-time
@@ -277,7 +277,7 @@ Only return valid JSON, no other text.`;
 
   const response = await runWithTimeout(
     ai.run(
-      "@cf/zai-org/glm-5.1" as Parameters<typeof ai.run>[0],
+      "@cf/moonshotai/kimi-k2.6" as Parameters<typeof ai.run>[0],
       options as unknown as Parameters<typeof ai.run>[1],
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
@@ -328,7 +328,7 @@ Only return valid JSON, no other text.`;
 
   const response = await runWithTimeout(
     ai.run(
-      "@cf/zai-org/glm-5.1" as Parameters<typeof ai.run>[0],
+      "@cf/moonshotai/kimi-k2.6" as Parameters<typeof ai.run>[0],
       options as unknown as Parameters<typeof ai.run>[1],
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
@@ -432,7 +432,7 @@ function parseResearchResponse(response: unknown): ResearchResult {
       // Workers AI native format
       text = (response as { response?: string }).response ?? undefined;
     } else if ("choices" in response) {
-      // OpenAI-compatible format (returned by glm-5.1)
+      // OpenAI-compatible format
       const r = response as {
         choices?: Array<{ message?: { content?: string } }>;
       };

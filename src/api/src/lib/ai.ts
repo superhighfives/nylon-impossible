@@ -224,6 +224,10 @@ export function urlMentionedInText(url: string, text: string): boolean {
   } catch {
     return false;
   }
+  // Reject dotless hostnames like "https://dogs" — the model invented a
+  // domain from a single word in the input. Real public URLs always have
+  // a TLD separator.
+  if (!hostname.includes(".")) return false;
   const lowerText = text.toLowerCase();
   if (lowerText.includes(hostname)) return true;
   // Also accept the bare domain without the www. prefix (user may have
@@ -260,7 +264,7 @@ export async function enrichTodo(
   // Model added recently, types not yet updated
   const response = await runWithTimeout(
     ai.run(
-      "@cf/zai-org/glm-5.1" as Parameters<typeof ai.run>[0],
+      "@cf/moonshotai/kimi-k2.6" as Parameters<typeof ai.run>[0],
       {
         messages: [
           { role: "system", content: systemPrompt },
