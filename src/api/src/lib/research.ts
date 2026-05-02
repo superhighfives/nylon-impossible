@@ -28,6 +28,12 @@ interface ResearchResult {
 interface ChatCompletionsWithSearchOptions {
   messages: Array<{ role: string; content: string }>;
   max_tokens?: number;
+  // kimi-k2.6's built-in web search is incompatible with thinking mode.
+  // Set thinking: false so the model actually performs the search instead
+  // of silently ignoring web_search_options and generating from training
+  // data (which produces fabricated URLs).
+  // NB: kimi-k2.5 used `enable_thinking`; kimi-k2.6 renamed it to `thinking`.
+  chat_template_kwargs?: { thinking?: boolean };
   web_search_options?: {
     search_context_size?: "low" | "medium" | "high";
     user_location?: {
@@ -269,6 +275,7 @@ Only return valid JSON, no other text.`;
   const options: ChatCompletionsWithSearchOptions = {
     messages: [{ role: "user", content: prompt }],
     max_tokens: 4000,
+    chat_template_kwargs: { thinking: false },
     web_search_options: {
       search_context_size: "high",
       user_location: parseUserLocation(userLocation),
@@ -320,6 +327,7 @@ Only return valid JSON, no other text.`;
   const options: ChatCompletionsWithSearchOptions = {
     messages: [{ role: "user", content: prompt }],
     max_tokens: 4000,
+    chat_template_kwargs: { thinking: false },
     web_search_options: {
       search_context_size: "high",
       user_location: parseUserLocation(userLocation),
