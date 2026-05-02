@@ -43,7 +43,7 @@
     "drizzle-orm": "^0.45.0",
     "effect": "^3.21.1",
     "fractional-indexing": "^3.2.0",
-    "lucide-react": "^1.7.0",
+    "lucide-react": "^1.14.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "tailwindcss": "^4.0.6",
