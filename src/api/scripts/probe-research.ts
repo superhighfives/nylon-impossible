@@ -6,22 +6,59 @@
  * the raw model response without going through the queue or durable
  * object plumbing.
  *
- * Usage:
- *   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... \
- *     pnpm --filter @nylon-impossible/api probe:research "Research dogs"
+ * Usage (reads CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID from src/api/.env
+ * or the shell env):
  *
- *   CLOUDFLARE_API_TOKEN=... CLOUDFLARE_ACCOUNT_ID=... \
- *     pnpm --filter @nylon-impossible/api probe:enrich "Research dogs"
+ *   pnpm --filter @nylon-impossible/api probe research "Research dogs"
+ *   pnpm --filter @nylon-impossible/api probe enrich "Research dogs"
  *
  * The first form runs the executeGeneralResearch payload (web_search_options
- * + thinking off) and prints the raw response. The second runs the
- * enrichTodo classifier so you can see whether the model decides the input
- * needs research at all.
+ * + thinking off). The second runs the enrichTodo classifier so you can see
+ * whether the model decides the input needs research at all.
  */
+
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const MODEL = "@cf/moonshotai/kimi-k2.6";
 
 type Mode = "research" | "enrich";
+
+/**
+ * Minimal .env loader. Only sets vars that aren't already in process.env, so
+ * shell-exported values still take precedence. Handles KEY=value lines,
+ * comments, and surrounding double quotes — that's all this needs.
+ */
+function loadDotenv(): void {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const envPath = resolve(here, "..", ".env");
+  let contents: string;
+  try {
+    contents = readFileSync(envPath, "utf8");
+  } catch {
+    return;
+  }
+  for (const rawLine of contents.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq === -1) continue;
+    const key = line.slice(0, eq).trim();
+    let value = line.slice(eq + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadDotenv();
 
 function readEnv(name: string): string {
   const v = process.env[name];
