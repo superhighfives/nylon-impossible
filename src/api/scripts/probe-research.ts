@@ -123,33 +123,86 @@ Only return valid JSON, no other text.`;
 }
 
 function enrichPayload(text: string) {
+  // Mirror the real schema and system prompt from src/api/src/lib/ai.ts so
+  // the probe reproduces the actual enrichTodo call. If you change one,
+  // change both.
+  const today = new Date().toISOString().split("T")[0];
+  const systemPrompt = `You are a metadata extractor for todo items. Today's date is: ${today}
+
+Your ONLY job is to extract metadata from the user's text:
+1. URLs/domains - find them and remove them from the title
+2. Due dates - convert relative dates to ISO format
+3. Priority - if mentioned
+4. Research intent - questions, comparisons, "look up", "how to", venue references
+
+CRITICAL RULES:
+- Do NOT rephrase, reword, or rewrite the title
+- Do NOT change the meaning or intent of the title
+- ONLY remove URLs/domains from the title text
+- Keep everything else in the title exactly as written
+- Exception: when removing a URL/domain leaves ONLY a single generic word (e.g. "Research", "Check", "Look"), keep the domain name in the title (e.g. "Research https://google.com" → title: "Research google.com")
+- NEVER invent, guess, or fabricate URLs based on the topic. Only return URLs that literally appear in the user's text. If the text describes a concept without mentioning a URL (e.g. "Research back pain remedies", "Look up white chocolate recipe"), the urls array MUST be empty.
+
+RESEARCH DETECTION:
+- Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
+- Set research.type = "location" for venue/place todos (restaurants, bars, cafes, shops, addresses)
+- Do NOT set research for plain action items (buy, call, email, fix, etc.)
+
+Examples:
+- "Research dogs" → { title: "Research dogs", research: { type: "general" } }
+- "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" } }
+- "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" } }
+- "Buy milk" → { title: "Buy milk" }
+- "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" } }
+
+Always call the enrich_todo tool with your findings.`;
+
   return {
     messages: [
-      {
-        role: "system",
-        content:
-          "You are a metadata extractor. Given a todo, extract any URLs, due dates, priority, and decide whether it needs research (general or location).",
-      },
+      { role: "system", content: systemPrompt },
       { role: "user", content: text },
     ],
+    max_tokens: 4000,
     tools: [
       {
         type: "function",
         function: {
           name: "enrich_todo",
-          description: "Extract metadata from a todo",
+          description:
+            "Extract metadata from a todo item. Find URLs/domains and remove them from the title. Extract due dates and priority. Do NOT rephrase or rewrite the title - only remove URLs from it.",
           parameters: {
             type: "object",
             properties: {
-              title: { type: "string" },
-              urls: { type: "array", items: { type: "string" } },
-              dueDate: { type: "string" },
-              priority: { type: "string", enum: ["low", "high"] },
+              title: {
+                type: "string",
+                description:
+                  "The original title with URLs/domains removed. Do NOT rephrase, reword, or change the meaning.",
+              },
+              urls: {
+                type: "array",
+                description:
+                  "Extract URLs and domains that LITERALLY appear in the user's text. Never invent or fabricate URLs.",
+                items: { type: "string" },
+              },
+              dueDate: {
+                type: "string",
+                description: "Due date in ISO format (YYYY-MM-DD).",
+              },
+              priority: {
+                type: "string",
+                enum: ["high", "low"],
+              },
               research: {
                 type: "object",
+                description:
+                  "Set when the todo has research intent - questions, comparisons, 'look up', 'how to', venue references.",
                 properties: {
-                  type: { type: "string", enum: ["general", "location"] },
+                  type: {
+                    type: "string",
+                    enum: ["general", "location"],
+                  },
                 },
+                required: ["type"],
               },
             },
             required: ["title"],
