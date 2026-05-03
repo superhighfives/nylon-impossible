@@ -139,12 +139,15 @@ import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui"
 **Props:**
 - `items`: `{ value: string; label: string }[]`
 - `placeholder`: `string` [default: `"Select an option"`]
+- `size`: `"xs" | "sm" | "base" | "lg"` [default: `"base"`] — matches `Input.inputSize` heights
+- `className`: `string` — passed to the trigger
 - All standard `@base-ui/react` Select.Root attributes
 
 **Examples:**
 
 ```tsx
 <Select
+  size="sm"
   items={[{ value: "low", label: "Low" }, { value: "high", label: "High" }]}
   placeholder="Select priority"
   value={priority}

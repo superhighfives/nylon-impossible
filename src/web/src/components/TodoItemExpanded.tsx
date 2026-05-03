@@ -158,7 +158,7 @@ export function TodoItemExpanded({
   };
 
   return (
-    <div className="mt-3 pl-7 space-y-4 bg-gray-surface rounded-lg p-4 shadow-sm">
+    <div className="mt-3 pl-7 space-y-5 bg-gray-surface rounded-lg p-5 ring-1 ring-gray-subtle shadow-sm">
       {/* Title */}
       <div className="space-y-1.5">
         <label
@@ -188,9 +188,7 @@ export function TodoItemExpanded({
             Notes
           </label>
           {user?.aiEnabled && (
-            <span className="text-xs text-gray-muted italic">
-              Not used by AI
-            </span>
+            <span className="text-xs text-gray-muted">Not used by AI</span>
           )}
         </div>
         <Textarea
@@ -204,30 +202,30 @@ export function TodoItemExpanded({
       </div>
 
       {/* Due Date and Priority row */}
-      <div className="flex flex-wrap items-start gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Due Date */}
         <div className="space-y-1.5">
           <label
             htmlFor={`due-${todo.id}`}
-            className="text-xs font-medium text-gray-muted flex items-center gap-1"
+            className="text-xs font-medium text-gray-muted flex items-center gap-1.5"
           >
             <Calendar size={12} />
             Due date
           </label>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             <Input
               id={`due-${todo.id}`}
               type="date"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-[160px]"
+              className="flex-1 min-w-0"
               inputSize="sm"
               disabled={isUpdating}
             />
             {dueDate && (
               <Button
                 variant="ghost"
-                size="xs"
+                size="sm"
                 shape="square"
                 onClick={handleClearDueDate}
                 disabled={isUpdating}
@@ -248,6 +246,7 @@ export function TodoItemExpanded({
             Priority
           </label>
           <Select
+            size="sm"
             value={priority}
             onValueChange={handlePriorityChange}
             disabled={isUpdating}
@@ -261,7 +260,7 @@ export function TodoItemExpanded({
       </div>
 
       {/* Save / Delete row */}
-      <div className="flex items-center justify-between pt-2">
+      <div className="flex items-center justify-between pt-4 border-t border-gray-subtle">
         <Button
           variant="ghost"
           size="sm"
