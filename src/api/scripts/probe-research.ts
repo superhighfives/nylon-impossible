@@ -1,5 +1,5 @@
 /**
- * Probe kimi-k2.6 research / enrichment outside the app.
+ * Probe kimi research / enrichment outside the app.
  *
  * Hits the Workers AI REST API directly with the same payload research.ts
  * and ai.ts use, so you can verify web search is actually firing and see
@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MODEL = "@cf/moonshotai/kimi-k2.6";
+const MODEL = "@cf/moonshotai/kimi-k2.5";
 
 type Mode = "research" | "enrich";
 
@@ -163,10 +163,6 @@ Always call the enrich_todo tool with your findings.`;
       { role: "user", content: text },
     ],
     max_tokens: 4000,
-    // kimi-k2.6 was reasoning correctly about research intent but dropping
-    // the field from tool_calls.arguments — disable thinking so the output
-    // follows the reasoning instead of synthesizing them separately.
-    chat_template_kwargs: { thinking: false },
     tools: [
       {
         type: "function",

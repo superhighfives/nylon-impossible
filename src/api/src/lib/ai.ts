@@ -261,10 +261,9 @@ export async function enrichTodo(
 ): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
 
-  // Model added recently, types not yet updated
   const response = await runWithTimeout(
     ai.run(
-      "@cf/moonshotai/kimi-k2.6" as Parameters<typeof ai.run>[0],
+      "@cf/moonshotai/kimi-k2.5",
       {
         messages: [
           { role: "system", content: systemPrompt },

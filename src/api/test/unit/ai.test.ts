@@ -318,7 +318,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/moonshotai/kimi-k2.6",
+        "@cf/moonshotai/kimi-k2.5",
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -345,7 +345,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com", "my-gateway");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/moonshotai/kimi-k2.6",
+        "@cf/moonshotai/kimi-k2.5",
         expect.any(Object),
         { gateway: { id: "my-gateway" } },
       );
