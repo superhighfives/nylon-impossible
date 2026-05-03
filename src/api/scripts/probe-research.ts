@@ -163,6 +163,11 @@ Always call the enrich_todo tool with your findings.`;
       { role: "user", content: text },
     ],
     max_tokens: 4000,
+    // kimi reasons correctly about research intent but the tool_calls
+    // emitted under thinking mode often drop the field. Force the
+    // reasoning to happen in the response stream so output and intent
+    // can't desync.
+    chat_template_kwargs: { enable_thinking: false },
     tools: [
       {
         type: "function",
