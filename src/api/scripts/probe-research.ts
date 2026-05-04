@@ -22,7 +22,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_MODEL = "@cf/moonshotai/kimi-k2.5";
+const DEFAULT_MODEL = "@cf/zai-org/glm-4.7-flash";
 
 type Mode = "research" | "enrich" | "tavily";
 
@@ -193,12 +193,7 @@ Always call the enrich_todo tool with your findings.`;
       { role: "system", content: systemPrompt },
       { role: "user", content: text },
     ],
-    max_completion_tokens: 16000,
-    // kimi reasons correctly about research intent but the tool_calls
-    // emitted under thinking mode often drop the field. Force the
-    // reasoning to happen in the response stream so output and intent
-    // can't desync.
-    chat_template_kwargs: { enable_thinking: false },
+    max_tokens: 4000,
     tools: [
       {
         type: "function",
