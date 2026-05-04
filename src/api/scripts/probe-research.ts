@@ -12,16 +12,21 @@
  *   pnpm --filter @nylon-impossible/api probe research "Research dogs"
  *   pnpm --filter @nylon-impossible/api probe enrich "Research dogs"
  *
- * The first form runs the executeGeneralResearch payload (web_search_options
- * + thinking off). The second runs the enrichTodo classifier so you can see
- * whether the model decides the input needs research at all.
+ * Override the model with --model:
+ *
+ *   pnpm --filter @nylon-impossible/api probe \\
+ *     --model @cf/zai-org/glm-4.7-flash enrich "Research dogs"
+ *
+ * The research form runs the executeGeneralResearch payload
+ * (web_search_options). The enrich form runs the enrichTodo classifier so
+ * you can see whether the model decides the input needs research at all.
  */
 
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const MODEL = "@cf/moonshotai/kimi-k2.5";
+const DEFAULT_MODEL = "@cf/moonshotai/kimi-k2.5";
 
 type Mode = "research" | "enrich";
 
@@ -69,10 +74,13 @@ function readEnv(name: string): string {
   return v;
 }
 
-async function callWorkersAi(payload: unknown): Promise<unknown> {
+async function callWorkersAi(
+  payload: unknown,
+  model: string,
+): Promise<unknown> {
   const accountId = readEnv("CLOUDFLARE_ACCOUNT_ID");
   const apiToken = readEnv("CLOUDFLARE_API_TOKEN");
-  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${MODEL}`;
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
 
   const res = await fetch(url, {
     method: "POST",
@@ -220,12 +228,28 @@ Always call the enrich_todo tool with your findings.`;
 }
 
 async function main() {
-  const [, , modeArg, ...rest] = process.argv;
+  const argv = process.argv.slice(2);
+  let model = DEFAULT_MODEL;
+  const positional: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--model" && i + 1 < argv.length) {
+      model = argv[++i];
+    } else if (arg.startsWith("--model=")) {
+      model = arg.slice("--model=".length);
+    } else {
+      positional.push(arg);
+    }
+  }
+
+  const [modeArg, ...rest] = positional;
   const mode = modeArg as Mode | undefined;
   const query = rest.join(" ").trim();
 
   if (!mode || (mode !== "research" && mode !== "enrich") || !query) {
-    console.error('Usage: probe-research.ts <research|enrich> "<query>"');
+    console.error(
+      'Usage: probe-research.ts [--model=<id>] <research|enrich> "<query>"',
+    );
     process.exit(1);
   }
 
@@ -236,9 +260,9 @@ async function main() {
   const payload =
     mode === "research" ? researchPayload(query) : enrichPayload(query);
 
-  console.log(`> ${mode}: ${query}`);
+  console.log(`> ${mode} [${model}]: ${query}`);
   console.log("---");
-  const response = await callWorkersAi(payload);
+  const response = await callWorkersAi(payload, model);
   console.log(JSON.stringify(response, null, 2));
 }
 
