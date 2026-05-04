@@ -1,25 +1,21 @@
 /**
- * Probe kimi research / enrichment outside the app.
+ * Probe research / enrichment outside the app.
  *
- * Hits the Workers AI REST API directly with the same payload research.ts
- * and ai.ts use, so you can verify web search is actually firing and see
- * the raw model response without going through the queue or durable
- * object plumbing.
+ * Three modes:
+ *   research — executeGeneralResearch payload via Workers AI REST API
+ *   enrich   — enrichTodo classifier via Workers AI REST API
+ *   tavily   — raw Tavily search call (verifies TAVILY_API_KEY works)
  *
- * Usage (reads CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID from src/api/.env
- * or the shell env):
+ * Usage (reads creds from src/api/.env or the shell env):
  *
  *   pnpm --filter @nylon-impossible/api probe research "Research dogs"
  *   pnpm --filter @nylon-impossible/api probe enrich "Research dogs"
+ *   pnpm --filter @nylon-impossible/api probe tavily "Research dogs"
  *
- * Override the model with --model:
+ * Override the Workers AI model (research / enrich only):
  *
  *   pnpm --filter @nylon-impossible/api probe \\
  *     --model @cf/zai-org/glm-4.7-flash enrich "Research dogs"
- *
- * The research form runs the executeGeneralResearch payload
- * (web_search_options). The enrich form runs the enrichTodo classifier so
- * you can see whether the model decides the input needs research at all.
  */
 
 import { readFileSync } from "node:fs";
@@ -28,7 +24,34 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_MODEL = "@cf/moonshotai/kimi-k2.5";
 
-type Mode = "research" | "enrich";
+type Mode = "research" | "enrich" | "tavily";
+
+async function callTavily(query: string): Promise<unknown> {
+  const apiKey = readEnv("TAVILY_API_KEY");
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      search_depth: "advanced",
+      max_results: 5,
+      include_answer: false,
+      include_raw_content: false,
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Tavily ${res.status}: ${text}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
 
 /**
  * Minimal .env loader. Only sets vars that aren't already in process.env, so
@@ -246,11 +269,24 @@ async function main() {
   const mode = modeArg as Mode | undefined;
   const query = rest.join(" ").trim();
 
-  if (!mode || (mode !== "research" && mode !== "enrich") || !query) {
+  if (
+    !mode ||
+    (mode !== "research" && mode !== "enrich" && mode !== "tavily") ||
+    !query
+  ) {
     console.error(
-      'Usage: probe-research.ts [--model=<id>] <research|enrich> "<query>"',
+      'Usage: probe-research.ts [--model=<id>] <research|enrich|tavily> "<query>"',
     );
     process.exit(1);
+  }
+
+  if (mode === "tavily") {
+    readEnv("TAVILY_API_KEY");
+    console.log(`> tavily: ${query}`);
+    console.log("---");
+    const response = await callTavily(query);
+    console.log(JSON.stringify(response, null, 2));
+    return;
   }
 
   // Validate creds up front before printing the banner.

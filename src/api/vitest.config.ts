@@ -44,11 +44,12 @@ export default defineConfig(async () => {
     "url-metadata.ts",
   );
 
-  // AI Gateway bindings for real AI tests (injected from environment)
+  // AI Gateway + Tavily bindings for real AI tests (injected from environment)
   const aiBindings = useAI
     ? {
         CF_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
         CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN ?? "",
+        TAVILY_API_KEY: process.env.TAVILY_API_KEY ?? "",
       }
     : {};
 
