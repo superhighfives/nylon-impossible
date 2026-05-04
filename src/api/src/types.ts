@@ -18,6 +18,8 @@ export type Env = {
     SENTRY_DSN?: string;
     ENVIRONMENT?: string;
     CF_AI_GATEWAY_ID?: string;
+    LOG_AI_DEBUG?: string;
+    TAVILY_API_KEY?: string;
   };
   Variables: {
     userId: string;

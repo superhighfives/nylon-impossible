@@ -318,7 +318,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/moonshotai/kimi-k2.5",
+        "@cf/zai-org/glm-4.7-flash",
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -345,7 +345,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com", "my-gateway");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/moonshotai/kimi-k2.5",
+        "@cf/zai-org/glm-4.7-flash",
         expect.any(Object),
         { gateway: { id: "my-gateway" } },
       );
@@ -417,5 +417,11 @@ describe("urlMentionedInText", () => {
 
   it("rejects malformed URLs", () => {
     expect(urlMentionedInText("not-a-url", "anything")).toBe(false);
+  });
+
+  it("rejects dotless hostnames invented from a single word", () => {
+    // Some models occasionally emit "https://dogs" for input "Research dogs".
+    // The hostname matches a word in the text but isn't a real domain.
+    expect(urlMentionedInText("https://dogs", "Research dogs")).toBe(false);
   });
 });

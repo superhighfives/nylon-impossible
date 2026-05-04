@@ -13,7 +13,8 @@
     "format": "biome format --write --config-path ../..",
     "check": "biome check --config-path ../..",
     "check:fix": "biome check --write --config-path ../..",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "probe": "tsx scripts/probe-research.ts"
   },
   "dependencies": {
     "@clerk/backend": "^3.2.3",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.13.3",
     "@cloudflare/workers-types": "^4.20260411.1",
+    "tsx": "^4.0.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.4",
     "wrangler": "^4.40.3"

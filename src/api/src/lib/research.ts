@@ -1,8 +1,13 @@
 /**
  * Research execution for todos
  *
- * Runs web search via Workers AI to gather information about a topic,
- * then stores a summary with numbered citations linking to source URLs.
+ * Searches the web via Tavily for grounded sources, then asks Workers AI to
+ * write a brief summary with numbered citations referencing those sources.
+ *
+ * Tavily is required: no Workers AI model currently performs real web search
+ * (web_search_options is silently ignored across kimi-k2.5/k2.6, glm-4.7-flash,
+ * gemma-4 — probe-confirmed). Without grounded sources the model fabricates
+ * URLs from training data.
  */
 
 import * as Sentry from "@sentry/cloudflare";
@@ -18,23 +23,10 @@ interface ResearchResult {
   sources: string[];
 }
 
-/**
- * Workers AI options for kimi-k2.5 with web_search_options.
- * The @cloudflare/workers-types package types `web_search_options` for
- * ChatCompletions-compatible models, but the `ai.run` signature is narrowed
- * per model. We declare the exact shape we need so callers get compile-time
- * checks on our options.
- */
-interface ChatCompletionsWithSearchOptions {
-  messages: Array<{ role: string; content: string }>;
-  max_tokens?: number;
-  web_search_options?: {
-    search_context_size?: "low" | "medium" | "high";
-    user_location?: {
-      type: "approximate";
-      approximate: { city?: string; region?: string; country?: string };
-    };
-  };
+interface TavilyResult {
+  title: string;
+  url: string;
+  content: string;
 }
 
 /**
@@ -44,7 +36,11 @@ interface ChatCompletionsWithSearchOptions {
 export async function executeResearch(
   db: ReturnType<typeof getDb>,
   ai: Ai,
-  env: { USER_SYNC: DurableObjectNamespace; CF_AI_GATEWAY_ID?: string },
+  env: {
+    USER_SYNC: DurableObjectNamespace;
+    CF_AI_GATEWAY_ID?: string;
+    TAVILY_API_KEY?: string;
+  },
   todoId: string,
   userId: string,
   query: string,
@@ -53,11 +49,28 @@ export async function executeResearch(
   userLocation?: string | null,
 ): Promise<void> {
   try {
+    if (!env.TAVILY_API_KEY) {
+      throw new Error(
+        "TAVILY_API_KEY is not configured — set it via `wrangler secret put TAVILY_API_KEY`",
+      );
+    }
     const gatewayId = env.CF_AI_GATEWAY_ID;
     const result =
       researchType === "location"
-        ? await executeLocationResearch(ai, query, userLocation, gatewayId)
-        : await executeGeneralResearch(ai, query, userLocation, gatewayId);
+        ? await executeLocationResearch(
+            ai,
+            query,
+            userLocation,
+            gatewayId,
+            env.TAVILY_API_KEY,
+          )
+        : await executeGeneralResearch(
+            ai,
+            query,
+            userLocation,
+            gatewayId,
+            env.TAVILY_API_KEY,
+          );
 
     // Deduplicate sources returned by the AI, normalizing URLs so
     // "https://google.com" and "https://google.com/" are treated as the same.
@@ -219,23 +232,86 @@ export async function executeResearch(
 }
 
 /**
- * Parse a user location string (e.g., "Los Angeles, CA") into the
- * WebSearchUserLocation format expected by Workers AI.
+ * Search the web via Tavily and return ranked results.
+ *
+ * topic: "general" for questions/comparisons/how-to; "general" + a near-by
+ * suffix for venues. Tavily doesn't have a dedicated "places" mode, so we
+ * lean on query phrasing.
  */
-function parseUserLocation(
-  location?: string | null,
-):
-  | { type: "approximate"; approximate: { city?: string; region?: string } }
-  | undefined {
-  if (!location) return undefined;
-  const parts = location.split(",").map((s) => s.trim());
-  return {
-    type: "approximate",
-    approximate: {
-      city: parts[0] || undefined,
-      region: parts[1] || undefined,
+async function searchWeb(
+  query: string,
+  apiKey: string,
+  searchDepth: "basic" | "advanced" = "advanced",
+  maxResults = 5,
+): Promise<TavilyResult[]> {
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
     },
-  };
+    body: JSON.stringify({
+      query,
+      search_depth: searchDepth,
+      max_results: maxResults,
+      include_answer: false,
+      include_raw_content: false,
+    }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Tavily search failed: ${res.status} ${body}`);
+  }
+
+  const data = (await res.json()) as { results?: TavilyResult[] };
+  return Array.isArray(data.results) ? data.results : [];
+}
+
+/**
+ * Ask the model to write a brief summary of the topic using ONLY the
+ * Tavily-supplied sources. The model never emits URLs — those come from
+ * Tavily directly, so fabrication is impossible.
+ */
+async function summarizeWithSources(
+  ai: Ai,
+  query: string,
+  sources: TavilyResult[],
+  promptIntro: string,
+  gatewayId?: string,
+): Promise<string> {
+  const numbered = sources
+    .map(
+      (s, i) => `[${i + 1}] ${s.title}\nURL: ${s.url}\nExcerpt: ${s.content}`,
+    )
+    .join("\n\n");
+
+  const prompt = `${promptIntro}
+
+Topic: "${query}"
+
+Sources:
+${numbered}
+
+Instructions:
+1. Write a concise 2-3 sentence summary using ONLY the information in the sources above.
+2. Insert numbered citations [1], [2], etc. inline that reference the sources by their number.
+3. Do not output URLs — only the citation markers.
+4. Do not include any text other than the summary itself.`;
+
+  const response = await runWithTimeout(
+    ai.run(
+      "@cf/zai-org/glm-4.7-flash",
+      {
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 600,
+      },
+      gatewayId ? { gateway: { id: gatewayId } } : {},
+    ),
+    RESEARCH_TIMEOUT_MS,
+  );
+
+  return extractSummaryText(response);
 }
 
 /**
@@ -244,47 +320,27 @@ function parseUserLocation(
 async function executeGeneralResearch(
   ai: Ai,
   query: string,
-  userLocation?: string | null,
-  gatewayId?: string,
+  _userLocation: string | null | undefined,
+  gatewayId: string | undefined,
+  tavilyApiKey: string,
 ): Promise<ResearchResult> {
-  const prompt = `Research the following topic and provide a brief 2-3 sentence summary with numbered citations.
+  const results = await searchWeb(query, tavilyApiKey);
+  if (results.length === 0) {
+    return {
+      summary: "No web results were found for this topic.",
+      sources: [],
+    };
+  }
 
-Topic: "${query}"
-
-Instructions:
-1. Search for reliable, current information about this topic
-2. Write a concise 2-3 sentence summary of the key findings
-3. Use numbered citations [1], [2], etc. to reference your sources
-4. Include only URLs from your search results — do not guess or fabricate URLs
-5. Limit to 3-5 sources maximum
-
-Format your response as JSON:
-{
-  "summary": "Your 2-3 sentence summary with [1], [2] citations inline.",
-  "sources": ["https://source1.com/article", "https://source2.com/page"]
-}
-
-Only return valid JSON, no other text.`;
-
-  const options: ChatCompletionsWithSearchOptions = {
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 4000,
-    web_search_options: {
-      search_context_size: "high",
-      user_location: parseUserLocation(userLocation),
-    },
-  };
-
-  const response = await runWithTimeout(
-    ai.run(
-      "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-      options as unknown as Parameters<typeof ai.run>[1],
-      gatewayId ? { gateway: { id: gatewayId } } : {},
-    ),
-    RESEARCH_TIMEOUT_MS,
+  const summary = await summarizeWithSources(
+    ai,
+    query,
+    results,
+    "Summarize the following research topic for a todo app user.",
+    gatewayId,
   );
 
-  return parseResearchResponse(response);
+  return { summary, sources: results.map((r) => r.url) };
 }
 
 /**
@@ -293,49 +349,28 @@ Only return valid JSON, no other text.`;
 async function executeLocationResearch(
   ai: Ai,
   query: string,
-  userLocation?: string | null,
-  gatewayId?: string,
+  userLocation: string | null | undefined,
+  gatewayId: string | undefined,
+  tavilyApiKey: string,
 ): Promise<ResearchResult> {
   const searchQuery = userLocation ? `${query} near ${userLocation}` : query;
+  const results = await searchWeb(searchQuery, tavilyApiKey);
+  if (results.length === 0) {
+    return {
+      summary: "No web results were found for this location.",
+      sources: [],
+    };
+  }
 
-  const prompt = `Find information about this venue/location and provide a brief summary.
-
-Query: "${searchQuery}"
-
-Instructions:
-1. Search for this specific venue/place
-2. Write 1-2 sentences describing what it is and where it's located
-3. Use [1] to cite the venue's official website (if found)
-4. Use [2] to cite a maps or review link (if found)
-5. Include only URLs from your search results — do not guess or fabricate URLs
-
-Format your response as JSON:
-{
-  "summary": "Brief description of the venue with [1] and [2] citations.",
-  "sources": ["https://venue-website.com", "https://maps.google.com/..."]
-}
-
-Only return valid JSON, no other text.`;
-
-  const options: ChatCompletionsWithSearchOptions = {
-    messages: [{ role: "user", content: prompt }],
-    max_tokens: 4000,
-    web_search_options: {
-      search_context_size: "high",
-      user_location: parseUserLocation(userLocation),
-    },
-  };
-
-  const response = await runWithTimeout(
-    ai.run(
-      "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
-      options as unknown as Parameters<typeof ai.run>[1],
-      gatewayId ? { gateway: { id: gatewayId } } : {},
-    ),
-    RESEARCH_TIMEOUT_MS,
+  const summary = await summarizeWithSources(
+    ai,
+    searchQuery,
+    results,
+    "Summarize the following venue/location for a todo app user. Mention what it is and where it's located.",
+    gatewayId,
   );
 
-  return parseResearchResponse(response);
+  return { summary, sources: results.map((r) => r.url) };
 }
 
 // How long each reachability check is allowed to take. Short so a single
@@ -419,60 +454,27 @@ export function isPlausibleUrl(url: string): boolean {
 }
 
 /**
- * Parse AI response into summary and sources
+ * Pull the assistant's plain-text reply out of a Workers AI response. The
+ * binding can return either the native shape ({ response }) or the
+ * OpenAI-compatible shape ({ choices[0].message.content }) depending on the
+ * model — accept both. Strips surrounding whitespace.
  */
-function parseResearchResponse(response: unknown): ResearchResult {
-  // Handle various response formats from Workers AI
-  let text: string | undefined;
-
-  if (typeof response === "string") {
-    text = response;
-  } else if (response && typeof response === "object") {
+function extractSummaryText(response: unknown): string {
+  if (typeof response === "string") return response.trim();
+  if (response && typeof response === "object") {
     if ("response" in response) {
-      // Workers AI native format
-      text = (response as { response?: string }).response ?? undefined;
-    } else if ("choices" in response) {
-      // OpenAI-compatible format (returned by kimi-k2.5)
+      const r = (response as { response?: string }).response;
+      if (r) return r.trim();
+    }
+    if ("choices" in response) {
       const r = response as {
         choices?: Array<{ message?: { content?: string } }>;
       };
-      text = r.choices?.[0]?.message?.content ?? undefined;
+      const content = r.choices?.[0]?.message?.content;
+      if (content) return content.trim();
     }
   }
-
-  if (!text) {
-    throw new Error("No response text from AI");
-  }
-
-  // Try to extract JSON from the response
-  // The model might include markdown code blocks or other text
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) {
-    // If no JSON found, use the entire response as summary with no sources
-    return {
-      summary: text.trim(),
-      sources: [],
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(jsonMatch[0]);
-    const rawSources = Array.isArray(parsed.sources)
-      ? parsed.sources.filter(
-          (s: unknown) => typeof s === "string" && s.startsWith("http"),
-        )
-      : [];
-    return {
-      summary: parsed.summary ?? text.trim(),
-      sources: rawSources.filter((url: string) => isPlausibleUrl(url)),
-    };
-  } catch {
-    // JSON parse failed, use raw text
-    return {
-      summary: text.trim(),
-      sources: [],
-    };
-  }
+  throw new Error("No response text from AI");
 }
 
 /**

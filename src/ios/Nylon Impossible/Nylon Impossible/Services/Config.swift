@@ -25,6 +25,22 @@ enum Config {
         return dsn
     }()
 
+    // Sentry environment tag.
+    // - DEBUG builds → "development" (Xcode runs on simulator/device)
+    // - TestFlight (Fastlane sets IS_TESTFLIGHT=YES via Info.plist) → "preview"
+    // - App Store → "production"
+    static let sentryEnvironment: String = {
+        #if DEBUG
+        return "development"
+        #else
+        if let flag = Bundle.main.infoDictionary?["IsTestFlight"] as? String,
+           flag == "YES" {
+            return "preview"
+        }
+        return "production"
+        #endif
+    }()
+
     // MARK: - API
     // Simulator uses localhost for local dev.
     // Device reads from Info.plist (set via API_BASE_URL build setting), defaulting to production.
