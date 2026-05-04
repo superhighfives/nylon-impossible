@@ -282,8 +282,7 @@ async function summarizeWithSources(
 ): Promise<string> {
   const numbered = sources
     .map(
-      (s, i) =>
-        `[${i + 1}] ${s.title}\nURL: ${s.url}\nExcerpt: ${s.content}`,
+      (s, i) => `[${i + 1}] ${s.title}\nURL: ${s.url}\nExcerpt: ${s.content}`,
     )
     .join("\n\n");
 
@@ -327,7 +326,10 @@ async function executeGeneralResearch(
 ): Promise<ResearchResult> {
   const results = await searchWeb(query, tavilyApiKey);
   if (results.length === 0) {
-    return { summary: "No web results were found for this topic.", sources: [] };
+    return {
+      summary: "No web results were found for this topic.",
+      sources: [],
+    };
   }
 
   const summary = await summarizeWithSources(
