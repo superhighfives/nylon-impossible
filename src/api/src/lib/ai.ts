@@ -263,7 +263,7 @@ export async function enrichTodo(
 
   const response = await runWithTimeout(
     ai.run(
-      "@cf/moonshotai/kimi-k2.5",
+      "@cf/zai-org/glm-4.7-flash",
       {
         messages: [
           { role: "system", content: systemPrompt },
