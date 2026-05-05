@@ -23,10 +23,50 @@ interface ResearchResult {
   sources: string[];
 }
 
-interface TavilyResult {
+export interface TavilyResult {
   title: string;
   url: string;
   content: string;
+}
+
+export const SUMMARIZE_MODEL = "@cf/moonshotai/kimi-k2.6";
+
+/**
+ * Build the messages + token settings the summarize call sends to Workers AI.
+ * Exported so the probe can reproduce production's payload exactly.
+ */
+export function buildSummarizePayload(
+  query: string,
+  sources: TavilyResult[],
+  intro: string,
+) {
+  const numbered = sources
+    .map(
+      (s, i) => `[${i + 1}] ${s.title}\nURL: ${s.url}\nExcerpt: ${s.content}`,
+    )
+    .join("\n\n");
+
+  const prompt = `${intro}
+
+Topic: "${query}"
+
+Sources:
+${numbered}
+
+Instructions:
+1. Write a concise 2-3 sentence summary using ONLY the information in the sources above.
+2. Insert numbered citations [1], [2], etc. inline that reference the sources by their number.
+3. Do not output URLs — only the citation markers.
+4. Do not include any text other than the summary itself.`;
+
+  return {
+    messages: [{ role: "user", content: prompt }],
+    // 2-3 sentences fits in ~150 tokens; the wider budget is a buffer for
+    // kimi's reasoning overhead — the model still emits reasoning_content
+    // even with enable_thinking:false, and tight caps truncated the summary.
+    max_completion_tokens: 1500,
+    chat_template_kwargs: { enable_thinking: false },
+  };
 }
 
 /**
@@ -288,32 +328,11 @@ async function summarizeWithSources(
   promptIntro: string,
   gatewayId?: string,
 ): Promise<string> {
-  const numbered = sources
-    .map(
-      (s, i) => `[${i + 1}] ${s.title}\nURL: ${s.url}\nExcerpt: ${s.content}`,
-    )
-    .join("\n\n");
-
-  const prompt = `${promptIntro}
-
-Topic: "${query}"
-
-Sources:
-${numbered}
-
-Instructions:
-1. Write a concise 2-3 sentence summary using ONLY the information in the sources above.
-2. Insert numbered citations [1], [2], etc. inline that reference the sources by their number.
-3. Do not output URLs — only the citation markers.
-4. Do not include any text other than the summary itself.`;
-
+  const payload = buildSummarizePayload(query, sources, promptIntro);
   const response = await runWithTimeout(
     ai.run(
-      "@cf/zai-org/glm-4.7-flash",
-      {
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 600,
-      },
+      SUMMARIZE_MODEL,
+      payload,
       gatewayId ? { gateway: { id: gatewayId } } : {},
     ),
     RESEARCH_TIMEOUT_MS,

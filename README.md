@@ -225,6 +225,7 @@ base64 -i "Nylon_Impossible_AppStore.mobileprovision" | pbcopy
 | Script | Description |
 |--------|-------------|
 | `pnpm dev` | Start web + API dev servers in parallel |
+| `pnpm api:probe` | Probe AI flows (enrich / fetch / research) outside the worker — see [`src/api/README.md`](src/api/README.md#probing-ai-flows) |
 | `pnpm ios:open` | Open iOS project in Xcode |
 | `pnpm ios:simulator` | Open iOS Simulator |
 

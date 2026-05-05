@@ -46,6 +46,7 @@
     "api:format": "pnpm --filter @nylon-impossible/api format",
     "api:check": "pnpm --filter @nylon-impossible/api check",
     "api:check:fix": "pnpm --filter @nylon-impossible/api check:fix",
+    "api:probe": "pnpm --filter @nylon-impossible/api probe",
     "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
     "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
     "ios:simulator": "open -a Simulator",

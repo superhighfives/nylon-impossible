@@ -47,7 +47,7 @@ interface ParsedToolCall {
   arguments: TodoEnrichment;
 }
 
-const enrichTodoTool = {
+export const enrichTodoTool = {
   type: "function" as const,
   function: {
     name: "enrich_todo",
@@ -100,7 +100,7 @@ const enrichTodoTool = {
   },
 };
 
-function getSystemPrompt(): string {
+export function getSystemPrompt(): string {
   const today = new Date().toISOString().split("T")[0];
 
   return `You are a metadata extractor for todo items. Today's date is: ${today}
@@ -263,7 +263,7 @@ export async function enrichTodo(
 
   const response = await runWithTimeout(
     ai.run(
-      "@cf/zai-org/glm-4.7-flash",
+      "@cf/openai/gpt-oss-120b",
       {
         messages: [
           { role: "system", content: systemPrompt },
