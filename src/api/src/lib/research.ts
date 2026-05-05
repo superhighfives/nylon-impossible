@@ -208,6 +208,14 @@ export async function executeResearch(
       await notifySync(env, userId);
     }
   } catch (error) {
+    // Surface in wrangler dev / production worker logs. Sentry below also
+    // captures it, but having it on stdout makes local debugging trivial.
+    console.error("research.failed", {
+      researchType,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     Sentry.addBreadcrumb({
       category: "research",
       message: "research.failed",
