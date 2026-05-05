@@ -123,6 +123,7 @@ export async function enrichTodoWithAI(
           todoId,
           researchType: enrichment.research.type,
           status: "pending",
+          searchQuery: enrichment.searchQuery ?? null,
           createdAt: now,
           updatedAt: now,
         })
@@ -137,7 +138,10 @@ export async function enrichTodoWithAI(
       await env.RESEARCH_QUEUE.send({
         todoId,
         userId,
-        query: originalText,
+        // Prefer the LLM-emitted searchQuery — it strips imperatives like
+        // "Research" so Tavily searches for the actual topic instead of
+        // returning meta-content about researching it.
+        query: enrichment.searchQuery ?? originalText,
         researchType: enrichment.research.type,
         researchId: research.id,
         userLocation: userLocation ?? null,

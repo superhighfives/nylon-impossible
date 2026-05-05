@@ -44,12 +44,19 @@ export async function reresearchTodo(c: Context<Env>) {
 
   // Delete existing research (cascades to source URLs with researchId)
   const [existingResearch] = await db
-    .select({ id: todoResearch.id, researchType: todoResearch.researchType })
+    .select({
+      id: todoResearch.id,
+      researchType: todoResearch.researchType,
+      searchQuery: todoResearch.searchQuery,
+    })
     .from(todoResearch)
     .where(eq(todoResearch.todoId, todoId));
 
   // Get the research type from existing record or default to general
   const researchType = existingResearch?.researchType ?? "general";
+  // Carry forward the LLM-extracted search query so re-research uses the
+  // same Tavily-optimized phrasing rather than the raw todo title.
+  const searchQuery = existingResearch?.searchQuery ?? null;
 
   if (existingResearch) {
     // Delete URLs linked to this research (FK cascade should handle this,
@@ -72,6 +79,7 @@ export async function reresearchTodo(c: Context<Env>) {
     todoId,
     researchType,
     status: "pending",
+    searchQuery,
     createdAt: now,
     updatedAt: now,
   });
@@ -86,7 +94,7 @@ export async function reresearchTodo(c: Context<Env>) {
   await c.env.RESEARCH_QUEUE.send({
     todoId,
     userId,
-    query: todo.title,
+    query: searchQuery ?? todo.title,
     researchType,
     researchId: newResearchId,
     userLocation: user?.location ?? null,

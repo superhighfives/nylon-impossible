@@ -245,6 +245,10 @@ export async function updateTodo(c: Context<Env>) {
         todoId,
         researchType: research.researchType,
         status: "pending",
+        // Title-edit changed the topic — discard the previous searchQuery
+        // and let this run fall back to the new title until the user
+        // re-enriches. (No LLM call here to keep edits cheap.)
+        searchQuery: null,
         createdAt: now,
         updatedAt: now,
       });

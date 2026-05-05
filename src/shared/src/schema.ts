@@ -129,6 +129,7 @@ export const todoResearch = sqliteTable(
       .notNull()
       .default("general"),
     summary: text("summary"),
+    searchQuery: text("search_query"),
     researchedAt: integer("researched_at", { mode: "timestamp" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()

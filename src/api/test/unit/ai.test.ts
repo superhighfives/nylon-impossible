@@ -318,7 +318,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/zai-org/glm-4.7-flash",
+        "@cf/openai/gpt-oss-120b",
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -345,7 +345,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com", "my-gateway");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/zai-org/glm-4.7-flash",
+        "@cf/openai/gpt-oss-120b",
         expect.any(Object),
         { gateway: { id: "my-gateway" } },
       );
