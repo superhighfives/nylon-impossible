@@ -6,7 +6,7 @@
     "dev": "wrangler dev --persist-to ../../.wrangler/state",
     "dev:remote": "wrangler dev --remote --persist-to ../../.wrangler/state",
     "deploy": "wrangler deploy",
-    "test": "vitest run",
+    "test": "node scripts/test.mjs",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint --config-path ../..",
     "lint:fix": "biome lint --write --config-path ../..",
@@ -28,6 +28,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.13.3",
     "@cloudflare/workers-types": "^4.20260411.1",
+    "miniflare": "4.20260317.1",
     "tsx": "^4.0.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.4",

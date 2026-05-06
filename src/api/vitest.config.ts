@@ -3,6 +3,7 @@ import {
   cloudflareTest,
   readD1Migrations,
 } from "@cloudflare/vitest-pool-workers";
+import { Log, LogLevel } from "miniflare";
 import { defineConfig } from "vitest/config";
 
 // Use AI-enabled config when RUN_AI_TESTS=true
@@ -60,6 +61,10 @@ export default defineConfig(async () => {
         singleWorker: true,
         wrangler: { configPath: wranglerConfig },
         miniflare: {
+          // Silence the [vpw:debug]/[vpw:info] compatibility-flag chatter that
+          // miniflare prints for every isolate. WARN keeps real problems
+          // surfaced; everything below is upstream noise.
+          log: new Log(LogLevel.WARN),
           bindings: {
             TEST_MIGRATIONS: migrations,
             CLERK_SECRET_KEY: "sk_test_fake",
