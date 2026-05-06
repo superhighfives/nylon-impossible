@@ -161,7 +161,7 @@ Always call the enrich_todo tool with your findings.`;
  * the native Workers AI format (top-level tool_calls) and the OpenAI-compatible
  * chat completions format (choices[0].message.tool_calls).
  */
-function extractToolCall(response: unknown): ParsedToolCall | null {
+export function extractToolCall(response: unknown): ParsedToolCall | null {
   // Native Workers AI format
   const native = response as WorkersAIToolCallResponse;
   if (native.tool_calls?.length) {

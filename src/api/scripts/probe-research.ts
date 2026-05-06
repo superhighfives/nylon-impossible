@@ -3,9 +3,15 @@
  *
  * Three modes:
  *   enrich   — enrichTodo classifier via Workers AI REST API
- *   fetch    — raw Tavily search call (verifies TAVILY_API_KEY works)
- *   research — full Tavily → summarize chain that production runs for
- *              research-typed todos
+ *   fetch    — derive a Tavily-optimized searchQuery via enrichment, then
+ *              fetch results from Tavily (mirrors what production sends)
+ *   research — full chain: enrich → Tavily → summarize, exactly what
+ *              production runs for research-typed todos
+ *
+ * fetch and research run the enrichment step first (gpt-oss-120b) to
+ * derive searchQuery, so Tavily receives the same phrasing it would
+ * receive in production. If enrichment doesn't emit a searchQuery
+ * (e.g. plain action items), the raw query is used instead.
  *
  * Usage (reads creds from src/api/.env or the shell env):
  *
@@ -13,7 +19,11 @@
  *   pnpm --filter @nylon-impossible/api probe fetch "Research dogs"
  *   pnpm --filter @nylon-impossible/api probe research "Research dogs"
  *
- * Override the Workers AI model (enrich / research only):
+ * Override the Workers AI model:
+ *   --model in `enrich` mode overrides the enrichment model.
+ *   --model in `research` mode overrides the summarization model;
+ *     enrichment still uses gpt-oss-120b.
+ *   --model in `fetch` mode overrides the enrichment model.
  *
  *   pnpm --filter @nylon-impossible/api probe \\
  *     --model @cf/openai/gpt-oss-120b enrich "Research dogs"
@@ -22,7 +32,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { enrichTodoTool, getSystemPrompt } from "../src/lib/ai";
+import { enrichTodoTool, extractToolCall, getSystemPrompt } from "../src/lib/ai";
 import {
   buildSummarizePayload,
   SUMMARIZE_MODEL,
@@ -144,6 +154,39 @@ function enrichPayload(text: string) {
   };
 }
 
+/**
+ * Run the enrichment classifier the same way production does and return the
+ * Tavily-optimized searchQuery, falling back to the raw text if enrichment
+ * fails or doesn't emit one. Mirrors how ai-enrich.ts derives the query
+ * before sending to the research queue.
+ */
+async function deriveSearchQuery(
+  text: string,
+  enrichmentModel: string,
+): Promise<string> {
+  try {
+    const response = await callWorkersAi(enrichPayload(text), enrichmentModel);
+    // Workers AI REST API wraps the model response in { result, success,
+    // errors }. The production env.AI.run() returns the unwrapped shape,
+    // which is what extractToolCall expects — so peel `result` off here.
+    const unwrapped = (response as { result?: unknown }).result ?? response;
+    const tc = extractToolCall(unwrapped);
+    const fromModel = tc?.arguments?.searchQuery;
+    if (typeof fromModel === "string" && fromModel.trim().length > 0) {
+      return fromModel;
+    }
+    console.error(
+      "(enrichment did not emit searchQuery — falling back to raw text)",
+    );
+    return text;
+  } catch (err) {
+    console.error(
+      `(enrichment failed — falling back to raw text: ${(err as Error).message})`,
+    );
+    return text;
+  }
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   let modelOverride: string | undefined;
@@ -176,9 +219,14 @@ async function main() {
 
   if (mode === "fetch") {
     readEnv("TAVILY_API_KEY");
-    console.log(`> fetch: ${query}`);
+    readEnv("CLOUDFLARE_API_TOKEN");
+    readEnv("CLOUDFLARE_ACCOUNT_ID");
+    const enrichmentModel = modelOverride ?? ENRICH_DEFAULT_MODEL;
+    console.log(`> fetch [enrich:${enrichmentModel}]: ${query}`);
+    const searchQuery = await deriveSearchQuery(query, enrichmentModel);
+    console.log(`searchQuery: ${JSON.stringify(searchQuery)}`);
     console.log("---");
-    const response = await callTavily(query);
+    const response = await callTavily(searchQuery);
     console.log(JSON.stringify(response, null, 2));
     return;
   }
@@ -189,10 +237,16 @@ async function main() {
 
   if (mode === "research") {
     readEnv("TAVILY_API_KEY");
-    const model = modelOverride ?? SUMMARIZE_MODEL;
-    console.log(`> research [${model}]: ${query}`);
+    const summarizeModel = modelOverride ?? SUMMARIZE_MODEL;
+    console.log(
+      `> research [enrich:${ENRICH_DEFAULT_MODEL} → summarize:${summarizeModel}]: ${query}`,
+    );
+    const searchQuery = await deriveSearchQuery(query, ENRICH_DEFAULT_MODEL);
+    console.log(`searchQuery: ${JSON.stringify(searchQuery)}`);
     console.log("---");
-    const tavily = (await callTavily(query)) as { results?: TavilyResult[] };
+    const tavily = (await callTavily(searchQuery)) as {
+      results?: TavilyResult[];
+    };
     const sources = tavily.results ?? [];
     console.log(`Tavily returned ${sources.length} sources`);
     if (sources.length === 0) {
@@ -200,11 +254,11 @@ async function main() {
       return;
     }
     const payload = buildSummarizePayload(
-      query,
+      searchQuery,
       sources,
       "Summarize the following research topic for a todo app user.",
     );
-    const response = await callWorkersAi(payload, model);
+    const response = await callWorkersAi(payload, summarizeModel);
     console.log(JSON.stringify(response, null, 2));
     return;
   }
