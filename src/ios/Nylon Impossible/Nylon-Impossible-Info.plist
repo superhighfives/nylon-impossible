@@ -12,6 +12,8 @@
 	<string>$(API_BASE_URL)</string>
 	<key>SentryDSN</key>
 	<string>$(SENTRY_DSN)</string>
+	<key>IsTestFlight</key>
+	<string>$(IS_TESTFLIGHT)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>

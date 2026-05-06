@@ -10,6 +10,7 @@
  * Does NOT rephrase or rewrite the title - only removes URLs.
  */
 
+import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { ResearchJobMessage } from "../types";
 import { enrichTodo } from "./ai";
@@ -29,6 +30,7 @@ export async function enrichTodoWithAI(
     USER_SYNC: DurableObjectNamespace;
     RESEARCH_QUEUE: Queue<ResearchJobMessage>;
     CF_AI_GATEWAY_ID?: string;
+    LOG_AI_DEBUG?: string;
   },
   todoId: string,
   userId: string,
@@ -44,7 +46,12 @@ export async function enrichTodoWithAI(
     .where(eq(todos.id, todoId));
 
   try {
-    const enrichment = await enrichTodo(ai, originalText, env.CF_AI_GATEWAY_ID);
+    const enrichment = await enrichTodo(
+      ai,
+      originalText,
+      env.CF_AI_GATEWAY_ID,
+      env.LOG_AI_DEBUG === "true",
+    );
 
     // If AI returned nothing useful, mark complete and exit
     if (!enrichment) {
@@ -116,6 +123,7 @@ export async function enrichTodoWithAI(
           todoId,
           researchType: enrichment.research.type,
           status: "pending",
+          searchQuery: enrichment.searchQuery ?? null,
           createdAt: now,
           updatedAt: now,
         })
@@ -130,7 +138,10 @@ export async function enrichTodoWithAI(
       await env.RESEARCH_QUEUE.send({
         todoId,
         userId,
-        query: originalText,
+        // Prefer the LLM-emitted searchQuery — it strips imperatives like
+        // "Research" so Tavily searches for the actual topic instead of
+        // returning meta-content about researching it.
+        query: enrichment.searchQuery ?? originalText,
         researchType: enrichment.research.type,
         researchId: research.id,
         userLocation: userLocation ?? null,
@@ -138,6 +149,10 @@ export async function enrichTodoWithAI(
     }
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);
+    Sentry.captureException(error, {
+      tags: { area: "ai-enrich" },
+      extra: { todoId },
+    });
     await db
       .update(todos)
       .set({ aiStatus: "failed", updatedAt: new Date() })

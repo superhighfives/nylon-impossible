@@ -28,6 +28,7 @@ jobs:
           RUN_AI_TESTS: "true"
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
           TEST_FILTER: ${{ github.event.inputs.test_filter }}
         run: |
           if [ -n "$TEST_FILTER" ]; then

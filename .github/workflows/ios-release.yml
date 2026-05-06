@@ -1,23 +1,14 @@
-name: Deploy to TestFlight
+name: Deploy to App Store
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "src/ios/**"
   workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number (optional - uses preview API if set)"
-        required: false
-        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-deploy-${{ github.ref }}
-  cancel-in-progress: true
+  group: ios-release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   test:
@@ -140,7 +131,7 @@ jobs:
           key: spm-${{ hashFiles('**/Package.resolved') }}
           restore-keys: spm-
 
-      - name: Build and upload to TestFlight
+      - name: Build and upload to App Store Connect
         env:
           APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -148,9 +139,9 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-          API_BASE_URL: ${{ inputs.pr_number && format('https://api-pr-{0}.nylonimpossible.com', inputs.pr_number) || 'https://api.nylonimpossible.com' }}
+          API_BASE_URL: https://api.nylonimpossible.com
           SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
-        run: bundle exec fastlane beta --verbose
+        run: bundle exec fastlane release --verbose
 
       - name: Upload dSYMs to Sentry
         env:

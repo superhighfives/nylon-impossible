@@ -42,6 +42,9 @@ jobs:
         run: |
           xcodebuild -version
 
+      - name: Clear stale SwiftPM artifacts
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData
+
       - name: Run tests
         run: |
           xcrun simctl list runtimes

@@ -271,6 +271,9 @@ describe("enrichTodo", () => {
 
   describe("error handling", () => {
     it("throws when response has no tool_calls", async () => {
+      // ai.ts logs the response shape via console.error before throwing —
+      // useful for diagnosing unfamiliar models in production, noise here.
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const ai = createMockAiWithResponse({
         response: "I can help you with that!",
       });
@@ -278,9 +281,11 @@ describe("enrichTodo", () => {
       await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
         "AI did not return enrichment",
       );
+      errSpy.mockRestore();
     });
 
     it("throws when tool_calls is an empty array", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const ai = createMockAiWithResponse({
         response: null,
         tool_calls: [],
@@ -289,6 +294,7 @@ describe("enrichTodo", () => {
       await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
         "AI did not return enrichment",
       );
+      errSpy.mockRestore();
     });
 
     it("throws when tool call has a wrong name", async () => {
@@ -318,7 +324,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/moonshotai/kimi-k2.5",
+        "@cf/openai/gpt-oss-120b",
         expect.objectContaining({
           messages: expect.arrayContaining([
             expect.objectContaining({
@@ -345,7 +351,7 @@ describe("enrichTodo", () => {
       await enrichTodo(ai, "Buy milk https://example.com", "my-gateway");
 
       expect(ai.run).toHaveBeenCalledWith(
-        "@cf/moonshotai/kimi-k2.5",
+        "@cf/openai/gpt-oss-120b",
         expect.any(Object),
         { gateway: { id: "my-gateway" } },
       );
@@ -417,5 +423,11 @@ describe("urlMentionedInText", () => {
 
   it("rejects malformed URLs", () => {
     expect(urlMentionedInText("not-a-url", "anything")).toBe(false);
+  });
+
+  it("rejects dotless hostnames invented from a single word", () => {
+    // Some models occasionally emit "https://dogs" for input "Research dogs".
+    // The hostname matches a word in the text but isn't a real domain.
+    expect(urlMentionedInText("https://dogs", "Research dogs")).toBe(false);
   });
 });

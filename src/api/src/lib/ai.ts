@@ -17,6 +17,10 @@ export interface TodoEnrichment {
   research?: {
     type: "general" | "location";
   };
+  // Search-optimized version of the topic — used as the Tavily query when
+  // research is set. Strips imperative verbs ("Research X" -> "X") so we
+  // don't search for the meta-topic of researching the thing.
+  searchQuery?: string;
 }
 
 // Native Workers AI tool call format
@@ -47,7 +51,7 @@ interface ParsedToolCall {
   arguments: TodoEnrichment;
 }
 
-const enrichTodoTool = {
+export const enrichTodoTool = {
   type: "function" as const,
   function: {
     name: "enrich_todo",
@@ -94,13 +98,18 @@ const enrichTodoTool = {
           },
           required: ["type"],
         },
+        searchQuery: {
+          type: "string",
+          description:
+            "ONLY set when research is set. A search-engine-optimized version of the topic for Tavily. Strip imperative verbs and todo framing so the query reflects what the user wants to learn, not the meta-task of researching it. Examples: 'Research dogs' -> 'dogs'; 'Look up white chocolate recipe' -> 'white chocolate recipe'; 'How does OAuth work' -> 'how OAuth works'; 'Book dinner at San Jalisco' -> 'San Jalisco restaurant'. Keep proper nouns and topic-specific words; drop 'research', 'look up', 'find out about', 'check', 'book', etc.",
+        },
       },
       required: ["title"],
     },
   },
 };
 
-function getSystemPrompt(): string {
+export function getSystemPrompt(): string {
   const today = new Date().toISOString().split("T")[0];
 
   return `You are a metadata extractor for todo items. Today's date is: ${today}
@@ -123,6 +132,7 @@ RESEARCH DETECTION:
 - Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
 - Set research.type = "location" for venue/place todos (restaurants, bars, cafes, shops, addresses)
 - Do NOT set research for plain action items (buy, call, email, fix, etc.)
+- WHEN research IS SET, you MUST also populate searchQuery: a Tavily-optimized phrasing of the topic. Strip imperative verbs ("Research", "Look up", "Find out about", "Check", "Book") and todo framing — the query should describe what the user wants to learn, not the act of researching it. Keep proper nouns and topic words. Examples below.
 
 Examples:
 - "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
@@ -133,14 +143,15 @@ Examples:
 - "github.com/user/repo review this" → { title: "review this", urls: ["https://github.com/user/repo"] }
 - "Low priority fix the bug" → { title: "Low priority fix the bug", priority: "low" } (no research - plain action)
 - "Meeting next Friday" → { title: "Meeting next Friday", dueDate: "[next Friday's date]" }
-- "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" } }
-- "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" } }
-- "Best practices for React Server Components" → { title: "Best practices for React Server Components", research: { type: "general" } }
-- "Look up white chocolate recipe" → { title: "Look up white chocolate recipe", research: { type: "general" } } (no urls — topic only, no URL in text)
-- "Research back pain remedies" → { title: "Research back pain remedies", research: { type: "general" } } (no urls — do NOT invent domains like "backpainremedies.com")
-- "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" } }
-- "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" } }
-- "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" } }
+- "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" }, searchQuery: "dog ages vs human ages" }
+- "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" }, searchQuery: "how OAuth works" }
+- "Best practices for React Server Components" → { title: "Best practices for React Server Components", research: { type: "general" }, searchQuery: "React Server Components best practices" }
+- "Look up white chocolate recipe" → { title: "Look up white chocolate recipe", research: { type: "general" }, searchQuery: "white chocolate recipe" } (no urls — topic only, no URL in text)
+- "Research back pain remedies" → { title: "Research back pain remedies", research: { type: "general" }, searchQuery: "back pain remedies" } (no urls — do NOT invent domains like "backpainremedies.com")
+- "Research dogs" → { title: "Research dogs", research: { type: "general" }, searchQuery: "dogs" }
+- "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" }, searchQuery: "San Jalisco restaurant" }
+- "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" }, searchQuery: "The Rusty Nail bar" }
+- "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" }, searchQuery: "ramen Main St" }
 
 Always call the enrich_todo tool with your findings.`;
 }
@@ -150,7 +161,7 @@ Always call the enrich_todo tool with your findings.`;
  * the native Workers AI format (top-level tool_calls) and the OpenAI-compatible
  * chat completions format (choices[0].message.tool_calls).
  */
-function extractToolCall(response: unknown): ParsedToolCall | null {
+export function extractToolCall(response: unknown): ParsedToolCall | null {
   // Native Workers AI format
   const native = response as WorkersAIToolCallResponse;
   if (native.tool_calls?.length) {
@@ -174,6 +185,23 @@ function extractToolCall(response: unknown): ParsedToolCall | null {
   }
 
   return null;
+}
+
+// Summarize the top-level shape of a Workers AI response for diagnostics —
+// keys only, no user content, so it's safe to log and include in error
+// messages. Helps identify when a model returns a different envelope than
+// expected (e.g. a new model that doesn't speak the tool-call protocol).
+function describeResponseShape(response: unknown): string {
+  if (response === null || response === undefined) return String(response);
+  if (typeof response !== "object") return typeof response;
+  const keys = Object.keys(response as Record<string, unknown>);
+  const obj = response as Record<string, unknown>;
+  const hints: string[] = [];
+  if (typeof obj.response === "string") hints.push("response:string");
+  if (Array.isArray(obj.tool_calls))
+    hints.push(`tool_calls:${obj.tool_calls.length}`);
+  if (Array.isArray(obj.choices)) hints.push(`choices:${obj.choices.length}`);
+  return `{${keys.join(",")}}${hints.length ? ` (${hints.join(",")})` : ""}`;
 }
 
 function parseArguments(
@@ -207,6 +235,10 @@ export function urlMentionedInText(url: string, text: string): boolean {
   } catch {
     return false;
   }
+  // Reject dotless hostnames like "https://dogs" — the model invented a
+  // domain from a single word in the input. Real public URLs always have
+  // a TLD separator.
+  if (!hostname.includes(".")) return false;
   const lowerText = text.toLowerCase();
   if (lowerText.includes(hostname)) return true;
   // Also accept the bare domain without the www. prefix (user may have
@@ -236,13 +268,13 @@ export async function enrichTodo(
   ai: Ai,
   text: string,
   gatewayId?: string,
+  debug = false,
 ): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
 
-  // Model added recently, types not yet updated
   const response = await runWithTimeout(
     ai.run(
-      "@cf/moonshotai/kimi-k2.5" as Parameters<typeof ai.run>[0],
+      "@cf/openai/gpt-oss-120b",
       {
         messages: [
           { role: "system", content: systemPrompt },
@@ -263,8 +295,9 @@ export async function enrichTodo(
   const tc = extractToolCall(response);
 
   if (!tc) {
-    console.error("No tool call found in AI response");
-    throw new Error("AI did not return enrichment");
+    const shape = describeResponseShape(response);
+    console.error("No tool call found in AI response", shape);
+    throw new Error(`AI did not return enrichment (shape: ${shape})`);
   }
 
   if (tc.name !== "enrich_todo") {
@@ -272,6 +305,19 @@ export async function enrichTodo(
   }
 
   const enrichment = tc.arguments;
+
+  // Diagnostic for unfamiliar models: report which fields the model populated.
+  // PII-free (keys and booleans only). Off by default; opt in with LOG_AI_DEBUG.
+  if (debug) {
+    console.log("AI enrichment returned", {
+      keys: Object.keys(enrichment ?? {}),
+      hasUrls: Array.isArray(enrichment?.urls) && enrichment.urls.length > 0,
+      hasDueDate: Boolean(enrichment?.dueDate),
+      hasPriority: Boolean(enrichment?.priority),
+      hasResearch: Boolean(enrichment?.research),
+      titleChanged: enrichment?.title !== text,
+    });
+  }
 
   // Defensive filter: drop URLs the model invented from the topic. Even with
   // the prompt telling it not to fabricate, the model sometimes guesses

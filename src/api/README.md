@@ -70,16 +70,27 @@ The API runs at **http://localhost:8787**.
 
 ### Environment
 
-Create `.dev.vars` for local development:
+Copy `.env.example` to `.env` and fill in the values. Wrangler picks up `.env` automatically for local dev.
 
 ```bash
-CLERK_SECRET_KEY=sk_test_your_key_here
-CLERK_PUBLISHABLE_KEY=pk_test_your_key_here
+cp .env.example .env
 ```
+
+Required for the worker:
+
+- `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Clerk auth
+- `AI_GATEWAY_ID` — AI Gateway slug (already set in `.env.example`)
+
+Required for the `probe` script (Workers AI + Tavily access from outside the worker):
+
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
+- `TAVILY_API_KEY` — get one at [tavily.com](https://tavily.com); the research feature won't work without it
+
+In production, set the same values as Workers secrets via `wrangler secret put`.
 
 ### Database
 
-The API shares the D1 database with the web project. Migrations live in `src/web/migrations/`.
+The API shares the D1 database with the web project. Migrations live in `src/api/migrations/`.
 
 ```bash
 # Apply migrations locally
@@ -94,30 +105,40 @@ pnpm db:migrate:remote
 ```
 src/api/
 ├── src/
-│   ├── index.ts              # Hono app with routes and middleware
-│   ├── types.ts              # Env bindings type definitions
+│   ├── index.ts                  # Hono app with routes and middleware
+│   ├── types.ts                  # Env bindings type definitions
+│   ├── db/seeds/                 # SQL seed data for local dev
 │   ├── handlers/
-│   │   ├── todos.ts          # CRUD endpoint handlers
-│   │   └── sync.ts           # Sync endpoint with conflict resolution
+│   │   ├── todos.ts              # CRUD endpoint handlers
+│   │   ├── sync.ts               # Sync endpoint with conflict resolution
+│   │   ├── users.ts              # Current-user endpoints
+│   │   ├── smart-create.ts       # Create todo and trigger background AI enrichment
+│   │   ├── reresearch.ts         # Manually re-run research for a todo
+│   │   └── cancel-research.ts    # Cancel an in-flight research job
 │   ├── lib/
-│   │   ├── auth.ts           # Clerk JWT verification middleware
-│   │   └── db.ts             # Drizzle schema and database client
+│   │   ├── ai.ts                 # enrichTodo classifier + tool schema
+│   │   ├── ai-enrich.ts          # Background enrichment orchestration (DB writes, queue dispatch)
+│   │   ├── research.ts           # Tavily search + summarization for research-typed todos
+│   │   ├── auth.ts               # Clerk JWT verification middleware
+│   │   ├── db.ts                 # Drizzle schema and database client
+│   │   ├── errors.ts             # Shared error types
+│   │   ├── url-helpers.ts        # URL parsing / title-truncation utilities
+│   │   └── url-metadata.ts       # OG metadata fetching for extracted URLs
 │   └── durable-objects/
-│       └── UserSync.ts       # WebSocket Durable Object
+│       └── UserSync.ts           # WebSocket Durable Object
+├── scripts/
+│   └── probe-research.ts         # Probe enrich / fetch / research outside the worker (see "Probing AI flows")
+├── migrations/                   # D1 migrations (drizzle-generated + raw SQL)
 ├── test/
-│   ├── helpers.ts            # Test utilities (seed, auth mock)
-│   ├── apply-migrations.ts   # D1 migration setup for tests
-│   ├── unit/
-│   │   └── auth.test.ts      # Auth middleware tests
-│   └── integration/
-│       ├── routing.test.ts   # Route matching, CORS, 404s
-│       ├── todos-crud.test.ts # Full CRUD against real D1
-│       ├── sync.test.ts      # Sync with conflict resolution
-│       └── durable-object.test.ts # WebSocket broadcast tests
-├── biome.json                # Biome linter/formatter config
-├── vitest.config.ts          # Vitest with Workers pool config
-├── tsconfig.json             # TypeScript (strict)
-└── wrangler.jsonc            # Cloudflare Workers config
+│   ├── helpers.ts                # Test utilities (seed, auth mock)
+│   ├── apply-migrations.ts       # D1 migration setup for tests
+│   ├── __mocks__/                # Per-module mocks (ai, clerk-backend, url-metadata)
+│   ├── unit/                     # Pure-logic tests (ai, auth, errors, url-helpers, ...)
+│   └── integration/              # Tests against real D1 + Workers runtime
+├── drizzle.config.ts             # Drizzle Kit config
+├── vitest.config.ts              # Vitest with Workers pool config
+├── tsconfig.json                 # TypeScript (strict)
+└── wrangler.jsonc                # Cloudflare Workers config
 ```
 
 ## Scripts
@@ -132,6 +153,35 @@ src/api/
 | `pnpm check` | Run Biome lint + format check |
 | `pnpm deploy` | Deploy to Cloudflare Workers |
 | `pnpm cf-typegen` | Generate Cloudflare binding types |
+| `pnpm probe` | Probe AI flows outside the app (see below) |
+
+## Probing AI flows
+
+The `probe` script (`scripts/probe-research.ts`) reproduces production's AI calls against the real Workers AI and Tavily APIs without booting the worker. Useful for tuning prompts, comparing models, and debugging extractor regressions.
+
+It reads `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `TAVILY_API_KEY` from `src/api/.env` (or the shell env).
+
+Three modes:
+
+| Mode | What it does |
+|------|--------------|
+| `enrich` | Runs the `enrichTodo` classifier — same prompt and tool schema as production. Reports the raw Workers AI response so you can inspect tool_calls and reasoning_content. |
+| `fetch` | Calls Tavily directly with the query. Sanity check that `TAVILY_API_KEY` works and returns sources. |
+| `research` | Full Tavily → kimi-k2.6 summarization chain that production runs for research-typed todos. |
+
+```bash
+pnpm probe enrich "Research dogs"
+pnpm probe fetch "Research dogs"
+pnpm probe research "Research dogs"
+```
+
+Override the Workers AI model (applies to `enrich` and `research`):
+
+```bash
+pnpm probe --model @cf/openai/gpt-oss-120b enrich "Research dogs"
+```
+
+The probe imports the actual prompt + tool schema from [`src/lib/ai.ts`](src/lib/ai.ts) and the summarize payload builder from [`src/lib/research.ts`](src/lib/research.ts), so it can't drift from production.
 
 ## Deployment
 

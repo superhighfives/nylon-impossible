@@ -1,7 +1,7 @@
 import { getSocialUrlInfo } from "@/lib/social-urls";
 import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
 import type { SerializedTodoUrl } from "@/types/database";
-import { Loader } from "./loader";
+import { Loader } from "./Loader";
 import { SocialPreviewCardCompact } from "./SocialPreviewCard";
 
 /** Pending URLs older than this are treated as failed (worker likely restarted) */
