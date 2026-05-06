@@ -26,18 +26,10 @@ export default defineConfig(async () => {
     ),
   };
 
-  // Mock AI and URL metadata modules when not running real AI tests
-  if (!useAI) {
-    aliases["../lib/ai"] = path.join(__dirname, "test", "__mocks__", "ai.ts");
-    aliases["../lib/url-metadata"] = path.join(
-      __dirname,
-      "test",
-      "__mocks__",
-      "url-metadata.ts",
-    );
-  }
-
-  // Always mock URL metadata fetching to prevent real HTTP requests in tests
+  // Always mock URL metadata fetching to prevent real HTTP requests in tests.
+  // (The AI side is mocked via test/setup-mocks.ts using vi.mock — aliases
+  // here only fire on literal import-string matches, so they couldn't reach
+  // ai-enrich.ts's `./ai` import or the handlers' background enrichment.)
   aliases["../lib/url-metadata"] = path.join(
     __dirname,
     "test",
@@ -78,7 +70,7 @@ export default defineConfig(async () => {
       alias: aliases,
     },
     test: {
-      setupFiles: ["./test/apply-migrations.ts"],
+      setupFiles: ["./test/setup-mocks.ts", "./test/apply-migrations.ts"],
     },
   };
 });

@@ -271,6 +271,9 @@ describe("enrichTodo", () => {
 
   describe("error handling", () => {
     it("throws when response has no tool_calls", async () => {
+      // ai.ts logs the response shape via console.error before throwing —
+      // useful for diagnosing unfamiliar models in production, noise here.
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const ai = createMockAiWithResponse({
         response: "I can help you with that!",
       });
@@ -278,9 +281,11 @@ describe("enrichTodo", () => {
       await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
         "AI did not return enrichment",
       );
+      errSpy.mockRestore();
     });
 
     it("throws when tool_calls is an empty array", async () => {
+      const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       const ai = createMockAiWithResponse({
         response: null,
         tool_calls: [],
@@ -289,6 +294,7 @@ describe("enrichTodo", () => {
       await expect(enrichTodo(ai, "Buy milk")).rejects.toThrow(
         "AI did not return enrichment",
       );
+      errSpy.mockRestore();
     });
 
     it("throws when tool call has a wrong name", async () => {

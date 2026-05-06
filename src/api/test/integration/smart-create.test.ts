@@ -2,8 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todos, todoUrls, users } from "../../src/lib/db";
-import { resetAIMock } from "../__mocks__/ai";
+import { getDb, todoUrls, users } from "../../src/lib/db";
 import { cleanDb, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -42,7 +41,6 @@ describe("Smart create endpoint", () => {
     await cleanDb();
     mockVerifyToken.mockReset();
     mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
-    resetAIMock();
     await seedUser();
   });
 
