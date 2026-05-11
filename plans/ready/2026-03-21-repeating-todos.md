@@ -50,25 +50,28 @@ History of past completions is not preserved in v1. If we later want a completio
 - **Optimistic client advance**: on tick-to-complete, the client immediately advances `dueDate` and clears `completed` locally so the UI doesn't flash "done" and disappear from the today view.
 - **Canonical server advance**: the sync/update handler re-computes the advance from the server's view of the row. The server's result is authoritative on conflict.
 
-Both implementations live behind a shared helper (`nextDueDate(recurrence, from)`) ported to TS and Swift with matching tests so the two paths agree.
+Both implementations live behind a shared helper `nextDueDate(recurrence, from, now)`, ported to TS and Swift with matching tests so the two paths agree. `from` is the todo's current `dueDate` (the anchor); `now` is the current wall-clock time. The helper advances from `from` by `frequency` repeatedly until the result is strictly greater than `now`, so a daily todo left unchecked for a week becomes a single advance to tomorrow rather than seven advances.
 
 ### Picker UI
 
 A flat 5-option control: **None · Daily · Weekly · Monthly · Yearly**.
 
 - iOS (`TodoEditSheet.swift`): SwiftUI `Picker` with `.menu` style.
-- Web (`TodoItemExpanded.tsx`): Radix `Select` (already used elsewhere in the component library).
+- Web (`TodoItemExpanded.tsx`): the existing `Select` component in `src/web/src/components/ui/Select.tsx` (built on `@base-ui/react/select`).
 - Disabled (with helper text) until a `dueDate` is set.
 - The label reflects the anchor — e.g. "Weekly on Wednesday", "Monthly on the 14th" — computed from `dueDate` rather than stored.
 
 ### AI smart-create integration
 
-Extend the `extract_todos` tool in `src/api/src/lib/ai.ts` with an optional `recurrence` field on each extracted todo, using the same JSON shape as storage. Prompts like "remind me every Monday to review backlog" should produce a todo with `dueDate` set to the next Monday and `recurrence: { frequency: "weekly" }`. If the model returns a recurrence without a `dueDate`, the API derives one (e.g. the next matching weekday) before persisting.
+The current smart-create path (`src/api/src/handlers/smart-create.ts`) takes raw text as the todo title and then runs `enrichTodoTool` from `src/api/src/lib/ai.ts` for URL/metadata enrichment — it does not extract structured fields like `dueDate` or recurrence from the input. v1 adds that extraction: either extend `enrichTodoTool` to also return optional `dueDate` and `recurrence` (same JSON shape as storage), or add a small dedicated extraction tool invoked from `smartCreate` before enrichment. Prompts like "remind me every Monday to review backlog" should produce a todo with `title: "review backlog"`, `dueDate` set to the next Monday, and `recurrence: { frequency: "weekly" }`. If the model returns a recurrence without a `dueDate`, the API derives one (e.g. the next matching weekday) before persisting.
 
 ## Notifications (v1: badge only)
 
-- **iOS**: set `applicationIconBadgeNumber` to the count of todos where `dueDate <= today AND completed = false`, recomputed after every sync and on app foreground.
-- **Web**: call `navigator.setAppBadge(n)` (feature-detected) with the same count, recomputed in the `useTodos` hook.
+The badge count is the number of todos where `completed = false` and `dueDate < startOfTomorrowLocal`, where `startOfTomorrowLocal` is midnight at the start of the next calendar day in the user's local timezone. `dueDate` is stored as a UTC timestamp (`integer("due_date", { mode: "timestamp" })` in `src/shared/src/schema.ts`), so each surface converts that timestamp into the local day before comparing. This intentionally treats "due today" and "overdue" the same way for badging.
+
+- **iOS**: set `applicationIconBadgeNumber` to that count, recomputed after every sync and on app foreground (so the badge crosses the day boundary even without a sync).
+- **Web**: call `navigator.setAppBadge(n)` (feature-detected) with the same count, recomputed in the `useTodos` hook and on tab visibility change.
+- **Server-side computation** is unnecessary for v1 because we only badge on the user's own devices; both clients use their own local timezone.
 
 Local notifications and push are explicitly out of scope for v1. Once the badge surface is in place we can decide whether scheduled local notifications add enough value to justify the permission prompt.
 
@@ -76,13 +79,13 @@ Local notifications and push are explicitly out of scope for v1. Once the badge 
 
 Rough order of work, not a contract:
 
-1. **Schema** — add nullable `recurrence` JSON column to `todos` in `src/api/drizzle/` and mirror in `src/web/src/lib/schema.ts` and `TodoItem.swift`. Extend `createTodoSchema` / `updateTodoSchema` in `src/web/src/lib/validation.ts`.
-2. **Shared advance helper** — `nextDueDate(recurrence, from, now)` in both TS (`src/api/src/lib`) and Swift (`Nylon Impossible/Utils`), with parity tests.
+1. **Schema** — add nullable `recurrence` JSON column to the `todos` table in `src/shared/src/schema.ts` (the canonical Drizzle schema; `src/web/src/lib/schema.ts` re-exports it). Generate the migration into `src/api/migrations/`. Mirror the field on `TodoItem.swift`. Extend `createTodoSchema` / `updateTodoSchema` in `src/web/src/lib/validation.ts`.
+2. **Shared advance helper** — `nextDueDate(recurrence, from, now)` in both TS (`src/api/src/lib`, also reachable from the web) and Swift (`Nylon Impossible/Utils`), with parity tests.
 3. **Server complete-handler** — when an update flips `completed` from `false` → `true` on a row with non-null `recurrence`, advance `dueDate` and keep `completed = false` instead of persisting the completion.
 4. **Client optimistic advance** — same logic in `useTodos.ts` (web) and `TodoViewModel.swift` (iOS) before the network round-trip.
 5. **Picker UI** — add to `TodoEditSheet.swift` and `TodoItemExpanded.tsx`.
-6. **Badge** — wire `applicationIconBadgeNumber` in iOS and `navigator.setAppBadge` in the web sync path.
-7. **AI** — extend `extract_todos` schema and prompt in `src/api/src/lib/ai.ts` and the smart-create handler.
+6. **Badge** — wire `applicationIconBadgeNumber` in iOS and `navigator.setAppBadge` in the web sync path, using the local-day boundary defined in *Notifications*.
+7. **AI** — extend `enrichTodoTool` in `src/api/src/lib/ai.ts` (or add a small extraction tool invoked from `src/api/src/handlers/smart-create.ts`) to surface optional `dueDate` and `recurrence` from the input text.
 
 ## Acceptance criteria
 
