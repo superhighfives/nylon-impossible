@@ -259,7 +259,6 @@ function SortableTodoItem(
     setNodeRef,
     transform,
     transition,
-    isDragging,
   } = useSortable({ id: props.todo.id });
 
   const style = {
@@ -268,11 +267,7 @@ function SortableTodoItem(
   };
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={"group"}
-    >
+    <div ref={setNodeRef} style={style} className={"group"}>
       <div className="flex items-start gap-2">
         <button
           type="button"
@@ -302,10 +297,7 @@ function SortableTodoItem(
 
 function TodoSkeleton() {
   return (
-    <output
-      className="block"
-      aria-label="Loading todos"
-    >
+    <output className="block" aria-label="Loading todos">
       {[72, 56, 80].map((width) => (
         <div key={width} className="flex items-start gap-2 animate-pulse">
           <div className="w-4 shrink-0" />
@@ -381,7 +373,7 @@ export function TodoList() {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [_activeId, setActiveId] = useState<string | null>(null);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     TodoWithUrls[] | null
   >(null);
@@ -470,10 +462,6 @@ export function TodoList() {
   const completedTodos = sortedTodos.filter((t) => t.completed);
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
-  const activeItem = activeId
-    ? (displayIncompleteTodos.find((t) => t.id === activeId) ?? null)
-    : null;
-
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveId(active.id as string);
   };
