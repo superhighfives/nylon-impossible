@@ -9,48 +9,93 @@ Todos cannot currently repeat. Users who have recurring tasks (weekly reviews, m
 
 ## Solution
 
-Add a recurrence model to todos so that, when a repeating todo is completed, a new instance is automatically created for the next occurrence.
+Add a recurrence rule to todos. When a repeating todo is completed, its `dueDate` advances in place to the next occurrence and the `completed` flag is cleared — one row, advancing forward, instead of cloning a new row per occurrence.
 
-## Recurrence patterns
+## Recurrence patterns (v1)
 
-The system needs to support a range of recurrence expressions:
+A deliberately small set, all anchored on the todo's `dueDate`:
 
 - **Daily** — repeat every day
-- **Weekly on a specific day** — e.g. every Wednesday
-- **Monthly on a specific date** — e.g. the 14th of every month
-- **Monthly on a relative day** — e.g. the third Sunday, the last Friday
-- **Multiple times per month** — e.g. twice a month on Tuesday (1st and 3rd Tuesday)
-- **Custom intervals** — e.g. every 2 weeks
+- **Weekly** — repeat on the same day-of-week as `dueDate`
+- **Monthly** — repeat on the same day-of-month as `dueDate` (clamped for short months: Jan 31 → Feb 28/29)
+- **Yearly** — repeat on the same month + day as `dueDate`
 
-## Open questions
+Out of scope for v1: custom intervals (every 2 weeks), nth-weekday-of-month (third Sunday), multiple days per week, end dates, occurrence counts. The JSON shape leaves room to add these later without a migration.
 
-These should be resolved before implementation begins:
+## Resolved decisions
 
-- **Storage format** — A structured JSON field on the `todos` table (e.g. `recurrence: { frequency: "weekly", dayOfWeek: 3 }`) would be flexible and queryable. Alternatively a compact RRULE string (iCalendar standard) would allow reuse of existing libraries but is less readable.
-- **Clone vs. advance** — When a repeating todo recurs, does it get cloned with a new due date, or does completion just advance the `dueDate` in place? Cloning preserves history; advancing is simpler.
-- **Eager vs. lazy generation** — Should the next occurrence be created eagerly on completion, or generated lazily on load?
-- **Recurrence picker UI** — How should the iOS app and web UI expose the recurrence picker? The recurrence options mirror what Calendar apps offer — a natural place to follow existing conventions (e.g. iOS Calendar's repeat sheet).
-- **AI smart-create integration** — Should recurrence interact with the AI smart-create input? e.g. "remind me every Monday to review backlog" → creates a repeating todo.
+### Storage
 
-## Notifications
+A structured JSON column `recurrence` on the `todos` table, nullable. Shape for v1:
 
-Repeating todos make notifications more meaningful because there's always a next occurrence to surface. At minimum:
+```json
+{ "frequency": "daily" | "weekly" | "monthly" | "yearly" }
+```
 
-- **App badge** — show a count of todos due today (including repeating instances that have come due). iOS supports this via `UNUserNotificationCenter` / `applicationIconBadgeNumber`; the web can use the [Badging API](https://developer.mozilla.org/en-US/docs/Web/API/Badging_API) (`navigator.setAppBadge(n)`).
-- **Scheduled local notifications** — when a repeating todo is created or its next occurrence is generated, schedule a local notification for the due time. Local notifications avoid needing a push infrastructure for the common case.
-- **Push notifications** — for server-side recurrence (e.g. occurrences generated in the background), a push notification can wake the app and update the badge. Requires APNs integration on iOS and Web Push on the browser.
+A todo with `recurrence = null` is non-repeating. Recurrence requires a `dueDate` — the rule has no meaning without an anchor, and the picker is disabled until a due date is set.
 
-Badge count should be recomputed whenever todos are synced and cleared when all due items are completed.
+Chosen over an RRULE string because v1 patterns are simple, the JSON is directly readable from both Swift and TypeScript without a parser dependency, and additional fields (interval, byDay, etc.) can be added later without changing the storage format.
+
+### Advance, don't clone
+
+Completing a repeating todo:
+1. computes the next `dueDate` from `frequency` + current `dueDate`
+2. advances `dueDate` past "now" (skipping any missed occurrences in one step, so a daily todo left unchecked for a week doesn't backfill 7 advances)
+3. clears `completed` back to `false`
+
+History of past completions is not preserved in v1. If we later want a completion log, it's an additive table — not a reason to clone now.
+
+### Eager advance, both client and server
+
+- **Optimistic client advance**: on tick-to-complete, the client immediately advances `dueDate` and clears `completed` locally so the UI doesn't flash "done" and disappear from the today view.
+- **Canonical server advance**: the sync/update handler re-computes the advance from the server's view of the row. The server's result is authoritative on conflict.
+
+Both implementations live behind a shared helper (`nextDueDate(recurrence, from)`) ported to TS and Swift with matching tests so the two paths agree.
+
+### Picker UI
+
+A flat 5-option control: **None · Daily · Weekly · Monthly · Yearly**.
+
+- iOS (`TodoEditSheet.swift`): SwiftUI `Picker` with `.menu` style.
+- Web (`TodoItemExpanded.tsx`): Radix `Select` (already used elsewhere in the component library).
+- Disabled (with helper text) until a `dueDate` is set.
+- The label reflects the anchor — e.g. "Weekly on Wednesday", "Monthly on the 14th" — computed from `dueDate` rather than stored.
+
+### AI smart-create integration
+
+Extend the `extract_todos` tool in `src/api/src/lib/ai.ts` with an optional `recurrence` field on each extracted todo, using the same JSON shape as storage. Prompts like "remind me every Monday to review backlog" should produce a todo with `dueDate` set to the next Monday and `recurrence: { frequency: "weekly" }`. If the model returns a recurrence without a `dueDate`, the API derives one (e.g. the next matching weekday) before persisting.
+
+## Notifications (v1: badge only)
+
+- **iOS**: set `applicationIconBadgeNumber` to the count of todos where `dueDate <= today AND completed = false`, recomputed after every sync and on app foreground.
+- **Web**: call `navigator.setAppBadge(n)` (feature-detected) with the same count, recomputed in the `useTodos` hook.
+
+Local notifications and push are explicitly out of scope for v1. Once the badge surface is in place we can decide whether scheduled local notifications add enough value to justify the permission prompt.
+
+## Implementation outline
+
+Rough order of work, not a contract:
+
+1. **Schema** — add nullable `recurrence` JSON column to `todos` in `src/api/drizzle/` and mirror in `src/web/src/lib/schema.ts` and `TodoItem.swift`. Extend `createTodoSchema` / `updateTodoSchema` in `src/web/src/lib/validation.ts`.
+2. **Shared advance helper** — `nextDueDate(recurrence, from, now)` in both TS (`src/api/src/lib`) and Swift (`Nylon Impossible/Utils`), with parity tests.
+3. **Server complete-handler** — when an update flips `completed` from `false` → `true` on a row with non-null `recurrence`, advance `dueDate` and keep `completed = false` instead of persisting the completion.
+4. **Client optimistic advance** — same logic in `useTodos.ts` (web) and `TodoViewModel.swift` (iOS) before the network round-trip.
+5. **Picker UI** — add to `TodoEditSheet.swift` and `TodoItemExpanded.tsx`.
+6. **Badge** — wire `applicationIconBadgeNumber` in iOS and `navigator.setAppBadge` in the web sync path.
+7. **AI** — extend `extract_todos` schema and prompt in `src/api/src/lib/ai.ts` and the smart-create handler.
 
 ## Acceptance criteria
 
-- [ ] A todo can be created with a recurrence rule
-- [ ] Completing a repeating todo creates a new instance for the next occurrence
-- [ ] The recurrence picker is available in the iOS and web todo create/edit UI
-- [ ] App badge reflects count of todos due today, including repeating instances
-- [ ] Local notifications are scheduled for upcoming repeating todos
-- [ ] All open questions above are resolved and documented before implementation
+- [ ] A todo can be created or edited with a recurrence rule (Daily/Weekly/Monthly/Yearly) when a due date is set
+- [ ] Completing a repeating todo advances its `dueDate` to the next future occurrence and clears `completed`, on both iOS and web
+- [ ] Optimistic client advance and server advance produce the same next `dueDate` for the same input (covered by parity tests)
+- [ ] The recurrence picker is available in the iOS edit sheet and the web expanded todo view, and is disabled without a due date
+- [ ] App badge on iOS and web reflects the count of todos due today or overdue, and updates after sync and on completion
+- [ ] AI smart-create can produce a repeating todo from natural-language input like "every Monday review backlog"
 
-## Dependencies
+## Out of scope (deferred)
 
-- Notification infrastructure (badge + local notifications) may overlap with any future push notification work
+- Custom intervals, nth-weekday-of-month, multiple days per week, end dates / occurrence counts
+- Per-occurrence edits or skip-this-one
+- Completion history for repeating todos
+- Scheduled local notifications and push notifications
