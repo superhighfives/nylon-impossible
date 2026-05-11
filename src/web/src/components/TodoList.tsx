@@ -253,13 +253,8 @@ function SortableTodoItem(
     }) => void;
   },
 ) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-  } = useSortable({ id: props.todo.id });
+  const { attributes, listeners, setNodeRef, transform, transition } =
+    useSortable({ id: props.todo.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
