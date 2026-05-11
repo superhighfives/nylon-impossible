@@ -114,7 +114,7 @@ function TodoItemContent({
 }: TodoItemProps) {
   return (
     <div className="flex items-start gap-3">
-      <div className="pt-0.5">
+      <div className="relative -top-px">
         <Checkbox
           checked={todo.completed}
           onCheckedChange={() => onToggle(todo.id, todo.completed)}
@@ -211,7 +211,7 @@ function TodoItemContent({
       <div className="hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
         <Button
           variant="ghost"
-          size="sm"
+          size="xs"
           shape="square"
           type="button"
           onClick={() => onToggleExpand(todo.id)}
@@ -263,17 +263,20 @@ function SortableTodoItem(
   } = useSortable({ id: props.todo.id });
 
   const style = {
-    transform: isDragging ? undefined : CSS.Transform.toString(transform),
-    transition: isDragging ? "none" : transition,
-    opacity: isDragging ? 0 : 1,
+    transform: CSS.Transform.toString(transform),
+    transition: transition ?? undefined,
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="py-3 group">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={"group"}
+    >
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="pt-1 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none"
+          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -282,7 +285,7 @@ function SortableTodoItem(
         </button>
         <div className="flex-1 min-w-0">
           <TodoItemContent {...props} />
-          {props.isExpanded && !isDragging && (
+          {props.isExpanded && (
             <ExpandedSection
               todo={props.todo}
               onUpdate={props.onUpdateExpanded}
@@ -300,20 +303,23 @@ function SortableTodoItem(
 function TodoSkeleton() {
   return (
     <output
-      className="block divide-y divide-gray-subtle"
+      className="block"
       aria-label="Loading todos"
     >
       {[72, 56, 80].map((width) => (
-        <div key={width} className="py-3 flex items-start gap-3 animate-pulse">
-          <div className="pt-0.5">
-            <div className="h-4 w-4 rounded bg-gray-base" />
-          </div>
-          <div className="flex-1 space-y-2">
-            <div
-              className="h-3 rounded bg-gray-base"
-              style={{ width: `${width}%` }}
-            />
-            <div className="h-2.5 rounded bg-gray-base w-1/3" />
+        <div key={width} className="flex items-start gap-2 animate-pulse">
+          <div className="w-4 shrink-0" />
+          <div className="flex-1 flex items-start gap-3">
+            <div className="relative -top-px">
+              <div className="h-4 w-4 rounded bg-gray-base" />
+            </div>
+            <div className="flex-1 space-y-2">
+              <div
+                className="h-3 rounded bg-gray-base"
+                style={{ width: `${width}%` }}
+              />
+              <div className="h-2.5 rounded bg-gray-base w-1/3" />
+            </div>
           </div>
         </div>
       ))}
@@ -518,7 +524,7 @@ export function TodoList() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="divide-y divide-gray-subtle">
+      <div>
         <SortableContext
           items={displayIncompleteTodos.map((t) => t.id)}
           strategy={verticalListSortingStrategy}
@@ -531,35 +537,24 @@ export function TodoList() {
             />
           ))}
         </SortableContext>
-        <DragOverlay>
-          {activeItem ? (
-            <div
-              className="py-3 bg-gray-surface shadow-lg rounded-lg opacity-95 pointer-events-none"
-              aria-hidden="true"
-            >
-              <div className="flex items-start gap-2">
-                <div className="pt-1 cursor-grabbing text-gray-muted">
-                  <GripVertical size={16} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <TodoItemContent {...sharedProps(activeItem)} />
-                </div>
+        <DragOverlay dropAnimation={null} />
+        {completedTodos.map((todo) => (
+          <div key={todo.id} className="group">
+            <div className="flex items-start gap-2">
+              <div className="w-4 shrink-0" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <TodoItemContent {...sharedProps(todo)} />
+                {expandedId === todo.id && (
+                  <ExpandedSection
+                    todo={todo}
+                    onUpdate={handleUpdateExpanded(todo.id)}
+                    isUpdating={updateTodo.isPending}
+                    onDelete={handleDelete}
+                    deletePending={deleteTodo.isPending}
+                  />
+                )}
               </div>
             </div>
-          ) : null}
-        </DragOverlay>
-        {completedTodos.map((todo) => (
-          <div key={todo.id} className="py-3 group">
-            <TodoItemContent {...sharedProps(todo)} />
-            {expandedId === todo.id && (
-              <ExpandedSection
-                todo={todo}
-                onUpdate={handleUpdateExpanded(todo.id)}
-                isUpdating={updateTodo.isPending}
-                onDelete={handleDelete}
-                deletePending={deleteTodo.isPending}
-              />
-            )}
           </div>
         ))}
       </div>

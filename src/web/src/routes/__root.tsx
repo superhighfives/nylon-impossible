@@ -131,7 +131,12 @@ function RootDocument() {
           }}
         />
       </head>
-      <body className="bg-gray-app text-gray antialiased">
+      <body className="min-h-full bg-gray-app text-gray antialiased">
+        <img
+          src="/images/background-valley.webp"
+          alt=""
+          className="pointer-events-none fixed bottom-0 left-0 w-full max-h-[600px] object-contain object-bottom"
+        />
         <ClerkProvider>
           <SentryUserSync />
           <Sentry.ErrorBoundary
