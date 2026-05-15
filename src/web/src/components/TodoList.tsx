@@ -292,7 +292,7 @@ function SortableTodoItem(
 
 function TodoSkeleton() {
   return (
-    <output className="block" aria-label="Loading todos">
+    <output className="block space-y-4 py-2" aria-label="Loading todos">
       {[72, 56, 80].map((width) => (
         <div key={width} className="flex items-start gap-2 animate-pulse">
           <div className="w-4 shrink-0" />

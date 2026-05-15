@@ -135,7 +135,7 @@ function RootDocument() {
         <img
           src="/images/background-valley.webp"
           alt=""
-          className="pointer-events-none fixed bottom-0 left-0 w-full max-h-[600px] object-contain object-bottom"
+          className="pointer-events-none fixed bottom-0 left-0 -z-10 w-full max-h-[600px] object-contain object-bottom [mask-image:linear-gradient(to_top,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_40%,transparent_100%)]"
         />
         <ClerkProvider>
           <SentryUserSync />
