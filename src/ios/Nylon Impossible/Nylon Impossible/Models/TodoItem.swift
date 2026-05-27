@@ -22,6 +22,20 @@ enum TodoAIStatus: String, Codable, CaseIterable {
     case failed
 }
 
+/// Recurrence frequency for a repeating todo. Anchored on the todo's `dueDate`.
+enum RecurrenceFrequency: String, Codable, CaseIterable {
+    case daily
+    case weekly
+    case monthly
+    case yearly
+}
+
+/// Recurrence rule attached to a todo. Wire format matches the server's JSON
+/// shape so it can be sent/received without translation.
+struct Recurrence: Codable, Sendable, Equatable {
+    var frequency: RecurrenceFrequency
+}
+
 @Model
 final class TodoItem {
     var id: UUID
@@ -36,6 +50,7 @@ final class TodoItem {
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
     var priority: String?         // "high" or "low", stored as String for SwiftData
+    var recurrenceFrequency: String?  // RecurrenceFrequency raw value; nil = non-repeating
     var aiStatus: String?         // AI processing status: pending, processing, complete, failed
     var researchId: String?           // Research record ID from server
     var researchStatus: String?       // "pending" | "completed" | "failed"
@@ -59,6 +74,7 @@ final class TodoItem {
         self.isDeleted = false
         self.dueDate = nil
         self.priority = nil
+        self.recurrenceFrequency = nil
         self.aiStatus = nil
         self.researchId = nil
         self.researchStatus = nil
@@ -83,6 +99,18 @@ final class TodoItem {
         }
         set {
             priority = newValue?.rawValue
+        }
+    }
+
+    /// Recurrence rule as a typed value. Mirrors the server's JSON shape.
+    var recurrence: Recurrence? {
+        get {
+            guard let raw = recurrenceFrequency,
+                  let freq = RecurrenceFrequency(rawValue: raw) else { return nil }
+            return Recurrence(frequency: freq)
+        }
+        set {
+            recurrenceFrequency = newValue?.frequency.rawValue
         }
     }
     

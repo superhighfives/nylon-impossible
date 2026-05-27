@@ -1,3 +1,4 @@
+import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -15,6 +16,10 @@ import {
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env, ResearchJobMessage } from "../types";
 
+const recurrenceSchema = z.object({
+  frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
+});
+
 // Validation schemas
 const createTodoSchema = z.object({
   id: z.string().uuid().optional(),
@@ -28,6 +33,7 @@ const updateTodoSchema = z.object({
   position: z.string().optional(),
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["high", "low"]).nullable().optional(),
+  recurrence: recurrenceSchema.nullable().optional(),
   updatedAt: z.coerce.date().optional(),
 });
 
@@ -42,6 +48,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    recurrence: todo.recurrence,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -216,6 +223,25 @@ export async function updateTodo(c: Context<Env>) {
   if (parsed.data.dueDate !== undefined) updates.dueDate = parsed.data.dueDate;
   if (parsed.data.priority !== undefined)
     updates.priority = parsed.data.priority;
+  if (parsed.data.recurrence !== undefined)
+    updates.recurrence = parsed.data.recurrence;
+
+  // Server-canonical advance: when a recurring todo is being marked complete
+  // for the first time, advance dueDate to the next future occurrence and keep
+  // completed = false instead of persisting the completion. The client does the
+  // same advance optimistically; the server's result is authoritative.
+  const completingRow =
+    parsed.data.completed === true && existing.completed === false;
+  const recurrence =
+    parsed.data.recurrence !== undefined
+      ? parsed.data.recurrence
+      : existing.recurrence;
+  const anchor =
+    parsed.data.dueDate !== undefined ? parsed.data.dueDate : existing.dueDate;
+  if (completingRow && recurrence && anchor) {
+    updates.completed = false;
+    updates.dueDate = nextDueDate(recurrence, anchor, new Date());
+  }
 
   await db
     .update(todos)

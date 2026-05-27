@@ -1,4 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
+import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -25,6 +26,10 @@ import type { Env } from "../types";
 
 const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
 
+const recurrenceSchema = z.object({
+  frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
+});
+
 // Sync request schema
 const syncRequestSchema = z.object({
   lastSyncedAt: z.union([z.null(), z.coerce.date()]).optional(),
@@ -37,6 +42,7 @@ const syncRequestSchema = z.object({
       position: z.string().optional(),
       dueDate: z.coerce.date().nullable().optional(),
       priority: z.enum(["high", "low"]).nullable().optional(),
+      recurrence: recurrenceSchema.nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
       urls: z
@@ -103,6 +109,7 @@ function serializeTodo(
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    recurrence: todo.recurrence,
     aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
@@ -230,19 +237,39 @@ export async function syncTodos(c: Context<Env>) {
     } else if (existing) {
       // Update existing - last write wins
       if (change.updatedAt >= existing.updatedAt) {
+        const nextRecurrence =
+          change.recurrence !== undefined
+            ? change.recurrence
+            : existing.recurrence;
+        const nextDueDateValue =
+          change.dueDate !== undefined ? change.dueDate : existing.dueDate;
+        const completing =
+          change.completed === true && existing.completed === false;
+        let dueDateToWrite = nextDueDateValue;
+        let completedToWrite = change.completed ?? existing.completed;
+        // Recurring todo being marked complete: advance the anchor and clear
+        // the completion flag. Mirrors the optimistic client advance.
+        if (completing && nextRecurrence && nextDueDateValue) {
+          dueDateToWrite = nextDueDate(
+            nextRecurrence,
+            nextDueDateValue,
+            new Date(),
+          );
+          completedToWrite = false;
+        }
         await db
           .update(todos)
           .set({
             title: change.title ? truncateTitle(change.title) : existing.title,
             notes: change.notes !== undefined ? change.notes : existing.notes,
-            completed: change.completed ?? existing.completed,
+            completed: completedToWrite,
             position: change.position ?? existing.position,
-            dueDate:
-              change.dueDate !== undefined ? change.dueDate : existing.dueDate,
+            dueDate: dueDateToWrite,
             priority:
               change.priority !== undefined
                 ? change.priority
                 : existing.priority,
+            recurrence: nextRecurrence,
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
@@ -281,6 +308,7 @@ export async function syncTodos(c: Context<Env>) {
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
           priority: change.priority ?? null,
+          recurrence: change.recurrence ?? null,
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });

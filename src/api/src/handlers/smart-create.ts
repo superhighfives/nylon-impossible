@@ -27,6 +27,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    recurrence: todo.recurrence,
     aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),

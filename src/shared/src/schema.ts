@@ -7,6 +7,12 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 
+// Recurrence rule attached to a todo. v1 supports only a simple frequency; the
+// JSON shape leaves room for future fields (interval, byDay, etc.) without a
+// migration.
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
+export type Recurrence = { frequency: RecurrenceFrequency };
+
 // Users table
 export const users = sqliteTable(
   "users",
@@ -46,6 +52,7 @@ export const todos = sqliteTable(
     notes: text("notes"),
     dueDate: integer("due_date", { mode: "timestamp" }),
     priority: text("priority", { enum: ["high", "low"] }),
+    recurrence: text("recurrence", { mode: "json" }).$type<Recurrence>(),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),

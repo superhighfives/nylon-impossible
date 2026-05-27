@@ -78,16 +78,32 @@ final class TodoViewModel {
         title: String,
         notes: String?,
         dueDate: Date?,
-        priority: TodoPriority?
+        priority: TodoPriority?,
+        recurrence: Recurrence?
     ) {
         todo.title = title
         todo.itemNotes = notes
         todo.dueDate = dueDate
         todo.todoPriority = priority
+        todo.recurrence = recurrence
         todo.markModified()
     }
 
     func toggleTodo(_ todo: TodoItem, allTodos: [TodoItem]) {
+        // Optimistic recurrence advance: completing a repeating todo rolls its
+        // dueDate forward to the next future occurrence and keeps the
+        // completion flag clear, so it stays in the today view instead of
+        // flashing "done" and disappearing. Mirrors the server's canonical
+        // advance in updateTodo / syncTodos.
+        if !todo.isCompleted,
+           let recurrence = todo.recurrence,
+           let anchor = todo.dueDate {
+            todo.dueDate = RecurrenceHelper.nextDueDate(
+                recurrence, from: anchor, now: Date()
+            )
+            todo.markModified()
+            return
+        }
         if todo.isCompleted {
             // Unchecking: move to end of incomplete list so it doesn't snap back to original position
             let incompleteTodos = allTodos

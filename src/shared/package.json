@@ -6,7 +6,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./src/schema.ts"
+    "./schema": "./src/schema.ts",
+    "./recurrence": "./src/recurrence.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"

@@ -1,7 +1,10 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
+import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
@@ -49,15 +52,35 @@ export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
 }
 
 export function useTodos() {
-  return useQuery<TodoWithUrls[]>({
+  const queryClient = useQueryClient();
+  const query = useQuery<TodoWithUrls[]>({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
-    refetchInterval: (query) => {
-      const data = query.state.data;
+    refetchInterval: (q) => {
+      const data = q.state.data;
       if (!data) return false;
       return hasPendingNonStaleWork(data) ? 3000 : false;
     },
   });
+
+  // Keep the app badge in sync with the visible cache. Recomputed whenever
+  // the data changes (post-sync / post-mutation) and on tab visibility change
+  // so the badge crosses the day boundary even without a sync.
+  useEffect(() => {
+    if (query.data) updateAppBadge(query.data);
+  }, [query.data]);
+
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible") return;
+      const data = queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+      if (data) updateAppBadge(data);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [queryClient]);
+
+  return query;
 }
 
 export function useCreateTodo() {
@@ -81,6 +104,7 @@ export function useCreateTodo() {
         position: "a0", // placeholder — replaced when onSettled invalidates
         dueDate: input.dueDate?.toISOString() ?? null,
         priority: input.priority ?? null,
+        recurrence: input.recurrence ?? null,
         aiStatus: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -150,12 +174,10 @@ export function useUpdateTodo() {
           previousTodos.map((todo) => {
             if (todo.id !== id) return todo;
             // Build optimistic update, converting Date to ISO string
-            return {
+            const merged: TodoWithUrls = {
               ...todo,
               ...(input.title !== undefined && { title: input.title }),
-              ...(input.notes !== undefined && {
-                notes: input.notes,
-              }),
+              ...(input.notes !== undefined && { notes: input.notes }),
               ...(input.completed !== undefined && {
                 completed: input.completed,
               }),
@@ -164,7 +186,25 @@ export function useUpdateTodo() {
                 dueDate: input.dueDate?.toISOString() ?? null,
               }),
               ...(input.priority !== undefined && { priority: input.priority }),
+              ...(input.recurrence !== undefined && {
+                recurrence: input.recurrence,
+              }),
             };
+            // Optimistic recurrence advance: if this update marks a recurring
+            // todo complete, roll dueDate forward and keep completed = false
+            // so the UI doesn't flash "done" and disappear from the today view.
+            // Mirrors the server's canonical advance in updateTodo / syncTodos.
+            const becameComplete = input.completed === true && !todo.completed;
+            const anchor = merged.dueDate ? new Date(merged.dueDate) : null;
+            if (becameComplete && merged.recurrence && anchor) {
+              merged.completed = false;
+              merged.dueDate = nextDueDate(
+                merged.recurrence,
+                anchor,
+                new Date(),
+              ).toISOString();
+            }
+            return merged;
           }),
         );
       }
