@@ -1,10 +1,10 @@
 import type { Recurrence } from "./schema";
 
 /**
- * Compute the next due date for a repeating todo. Advances `from` by the
- * recurrence frequency repeatedly until the result is strictly greater than
- * `now`, so a daily todo left unchecked for a week becomes a single advance to
- * tomorrow rather than seven advances.
+ * Compute the next due date for a repeating todo: the first occurrence of the
+ * recurrence rule strictly after `now`. Missed occurrences are not stored or
+ * surfaced — a daily todo left unchecked for a week jumps straight to
+ * tomorrow's date rather than producing a backlog of seven overdue rows.
  *
  * The Swift port lives at src/ios/Nylon Impossible/Nylon Impossible/Utils/Recurrence.swift
  * and must produce the same result for the same inputs (covered by parity

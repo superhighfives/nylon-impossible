@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
-import { recurrenceFixtures } from "../../../shared/src/recurrence-test-fixtures";
+import { recurrenceFixtures } from "@nylon-impossible/shared/recurrence-test-fixtures";
 
 describe("nextDueDate", () => {
   for (const fixture of recurrenceFixtures) {

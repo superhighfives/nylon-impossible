@@ -126,7 +126,9 @@ export function TodoItemExpanded({
   );
 
   // Recurrence has no anchor without a due date — disable the picker and
-  // force it back to "none" if the user clears the date.
+  // treat the selection as "none" while there's no due date. We don't reset
+  // the underlying state, so the user's prior choice is preserved if they
+  // re-enter a due date in the same session.
   const recurrenceDisabled = !dueDate;
   const effectiveRecurrence: RecurrenceFrequency | "none" = recurrenceDisabled
     ? "none"

@@ -16,7 +16,13 @@ export function updateAppBadge(todos: TodoWithUrls[]): void {
   };
   if (!nav.setAppBadge) return;
   const count = countDueByEndOfToday(todos);
+  // Some implementations only fully drop the badge via clearAppBadge();
+  // setAppBadge(0) can leave a lingering "0" pip on platforms like macOS.
   // Errors here are non-fatal (e.g. denied permission); swallow them.
+  if (count === 0) {
+    void nav.clearAppBadge?.().catch(() => undefined);
+    return;
+  }
   void nav.setAppBadge(count).catch(() => undefined);
 }
 

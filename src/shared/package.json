@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
-    "./recurrence": "./src/recurrence.ts"
+    "./recurrence": "./src/recurrence.ts",
+    "./recurrence-test-fixtures": "./src/recurrence-test-fixtures.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"
