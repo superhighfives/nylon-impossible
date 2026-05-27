@@ -119,6 +119,7 @@ struct APIServiceTests {
             position: nil,
             dueDate: nil,
             priority: nil,
+            recurrence: nil,
             updatedAt: Date(timeIntervalSince1970: 1700000000),
             deleted: nil,
             urls: nil
