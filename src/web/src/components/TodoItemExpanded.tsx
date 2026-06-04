@@ -158,7 +158,7 @@ export function TodoItemExpanded({
   };
 
   return (
-    <div className="mt-3 pl-7 space-y-5 bg-gray-surface rounded-lg p-5 ring-1 ring-gray-subtle shadow-sm">
+    <div className="mt-3 space-y-5 rounded-xl border border-gray-subtle bg-gray-app/70 backdrop-blur-sm p-4">
       {/* Title */}
       <div className="space-y-1.5">
         <label

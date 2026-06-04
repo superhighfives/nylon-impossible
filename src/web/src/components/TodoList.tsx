@@ -254,7 +254,7 @@ function SortableTodoItem(
   },
 ) {
   const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: props.todo.id });
+    useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -262,11 +262,12 @@ function SortableTodoItem(
   };
 
   return (
-    <div ref={setNodeRef} style={style} className={"group"}>
+    <div ref={setNodeRef} style={style} className="group py-2">
       <div className="flex items-start gap-2">
         <button
           type="button"
-          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none"
+          disabled={props.isExpanded}
+          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -522,7 +523,7 @@ export function TodoList() {
         </SortableContext>
         <DragOverlay dropAnimation={null} />
         {completedTodos.map((todo) => (
-          <div key={todo.id} className="group">
+          <div key={todo.id} className="group py-2">
             <div className="flex items-start gap-2">
               <div className="w-4 shrink-0" aria-hidden="true" />
               <div className="flex-1 min-w-0">
