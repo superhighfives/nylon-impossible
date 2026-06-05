@@ -15,6 +15,11 @@
   --shadow-yellow: 0 2px 12px rgba(255, 214, 10, 0.25);
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   @apply m-0 bg-gray-app text-gray;
   -webkit-font-smoothing: antialiased;

@@ -72,7 +72,7 @@ export function LandingPage() {
         {features.map((feature) => (
           <li
             key={feature.title}
-            className="rounded-xl border border-gray-subtle p-4 space-y-1"
+            className="rounded-xl border border-gray-subtle bg-gray-app/70 backdrop-blur-sm p-4 space-y-1"
           >
             <p className="text-sm font-medium">{feature.title}</p>
             <p className="text-sm text-gray-muted">{feature.description}</p>
