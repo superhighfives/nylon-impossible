@@ -40,7 +40,7 @@
     "@tanstack/react-table": "^8.21.2",
     "@tanstack/router-plugin": "^1.167.22",
     "class-variance-authority": "^0.7.1",
-    "drizzle-orm": "^0.45.0",
+    "drizzle-orm": "^0.45.2",
     "effect": "^3.21.1",
     "fractional-indexing": "^3.2.0",
     "lucide-react": "^1.14.0",

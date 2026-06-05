@@ -20,7 +20,7 @@
     "@clerk/backend": "^3.2.3",
     "@nylon-impossible/shared": "workspace:*",
     "@sentry/cloudflare": "^10.47.0",
-    "drizzle-orm": "^0.45.0",
+    "drizzle-orm": "^0.45.2",
     "fractional-indexing": "^3.2.0",
     "hono": "^4.12.3",
     "zod": "^4.1.13"
