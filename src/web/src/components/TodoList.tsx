@@ -557,12 +557,16 @@ export function TodoList() {
         </SortableContext>
         <DragOverlay dropAnimation={null}>
           {activeTodo ? (
-            // Mirror the source row's box model exactly (py-2, no horizontal
-            // padding, muted grip) so the lifted clone overlays it 1:1 when
-            // dragged straight down — only the elevation styles are added.
-            <div className="cursor-grabbing rounded-xl bg-gray-surface py-2 shadow-xl ring-1 ring-gray-subtle">
+            // Extend the card 12px past the row on each side (px-3 -mx-3) for a
+            // lifted feel while the content still overlays the source row 1:1.
+            // The grip is hidden — the cursor sits over it — but keeps its space
+            // so the text stays aligned with the rest of the list.
+            <div className="cursor-grabbing -mx-3 rounded-xl bg-gray-surface px-3 py-2 shadow-xl ring-1 ring-gray-subtle">
               <div className="flex items-start gap-2">
-                <span className="pt-0.5 text-gray-muted" aria-hidden="true">
+                <span
+                  className="pt-0.5 text-gray-muted opacity-0"
+                  aria-hidden="true"
+                >
                   <GripVertical size={16} />
                 </span>
                 <div className="flex-1 min-w-0">
