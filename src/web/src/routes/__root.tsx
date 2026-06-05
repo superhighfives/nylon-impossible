@@ -94,6 +94,16 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   component: RootDocument,
 });
 
+function BackgroundImage({ className }: { className?: string }) {
+  return (
+    <img
+      src="/images/background-valley.webp"
+      alt=""
+      className={`pointer-events-none fixed bottom-0 left-0 -z-10 w-full max-h-[600px] object-contain object-bottom [mask-image:linear-gradient(to_top,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_40%,transparent_100%)] ${className ?? ""}`}
+    />
+  );
+}
+
 function SentryUserSync() {
   const { user } = useUser();
   useEffect(() => {
@@ -132,12 +142,14 @@ function RootDocument() {
         />
       </head>
       <body className="min-h-full bg-gray-app text-gray antialiased">
-        <img
-          src="/images/background-valley.webp"
-          alt=""
-          className="pointer-events-none fixed bottom-0 left-0 -z-10 w-full max-h-[600px] object-contain object-bottom opacity-50 [mask-image:linear-gradient(to_top,black_40%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_top,black_40%,transparent_100%)]"
-        />
         <ClerkProvider>
+          {/* Full-strength background on the logged-out landing, dimmed once signed in */}
+          <Show when="signed-out">
+            <BackgroundImage className="opacity-100" />
+          </Show>
+          <Show when="signed-in">
+            <BackgroundImage className="opacity-25" />
+          </Show>
           <SentryUserSync />
           <Sentry.ErrorBoundary
             fallback={({ resetError }) => <ErrorView reset={resetError} />}
