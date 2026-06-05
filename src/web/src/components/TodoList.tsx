@@ -253,16 +253,42 @@ function SortableTodoItem(
     }) => void;
   },
 ) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: props.todo.id, disabled: props.isExpanded });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isSorting,
+    activeIndex,
+    overIndex,
+    index,
+  } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition: transition ?? undefined,
   };
 
+  // Drop indicator: show a guide line at the insertion point while dragging.
+  // The line sits on the leading edge of the hovered row, on the side the
+  // dragged item will land — above when moving up, below when moving down.
+  const isDropTarget =
+    isSorting && !isDragging && index === overIndex && activeIndex !== overIndex;
+  const lineAbove = isDropTarget && overIndex < activeIndex;
+  const lineBelow = isDropTarget && overIndex > activeIndex;
+
   return (
-    <div ref={setNodeRef} style={style} className="group py-2">
+    <div ref={setNodeRef} style={style} className="group relative py-2">
+      {(lineAbove || lineBelow) && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-yellow-solid ${
+            lineAbove ? "top-0" : "bottom-0"
+          }`}
+        />
+      )}
       <div className="flex items-start gap-2">
         <button
           type="button"
