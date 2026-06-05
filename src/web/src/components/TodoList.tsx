@@ -362,7 +362,9 @@ function SortableTodoItem(
           : ""
       }`}
     >
-      {(lineAbove || lineBelow) && (
+      {/* Drop line is for pointer drags; keyboard drags use the dragged row's
+          own yellow border to show the destination, so the line is redundant. */}
+      {(lineAbove || lineBelow) && !props.isKeyboardDragging && (
         <span
           aria-hidden="true"
           style={{ transform: `translateY(${lineShift}px)` }}
