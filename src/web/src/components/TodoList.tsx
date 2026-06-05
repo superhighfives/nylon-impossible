@@ -2,8 +2,6 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
-  DragOverlay,
-  type DragStartEvent,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -200,8 +198,10 @@ function TodoItemContent({
           hugs the title instead of stretching to the taller control. */}
       {showActions && (
         <>
-          {/* Mobile: popover actions menu */}
-          <div className="flex sm:hidden">
+          {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
+              control on the title line so it doesn't stretch the row height on
+              todos without a description. */}
+          <div className="flex h-5 items-center sm:hidden">
             <TodoActionsMenu
               todoId={todo.id}
               todoTitle={todo.title}
@@ -213,7 +213,7 @@ function TodoItemContent({
           </div>
 
           {/* Desktop: inline button revealed on hover */}
-          <div className="hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <div className="hidden h-5 items-center sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
             <Button
               variant="ghost"
               size="xs"
@@ -273,10 +273,10 @@ function SortableTodoItem(
     index,
   } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
-  // Let the rows reflow to open a gap at the target — this is what keeps both
-  // pointer and keyboard moves lined up, since the lifted overlay clone lands
-  // in the opened gap rather than on top of a row. The source row also dims to
-  // show it's been lifted out.
+  // The dragged row lifts in place and moves itself (no separate overlay clone,
+  // so there's only ever one copy — no ghost). Other rows reflow to open a gap
+  // at the target, and this same item slots into it, which keeps pointer and
+  // keyboard moves lined up.
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -298,8 +298,10 @@ function SortableTodoItem(
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative py-2 transition-opacity ${
-        isDragging ? "opacity-40" : ""
+      className={`group relative py-2 ${
+        isDragging
+          ? "z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl ring-1 ring-gray-subtle backdrop-blur-sm"
+          : ""
       }`}
     >
       {(lineAbove || lineBelow) && (
@@ -322,7 +324,7 @@ function SortableTodoItem(
           <GripVertical size={16} className="block" />
         </button>
         <div className="flex-1 min-w-0">
-          <TodoItemContent {...props} />
+          <TodoItemContent {...props} showActions={!isDragging} />
           {props.isExpanded && (
             <ExpandedSection
               todo={props.todo}
@@ -416,7 +418,6 @@ export function TodoList() {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [activeId, setActiveId] = useState<string | null>(null);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     TodoWithUrls[] | null
   >(null);
@@ -505,20 +506,9 @@ export function TodoList() {
   const completedTodos = sortedTodos.filter((t) => t.completed);
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
-  const activeTodo = activeId
-    ? (displayIncompleteTodos.find((t) => t.id === activeId) ?? null)
-    : null;
-  const handleDragStart = ({ active }: DragStartEvent) => {
-    setActiveId(active.id as string);
-  };
-
-  const handleDragCancel = () => {
-    setActiveId(null);
-  };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    setActiveId(null);
     if (!over || active.id === over.id) return;
 
     const currentItems = localIncompleteTodos ?? incompleteTodos;
@@ -554,9 +544,7 @@ export function TodoList() {
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={handleDragCancel}
     >
       <div>
         <SortableContext
@@ -571,32 +559,6 @@ export function TodoList() {
             />
           ))}
         </SortableContext>
-        <DragOverlay dropAnimation={null}>
-          {activeTodo ? (
-            // Extend the card 12px past the row on each side (px-3 -mx-3) for a
-            // lifted feel while the content still overlays the source row 1:1.
-            // The grip is hidden — the cursor sits over it — but keeps its space
-            // so the text stays aligned with the rest of the list. Frosted
-            // (translucent + backdrop blur) so the drop line reads through it.
-            <div className="cursor-grabbing -mx-3 rounded-xl bg-gray-surface/80 px-3 py-2 shadow-xl ring-1 ring-gray-subtle backdrop-blur-sm">
-              <div className="flex items-start gap-2">
-                <span
-                  className="pt-0.5 text-gray-muted opacity-0"
-                  aria-hidden="true"
-                >
-                  <GripVertical size={16} className="block" />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <TodoItemContent
-                    {...sharedProps(activeTodo)}
-                    isExpanded={false}
-                    showActions={false}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </DragOverlay>
         {completedTodos.map((todo) => (
           <div key={todo.id} className="group py-2">
             <div className="flex items-start gap-2">
