@@ -60,7 +60,7 @@ Instructions:
 4. Do not include any text other than the summary itself.`;
 
   return {
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user" as const, content: prompt }],
     // 2-3 sentences fits in ~150 tokens; the wider budget is a buffer for
     // kimi's reasoning overhead — the model still emits reasoning_content
     // even with enable_thinking:false, and tight caps truncated the summary.
