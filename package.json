@@ -13,7 +13,7 @@
     "check:fix": "pnpm web:check:fix && pnpm api:check:fix",
     "typecheck": "pnpm web:typecheck && pnpm api:typecheck",
     "deploy": "pnpm web:deploy && pnpm api:deploy",
-    "db:migrate": "wrangler d1 migrations apply nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc --skip-confirmation",
+    "db:migrate": "CI=true wrangler d1 migrations apply nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote -c src/api/wrangler.jsonc",
     "db:generate": "drizzle-kit generate --config src/api/drizzle.config.ts",
     "db:studio": "drizzle-kit studio --config src/api/drizzle.config.ts",
