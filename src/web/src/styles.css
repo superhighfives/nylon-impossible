@@ -18,6 +18,11 @@
 html,
 body {
   height: 100%;
+  /* Let native controls (date-picker calendar glyph, dropdowns, scrollbars)
+     follow the OS light/dark preference — the same trigger the radix `dark`
+     variant uses. Without this they default to the light scheme and render
+     dark-on-dark (e.g. an invisible calendar icon in the due-date input). */
+  color-scheme: light dark;
 }
 
 body {
