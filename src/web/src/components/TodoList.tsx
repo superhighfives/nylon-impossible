@@ -17,7 +17,6 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { generateKeyBetween } from "fractional-indexing";
 import {
   AlertCircle,
@@ -257,8 +256,6 @@ function SortableTodoItem(
     attributes,
     listeners,
     setNodeRef,
-    transform,
-    transition,
     isDragging,
     isSorting,
     activeIndex,
@@ -266,21 +263,29 @@ function SortableTodoItem(
     index,
   } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition: transition ?? undefined,
-  };
+  // The list stays still while dragging — the floating overlay clone carries
+  // the motion and the snap line marks the target — so no sort transform is
+  // applied here. The source row just dims to show it's been lifted out.
 
-  // Drop indicator: show a guide line at the insertion point while dragging.
-  // The line sits on the leading edge of the hovered row, on the side the
-  // dragged item will land — above when moving up, below when moving down.
+  // Drop indicator: a guide line at the insertion point. It sits on the
+  // leading edge of the hovered row, on the side the dragged item will land —
+  // above when moving up, below when moving down. The line snaps between rows
+  // rather than animating, so placement reads instantly.
   const isDropTarget =
-    isSorting && !isDragging && index === overIndex && activeIndex !== overIndex;
+    isSorting &&
+    !isDragging &&
+    index === overIndex &&
+    activeIndex !== overIndex;
   const lineAbove = isDropTarget && overIndex < activeIndex;
   const lineBelow = isDropTarget && overIndex > activeIndex;
 
   return (
-    <div ref={setNodeRef} style={style} className="group relative py-2">
+    <div
+      ref={setNodeRef}
+      className={`group relative py-2 transition-opacity ${
+        isDragging ? "opacity-40" : ""
+      }`}
+    >
       {(lineAbove || lineBelow) && (
         <span
           aria-hidden="true"
@@ -293,7 +298,7 @@ function SortableTodoItem(
         <button
           type="button"
           disabled={props.isExpanded}
-          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted"
+          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none transition-transform active:scale-[0.96] disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -395,7 +400,7 @@ export function TodoList() {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [_activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     TodoWithUrls[] | null
   >(null);
@@ -484,6 +489,9 @@ export function TodoList() {
   const completedTodos = sortedTodos.filter((t) => t.completed);
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
+  const activeTodo = activeId
+    ? (displayIncompleteTodos.find((t) => t.id === activeId) ?? null)
+    : null;
   const handleDragStart = ({ active }: DragStartEvent) => {
     setActiveId(active.id as string);
   };
@@ -547,7 +555,21 @@ export function TodoList() {
             />
           ))}
         </SortableContext>
-        <DragOverlay dropAnimation={null} />
+        <DragOverlay dropAnimation={null}>
+          {activeTodo ? (
+            <div className="flex items-start gap-2 cursor-grabbing rounded-xl bg-gray-surface px-3 py-2 shadow-xl ring-1 ring-gray-subtle">
+              <span className="pt-0.5 text-gray" aria-hidden="true">
+                <GripVertical size={16} />
+              </span>
+              <div className="flex-1 min-w-0">
+                <TodoItemContent
+                  {...sharedProps(activeTodo)}
+                  isExpanded={false}
+                />
+              </div>
+            </div>
+          ) : null}
+        </DragOverlay>
         {completedTodos.map((todo) => (
           <div key={todo.id} className="group py-2">
             <div className="flex items-start gap-2">
