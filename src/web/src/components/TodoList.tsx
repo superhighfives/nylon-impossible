@@ -269,7 +269,6 @@ function SortableTodoItem(
   },
 ) {
   const {
-    active,
     attributes,
     listeners,
     setNodeRef,
@@ -282,24 +281,19 @@ function SortableTodoItem(
     index,
   } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
-  // The dragged row lifts in place and moves itself (no separate overlay clone,
-  // so there's only ever one copy — no ghost). Other rows reflow to open a gap
-  // at the target, and this same item slots into it, which keeps pointer and
-  // keyboard moves lined up.
-  //
-  // Use Translate, not Transform: rows have variable heights (compact without a
-  // description, taller with one), and Transform would bake in a scaleY to morph
-  // rows between sizes as they pass — that scale is what caused the squish and
-  // stretch. Translate keeps only the x/y movement.
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-  };
+  // Only the dragged row moves — it lifts in place and tracks the pointer or
+  // keyboard. The rest of the list holds still (no reflow), which keeps the
+  // drop line static instead of riding the shifting rows. Translate only — no
+  // scaleY — so variable-height rows never squish or stretch.
+  const style = isDragging
+    ? { transform: CSS.Translate.toString(transform), transition }
+    : undefined;
 
-  // Drop indicator: a guide line at the insertion point. It sits on the
-  // leading edge of the hovered row, on the side the dragged item will land —
-  // above when moving up, below when moving down. The line snaps between rows
-  // rather than animating, so placement reads instantly.
+  // Drop indicator: a guide line at the insertion point. It sits on the leading
+  // edge of the hovered row, on the side the dragged item will land — above when
+  // moving up, below when moving down. Because the list stays still, the line
+  // sits at the row boundary, which is centered in the uniform py-2 gap between
+  // rows regardless of their height.
   const isDropTarget =
     isSorting &&
     !isDragging &&
@@ -307,12 +301,6 @@ function SortableTodoItem(
     activeIndex !== overIndex;
   const lineAbove = isDropTarget && overIndex < activeIndex;
   const lineBelow = isDropTarget && overIndex > activeIndex;
-
-  // Reflow opens a gap the height of the dragged row beyond the row edge, so
-  // nudge the line by half that height to sit centered in the gap rather than
-  // hugging the row above/below it.
-  const draggedHeight = active?.rect.current.initial?.height ?? 0;
-  const lineShift = lineAbove ? -draggedHeight / 2 : draggedHeight / 2;
 
   return (
     <div
@@ -327,7 +315,6 @@ function SortableTodoItem(
       {(lineAbove || lineBelow) && (
         <span
           aria-hidden="true"
-          style={{ transform: `translateY(${lineShift}px)` }}
           className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-yellow-solid ${
             lineAbove ? "top-0" : "bottom-0"
           }`}
