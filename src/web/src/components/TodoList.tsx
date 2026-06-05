@@ -3,6 +3,7 @@ import {
   DndContext,
   type DragEndEvent,
   type DragStartEvent,
+  type KeyboardCoordinateGetter,
   KeyboardSensor,
   type Modifier,
   PointerSensor,
@@ -13,7 +14,6 @@ import {
 import {
   arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
@@ -46,6 +46,45 @@ const restrictToVerticalAxis: Modifier = ({ transform }) => ({
   ...transform,
   x: 0,
 });
+
+// Custom keyboard movement. dnd-kit's default sortableKeyboardCoordinates
+// mis-offsets across variable-height rows: arrowing a short row past a tall one
+// moves it by the wrong distance, so it lands overlapping its neighbor instead
+// of in the gap. This reads each row's live position and lands the dragged row
+// flush against the neighbor it passes, using that neighbor's actual height.
+const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
+  event,
+  { context: { active, collisionRect, droppableContainers } },
+) => {
+  if (event.code !== "ArrowDown" && event.code !== "ArrowUp") return undefined;
+  if (!active || !collisionRect) return undefined;
+  event.preventDefault();
+
+  const activeTop = collisionRect.top;
+  const others: DOMRect[] = [];
+  for (const container of droppableContainers.getEnabled()) {
+    if (!container || container.disabled || container.id === active.id)
+      continue;
+    const node = container.node.current;
+    if (node) others.push(node.getBoundingClientRect());
+  }
+
+  if (event.code === "ArrowDown") {
+    // Nearest row below; land just past its bottom (its top + its height).
+    const below = others
+      .filter((r) => r.top > activeTop + 1)
+      .sort((a, b) => a.top - b.top)[0];
+    if (!below) return undefined;
+    return { x: collisionRect.left, y: activeTop + below.height };
+  }
+
+  // Nearest row above; take its slot at its top.
+  const above = others
+    .filter((r) => r.top < activeTop - 1)
+    .sort((a, b) => b.top - a.top)[0];
+  if (!above) return undefined;
+  return { x: collisionRect.left, y: above.top };
+};
 
 interface TodoItemProps {
   todo: TodoWithUrls;
@@ -451,7 +490,7 @@ export function TodoList() {
       activationConstraint: { delay: 200, tolerance: 5 },
     }),
     useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
+      coordinateGetter: verticalKeyboardCoordinates,
     }),
   );
 
