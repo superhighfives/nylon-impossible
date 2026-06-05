@@ -261,6 +261,7 @@ function SortableTodoItem(
   },
 ) {
   const {
+    active,
     attributes,
     listeners,
     setNodeRef,
@@ -299,6 +300,12 @@ function SortableTodoItem(
   const lineAbove = isDropTarget && overIndex < activeIndex;
   const lineBelow = isDropTarget && overIndex > activeIndex;
 
+  // Reflow opens a gap the height of the dragged row beyond the row edge, so
+  // nudge the line by half that height to sit centered in the gap rather than
+  // hugging the row above/below it.
+  const draggedHeight = active?.rect.current.initial?.height ?? 0;
+  const lineShift = lineAbove ? -draggedHeight / 2 : draggedHeight / 2;
+
   return (
     <div
       ref={setNodeRef}
@@ -312,6 +319,7 @@ function SortableTodoItem(
       {(lineAbove || lineBelow) && (
         <span
           aria-hidden="true"
+          style={{ transform: `translateY(${lineShift}px)` }}
           className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-yellow-solid ${
             lineAbove ? "top-0" : "bottom-0"
           }`}
