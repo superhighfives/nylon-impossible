@@ -101,6 +101,13 @@ export async function enrichTodoWithAI(
       updates.priority = enrichment.priority;
     }
 
+    // Update recurrence if extracted. A recurrence rule requires a dueDate
+    // anchor; if the model returned a frequency without one, the rule is
+    // dropped (we can't safely guess the user's intended occurrence).
+    if (enrichment.recurrence && updates.dueDate) {
+      updates.recurrence = enrichment.recurrence;
+    }
+
     await db.update(todos).set(updates).where(eq(todos.id, todoId));
 
     // Notify clients that core AI enrichment is complete

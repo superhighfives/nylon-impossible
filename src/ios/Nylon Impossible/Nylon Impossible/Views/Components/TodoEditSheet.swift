@@ -10,7 +10,7 @@ import SwiftUI
 struct TodoEditSheet: View {
     let todo: TodoItem
     let apiService: APIService?
-    var onSave: (String, String?, Date?, TodoPriority?) -> Void
+    var onSave: (String, String?, Date?, TodoPriority?, Recurrence?) -> Void
     var onCancel: () -> Void
 
     @Environment(UserPreferencesService.self) private var preferencesService
@@ -19,6 +19,7 @@ struct TodoEditSheet: View {
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var priority: TodoPriority?
+    @State private var recurrenceFrequency: RecurrenceFrequency?
     @State private var urls: [APITodoUrl] = []
     @State private var research: APIResearch? = nil
     @State private var isLoadingUrls: Bool = false
@@ -29,7 +30,7 @@ struct TodoEditSheet: View {
         todo: TodoItem,
         apiService: APIService? = nil,
         initialUrls: [APITodoUrl] = [],
-        onSave: @escaping (String, String?, Date?, TodoPriority?) -> Void,
+        onSave: @escaping (String, String?, Date?, TodoPriority?, Recurrence?) -> Void,
         onCancel: @escaping () -> Void
     ) {
         self.todo = todo
@@ -42,6 +43,7 @@ struct TodoEditSheet: View {
         _hasDueDate = State(initialValue: todo.dueDate != nil)
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _priority = State(initialValue: todo.todoPriority)
+        _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
         _urls = State(initialValue: initialUrls)
         let initialResearch: APIResearch?
         if let researchId = todo.researchId {
@@ -112,6 +114,29 @@ struct TodoEditSheet: View {
                 } header: {
                     Text("Priority")
                 }
+
+                // Recurrence — disabled until a due date is set, since the
+                // rule has no anchor without one.
+                Section {
+                    Picker("Repeat", selection: $recurrenceFrequency) {
+                        Text("None").tag(nil as RecurrenceFrequency?)
+                        Text(weeklyLabel).tag(RecurrenceFrequency.weekly as RecurrenceFrequency?)
+                        Text("Daily").tag(RecurrenceFrequency.daily as RecurrenceFrequency?)
+                        Text(monthlyLabel).tag(RecurrenceFrequency.monthly as RecurrenceFrequency?)
+                        Text("Yearly").tag(RecurrenceFrequency.yearly as RecurrenceFrequency?)
+                    }
+                    .pickerStyle(.menu)
+                    .disabled(!hasDueDate)
+                } header: {
+                    Text("Repeat")
+                } footer: {
+                    if !hasDueDate {
+                        Text("Set a due date to enable repeats.")
+                    }
+                }
+                .onChange(of: hasDueDate) { _, hasDate in
+                    if !hasDate { recurrenceFrequency = nil }
+                }
                 
                 // Research
                 if let research {
@@ -179,8 +204,33 @@ struct TodoEditSheet: View {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let notesValue = trimmedNotes.isEmpty ? nil : trimmedNotes
         let dueDateValue = hasDueDate ? dueDate : nil
+        let recurrenceValue: Recurrence? = (hasDueDate && recurrenceFrequency != nil)
+            ? Recurrence(frequency: recurrenceFrequency!)
+            : nil
 
-        onSave(trimmedTitle, notesValue, dueDateValue, priority)
+        onSave(trimmedTitle, notesValue, dueDateValue, priority, recurrenceValue)
+    }
+
+    /// "Weekly on Wednesday" — anchor is derived from the due date so the user
+    /// doesn't need to pick a weekday separately.
+    private var weeklyLabel: String {
+        guard hasDueDate else { return "Weekly" }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return "Weekly on \(formatter.string(from: dueDate))"
+    }
+
+    /// "Monthly on the 14th" — derived from the due date's day-of-month.
+    private var monthlyLabel: String {
+        guard hasDueDate else { return "Monthly" }
+        let day = Calendar.current.component(.day, from: dueDate)
+        return "Monthly on the \(ordinal(day))"
+    }
+
+    private func ordinal(_ n: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .ordinal
+        return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
     }
     
     private func reresearch() async {
@@ -364,7 +414,7 @@ struct UrlRow: View {
             item.priority = "high"
             return item
         }(),
-        onSave: { _, _, _, _ in },
+        onSave: { _, _, _, _, _ in },
         onCancel: {}
     )
     .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))

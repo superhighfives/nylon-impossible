@@ -2,6 +2,7 @@
  * Server functions for todos using Effect for type-safe error handling
  */
 
+import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { Effect } from "effect";
@@ -70,6 +71,7 @@ function serializeTodoWithUrls(
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
+    recurrence: todo.recurrence,
     aiStatus: todo.aiStatus ?? null,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
@@ -214,6 +216,7 @@ export const createTodo = createServerFn({ method: "POST" })
                 completed: false,
                 dueDate: validated.dueDate ?? null,
                 priority: validated.priority ?? null,
+                recurrence: validated.recurrence ?? null,
               })
               .returning(),
           catch: (error) =>
@@ -252,6 +255,26 @@ export const updateTodo = createServerFn({ method: "POST" })
 
     const program = withAuthenticatedUser((user, db) =>
       Effect.gen(function* () {
+        // Fetch existing row so we can server-canonically advance a recurring
+        // todo when completion flips false → true. (Mirrors the api worker's
+        // update handler.)
+        const existing = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select()
+              .from(todos)
+              .where(and(eq(todos.id, id), eq(todos.userId, user.id)))
+              .get(),
+          catch: (error) =>
+            new DatabaseError({
+              operation: "getTodo",
+              cause: error,
+            }),
+        });
+        if (!existing) {
+          return yield* Effect.fail(new TodoNotFoundError({ id }));
+        }
+
         // Build update object dynamically
         const updates: Record<string, unknown> = {};
         if (validated.title !== undefined) updates.title = validated.title;
@@ -264,6 +287,23 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.dueDate = validated.dueDate;
         if (validated.priority !== undefined)
           updates.priority = validated.priority;
+        if (validated.recurrence !== undefined)
+          updates.recurrence = validated.recurrence;
+
+        const becameComplete =
+          validated.completed === true && existing.completed === false;
+        const recurrence =
+          validated.recurrence !== undefined
+            ? validated.recurrence
+            : existing.recurrence;
+        const anchor =
+          validated.dueDate !== undefined
+            ? validated.dueDate
+            : existing.dueDate;
+        if (becameComplete && recurrence && anchor) {
+          updates.completed = false;
+          updates.dueDate = nextDueDate(recurrence, anchor, new Date());
+        }
 
         // Update todo with compound where clause for authorization
         const [result] = yield* Effect.tryPromise({

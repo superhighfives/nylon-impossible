@@ -155,6 +155,11 @@ final class SyncService {
                 userId: userId
             )
 
+            // Recompute app icon badge after every sync (due-today / overdue).
+            if let modelContext {
+                BadgeService.refresh(modelContext: modelContext)
+            }
+
             // 4. Update sync timestamp
             if let syncedAt = ISO8601DateFormatter().date(from: response.syncedAt) {
                 lastSyncedAt = syncedAt
@@ -240,6 +245,7 @@ final class SyncService {
                 position: todo.isDeleted ? nil : todo.position,
                 dueDate: todo.isDeleted ? nil : todo.dueDate,
                 priority: todo.isDeleted ? nil : todo.priority,
+                recurrence: todo.isDeleted ? nil : todo.recurrence,
                 updatedAt: todo.updatedAt,
                 deleted: todo.isDeleted ? true : nil,
                 urls: pendingUrlChanges
@@ -283,6 +289,7 @@ final class SyncService {
                     local.position = remote.position ?? local.position
                     local.dueDate = remote.dueDate
                     local.priority = remote.priority
+                    local.recurrence = remote.recurrence
                     local.aiStatus = remote.aiStatus?.rawValue
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
@@ -303,6 +310,7 @@ final class SyncService {
                 todo.isCompleted = remote.completed
                 todo.dueDate = remote.dueDate
                 todo.priority = remote.priority
+                todo.recurrence = remote.recurrence
                 todo.aiStatus = remote.aiStatus?.rawValue
                 todo.researchId = remote.research?.id
                 todo.researchStatus = remote.research?.status

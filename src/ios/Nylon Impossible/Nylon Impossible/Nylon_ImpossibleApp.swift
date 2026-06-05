@@ -189,6 +189,9 @@ struct RootView: View {
                 // Refresh the stored auth token so BackgroundSyncService has a valid
                 // credential for the next ~50 minutes
                 Task { await authService.persistAuthTokenToKeychain() }
+                // Recompute the badge on foreground so it crosses the day
+                // boundary even without a sync round-trip.
+                BadgeService.refresh(modelContext: modelContext)
             case .background, .inactive:
                 syncService.disconnectWebSocket()
             @unknown default:

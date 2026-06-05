@@ -1,10 +1,15 @@
 import { z } from "zod";
 
+export const recurrenceSchema = z.object({
+  frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
+});
+
 export const createTodoSchema = z.object({
   title: z.string().min(1, "Title is required").max(500),
   notes: z.string().max(10000).nullable().optional(),
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["high", "low"]).nullable().optional(),
+  recurrence: recurrenceSchema.nullable().optional(),
 });
 
 export const updateTodoSchema = z.object({
@@ -14,4 +19,5 @@ export const updateTodoSchema = z.object({
   position: z.string().optional(),
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["high", "low"]).nullable().optional(),
+  recurrence: recurrenceSchema.nullable().optional(),
 });

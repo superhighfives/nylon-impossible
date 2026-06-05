@@ -1,11 +1,22 @@
 // Re-export Drizzle-inferred types for convenience
-export type { List, Todo, TodoList, TodoUrl, User } from "@/lib/schema";
+export type {
+  List,
+  Recurrence,
+  RecurrenceFrequency,
+  Todo,
+  TodoList,
+  TodoUrl,
+  User,
+} from "@/lib/schema";
+
+import type { Recurrence } from "@/lib/schema";
 
 export interface CreateTodoInput {
   title: string;
   notes?: string | null;
   dueDate?: Date | null;
   priority?: "high" | "low" | null;
+  recurrence?: Recurrence | null;
 }
 
 export interface UpdateTodoInput {
@@ -15,6 +26,7 @@ export interface UpdateTodoInput {
   position?: string;
   dueDate?: Date | null;
   priority?: "high" | "low" | null;
+  recurrence?: Recurrence | null;
 }
 
 /** Fetch status for URL metadata */
@@ -67,6 +79,7 @@ export interface TodoWithUrls {
   position: string;
   dueDate: string | null;
   priority: "high" | "low" | null;
+  recurrence: Recurrence | null;
   aiStatus: AiStatus | null;
   createdAt: string;
   updatedAt: string;

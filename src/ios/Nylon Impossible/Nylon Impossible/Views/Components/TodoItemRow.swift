@@ -12,7 +12,7 @@ struct TodoItemRow: View {
     let apiService: APIService?
     let urls: [APITodoUrl]
     var onToggle: () -> Void
-    var onSave: (String, String?, Date?, TodoPriority?) -> Void
+    var onSave: (String, String?, Date?, TodoPriority?, Recurrence?) -> Void
 
     @State private var checkmarkScale: CGFloat = 1.0
     @State private var showingEditSheet = false
@@ -153,8 +153,8 @@ struct TodoItemRow: View {
                 todo: todo,
                 apiService: apiService,
                 initialUrls: urls,
-                onSave: { title, notes, dueDate, priority in
-                    onSave(title, notes, dueDate, priority)
+                onSave: { title, notes, dueDate, priority, recurrence in
+                    onSave(title, notes, dueDate, priority, recurrence)
                     showingEditSheet = false
                 },
                 onCancel: {
@@ -180,7 +180,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -191,7 +191,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -202,7 +202,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
         }
         .padding()

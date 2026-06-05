@@ -14,6 +14,9 @@ export interface TodoEnrichment {
   urls?: string[];
   dueDate?: string; // ISO date string YYYY-MM-DD
   priority?: "high" | "low";
+  recurrence?: {
+    frequency: "daily" | "weekly" | "monthly" | "yearly";
+  };
   research?: {
     type: "general" | "location";
   };
@@ -84,6 +87,20 @@ export const enrichTodoTool = {
           description:
             "Extract priority if mentioned. Look for words like 'urgent', 'important', 'high priority', 'asap' (high) or 'low priority', 'whenever', 'not urgent' (low).",
         },
+        recurrence: {
+          type: "object",
+          description:
+            "Set when the todo repeats. Look for phrases like 'every day', 'daily', 'every Monday', 'weekly', 'monthly', 'each month', 'yearly', 'annually'. Pair with a dueDate (next matching occurrence). Do NOT set for one-off tasks.",
+          properties: {
+            frequency: {
+              type: "string",
+              enum: ["daily", "weekly", "monthly", "yearly"],
+              description:
+                "'daily' = every day. 'weekly' = every week on the same weekday as dueDate. 'monthly' = same day-of-month. 'yearly' = same month+day.",
+            },
+          },
+          required: ["frequency"],
+        },
         research: {
           type: "object",
           description:
@@ -118,7 +135,8 @@ Your ONLY job is to extract metadata from the user's text:
 1. URLs/domains - find them and remove them from the title
 2. Due dates - convert relative dates to ISO format
 3. Priority - if mentioned
-4. Research intent - questions, comparisons, "look up", "how to", venue references
+4. Recurrence - "every day"/"daily", "every Monday"/"weekly", "monthly", "yearly". Pair with a dueDate for the next matching occurrence.
+5. Research intent - questions, comparisons, "look up", "how to", venue references
 
 CRITICAL RULES:
 - Do NOT rephrase, reword, or rewrite the title
@@ -143,6 +161,9 @@ Examples:
 - "github.com/user/repo review this" → { title: "review this", urls: ["https://github.com/user/repo"] }
 - "Low priority fix the bug" → { title: "Low priority fix the bug", priority: "low" } (no research - plain action)
 - "Meeting next Friday" → { title: "Meeting next Friday", dueDate: "[next Friday's date]" }
+- "Every Monday review backlog" → { title: "review backlog", dueDate: "[next Monday]", recurrence: { frequency: "weekly" } }
+- "Daily standup at 10am" → { title: "Daily standup at 10am", dueDate: "${today}", recurrence: { frequency: "daily" } }
+- "Pay rent on the 1st of every month" → { title: "Pay rent", dueDate: "[next 1st of month]", recurrence: { frequency: "monthly" } }
 - "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" }, searchQuery: "dog ages vs human ages" }
 - "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" }, searchQuery: "how OAuth works" }
 - "Best practices for React Server Components" → { title: "Best practices for React Server Components", research: { type: "general" }, searchQuery: "React Server Components best practices" }

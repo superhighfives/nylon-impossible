@@ -10,7 +10,12 @@ import { useState } from "react";
 import { useUser } from "@/hooks/useUser";
 import { getSocialUrlInfo } from "@/lib/social-urls";
 import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
-import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
+import type {
+  Recurrence,
+  RecurrenceFrequency,
+  SerializedTodoUrl,
+  TodoWithUrls,
+} from "@/types/database";
 import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
@@ -22,6 +27,7 @@ interface TodoItemExpandedProps {
     notes?: string | null;
     dueDate?: Date | null;
     priority?: "high" | "low" | null;
+    recurrence?: Recurrence | null;
   }) => void;
   isUpdating: boolean;
   onDelete: (id: string) => void;
@@ -32,6 +38,14 @@ function formatDate(isoString: string | null): string {
   if (!isoString) return "";
   const date = new Date(isoString);
   return date.toISOString().split("T")[0];
+}
+
+function ordinal(n: number): string {
+  const suffixes = ["th", "st", "nd", "rd"];
+  const mod100 = n % 100;
+  const suffix =
+    suffixes[(mod100 - 20) % 10] ?? suffixes[mod100] ?? suffixes[0];
+  return `${n}${suffix}`;
 }
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
@@ -107,13 +121,26 @@ export function TodoItemExpanded({
   const [priority, setPriority] = useState<"high" | "low" | "none">(
     todo.priority ?? "none",
   );
+  const [recurrence, setRecurrence] = useState<RecurrenceFrequency | "none">(
+    todo.recurrence?.frequency ?? "none",
+  );
+
+  // Recurrence has no anchor without a due date — disable the picker and
+  // treat the selection as "none" while there's no due date. We don't reset
+  // the underlying state, so the user's prior choice is preserved if they
+  // re-enter a due date in the same session.
+  const recurrenceDisabled = !dueDate;
+  const effectiveRecurrence: RecurrenceFrequency | "none" = recurrenceDisabled
+    ? "none"
+    : recurrence;
 
   // Check if there are unsaved changes
   const hasChanges =
     title.trim() !== todo.title ||
     notes.trim() !== (todo.notes ?? "") ||
     dueDate !== formatDate(todo.dueDate) ||
-    priority !== (todo.priority ?? "none");
+    priority !== (todo.priority ?? "none") ||
+    effectiveRecurrence !== (todo.recurrence?.frequency ?? "none");
 
   const canSave = hasChanges && title.trim().length > 0;
 
@@ -123,6 +150,7 @@ export function TodoItemExpanded({
       notes?: string | null;
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
+      recurrence?: Recurrence | null;
     } = {};
 
     const trimmedTitle = title.trim();
@@ -143,6 +171,13 @@ export function TodoItemExpanded({
       updates.priority = priority === "none" ? null : priority;
     }
 
+    if (effectiveRecurrence !== (todo.recurrence?.frequency ?? "none")) {
+      updates.recurrence =
+        effectiveRecurrence === "none"
+          ? null
+          : { frequency: effectiveRecurrence };
+    }
+
     if (Object.keys(updates).length > 0) {
       onUpdate(updates);
     }
@@ -156,6 +191,29 @@ export function TodoItemExpanded({
     if (value === null || value === undefined) return;
     setPriority(value as "high" | "low" | "none");
   };
+
+  const handleRecurrenceChange = (value: unknown) => {
+    if (value === null || value === undefined) return;
+    setRecurrence(value as RecurrenceFrequency | "none");
+  };
+
+  // Label reflects the anchor — "Weekly on Wednesday", "Monthly on the 14th".
+  const recurrenceItems = (() => {
+    const anchor = dueDate ? new Date(`${dueDate}T00:00:00`) : null;
+    const weeklyLabel = anchor
+      ? `Weekly on ${anchor.toLocaleDateString(undefined, { weekday: "long" })}`
+      : "Weekly";
+    const monthlyLabel = anchor
+      ? `Monthly on the ${ordinal(anchor.getDate())}`
+      : "Monthly";
+    return [
+      { value: "none", label: "None" },
+      { value: "daily", label: "Daily" },
+      { value: "weekly", label: weeklyLabel },
+      { value: "monthly", label: monthlyLabel },
+      { value: "yearly", label: "Yearly" },
+    ];
+  })();
 
   return (
     <div className="mt-3 space-y-5 rounded-xl border border-gray-subtle bg-gray-app/70 backdrop-blur-sm p-4">
@@ -257,6 +315,29 @@ export function TodoItemExpanded({
             ]}
           />
         </div>
+      </div>
+
+      {/* Repeat — disabled until a due date is set, since the rule has no
+          anchor without one. */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={`repeat-${todo.id}`}
+          className="text-xs font-medium text-gray-muted"
+        >
+          Repeat
+        </label>
+        <Select
+          size="sm"
+          value={effectiveRecurrence}
+          onValueChange={handleRecurrenceChange}
+          disabled={isUpdating || recurrenceDisabled}
+          items={recurrenceItems}
+        />
+        {recurrenceDisabled && (
+          <p className="text-xs text-gray-muted">
+            Set a due date to enable repeats.
+          </p>
+        )}
       </div>
 
       {/* Save / Delete row */}
