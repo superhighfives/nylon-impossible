@@ -2,6 +2,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  type DragStartEvent,
   KeyboardSensor,
   type Modifier,
   PointerSensor,
@@ -260,6 +261,7 @@ function ExpandedSection({
 
 function SortableTodoItem(
   props: TodoItemProps & {
+    isKeyboardDragging: boolean;
     onUpdateExpanded: (updates: {
       title?: string;
       notes?: string | null;
@@ -310,7 +312,14 @@ function SortableTodoItem(
       style={style}
       className={`group relative py-2 ${
         isDragging
-          ? "z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl ring-2 ring-yellow-strong backdrop-blur-sm"
+          ? `z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl backdrop-blur-sm ${
+              // Yellow border only for keyboard drags — it flags the selected
+              // row when there's no cursor on it. Pointer drags keep the gray
+              // ring since the cursor already shows what's being moved.
+              props.isKeyboardDragging
+                ? "ring-2 ring-yellow-strong"
+                : "ring-1 ring-gray-subtle"
+            }`
           : ""
       }`}
     >
@@ -429,6 +438,7 @@ export function TodoList() {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     TodoWithUrls[] | null
   >(null);
@@ -518,7 +528,18 @@ export function TodoList() {
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
 
+  const handleDragStart = ({ activatorEvent }: DragStartEvent) => {
+    // The drag was started by the keyboard sensor when a keyboard event kicked
+    // it off (Space/Enter on the grip) rather than a pointer.
+    setIsKeyboardDragging(activatorEvent instanceof KeyboardEvent);
+  };
+
+  const handleDragCancel = () => {
+    setIsKeyboardDragging(false);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setIsKeyboardDragging(false);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -556,7 +577,9 @@ export function TodoList() {
       sensors={sensors}
       collisionDetection={closestCenter}
       modifiers={[restrictToVerticalAxis]}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div>
         <SortableContext
@@ -567,6 +590,7 @@ export function TodoList() {
             <SortableTodoItem
               key={todo.id}
               {...sharedProps(todo)}
+              isKeyboardDragging={isKeyboardDragging}
               onUpdateExpanded={handleUpdateExpanded(todo.id)}
             />
           ))}
