@@ -3,6 +3,7 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
+  type Modifier,
   PointerSensor,
   TouchSensor,
   useSensor,
@@ -37,6 +38,13 @@ import {
 import type { TodoWithUrls } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
+
+// This is a single-column vertical list, so lock dragging to the Y axis —
+// otherwise the lifted row drifts sideways as it tracks the pointer/keyboard.
+const restrictToVerticalAxis: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+});
 
 interface TodoItemProps {
   todo: TodoWithUrls;
@@ -557,6 +565,7 @@ export function TodoList() {
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis]}
       onDragEnd={handleDragEnd}
     >
       <div>
