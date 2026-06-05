@@ -277,8 +277,13 @@ function SortableTodoItem(
   // so there's only ever one copy — no ghost). Other rows reflow to open a gap
   // at the target, and this same item slots into it, which keeps pointer and
   // keyboard moves lined up.
+  //
+  // Use Translate, not Transform: rows have variable heights (compact without a
+  // description, taller with one), and Transform would bake in a scaleY to morph
+  // rows between sizes as they pass — that scale is what caused the squish and
+  // stretch. Translate keeps only the x/y movement.
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 
