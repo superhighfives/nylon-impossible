@@ -269,11 +269,11 @@ function SortableTodoItem(
   },
 ) {
   const {
+    active,
     attributes,
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
     isSorting,
     activeIndex,
@@ -281,19 +281,15 @@ function SortableTodoItem(
     index,
   } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
-  // Only the dragged row moves — it lifts in place and tracks the pointer or
-  // keyboard. The rest of the list holds still (no reflow), which keeps the
-  // drop line static instead of riding the shifting rows. Translate only — no
-  // scaleY — so variable-height rows never squish or stretch.
-  const style = isDragging
-    ? { transform: CSS.Translate.toString(transform), transition }
-    : undefined;
+  // Rows reflow to open a gap at the target so it's clear where the item lands.
+  // No transition — rows (and the drop line) snap into place instead of sliding,
+  // which is what kept the line from feeling static. Translate only, no scaleY,
+  // so variable-height rows never squish or stretch.
+  const style = { transform: CSS.Translate.toString(transform) };
 
   // Drop indicator: a guide line at the insertion point. It sits on the leading
   // edge of the hovered row, on the side the dragged item will land — above when
-  // moving up, below when moving down. Because the list stays still, the line
-  // sits at the row boundary, which is centered in the uniform py-2 gap between
-  // rows regardless of their height.
+  // moving up, below when moving down.
   const isDropTarget =
     isSorting &&
     !isDragging &&
@@ -302,19 +298,26 @@ function SortableTodoItem(
   const lineAbove = isDropTarget && overIndex < activeIndex;
   const lineBelow = isDropTarget && overIndex > activeIndex;
 
+  // Reflow opens a gap the height of the dragged row beyond the row edge, so
+  // nudge the line by half that height to sit centered in the gap. Since nothing
+  // animates, it snaps straight to the centered position.
+  const draggedHeight = active?.rect.current.initial?.height ?? 0;
+  const lineShift = lineAbove ? -draggedHeight / 2 : draggedHeight / 2;
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={`group relative py-2 ${
         isDragging
-          ? "z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl ring-1 ring-gray-subtle backdrop-blur-sm"
+          ? "z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl ring-2 ring-yellow-strong backdrop-blur-sm"
           : ""
       }`}
     >
       {(lineAbove || lineBelow) && (
         <span
           aria-hidden="true"
+          style={{ transform: `translateY(${lineShift}px)` }}
           className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-yellow-solid ${
             lineAbove ? "top-0" : "bottom-0"
           }`}
