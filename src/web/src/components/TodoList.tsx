@@ -17,6 +17,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { generateKeyBetween } from "fractional-indexing";
 import {
   AlertCircle,
@@ -110,7 +111,8 @@ function TodoItemContent({
   onDelete,
   updatePending,
   deletePending,
-}: TodoItemProps) {
+  showActions = true,
+}: TodoItemProps & { showActions?: boolean }) {
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
@@ -194,31 +196,37 @@ function TodoItemContent({
           })()}
         <TodoIndicators todo={todo} />
       </div>
-      {/* Mobile: popover actions menu */}
-      <div className="flex sm:hidden">
-        <TodoActionsMenu
-          todoId={todo.id}
-          todoTitle={todo.title}
-          isExpanded={isExpanded}
-          onToggleExpand={onToggleExpand}
-          onDelete={onDelete}
-          deletePending={deletePending}
-        />
-      </div>
+      {/* Actions are hidden in the drag overlay clone so the lifted card
+          hugs the title instead of stretching to the taller control. */}
+      {showActions && (
+        <>
+          {/* Mobile: popover actions menu */}
+          <div className="flex sm:hidden">
+            <TodoActionsMenu
+              todoId={todo.id}
+              todoTitle={todo.title}
+              isExpanded={isExpanded}
+              onToggleExpand={onToggleExpand}
+              onDelete={onDelete}
+              deletePending={deletePending}
+            />
+          </div>
 
-      {/* Desktop: inline button revealed on hover */}
-      <div className="hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="xs"
-          shape="square"
-          type="button"
-          onClick={() => onToggleExpand(todo.id)}
-          aria-label={isExpanded ? "Collapse details" : "Expand details"}
-        >
-          {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </Button>
-      </div>
+          {/* Desktop: inline button revealed on hover */}
+          <div className="hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="xs"
+              shape="square"
+              type="button"
+              onClick={() => onToggleExpand(todo.id)}
+              aria-label={isExpanded ? "Collapse details" : "Expand details"}
+            >
+              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -256,6 +264,8 @@ function SortableTodoItem(
     attributes,
     listeners,
     setNodeRef,
+    transform,
+    transition,
     isDragging,
     isSorting,
     activeIndex,
@@ -263,9 +273,14 @@ function SortableTodoItem(
     index,
   } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
-  // The list stays still while dragging — the floating overlay clone carries
-  // the motion and the snap line marks the target — so no sort transform is
-  // applied here. The source row just dims to show it's been lifted out.
+  // Let the rows reflow to open a gap at the target — this is what keeps both
+  // pointer and keyboard moves lined up, since the lifted overlay clone lands
+  // in the opened gap rather than on top of a row. The source row also dims to
+  // show it's been lifted out.
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   // Drop indicator: a guide line at the insertion point. It sits on the
   // leading edge of the hovered row, on the side the dragged item will land —
@@ -282,6 +297,7 @@ function SortableTodoItem(
   return (
     <div
       ref={setNodeRef}
+      style={style}
       className={`group relative py-2 transition-opacity ${
         isDragging ? "opacity-40" : ""
       }`}
@@ -560,9 +576,9 @@ export function TodoList() {
             // Extend the card 12px past the row on each side (px-3 -mx-3) for a
             // lifted feel while the content still overlays the source row 1:1.
             // The grip is hidden — the cursor sits over it — but keeps its space
-            // so the text stays aligned with the rest of the list. Slightly
-            // translucent so the drop line shows through where they overlap.
-            <div className="cursor-grabbing -mx-3 rounded-xl bg-gray-surface px-3 py-2 opacity-80 shadow-xl ring-1 ring-gray-subtle">
+            // so the text stays aligned with the rest of the list. Frosted
+            // (translucent + backdrop blur) so the drop line reads through it.
+            <div className="cursor-grabbing -mx-3 rounded-xl bg-gray-surface/80 px-3 py-2 shadow-xl ring-1 ring-gray-subtle backdrop-blur-sm">
               <div className="flex items-start gap-2">
                 <span
                   className="pt-0.5 text-gray-muted opacity-0"
@@ -574,6 +590,7 @@ export function TodoList() {
                   <TodoItemContent
                     {...sharedProps(activeTodo)}
                     isExpanded={false}
+                    showActions={false}
                   />
                 </div>
               </div>
