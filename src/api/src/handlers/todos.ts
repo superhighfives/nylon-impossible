@@ -8,6 +8,7 @@ import {
   eq,
   getDb,
   inArray,
+  todoMessages,
   todoResearch,
   todos,
   todoUrls,
@@ -241,6 +242,20 @@ export async function updateTodo(c: Context<Env>) {
   if (completingRow && recurrence && anchor) {
     updates.completed = false;
     updates.dueDate = nextDueDate(recurrence, anchor, new Date());
+  }
+
+  // Completing a todo with an open question clears the question automatically.
+  if (completingRow && existing.needsInput) {
+    updates.needsInput = false;
+    await db
+      .update(todoMessages)
+      .set({ awaitingReply: false })
+      .where(
+        and(
+          eq(todoMessages.todoId, todoId),
+          eq(todoMessages.awaitingReply, true),
+        ),
+      );
   }
 
   await db

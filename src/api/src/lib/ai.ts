@@ -24,6 +24,15 @@ export interface TodoEnrichment {
   // research is set. Strips imperative verbs ("Research X" -> "X") so we
   // don't search for the meta-topic of researching the thing.
   searchQuery?: string;
+  // Present if the agent decided to ask the user a clarifying question.
+  question?: string;
+}
+
+// A single turn in a todo's conversation thread, oldest-first, used to
+// re-enrich after the user replies to the agent's question.
+export interface ConversationTurn {
+  role: "assistant" | "user";
+  content: string;
 }
 
 // Native Workers AI tool call format
@@ -126,6 +135,25 @@ export const enrichTodoTool = {
   },
 };
 
+export const askUserTool = {
+  type: "function" as const,
+  function: {
+    name: "ask_user",
+    description:
+      "Ask the user ONE clarifying question. Only use when the todo is genuinely unactionable without more info and a short answer would meaningfully improve enrichment (destination, date, scope). Do NOT use for stylistic preferences, things you can reasonably assume, or already-actionable todos like 'Buy milk' or 'Email Sarah'.",
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description: "A single, specific question under 80 characters.",
+        },
+      },
+      required: ["question"],
+    },
+  },
+};
+
 export function getSystemPrompt(): string {
   const today = new Date().toISOString().split("T")[0];
 
@@ -174,6 +202,13 @@ Examples:
 - "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" }, searchQuery: "The Rusty Nail bar" }
 - "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" }, searchQuery: "ramen Main St" }
 
+ASKING A CLARIFYING QUESTION:
+- You may also call the ask_user tool to ask ONE short clarifying question, but ONLY when the todo is genuinely unactionable without more info and a short answer would meaningfully improve enrichment. Most todos should NOT trigger a question.
+- When you ask, still call enrich_todo too with whatever you can extract from the current text (partial info is fine).
+- If a conversation history is provided and you have ALREADY asked once, strongly prefer enriching with what you now know — only ask again if something is genuinely still blocking action.
+- Examples that SHOULD ask: "Book a flight" → ask("Where to, and when?"); "Plan birthday party" → ask("Whose birthday, and any date in mind?").
+- Examples that should NOT ask (enrich only): "Buy milk", "Call mom", "Email Sarah about the Q3 numbers", "Research dog breeds".
+
 Always call the enrich_todo tool with your findings.`;
 }
 
@@ -206,6 +241,48 @@ export function extractToolCall(response: unknown): ParsedToolCall | null {
   }
 
   return null;
+}
+
+/**
+ * Like {@link extractToolCall} but returns every tool call, not just the first.
+ * Needed now that the model may call both `enrich_todo` and `ask_user` in one
+ * turn. Arguments are returned raw (parsed from JSON if needed); callers narrow
+ * them per tool name.
+ */
+export function extractAllToolCalls(
+  response: unknown,
+): Array<{ name: string; arguments: Record<string, unknown> }> {
+  const native = response as WorkersAIToolCallResponse;
+  if (native.tool_calls?.length) {
+    return native.tool_calls.map((tc) => ({
+      name: tc.name,
+      arguments: parseRawArguments(tc.arguments),
+    }));
+  }
+
+  const openai = response as OpenAICompatToolCallResponse;
+  const toolCalls = openai.choices?.[0]?.message?.tool_calls;
+  if (toolCalls?.length) {
+    return toolCalls
+      .filter((tc) => tc.function)
+      .map((tc) => ({
+        // biome-ignore lint/style/noNonNullAssertion: filtered above
+        name: tc.function!.name,
+        // biome-ignore lint/style/noNonNullAssertion: filtered above
+        arguments: parseRawArguments(tc.function!.arguments),
+      }));
+  }
+
+  return [];
+}
+
+function parseRawArguments(
+  args: Record<string, unknown> | string | unknown,
+): Record<string, unknown> {
+  if (typeof args === "string") {
+    return JSON.parse(args.trim());
+  }
+  return (args ?? {}) as Record<string, unknown>;
 }
 
 // Summarize the top-level shape of a Workers AI response for diagnostics —
@@ -290,22 +367,33 @@ export async function enrichTodo(
   text: string,
   gatewayId?: string,
   debug = false,
+  history?: ConversationTurn[],
 ): Promise<TodoEnrichment | null> {
   const systemPrompt = getSystemPrompt();
+
+  // Base turn is the todo itself; any prior conversation (the agent's question
+  // and the user's reply) follows so the model re-enriches with full context.
+  const messages: Array<{
+    role: "system" | "assistant" | "user";
+    content: string;
+  }> = [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: text },
+  ];
+  if (history?.length) {
+    for (const turn of history) {
+      messages.push({ role: turn.role, content: turn.content });
+    }
+  }
 
   const response = await runWithTimeout(
     ai.run(
       "@cf/openai/gpt-oss-120b",
       {
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: text },
-        ],
-        tools: [enrichTodoTool],
-        tool_choice: {
-          type: "function",
-          function: { name: "enrich_todo" },
-        },
+        messages,
+        // Offer both tools; the model decides whether to enrich, ask, or both.
+        tools: [enrichTodoTool, askUserTool],
+        tool_choice: "auto",
         max_tokens: 4000,
       },
       gatewayId ? { gateway: { id: gatewayId } } : {},
@@ -313,19 +401,37 @@ export async function enrichTodo(
     ENRICH_TIMEOUT_MS,
   );
 
-  const tc = extractToolCall(response);
+  const toolCalls = extractAllToolCalls(response);
 
-  if (!tc) {
+  if (toolCalls.length === 0) {
     const shape = describeResponseShape(response);
     console.error("No tool call found in AI response", shape);
     throw new Error(`AI did not return enrichment (shape: ${shape})`);
   }
 
-  if (tc.name !== "enrich_todo") {
-    throw new Error(`Unexpected tool call: ${tc.name}`);
+  const enrichCall = toolCalls.find((tc) => tc.name === "enrich_todo");
+  const askCall = toolCalls.find((tc) => tc.name === "ask_user");
+
+  if (!enrichCall && !askCall) {
+    throw new Error(`Unexpected tool call: ${toolCalls[0].name}`);
   }
 
-  const enrichment = tc.arguments;
+  // Merge into one enrichment shape. ask_user-only keeps the title unchanged
+  // (so no rewrite happens downstream) and carries just the question.
+  const enrichment: TodoEnrichment = enrichCall
+    ? (enrichCall.arguments as unknown as TodoEnrichment)
+    : { title: text };
+
+  // enrich_todo can omit the title in rare malformed responses; fall back to
+  // the original text so downstream title logic always has a string.
+  if (typeof enrichment.title !== "string" || enrichment.title.length === 0) {
+    enrichment.title = text;
+  }
+
+  if (askCall && typeof askCall.arguments.question === "string") {
+    const question = askCall.arguments.question.trim();
+    if (question) enrichment.question = question;
+  }
 
   // Diagnostic for unfamiliar models: report which fields the model populated.
   // PII-free (keys and booleans only). Off by default; opt in with LOG_AI_DEBUG.
@@ -368,12 +474,14 @@ export async function enrichTodo(
     }
   }
 
-  // If nothing was extracted (no URLs, no date, no priority, no research), return null
+  // If nothing was extracted (no URLs, no date, no priority, no research, no
+  // question), return null
   const hasEnrichment =
     (enrichment.urls && enrichment.urls.length > 0) ||
     enrichment.dueDate ||
     enrichment.priority ||
-    enrichment.research;
+    enrichment.research ||
+    enrichment.question;
 
   if (!hasEnrichment && enrichment.title === text) {
     return null;

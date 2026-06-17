@@ -12,8 +12,10 @@ import {
   inArray,
   lists,
   type Todo,
+  type TodoMessage,
   type TodoResearch,
   type TodoUrl,
+  todoMessages,
   todoResearch,
   todos,
   todoUrls,
@@ -94,11 +96,24 @@ function serializeResearch(research: TodoResearch | null) {
   };
 }
 
+// Serialize a conversation message with ISO8601 dates and lowercase IDs
+function serializeMessage(m: TodoMessage) {
+  return {
+    id: m.id.toLowerCase(),
+    todoId: m.todoId.toLowerCase(),
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt.toISOString(),
+    awaitingReply: m.awaitingReply,
+  };
+}
+
 // Serialize a todo with explicit ISO8601 dates and lowercase ID
 function serializeTodo(
   todo: typeof todos.$inferSelect,
   urls: ReturnType<typeof serializeUrl>[] = [],
   research: TodoResearch | null = null,
+  messages: ReturnType<typeof serializeMessage>[] = [],
 ) {
   return {
     id: todo.id.toLowerCase(),
@@ -111,9 +126,11 @@ function serializeTodo(
     priority: todo.priority,
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus,
+    needsInput: todo.needsInput,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     research: serializeResearch(research),
+    messages,
     urls,
   };
 }
@@ -442,8 +459,9 @@ export async function syncTodos(c: Context<Env>) {
   const todoIds = serverTodos.map((t) => t.id);
   let allUrls: TodoUrl[] = [];
   let allResearch: TodoResearch[] = [];
+  let allMessages: TodoMessage[] = [];
   if (todoIds.length > 0) {
-    [allUrls, allResearch] = await Promise.all([
+    [allUrls, allResearch, allMessages] = await Promise.all([
       db
         .select()
         .from(todoUrls)
@@ -453,6 +471,11 @@ export async function syncTodos(c: Context<Env>) {
         .select()
         .from(todoResearch)
         .where(inArray(todoResearch.todoId, todoIds)),
+      db
+        .select()
+        .from(todoMessages)
+        .where(inArray(todoMessages.todoId, todoIds))
+        .orderBy(asc(todoMessages.createdAt)),
     ]);
   }
 
@@ -471,12 +494,25 @@ export async function syncTodos(c: Context<Env>) {
     researchByTodoId.set(research.todoId, research);
   }
 
+  // Group messages by todoId (already ordered by createdAt asc)
+  const messagesByTodoId = new Map<
+    string,
+    ReturnType<typeof serializeMessage>[]
+  >();
+  for (const message of allMessages) {
+    const serialized = serializeMessage(message);
+    const existing = messagesByTodoId.get(message.todoId) ?? [];
+    existing.push(serialized);
+    messagesByTodoId.set(message.todoId, existing);
+  }
+
   return c.json({
     todos: serverTodos.map((todo) =>
       serializeTodo(
         todo,
         urlsByTodoId.get(todo.id) ?? [],
         researchByTodoId.get(todo.id) ?? null,
+        messagesByTodoId.get(todo.id) ?? [],
       ),
     ),
     syncedAt: syncedAt.toISOString(),

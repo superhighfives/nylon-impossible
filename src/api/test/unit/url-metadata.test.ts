@@ -21,13 +21,9 @@ function makeHtml(parts: {
       `<meta property="og:description" content="${parts.ogDescription}">`,
     );
   if (parts.ogSiteName)
-    tags.push(
-      `<meta property="og:site_name" content="${parts.ogSiteName}">`,
-    );
+    tags.push(`<meta property="og:site_name" content="${parts.ogSiteName}">`);
   if (parts.twitterTitle)
-    tags.push(
-      `<meta name="twitter:title" content="${parts.twitterTitle}">`,
-    );
+    tags.push(`<meta name="twitter:title" content="${parts.twitterTitle}">`);
   if (parts.twitterDescription)
     tags.push(
       `<meta name="twitter:description" content="${parts.twitterDescription}">`,
@@ -35,8 +31,7 @@ function makeHtml(parts: {
   if (parts.description)
     tags.push(`<meta name="description" content="${parts.description}">`);
   if (parts.title) tags.push(`<title>${parts.title}</title>`);
-  if (parts.icon)
-    tags.push(`<link rel="icon" href="${parts.icon}">`);
+  if (parts.icon) tags.push(`<link rel="icon" href="${parts.icon}">`);
   if (parts.appleIcon)
     tags.push(`<link rel="apple-touch-icon" href="${parts.appleIcon}">`);
 
@@ -146,7 +141,10 @@ describe("fetchUrlMetadata", () => {
 
     it("falls back to twitter:description", async () => {
       stubFetchOk(
-        makeHtml({ twitterDescription: "Twitter Desc", description: "Meta Desc" }),
+        makeHtml({
+          twitterDescription: "Twitter Desc",
+          description: "Meta Desc",
+        }),
       );
       const meta = await fetchUrlMetadata("https://example.com");
       expect(meta.description).toBe("Twitter Desc");

@@ -15,7 +15,9 @@ describe("isPlausibleUrl", () => {
 
     it("accepts a URL with a path containing hyphens and dots", () => {
       expect(
-        isPlausibleUrl("https://www.petsmart.com/learning-center/cat-care.html"),
+        isPlausibleUrl(
+          "https://www.petsmart.com/learning-center/cat-care.html",
+        ),
       ).toBe(true);
     });
 
@@ -32,14 +34,13 @@ describe("isPlausibleUrl", () => {
     });
 
     it("accepts Google Maps directions URLs", () => {
-      expect(
-        isPlausibleUrl("https://www.google.com/maps/dir/A/B"),
-      ).toBe(true);
+      expect(isPlausibleUrl("https://www.google.com/maps/dir/A/B")).toBe(true);
     });
 
     it("accepts maps.google.com URLs", () => {
-      expect(isPlausibleUrl("https://maps.google.com/maps/place/Somewhere"))
-        .toBe(true);
+      expect(
+        isPlausibleUrl("https://maps.google.com/maps/place/Somewhere"),
+      ).toBe(true);
     });
 
     it("accepts URLs with '+' in the path (not a fabrication signal)", () => {
@@ -47,9 +48,9 @@ describe("isPlausibleUrl", () => {
     });
 
     it("accepts URLs with ordinary query parameters on non-Google hosts", () => {
-      expect(
-        isPlausibleUrl("https://news.ycombinator.com/item?id=12345"),
-      ).toBe(true);
+      expect(isPlausibleUrl("https://news.ycombinator.com/item?id=12345")).toBe(
+        true,
+      );
     });
   });
 
@@ -72,9 +73,7 @@ describe("isPlausibleUrl", () => {
 
     it("rejects google.com image search deep links", () => {
       expect(
-        isPlausibleUrl(
-          "https://google.com/kittens/search?q=kittens&tbm=isch",
-        ),
+        isPlausibleUrl("https://google.com/kittens/search?q=kittens&tbm=isch"),
       ).toBe(false);
     });
 
@@ -112,18 +111,14 @@ describe("isUrlReachable", () => {
   });
 
   it("rejects URLs that return 404", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 404 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 });
     vi.stubGlobal("fetch", fetchMock);
 
     expect(await isUrlReachable("https://example.com/missing")).toBe(false);
   });
 
   it("rejects URLs that return 500", async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue({ ok: false, status: 500 });
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
     vi.stubGlobal("fetch", fetchMock);
 
     expect(await isUrlReachable("https://example.com")).toBe(false);
@@ -159,9 +154,7 @@ describe("isUrlReachable", () => {
       vi.fn().mockRejectedValue(new TypeError("fetch failed")),
     );
 
-    expect(await isUrlReachable("https://does-not-exist.invalid")).toBe(
-      false,
-    );
+    expect(await isUrlReachable("https://does-not-exist.invalid")).toBe(false);
   });
 
   it("rejects URLs that time out", async () => {

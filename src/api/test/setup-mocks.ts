@@ -2,7 +2,7 @@ import { vi } from "vitest";
 
 // Mock the background-enrichment side effect so handlers (smart-create,
 // reresearch, todos) don't actually hit Workers AI in tests. The real
-// enrichTodoWithAI runs inside ctx.waitUntil() and would otherwise crash
+// enrichOrAskWithAI runs inside ctx.waitUntil() and would otherwise crash
 // because env.AI is not bound in wrangler.test.jsonc — leaving stderr full
 // of "Cannot read properties of undefined (reading 'run')" noise even
 // though tests still pass.
@@ -21,6 +21,6 @@ vi.mock("../src/lib/ai-enrich", async (importActual) => {
     return await importActual<typeof import("../src/lib/ai-enrich")>();
   }
   return {
-    enrichTodoWithAI: vi.fn().mockResolvedValue(undefined),
+    enrichOrAskWithAI: vi.fn().mockResolvedValue(undefined),
   };
 });

@@ -16,7 +16,7 @@ import { env } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoResearch, todoUrls, todos } from "../../src/lib/db";
+import { getDb, todoResearch, todos, todoUrls } from "../../src/lib/db";
 import { executeResearch } from "../../src/lib/research";
 import { cleanDb, seedUser } from "../helpers";
 
