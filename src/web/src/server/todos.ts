@@ -12,13 +12,14 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
-import type { Todo, TodoResearch, TodoUrl } from "@/lib/schema";
-import { todoResearch, todos, todoUrls } from "@/lib/schema";
+import type { Todo, TodoMessage, TodoResearch, TodoUrl } from "@/lib/schema";
+import { todoMessages, todoResearch, todos, todoUrls } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import { createTodoSchema, updateTodoSchema } from "@/lib/validation";
 import type {
   CreateTodoInput,
   SerializedResearch,
+  SerializedTodoMessage,
   SerializedTodoUrl,
   TodoWithUrls,
   UpdateTodoInput,
@@ -56,11 +57,24 @@ function serializeResearch(research: TodoResearch): SerializedResearch {
   };
 }
 
-/** Serialize a todo with URLs and research for JSON response */
+/** Serialize a conversation message for JSON response */
+function serializeMessage(message: TodoMessage): SerializedTodoMessage {
+  return {
+    id: message.id,
+    todoId: message.todoId,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt.toISOString(),
+    awaitingReply: message.awaitingReply,
+  };
+}
+
+/** Serialize a todo with URLs, research and messages for JSON response */
 function serializeTodoWithUrls(
   todo: Todo,
   urls: TodoUrl[],
   research: TodoResearch | null,
+  messages: TodoMessage[] = [],
 ): TodoWithUrls {
   return {
     id: todo.id,
@@ -73,9 +87,11 @@ function serializeTodoWithUrls(
     priority: todo.priority,
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus ?? null,
+    needsInput: todo.needsInput,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     research: research ? serializeResearch(research) : null,
+    messages: messages.map(serializeMessage),
     urls: urls.map(serializeUrl),
   };
 }
@@ -105,8 +121,9 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
       const todoIds = userTodos.map((t) => t.id);
       let allUrls: TodoUrl[] = [];
       let allResearch: TodoResearch[] = [];
+      let allMessages: TodoMessage[] = [];
       if (todoIds.length > 0) {
-        const [urls, research] = yield* Effect.tryPromise({
+        const [urls, research, messages] = yield* Effect.tryPromise({
           try: () =>
             Promise.all([
               db
@@ -118,6 +135,11 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
                 .select()
                 .from(todoResearch)
                 .where(inArray(todoResearch.todoId, todoIds)),
+              db
+                .select()
+                .from(todoMessages)
+                .where(inArray(todoMessages.todoId, todoIds))
+                .orderBy(asc(todoMessages.createdAt)),
             ]),
           catch: (error) =>
             new DatabaseError({
@@ -127,6 +149,7 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         });
         allUrls = urls;
         allResearch = research;
+        allMessages = messages;
       }
 
       // Group URLs by todoId
@@ -143,16 +166,25 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         researchByTodoId.set(research.todoId, research);
       }
 
+      // Group messages by todoId (already ordered by createdAt asc)
+      const messagesByTodoId = new Map<string, TodoMessage[]>();
+      for (const message of allMessages) {
+        const existing = messagesByTodoId.get(message.todoId) ?? [];
+        existing.push(message);
+        messagesByTodoId.set(message.todoId, existing);
+      }
+
       yield* Effect.log(
         `Fetched ${userTodos.length} todos for user ${user.id}`,
       );
 
-      // Return todos with their URLs and research
+      // Return todos with their URLs, research and messages
       return userTodos.map((todo) =>
         serializeTodoWithUrls(
           todo,
           urlsByTodoId.get(todo.id) ?? [],
           researchByTodoId.get(todo.id) ?? null,
+          messagesByTodoId.get(todo.id) ?? [],
         ),
       );
     }),

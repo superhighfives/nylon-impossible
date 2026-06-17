@@ -8,6 +8,8 @@ import {
   hasPendingNonStaleWork,
   useCreateTodo,
   useDeleteTodo,
+  useDismissTodoQuestion,
+  useReplyToTodo,
   useReresearch,
   useTodos,
   useUpdateTodo,
@@ -61,7 +63,9 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     aiStatus: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
+    needsInput: false,
     research: null,
+    messages: [],
     urls: [],
     ...overrides,
   };
@@ -479,5 +483,151 @@ describe("useReresearch", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error?.message).toBe("Request failed (500)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useReplyToTodo – optimistic message + clear needsInput
+// ---------------------------------------------------------------------------
+
+describe("useReplyToTodo", () => {
+  const TODO_QUERY_KEY = ["todos"];
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("optimistically appends the user message and clears needsInput", async () => {
+    let resolveFetch!: (v: Response) => void;
+    vi.mocked(global.fetch).mockReturnValue(
+      new Promise<Response>((res) => {
+        resolveFetch = res;
+      }),
+    );
+
+    const initial = makeTodo({ needsInput: true, messages: [] });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useReplyToTodo(), { wrapper: Wrapper });
+    result.current.mutate({ todoId: "todo-1", content: "Lisbon" });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+      expect(cached?.[0]?.needsInput).toBe(false);
+      expect(cached?.[0]?.messages).toHaveLength(1);
+      expect(cached?.[0]?.messages[0]).toMatchObject({
+        role: "user",
+        content: "Lisbon",
+      });
+    });
+
+    resolveFetch({
+      ok: true,
+      json: () => Promise.resolve({ id: "m1" }),
+    } as Response);
+  });
+
+  it("rolls back to the snapshot when the reply errors", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "boom" }),
+    } as Response);
+
+    const initial = makeTodo({ needsInput: true, messages: [] });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useReplyToTodo(), { wrapper: Wrapper });
+    result.current.mutate({ todoId: "todo-1", content: "Lisbon" });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+    expect(cached?.[0]?.needsInput).toBe(true);
+    expect(cached?.[0]?.messages).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useDismissTodoQuestion – optimistic clear, no new message
+// ---------------------------------------------------------------------------
+
+describe("useDismissTodoQuestion", () => {
+  const TODO_QUERY_KEY = ["todos"];
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("clears needsInput and the awaiting flag optimistically without adding a message", async () => {
+    let resolveFetch!: (v: Response) => void;
+    vi.mocked(global.fetch).mockReturnValue(
+      new Promise<Response>((res) => {
+        resolveFetch = res;
+      }),
+    );
+
+    const initial = makeTodo({
+      needsInput: true,
+      messages: [
+        {
+          id: "a1",
+          todoId: "todo-1",
+          role: "assistant",
+          content: "Where to?",
+          createdAt: new Date().toISOString(),
+          awaitingReply: true,
+        },
+      ],
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useDismissTodoQuestion(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ todoId: "todo-1" });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+      expect(cached?.[0]?.needsInput).toBe(false);
+      expect(cached?.[0]?.messages).toHaveLength(1);
+      expect(cached?.[0]?.messages[0]?.awaitingReply).toBe(false);
+    });
+
+    resolveFetch({
+      ok: true,
+      json: () => Promise.resolve({ success: true }),
+    } as Response);
+  });
+
+  it("rolls back when dismiss errors", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "boom" }),
+    } as Response);
+
+    const initial = makeTodo({ needsInput: true });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useDismissTodoQuestion(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ todoId: "todo-1" });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+    expect(cached?.[0]?.needsInput).toBe(true);
   });
 });

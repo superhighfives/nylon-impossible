@@ -16,6 +16,7 @@ import type {
   SerializedTodoUrl,
   TodoWithUrls,
 } from "@/types/database";
+import { ConversationSection } from "./ConversationSection";
 import { ResearchSection } from "./ResearchSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
@@ -375,6 +376,9 @@ export function TodoItemExpanded({
           )}
         />
       )}
+
+      {/* Conversation Section — agent questions and the user's replies */}
+      <ConversationSection todo={todo} />
 
       {/* URLs (user-provided, not research sources) */}
       {todo.urls && todo.urls.filter((url) => !url.researchId).length > 0 && (
