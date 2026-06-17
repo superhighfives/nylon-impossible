@@ -1,8 +1,38 @@
 # Conversational Todo Refinement
 
 **Date**: 2026-06-04
-**Status**: Ready
+**Status**: In progress
 **Scope**: API + Web + iOS
+
+## Phase 0 outcome (2026-06-05): Fall back — do NOT adopt Flue
+
+Spiked `@flue/runtime@0.9.2` in `src/api/` (throwaway, since deleted). Findings:
+
+- **Dependency weight.** Installing it pulled in **275 transitive packages**,
+  including native modules (`node-liblzma` requiring `node-gyp`, which failed to
+  build; `@mongodb-js/zstd`) plus Node-server-only deps (`@hono/node-server`,
+  `ws`, `@google/genai`, `protobufjs`). A throwaway worker that merely *references*
+  an agent bundled to **8.8 MB (1.2 MB gzip)** — versus the current lean worker.
+- **No clean stateless run path.** `createAgent()` returns only an initializer
+  (`{ __flueCreatedAgent, initialize }`); it is not directly runnable. Getting a
+  typed result requires `FlueSession.prompt(text, { result: schema })`, and a
+  session is created via `handleAgentRequest`/`DirectAgent`, whose `createContext`
+  on Cloudflare wires **DO env + DO SQLite session store + CF sandbox**
+  (`cfSandboxToSessionEnv`). The `./cloudflare` export is built around Durable
+  Objects and R2 (`getDurableObjectIdentity`, `hydrateFromBucket`, `store`,
+  WebSocket sessions). `dispatch()` is fire-and-forget (returns a receipt), not a
+  synchronous typed result. Running it truly statelessly means hand-rolling a
+  custom `SessionStore`, `sandbox: false`, and manual context — reimplementing
+  the platform glue Flue exists to provide. That is exactly the "fights the
+  existing architecture" case the gate warned about.
+
+**Decision.** Keep the existing `src/api/src/lib/ai.ts` structure (hand-written
+JSON-Schema tool definitions + Workers AI tool calls via the AI Gateway). We do
+**not** adopt Flue, and we do **not** introduce Valibot — the codebase is Zod v4
+throughout, and `ai.ts`'s tool-call parsing is already well-tested. The system
+prompt stays an inline function (it interpolates today's date). Downstream phases
+are unchanged in shape, per the plan. The `ask_user` tool is added the same way
+`enrich_todo` already is.
 
 ## Problem
 
@@ -349,6 +379,20 @@ After the existing enrichment-writing logic, add a block that handles `enrichmen
 ```ts
 if (enrichment.question) {
   const now = new Date();
+
+  // Enforce "max one open question at a time": clear awaiting_reply on any
+  // existing open assistant messages before posting the new one. Guards
+  // against concurrent/background runs leaving multiple awaiting messages.
+  await db
+    .update(todoMessages)
+    .set({ awaitingReply: false })
+    .where(
+      and(
+        eq(todoMessages.todoId, todoId),
+        eq(todoMessages.awaitingReply, true),
+      ),
+    );
+
   await db.insert(todoMessages).values({
     id: crypto.randomUUID(),
     todoId,
@@ -428,27 +472,19 @@ export async function replyToTodo(c: Context<Env>) {
     awaitingReply: false,
   });
 
-  // Clear awaiting_reply on the last assistant message
-  // (SQLite has no easy "update most recent" — load latest assistant message)
-  const [lastAssistant] = await db
-    .select()
-    .from(todoMessages)
+  // Clear awaiting_reply on any open assistant messages in one UPDATE.
+  // `needs_input` already guarantees at most one is open, so this is both
+  // simpler and more robust than a SELECT-then-UPDATE on the most recent.
+  // (Same approach as the dismiss endpoint.)
+  await db
+    .update(todoMessages)
+    .set({ awaitingReply: false })
     .where(
       and(
         eq(todoMessages.todoId, todoId),
-        eq(todoMessages.role, "assistant"),
         eq(todoMessages.awaitingReply, true),
       ),
-    )
-    .orderBy(asc(todoMessages.createdAt))
-    .limit(1);
-
-  if (lastAssistant) {
-    await db
-      .update(todoMessages)
-      .set({ awaitingReply: false })
-      .where(eq(todoMessages.id, lastAssistant.id));
-  }
+    );
 
   // Clear needs_input on the todo, bump updatedAt for sync
   await db
@@ -705,7 +741,7 @@ export function useDismissTodoQuestion() {
 
 The todo row lives in `src/web/src/components/TodoList.tsx` (around line 141, where `aiStatus === "pending" || aiStatus === "processing"` is rendered). When `todo.needsInput === true`, render a small badge alongside that AI status indicator. Use the existing `@/components/ui` components — no new primitives.
 
-Suggested treatment: a small chat-bubble icon button in `bg-yellow-base hover:bg-yellow-hover` with `text-yellow-12`, sized as `Button shape="circle" size="xs"`. Clicking it opens the existing todo detail popover (call the same handler the row uses for opening detail).
+Suggested treatment: a small chat-bubble icon button in `bg-yellow-base hover:bg-yellow-hover` with `text-yellow` (the repo's high-contrast yellow token — `text-yellow-12` does not exist), sized as `Button shape="circle" size="xs"`. Clicking it opens the existing todo detail popover (call the same handler the row uses for opening detail).
 
 #### Step 3.5: `ConversationSection` component
 
@@ -713,7 +749,7 @@ Create `src/web/src/components/ConversationSection.tsx`:
 
 ```tsx
 import { useState } from "react";
-import { Button, Field, Input, Loader } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { useDismissTodoQuestion, useReplyToTodo } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
 
@@ -743,7 +779,11 @@ export function ConversationSection({ todo }: Props) {
           key={m.id}
           className={`text-sm ${m.role === "assistant" ? "text-gray" : "text-gray-muted pl-4"}`}
         >
-          <span className="mr-2">{m.role === "assistant" ? "🤖" : "👤"}</span>
+          {/* Accessible role label instead of an emoji: visible icon is
+              decorative (aria-hidden), screen readers get the real word. */}
+          <span className="sr-only">
+            {m.role === "assistant" ? "Assistant: " : "You: "}
+          </span>
           {m.content}
         </div>
       ))}
@@ -1025,8 +1065,8 @@ Add to `src/web/test/`:
 
 ## Acceptance criteria
 
-- [ ] Phase 0 spike completed, Flue decision documented inline in this plan under "Phase 0 outcome"
-- [ ] Migration `0009_add_todo_messages.sql` creates `todo_messages` table and `todos.needs_input` column; `pnpm db:migrate` succeeds locally
+- [x] Phase 0 spike completed, Flue decision documented inline in this plan under "Phase 0 outcome"
+- [ ] Migration `0010_add_todo_messages.sql` creates `todo_messages` table and `todos.needs_input` column; `pnpm db:migrate` succeeds locally
 - [ ] Sync protocol returns `messages: [...]` and `needsInput: boolean` per todo
 - [ ] Inserting a message bumps `todos.updatedAt` (verified via integration test)
 - [ ] Ambiguous todos like "Book a flight" trigger one question; specific todos like "Buy milk" do not (verified by unit-testing tool-call parser with fixture responses)
@@ -1040,9 +1080,9 @@ Add to `src/web/test/`:
 - [ ] iOS list shows a question indicator when `needsInput` is true
 - [ ] iOS detail view shows the conversation thread with reply and dismiss actions
 - [ ] Offline iOS reply queues with `isSynced = false` and syncs on reconnection
-- [ ] All existing AI behaviour (URL extraction, date parsing, research) continues to work unchanged for non-ambiguous todos (regression-checked via existing tests)
-- [ ] `pnpm check && pnpm typecheck && pnpm test` passes from repo root
-- [ ] `swiftlint` passes in `src/ios/Nylon Impossible/`
+- [x] All existing AI behaviour (URL extraction, date parsing, research) continues to work unchanged for non-ambiguous todos (regression-checked via existing tests)
+- [x] `pnpm check && pnpm typecheck && pnpm test` passes from repo root
+- [x] `swiftlint` passes in `src/ios/Nylon Impossible/` (12 warnings, 0 serious — pre-existing file-length / implicit-optional warnings outside this change's scope)
 
 ## Out of scope
 
