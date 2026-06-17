@@ -42,6 +42,15 @@ struct APIResearch: Codable, Sendable {
     let createdAt: Date
 }
 
+struct APITodoMessage: Codable, Sendable, Identifiable {
+    let id: String
+    let todoId: String
+    let role: String         // "assistant" | "user"
+    let content: String
+    let createdAt: Date
+    let awaitingReply: Bool
+}
+
 struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
@@ -53,18 +62,21 @@ struct APITodo: Codable, Sendable {
     let priority: String?
     let recurrence: Recurrence?
     let aiStatus: AIStatus?
+    let needsInput: Bool?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
     let research: APIResearch?
+    let messages: [APITodoMessage]?  // Conversation included in sync response
 
     init(
         id: String, userId: String, title: String, notes: String? = nil,
         completed: Bool, position: String? = nil, dueDate: Date? = nil,
         priority: String? = nil, recurrence: Recurrence? = nil,
-        aiStatus: AIStatus? = nil,
+        aiStatus: AIStatus? = nil, needsInput: Bool? = nil,
         createdAt: Date, updatedAt: Date,
-        urls: [APITodoUrl]? = nil, research: APIResearch? = nil
+        urls: [APITodoUrl]? = nil, research: APIResearch? = nil,
+        messages: [APITodoMessage]? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -76,10 +88,12 @@ struct APITodo: Codable, Sendable {
         self.priority = priority
         self.recurrence = recurrence
         self.aiStatus = aiStatus
+        self.needsInput = needsInput
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls
         self.research = research
+        self.messages = messages
     }
 }
 
@@ -281,6 +295,8 @@ protocol APIProviding: Sendable {
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func reresearch(todoId: String) async throws
     func cancelResearch(todoId: String) async throws
+    func replyToTodo(todoId: String, content: String) async throws -> String
+    func dismissQuestion(todoId: String) async throws
 }
 
 // MARK: - API Service
@@ -397,6 +413,24 @@ final class APIService: APIProviding {
 
     func cancelResearch(todoId: String) async throws {
         let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/research")
+    }
+
+    // MARK: - Conversation
+
+    /// Reply to the agent's clarifying question. Returns the server message id.
+    func replyToTodo(todoId: String, content: String) async throws -> String {
+        struct ReplyRequest: Codable { let content: String }
+        struct ReplyResponse: Decodable { let id: String }
+        let response: ReplyResponse = try await post(
+            path: "/todos/\(todoId)/reply",
+            body: ReplyRequest(content: content)
+        )
+        return response.id
+    }
+
+    /// Dismiss the agent's open question without answering.
+    func dismissQuestion(todoId: String) async throws {
+        let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/question")
     }
 
     // MARK: - User Preferences

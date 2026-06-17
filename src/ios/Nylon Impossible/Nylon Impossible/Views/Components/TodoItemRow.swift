@@ -96,6 +96,14 @@ struct TodoItemRow: View {
                                 .accessibilityLabel("Researching")
                         }
 
+                        // Agent has a question awaiting the user's reply
+                        if todo.needsInput {
+                            Image(systemName: "bubble.left.fill")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.yellow)
+                                .accessibilityLabel("The assistant has a question")
+                        }
+
                         Spacer()
                         if !todo.isSynced {
                             Circle()

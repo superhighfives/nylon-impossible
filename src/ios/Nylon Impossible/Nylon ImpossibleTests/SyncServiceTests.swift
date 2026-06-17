@@ -7,7 +7,7 @@ import SwiftData
 struct SyncServiceTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(for: TodoItem.self, TodoUrl.self, configurations: config)
+        return try ModelContainer(for: TodoItem.self, TodoUrl.self, TodoMessage.self, configurations: config)
     }
 
     @Test("Skips sync when not signed in")
