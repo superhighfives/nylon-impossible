@@ -263,7 +263,7 @@ final class SyncService {
         remoteTodos: [APITodo],
         localChangeIds: Set<String>,
         userId: String,
-        justPushedMessageIds: Set<UUID> = []
+        justPushedMessageIds: Set<String> = []
     ) throws {
         guard let modelContext else { return }
 
@@ -470,7 +470,7 @@ extension SyncService {
     /// may not include them in this same response if enrichment is still
     /// running). Failures are left unsynced to retry next time; a single
     /// failed reply must not abort the whole sync.
-    fileprivate func pushPendingReplies(apiService: any APIProviding, userId: String) async -> Set<UUID> {
+    fileprivate func pushPendingReplies(apiService: any APIProviding, userId: String) async -> Set<String> {
         guard let modelContext else { return [] }
 
         let descriptor = FetchDescriptor<TodoMessage>(
@@ -481,7 +481,7 @@ extension SyncService {
         }
 
         var didChange = false
-        var pushedIds: Set<UUID> = []
+        var pushedIds: Set<String> = []
         for message in pending {
             guard let todo = message.todo, todo.userId == userId else { continue }
             let todoId = todo.id.uuidString.lowercased()
