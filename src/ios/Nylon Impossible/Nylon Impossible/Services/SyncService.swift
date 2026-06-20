@@ -139,7 +139,7 @@ final class SyncService {
         do {
             // 0. Push any pending offline replies so the server can re-enrich and
             // return the updated conversation in this same sync round.
-            await pushPendingReplies(apiService: apiService, userId: userId)
+            let pushedMessageIds = await pushPendingReplies(apiService: apiService, userId: userId)
 
             // 1. Gather local changes (unsynced items for this user)
             let localChanges = try gatherLocalChanges(userId: userId)
@@ -156,7 +156,8 @@ final class SyncService {
             try applySync(
                 remoteTodos: response.todos,
                 localChangeIds: localChangeIds,
-                userId: userId
+                userId: userId,
+                justPushedMessageIds: pushedMessageIds
             )
 
             // Recompute app icon badge after every sync (due-today / overdue).
@@ -257,48 +258,12 @@ final class SyncService {
         }
     }
 
-    /// Push locally-created replies (offline or failed) to the server via the
-    /// dedicated reply endpoint. Failures are left unsynced to retry next time;
-    /// a single failed reply must not abort the whole sync.
-    private func pushPendingReplies(apiService: any APIProviding, userId: String) async {
-        guard let modelContext else { return }
-
-        let descriptor = FetchDescriptor<TodoMessage>(
-            predicate: #Predicate { $0.isSynced == false && $0.role == "user" }
-        )
-        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else {
-            return
-        }
-
-        var didChange = false
-        for message in pending {
-            // Only push replies for this user's todos.
-            guard let todo = message.todo, todo.userId == userId else { continue }
-            let todoId = todo.id.uuidString.lowercased()
-            do {
-                _ = try await apiService.replyToTodo(todoId: todoId, content: message.content)
-                // Server now owns the canonical message; mark synced so the upsert
-                // step reconciles it (the server's copy replaces this one by id).
-                message.isSynced = true
-                didChange = true
-            } catch {
-                // Leave unsynced; next sync retries.
-                SentrySDK.capture(error: error) { scope in
-                    scope.setTag(value: "reply-push", key: "area")
-                }
-            }
-        }
-
-        if didChange {
-            try? modelContext.save()
-        }
-    }
-
     /// Apply all sync changes in a single atomic operation
     private func applySync(
         remoteTodos: [APITodo],
         localChangeIds: Set<String>,
-        userId: String
+        userId: String,
+        justPushedMessageIds: Set<UUID> = []
     ) throws {
         guard let modelContext else { return }
 
@@ -462,8 +427,13 @@ final class SyncService {
             let existingById = todo.messages.reduce(into: [:]) { dict, m in dict[m.id] = m }
 
             // Delete only synced messages no longer present on the server.
+            // Skip messages we just pushed in this round — the server may not
+            // have included them in this response yet (e.g. enrichment still
+            // running). They'll reconcile on the next sync.
             for message in todo.messages
-            where message.isSynced && !remoteMessageIds.contains(message.id) {
+            where message.isSynced
+                && !remoteMessageIds.contains(message.id)
+                && !justPushedMessageIds.contains(message.id) {
                 modelContext.delete(message)
             }
 
@@ -490,5 +460,46 @@ final class SyncService {
         lastSyncedAt = nil
         state = .idle
         UserDefaults.standard.removeObject(forKey: lastSyncedAtKey)
+    }
+}
+
+extension SyncService {
+    /// Push locally-created replies (offline or failed) to the server via the
+    /// dedicated reply endpoint. Returns the ids of messages successfully
+    /// pushed so the caller can skip them in the delete-sweep step (the server
+    /// may not include them in this same response if enrichment is still
+    /// running). Failures are left unsynced to retry next time; a single
+    /// failed reply must not abort the whole sync.
+    fileprivate func pushPendingReplies(apiService: any APIProviding, userId: String) async -> Set<UUID> {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<TodoMessage>(
+            predicate: #Predicate { $0.isSynced == false && $0.role == "user" }
+        )
+        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else {
+            return []
+        }
+
+        var didChange = false
+        var pushedIds: Set<UUID> = []
+        for message in pending {
+            guard let todo = message.todo, todo.userId == userId else { continue }
+            let todoId = todo.id.uuidString.lowercased()
+            do {
+                _ = try await apiService.replyToTodo(todoId: todoId, content: message.content)
+                message.isSynced = true
+                pushedIds.insert(message.id)
+                didChange = true
+            } catch {
+                SentrySDK.capture(error: error) { scope in
+                    scope.setTag(value: "reply-push", key: "area")
+                }
+            }
+        }
+
+        if didChange {
+            try? modelContext.save()
+        }
+        return pushedIds
     }
 }
