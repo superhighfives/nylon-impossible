@@ -21,10 +21,9 @@ struct TodoEditSheet: View {
     @State private var priority: TodoPriority?
     @State private var recurrenceFrequency: RecurrenceFrequency?
     @State private var urls: [APITodoUrl] = []
-    @State private var research: APIResearch? = nil
+    @State private var research: APIResearch?
     @State private var isLoadingUrls: Bool = false
     @State private var isReresearching: Bool = false
-
 
     init(
         todo: TodoItem,
@@ -147,6 +146,9 @@ struct TodoEditSheet: View {
                         onCancelResearch: { await cancelResearch() }
                     )
                 }
+
+                // Conversation — agent questions and the user's replies
+                ConversationSection(todo: todo, apiService: apiService)
 
                 // Links (non-research URLs only)
                 let regularUrls = urls.filter { $0.researchId == nil }

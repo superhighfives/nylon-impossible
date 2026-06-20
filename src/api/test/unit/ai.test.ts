@@ -221,10 +221,7 @@ describe("enrichTodo", () => {
         ],
       });
 
-      const result = await enrichTodo(
-        ai,
-        "Compare github.com/user/repo with",
-      );
+      const result = await enrichTodo(ai, "Compare github.com/user/repo with");
       expect(result!.urls).toEqual(["https://github.com/user/repo"]);
     });
 
@@ -333,10 +330,7 @@ describe("enrichTodo", () => {
             }),
           ]),
           tools: expect.any(Array),
-          tool_choice: expect.objectContaining({
-            type: "function",
-            function: { name: "enrich_todo" },
-          }),
+          tool_choice: "auto",
         }),
         {},
       );
@@ -369,6 +363,78 @@ describe("enrichTodo", () => {
       const inputs = call[1];
       expect(inputs.messages[0].role).toBe("system");
       expect(inputs.messages[0].content).toContain("metadata extractor");
+    });
+  });
+
+  describe("ask_user tool parsing", () => {
+    it("parses an ask_user-only response (keeps title, sets question)", async () => {
+      const ai = createMockAiWithResponse({
+        response: null,
+        tool_calls: [
+          { name: "ask_user", arguments: { question: "Where to, and when?" } },
+        ],
+      });
+
+      const result = await enrichTodo(ai, "Book a flight");
+      expect(result).not.toBeNull();
+      expect(result?.question).toBe("Where to, and when?");
+      // No enrich_todo call → title falls back to the original text unchanged.
+      expect(result?.title).toBe("Book a flight");
+    });
+
+    it("merges enrich_todo and ask_user when both are called", async () => {
+      const ai = createMockAiWithResponse({
+        response: null,
+        tool_calls: [
+          {
+            name: "enrich_todo",
+            arguments: { title: "Book a flight", priority: "high" },
+          },
+          { name: "ask_user", arguments: { question: "Where to?" } },
+        ],
+      });
+
+      const result = await enrichTodo(ai, "Book a flight urgently");
+      expect(result?.priority).toBe("high");
+      expect(result?.question).toBe("Where to?");
+    });
+
+    it("handles enrich_todo-only with no question", async () => {
+      const ai = createMockAiWithResponse({
+        response: null,
+        tool_calls: [
+          {
+            name: "enrich_todo",
+            arguments: { title: "Buy milk", priority: "low" },
+          },
+        ],
+      });
+
+      const result = await enrichTodo(ai, "Buy milk");
+      expect(result?.priority).toBe("low");
+      expect(result?.question).toBeUndefined();
+    });
+
+    it("parses ask_user from the OpenAI-compatible tool_calls shape", async () => {
+      const ai = createMockAiWithResponse({
+        choices: [
+          {
+            message: {
+              tool_calls: [
+                {
+                  function: {
+                    name: "ask_user",
+                    arguments: JSON.stringify({ question: "Whose birthday?" }),
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      });
+
+      const result = await enrichTodo(ai, "Plan birthday party");
+      expect(result?.question).toBe("Whose birthday?");
     });
   });
 });

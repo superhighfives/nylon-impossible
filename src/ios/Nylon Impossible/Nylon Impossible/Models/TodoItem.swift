@@ -58,8 +58,10 @@ final class TodoItem {
     var researchSummary: String?
     var researchedAt: Date?
     var researchCreatedAt: Date?      // When research was started (for stale detection)
+    var needsInput: Bool = false  // Agent has posted a question awaiting the user's reply
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
+    @Relationship(deleteRule: .cascade) var messages: [TodoMessage] = []
 
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
@@ -82,6 +84,7 @@ final class TodoItem {
         self.researchSummary = nil
         self.researchedAt = nil
         self.researchCreatedAt = nil
+        self.needsInput = false
         self.pendingUrls = []
     }
     

@@ -166,7 +166,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [TodoItem.self, TodoUrl.self], inMemory: true)
+        .modelContainer(for: [TodoItem.self, TodoUrl.self, TodoMessage.self], inMemory: true)
         .environment(AuthService())
         .environment(SyncService(authService: AuthService()))
 }

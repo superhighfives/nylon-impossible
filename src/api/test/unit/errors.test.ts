@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import { z } from "zod/v4";
 import { describe, expect, it } from "vitest";
+import { z } from "zod/v4";
 import {
   API_ERRORS,
   apiError,
@@ -8,7 +8,9 @@ import {
   readJsonBody,
 } from "../../src/lib/errors";
 
-function makeApp(handler: (c: Parameters<Parameters<Hono["get"]>[1]>[0]) => unknown) {
+function makeApp(
+  handler: (c: Parameters<Parameters<Hono["get"]>[1]>[0]) => unknown,
+) {
   const app = new Hono();
   // biome-ignore lint/suspicious/noExplicitAny: test shim for handler
   app.get("/test", handler as any);

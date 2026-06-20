@@ -2,7 +2,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { enrichTodoWithAI } from "../lib/ai-enrich";
+import { enrichOrAskWithAI } from "../lib/ai-enrich";
 import { eq, getDb, todos, todoUrls, users } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import {
@@ -167,7 +167,7 @@ export async function smartCreate(c: Context<Env>) {
       .then((rows) => rows[0]);
 
     c.executionCtx.waitUntil(
-      enrichTodoWithAI(
+      enrichOrAskWithAI(
         db,
         c.env.AI,
         c.env,

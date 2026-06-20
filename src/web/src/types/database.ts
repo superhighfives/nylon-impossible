@@ -51,6 +51,16 @@ export interface SerializedResearch {
   createdAt: string;
 }
 
+/** Serialized conversation message from the API */
+export interface SerializedTodoMessage {
+  id: string;
+  todoId: string;
+  role: "assistant" | "user";
+  content: string;
+  createdAt: string; // ISO
+  awaitingReply: boolean;
+}
+
 /** Serialized URL metadata from the API */
 export interface SerializedTodoUrl {
   id: string;
@@ -81,8 +91,10 @@ export interface TodoWithUrls {
   priority: "high" | "low" | null;
   recurrence: Recurrence | null;
   aiStatus: AiStatus | null;
+  needsInput: boolean;
   createdAt: string;
   updatedAt: string;
   research: SerializedResearch | null;
+  messages: SerializedTodoMessage[];
   urls: SerializedTodoUrl[];
 }

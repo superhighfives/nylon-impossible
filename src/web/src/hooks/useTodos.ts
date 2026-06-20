@@ -106,9 +106,11 @@ export function useCreateTodo() {
         priority: input.priority ?? null,
         recurrence: input.recurrence ?? null,
         aiStatus: null,
+        needsInput: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         research: null,
+        messages: [],
         urls: [],
       };
 
@@ -403,6 +405,145 @@ export function useCancelResearch() {
     onError: (err) => {
       Sentry.captureException(err, { tags: { mutation: "cancelResearch" } });
       toast.error(messageFromError(err, "Couldn't cancel research"));
+    },
+  });
+}
+
+/**
+ * Hook to reply to the agent's clarifying question on a todo.
+ * Optimistically appends the user's message and clears the needs-input
+ * indicator; re-enrichment runs server-side and arrives via sync.
+ */
+export function useReplyToTodo() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      todoId,
+      content,
+    }: {
+      todoId: string;
+      content: string;
+    }) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/reply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onMutate: async ({ todoId, content }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
+        old?.map((todo) =>
+          todo.id === todoId
+            ? {
+                ...todo,
+                needsInput: false,
+                messages: [
+                  ...todo.messages,
+                  {
+                    id: `temp-${crypto.randomUUID()}`,
+                    todoId,
+                    role: "user" as const,
+                    content,
+                    createdAt: new Date().toISOString(),
+                    awaitingReply: false,
+                  },
+                ],
+              }
+            : todo,
+        ),
+      );
+
+      return { previousTodos };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+      Sentry.captureException(err, { tags: { mutation: "replyToTodo" } });
+      toast.error(messageFromError(err, "Couldn't send reply"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
+ * Hook to dismiss the agent's open question without answering. Clears the
+ * needs-input indicator optimistically; the message stays in history.
+ */
+export function useDismissTodoQuestion() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ todoId }: { todoId: string }) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/question`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onMutate: async ({ todoId }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
+        old?.map((todo) =>
+          todo.id === todoId
+            ? {
+                ...todo,
+                needsInput: false,
+                messages: todo.messages.map((m) =>
+                  m.awaitingReply ? { ...m, awaitingReply: false } : m,
+                ),
+              }
+            : todo,
+        ),
+      );
+
+      return { previousTodos };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+      Sentry.captureException(err, { tags: { mutation: "dismissQuestion" } });
+      toast.error(messageFromError(err, "Couldn't dismiss question"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
     },
   });
 }

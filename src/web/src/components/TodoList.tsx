@@ -25,6 +25,7 @@ import {
   ChevronUp,
   GripVertical,
   Inbox,
+  MessageCircle,
   RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -207,6 +208,19 @@ function TodoItemContent({
                 />
               </output>
             )}
+          {todo.needsInput && (
+            <Button
+              variant="ghost"
+              size="xs"
+              shape="circle"
+              type="button"
+              onClick={() => onToggleExpand(todo.id)}
+              aria-label="The assistant has a question — open to reply"
+              className="bg-yellow-base hover:bg-yellow-hover text-yellow"
+            >
+              <MessageCircle size={12} />
+            </Button>
+          )}
         </div>
         {!isExpanded &&
           todo.research?.status === "completed" &&

@@ -1,5 +1,5 @@
 import { env } from "cloudflare:test";
-import { getDb, todoUrls, users } from "../src/lib/db";
+import { getDb, todoMessages, todos, todoUrls, users } from "../src/lib/db";
 
 export async function seedUser(
   userId = "user_test_123",
@@ -23,7 +23,40 @@ export async function seedTodoUrl(
   return inserted;
 }
 
+export async function seedTodo(
+  todoId: string,
+  userId = "user_test_123",
+  overrides: Partial<typeof todos.$inferInsert> = {},
+) {
+  const db = getDb(env.DB);
+  const [inserted] = await db
+    .insert(todos)
+    .values({ id: todoId, userId, title: "Test todo", ...overrides })
+    .returning();
+  return inserted;
+}
+
+export async function seedMessage(
+  todoId: string,
+  overrides: Partial<typeof todoMessages.$inferInsert> = {},
+) {
+  const db = getDb(env.DB);
+  const [inserted] = await db
+    .insert(todoMessages)
+    .values({
+      id: crypto.randomUUID(),
+      todoId,
+      role: "assistant",
+      content: "Where to, and when?",
+      awaitingReply: true,
+      ...overrides,
+    })
+    .returning();
+  return inserted;
+}
+
 export async function cleanDb() {
+  await env.DB.exec("DELETE FROM todo_messages");
   await env.DB.exec("DELETE FROM todo_urls");
   await env.DB.exec("DELETE FROM todo_research");
   await env.DB.exec("DELETE FROM todos");

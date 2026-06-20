@@ -1,7 +1,15 @@
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { cleanDb, seedTodoUrl, seedUser } from "../helpers";
+import { getDb, todoMessages, todos } from "../../src/lib/db";
+import {
+  cleanDb,
+  seedMessage,
+  seedTodo,
+  seedTodoUrl,
+  seedUser,
+} from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -150,6 +158,36 @@ describe("Todos CRUD", () => {
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       expect(body.completed).toBe(true);
+    });
+
+    it("completing a todo with an open question clears needs_input and awaitingReply", async () => {
+      const todoId = "44444444-4444-4444-4444-444444444444";
+      await seedTodo(todoId, "user_test_123", {
+        needsInput: true,
+        completed: false,
+      });
+      const message = await seedMessage(todoId, {
+        role: "assistant",
+        awaitingReply: true,
+      });
+
+      const res = await SELF.fetch(`http://localhost/todos/${todoId}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ completed: true }),
+      });
+      expect(res.status).toBe(200);
+
+      const db = getDb(env.DB);
+      const [todo] = await db.select().from(todos).where(eq(todos.id, todoId));
+      expect(todo.completed).toBe(true);
+      expect(todo.needsInput).toBe(false);
+
+      const [reloaded] = await db
+        .select()
+        .from(todoMessages)
+        .where(eq(todoMessages.id, message.id));
+      expect(reloaded.awaitingReply).toBe(false);
     });
 
     it("updates position", async () => {

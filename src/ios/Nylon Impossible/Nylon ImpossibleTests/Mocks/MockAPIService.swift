@@ -95,4 +95,26 @@ final class MockAPIService: APIProviding {
             throw error
         }
     }
+
+    var replyError: Error?
+    var replyResponseId: String = "mock-message-id"
+    var lastReply: (todoId: String, content: String)?
+
+    func replyToTodo(todoId: String, content: String) async throws -> String {
+        lastReply = (todoId, content)
+        if let error = replyError {
+            throw error
+        }
+        return replyResponseId
+    }
+
+    var dismissQuestionError: Error?
+    var lastDismissTodoId: String?
+
+    func dismissQuestion(todoId: String) async throws {
+        lastDismissTodoId = todoId
+        if let error = dismissQuestionError {
+            throw error
+        }
+    }
 }

@@ -13,8 +13,16 @@
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { ResearchJobMessage } from "../types";
-import { enrichTodo } from "./ai";
-import { eq, type getDb, todoResearch, todos, todoUrls } from "./db";
+import { type ConversationTurn, enrichTodo } from "./ai";
+import {
+  and,
+  eq,
+  type getDb,
+  todoMessages,
+  todoResearch,
+  todos,
+  todoUrls,
+} from "./db";
 import { truncateTitle } from "./url-helpers";
 import { fetchUrlMetadata } from "./url-metadata";
 
@@ -23,7 +31,7 @@ import { fetchUrlMetadata } from "./url-metadata";
  * Updates the todo in place and notifies connected clients.
  * If research intent is detected, creates a research record and executes research.
  */
-export async function enrichTodoWithAI(
+export async function enrichOrAskWithAI(
   db: ReturnType<typeof getDb>,
   ai: Ai,
   env: {
@@ -36,6 +44,7 @@ export async function enrichTodoWithAI(
   userId: string,
   originalText: string,
   userLocation?: string | null,
+  history?: ConversationTurn[],
 ): Promise<void> {
   const now = new Date();
 
@@ -51,6 +60,7 @@ export async function enrichTodoWithAI(
       originalText,
       env.CF_AI_GATEWAY_ID,
       env.LOG_AI_DEBUG === "true",
+      history,
     );
 
     // If AI returned nothing useful, mark complete and exit
@@ -122,37 +132,107 @@ export async function enrichTodoWithAI(
 
     // Handle research if detected
     if (enrichment.research) {
-      const now = new Date();
-      const research = await db
-        .insert(todoResearch)
-        .values({
-          id: crypto.randomUUID(),
-          todoId,
-          researchType: enrichment.research.type,
-          status: "pending",
-          searchQuery: enrichment.searchQuery ?? null,
-          createdAt: now,
-          updatedAt: now,
+      // A todo can have at most one research row (UNIQUE on todoId). On the
+      // initial create there's none, so we insert. On re-enrichment after a
+      // reply there may already be one: only replace it when the conversation
+      // produced a meaningfully different searchQuery, mirroring the
+      // title-change behaviour in updateTodo. Otherwise leave it untouched.
+      const [existingResearch] = await db
+        .select({
+          id: todoResearch.id,
+          searchQuery: todoResearch.searchQuery,
         })
-        .returning()
-        .then((r) => r[0]);
+        .from(todoResearch)
+        .where(eq(todoResearch.todoId, todoId));
 
-      // Notify so clients can show pending research state before long-running work
-      await notifySync(env, userId);
+      const newQuery = enrichment.searchQuery ?? null;
+      const norm = (q: string | null) => (q ?? "").trim().toLowerCase();
+      const queryChanged =
+        norm(existingResearch?.searchQuery ?? null) !== norm(newQuery);
 
-      // Enqueue research job — runs in a separate Worker invocation with its own
-      // execution budget, not constrained by this waitUntil lifetime
-      await env.RESEARCH_QUEUE.send({
+      // Skip only when we already have research AND the query is unchanged.
+      // (queryChanged is always true when there's no existing row.)
+      const shouldRunResearch = !existingResearch || queryChanged;
+
+      if (existingResearch && queryChanged) {
+        // Drop the stale research and its source URLs before recreating.
+        await db
+          .delete(todoUrls)
+          .where(eq(todoUrls.researchId, existingResearch.id));
+        await db
+          .delete(todoResearch)
+          .where(eq(todoResearch.id, existingResearch.id));
+      }
+
+      if (shouldRunResearch) {
+        const now = new Date();
+        const research = await db
+          .insert(todoResearch)
+          .values({
+            id: crypto.randomUUID(),
+            todoId,
+            researchType: enrichment.research.type,
+            status: "pending",
+            searchQuery: newQuery,
+            createdAt: now,
+            updatedAt: now,
+          })
+          .returning()
+          .then((r) => r[0]);
+
+        // Notify so clients can show pending research state before long-running work
+        await notifySync(env, userId);
+
+        // Enqueue research job — runs in a separate Worker invocation with its own
+        // execution budget, not constrained by this waitUntil lifetime
+        await env.RESEARCH_QUEUE.send({
+          todoId,
+          userId,
+          // Prefer the LLM-emitted searchQuery — it strips imperatives like
+          // "Research" so Tavily searches for the actual topic instead of
+          // returning meta-content about researching it.
+          query: enrichment.searchQuery ?? originalText,
+          researchType: enrichment.research.type,
+          researchId: research.id,
+          userLocation: userLocation ?? null,
+        });
+      }
+    }
+
+    // Handle a clarifying question if the agent decided to ask one.
+    if (enrichment.question) {
+      const questionNow = new Date();
+
+      // Enforce "max one open question at a time": clear awaiting_reply on any
+      // existing open assistant messages before posting the new one. Guards
+      // against concurrent/background runs leaving multiple awaiting messages.
+      await db
+        .update(todoMessages)
+        .set({ awaitingReply: false })
+        .where(
+          and(
+            eq(todoMessages.todoId, todoId),
+            eq(todoMessages.awaitingReply, true),
+          ),
+        );
+
+      await db.insert(todoMessages).values({
+        id: crypto.randomUUID(),
         todoId,
-        userId,
-        // Prefer the LLM-emitted searchQuery — it strips imperatives like
-        // "Research" so Tavily searches for the actual topic instead of
-        // returning meta-content about researching it.
-        query: enrichment.searchQuery ?? originalText,
-        researchType: enrichment.research.type,
-        researchId: research.id,
-        userLocation: userLocation ?? null,
+        role: "assistant",
+        content: enrichment.question,
+        createdAt: questionNow,
+        awaitingReply: true,
       });
+
+      // Bump the parent todo so the sync cursor picks the message up, and flip
+      // needs_input so the list view shows the affordance.
+      await db
+        .update(todos)
+        .set({ needsInput: true, updatedAt: questionNow })
+        .where(eq(todos.id, todoId));
+
+      await notifySync(env, userId);
     }
   } catch (error) {
     console.error("AI enrichment failed for todo:", todoId, error);

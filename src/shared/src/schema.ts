@@ -63,10 +63,40 @@ export const todos = sqliteTable(
     aiStatus: text("ai_status", {
       enum: ["pending", "processing", "complete", "failed"],
     }),
+    // Cheap signal for the list view: true when the agent has posted a question
+    // awaiting the user's reply. Orthogonal to aiStatus (both can be set at once).
+    needsInput: integer("needs_input", { mode: "boolean" })
+      .notNull()
+      .default(false),
   },
   (table) => [
     index("idx_todos_user_id").on(table.userId),
     index("idx_todos_user_position").on(table.userId, table.position),
+  ],
+);
+
+// Conversation thread on a todo. Append-only and immutable except for
+// awaitingReply, which clears (to false) when the user replies or dismisses.
+export const todoMessages = sqliteTable(
+  "todo_messages",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    todoId: text("todo_id")
+      .notNull()
+      .references(() => todos.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["assistant", "user"] }).notNull(),
+    content: text("content").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    awaitingReply: integer("awaiting_reply", { mode: "boolean" })
+      .notNull()
+      .default(false),
+  },
+  (table) => [
+    index("idx_todo_messages_todo_id").on(table.todoId, table.createdAt),
   ],
 );
 
@@ -206,6 +236,14 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
   todoLists: many(todoLists),
   todoUrls: many(todoUrls),
   research: one(todoResearch),
+  messages: many(todoMessages),
+}));
+
+export const todoMessagesRelations = relations(todoMessages, ({ one }) => ({
+  todo: one(todos, {
+    fields: [todoMessages.todoId],
+    references: [todos.id],
+  }),
 }));
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -262,3 +300,5 @@ export type TodoResearch = typeof todoResearch.$inferSelect;
 export type NewTodoResearch = typeof todoResearch.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
+export type TodoMessage = typeof todoMessages.$inferSelect;
+export type NewTodoMessage = typeof todoMessages.$inferInsert;
