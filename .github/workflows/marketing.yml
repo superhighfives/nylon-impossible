@@ -23,10 +23,10 @@ jobs:
 
     steps:
       - name: Checkout nylon-impossible
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Checkout superhighfives.com
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: superhighfives/superhighfives.com
           token: ${{ secrets.SUPERHIGHFIVES_DEPLOY_TOKEN }}
