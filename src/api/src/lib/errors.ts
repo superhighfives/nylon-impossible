@@ -10,11 +10,14 @@ import type { z } from "zod/v4";
  */
 export const API_ERRORS = {
   unauthorized: { status: 401, message: "Unauthorized" },
+  forbidden: { status: 403, message: "Forbidden" },
+  invalid_signature: { status: 401, message: "Invalid webhook signature" },
   websocket_upgrade_required: {
     status: 400,
     message: "Expected WebSocket upgrade",
   },
   todo_id_required: { status: 400, message: "Todo ID required" },
+  user_id_required: { status: 400, message: "User ID required" },
   todo_not_found: { status: 404, message: "Todo not found" },
   user_not_found: { status: 404, message: "User not found" },
   invalid_json: { status: 400, message: "Invalid JSON body" },

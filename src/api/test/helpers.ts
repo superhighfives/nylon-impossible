@@ -4,9 +4,16 @@ import { getDb, todoMessages, todos, todoUrls, users } from "../src/lib/db";
 export async function seedUser(
   userId = "user_test_123",
   email = "test@example.com",
+  overrides: Partial<typeof users.$inferInsert> = {},
 ) {
   const db = getDb(env.DB);
-  await db.insert(users).values({ id: userId, email }).onConflictDoNothing();
+  // Default test users to the "pro" plan so the existing AI-path tests keep
+  // exercising AI behavior. Tests that explicitly verify the free-tier gate
+  // can pass `{ plan: "free" }`.
+  await db
+    .insert(users)
+    .values({ id: userId, email, plan: "pro", ...overrides })
+    .onConflictDoNothing();
   return userId;
 }
 

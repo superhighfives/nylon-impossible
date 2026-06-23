@@ -63,6 +63,29 @@ export function useUser() {
   });
 }
 
+async function deleteCurrentUser(
+  getToken: () => Promise<string | null>,
+): Promise<void> {
+  const token = await getToken();
+  if (!token) {
+    throw new Error("Not authenticated");
+  }
+  const response = await fetch(`${API_URL}/users/me`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    throw new Error("Failed to delete account");
+  }
+}
+
+export function useDeleteCurrentUser() {
+  const { getToken } = useAuth();
+  return useMutation({
+    mutationFn: () => deleteCurrentUser(getToken),
+  });
+}
+
 export function useUpdateUser() {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();

@@ -102,7 +102,8 @@ export async function smartCreate(c: Context<Env>) {
 
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
-  const aiEnabled = c.get("aiEnabled");
+  // Free users always take the fast path regardless of their aiEnabled preference.
+  const useAI = c.get("aiEnabled") && c.get("plan") === "pro";
 
   // Get the lowest position so new todo is prepended at the start
   const firstTodo = await db
@@ -131,7 +132,7 @@ export async function smartCreate(c: Context<Env>) {
     title: initial.title,
     completed: false,
     position,
-    aiStatus: aiEnabled ? "pending" : null,
+    aiStatus: useAI ? "pending" : null,
     createdAt: now,
     updatedAt: now,
   });
@@ -158,7 +159,7 @@ export async function smartCreate(c: Context<Env>) {
   }
 
   // If AI is enabled, enrich in background
-  if (aiEnabled) {
+  if (useAI) {
     // Fetch user's location for location research context
     const user = await db
       .select({ location: users.location })
@@ -195,7 +196,7 @@ export async function smartCreate(c: Context<Env>) {
 
   await notifySync(c.env, userId);
 
-  return c.json({ todos: [serializeTodo(created)], ai: aiEnabled });
+  return c.json({ todos: [serializeTodo(created)], ai: useAI });
 }
 
 /** Fetch metadata for URLs in background */

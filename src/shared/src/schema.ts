@@ -22,6 +22,7 @@ export const users = sqliteTable(
     aiEnabled: integer("ai_enabled", { mode: "boolean" })
       .notNull()
       .default(true),
+    plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
     location: text("location"), // Used to bias location research queries
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()

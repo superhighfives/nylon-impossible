@@ -1,6 +1,12 @@
 import * as Sentry from "@sentry/cloudflare";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import {
+  deleteUserAsAdmin,
+  getUser,
+  listUsers,
+  updateUserPlan,
+} from "./handlers/admin";
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
 import { replyToTodo } from "./handlers/reply";
@@ -14,8 +20,9 @@ import {
   listTodos,
   updateTodo,
 } from "./handlers/todos";
-import { getMe, updateMe } from "./handlers/users";
-import { authMiddleware, verifyClerkJWT } from "./lib/auth";
+import { deleteMe, getMe, updateMe } from "./handlers/users";
+import { clerkWebhook } from "./handlers/webhooks";
+import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
 import { executeResearch } from "./lib/research";
@@ -72,6 +79,12 @@ app.use("/todos", authMiddleware);
 // Auth middleware for user routes
 app.use("/users/*", authMiddleware);
 
+// Admin routes (auth + admin role required)
+app.use("/admin/*", authMiddleware, requireAdmin);
+
+// Clerk webhooks (Svix signature is the auth — NOT wrapped in authMiddleware)
+app.post("/webhooks/clerk", clerkWebhook);
+
 // Todo routes
 app.post("/todos/smart", smartCreate);
 app.post("/todos/sync", syncTodos);
@@ -88,6 +101,13 @@ app.delete("/todos/:id/question", dismissQuestion);
 // User routes
 app.get("/users/me", getMe);
 app.patch("/users/me", updateMe);
+app.delete("/users/me", deleteMe);
+
+// Admin endpoints
+app.get("/admin/users", listUsers);
+app.get("/admin/users/:id", getUser);
+app.patch("/admin/users/:id/plan", updateUserPlan);
+app.delete("/admin/users/:id", deleteUserAsAdmin);
 
 const handler: ExportedHandler<Env["Bindings"], ResearchJobMessage> = {
   fetch: app.fetch,

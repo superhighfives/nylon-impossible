@@ -1,7 +1,7 @@
 # Subscription Plans (Free + Pro)
 
 **Date:** 2026-03-23
-**Status:** Ready
+**Status:** In Progress
 **Scope:** API + Shared Schema (Web/iOS UI to follow)
 
 ## Problem

@@ -141,6 +141,23 @@ Set `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` as repository secrets.
    - `CLERK_PUBLISHABLE_KEY` — the publishable key (used by the API Worker)
    - `VITE_CLERK_PUBLISHABLE_KEY` — same publishable key (injected into the Vite web build)
 
+#### Webhook secret (account deletion sync)
+
+The API Worker accepts a Clerk `user.deleted` webhook so users deleted from the Clerk dashboard are also removed from our DB.
+
+1. In Clerk, **Webhooks → Add Endpoint**, URL `https://api.nylonimpossible.com/webhooks/clerk`, subscribe to `user.deleted`.
+2. Copy the signing secret (`whsec_…`) and set it as `CLERK_WEBHOOK_SECRET` via `wrangler secret put CLERK_WEBHOOK_SECRET -c src/api/wrangler.jsonc`.
+
+#### Admin role
+
+The admin app (`src/admin`, deployed to `nylon-impossible-admin`) gates access on `publicMetadata.role === "admin"`. To make someone an admin: in the Clerk dashboard open the user, edit **Public metadata**, and add:
+
+```json
+{ "role": "admin" }
+```
+
+The role appears in the JWT immediately on next sign-in; no DB column needed.
+
 ---
 
 ### App Store Connect
