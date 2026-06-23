@@ -136,7 +136,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
       )}
       {hasDueDate && dueDate && (
         <span
-          className={`text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
+          className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
             isOverdue
               ? "bg-red-base hover:bg-red-hover active:bg-red-active text-red-muted"
               : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
@@ -481,7 +481,7 @@ function ErrorState({
         disabled={isRetrying}
         className="mt-4"
       >
-        <RefreshCw size={14} />
+        {!isRetrying && <RefreshCw size={14} />}
         Try again
       </Button>
     </div>

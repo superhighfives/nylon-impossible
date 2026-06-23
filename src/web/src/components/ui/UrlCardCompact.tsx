@@ -37,6 +37,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
         <img
           src={favicon}
           alt=""
+          loading="lazy"
           className="w-4 h-4 shrink-0"
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />

@@ -151,7 +151,7 @@ export function ResearchSection({
       disabled={reresearch.isPending || cancelResearch.isPending}
       loading={reresearch.isPending}
     >
-      <RefreshCw size={14} className="mr-1" />
+      {!reresearch.isPending && <RefreshCw size={14} />}
       Try again
     </Button>
   );
