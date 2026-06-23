@@ -481,7 +481,7 @@ function ErrorState({
         disabled={isRetrying}
         className="mt-4"
       >
-        <RefreshCw size={14} />
+        {!isRetrying && <RefreshCw size={14} />}
         Try again
       </Button>
     </div>
