@@ -76,6 +76,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
         <img
           src={favicon}
           alt=""
+          loading="lazy"
           className="w-4 h-4 mt-0.5 shrink-0"
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
