@@ -21,12 +21,29 @@ export async function deleteUserCascade(
     try {
       await clerkClient(env).users.deleteUser(userId);
     } catch (error) {
-      // Already-deleted Clerk users surface as 404 — safe to ignore so the
-      // operation stays idempotent for retries and webhook races.
+      // Only swallow "already gone" — anything else (network/permission/5xx)
+      // must surface so the caller can retry. The DB row is already deleted,
+      // but a hard failure here means Clerk and our DB are out of sync.
+      if (isClerkNotFound(error)) {
+        Sentry.addBreadcrumb({
+          category: "delete-user",
+          message: "clerk.user.already_deleted",
+          data: { userId },
+          level: "info",
+        });
+        return;
+      }
       Sentry.captureException(error, {
         tags: { area: "delete-user-clerk" },
         extra: { userId },
       });
+      throw error;
     }
   }
+}
+
+function isClerkNotFound(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const status = (error as { status?: unknown }).status;
+  return status === 404;
 }

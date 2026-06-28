@@ -15,7 +15,7 @@
     "deploy": "pnpm build && wrangler deploy"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.30.0",
+    "@clerk/react": "^6.11.1",
     "@tailwindcss/vite": "^4.3.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

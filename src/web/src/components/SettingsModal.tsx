@@ -180,7 +180,7 @@ export function SettingsModal() {
                   </button>
                 </div>
                 <div className="border-t border-gray-base pt-4 mt-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-red mb-2">
                     Danger zone
                   </h3>
                   <p className="text-xs text-gray-muted mb-3">
@@ -193,7 +193,7 @@ export function SettingsModal() {
                     onClick={handleDeleteAccount}
                     disabled={deleteUser.isPending || updateUser.isPending}
                     loading={deleteUser.isPending}
-                    className="text-red-700 border-red-300 hover:bg-red-50"
+                    className="text-red border-red-base hover:bg-red-base"
                   >
                     Delete my account
                   </Button>

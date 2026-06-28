@@ -19,6 +19,14 @@ import type { Env } from "../types";
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
+function parseCursor(cursor: string | undefined): Date | null {
+  if (!cursor) return null;
+  const ms = Number(cursor);
+  if (!Number.isFinite(ms)) return null;
+  const date = new Date(ms);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 // GET /admin/users
 export async function listUsers(c: Context<Env>) {
   const cursor = c.req.query("cursor");
@@ -32,9 +40,9 @@ export async function listUsers(c: Context<Env>) {
   );
 
   const db = getDb(c.env.DB);
-  const cursorDate = cursor ? new Date(Number(cursor)) : null;
+  const cursorDate = parseCursor(cursor);
 
-  const rows = await db
+  const baseQuery = db
     .select({
       id: users.id,
       email: users.email,
@@ -43,8 +51,12 @@ export async function listUsers(c: Context<Env>) {
       createdAt: users.createdAt,
       todoCount: sql<number>`(SELECT COUNT(*) FROM ${todos} WHERE ${todos.userId} = ${users.id})`,
     })
-    .from(users)
-    .where(cursorDate ? lt(users.createdAt, cursorDate) : undefined)
+    .from(users);
+
+  const rows = await (cursorDate
+    ? baseQuery.where(lt(users.createdAt, cursorDate))
+    : baseQuery
+  )
     .orderBy(desc(users.createdAt))
     .limit(limit + 1);
 

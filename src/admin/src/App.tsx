@@ -1,11 +1,11 @@
 import {
-  SignedIn,
-  SignedOut,
+  ClerkLoaded,
+  ClerkLoading,
   SignIn,
   UserButton,
   useAuth,
   useUser,
-} from "@clerk/clerk-react";
+} from "@clerk/react";
 import { useEffect, useState } from "react";
 import { UserDetailPanel } from "./components/UserDetailPanel";
 import { UsersTable } from "./components/UsersTable";
@@ -13,16 +13,28 @@ import { UsersTable } from "./components/UsersTable";
 export function App() {
   return (
     <>
-      <SignedOut>
-        <div className="flex h-full items-center justify-center bg-neutral-50">
-          <SignIn routing="hash" />
+      <ClerkLoading>
+        <div className="flex h-full items-center justify-center bg-neutral-50 text-sm text-neutral-500">
+          Loading session…
         </div>
-      </SignedOut>
-      <SignedIn>
-        <AdminShell />
-      </SignedIn>
+      </ClerkLoading>
+      <ClerkLoaded>
+        <Gate />
+      </ClerkLoaded>
     </>
   );
+}
+
+function Gate() {
+  const { isSignedIn } = useAuth();
+  if (!isSignedIn) {
+    return (
+      <div className="flex h-full items-center justify-center bg-neutral-50">
+        <SignIn routing="hash" />
+      </div>
+    );
+  }
+  return <AdminShell />;
 }
 
 function AdminShell() {

@@ -46,15 +46,37 @@ async function verifySvixSignature(
     key,
     new TextEncoder().encode(signedPayload),
   );
-  const expected = btoa(String.fromCharCode(...new Uint8Array(mac)));
+  const expected = new Uint8Array(mac);
 
   return headers.signature
     .split(" ")
     .map((part) => part.trim())
     .some((part) => {
       const [version, value] = part.split(",", 2);
-      return version === "v1" && value === expected;
+      if (version !== "v1" || !value) return false;
+      let provided: Uint8Array;
+      try {
+        provided = Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
+      } catch {
+        return false;
+      }
+      return constantTimeEqual(provided, expected);
     });
+}
+
+/**
+ * Length-independent constant-time byte comparison. Always loops over the
+ * longer input so the timing doesn't leak which side is shorter, then folds in
+ * the length mismatch via OR so equal-length-but-different inputs and
+ * different-length inputs both return false without short-circuiting.
+ */
+function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  }
+  return diff === 0;
 }
 
 // POST /webhooks/clerk
