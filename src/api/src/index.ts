@@ -34,7 +34,7 @@ const app = new Hono<Env>();
 
 // CORS
 const ALLOWED_ORIGINS =
-  /^https:\/\/(www\.)?nylonimpossible\.com$|^https:\/\/(?:api-)?pr-\d+\.nylonimpossible\.com$/;
+  /^https:\/\/(www\.|admin\.)?nylonimpossible\.com$|^https:\/\/(?:api-)?pr-\d+\.nylonimpossible\.com$/;
 const LOCALHOST_ORIGIN = /^http:\/\/localhost(:\d+)?$/;
 
 app.use("*", (c, next) => {
