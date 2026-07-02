@@ -162,6 +162,25 @@ export const errorToResponse = (
             statusText: "Internal Server Error",
           }),
         );
+
+      case "ExternalServiceError": {
+        const status =
+          "status" in error && typeof error.status === "number"
+            ? error.status
+            : 502;
+        const message =
+          "message" in error && typeof error.message === "string"
+            ? error.message
+            : "External service error";
+        if (status >= 500) console.error("External service error:", error);
+        return Effect.fail(
+          new Response(JSON.stringify({ error: message }), {
+            status,
+            statusText: status < 500 ? "Bad Request" : "Bad Gateway",
+            headers: { "Content-Type": "application/json" },
+          }),
+        );
+      }
     }
   }
 

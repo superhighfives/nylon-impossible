@@ -50,3 +50,17 @@ export class ForbiddenError extends Data.TaggedError("ForbiddenError")<{
   readonly resource: string;
   readonly userId: string;
 }> {}
+
+/**
+ * Thrown when an external service (e.g. Google Tasks, Clerk token exchange)
+ * fails or a prerequisite (a connected account) is missing. `status` is the
+ * HTTP status surfaced to the client and `message` is safe to display.
+ */
+export class ExternalServiceError extends Data.TaggedError(
+  "ExternalServiceError",
+)<{
+  readonly service: string;
+  readonly message: string;
+  readonly status?: number;
+  readonly cause?: unknown;
+}> {}

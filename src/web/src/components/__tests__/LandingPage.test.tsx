@@ -12,6 +12,14 @@ vi.mock("@clerk/tanstack-react-start", () => ({
   ),
 }));
 
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 describe("LandingPage", () => {
   it("renders Sign in and Create account buttons", () => {
     render(<LandingPage />);

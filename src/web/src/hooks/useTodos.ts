@@ -8,7 +8,13 @@ import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
-import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
+import {
+  createTodo,
+  deleteTodo,
+  getTodos,
+  importGoogleTasks,
+  updateTodo,
+} from "@/server/todos";
 import type {
   CreateTodoInput,
   TodoWithUrls,
@@ -332,6 +338,38 @@ export function useSmartCreate() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
+    },
+  });
+}
+
+/**
+ * Hook to import todos from the user's Google Tasks account. Surfaces a
+ * success/skip summary via toast and refreshes the list on completion.
+ */
+export function useImportGoogleTasks() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+
+  return useMutation({
+    mutationFn: () => importGoogleTasks(),
+    onSuccess: ({ imported, skipped }) => {
+      if (imported > 0) {
+        toast.success(
+          `Imported ${imported} ${imported === 1 ? "task" : "tasks"} from Google`,
+        );
+      } else if (skipped > 0) {
+        toast.info("Your Google Tasks are already imported");
+      } else {
+        toast.info("No Google Tasks to import");
+      }
+      notifyChanged();
+    },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "importGoogleTasks" } });
+      toast.error(messageFromError(err, "Couldn't import from Google Tasks"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
     },
   });
 }

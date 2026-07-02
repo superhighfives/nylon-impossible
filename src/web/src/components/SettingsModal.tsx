@@ -3,6 +3,7 @@ import { useClerk } from "@clerk/tanstack-react-start";
 import { MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import { useImportGoogleTasks } from "@/hooks/useTodos";
 import { useDeleteCurrentUser, useUpdateUser, useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { Button, Field, Input, Loader } from "./ui";
@@ -23,6 +24,7 @@ export function SettingsModal() {
   const { data: user, isLoading: isLoadingUser } = useUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteCurrentUser();
+  const importGoogleTasks = useImportGoogleTasks();
   const { signOut } = useClerk();
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -178,6 +180,25 @@ export function SettingsModal() {
                       className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
                     />
                   </button>
+                </div>
+                <div className="border-t border-gray-base pt-4 mt-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-muted mb-2">
+                    Import
+                  </h3>
+                  <p className="text-xs text-gray-muted mb-3">
+                    Bring across open tasks from your Google Tasks “My Tasks”
+                    list. Already-imported tasks are skipped, so it's safe to
+                    run again.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => importGoogleTasks.mutate()}
+                    disabled={importGoogleTasks.isPending}
+                    loading={importGoogleTasks.isPending}
+                  >
+                    Import from Google Tasks
+                  </Button>
                 </div>
                 <div className="border-t border-gray-base pt-4 mt-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-red mb-2">
