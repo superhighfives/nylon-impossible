@@ -1,0 +1,18 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "nylon-impossible-admin",
+	"compatibility_date": "2025-09-02",
+	"routes": [
+		{
+			"pattern": "admin.nylonimpossible.com",
+			"custom_domain": true
+		}
+	],
+	"assets": {
+		"directory": "./dist",
+		"not_found_handling": "single-page-application"
+	},
+	"observability": {
+		"enabled": true
+	}
+}

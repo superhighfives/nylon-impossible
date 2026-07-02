@@ -1,8 +1,9 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { useClerk } from "@clerk/tanstack-react-start";
 import { MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { useUpdateUser, useUser } from "@/hooks/useUser";
+import { useDeleteCurrentUser, useUpdateUser, useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { Button, Field, Input, Loader } from "./ui";
 
@@ -21,10 +22,28 @@ const NominatimSchema = z.object({
 export function SettingsModal() {
   const { data: user, isLoading: isLoadingUser } = useUser();
   const updateUser = useUpdateUser();
+  const deleteUser = useDeleteCurrentUser();
+  const { signOut } = useClerk();
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
   const [open, setOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+
+  const handleDeleteAccount = () => {
+    const confirmed = window.confirm(
+      "Permanently delete your account? All of your todos, lists, and conversation history will be removed and cannot be recovered.",
+    );
+    if (!confirmed) return;
+    deleteUser.mutate(undefined, {
+      onSuccess: async () => {
+        setOpen(false);
+        await signOut({ redirectUrl: "/" });
+      },
+      onError: (err) => {
+        toast.error(messageFromError(err, "Couldn't delete your account"));
+      },
+    });
+  };
 
   // Sync local state when user data loads or modal opens
   useEffect(() => {
@@ -159,6 +178,25 @@ export function SettingsModal() {
                       className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
                     />
                   </button>
+                </div>
+                <div className="border-t border-gray-base pt-4 mt-2">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-red mb-2">
+                    Danger zone
+                  </h3>
+                  <p className="text-xs text-gray-muted mb-3">
+                    Permanently delete your account and all of your data. This
+                    cannot be undone.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDeleteAccount}
+                    disabled={deleteUser.isPending || updateUser.isPending}
+                    loading={deleteUser.isPending}
+                    className="text-red border-red-base hover:bg-red-base"
+                  >
+                    Delete my account
+                  </Button>
                 </div>
               </>
             )}

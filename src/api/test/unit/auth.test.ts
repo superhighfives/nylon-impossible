@@ -45,7 +45,16 @@ describe("verifyClerkJWT", () => {
   it("returns userId when token is valid", async () => {
     mockVerifyToken.mockResolvedValueOnce({ sub: "user_123" } as any);
     const result = await verifyClerkJWT("Bearer valid-token", fakeEnv);
-    expect(result).toEqual({ userId: "user_123" });
+    expect(result).toEqual({ userId: "user_123", role: null });
+  });
+
+  it("extracts admin role from publicMetadata", async () => {
+    mockVerifyToken.mockResolvedValueOnce({
+      sub: "user_123",
+      public_metadata: { role: "admin" },
+    } as any);
+    const result = await verifyClerkJWT("Bearer valid-token", fakeEnv);
+    expect(result).toEqual({ userId: "user_123", role: "admin" });
   });
 
   it("passes the secret key to verifyToken", async () => {

@@ -120,6 +120,28 @@ describe("Smart create endpoint", () => {
     });
   });
 
+  describe("free-tier plan gate", () => {
+    beforeEach(async () => {
+      // aiEnabled true so the only thing preventing AI is the plan gate.
+      await enableAI();
+      const db = getDb(env.DB);
+      await db
+        .update(users)
+        .set({ plan: "free" })
+        .where(eq(users.id, "user_test_123"));
+    });
+
+    it("forces free users onto the fast path even with aiEnabled true", async () => {
+      const res = await smartCreate("buy milk and eggs tomorrow");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.todos).toHaveLength(1);
+      expect(body.todos[0].aiStatus).toBeNull();
+      expect(body.ai).toBe(false);
+    });
+  });
+
   describe("URL handling", () => {
     it("creates todo from short URL input", async () => {
       const res = await smartCreate("https://example.com");

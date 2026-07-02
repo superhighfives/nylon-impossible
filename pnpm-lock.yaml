@@ -24,6 +24,43 @@ importers:
         specifier: ^4.40.3
         version: 4.76.0(@cloudflare/workers-types@4.20260605.1)
 
+  src/admin:
+    dependencies:
+      '@clerk/react':
+        specifier: ^6.11.1
+        version: 6.11.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@tailwindcss/vite':
+        specifier: ^4.3.1
+        version: 4.3.1(vite@8.0.7(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0))
+      react:
+        specifier: ^19.2.5
+        version: 19.2.5
+      react-dom:
+        specifier: ^19.2.5
+        version: 19.2.5(react@19.2.5)
+      tailwindcss:
+        specifier: ^4.3.1
+        version: 4.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.2.14
+      '@types/react-dom':
+        specifier: ^19.2.0
+        version: 19.2.3(@types/react@19.2.14)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.1
+        version: 6.0.1(vite@8.0.7(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0))
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vite:
+        specifier: ^8.0.3
+        version: 8.0.7(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)
+      wrangler:
+        specifier: ^4.40.3
+        version: 4.98.0(@cloudflare/workers-types@4.20260605.1)
+
   src/api:
     dependencies:
       '@clerk/backend':
@@ -454,8 +491,8 @@ packages:
     resolution: {integrity: sha512-zAELfaYtrlxlxxB6PT3EHPsHck6IPuyTQSKm7hWQqXp9GoFOM6wKOflFZgI0Q2M1C5SgrkDcrMNchkWXRwbsQw==}
     engines: {node: '>=20.9.0'}
 
-  '@clerk/react@6.6.2':
-    resolution: {integrity: sha512-eLev3C21yh2vqyvEBfXpc1QHa4q+wxbtRdTtBG0fCI+tMQUim8TIS300AJAciM6ox8tgInTWwIeIxr5jiYsvtw==}
+  '@clerk/react@6.11.1':
+    resolution: {integrity: sha512-iEWckisZa/V3siCFlvGTNg7Yj+kndRx7HKBZ/QMSd6uEU9kd2tZ8Ymvd4GFPCpClwcki4h7jC750FujN656Jqg==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
@@ -463,6 +500,18 @@ packages:
 
   '@clerk/shared@4.10.2':
     resolution: {integrity: sha512-2RXGaCV94U2wYWaMQZA/AhVkqjcSx8f+oVjh6wgr4yXDmZ24BQRjPJ+K4L6IHiB/agoaXtKWJ0GI8InRZjo9/g==}
+    engines: {node: '>=20.9.0'}
+    peerDependencies:
+      react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+      react-dom: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
+    peerDependenciesMeta:
+      react:
+        optional: true
+      react-dom:
+        optional: true
+
+  '@clerk/shared@4.22.0':
+    resolution: {integrity: sha512-GZ56kzUB2UBb8MCF+Eo8WIey+W4RP1tAkyOL+geiHxrQxJlUcgD+xalY2YPJLH8WVFwtOnfIl8KPEo0M0e/DRg==}
     engines: {node: '>=20.9.0'}
     peerDependencies:
       react: ^18.0.0 || ~19.0.3 || ~19.1.4 || ~19.2.3 || ~19.3.0-0
@@ -2862,6 +2911,10 @@ packages:
     resolution: {integrity: sha512-cEiJEAEoIbWfCZYKWhVwFuvPX1gETRYPw6LlaTKoxD3s2AkXzkCjnp6h0V77ozyqj0jakteJ4YqDJT830+lVGw==}
     engines: {node: '>=14'}
 
+  js-cookie@3.0.7:
+    resolution: {integrity: sha512-z/wZZgDrkNV1eA0ULjM/F9/50Ya8fbzgKneSpoPsXSGd0KnpdtHfOZWK+GcwLk+EZbS4F9RBhU+K2RgzuDaItw==}
+    engines: {node: '>=20'}
+
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
@@ -3891,9 +3944,9 @@ snapshots:
       - react
       - react-dom
 
-  '@clerk/react@6.6.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+  '@clerk/react@6.11.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
-      '@clerk/shared': 4.10.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@clerk/shared': 4.22.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
       tslib: 2.8.1
@@ -3905,6 +3958,16 @@ snapshots:
       glob-to-regexp: 0.4.1
       js-cookie: 3.0.5
       std-env: 3.10.0
+    optionalDependencies:
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
+
+  '@clerk/shared@4.22.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
+    dependencies:
+      '@tanstack/query-core': 5.101.0
+      dequal: 2.0.3
+      glob-to-regexp: 0.4.1
+      js-cookie: 3.0.7
     optionalDependencies:
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
@@ -3934,7 +3997,7 @@ snapshots:
   '@clerk/tanstack-react-start@1.2.3(@tanstack/react-router@1.168.22(react-dom@19.2.5(react@19.2.5))(react@19.2.5))(@tanstack/react-start@1.167.41(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.7(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0)))(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       '@clerk/backend': 3.4.7(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
-      '@clerk/react': 6.6.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      '@clerk/react': 6.11.1(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@clerk/shared': 4.10.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-router': 1.168.22(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       '@tanstack/react-start': 1.167.41(react-dom@19.2.5(react@19.2.5))(react@19.2.5)(vite@8.0.7(@types/node@25.6.0)(esbuild@0.27.4)(jiti@2.7.0)(tsx@4.21.0))
@@ -5891,6 +5954,8 @@ snapshots:
   jiti@2.7.0: {}
 
   js-cookie@3.0.5: {}
+
+  js-cookie@3.0.7: {}
 
   js-tokens@4.0.0: {}
 

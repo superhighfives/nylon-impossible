@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { eq, getDb, users } from "../lib/db";
+import { deleteUserCascade } from "../lib/delete-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
@@ -99,4 +100,11 @@ export async function updateMe(c: Context<Env>) {
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });
+}
+
+// DELETE /users/me
+export async function deleteMe(c: Context<Env>) {
+  const userId = c.get("userId");
+  await deleteUserCascade(c.env, userId, { deleteClerk: true });
+  return c.json({ deleted: true });
 }

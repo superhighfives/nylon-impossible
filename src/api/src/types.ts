@@ -15,6 +15,7 @@ export type Env = {
     RESEARCH_QUEUE: Queue<ResearchJobMessage>;
     CLERK_SECRET_KEY: string;
     CLERK_PUBLISHABLE_KEY: string;
+    CLERK_WEBHOOK_SECRET?: string;
     SENTRY_DSN?: string;
     ENVIRONMENT?: string;
     CF_AI_GATEWAY_ID?: string;
@@ -24,5 +25,7 @@ export type Env = {
   Variables: {
     userId: string;
     aiEnabled: boolean;
+    plan: "free" | "pro";
+    role: "admin" | null;
   };
 };
