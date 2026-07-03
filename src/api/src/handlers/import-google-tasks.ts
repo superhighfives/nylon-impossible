@@ -38,6 +38,9 @@ async function fetchGoogleTasks(accessToken: string): Promise<GoogleTask[]> {
       "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks",
     );
     url.searchParams.set("maxResults", "100");
+    // Exclude completed tasks — the API returns them by default, and an import
+    // should only bring across open todos.
+    url.searchParams.set("showCompleted", "false");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
 
     const res = await fetch(url, {
@@ -112,7 +115,7 @@ export async function importGoogleTasks(c: Context<Env>) {
   }
 
   if (googleTasks.length === 0) {
-    return c.json({ imported: 0, skipped: 0 });
+    return c.json({ imported: 0, skipped: 0, importedIds: [], datedTodos: [] });
   }
 
   const db = getDb(c.env.DB);
@@ -132,7 +135,12 @@ export async function importGoogleTasks(c: Context<Env>) {
     .sort((a, b) => (a.position ?? "").localeCompare(b.position ?? ""));
 
   if (toImport.length === 0) {
-    return c.json({ imported: 0, skipped: googleTasks.length });
+    return c.json({
+      imported: 0,
+      skipped: googleTasks.length,
+      importedIds: [],
+      datedTodos: [],
+    });
   }
 
   // Land imports above existing todos, in Google order (first task highest).

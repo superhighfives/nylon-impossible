@@ -253,7 +253,7 @@ export function SettingsModal() {
                               importedIds,
                               datedTodos,
                             }) => {
-                              if (importedIds.length === 0) return;
+                              if (!importedIds?.length) return;
                               // Step out of Settings and into the focused
                               // repeat-schedule review for the new dated tasks.
                               setOpen(false);

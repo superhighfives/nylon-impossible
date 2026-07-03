@@ -42,7 +42,7 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
-      <span className="text-sm text-gray truncate group-hover/link:underline shrink-0 max-w-full">
+      <span className="text-sm text-gray truncate group-hover/link:underline min-w-0">
         {displayTitle}
       </span>
       {!isPending && url.description && (
