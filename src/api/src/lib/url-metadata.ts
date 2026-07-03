@@ -148,6 +148,85 @@ function extractHostname(url: string): string | null {
 /** Timeout for metadata fetch requests (10 seconds) */
 const FETCH_TIMEOUT_MS = 10_000;
 
+// Matches a tweet permalink and captures its numeric id, e.g.
+// x.com/user/status/123, twitter.com/i/web/status/123.
+const TWEET_URL_RE =
+  /^https?:\/\/(?:www\.)?(?:twitter|x)\.com\/(?:[^/?#]+|i\/(?:web\/)?)\/?status(?:es)?\/(\d+)/i;
+
+function extractTweetId(url: string): string | null {
+  return url.match(TWEET_URL_RE)?.[1] ?? null;
+}
+
+// X blocks the tweet text from the page HTML for bots, but its public
+// syndication endpoint (the one embeds/react-tweet use) returns the tweet as
+// JSON without auth. The token is a deterministic value derived from the id.
+function syndicationToken(id: string): string {
+  return ((Number(id) / 1e15) * Math.PI).toString(36).replace(/(0+|\.)/g, "");
+}
+
+interface TweetResult {
+  text?: string;
+  user?: { name?: string; screen_name?: string };
+  photos?: { url?: string }[];
+  mediaDetails?: { media_url_https?: string }[];
+}
+
+/**
+ * Fetch tweet content (text, author, first image) from X's public syndication
+ * endpoint. Returns null on any failure so the caller can fall back to the
+ * normal HTML scrape.
+ */
+async function fetchTweetMetadata(id: string): Promise<UrlMetadata | null> {
+  const endpoint = new URL("https://cdn.syndication.twimg.com/tweet-result");
+  endpoint.searchParams.set("id", id);
+  endpoint.searchParams.set("lang", "en");
+  endpoint.searchParams.set("token", syndicationToken(id));
+
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      headers: { "User-Agent": "NylonBot/1.0" },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+
+  let data: TweetResult;
+  try {
+    data = (await response.json()) as TweetResult;
+  } catch {
+    return null;
+  }
+
+  // A tombstone (deleted/protected tweet) has no text — treat as a miss.
+  if (!data?.text) return null;
+
+  const name = data.user?.name?.trim() || null;
+  const handle = data.user?.screen_name?.trim();
+  // Match the "Name (@handle)" shape the web card parses author info from.
+  const title = name && handle ? `${name} (@${handle})` : name;
+  const image =
+    data.photos?.find((p) => p.url)?.url ??
+    data.mediaDetails?.find((m) => m.media_url_https)?.media_url_https ??
+    null;
+
+  // X appends a trailing t.co link for attached media; strip it so a
+  // media-only tweet reads as no body rather than a bare shortlink.
+  const text = data.text
+    .replace(/(?:\s*https:\/\/t\.co\/\w+)+\s*$/i, "")
+    .trim();
+
+  return {
+    title,
+    description: text || null,
+    siteName: "X",
+    favicon: "https://abs.twimg.com/favicons/twitter.3.ico",
+    image,
+  };
+}
+
 /**
  * Fetch and extract metadata from a URL.
  *
@@ -156,6 +235,14 @@ const FETCH_TIMEOUT_MS = 10_000;
  * Times out after 10 seconds to prevent hanging on slow/unresponsive servers.
  */
 export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
+  // Tweets don't expose their text to bots via HTML — pull it from X's
+  // syndication endpoint first, falling back to the scrape below if that fails.
+  const tweetId = extractTweetId(url);
+  if (tweetId) {
+    const tweet = await fetchTweetMetadata(tweetId);
+    if (tweet) return tweet;
+  }
+
   let response: Response;
   try {
     response = await fetch(url, {

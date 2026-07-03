@@ -46,7 +46,10 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
         {displayTitle}
       </span>
       {!isPending && url.description && (
-        <span className="font-mono text-[11px] text-gray-muted truncate min-w-0">
+        // High shrink factor lets the description collapse first, so the title
+        // "wins" the available width and only truncates once the description
+        // has fully given way.
+        <span className="font-mono text-[11px] text-gray-muted truncate min-w-0 shrink-[1000]">
           {url.description}
         </span>
       )}

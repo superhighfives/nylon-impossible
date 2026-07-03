@@ -280,4 +280,79 @@ describe("fetchUrlMetadata", () => {
       );
     });
   });
+
+  describe("tweet syndication", () => {
+    const TWEET_URL = "https://x.com/nifinet/status/2072704249663004773?s=46";
+
+    it("pulls tweet text, author, and image from the syndication endpoint", async () => {
+      const stub = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            text: "Just shipped a thing",
+            user: { name: "Nicolas Finet", screen_name: "nifinet" },
+            photos: [{ url: "https://pbs.twimg.com/media/abc.jpg" }],
+          }),
+      });
+      vi.stubGlobal("fetch", stub);
+
+      const meta = await fetchUrlMetadata(TWEET_URL);
+
+      expect(String(stub.mock.calls[0][0])).toContain(
+        "cdn.syndication.twimg.com/tweet-result",
+      );
+      expect(meta.title).toBe("Nicolas Finet (@nifinet)");
+      expect(meta.description).toBe("Just shipped a thing");
+      expect(meta.siteName).toBe("X");
+      expect(meta.image).toBe("https://pbs.twimg.com/media/abc.jpg");
+    });
+
+    it("strips a trailing media t.co link from the tweet text", async () => {
+      const stub = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            text: "Check this out https://t.co/LDwScMtine",
+            user: { name: "Nicolas Finet", screen_name: "nifinet" },
+          }),
+      });
+      vi.stubGlobal("fetch", stub);
+
+      const meta = await fetchUrlMetadata(TWEET_URL);
+      expect(meta.description).toBe("Check this out");
+    });
+
+    it("uses a null description for a media-only tweet", async () => {
+      const stub = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            text: "https://t.co/LDwScMtine",
+            user: { name: "Nicolas Finet", screen_name: "nifinet" },
+          }),
+      });
+      vi.stubGlobal("fetch", stub);
+
+      const meta = await fetchUrlMetadata(TWEET_URL);
+      expect(meta.description).toBeNull();
+      expect(meta.title).toBe("Nicolas Finet (@nifinet)");
+    });
+
+    it("falls back to the HTML scrape when syndication fails", async () => {
+      const stub = vi.fn(async (input: RequestInfo | URL) => {
+        if (String(input).includes("syndication")) {
+          return { ok: false, status: 404 } as Response;
+        }
+        return {
+          ok: true,
+          text: () => Promise.resolve(makeHtml({ ogTitle: "Scraped Title" })),
+        } as unknown as Response;
+      });
+      vi.stubGlobal("fetch", stub);
+
+      const meta = await fetchUrlMetadata(TWEET_URL);
+
+      expect(meta.title).toBe("Scraped Title");
+    });
+  });
 });
