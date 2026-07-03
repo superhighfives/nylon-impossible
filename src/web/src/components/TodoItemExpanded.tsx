@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useUser } from "@/hooks/useUser";
+import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
 import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
 import type {
@@ -39,14 +40,6 @@ function formatDate(isoString: string | null): string {
   if (!isoString) return "";
   const date = new Date(isoString);
   return date.toISOString().split("T")[0];
-}
-
-function ordinal(n: number): string {
-  const suffixes = ["th", "st", "nd", "rd"];
-  const mod100 = n % 100;
-  const suffix =
-    suffixes[(mod100 - 20) % 10] ?? suffixes[mod100] ?? suffixes[0];
-  return `${n}${suffix}`;
 }
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
@@ -237,22 +230,9 @@ export function TodoItemExpanded({
   };
 
   // Label reflects the anchor — "Weekly on Wednesday", "Monthly on the 14th".
-  const recurrenceItems = (() => {
-    const anchor = dueDate ? new Date(`${dueDate}T00:00:00`) : null;
-    const weeklyLabel = anchor
-      ? `Weekly on ${anchor.toLocaleDateString(undefined, { weekday: "long" })}`
-      : "Weekly";
-    const monthlyLabel = anchor
-      ? `Monthly on the ${ordinal(anchor.getDate())}`
-      : "Monthly";
-    return [
-      { value: "none", label: "None" },
-      { value: "daily", label: "Daily" },
-      { value: "weekly", label: weeklyLabel },
-      { value: "monthly", label: monthlyLabel },
-      { value: "yearly", label: "Yearly" },
-    ];
-  })();
+  const recurrenceItems = buildRecurrenceItems(
+    dueDate ? new Date(`${dueDate}T00:00:00`) : null,
+  );
 
   return (
     <div className="mt-3 space-y-5 rounded-xl border border-gray-subtle bg-gray-app/70 backdrop-blur-sm p-4">

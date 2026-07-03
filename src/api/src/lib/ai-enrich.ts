@@ -45,6 +45,10 @@ export async function enrichOrAskWithAI(
   originalText: string,
   userLocation?: string | null,
   history?: ConversationTurn[],
+  options?: {
+    preserveExistingDueDate?: boolean;
+    existingDueDate?: Date | null;
+  },
 ): Promise<void> {
   const now = new Date();
 
@@ -101,8 +105,9 @@ export async function enrichOrAskWithAI(
       updates.title = truncateTitle(cleanTitle);
     }
 
-    // Update due date if extracted
-    if (enrichment.dueDate) {
+    // Update due date if extracted, unless the caller supplied an authoritative
+    // one (e.g. a Google Tasks import) that AI shouldn't overwrite.
+    if (enrichment.dueDate && !options?.preserveExistingDueDate) {
       updates.dueDate = new Date(enrichment.dueDate);
     }
 
@@ -112,9 +117,12 @@ export async function enrichOrAskWithAI(
     }
 
     // Update recurrence if extracted. A recurrence rule requires a dueDate
-    // anchor; if the model returned a frequency without one, the rule is
-    // dropped (we can't safely guess the user's intended occurrence).
-    if (enrichment.recurrence && updates.dueDate) {
+    // anchor: either one freshly extracted here, or one the todo already has
+    // (e.g. a Google Tasks import, where we preserve the existing due date and
+    // so never populate updates.dueDate). If neither exists, drop the rule —
+    // we can't safely guess the user's intended occurrence.
+    const recurrenceAnchor = updates.dueDate ?? options?.existingDueDate;
+    if (enrichment.recurrence && recurrenceAnchor) {
       updates.recurrence = enrichment.recurrence;
     }
 

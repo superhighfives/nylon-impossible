@@ -42,9 +42,14 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
-      <span className="text-sm text-gray truncate group-hover/link:underline">
+      <span className="text-sm text-gray truncate group-hover/link:underline shrink-0 max-w-full">
         {displayTitle}
       </span>
+      {!isPending && url.description && (
+        <span className="font-mono text-[11px] text-gray-muted truncate min-w-0">
+          {url.description}
+        </span>
+      )}
       {isPending && (
         <span className="text-xs text-gray-muted shrink-0">Fetching...</span>
       )}

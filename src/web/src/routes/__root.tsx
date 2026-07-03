@@ -14,10 +14,15 @@ import { useEffect } from "react";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
+import { ImportReviewModal } from "../components/ImportReviewModal";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
 import { SettingsModal } from "../components/SettingsModal";
 import { Toaster } from "../components/ui";
+import {
+  ImportReviewContext,
+  useImportReviewValue,
+} from "../hooks/useImportReview";
 import {
   OnlineStatusContext,
   useOnlineStatusValue,
@@ -119,6 +124,7 @@ function SentryUserSync() {
 function RootDocument() {
   const origin = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
+  const importReview = useImportReviewValue();
 
   return (
     <html lang="en" className="light" suppressHydrationWarning>
@@ -155,16 +161,19 @@ function RootDocument() {
             fallback={({ resetError }) => <ErrorView reset={resetError} />}
           >
             <OnlineStatusContext.Provider value={onlineStatus}>
-              <OfflineBanner />
-              <Header />
-              <div className="pt-header-offset">
-                <Outlet />
-              </div>
-              <DevEnvironmentIndicator origin={origin} />
-              <Show when="signed-in">
-                <SettingsModal />
-              </Show>
-              <Toaster />
+              <ImportReviewContext.Provider value={importReview}>
+                <OfflineBanner />
+                <Header />
+                <div className="pt-header-offset">
+                  <Outlet />
+                </div>
+                <DevEnvironmentIndicator origin={origin} />
+                <Show when="signed-in">
+                  <SettingsModal />
+                  <ImportReviewModal />
+                </Show>
+                <Toaster />
+              </ImportReviewContext.Provider>
             </OnlineStatusContext.Provider>
           </Sentry.ErrorBoundary>
           <TanStackDevtools

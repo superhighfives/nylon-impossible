@@ -21,6 +21,42 @@ const NULL_METADATA: UrlMetadata = {
   image: null,
 };
 
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+/**
+ * Decode HTML entities (named like `&amp;` and numeric like `&#039;` / `&#x27;`)
+ * so titles/descriptions read as plain text instead of raw markup.
+ */
+function decodeHtmlEntities(text: string | null): string | null {
+  if (!text) return text;
+  return text.replace(
+    /&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g,
+    (match, entity) => {
+      if (entity[0] === "#") {
+        const isHex = entity[1] === "x" || entity[1] === "X";
+        const code = Number.parseInt(
+          entity.slice(isHex ? 2 : 1),
+          isHex ? 16 : 10,
+        );
+        if (Number.isNaN(code)) return match;
+        try {
+          return String.fromCodePoint(code);
+        } catch {
+          return match;
+        }
+      }
+      return NAMED_ENTITIES[entity] ?? match;
+    },
+  );
+}
+
 /**
  * Extract content from a meta tag by property or name attribute.
  *
@@ -161,5 +197,11 @@ export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
     extractMeta(html, "twitter:image:src");
   const image = rawImage ? (resolveUrl(rawImage, url) ?? rawImage) : null;
 
-  return { title, description, siteName, favicon, image };
+  return {
+    title: decodeHtmlEntities(title),
+    description: decodeHtmlEntities(description),
+    siteName: decodeHtmlEntities(siteName),
+    favicon,
+    image,
+  };
 }

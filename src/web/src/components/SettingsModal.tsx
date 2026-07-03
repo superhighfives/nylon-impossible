@@ -1,12 +1,18 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { useClerk } from "@clerk/tanstack-react-start";
+import { useClerk, useUser as useClerkUser } from "@clerk/tanstack-react-start";
 import { MapPin, Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import { useImportReview } from "@/hooks/useImportReview";
 import { useImportGoogleTasks } from "@/hooks/useTodos";
 import { useDeleteCurrentUser, useUpdateUser, useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { Button, Field, Input, Loader } from "./ui";
+
+// Full Google scope required to read Tasks. Google rejects the shorthand
+// (`tasks.readonly`) with invalid_scope, so the fully-qualified URL is used
+// both here and in the Clerk connection's additional scopes.
+const GOOGLE_TASKS_SCOPE = "https://www.googleapis.com/auth/tasks.readonly";
 
 const NominatimSchema = z.object({
   address: z
@@ -25,11 +31,46 @@ export function SettingsModal() {
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteCurrentUser();
   const importGoogleTasks = useImportGoogleTasks();
+  const { startReview } = useImportReview();
+  const { user: clerkUser, isLoaded: isClerkLoaded } = useClerkUser();
   const { signOut } = useClerk();
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
   const [open, setOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
+  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
+
+  // A Google account is only usable for import once it's connected *and* has
+  // granted the Tasks scope — a plain sign-in connection won't have it.
+  const googleAccount = clerkUser?.externalAccounts.find(
+    (account) => account.provider === "google",
+  );
+  const googleTasksReady = Boolean(
+    googleAccount?.approvedScopes?.includes(GOOGLE_TASKS_SCOPE),
+  );
+
+  const handleConnectGoogle = async () => {
+    if (!clerkUser) return;
+    setIsConnectingGoogle(true);
+    try {
+      const externalAccount = await clerkUser.createExternalAccount({
+        strategy: "oauth_google",
+        redirectUrl: window.location.href,
+        additionalScopes: [GOOGLE_TASKS_SCOPE],
+      });
+      const redirect =
+        externalAccount.verification?.externalVerificationRedirectURL;
+      if (redirect) {
+        window.location.href = redirect.toString();
+        return; // navigating away; keep the spinner until unload
+      }
+      setIsConnectingGoogle(false);
+      toast.error("Couldn't start the Google connection");
+    } catch (err) {
+      setIsConnectingGoogle(false);
+      toast.error(messageFromError(err, "Couldn't connect Google"));
+    }
+  };
 
   const handleDeleteAccount = () => {
     const confirmed = window.confirm(
@@ -185,20 +226,71 @@ export function SettingsModal() {
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-muted mb-2">
                     Import
                   </h3>
-                  <p className="text-xs text-gray-muted mb-3">
-                    Bring across open tasks from your Google Tasks “My Tasks”
-                    list. Already-imported tasks are skipped, so it's safe to
-                    run again.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => importGoogleTasks.mutate()}
-                    disabled={importGoogleTasks.isPending}
-                    loading={importGoogleTasks.isPending}
-                  >
-                    Import from Google Tasks
-                  </Button>
+                  {!isClerkLoaded ? (
+                    <div
+                      className="flex items-center gap-2 text-xs text-gray-muted py-1"
+                      aria-live="polite"
+                    >
+                      <Loader size="sm" />
+                      <span>Checking Google connection…</span>
+                    </div>
+                  ) : googleTasksReady ? (
+                    <>
+                      <p className="text-xs text-gray-muted mb-3">
+                        Bring across open tasks from your Google Tasks “My
+                        Tasks” list, with due dates and link research. Google
+                        doesn't share repeat schedules, so we'll help you set
+                        those afterwards. Already-imported tasks are skipped, so
+                        it's safe to run again.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          importGoogleTasks.mutate(undefined, {
+                            onSuccess: ({
+                              imported,
+                              importedIds,
+                              datedTodos,
+                            }) => {
+                              if (importedIds.length === 0) return;
+                              // Step out of Settings and into the focused
+                              // repeat-schedule review for the new dated tasks.
+                              setOpen(false);
+                              startReview({
+                                importedIds,
+                                datedTodos,
+                                imported,
+                              });
+                            },
+                          })
+                        }
+                        disabled={importGoogleTasks.isPending}
+                        loading={importGoogleTasks.isPending}
+                      >
+                        Import from Google Tasks
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs text-gray-muted mb-3">
+                        Connect your Google account to import open tasks from
+                        Google Tasks. We only request read-only access to your
+                        tasks.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleConnectGoogle}
+                        disabled={isConnectingGoogle}
+                        loading={isConnectingGoogle}
+                      >
+                        {googleAccount
+                          ? "Reconnect Google for Tasks"
+                          : "Connect Google"}
+                      </Button>
+                    </>
+                  )}
                 </div>
                 <div className="border-t border-gray-base pt-4 mt-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-red mb-2">
@@ -225,7 +317,7 @@ export function SettingsModal() {
               <Dialog.Close
                 render={
                   <Button variant="ghost" disabled={updateUser.isPending}>
-                    Cancel
+                    Done
                   </Button>
                 }
               />

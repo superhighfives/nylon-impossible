@@ -8,13 +8,7 @@ import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
-import {
-  createTodo,
-  deleteTodo,
-  getTodos,
-  importGoogleTasks,
-  updateTodo,
-} from "@/server/todos";
+import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
 import type {
   CreateTodoInput,
   TodoWithUrls,
@@ -349,18 +343,38 @@ export function useSmartCreate() {
 export function useImportGoogleTasks() {
   const queryClient = useQueryClient();
   const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
 
   return useMutation({
-    mutationFn: () => importGoogleTasks(),
+    mutationFn: async (): Promise<{
+      imported: number;
+      skipped: number;
+      importedIds: string[];
+      datedTodos: { id: string; title: string; dueDate: string }[];
+    }> => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/import/google-tasks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
     onSuccess: ({ imported, skipped }) => {
-      if (imported > 0) {
-        toast.success(
-          `Imported ${imported} ${imported === 1 ? "task" : "tasks"} from Google`,
+      // The success toast for imported > 0 is deferred: it fires once the
+      // caller finishes the post-import repeat-schedule review, alongside
+      // revealing the new rows. Only the no-op outcomes toast here.
+      if (imported === 0) {
+        toast.info(
+          skipped > 0
+            ? "Your Google Tasks are already imported"
+            : "No Google Tasks to import",
         );
-      } else if (skipped > 0) {
-        toast.info("Your Google Tasks are already imported");
-      } else {
-        toast.info("No Google Tasks to import");
       }
       notifyChanged();
     },

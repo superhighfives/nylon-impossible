@@ -2,7 +2,6 @@
  * Server functions for todos using Effect for type-safe error handling
  */
 
-import { clerkClient } from "@clerk/tanstack-react-start/server";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
@@ -10,7 +9,6 @@ import { Effect } from "effect";
 import { generateKeyBetween } from "fractional-indexing";
 import {
   DatabaseError,
-  ExternalServiceError,
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
@@ -268,179 +266,6 @@ export const createTodo = createServerFn({ method: "POST" })
 
     return runEffect(program);
   });
-
-/** A single task as returned by the Google Tasks REST API. */
-interface GoogleTask {
-  id: string;
-  title?: string;
-  notes?: string;
-  status?: "needsAction" | "completed";
-  due?: string;
-}
-
-/**
- * Fetch all incomplete tasks from the user's default Google Tasks list
- * ("My Tasks"), following pagination. Completed tasks are excluded so an
- * import only brings across open todos.
- */
-async function fetchGoogleTasks(accessToken: string): Promise<GoogleTask[]> {
-  const tasks: GoogleTask[] = [];
-  let pageToken: string | undefined;
-
-  do {
-    const url = new URL(
-      "https://tasks.googleapis.com/tasks/v1/lists/@default/tasks",
-    );
-    url.searchParams.set("maxResults", "100");
-    if (pageToken) url.searchParams.set("pageToken", pageToken);
-
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => "");
-      throw new Error(`Google Tasks API ${res.status}: ${body.slice(0, 300)}`);
-    }
-
-    const json = (await res.json()) as {
-      items?: GoogleTask[];
-      nextPageToken?: string;
-    };
-    if (json.items) tasks.push(...json.items);
-    pageToken = json.nextPageToken;
-  } while (pageToken);
-
-  return tasks;
-}
-
-/**
- * Import todos from the authenticated user's Google Tasks account.
- *
- * Requires a Google OAuth connection in Clerk granting the
- * `https://www.googleapis.com/auth/tasks.readonly` scope. Tasks already
- * imported (matched on `googleTaskId`) are skipped, so this is safe to run
- * repeatedly.
- */
-export const importGoogleTasks = createServerFn({ method: "POST" }).handler(
-  async () => {
-    const program = withAuthenticatedUser((user, db) =>
-      Effect.gen(function* () {
-        // Exchange the Clerk-held Google connection for an access token.
-        const tokenResponse = yield* Effect.tryPromise({
-          try: () =>
-            clerkClient().users.getUserOauthAccessToken(user.id, "google"),
-          catch: (cause) =>
-            new ExternalServiceError({
-              service: "clerk",
-              message: "Couldn't reach your Google account. Try again.",
-              status: 502,
-              cause,
-            }),
-        });
-
-        const accessToken = tokenResponse.data[0]?.token;
-        if (!accessToken) {
-          return yield* Effect.fail(
-            new ExternalServiceError({
-              service: "google",
-              message:
-                "Connect your Google account (with Tasks access) to import.",
-              status: 400,
-            }),
-          );
-        }
-
-        // Pull every open task from the default list.
-        const googleTasks = yield* Effect.tryPromise({
-          try: () => fetchGoogleTasks(accessToken),
-          catch: (cause) =>
-            new ExternalServiceError({
-              service: "google",
-              message: "Couldn't fetch your Google Tasks. Try again.",
-              status: 502,
-              cause,
-            }),
-        });
-
-        if (googleTasks.length === 0) {
-          return { imported: 0, skipped: 0 };
-        }
-
-        // Skip tasks already imported (dedupe on googleTaskId).
-        const existing = yield* Effect.tryPromise({
-          try: () =>
-            db
-              .select({ googleTaskId: todos.googleTaskId })
-              .from(todos)
-              .where(eq(todos.userId, user.id)),
-          catch: (error) =>
-            new DatabaseError({
-              operation: "getImportedTaskIds",
-              cause: error,
-            }),
-        });
-        const importedIds = new Set(
-          existing.map((row) => row.googleTaskId).filter(Boolean),
-        );
-
-        const toImport = googleTasks.filter(
-          (task) => !importedIds.has(task.id),
-        );
-        if (toImport.length === 0) {
-          return { imported: 0, skipped: googleTasks.length };
-        }
-
-        // Get the last position so imported todos append to the bottom.
-        const lastTodo = yield* Effect.tryPromise({
-          try: () =>
-            db
-              .select({ position: todos.position })
-              .from(todos)
-              .where(eq(todos.userId, user.id))
-              .orderBy(desc(todos.position))
-              .limit(1)
-              .get(),
-          catch: (error) =>
-            new DatabaseError({ operation: "getLastTodo", cause: error }),
-        });
-
-        let prevPosition = lastTodo?.position ?? null;
-        const rows = toImport.map((task) => {
-          const position = generateKeyBetween(prevPosition, null);
-          prevPosition = position;
-          const title = (task.title?.trim() || "Untitled").slice(0, 500);
-          return {
-            userId: user.id,
-            googleTaskId: task.id,
-            title,
-            notes: task.notes ? task.notes.slice(0, 10000) : null,
-            completed: false,
-            position,
-            dueDate: task.due ? new Date(task.due) : null,
-          };
-        });
-
-        yield* Effect.tryPromise({
-          try: () => db.insert(todos).values(rows),
-          catch: (error) =>
-            new DatabaseError({ operation: "importGoogleTasks", cause: error }),
-        });
-
-        yield* Effect.log(
-          `Imported ${rows.length} Google Tasks for user ${user.id}`,
-        );
-
-        return {
-          imported: rows.length,
-          skipped: googleTasks.length - rows.length,
-        };
-      }),
-    );
-
-    return runEffect(program);
-  },
-);
 
 interface UpdateTodoParams {
   id: string;
