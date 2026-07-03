@@ -9,6 +9,7 @@ import {
 } from "./handlers/admin";
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
+import { importGoogleTasks } from "./handlers/import-google-tasks";
 import { replyToTodo } from "./handlers/reply";
 import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
@@ -87,6 +88,7 @@ app.post("/webhooks/clerk", clerkWebhook);
 
 // Todo routes
 app.post("/todos/smart", smartCreate);
+app.post("/todos/import/google-tasks", importGoogleTasks);
 app.post("/todos/sync", syncTodos);
 app.get("/todos", listTodos);
 app.post("/todos", createTodo);

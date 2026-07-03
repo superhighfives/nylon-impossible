@@ -42,9 +42,17 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
-      <span className="text-sm text-gray truncate group-hover/link:underline">
+      <span className="text-sm text-gray truncate group-hover/link:underline min-w-0">
         {displayTitle}
       </span>
+      {!isPending && url.description && (
+        // High shrink factor lets the description collapse first, so the title
+        // "wins" the available width and only truncates once the description
+        // has fully given way.
+        <span className="font-mono text-[11px] text-gray-muted truncate min-w-0 shrink-[1000]">
+          {url.description}
+        </span>
+      )}
       {isPending && (
         <span className="text-xs text-gray-muted shrink-0">Fetching...</span>
       )}

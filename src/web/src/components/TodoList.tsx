@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
+import { useImportReview } from "@/hooks/useImportReview";
 import {
   STALE_AI_MS,
   STALE_RESEARCH_MS,
@@ -315,6 +316,7 @@ function ExpandedSection({
 function SortableTodoItem(
   props: TodoItemProps & {
     isKeyboardDragging: boolean;
+    highlighted: boolean;
     onUpdateExpanded: (updates: {
       title?: string;
       notes?: string | null;
@@ -363,7 +365,11 @@ function SortableTodoItem(
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative py-2 ${
+      className={`group relative rounded-lg py-2 transition-colors duration-1000 ease-out ${
+        // Freshly imported rows glow briefly, then the tint transitions out
+        // once the highlight clears — a gentle "these are new" cue.
+        !isDragging && props.highlighted ? "bg-yellow-base" : ""
+      } ${
         isDragging
           ? `z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl backdrop-blur-sm ${
               // Yellow border only for keyboard drags — it flags the selected
@@ -492,6 +498,7 @@ export function TodoList() {
   const { data: todos, isLoading, error, refetch, isFetching } = useTodos();
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
+  const { highlightIds, hiddenIds } = useImportReview();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
@@ -578,7 +585,11 @@ export function TodoList() {
     return bUpdated - aUpdated;
   });
 
-  const incompleteTodos = sortedTodos.filter((t) => !t.completed);
+  // Imports under repeat-schedule review are held out of the list until the
+  // user finishes, so they don't pop in behind the review modal.
+  const incompleteTodos = sortedTodos.filter(
+    (t) => !t.completed && !hiddenIds.has(t.id),
+  );
   const completedTodos = sortedTodos.filter((t) => t.completed);
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
@@ -646,6 +657,7 @@ export function TodoList() {
               key={todo.id}
               {...sharedProps(todo)}
               isKeyboardDragging={isKeyboardDragging}
+              highlighted={highlightIds.has(todo.id)}
               onUpdateExpanded={handleUpdateExpanded(todo.id)}
             />
           ))}

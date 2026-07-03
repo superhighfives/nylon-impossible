@@ -337,6 +337,58 @@ export function useSmartCreate() {
 }
 
 /**
+ * Hook to import todos from the user's Google Tasks account. Surfaces a
+ * success/skip summary via toast and refreshes the list on completion.
+ */
+export function useImportGoogleTasks() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (): Promise<{
+      imported: number;
+      skipped: number;
+      importedIds: string[];
+      datedTodos: { id: string; title: string; dueDate: string }[];
+    }> => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/import/google-tasks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onSuccess: ({ imported, skipped }) => {
+      // The success toast for imported > 0 is deferred: it fires once the
+      // caller finishes the post-import repeat-schedule review, alongside
+      // revealing the new rows. Only the no-op outcomes toast here.
+      if (imported === 0) {
+        toast.info(
+          skipped > 0
+            ? "Your Google Tasks are already imported"
+            : "No Google Tasks to import",
+        );
+      }
+      notifyChanged();
+    },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "importGoogleTasks" } });
+      toast.error(messageFromError(err, "Couldn't import from Google Tasks"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+    },
+  });
+}
+
+/**
  * Hook to trigger re-research for a todo.
  * Deletes existing research and kicks off a fresh research run.
  */

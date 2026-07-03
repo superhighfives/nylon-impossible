@@ -1,4 +1,5 @@
 import { SignInButton, SignUpButton } from "@clerk/tanstack-react-start";
+import { Link } from "@tanstack/react-router";
 import { Button } from "./ui";
 
 const features = [
@@ -79,6 +80,15 @@ export function LandingPage() {
           </li>
         ))}
       </ul>
+
+      <footer className="flex justify-center gap-4 text-xs text-gray-muted">
+        <Link to="/privacy" className="hover:text-gray transition-colors">
+          Privacy
+        </Link>
+        <Link to="/terms" className="hover:text-gray transition-colors">
+          Terms
+        </Link>
+      </footer>
     </div>
   );
 }

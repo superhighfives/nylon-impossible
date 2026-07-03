@@ -5,6 +5,7 @@ import {
   primaryKey,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
 // Recurrence rule attached to a todo. v1 supports only a simple frequency; the
@@ -69,10 +70,19 @@ export const todos = sqliteTable(
     needsInput: integer("needs_input", { mode: "boolean" })
       .notNull()
       .default(false),
+    // Source task id when this todo was imported from Google Tasks. Null for
+    // todos created in-app. Used to dedupe on re-import.
+    googleTaskId: text("google_task_id"),
   },
   (table) => [
     index("idx_todos_user_id").on(table.userId),
     index("idx_todos_user_position").on(table.userId, table.position),
+    // Multiple NULLs are distinct in SQLite, so in-app todos never collide;
+    // this guarantees a Google task is imported at most once per user.
+    uniqueIndex("idx_todos_user_google_task").on(
+      table.userId,
+      table.googleTaskId,
+    ),
   ],
 );
 
