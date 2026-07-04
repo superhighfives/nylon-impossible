@@ -17,6 +17,11 @@ struct ImportReviewSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var allTodos: [TodoItem]
 
+    // Each Picker change writes to SwiftData immediately; the network sync is
+    // deferred to a single call when the sheet closes so setting schedules for
+    // several tasks doesn't fire a full sync per keystroke.
+    @State private var didChange = false
+
     /// Resolve the imported ids against live SwiftData, preserving the server's
     /// order (first Google task first). Any id not yet synced in is skipped.
     private var reviewItems: [TodoItem] {
@@ -32,7 +37,7 @@ struct ImportReviewSheet: View {
                 Section {
                     ForEach(reviewItems) { todo in
                         ImportReviewRow(todo: todo) {
-                            syncService.syncAfterAction()
+                            didChange = true
                         }
                     }
                 } footer: {
@@ -44,6 +49,13 @@ struct ImportReviewSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+            }
+            // Sync once on close (covers both the Done button and swipe-to-dismiss),
+            // pushing every schedule change in a single round-trip.
+            .onDisappear {
+                if didChange {
+                    syncService.syncAfterAction()
                 }
             }
         }
