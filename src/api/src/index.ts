@@ -5,7 +5,7 @@ import {
   deleteUserAsAdmin,
   getUser,
   listUsers,
-  updateUserPlan,
+  updateUser,
 } from "./handlers/admin";
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
@@ -108,7 +108,7 @@ app.delete("/users/me", deleteMe);
 // Admin endpoints
 app.get("/admin/users", listUsers);
 app.get("/admin/users/:id", getUser);
-app.patch("/admin/users/:id/plan", updateUserPlan);
+app.patch("/admin/users/:id", updateUser);
 app.delete("/admin/users/:id", deleteUserAsAdmin);
 
 const handler: ExportedHandler<Env["Bindings"], ResearchJobMessage> = {

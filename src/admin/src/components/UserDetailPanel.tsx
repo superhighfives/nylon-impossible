@@ -1,11 +1,6 @@
 import { useEffect, useState } from "react";
 import { useToken } from "../App";
-import {
-  type AdminUserDetail,
-  deleteUser,
-  getUser,
-  updateUserPlan,
-} from "../api";
+import { type AdminUserDetail, deleteUser, getUser, updateUser } from "../api";
 
 interface Props {
   userId: string;
@@ -13,16 +8,29 @@ interface Props {
   onDeleted: () => void;
 }
 
+interface EditForm {
+  plan: "free" | "pro";
+  aiEnabled: boolean;
+  location: string;
+}
+
 export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
   const token = useToken();
   const [detail, setDetail] = useState<AdminUserDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<EditForm>({
+    plan: "free",
+    aiEnabled: false,
+    location: "",
+  });
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     setError(null);
+    setEditing(false);
     getUser(token, userId)
       .then((d) => {
         if (!cancelled) setDetail(d);
@@ -35,13 +43,36 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
     };
   }, [token, userId]);
 
-  async function togglePlan() {
+  function startEdit() {
+    if (!detail) return;
+    setForm({
+      plan: detail.plan,
+      aiEnabled: detail.aiEnabled,
+      location: detail.location ?? "",
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
     if (!token || !detail) return;
-    const next = detail.plan === "pro" ? "free" : "pro";
     setBusy(true);
+    setError(null);
     try {
-      await updateUserPlan(token, userId, next);
-      setDetail({ ...detail, plan: next });
+      const location =
+        form.location.trim() === "" ? null : form.location.trim();
+      const updated = await updateUser(token, userId, {
+        plan: form.plan,
+        aiEnabled: form.aiEnabled,
+        location,
+      });
+      setDetail({
+        ...detail,
+        plan: updated.plan,
+        aiEnabled: updated.aiEnabled,
+        location: updated.location,
+        updatedAt: updated.updatedAt,
+      });
+      setEditing(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -96,12 +127,85 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
         </button>
       </div>
 
-      <h2 className="text-lg font-semibold break-words">{detail.email}</h2>
-      <p className="font-mono text-xs text-neutral-500">{detail.id}</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold break-words">{detail.email}</h2>
+          <p className="font-mono text-xs text-neutral-500">{detail.id}</p>
+        </div>
+        {!editing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="shrink-0 rounded border border-neutral-300 bg-white px-2 py-1 text-xs hover:bg-neutral-50"
+          >
+            Edit
+          </button>
+        )}
+      </div>
 
-      <dl className="mt-6 space-y-3 text-sm">
-        <Row label="Plan">
-          <div className="flex items-center gap-2">
+      {editing ? (
+        <div className="mt-6 space-y-4 text-sm">
+          <label className="flex items-center justify-between gap-4">
+            <span className="text-neutral-500">Plan</span>
+            <select
+              value={form.plan}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  plan: e.target.value as "free" | "pro",
+                }))
+              }
+              className="rounded border border-neutral-300 bg-white px-2 py-1"
+            >
+              <option value="free">free</option>
+              <option value="pro">pro</option>
+            </select>
+          </label>
+          <label className="flex items-center justify-between gap-4">
+            <span className="text-neutral-500">AI enabled</span>
+            <input
+              type="checkbox"
+              checked={form.aiEnabled}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, aiEnabled: e.target.checked }))
+              }
+              className="h-4 w-4"
+            />
+          </label>
+          <label className="flex items-center justify-between gap-4">
+            <span className="text-neutral-500">Location</span>
+            <input
+              type="text"
+              value={form.location}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, location: e.target.value }))
+              }
+              placeholder="—"
+              className="w-48 rounded border border-neutral-300 bg-white px-2 py-1 text-right"
+            />
+          </label>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              disabled={busy}
+              className="rounded border border-neutral-300 bg-white px-3 py-1 text-xs hover:bg-neutral-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={busy}
+              className="rounded border border-neutral-900 bg-neutral-900 px-3 py-1 text-xs text-white hover:bg-neutral-700 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <dl className="mt-6 space-y-3 text-sm">
+          <Row label="Plan">
             <span
               className={`rounded px-2 py-0.5 text-xs font-medium ${
                 detail.plan === "pro"
@@ -111,21 +215,17 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
             >
               {detail.plan}
             </span>
-            <button
-              type="button"
-              onClick={togglePlan}
-              disabled={busy}
-              className="rounded border border-neutral-300 bg-white px-2 py-0.5 text-xs hover:bg-neutral-50 disabled:opacity-50"
-            >
-              Make {detail.plan === "pro" ? "free" : "pro"}
-            </button>
-          </div>
-        </Row>
-        <Row label="AI enabled">{detail.aiEnabled ? "Yes" : "No"}</Row>
-        <Row label="Location">{detail.location ?? "—"}</Row>
-        <Row label="Created">{new Date(detail.createdAt).toLocaleString()}</Row>
-        <Row label="Updated">{new Date(detail.updatedAt).toLocaleString()}</Row>
-      </dl>
+          </Row>
+          <Row label="AI enabled">{detail.aiEnabled ? "Yes" : "No"}</Row>
+          <Row label="Location">{detail.location ?? "—"}</Row>
+          <Row label="Created">
+            {new Date(detail.createdAt).toLocaleString()}
+          </Row>
+          <Row label="Updated">
+            {new Date(detail.updatedAt).toLocaleString()}
+          </Row>
+        </dl>
+      )}
 
       <h3 className="mt-8 text-sm font-semibold uppercase tracking-wide text-neutral-500">
         Diagnostics

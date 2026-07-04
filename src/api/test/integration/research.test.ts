@@ -400,5 +400,16 @@ describe("Research functionality", () => {
       const body = await res.json<any>();
       expect(body.location).toBe("New York, NY");
     });
+
+    it("GET /users/me returns the user's plan", async () => {
+      const res = await SELF.fetch("http://localhost/users/me", {
+        headers: AUTH_HEADER,
+      });
+      expect(res.status).toBe(200);
+
+      const body = await res.json<any>();
+      // seedUser() defaults to the "pro" plan.
+      expect(body.plan).toBe("pro");
+    });
   });
 });

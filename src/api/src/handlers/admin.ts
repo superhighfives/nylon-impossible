@@ -136,18 +136,37 @@ export async function getUser(c: Context<Env>) {
   });
 }
 
-const updatePlanSchema = z.object({
-  plan: z.enum(["free", "pro"]),
+const updateUserSchema = z.object({
+  plan: z.enum(["free", "pro"]).optional(),
+  aiEnabled: z.boolean().optional(),
+  location: z.string().max(200).nullable().optional(),
 });
 
-// PATCH /admin/users/:id/plan
-export async function updateUserPlan(c: Context<Env>) {
+// PATCH /admin/users/:id
+export async function updateUser(c: Context<Env>) {
   const id = c.req.param("id");
   if (!id) return apiError(c, "user_id_required");
   const json = await readJsonBody(c);
   if (!json.ok) return json.response;
-  const parsed = updatePlanSchema.safeParse(json.body);
+  const parsed = updateUserSchema.safeParse(json.body);
   if (!parsed.success) return apiValidationError(c, parsed.error);
+
+  const updates: Partial<{
+    plan: "free" | "pro";
+    aiEnabled: boolean;
+    location: string | null;
+  }> = {};
+  if (parsed.data.plan !== undefined) updates.plan = parsed.data.plan;
+  if (parsed.data.aiEnabled !== undefined) {
+    updates.aiEnabled = parsed.data.aiEnabled;
+  }
+  if (parsed.data.location !== undefined) {
+    updates.location = parsed.data.location;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return apiError(c, "no_valid_fields");
+  }
 
   const db = getDb(c.env.DB);
   const existing = await db
@@ -161,10 +180,33 @@ export async function updateUserPlan(c: Context<Env>) {
 
   await db
     .update(users)
-    .set({ plan: parsed.data.plan, updatedAt: new Date() })
+    .set({ ...updates, updatedAt: new Date() })
     .where(eq(users.id, id));
 
-  return c.json({ id, plan: parsed.data.plan });
+  const user = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      plan: users.plan,
+      aiEnabled: users.aiEnabled,
+      location: users.location,
+      updatedAt: users.updatedAt,
+    })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!user) return apiError(c, "user_not_found");
+
+  return c.json({
+    id: user.id,
+    email: user.email,
+    plan: user.plan,
+    aiEnabled: user.aiEnabled,
+    location: user.location,
+    updatedAt: user.updatedAt.toISOString(),
+  });
 }
 
 // DELETE /admin/users/:id

@@ -22,6 +22,7 @@ final class MockAPIService: APIProviding {
         id: "mock-user-id",
         email: "test@example.com",
         aiEnabled: true,
+        plan: "pro",
         location: nil,
         createdAt: Date(timeIntervalSince1970: 1735689600),
         updatedAt: Date(timeIntervalSince1970: 1735689600)
@@ -70,10 +71,38 @@ final class MockAPIService: APIProviding {
             id: getMeResponse.id,
             email: getMeResponse.email,
             aiEnabled: request.aiEnabled ?? getMeResponse.aiEnabled,
+            plan: getMeResponse.plan,
             location: newLocation,
             createdAt: getMeResponse.createdAt,
             updatedAt: Date()
         )
+    }
+
+    var importGoogleTasksResponse: GoogleTasksImportResponse = GoogleTasksImportResponse(
+        imported: 0,
+        skipped: 0,
+        importedIds: [],
+        datedTodos: []
+    )
+    var importGoogleTasksError: Error?
+    var importGoogleTasksCallCount = 0
+
+    func importGoogleTasks() async throws -> GoogleTasksImportResponse {
+        importGoogleTasksCallCount += 1
+        if let error = importGoogleTasksError {
+            throw error
+        }
+        return importGoogleTasksResponse
+    }
+
+    var deleteMeError: Error?
+    var deleteMeCallCount = 0
+
+    func deleteMe() async throws {
+        deleteMeCallCount += 1
+        if let error = deleteMeError {
+            throw error
+        }
     }
 
     var reresearchError: Error?
