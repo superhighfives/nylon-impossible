@@ -303,7 +303,8 @@ struct SettingsView: View {
     /// Surface the API's own message for a failed import (e.g. the 400 asking the
     /// user to connect Google with Tasks access), falling back to a generic line.
     private func importErrorMessage(_ error: Error) -> String {
-        if case let APIError.serverError(_, message?, _) = error {
+        if let apiError = error as? APIError,
+           case let .serverError(_, message?, _) = apiError {
             return message
         }
         return "Couldn't import from Google Tasks. Try again."
