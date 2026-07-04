@@ -6,6 +6,7 @@ interface User {
   id: string;
   email: string;
   aiEnabled: boolean;
+  plan: "free" | "pro";
   location: string | null;
   createdAt: string;
   updatedAt: string;

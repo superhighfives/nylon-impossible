@@ -56,14 +56,14 @@ describe("Admin endpoints", () => {
     });
   });
 
-  describe("PATCH /admin/users/:id/plan", () => {
+  describe("PATCH /admin/users/:id", () => {
     it("flips a user's plan", async () => {
       mockAsAdmin();
       await seedUser("admin_test_1", "admin@example.com");
       await seedUser("target_user", "target@example.com", { plan: "free" });
 
       const res = await SELF.fetch(
-        "http://localhost/admin/users/target_user/plan",
+        "http://localhost/admin/users/target_user",
         {
           method: "PATCH",
           headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
@@ -80,17 +80,63 @@ describe("Admin endpoints", () => {
       expect(updated?.plan).toBe("pro");
     });
 
-    it("returns 404 for an unknown user", async () => {
+    it("updates aiEnabled and location together", async () => {
       mockAsAdmin();
       await seedUser("admin_test_1", "admin@example.com");
+      await seedUser("target_user", "target@example.com", {
+        aiEnabled: true,
+        location: "Los Angeles, CA",
+      });
+
       const res = await SELF.fetch(
-        "http://localhost/admin/users/missing/plan",
+        "http://localhost/admin/users/target_user",
         {
           method: "PATCH",
           headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: "pro" }),
+          body: JSON.stringify({ aiEnabled: false, location: null }),
         },
       );
+      expect(res.status).toBe(200);
+      const body = await res.json<{
+        aiEnabled: boolean;
+        location: string | null;
+      }>();
+      expect(body.aiEnabled).toBe(false);
+      expect(body.location).toBeNull();
+
+      const db = getDb(env.DB);
+      const [updated] = await db
+        .select({ aiEnabled: users.aiEnabled, location: users.location })
+        .from(users)
+        .where(eq(users.id, "target_user"));
+      expect(updated?.aiEnabled).toBe(false);
+      expect(updated?.location).toBeNull();
+    });
+
+    it("rejects an empty update with 400", async () => {
+      mockAsAdmin();
+      await seedUser("admin_test_1", "admin@example.com");
+      await seedUser("target_user", "target@example.com");
+
+      const res = await SELF.fetch(
+        "http://localhost/admin/users/target_user",
+        {
+          method: "PATCH",
+          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        },
+      );
+      expect(res.status).toBe(400);
+    });
+
+    it("returns 404 for an unknown user", async () => {
+      mockAsAdmin();
+      await seedUser("admin_test_1", "admin@example.com");
+      const res = await SELF.fetch("http://localhost/admin/users/missing", {
+        method: "PATCH",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro" }),
+      });
       expect(res.status).toBe(404);
     });
   });

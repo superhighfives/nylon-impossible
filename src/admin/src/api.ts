@@ -62,16 +62,30 @@ export function getUser(token: string, id: string) {
   return request<AdminUserDetail>(token, `/admin/users/${id}`);
 }
 
-export function updateUserPlan(
+export interface AdminUserUpdate {
+  plan?: "free" | "pro";
+  aiEnabled?: boolean;
+  location?: string | null;
+}
+
+export interface UpdateUserResponse {
+  id: string;
+  email: string;
+  plan: "free" | "pro";
+  aiEnabled: boolean;
+  location: string | null;
+  updatedAt: string;
+}
+
+export function updateUser(
   token: string,
   id: string,
-  plan: "free" | "pro",
+  updates: AdminUserUpdate,
 ) {
-  return request<{ id: string; plan: "free" | "pro" }>(
-    token,
-    `/admin/users/${id}/plan`,
-    { method: "PATCH", body: JSON.stringify({ plan }) },
-  );
+  return request<UpdateUserResponse>(token, `/admin/users/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
 }
 
 export function deleteUser(token: string, id: string) {

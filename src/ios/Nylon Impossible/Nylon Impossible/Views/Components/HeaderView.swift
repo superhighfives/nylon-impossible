@@ -9,7 +9,9 @@ import SwiftUI
 
 struct HeaderView: View {
     @Environment(UserPreferencesService.self) private var preferencesService
-    
+    @Environment(SyncService.self) private var syncService
+    @Environment(AuthService.self) private var authService
+
     var onSignOut: (() -> Void)?
     var syncState: SyncState = .idle
     var todoCount: Int = 0
@@ -53,6 +55,8 @@ struct HeaderView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .environment(preferencesService)
+                    .environment(syncService)
+                    .environment(authService)
             }
 
             // Title and count
@@ -123,7 +127,9 @@ struct HeaderView: View {
     @Previewable @State var preferencesService = UserPreferencesService(
         apiService: APIService(authService: AuthService())
     )
-    
+    @Previewable @State var syncService = SyncService(authService: AuthService())
+    @Previewable @State var authService = AuthService()
+
     ZStack {
         GradientBackground()
         VStack(spacing: 40) {
@@ -134,4 +140,6 @@ struct HeaderView: View {
         }
     }
     .environment(preferencesService)
+    .environment(syncService)
+    .environment(authService)
 }

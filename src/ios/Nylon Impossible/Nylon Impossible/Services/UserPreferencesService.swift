@@ -11,9 +11,13 @@ final class UserPreferencesService {
     private let apiService: APIService
 
     var aiEnabled: Bool = true
+    var plan: String = "free"
     var location: String? = nil
     var isLoading: Bool = false
     var error: Error?
+
+    /// AI is a paid feature — only pro users see the toggle.
+    var isPro: Bool { plan == "pro" }
 
     init(apiService: APIService) {
         self.apiService = apiService
@@ -26,6 +30,7 @@ final class UserPreferencesService {
         do {
             let user = try await apiService.getMe()
             aiEnabled = user.aiEnabled
+            plan = user.plan ?? "free"
             location = user.location
         } catch {
             self.error = error
