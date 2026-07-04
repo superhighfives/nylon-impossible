@@ -97,6 +97,7 @@ struct SettingsView: View {
 
     @State private var showDeleteConfirm = false
     @State private var isDeletingAccount = false
+    @State private var deleteMessage: String?
 
     // A Google account is only usable for import once it's connected *and* has
     // granted the Tasks scope — a plain sign-in connection won't have it.
@@ -337,6 +338,12 @@ struct SettingsView: View {
                 }
             }
             .disabled(isDeletingAccount)
+
+            if let deleteMessage {
+                Text(deleteMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         } header: {
             Text("Danger zone")
         } footer: {
@@ -347,6 +354,7 @@ struct SettingsView: View {
     private func deleteAccount() async {
         guard let api = syncService.apiService else { return }
         isDeletingAccount = true
+        deleteMessage = nil
         defer { isDeletingAccount = false }
 
         do {
@@ -358,7 +366,7 @@ struct SettingsView: View {
             await authService.signOut()
             dismiss()
         } catch {
-            importMessage = "Couldn't delete your account. Try again."
+            deleteMessage = "Couldn't delete your account. Try again."
         }
     }
 
@@ -386,4 +394,8 @@ struct SettingsView: View {
         .environment(syncService)
         .environment(authService)
         .environment(Clerk.shared)
+        .modelContainer(
+            for: [TodoItem.self, TodoUrl.self, TodoMessage.self],
+            inMemory: true
+        )
 }

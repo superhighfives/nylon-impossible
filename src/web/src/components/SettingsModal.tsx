@@ -218,7 +218,10 @@ export function SettingsModal() {
                       }
                       onClick={() => setAiEnabled(!aiEnabled)}
                       disabled={updateUser.isPending}
-                      className={`shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${aiEnabled ? "bg-yellow-solid" : "bg-gray-base"}`}
+                      // The visual track stays 16×28px; a -inset-3 pseudo-element
+                      // extends the clickable area to ~40×52px for an accessible
+                      // touch target without changing the design.
+                      className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${aiEnabled ? "bg-yellow-solid" : "bg-gray-base"}`}
                     >
                       <span
                         className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
