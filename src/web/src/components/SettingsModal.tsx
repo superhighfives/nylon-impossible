@@ -1,11 +1,16 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useClerk, useUser as useClerkUser } from "@clerk/tanstack-react-start";
-import { MapPin, Settings } from "lucide-react";
+import { MapPin, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useImportReview } from "@/hooks/useImportReview";
 import { useImportGoogleTasks } from "@/hooks/useTodos";
-import { useDeleteCurrentUser, useUpdateUser, useUser } from "@/hooks/useUser";
+import {
+  type Theme,
+  useDeleteCurrentUser,
+  useUpdateUser,
+  useUser,
+} from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { Button, Field, Input, Loader } from "./ui";
 
@@ -25,6 +30,12 @@ const NominatimSchema = z.object({
     })
     .optional(),
 });
+
+const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
 
 export function SettingsModal() {
   const { data: user, isLoading: isLoadingUser } = useUser();
@@ -195,6 +206,49 @@ export function SettingsModal() {
                     <MapPin size={12} />
                     {isLocating ? "Locating…" : "Use current location"}
                   </button>
+                </Field>
+                <Field
+                  label="Appearance"
+                  description="System follows your device's light or dark setting."
+                >
+                  <div className="inline-flex rounded-lg bg-gray-base p-0.5">
+                    {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+                      const selected = (user?.theme ?? "system") === value;
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={selected}
+                          disabled={updateUser.isPending}
+                          onClick={() => {
+                            if (selected) return;
+                            // Applies live via the optimistic cache update, which
+                            // ThemeSync watches — no Save needed.
+                            updateUser.mutate(
+                              { theme: value },
+                              {
+                                onError: (err) =>
+                                  toast.error(
+                                    messageFromError(
+                                      err,
+                                      "Couldn't change theme",
+                                    ),
+                                  ),
+                              },
+                            );
+                          }}
+                          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${
+                            selected
+                              ? "bg-gray-surface text-gray shadow-sm"
+                              : "text-gray-muted hover:text-gray"
+                          }`}
+                        >
+                          <Icon size={13} />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </Field>
                 {/* AI is a paid feature, so the toggle only appears for pro
                     users. Free users' aiEnabled is ignored server-side. */}

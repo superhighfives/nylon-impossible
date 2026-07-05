@@ -24,6 +24,7 @@ final class MockAPIService: APIProviding {
         aiEnabled: true,
         plan: "pro",
         location: nil,
+        theme: "system",
         createdAt: Date(timeIntervalSince1970: 1735689600),
         updatedAt: Date(timeIntervalSince1970: 1735689600)
     )
@@ -73,6 +74,7 @@ final class MockAPIService: APIProviding {
             aiEnabled: request.aiEnabled ?? getMeResponse.aiEnabled,
             plan: getMeResponse.plan,
             location: newLocation,
+            theme: request.theme ?? getMeResponse.theme,
             createdAt: getMeResponse.createdAt,
             updatedAt: Date()
         )

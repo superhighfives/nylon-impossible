@@ -12,14 +12,23 @@ export function ordinal(n: number): string {
 /**
  * Options for the "Repeat" dropdown. Weekly/monthly labels reflect the due
  * date anchor ("Weekly on Wednesday", "Monthly on the 14th") when one is
- * supplied, so the schedule reads unambiguously.
+ * supplied, so the schedule reads unambiguously. `timeZone` (from the time-zone
+ * client hint) resolves the weekday and day-of-month, so the label doesn't shift
+ * a day when rendered on the server (UTC) near midnight.
  */
-export function buildRecurrenceItems(anchor: Date | null): SelectItem[] {
+export function buildRecurrenceItems(
+  anchor: Date | null,
+  timeZone: string,
+): SelectItem[] {
   const weeklyLabel = anchor
-    ? `Weekly on ${anchor.toLocaleDateString(undefined, { weekday: "long" })}`
+    ? `Weekly on ${anchor.toLocaleDateString(undefined, { weekday: "long", timeZone })}`
     : "Weekly";
   const monthlyLabel = anchor
-    ? `Monthly on the ${ordinal(anchor.getDate())}`
+    ? `Monthly on the ${ordinal(
+        Number(
+          anchor.toLocaleDateString("en-US", { day: "numeric", timeZone }),
+        ),
+      )}`
     : "Monthly";
   return [
     { value: "none", label: "None" },

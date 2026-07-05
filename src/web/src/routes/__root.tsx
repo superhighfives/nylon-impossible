@@ -9,8 +9,13 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequestUrl } from "@tanstack/react-start/server";
+import {
+  getCookie,
+  getRequest,
+  getRequestUrl,
+} from "@tanstack/react-start/server";
 import { useEffect } from "react";
+import { ClientHintCheck } from "../components/ClientHintCheck";
 import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
@@ -18,7 +23,13 @@ import { ImportReviewModal } from "../components/ImportReviewModal";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
 import { SettingsModal } from "../components/SettingsModal";
+import {
+  THEME_COLOR,
+  THEME_STORAGE_KEY,
+  ThemeSync,
+} from "../components/ThemeSync";
 import { Toaster } from "../components/ui";
+import { HintsProvider } from "../hooks/useHints";
 import {
   ImportReviewContext,
   useImportReviewValue,
@@ -28,6 +39,7 @@ import {
   useOnlineStatusValue,
 } from "../hooks/useOnlineStatus";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import { getHints } from "../lib/client-hints";
 import { initSentry, Sentry } from "../lib/sentry";
 import appCss from "../styles.css?url";
 
@@ -37,12 +49,26 @@ interface MyRouterContext {
   queryClient: QueryClient;
 }
 
-const getOrigin = createServerFn({ method: "GET" }).handler(
-  () => getRequestUrl().origin,
-);
+// Resolve client hints on the server so the SSR HTML is themed/formatted
+// correctly on first paint (no flash, no hydration mismatch). Color scheme gets
+// an extra layer: the explicit light/dark/system preference rides in a cookie
+// written by ThemeSync and wins over the OS hint; "system" (or no preference)
+// falls back to the hint. time-zone and reduced-motion come straight from the
+// hints. The resolved scheme is folded back into the hints object so
+// useHints().colorScheme matches what's applied to <html>.
+const getRootData = createServerFn({ method: "GET" }).handler(() => {
+  const hints = getHints(getRequest());
+  const pref = getCookie(THEME_STORAGE_KEY);
+  const colorScheme: "light" | "dark" =
+    pref === "light" || pref === "dark" ? pref : hints.colorScheme;
+  return {
+    origin: getRequestUrl().origin,
+    hints: { ...hints, colorScheme },
+  };
+});
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-  loader: () => getOrigin(),
+  loader: () => getRootData(),
   notFoundComponent: NotFound,
   errorComponent: ({ reset }) => <ErrorView reset={reset} />,
   head: () => ({
@@ -57,16 +83,8 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       {
         title: "Nylon Impossible",
       },
-      {
-        name: "theme-color",
-        content: "#fdfdf9",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        name: "theme-color",
-        content: "#14120b",
-        media: "(prefers-color-scheme: dark)",
-      },
+      // theme-color is rendered in <head> below from the resolved scheme so it
+      // tracks explicit light/dark overrides; ThemeSync keeps it live at runtime.
     ],
     links: [
       {
@@ -122,73 +140,67 @@ function SentryUserSync() {
 }
 
 function RootDocument() {
-  const origin = Route.useLoaderData();
+  const { origin, hints } = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
   const importReview = useImportReviewValue();
 
   return (
-    <html lang="en" className="light" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={hints.colorScheme}
+      data-reduced-motion={hints.reducedMotion}
+    >
       <head>
+        {/* Must run before paint to reconcile the client-hint cookies. */}
+        <ClientHintCheck />
         <HeadContent />
-        <script
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: inline theme detection script with no user input
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                document.documentElement.classList.toggle('dark', isDark);
-                document.documentElement.classList.toggle('light', !isDark);
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                  document.documentElement.classList.toggle('dark', e.matches);
-                  document.documentElement.classList.toggle('light', !e.matches);
-                });
-              })();
-            `,
-          }}
-        />
+        <meta name="theme-color" content={THEME_COLOR[hints.colorScheme]} />
       </head>
       <body className="min-h-full bg-gray-app text-gray antialiased">
-        <ClerkProvider>
-          {/* Full-strength background on the logged-out landing, dimmed once signed in */}
-          <Show when="signed-out">
-            <BackgroundImage className="opacity-100" />
-          </Show>
-          <Show when="signed-in">
-            <BackgroundImage className="opacity-25" />
-          </Show>
-          <SentryUserSync />
-          <Sentry.ErrorBoundary
-            fallback={({ resetError }) => <ErrorView reset={resetError} />}
-          >
-            <OnlineStatusContext.Provider value={onlineStatus}>
-              <ImportReviewContext.Provider value={importReview}>
-                <OfflineBanner />
-                <Header />
-                <div className="pt-header-offset">
-                  <Outlet />
-                </div>
-                <DevEnvironmentIndicator origin={origin} />
-                <Show when="signed-in">
-                  <SettingsModal />
-                  <ImportReviewModal />
-                </Show>
-                <Toaster />
-              </ImportReviewContext.Provider>
-            </OnlineStatusContext.Provider>
-          </Sentry.ErrorBoundary>
-          <TanStackDevtools
-            config={{
-              position: "bottom-right",
-            }}
-            plugins={[
-              {
-                name: "Tanstack Router",
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-              TanStackQueryDevtools,
-            ]}
-          />
-        </ClerkProvider>
+        <HintsProvider hints={hints}>
+          <ClerkProvider>
+            {/* Full-strength background on the logged-out landing, dimmed once signed in */}
+            <Show when="signed-out">
+              <BackgroundImage className="opacity-100" />
+            </Show>
+            <Show when="signed-in">
+              <BackgroundImage className="opacity-25" />
+            </Show>
+            <SentryUserSync />
+            <ThemeSync />
+            <Sentry.ErrorBoundary
+              fallback={({ resetError }) => <ErrorView reset={resetError} />}
+            >
+              <OnlineStatusContext.Provider value={onlineStatus}>
+                <ImportReviewContext.Provider value={importReview}>
+                  <OfflineBanner />
+                  <Header />
+                  <div className="pt-header-offset">
+                    <Outlet />
+                  </div>
+                  <DevEnvironmentIndicator origin={origin} />
+                  <Show when="signed-in">
+                    <SettingsModal />
+                    <ImportReviewModal />
+                  </Show>
+                  <Toaster />
+                </ImportReviewContext.Provider>
+              </OnlineStatusContext.Provider>
+            </Sentry.ErrorBoundary>
+            <TanStackDevtools
+              config={{
+                position: "bottom-right",
+              }}
+              plugins={[
+                {
+                  name: "Tanstack Router",
+                  render: <TanStackRouterDevtoolsPanel />,
+                },
+                TanStackQueryDevtools,
+              ]}
+            />
+          </ClerkProvider>
+        </HintsProvider>
         <Scripts />
       </body>
     </html>

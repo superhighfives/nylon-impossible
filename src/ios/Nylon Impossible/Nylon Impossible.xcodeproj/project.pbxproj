@@ -55,13 +55,13 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Models/TodoItem.swift,
-				Models/TodoUrl.swift,
 				Models/TodoMessage.swift,
+				Models/TodoUrl.swift,
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
+				Utils/Badge.swift,
 				Utils/FractionalIndexing.swift,
 				Utils/Recurrence.swift,
-				Utils/Badge.swift,
 			);
 			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
 		};

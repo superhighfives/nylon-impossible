@@ -2,15 +2,24 @@ import { useAuth } from "@clerk/tanstack-react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { API_URL } from "@/lib/config";
 
-interface User {
+export type Theme = "light" | "dark" | "system";
+
+export interface User {
   id: string;
   email: string;
   aiEnabled: boolean;
   plan: "free" | "pro";
   location: string | null;
+  theme: Theme;
   createdAt: string;
   updatedAt: string;
 }
+
+type UserUpdate = {
+  aiEnabled?: boolean;
+  location?: string | null;
+  theme?: Theme;
+};
 
 const USER_QUERY_KEY = ["user", "me"] as const;
 
@@ -33,7 +42,7 @@ async function fetchUser(
 }
 
 async function updateUser(
-  data: { aiEnabled?: boolean; location?: string | null },
+  data: UserUpdate,
   getToken: () => Promise<string | null>,
 ): Promise<User> {
   const token = await getToken();
@@ -55,11 +64,14 @@ async function updateUser(
 }
 
 export function useUser() {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn } = useAuth();
 
   return useQuery({
     queryKey: USER_QUERY_KEY,
     queryFn: () => fetchUser(getToken),
+    // No /users/me to fetch when signed out — keeps ThemeSync (mounted app-wide)
+    // from firing failing requests on the logged-out landing page.
+    enabled: !!isSignedIn,
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
@@ -92,8 +104,7 @@ export function useUpdateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { aiEnabled?: boolean; location?: string | null }) =>
-      updateUser(data, getToken),
+    mutationFn: (data: UserUpdate) => updateUser(data, getToken),
     onMutate: async (newData) => {
       await queryClient.cancelQueries({ queryKey: USER_QUERY_KEY });
       const previousUser = queryClient.getQueryData<User>(USER_QUERY_KEY);
@@ -106,6 +117,9 @@ export function useUpdateUser() {
         }
         if (newData.location !== undefined) {
           updates.location = newData.location;
+        }
+        if (newData.theme !== undefined) {
+          updates.theme = newData.theme;
         }
         queryClient.setQueryData<User>(USER_QUERY_KEY, {
           ...previousUser,

@@ -113,6 +113,24 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    Picker("Appearance", selection: Binding(
+                        get: { preferencesService.theme },
+                        set: { newValue in
+                            Task { await preferencesService.setTheme(newValue) }
+                        }
+                    )) {
+                        Text("System").tag("system")
+                        Text("Light").tag("light")
+                        Text("Dark").tag("dark")
+                    }
+                    .pickerStyle(.segmented)
+                } header: {
+                    Text("Appearance")
+                } footer: {
+                    Text("System follows your device's light or dark setting.")
+                }
+
                 // AI is a paid feature, so the toggle only appears for pro users.
                 if preferencesService.isPro {
                     Section {

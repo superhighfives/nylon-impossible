@@ -13,6 +13,8 @@ final class UserPreferencesService {
     var aiEnabled: Bool = true
     var plan: String = "free"
     var location: String? = nil
+    /// Appearance preference: "light" | "dark" | "system". Synced across devices.
+    var theme: String = "system"
     var isLoading: Bool = false
     var error: Error?
 
@@ -32,6 +34,7 @@ final class UserPreferencesService {
             aiEnabled = user.aiEnabled
             plan = user.plan ?? "free"
             location = user.location
+            theme = user.theme ?? "system"
         } catch {
             self.error = error
             print("Failed to fetch user preferences: \(error)")
@@ -52,6 +55,22 @@ final class UserPreferencesService {
             aiEnabled = previousValue
             self.error = error
             print("Failed to update AI preference: \(error)")
+        }
+    }
+
+    func setTheme(_ newTheme: String) async {
+        let previousTheme = theme
+        theme = newTheme
+        error = nil
+
+        do {
+            let user = try await apiService.updateMe(
+                UpdateUserRequest(aiEnabled: nil, location: nil, theme: newTheme))
+            theme = user.theme ?? "system"
+        } catch {
+            theme = previousTheme
+            self.error = error
+            print("Failed to update theme: \(error)")
         }
     }
 

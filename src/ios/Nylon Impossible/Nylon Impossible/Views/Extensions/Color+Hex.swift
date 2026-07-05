@@ -39,6 +39,15 @@ extension Color {
     static let appBrand = Color(red: 1.0, green: 0.902, blue: 0.161) // #FFE629
     static let appBrandForeground = Color(red: 0.165, green: 0.165, blue: 0.165) // #2A2A2A
 
+    // Accent — used for research/citation/AI-question markers. The brand yellow
+    // reads well on dark surfaces but is too pale for text/icons on a light
+    // background, so light mode falls back to a deeper amber for contrast.
+    static let appAccent = Color(uiColor: UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 1.0, green: 0.902, blue: 0.161, alpha: 1) // #FFE629
+            : UIColor(red: 0.70, green: 0.53, blue: 0.0, alpha: 1) // deep amber
+    })
+
     // Backgrounds
     static let appBase = Color(.systemBackground)
     static let appElevated = Color(.secondarySystemBackground)

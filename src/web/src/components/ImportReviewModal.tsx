@@ -1,17 +1,17 @@
 import { Dialog } from "@base-ui/react/dialog";
+import { useHints } from "@/hooks/useHints";
 import { useImportReview } from "@/hooks/useImportReview";
 import { useTodos, useUpdateTodo } from "@/hooks/useTodos";
+import { formatDate } from "@/lib/date";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import type { RecurrenceFrequency, TodoWithUrls } from "@/types/database";
 import { Button, Loader, Select } from "./ui";
 
-function formatDue(dueDate: string): string {
-  return new Date(dueDate).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+const DUE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+};
 
 /**
  * A single dated todo in the review list. Reads the *live* todo so that, as
@@ -20,6 +20,7 @@ function formatDue(dueDate: string): string {
  */
 function ReviewRow({ todo }: { todo: TodoWithUrls }) {
   const updateTodo = useUpdateTodo();
+  const { timeZone } = useHints();
 
   const dueDate = todo.dueDate; // guaranteed non-null: only dated todos land here
   const anchor = dueDate ? new Date(dueDate) : null;
@@ -48,7 +49,7 @@ function ReviewRow({ todo }: { todo: TodoWithUrls }) {
         <p className="truncate text-sm text-gray">{todo.title}</p>
         {dueDate && (
           <p className="text-xs tabular-nums text-gray-muted">
-            {formatDue(dueDate)}
+            {formatDate(dueDate, timeZone, DUE_DATE_FORMAT)}
           </p>
         )}
       </div>
@@ -64,7 +65,7 @@ function ReviewRow({ todo }: { todo: TodoWithUrls }) {
             size="sm"
             value={value}
             onValueChange={handleChange}
-            items={buildRecurrenceItems(anchor)}
+            items={buildRecurrenceItems(anchor, timeZone)}
           />
         </div>
       </div>

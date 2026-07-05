@@ -7,6 +7,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useHints } from "@/hooks/useHints";
 import { useUser } from "@/hooks/useUser";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
@@ -108,6 +109,7 @@ export function TodoItemExpanded({
   deletePending,
 }: TodoItemExpandedProps) {
   const { data: user } = useUser();
+  const { timeZone } = useHints();
 
   // Local state for form fields. We track which fields the user has touched
   // so that background updates to the todo (e.g. AI re-enrichment after a
@@ -232,6 +234,7 @@ export function TodoItemExpanded({
   // Label reflects the anchor — "Weekly on Wednesday", "Monthly on the 14th".
   const recurrenceItems = buildRecurrenceItems(
     dueDate ? new Date(`${dueDate}T00:00:00`) : null,
+    timeZone,
   );
 
   return (

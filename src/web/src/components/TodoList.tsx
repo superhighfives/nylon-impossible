@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
+import { useHints } from "@/hooks/useHints";
 import { useImportReview } from "@/hooks/useImportReview";
 import {
   STALE_AI_MS,
@@ -38,6 +39,7 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
+import { formatDate } from "@/lib/date";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
@@ -113,6 +115,7 @@ interface ExpandedSectionProps {
 
 /** Indicator badges for due date and priority */
 function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
+  const { timeZone } = useHints();
   const hasDueDate = !!todo.dueDate;
   // Only show priority badge for explicit "high" or "low" values
   const hasPriority = todo.priority === "high" || todo.priority === "low";
@@ -144,7 +147,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
-          {dueDate.toLocaleDateString()}
+          {formatDate(dueDate, timeZone)}
         </span>
       )}
     </div>
