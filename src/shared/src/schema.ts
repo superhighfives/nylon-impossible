@@ -25,6 +25,10 @@ export const users = sqliteTable(
       .default(true),
     plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
     location: text("location"), // Used to bias location research queries
+    // Appearance preference, synced across devices. "system" follows the OS.
+    theme: text("theme", { enum: ["light", "dark", "system"] })
+      .notNull()
+      .default("system"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),

@@ -1,3 +1,4 @@
+/* biome-ignore-all lint/complexity/noImportantStyles: the reduced-motion reset below must override utility animations/transitions */
 @import "tailwindcss";
 @import "tailwindcss-radix-colors/dist/gray-colors-only.css";
 @import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
@@ -33,6 +34,20 @@ body {
 
 code {
   @apply font-mono;
+}
+
+/* Honor a reduced-motion preference. Server-resolved via the epic-web client
+   hint and reflected on <html data-reduced-motion="reduce"> (see __root.tsx),
+   so it's correct on first paint. Neutralizes animations, transitions, and
+   smooth scrolling app-wide. !important is required so the reset beats
+   animation/transition utilities (the conventional reduced-motion pattern). */
+[data-reduced-motion="reduce"] *,
+[data-reduced-motion="reduce"] *::before,
+[data-reduced-motion="reduce"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* iOS: fixed bottom input bar styled like the music app "now playing" pill */

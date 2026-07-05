@@ -213,7 +213,7 @@ private struct FormattedSummaryView: View {
             if num > 0, num <= urls.count, let dest = URL(string: urls[num - 1].url) {
                 var citation = AttributedString("[\(num)]")
                 citation.link = dest
-                citation.foregroundColor = .init(Color.yellow)
+                citation.foregroundColor = .init(Color.appAccent)
                 result += citation
             } else {
                 result += AttributedString("[\(num)]")
@@ -267,10 +267,10 @@ struct ResearchSourceCard: View {
             Text("[\(citationNumber)]")
                 .font(.caption2)
                 .fontWeight(.semibold)
-                .foregroundStyle(Color.yellow)
+                .foregroundStyle(Color.appAccent)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)
-                .background(Color.yellow.opacity(0.15))
+                .background(Color.appAccent.opacity(0.15))
                 .clipShape(RoundedRectangle(cornerRadius: 4))
 
             // Icon

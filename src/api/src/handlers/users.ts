@@ -8,6 +8,7 @@ import type { Env } from "../types";
 const updatePreferencesSchema = z.object({
   aiEnabled: z.boolean().optional(),
   location: z.string().max(200).nullable().optional(),
+  theme: z.enum(["light", "dark", "system"]).optional(),
 });
 
 // GET /users/me
@@ -22,6 +23,7 @@ export async function getMe(c: Context<Env>) {
       aiEnabled: users.aiEnabled,
       plan: users.plan,
       location: users.location,
+      theme: users.theme,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -40,6 +42,7 @@ export async function getMe(c: Context<Env>) {
     aiEnabled: user.aiEnabled,
     plan: user.plan,
     location: user.location,
+    theme: user.theme,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });
@@ -58,12 +61,19 @@ export async function updateMe(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  const updates: Partial<{ aiEnabled: boolean; location: string | null }> = {};
+  const updates: Partial<{
+    aiEnabled: boolean;
+    location: string | null;
+    theme: "light" | "dark" | "system";
+  }> = {};
   if (parsed.data.aiEnabled !== undefined) {
     updates.aiEnabled = parsed.data.aiEnabled;
   }
   if (parsed.data.location !== undefined) {
     updates.location = parsed.data.location;
+  }
+  if (parsed.data.theme !== undefined) {
+    updates.theme = parsed.data.theme;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -83,6 +93,7 @@ export async function updateMe(c: Context<Env>) {
       aiEnabled: users.aiEnabled,
       plan: users.plan,
       location: users.location,
+      theme: users.theme,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -101,6 +112,7 @@ export async function updateMe(c: Context<Env>) {
     aiEnabled: user.aiEnabled,
     plan: user.plan,
     location: user.location,
+    theme: user.theme,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });

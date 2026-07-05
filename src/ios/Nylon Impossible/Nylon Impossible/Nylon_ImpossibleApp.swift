@@ -127,7 +127,17 @@ struct RootView: View {
     private var isSignedIn: Bool {
         clerk.user != nil
     }
-    
+
+    /// Maps the synced appearance preference to a SwiftUI color scheme.
+    /// nil (for "system" or before preferences load) follows the device.
+    private var preferredColorScheme: ColorScheme? {
+        switch preferencesService?.theme {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
+        }
+    }
+
     var body: some View {
         Group {
             if clerk.client == nil {
@@ -155,6 +165,7 @@ struct RootView: View {
                 SignInView()
             }
         }
+        .preferredColorScheme(preferredColorScheme)
         .animation(.easeInOut, value: isSignedIn)
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in

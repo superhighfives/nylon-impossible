@@ -264,6 +264,9 @@ struct APIUser: Codable, Sendable {
     // that predates the field; treated as "free" when absent.
     let plan: String?
     let location: String?
+    // "light" | "dark" | "system". Optional so the client still decodes against
+    // an older API that predates the field; treated as "system" when absent.
+    let theme: String?
     let createdAt: Date
     let updatedAt: Date
 }
@@ -272,9 +275,13 @@ struct UpdateUserRequest: Encodable, Sendable {
     let aiEnabled: Bool?
     // Double optional: nil = omit field, .some(nil) = send null, .some(value) = send value
     let location: String??
+    // Single optional (theme is never nulled): nil = omit, value = send. `var`
+    // with a default keeps it in the memberwise init (a defaulted `let` would be
+    // dropped from it), so existing aiEnabled/location call sites still compile.
+    var theme: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case aiEnabled, location
+        case aiEnabled, location, theme
     }
 
     func encode(to encoder: Encoder) throws {
@@ -284,6 +291,9 @@ struct UpdateUserRequest: Encodable, Sendable {
         }
         if case .some(let loc) = location {
             try container.encode(loc, forKey: .location)
+        }
+        if let theme {
+            try container.encode(theme, forKey: .theme)
         }
     }
 }

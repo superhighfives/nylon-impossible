@@ -71,7 +71,7 @@ struct TodoItemRow: View {
                         if let priority = todo.todoPriority {
                             Text(priority == .high ? "!" : "")
                                 .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(priority == .high ? Color.red : Color.gray)
+                                .foregroundStyle(priority == .high ? Color.red : Color.appSubtle)
                         }
 
                         Text(todo.title)
@@ -92,7 +92,7 @@ struct TodoItemRow: View {
                         if !todo.isAIProcessing && todo.isResearchPending {
                             ProgressView()
                                 .scaleEffect(0.7)
-                                .tint(Color.yellow)
+                                .tint(Color.appAccent)
                                 .accessibilityLabel("Researching")
                         }
 
@@ -100,7 +100,7 @@ struct TodoItemRow: View {
                         if todo.needsInput {
                             Image(systemName: "bubble.left.fill")
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.yellow)
+                                .foregroundStyle(Color.appAccent)
                                 .accessibilityLabel("The assistant has a question")
                         }
 
