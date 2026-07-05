@@ -10,5 +10,7 @@ export function formatDate(
   options?: Intl.DateTimeFormatOptions,
 ): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return d.toLocaleDateString(undefined, { timeZone, ...options });
+  // timeZone last so an explicit `options.timeZone` can't silently override the
+  // argument and reintroduce SSR/client day mismatches.
+  return d.toLocaleDateString(undefined, { ...options, timeZone });
 }
