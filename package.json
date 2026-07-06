@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
     "dev:remote": "pnpm web:dev:remote & pnpm api:dev:remote & wait",
+    "dev:prod": "pnpm web:dev:prod",
     "test": "pnpm web:test && pnpm api:test",
     "lint": "pnpm web:lint && pnpm api:lint && pnpm admin:lint",
     "lint:fix": "pnpm web:lint:fix && pnpm api:lint:fix && pnpm admin:lint:fix",
@@ -27,6 +28,7 @@
     "web:open": "code 'src/web'",
     "web:dev": "pnpm --filter @nylon-impossible/web dev",
     "web:dev:remote": "pnpm --filter @nylon-impossible/web dev:remote",
+    "web:dev:prod": "pnpm --filter @nylon-impossible/web dev:prod",
     "web:build": "pnpm --filter @nylon-impossible/web build",
     "web:test": "pnpm --filter @nylon-impossible/web test",
     "web:typecheck": "pnpm --filter @nylon-impossible/web typecheck",
