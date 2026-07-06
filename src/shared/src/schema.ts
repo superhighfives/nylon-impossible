@@ -29,6 +29,10 @@ export const users = sqliteTable(
     theme: text("theme", { enum: ["light", "dark", "system"] })
       .notNull()
       .default("system"),
+    // When true, completed todos are hidden from the list. Synced across devices.
+    hideCompleted: integer("hide_completed", { mode: "boolean" })
+      .notNull()
+      .default(false),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -37,7 +41,9 @@ export const users = sqliteTable(
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("idx_users_email").on(table.email)],
+  // Unique so one email maps to at most one user row. Guards against duplicate
+  // accounts if the same email ever arrives under a different auth (Clerk) id.
+  (table) => [uniqueIndex("idx_users_email").on(table.email)],
 );
 
 // Todos table

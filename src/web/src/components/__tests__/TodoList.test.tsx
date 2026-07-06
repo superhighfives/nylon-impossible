@@ -11,6 +11,12 @@ vi.mock("@/hooks/useTodos", () => ({
   useDeleteTodo: vi.fn(),
 }));
 
+// TodoList reads the synced hideCompleted preference via useUser (which calls
+// Clerk's useAuth); mock it so the component renders without a ClerkProvider.
+vi.mock("@/hooks/useUser", () => ({
+  useUser: vi.fn(() => ({ data: undefined })),
+}));
+
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {

@@ -202,19 +202,30 @@ export async function syncTodos(c: Context<Env>) {
 
     await db.insert(users).values({ id: userId, email }).onConflictDoNothing();
 
-    // Seed default lists for new user
-    const positions = generateNKeysBetween(null, null, DEFAULT_LISTS.length);
-    const now = new Date();
-    await db.insert(lists).values(
-      DEFAULT_LISTS.map((name, i) => ({
-        id: crypto.randomUUID(),
-        userId,
-        name,
-        position: positions[i],
-        createdAt: now,
-        updatedAt: now,
-      })),
-    );
+    // Confirm the row now exists for this id. The users.email unique index means
+    // onConflictDoNothing() can skip the insert if another account already owns
+    // this email (e.g. a stale row from a prior auth id). Only seed default lists
+    // when we actually created the user, to avoid a lists FK violation.
+    const [created] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (created) {
+      // Seed default lists for new user
+      const positions = generateNKeysBetween(null, null, DEFAULT_LISTS.length);
+      const now = new Date();
+      await db.insert(lists).values(
+        DEFAULT_LISTS.map((name, i) => ({
+          id: crypto.randomUUID(),
+          userId,
+          name,
+          position: positions[i],
+          createdAt: now,
+          updatedAt: now,
+        })),
+      );
+    }
   }
 
   // Track todos that need URLs stored. explicitUrls takes priority over regex extraction.

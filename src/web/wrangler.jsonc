@@ -17,11 +17,6 @@
 			"binding": "DB",
 			"database_name": "nylon-impossible-db",
 			"database_id": "effd712c-bc6e-4536-bddd-735b56502080"
-		},
-		{
-			"binding": "nylon_impossible_db",
-			"database_name": "nylon-impossible-db",
-			"database_id": "4943b98f-cdcc-42dc-a678-b340d10f4ac7"
 		}
 	],
 	"observability": {

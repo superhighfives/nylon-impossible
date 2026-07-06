@@ -267,6 +267,9 @@ struct APIUser: Codable, Sendable {
     // "light" | "dark" | "system". Optional so the client still decodes against
     // an older API that predates the field; treated as "system" when absent.
     let theme: String?
+    // Whether completed todos are hidden from the list. Optional so the client
+    // still decodes against an older API that predates the field; false when absent.
+    let hideCompleted: Bool?
     let createdAt: Date
     let updatedAt: Date
 }
@@ -279,9 +282,12 @@ struct UpdateUserRequest: Encodable, Sendable {
     // with a default keeps it in the memberwise init (a defaulted `let` would be
     // dropped from it), so existing aiEnabled/location call sites still compile.
     var theme: String? = nil
+    // Single optional (never nulled): nil = omit, value = send. Defaulted `var`
+    // for the same memberwise-init reason as `theme`.
+    var hideCompleted: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
-        case aiEnabled, location, theme
+        case aiEnabled, location, theme, hideCompleted
     }
 
     func encode(to encoder: Encoder) throws {
@@ -294,6 +300,9 @@ struct UpdateUserRequest: Encodable, Sendable {
         }
         if let theme {
             try container.encode(theme, forKey: .theme)
+        }
+        if let hideCompleted {
+            try container.encode(hideCompleted, forKey: .hideCompleted)
         }
     }
 }

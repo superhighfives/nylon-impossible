@@ -250,6 +250,45 @@ export function SettingsModal() {
                     })}
                   </div>
                 </Field>
+                {/* Applies live via the optimistic cache update, which the todo
+                    list watches — no Save needed. */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-gray">
+                      Hide completed todos
+                    </span>
+                    <p className="text-xs text-gray-muted">
+                      When enabled, completed todos are hidden from your list.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={user?.hideCompleted ?? false}
+                    aria-label={
+                      user?.hideCompleted
+                        ? "Show completed todos"
+                        : "Hide completed todos"
+                    }
+                    onClick={() =>
+                      updateUser.mutate(
+                        { hideCompleted: !(user?.hideCompleted ?? false) },
+                        {
+                          onError: (err) =>
+                            toast.error(
+                              messageFromError(err, "Couldn't change setting"),
+                            ),
+                        },
+                      )
+                    }
+                    disabled={updateUser.isPending}
+                    className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${user?.hideCompleted ? "bg-yellow-solid" : "bg-gray-base"}`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${user?.hideCompleted ? "translate-x-3.5" : "translate-x-0.5"}`}
+                    />
+                  </button>
+                </div>
                 {/* AI is a paid feature, so the toggle only appears for pro
                     users. Free users' aiEnabled is ignored server-side. */}
                 {user?.plan === "pro" && (
