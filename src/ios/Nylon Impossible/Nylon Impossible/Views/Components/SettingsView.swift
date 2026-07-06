@@ -131,19 +131,6 @@ struct SettingsView: View {
                     Text("System follows your device's light or dark setting.")
                 }
 
-                Section {
-                    Toggle("Hide completed todos", isOn: Binding(
-                        get: { preferencesService.hideCompleted },
-                        set: { newValue in
-                            Task { await preferencesService.setHideCompleted(newValue) }
-                        }
-                    ))
-                } header: {
-                    Text("List")
-                } footer: {
-                    Text("When enabled, completed todos are hidden from your list.")
-                }
-
                 // AI is a paid feature, so the toggle only appears for pro users.
                 if preferencesService.isPro {
                     Section {

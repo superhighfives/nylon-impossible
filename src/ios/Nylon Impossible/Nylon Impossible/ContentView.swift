@@ -99,28 +99,23 @@ struct ContentView: View {
                 }
             }
 
-            if !completed.isEmpty && !preferencesService.hideCompleted {
+            if !completed.isEmpty {
                 Section {
-                    Text("Completed")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.appSubtle)
-                        .textCase(nil)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
-                        .moveDisabled(true)
+                    completedHeader(count: completed.count)
 
-                    ForEach(completed) { todo in
-                        todoRow(todo)
-                            .moveDisabled(true)
-                    }
-                    .onDelete { offsets in
-                        for index in offsets {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                viewModel.deleteTodo(completed[index], context: modelContext)
-                            }
+                    if !preferencesService.hideCompleted {
+                        ForEach(completed) { todo in
+                            todoRow(todo)
+                                .moveDisabled(true)
                         }
-                        syncService.syncAfterAction()
+                        .onDelete { offsets in
+                            for index in offsets {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    viewModel.deleteTodo(completed[index], context: modelContext)
+                                }
+                            }
+                            syncService.syncAfterAction()
+                        }
                     }
                 }
             }
@@ -129,6 +124,7 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
+        .animation(.easeInOut(duration: 0.25), value: preferencesService.hideCompleted)
         // Extra bottom padding so content clears the floating input bar
         .contentMargins(.bottom, 100, for: .scrollContent)
     }
@@ -162,6 +158,44 @@ struct ContentView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
+    }
+
+    /// Tappable header that sits between the incomplete and completed todos.
+    /// Toggling it collapses/expands the completed section by flipping the
+    /// synced `hideCompleted` preference.
+    @ViewBuilder
+    private func completedHeader(count: Int) -> some View {
+        Button {
+            Task { await preferencesService.setHideCompleted(!preferencesService.hideCompleted) }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.appSubtle)
+                    .rotationEffect(.degrees(preferencesService.hideCompleted ? 0 : 90))
+
+                Text("Completed")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.appSubtle)
+
+                Text("\(count)")
+                    .font(.system(size: 12, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(Color.appSubtle)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(Color.appSubtle.opacity(0.15)))
+
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .textCase(nil)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
+        .moveDisabled(true)
     }
 }
 
