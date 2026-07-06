@@ -28,16 +28,23 @@
 html,
 body {
   height: 100%;
-  /* Default native controls (date-picker calendar glyph, dropdowns, scrollbars)
-     to follow the OS until the resolved theme class is applied below. Without a
-     value they default to the light scheme and render dark-on-dark (e.g. an
-     invisible calendar icon in the due-date input). */
+}
+
+/* color-scheme lives only on <html> so its (inherited) value flows down to
+   <body> and page content. Setting it on <body> too would plant an explicit
+   value there that shadows the pinned html.light/html.dark below, leaving
+   native controls inside the body following the OS instead of the chosen theme.
+
+   The bare `html` rule is the pre-class fallback: native controls (date-picker
+   glyph, dropdowns, scrollbars) follow the OS until the resolved theme class is
+   applied. Without it they default to light and render dark-on-dark (e.g. an
+   invisible calendar icon in the due-date input). The class rules then pin the
+   scheme to the user's explicit choice — <html> always carries one of these
+   classes (SSR sets it from the theme cookie; ThemeSync keeps it live). */
+html {
   color-scheme: light dark;
 }
 
-/* Pin native controls to the resolved theme so they match the user's explicit
-   light/dark choice rather than the OS. <html> always carries one of these
-   classes (SSR sets it from the theme cookie; ThemeSync keeps it live). */
 html.light {
   color-scheme: light;
 }
