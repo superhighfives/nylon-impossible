@@ -24,7 +24,10 @@ struct HeaderView: View {
         // inside the avatar menu (the web app tucks these behind the Clerk
         // UserButton) rather than as separate top-bar controls.
         VStack(spacing: 12) {
-            HStack(spacing: -8) {
+            // Spacing accounts for the avatar's 44pt tap target (6pt of
+            // transparent inset around its 32pt visual) so the logo/avatar
+            // still visually overlap by ~8pt like the web header.
+            HStack(spacing: -14) {
                 logo
                 avatarMenu
             }
@@ -60,6 +63,13 @@ struct HeaderView: View {
                 .presentationCompactAdaptation(.popover)
             }
         }
+        // A successful retry can clear the error while the popover is still up;
+        // dismiss it so it doesn't linger showing empty content.
+        .onChange(of: syncState) { _, newValue in
+            if case .error = newValue {} else {
+                showErrorPopover = false
+            }
+        }
     }
 
     private var logo: some View {
@@ -93,7 +103,10 @@ struct HeaderView: View {
                 }
             }
         } label: {
+            // Keep the 32pt visual but give the menu a ≥44pt hit target.
             avatar
+                .frame(width: 44, height: 44)
+                .contentShape(Circle())
         }
         .accessibilityLabel("Account")
     }

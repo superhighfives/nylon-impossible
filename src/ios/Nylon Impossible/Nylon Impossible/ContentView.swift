@@ -160,6 +160,11 @@ struct ContentView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // Expose expanded/collapsed state to VoiceOver, mirroring the web
+        // toggle's aria-expanded.
+        .accessibilityLabel("Completed, \(count) \(count == 1 ? "item" : "items")")
+        .accessibilityValue(preferencesService.hideCompleted ? "Collapsed" : "Expanded")
+        .accessibilityHint(preferencesService.hideCompleted ? "Double tap to expand" : "Double tap to collapse")
         .textCase(nil)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
