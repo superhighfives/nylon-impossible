@@ -17,25 +17,6 @@ describe("config", () => {
     expect(WS_URL).toBe("ws://localhost:8787/ws");
   });
 
-  it("honors an explicit VITE_API_BASE_URL even on localhost (production dev mode)", async () => {
-    vi.stubGlobal("window", { location: { hostname: "localhost" } });
-    vi.stubEnv("VITE_API_BASE_URL", "https://api.nylonimpossible.com");
-
-    const { API_URL, WS_URL, IS_PRODUCTION_API } = await import("../config");
-
-    expect(API_URL).toBe("https://api.nylonimpossible.com");
-    expect(WS_URL).toBe("wss://api.nylonimpossible.com/ws");
-    expect(IS_PRODUCTION_API).toBe(true);
-  });
-
-  it("does not flag the local API as production", async () => {
-    vi.stubGlobal("window", { location: { hostname: "localhost" } });
-
-    const { IS_PRODUCTION_API } = await import("../config");
-
-    expect(IS_PRODUCTION_API).toBe(false);
-  });
-
   it("uses VITE_API_BASE_URL when set and not localhost", async () => {
     vi.stubGlobal("window", {
       location: { hostname: "pr-42.nylonimpossible.com" },

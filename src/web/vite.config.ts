@@ -7,8 +7,6 @@ import tailwindcss from '@tailwindcss/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
 
-const isRemote = process.env.REMOTE_BINDINGS === 'true'
-
 const config = defineConfig({
   build: {
     sourcemap: "hidden",
@@ -18,7 +16,6 @@ const config = defineConfig({
     cloudflare({
       viteEnvironment: { name: 'ssr' },
       persistState: { path: '../../.wrangler/state' },
-      ...(isRemote && { configPath: 'wrangler.remote.jsonc' }),
     }),
     // this is the plugin that enables path aliases
     viteTsConfigPaths({
