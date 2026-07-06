@@ -22,6 +22,7 @@ import { generateKeyBetween } from "fractional-indexing";
 import {
   AlertCircle,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   GripVertical,
   Inbox,
@@ -39,8 +40,9 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
-import { useUser } from "@/hooks/useUser";
+import { useUpdateUser, useUser } from "@/hooks/useUser";
 import { formatDate } from "@/lib/date";
+import { messageFromError, toast } from "@/lib/toast";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
@@ -503,6 +505,7 @@ export function TodoList() {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
   const { data: user } = useUser();
+  const updateUser = useUpdateUser();
   const { highlightIds, hiddenIds } = useImportReview();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
@@ -595,10 +598,24 @@ export function TodoList() {
   const incompleteTodos = sortedTodos.filter(
     (t) => !t.completed && !hiddenIds.has(t.id),
   );
-  // Completed todos are hidden entirely when the user opts in (synced preference).
-  const completedTodos = user?.hideCompleted
-    ? []
-    : sortedTodos.filter((t) => t.completed);
+  // Imports under review are held out of the completed section too, so they
+  // don't surface early and the accordion count stays accurate.
+  const completedTodos = sortedTodos.filter(
+    (t) => t.completed && !hiddenIds.has(t.id),
+  );
+  // The completed section collapses into an accordion; the collapsed/expanded
+  // state is the synced `hideCompleted` preference (true = collapsed).
+  const completedCollapsed = user?.hideCompleted ?? false;
+
+  const handleToggleCompleted = () => {
+    updateUser.mutate(
+      { hideCompleted: !completedCollapsed },
+      {
+        onError: (err) =>
+          toast.error(messageFromError(err, "Couldn't change setting")),
+      },
+    );
+  };
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
 
@@ -670,25 +687,49 @@ export function TodoList() {
             />
           ))}
         </SortableContext>
-        {completedTodos.map((todo) => (
-          <div key={todo.id} className="group py-2">
-            <div className="flex items-start gap-2">
-              <div className="w-4 shrink-0" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <TodoItemContent {...sharedProps(todo)} />
-                {expandedId === todo.id && (
-                  <ExpandedSection
-                    todo={todo}
-                    onUpdate={handleUpdateExpanded(todo.id)}
-                    isUpdating={updateTodo.isPending}
-                    onDelete={handleDelete}
-                    deletePending={deleteTodo.isPending}
-                  />
-                )}
-              </div>
-            </div>
+        {completedTodos.length > 0 && (
+          <div className="mt-2 border-t border-gray-base pt-1">
+            <button
+              type="button"
+              onClick={handleToggleCompleted}
+              disabled={updateUser.isPending}
+              aria-expanded={!completedCollapsed}
+              className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-medium text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50"
+            >
+              <ChevronRight
+                size={14}
+                aria-hidden="true"
+                className={`shrink-0 transition-transform ${
+                  completedCollapsed ? "" : "rotate-90"
+                }`}
+              />
+              <span>Completed</span>
+              <span className="rounded-md bg-gray-base px-1.5 py-0.5 tabular-nums text-gray-muted">
+                {completedTodos.length}
+              </span>
+            </button>
+            {!completedCollapsed &&
+              completedTodos.map((todo) => (
+                <div key={todo.id} className="group py-2">
+                  <div className="flex items-start gap-2">
+                    <div className="w-4 shrink-0" aria-hidden="true" />
+                    <div className="flex-1 min-w-0">
+                      <TodoItemContent {...sharedProps(todo)} />
+                      {expandedId === todo.id && (
+                        <ExpandedSection
+                          todo={todo}
+                          onUpdate={handleUpdateExpanded(todo.id)}
+                          isUpdating={updateTodo.isPending}
+                          onDelete={handleDelete}
+                          deletePending={deleteTodo.isPending}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
           </div>
-        ))}
+        )}
       </div>
     </DndContext>
   );
