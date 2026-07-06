@@ -504,7 +504,7 @@ export function TodoList() {
   const { data: todos, isLoading, error, refetch, isFetching } = useTodos();
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
-  const { data: user, isLoading: isUserLoading } = useUser();
+  const { data: user } = useUser();
   const updateUser = useUpdateUser();
   const { highlightIds, hiddenIds } = useImportReview();
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -688,10 +688,12 @@ export function TodoList() {
           ))}
         </SortableContext>
         {/* Hold the completed section until the synced `hideCompleted`
-            preference has loaded. Rendering before we know it would default to
-            expanded and flash the completed items open, then collapse them once
-            the preference arrives. */}
-        {!isUserLoading && completedTodos.length > 0 && (
+            preference is known (i.e. `user` has loaded). Rendering before then
+            would default to expanded and flash the completed items open, then
+            collapse them once the preference arrives. Gating on `user` — rather
+            than just "not loading" — also covers the errored/signed-out cases
+            where the query settles without ever producing a preference. */}
+        {user && completedTodos.length > 0 && (
           <div className="mt-2 border-t border-gray-base pt-1">
             <button
               type="button"
