@@ -185,7 +185,7 @@ function TodoItemContent({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p
-            className={`leading-snug break-words ${
+            className={`min-w-0 leading-snug wrap-anywhere ${
               todo.completed
                 ? "text-xs line-through text-gray-muted"
                 : "text-sm text-gray"
