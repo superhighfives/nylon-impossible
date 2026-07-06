@@ -25,6 +25,7 @@ final class MockAPIService: APIProviding {
         plan: "pro",
         location: nil,
         theme: "system",
+        hideCompleted: false,
         createdAt: Date(timeIntervalSince1970: 1735689600),
         updatedAt: Date(timeIntervalSince1970: 1735689600)
     )
@@ -75,6 +76,7 @@ final class MockAPIService: APIProviding {
             plan: getMeResponse.plan,
             location: newLocation,
             theme: request.theme ?? getMeResponse.theme,
+            hideCompleted: request.hideCompleted ?? getMeResponse.hideCompleted,
             createdAt: getMeResponse.createdAt,
             updatedAt: Date()
         )
