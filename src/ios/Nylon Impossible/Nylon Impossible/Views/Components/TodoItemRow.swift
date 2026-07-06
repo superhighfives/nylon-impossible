@@ -21,6 +21,56 @@ struct TodoItemRow: View {
         urls.filter { $0.researchId == nil }
     }
 
+    /// Priority + due-date pills shown under the title, mirroring the web
+    /// `TodoIndicators` row. Only explicit priorities render a badge.
+    @ViewBuilder
+    private var indicatorBadges: some View {
+        let priority = todo.todoPriority
+        if priority != nil || todo.dueDate != nil {
+            HStack(spacing: 6) {
+                if let priority {
+                    badge(
+                        priority == .high ? "High" : "Low",
+                        foreground: priority == .high ? Color.appAccent : Color.appSubtle,
+                        background: priority == .high ? Color.appBrand.opacity(0.22) : Color.appTint
+                    )
+                }
+
+                if let dueDate = todo.dueDate {
+                    badge(
+                        dueDate.formatted(date: .abbreviated, time: .omitted),
+                        foreground: todo.isOverdue ? Color.appDanger : Color.appSubtle,
+                        background: todo.isOverdue ? Color.appDanger.opacity(0.15) : Color.appTint,
+                        systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
+                    )
+                }
+            }
+            .padding(.top, 2)
+        }
+    }
+
+    @ViewBuilder
+    private func badge(
+        _ text: String,
+        foreground: Color,
+        background: Color,
+        systemImage: String? = nil
+    ) -> some View {
+        HStack(spacing: 4) {
+            if let systemImage {
+                Image(systemName: systemImage)
+                    .font(.system(size: 10))
+            }
+            Text(text)
+                .font(.system(size: 12))
+                .monospacedDigit()
+        }
+        .foregroundStyle(foreground)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(background, in: RoundedRectangle(cornerRadius: 6))
+    }
+
     var body: some View {
         HStack(spacing: 16) {
             // Checkbox
@@ -66,14 +116,9 @@ struct TodoItemRow: View {
                 showingEditSheet = true
             }) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Title row with priority indicator and AI status
+                    // Title row with AI status. Priority is shown as a labeled
+                    // badge below the title (see indicators row), matching web.
                     HStack(spacing: 6) {
-                        if let priority = todo.todoPriority {
-                            Text(priority == .high ? "!" : "")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(priority == .high ? Color.red : Color.appSubtle)
-                        }
-
                         Text(todo.title)
                             .font(.system(size: todo.isCompleted ? 13 : 16))
                             .foregroundStyle(todo.isCompleted ? Color.appSubtle : Color.appDefault)
@@ -112,17 +157,6 @@ struct TodoItemRow: View {
                         }
                     }
                     
-                    // Due date indicator
-                    if let dueDate = todo.dueDate {
-                        HStack(spacing: 4) {
-                            Image(systemName: todo.isOverdue ? "exclamationmark.circle.fill" : "calendar")
-                                .font(.system(size: 11))
-                            Text(dueDate, style: .date)
-                                .font(.system(size: 12))
-                        }
-                        .foregroundStyle(todo.isOverdue ? Color.red : Color.appSubtle)
-                    }
-                    
                     // URL cards (compact) — hide research URLs, limit to 2 visible
                     if !nonResearchUrls.isEmpty {
                         if todo.isCompleted {
@@ -143,6 +177,10 @@ struct TodoItemRow: View {
                             }
                         }
                     }
+
+                    // Priority and due-date badges — labeled pills, matching
+                    // web's indicator row.
+                    indicatorBadges
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

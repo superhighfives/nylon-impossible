@@ -16,7 +16,7 @@ struct AddTaskInputView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            TextField("Add a new task...", text: $text, axis: .vertical)
+            TextField("What needs to be done?", text: $text, axis: .vertical)
                 .font(.system(size: 16))
                 .foregroundStyle(Color.appDefault)
                 .focused($isFocused)

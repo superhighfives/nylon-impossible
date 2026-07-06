@@ -11,21 +11,25 @@ struct EmptyStateView: View {
     @State private var appeared = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             Spacer()
 
-            Image(systemName: "checklist")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.appLine)
-                .padding(.bottom, 16)
-
-            Text("No tasks yet")
-                .font(.system(size: 18))
+            Image(systemName: "tray")
+                .font(.system(size: 20))
                 .foregroundStyle(Color.appSubtle)
+                .frame(width: 48, height: 48)
+                .background(Color.appTint, in: Circle())
+                .padding(.bottom, 12)
 
-            Text("Add a task to get started")
-                .font(.system(size: 14))
-                .foregroundStyle(Color.appInactive)
+            Text("Nothing to do yet")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.appDefault)
+
+            Text("Add a todo below to get started. Try “Buy groceries tomorrow” or paste a link to research.")
+                .font(.system(size: 13))
+                .foregroundStyle(Color.appSubtle)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 280)
 
             Spacer()
         }
