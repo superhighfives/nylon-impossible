@@ -11,14 +11,16 @@ vi.mock("@/hooks/useTodos", () => ({
   useDeleteTodo: vi.fn(),
 }));
 
-// TodoList reads the synced hideCompleted preference via useUser (which calls
-// Clerk's useAuth); mock it so the component renders without a ClerkProvider.
+// TodoList reads the synced hideCompleted preference via useUser and toggles it
+// via useUpdateUser (both call Clerk's useAuth); mock them so the component
+// renders without a ClerkProvider.
 vi.mock("@/hooks/useUser", () => ({
   useUser: vi.fn(() => ({ data: undefined })),
+  useUpdateUser: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
-import { useUser } from "@/hooks/useUser";
+import { useUpdateUser, useUser } from "@/hooks/useUser";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   return {
@@ -159,5 +161,65 @@ describe("TodoList", () => {
     render(<TodoList />);
     expect(screen.getByText("Active thing")).toBeInTheDocument();
     expect(screen.queryByText("Done thing")).not.toBeInTheDocument();
+  });
+
+  it("shows a collapsed completed accordion with a count when hideCompleted is true", () => {
+    stubUser(true);
+    vi.mocked(useTodos).mockReturnValue({
+      data: [
+        makeTodo({ id: "a", title: "Active thing", completed: false }),
+        makeTodo({ id: "b", title: "Done one", completed: true }),
+        makeTodo({ id: "c", title: "Done two", completed: true }),
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    const accordion = screen.getByRole("button", { name: /completed/i });
+    expect(accordion).toHaveAttribute("aria-expanded", "false");
+    expect(accordion).toHaveTextContent("2");
+    expect(screen.queryByText("Done one")).not.toBeInTheDocument();
+  });
+
+  it("toggles the hideCompleted preference when the accordion is clicked", () => {
+    const mutate = vi.fn();
+    vi.mocked(useUpdateUser).mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateUser>);
+    stubUser(false);
+    vi.mocked(useTodos).mockReturnValue({
+      data: [makeTodo({ id: "b", title: "Done thing", completed: true })],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    fireEvent.click(screen.getByRole("button", { name: /completed/i }));
+    expect(mutate).toHaveBeenCalledWith(
+      { hideCompleted: true },
+      expect.anything(),
+    );
+  });
+
+  it("renders no completed accordion when there are no completed todos", () => {
+    stubUser(false);
+    vi.mocked(useTodos).mockReturnValue({
+      data: [makeTodo({ id: "a", title: "Active thing", completed: false })],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    expect(
+      screen.queryByRole("button", { name: /completed/i }),
+    ).not.toBeInTheDocument();
   });
 });
