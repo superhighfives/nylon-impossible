@@ -39,6 +39,7 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
+import { useUser } from "@/hooks/useUser";
 import { formatDate } from "@/lib/date";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
@@ -501,6 +502,7 @@ export function TodoList() {
   const { data: todos, isLoading, error, refetch, isFetching } = useTodos();
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
+  const { data: user } = useUser();
   const { highlightIds, hiddenIds } = useImportReview();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
@@ -593,7 +595,10 @@ export function TodoList() {
   const incompleteTodos = sortedTodos.filter(
     (t) => !t.completed && !hiddenIds.has(t.id),
   );
-  const completedTodos = sortedTodos.filter((t) => t.completed);
+  // Completed todos are hidden entirely when the user opts in (synced preference).
+  const completedTodos = user?.hideCompleted
+    ? []
+    : sortedTodos.filter((t) => t.completed);
 
   const displayIncompleteTodos = localIncompleteTodos ?? incompleteTodos;
 

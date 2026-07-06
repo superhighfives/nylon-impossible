@@ -11,6 +11,7 @@ export interface User {
   plan: "free" | "pro";
   location: string | null;
   theme: Theme;
+  hideCompleted: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -19,6 +20,7 @@ type UserUpdate = {
   aiEnabled?: boolean;
   location?: string | null;
   theme?: Theme;
+  hideCompleted?: boolean;
 };
 
 const USER_QUERY_KEY = ["user", "me"] as const;
@@ -120,6 +122,9 @@ export function useUpdateUser() {
         }
         if (newData.theme !== undefined) {
           updates.theme = newData.theme;
+        }
+        if (newData.hideCompleted !== undefined) {
+          updates.hideCompleted = newData.hideCompleted;
         }
         queryClient.setQueryData<User>(USER_QUERY_KEY, {
           ...previousUser,

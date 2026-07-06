@@ -9,6 +9,7 @@ const updatePreferencesSchema = z.object({
   aiEnabled: z.boolean().optional(),
   location: z.string().max(200).nullable().optional(),
   theme: z.enum(["light", "dark", "system"]).optional(),
+  hideCompleted: z.boolean().optional(),
 });
 
 // GET /users/me
@@ -24,6 +25,7 @@ export async function getMe(c: Context<Env>) {
       plan: users.plan,
       location: users.location,
       theme: users.theme,
+      hideCompleted: users.hideCompleted,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -43,6 +45,7 @@ export async function getMe(c: Context<Env>) {
     plan: user.plan,
     location: user.location,
     theme: user.theme,
+    hideCompleted: user.hideCompleted,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });
@@ -65,6 +68,7 @@ export async function updateMe(c: Context<Env>) {
     aiEnabled: boolean;
     location: string | null;
     theme: "light" | "dark" | "system";
+    hideCompleted: boolean;
   }> = {};
   if (parsed.data.aiEnabled !== undefined) {
     updates.aiEnabled = parsed.data.aiEnabled;
@@ -74,6 +78,9 @@ export async function updateMe(c: Context<Env>) {
   }
   if (parsed.data.theme !== undefined) {
     updates.theme = parsed.data.theme;
+  }
+  if (parsed.data.hideCompleted !== undefined) {
+    updates.hideCompleted = parsed.data.hideCompleted;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -94,6 +101,7 @@ export async function updateMe(c: Context<Env>) {
       plan: users.plan,
       location: users.location,
       theme: users.theme,
+      hideCompleted: users.hideCompleted,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -113,6 +121,7 @@ export async function updateMe(c: Context<Env>) {
     plan: user.plan,
     location: user.location,
     theme: user.theme,
+    hideCompleted: user.hideCompleted,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });
