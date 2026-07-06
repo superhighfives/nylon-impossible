@@ -598,7 +598,11 @@ export function TodoList() {
   const incompleteTodos = sortedTodos.filter(
     (t) => !t.completed && !hiddenIds.has(t.id),
   );
-  const completedTodos = sortedTodos.filter((t) => t.completed);
+  // Imports under review are held out of the completed section too, so they
+  // don't surface early and the accordion count stays accurate.
+  const completedTodos = sortedTodos.filter(
+    (t) => t.completed && !hiddenIds.has(t.id),
+  );
   // The completed section collapses into an accordion; the collapsed/expanded
   // state is the synced `hideCompleted` preference (true = collapsed).
   const completedCollapsed = user?.hideCompleted ?? false;
@@ -690,7 +694,7 @@ export function TodoList() {
               onClick={handleToggleCompleted}
               disabled={updateUser.isPending}
               aria-expanded={!completedCollapsed}
-              className="flex w-full items-center gap-1.5 rounded-lg py-2 text-xs font-medium text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50"
+              className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-medium text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50"
             >
               <ChevronRight
                 size={14}
