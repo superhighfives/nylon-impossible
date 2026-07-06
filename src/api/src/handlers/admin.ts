@@ -49,7 +49,10 @@ export async function listUsers(c: Context<Env>) {
       plan: users.plan,
       aiEnabled: users.aiEnabled,
       createdAt: users.createdAt,
-      todoCount: sql<number>`(SELECT COUNT(*) FROM ${todos} WHERE ${todos.userId} = ${users.id})`,
+      // Columns must be table-qualified: drizzle renders interpolated column
+      // refs unqualified, and a bare `id` inside `FROM todos` binds to todos.id
+      // (its own PK) instead of the outer users.id — silently counting 0.
+      todoCount: sql<number>`(SELECT COUNT(*) FROM todos WHERE todos.user_id = users.id)`,
     })
     .from(users);
 

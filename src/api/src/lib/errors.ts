@@ -20,6 +20,10 @@ export const API_ERRORS = {
   user_id_required: { status: 400, message: "User ID required" },
   todo_not_found: { status: 404, message: "Todo not found" },
   user_not_found: { status: 404, message: "User not found" },
+  email_already_registered: {
+    status: 409,
+    message: "Email already registered to another account",
+  },
   invalid_json: { status: 400, message: "Invalid JSON body" },
   text_required: { status: 400, message: "Text is required" },
   no_valid_fields: { status: 400, message: "No valid fields to update" },

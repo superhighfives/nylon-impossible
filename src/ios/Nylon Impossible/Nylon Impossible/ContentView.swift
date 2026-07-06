@@ -12,6 +12,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AuthService.self) private var authService
     @Environment(SyncService.self) private var syncService
+    @Environment(UserPreferencesService.self) private var preferencesService
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
 
@@ -98,7 +99,7 @@ struct ContentView: View {
                 }
             }
 
-            if !completed.isEmpty {
+            if !completed.isEmpty && !preferencesService.hideCompleted {
                 Section {
                     Text("Completed")
                         .font(.system(size: 13, weight: .semibold))
