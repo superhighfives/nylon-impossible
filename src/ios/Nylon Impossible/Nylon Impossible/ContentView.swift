@@ -29,8 +29,7 @@ struct ContentView: View {
                     onSignOut: {
                         Task { await authService.signOut() }
                     },
-                    syncState: syncService.state,
-                    todoCount: sortedTodosList.filter { !$0.isCompleted }.count
+                    syncState: syncService.state
                 )
 
                 // Task list or empty state
@@ -99,28 +98,27 @@ struct ContentView: View {
                 }
             }
 
-            if !completed.isEmpty && !preferencesService.hideCompleted {
+            // Completed items collapse into a bottom-of-list accordion, matching
+            // web: the toggle (with a count badge) always shows when there are
+            // completed items; `hideCompleted` controls collapsed vs expanded
+            // rather than hiding the section outright.
+            if !completed.isEmpty {
                 Section {
-                    Text("Completed")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.appSubtle)
-                        .textCase(nil)
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
-                        .moveDisabled(true)
+                    completedAccordionHeader(count: completed.count)
 
-                    ForEach(completed) { todo in
-                        todoRow(todo)
-                            .moveDisabled(true)
-                    }
-                    .onDelete { offsets in
-                        for index in offsets {
-                            withAnimation(.easeInOut(duration: 0.3)) {
-                                viewModel.deleteTodo(completed[index], context: modelContext)
-                            }
+                    if !preferencesService.hideCompleted {
+                        ForEach(completed) { todo in
+                            todoRow(todo)
+                                .moveDisabled(true)
                         }
-                        syncService.syncAfterAction()
+                        .onDelete { offsets in
+                            for index in offsets {
+                                withAnimation(.easeInOut(duration: 0.3)) {
+                                    viewModel.deleteTodo(completed[index], context: modelContext)
+                                }
+                            }
+                            syncService.syncAfterAction()
+                        }
                     }
                 }
             }
@@ -131,6 +129,42 @@ struct ContentView: View {
         .scrollDismissesKeyboard(.interactively)
         // Extra bottom padding so content clears the floating input bar
         .contentMargins(.bottom, 100, for: .scrollContent)
+    }
+
+    @ViewBuilder
+    private func completedAccordionHeader(count: Int) -> some View {
+        Button {
+            Task {
+                await preferencesService.setHideCompleted(!preferencesService.hideCompleted)
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .rotationEffect(.degrees(preferencesService.hideCompleted ? 0 : 90))
+                    .animation(.easeInOut(duration: 0.2), value: preferencesService.hideCompleted)
+
+                Text("Completed")
+                    .font(.system(size: 13, weight: .medium))
+
+                Text("\(count)")
+                    .font(.system(size: 12))
+                    .monospacedDigit()
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.appTint, in: RoundedRectangle(cornerRadius: 6))
+
+                Spacer()
+            }
+            .foregroundStyle(Color.appSubtle)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .textCase(nil)
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
+        .moveDisabled(true)
     }
 
     @ViewBuilder

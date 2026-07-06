@@ -14,101 +14,41 @@ struct HeaderView: View {
 
     var onSignOut: (() -> Void)?
     var syncState: SyncState = .idle
-    var todoCount: Int = 0
 
     @State private var showErrorPopover = false
     @State private var showSettings = false
 
     var body: some View {
+        // Mirrors the web header: a compact centered pill with the logo and the
+        // user avatar overlapping. Settings, sign out, and sync state live
+        // inside the avatar menu (the web app tucks these behind the Clerk
+        // UserButton) rather than as separate top-bar controls.
         VStack(spacing: 12) {
-            // Top bar with sync status and sign out
-            HStack {
-                // Sync status indicator
-                syncStatusView
-
-                Spacer()
-
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gear")
-                        .font(.system(size: 18))
-                        .foregroundStyle(Color.appStrong)
-                        .frame(width: 36, height: 36)
-                        .glassEffect(.regular, in: .circle)
-                }
-                .accessibilityLabel("Settings")
-
-                if let onSignOut {
-                    Button {
-                        onSignOut()
-                    } label: {
-                        Image(systemName: "rectangle.portrait.and.arrow.right")
-                            .font(.system(size: 18))
-                            .foregroundStyle(Color.appStrong)
-                            .frame(width: 36, height: 36)
-                            .glassEffect(.regular, in: .circle)
-                    }
-                }
+            HStack(spacing: -8) {
+                logo
+                avatarMenu
             }
-            .frame(height: 36)
-            .sheet(isPresented: $showSettings) {
-                SettingsView()
-                    .environment(preferencesService)
-                    .environment(syncService)
-                    .environment(authService)
-            }
-
-            // Title and count
-            VStack(alignment: .leading, spacing: 4) {
-                Text("My Tasks")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundStyle(Color.appDefault)
-
-                Text("\(todoCount) \(todoCount == 1 ? "task" : "tasks")")
-                    .font(.system(size: 13))
-                    .foregroundStyle(Color.appSubtle)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(4)
+            .glassEffect(.regular, in: .capsule)
+            .overlay(
+                Capsule()
+                    .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
+            )
 
             #if DEBUG
             DebugBannerView()
             #endif
         }
+        .frame(maxWidth: .infinity)
         .padding(.top, 16)
-    }
-
-    @ViewBuilder
-    private var syncStatusView: some View {
-        switch syncState {
-        case .idle:
-            EmptyView()
-        case .syncing:
-            HStack(spacing: 6) {
-                ProgressView()
-                    .scaleEffect(0.7)
-                Text("Syncing...")
-                    .font(.caption)
-                    .foregroundStyle(Color.appSubtle)
-            }
-        case .success(let date):
-            HStack(spacing: 4) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(Color.appSuccess)
-                Text("Synced \(date.formatted(.relative(presentation: .named)))")
-                    .font(.caption)
-                    .foregroundStyle(Color.appSubtle)
-            }
-        case .error(let message):
-            Button {
-                showErrorPopover.toggle()
-            } label: {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(Color.appDanger)
-            }
-            .popover(isPresented: $showErrorPopover) {
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
+                .environment(preferencesService)
+                .environment(syncService)
+                .environment(authService)
+        }
+        .popover(isPresented: $showErrorPopover) {
+            if case .error(let message) = syncState {
                 ScrollView {
                     Text(message)
                         .font(.caption)
@@ -118,6 +58,86 @@ struct HeaderView: View {
                 }
                 .frame(minWidth: 280, minHeight: 100, maxHeight: 300)
                 .presentationCompactAdaptation(.popover)
+            }
+        }
+    }
+
+    private var logo: some View {
+        Image("Logo")
+            .resizable()
+            .scaledToFit()
+            .frame(width: 20, height: 20)
+            .padding(6)
+            .frame(width: 32, height: 32)
+            .background(Color.appBrand)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(Color.appBase, lineWidth: 2))
+            .accessibilityLabel("Nylon Impossible")
+    }
+
+    private var avatarMenu: some View {
+        Menu {
+            syncStatusMenuContent
+
+            Button {
+                showSettings = true
+            } label: {
+                Label("Settings", systemImage: "gear")
+            }
+
+            if let onSignOut {
+                Button(role: .destructive) {
+                    onSignOut()
+                } label: {
+                    Label("Sign Out", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+            }
+        } label: {
+            avatar
+        }
+        .accessibilityLabel("Account")
+    }
+
+    private var avatar: some View {
+        AsyncImage(url: authService.userImageURL) { image in
+            image
+                .resizable()
+                .scaledToFill()
+        } placeholder: {
+            Image(systemName: "person.crop.circle.fill")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(Color.appSubtle)
+        }
+        .frame(width: 32, height: 32)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color.appBase, lineWidth: 2))
+        // Surface a sync failure without a separate top-bar control: tint a
+        // small dot on the avatar and let the menu carry the detail.
+        .overlay(alignment: .bottomTrailing) {
+            if case .error = syncState {
+                Circle()
+                    .fill(Color.appDanger)
+                    .frame(width: 9, height: 9)
+                    .overlay(Circle().stroke(Color.appBase, lineWidth: 1.5))
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var syncStatusMenuContent: some View {
+        switch syncState {
+        case .idle:
+            EmptyView()
+        case .syncing:
+            Text("Syncing…")
+        case .success(let date):
+            Text("Synced \(date.formatted(.relative(presentation: .named)))")
+        case .error:
+            Button {
+                showErrorPopover = true
+            } label: {
+                Label("Sync failed — view details", systemImage: "exclamationmark.circle")
             }
         }
     }
@@ -133,10 +153,10 @@ struct HeaderView: View {
     ZStack {
         GradientBackground()
         VStack(spacing: 40) {
-            HeaderView(onSignOut: {}, syncState: .idle, todoCount: 5)
-            HeaderView(onSignOut: {}, syncState: .syncing, todoCount: 3)
-            HeaderView(onSignOut: {}, syncState: .success(Date()), todoCount: 1)
-            HeaderView(onSignOut: {}, syncState: .error("Network error"), todoCount: 0)
+            HeaderView(onSignOut: {}, syncState: .idle)
+            HeaderView(onSignOut: {}, syncState: .syncing)
+            HeaderView(onSignOut: {}, syncState: .success(Date()))
+            HeaderView(onSignOut: {}, syncState: .error("Network error"))
         }
     }
     .environment(preferencesService)
