@@ -15,8 +15,10 @@ export default function DevEnvironmentIndicator({ origin }: Props) {
   if (import.meta.env.PROD && !isPreviewDeploy(hostname)) return null;
 
   const currentUrl = `${origin}${location.href}`;
-  // Local dev pointed at the deployed production API — real data, so flag it.
-  const hittingProduction = IS_PRODUCTION_API && hostname === "localhost";
+  // Flag whenever the client is pointed at the deployed production API — real
+  // data, whatever the origin. (This indicator is already hidden on the real
+  // production site, and preview deploys use their own preview API.)
+  const hittingProduction = IS_PRODUCTION_API;
 
   return (
     <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-1 rounded-lg bg-surface/90 px-3 py-2 text-xs font-mono text-surface backdrop-blur-sm">

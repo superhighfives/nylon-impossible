@@ -38,6 +38,12 @@ describe("DevEnvironmentIndicator", () => {
     expect(screen.getByText("production")).toBeInTheDocument();
   });
 
+  it("flags production regardless of the dev origin (e.g. 127.0.0.1)", () => {
+    mockConfig.IS_PRODUCTION_API = true;
+    render(<DevEnvironmentIndicator origin="http://127.0.0.1:3000" />);
+    expect(screen.getByText("production")).toBeInTheDocument();
+  });
+
   it("does not flag production for the local API", () => {
     render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
     expect(screen.queryByText("production")).not.toBeInTheDocument();
