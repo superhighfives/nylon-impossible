@@ -6,6 +6,7 @@
     "prepare": "effect-language-service patch",
     "dev": "vite dev --port 3000",
     "dev:remote": "REMOTE_BINDINGS=true vite dev --port 3000",
+    "dev:prod": "VITE_API_BASE_URL=https://api.nylonimpossible.com vite dev --port 3000",
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest run",

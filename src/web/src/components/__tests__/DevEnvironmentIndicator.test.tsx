@@ -6,13 +6,17 @@ vi.mock("@tanstack/react-router", () => ({
   useLocation: () => ({ href: "/tasks" }),
 }));
 
-vi.mock("../../lib/config", () => ({
+const mockConfig = vi.hoisted(() => ({
   API_URL: "https://api.nylonimpossible.com",
+  IS_PRODUCTION_API: false,
 }));
+
+vi.mock("../../lib/config", () => mockConfig);
 
 describe("DevEnvironmentIndicator", () => {
   afterEach(() => {
     import.meta.env.PROD = false;
+    mockConfig.IS_PRODUCTION_API = false;
   });
 
   it("shows in development builds", () => {
@@ -26,6 +30,17 @@ describe("DevEnvironmentIndicator", () => {
   it("shows the full current URL", () => {
     render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
     expect(screen.getByText("http://localhost:3000/tasks")).toBeInTheDocument();
+  });
+
+  it("flags a production badge when local dev hits the production API", () => {
+    mockConfig.IS_PRODUCTION_API = true;
+    render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
+    expect(screen.getByText("production")).toBeInTheDocument();
+  });
+
+  it("does not flag production for the local API", () => {
+    render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
+    expect(screen.queryByText("production")).not.toBeInTheDocument();
   });
 
   it("shows on preview deploy origins in production builds", () => {

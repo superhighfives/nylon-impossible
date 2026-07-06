@@ -1,5 +1,5 @@
 import { useLocation } from "@tanstack/react-router";
-import { API_URL } from "../lib/config";
+import { API_URL, IS_PRODUCTION_API } from "../lib/config";
 
 const isPreviewDeploy = (hostname: string) =>
   /^pr-\d+\.nylonimpossible\.com$/.test(hostname);
@@ -15,6 +15,8 @@ export default function DevEnvironmentIndicator({ origin }: Props) {
   if (import.meta.env.PROD && !isPreviewDeploy(hostname)) return null;
 
   const currentUrl = `${origin}${location.href}`;
+  // Local dev pointed at the deployed production API — real data, so flag it.
+  const hittingProduction = IS_PRODUCTION_API && hostname === "localhost";
 
   return (
     <div className="fixed bottom-4 left-4 z-50 flex flex-col gap-1 rounded-lg bg-surface/90 px-3 py-2 text-xs font-mono text-surface backdrop-blur-sm">
@@ -24,7 +26,14 @@ export default function DevEnvironmentIndicator({ origin }: Props) {
       </div>
       <div className="flex gap-2">
         <span className="text-muted">api</span>
-        <span>{API_URL}</span>
+        <span className={hittingProduction ? "text-red-11" : undefined}>
+          {API_URL}
+        </span>
+        {hittingProduction && (
+          <span className="rounded bg-red-base px-1 uppercase tracking-wide text-red-11">
+            production
+          </span>
+        )}
       </div>
     </div>
   );
