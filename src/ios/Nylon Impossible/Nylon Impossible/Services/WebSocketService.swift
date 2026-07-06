@@ -88,9 +88,14 @@ final class WebSocketService {
     }
 
     private func receiveLoop() {
-        task?.receive { [weak self] result in
+        guard let currentTask = task else { return }
+        currentTask.receive { [weak self] result in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                // Ignore callbacks from a task we've already replaced (e.g. a
+                // reconnect started a new task before this stale result arrived),
+                // so we never clobber the live connection's state.
+                guard self.task === currentTask else { return }
 
                 switch result {
                 case .success(let message):
@@ -101,9 +106,14 @@ final class WebSocketService {
                     // down the task (e.g. on backgrounding) or the OS suspending
                     // the connection. It isn't a failure worth reporting, and the
                     // scene-phase handler reconnects on foreground, so don't
-                    // schedule a redundant reconnect here either.
+                    // schedule a redundant reconnect here. We still clear the
+                    // connection state, otherwise an OS/network cancellation that
+                    // didn't go through disconnect() would leave `task` non-nil
+                    // and block a future connect() (guard task == nil).
                     if Self.isCancellation(error) {
                         print("[WebSocket] Receive cancelled: \(error)")
+                        self.task = nil
+                        self.isConnected = false
                         return
                     }
                     SentrySDK.capture(error: error) { scope in
