@@ -6,6 +6,15 @@
 @import "./styles/radix-utilities.css";
 @import "tw-animate-css";
 
+/* Drive the `dark` variant off the `.dark` class on <html> instead of Tailwind's
+   default `@media (prefers-color-scheme: dark)`. The whole theming system is
+   class-based: the server renders <html class="light|dark"> from the theme
+   cookie (see getRootData in __root.tsx) and ThemeSync toggles the class at
+   runtime. Without this, every `@variant dark` in radix-utilities.css follows
+   the OS instead of the user's choice, so the light/dark toggle appears to do
+   nothing. `:where()` keeps specificity at zero to match the default variant. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* top-4 (1rem) + pill height (~40px / 2.5rem) + breathing room (1.5rem) = 5rem */
   --spacing-header-offset: 5rem;
@@ -19,11 +28,22 @@
 html,
 body {
   height: 100%;
-  /* Let native controls (date-picker calendar glyph, dropdowns, scrollbars)
-     follow the OS light/dark preference — the same trigger the radix `dark`
-     variant uses. Without this they default to the light scheme and render
-     dark-on-dark (e.g. an invisible calendar icon in the due-date input). */
+  /* Default native controls (date-picker calendar glyph, dropdowns, scrollbars)
+     to follow the OS until the resolved theme class is applied below. Without a
+     value they default to the light scheme and render dark-on-dark (e.g. an
+     invisible calendar icon in the due-date input). */
   color-scheme: light dark;
+}
+
+/* Pin native controls to the resolved theme so they match the user's explicit
+   light/dark choice rather than the OS. <html> always carries one of these
+   classes (SSR sets it from the theme cookie; ThemeSync keeps it live). */
+html.light {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 body {
