@@ -97,6 +97,15 @@ final class WebSocketService {
                     self.handleMessage(message)
                     self.receiveLoop()
                 case .failure(let error):
+                    // A cancelled receive is the expected result of us tearing
+                    // down the task (e.g. on backgrounding) or the OS suspending
+                    // the connection. It isn't a failure worth reporting, and the
+                    // scene-phase handler reconnects on foreground, so don't
+                    // schedule a redundant reconnect here either.
+                    if Self.isCancellation(error) {
+                        print("[WebSocket] Receive cancelled: \(error)")
+                        return
+                    }
                     SentrySDK.capture(error: error) { scope in
                         scope.setTag(value: "websocket", key: "area")
                         scope.setTag(value: "receive", key: "event")
@@ -120,6 +129,23 @@ final class WebSocketService {
         @unknown default:
             break
         }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return true
+        }
+        // POSIX ECANCELED (89) — surfaced when an in-flight receive is torn down.
+        if nsError.domain == NSPOSIXErrorDomain && nsError.code == ECANCELED {
+            return true
+        }
+        return nsError.domain == NSURLErrorDomain
+            && nsError.underlyingErrors.contains { underlying in
+                let underlyingNSError = underlying as NSError
+                return underlyingNSError.domain == NSPOSIXErrorDomain
+                    && underlyingNSError.code == ECANCELED
+            }
     }
 
     private func handleDisconnect() {
