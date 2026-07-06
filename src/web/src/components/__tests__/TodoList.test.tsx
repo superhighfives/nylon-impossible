@@ -18,6 +18,7 @@ vi.mock("@/hooks/useUser", () => ({
 }));
 
 import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
+import { useUser } from "@/hooks/useUser";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   return {
@@ -41,6 +42,12 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   };
 }
 
+function stubUser(hideCompleted?: boolean) {
+  vi.mocked(useUser).mockReturnValue({
+    data: hideCompleted === undefined ? undefined : { hideCompleted },
+  } as unknown as ReturnType<typeof useUser>);
+}
+
 function stubMutations() {
   vi.mocked(useUpdateTodo).mockReturnValue({
     mutate: vi.fn(),
@@ -56,6 +63,7 @@ describe("TodoList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubMutations();
+    stubUser();
   });
 
   it("renders a skeleton while loading", () => {
@@ -115,5 +123,41 @@ describe("TodoList", () => {
     render(<TodoList />);
     expect(screen.getByText("First thing")).toBeInTheDocument();
     expect(screen.getByText("Second thing")).toBeInTheDocument();
+  });
+
+  it("shows completed todos when hideCompleted is false", () => {
+    stubUser(false);
+    vi.mocked(useTodos).mockReturnValue({
+      data: [
+        makeTodo({ id: "a", title: "Active thing", completed: false }),
+        makeTodo({ id: "b", title: "Done thing", completed: true }),
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    expect(screen.getByText("Active thing")).toBeInTheDocument();
+    expect(screen.getByText("Done thing")).toBeInTheDocument();
+  });
+
+  it("hides completed todos when hideCompleted is true", () => {
+    stubUser(true);
+    vi.mocked(useTodos).mockReturnValue({
+      data: [
+        makeTodo({ id: "a", title: "Active thing", completed: false }),
+        makeTodo({ id: "b", title: "Done thing", completed: true }),
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    expect(screen.getByText("Active thing")).toBeInTheDocument();
+    expect(screen.queryByText("Done thing")).not.toBeInTheDocument();
   });
 });

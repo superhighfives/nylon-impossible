@@ -21,7 +21,7 @@ import {
   todoUrls,
   users,
 } from "../lib/db";
-import { apiValidationError, readJsonBody } from "../lib/errors";
+import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
@@ -200,19 +200,19 @@ export async function syncTodos(c: Context<Env>) {
     const clerkUser = await clerk.users.getUser(userId);
     const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
 
-    await db.insert(users).values({ id: userId, email }).onConflictDoNothing();
+    // RETURNING tells us whether THIS call actually inserted the row. The
+    // users.email unique index means the insert no-ops when the email already
+    // belongs to a different auth id (or when Clerk gave us no email and a
+    // prior emailless user already holds the ""). Knowing we inserted lets us
+    // seed default lists exactly once — never again on a concurrent-sync race.
+    const [inserted] = await db
+      .insert(users)
+      .values({ id: userId, email })
+      .onConflictDoNothing()
+      .returning({ id: users.id });
 
-    // Confirm the row now exists for this id. The users.email unique index means
-    // onConflictDoNothing() can skip the insert if another account already owns
-    // this email (e.g. a stale row from a prior auth id). Only seed default lists
-    // when we actually created the user, to avoid a lists FK violation.
-    const [created] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.id, userId));
-
-    if (created) {
-      // Seed default lists for new user
+    if (inserted) {
+      // We created the user — seed default lists exactly once.
       const positions = generateNKeysBetween(null, null, DEFAULT_LISTS.length);
       const now = new Date();
       await db.insert(lists).values(
@@ -225,6 +225,18 @@ export async function syncTodos(c: Context<Env>) {
           updatedAt: now,
         })),
       );
+    } else {
+      // Insert no-op. Either a concurrent sync already created this exact user
+      // (fine — proceed), or the email is owned by a *different* account id, in
+      // which case this userId has no row and inserting todos would fail the FK.
+      // Surface that as a clean 409 instead of a downstream FK crash.
+      const [existing] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.id, userId));
+      if (!existing) {
+        return apiError(c, "email_already_registered");
+      }
     }
   }
 
