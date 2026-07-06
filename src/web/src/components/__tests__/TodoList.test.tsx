@@ -47,6 +47,14 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
 function stubUser(hideCompleted?: boolean) {
   vi.mocked(useUser).mockReturnValue({
     data: hideCompleted === undefined ? undefined : { hideCompleted },
+    isLoading: false,
+  } as unknown as ReturnType<typeof useUser>);
+}
+
+function stubUserLoading() {
+  vi.mocked(useUser).mockReturnValue({
+    data: undefined,
+    isLoading: true,
   } as unknown as ReturnType<typeof useUser>);
 }
 
@@ -205,6 +213,29 @@ describe("TodoList", () => {
       { hideCompleted: true },
       expect.anything(),
     );
+  });
+
+  it("does not flash completed todos while the hideCompleted preference is loading", () => {
+    stubUserLoading();
+    vi.mocked(useTodos).mockReturnValue({
+      data: [
+        makeTodo({ id: "a", title: "Active thing", completed: false }),
+        makeTodo({ id: "b", title: "Done thing", completed: true }),
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    // Incomplete todos render immediately, but the completed section stays out
+    // of the DOM until the preference resolves so it can't flash open.
+    expect(screen.getByText("Active thing")).toBeInTheDocument();
+    expect(screen.queryByText("Done thing")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /completed/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders no completed accordion when there are no completed todos", () => {
