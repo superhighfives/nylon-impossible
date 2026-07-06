@@ -89,34 +89,6 @@ See each package's README for detailed setup:
 - [`src/api/README.md`](src/api/README.md)
 - [`src/ios/README.md`](src/ios/README.md)
 
-## Running against production
-
-By default `pnpm dev` runs everything locally — the web and API workers use a
-local D1 database (`.wrangler/state`) seeded with test data. Two modes let you
-do dev work against **real production data** instead:
-
-| Command | What runs locally | What it talks to |
-|---------|-------------------|------------------|
-| `pnpm dev` | Web + API workers | Local D1, local bindings |
-| `pnpm dev:remote` | Web + API workers | **Production** Cloudflare bindings (D1, Queues, Durable Objects, AI) |
-| `pnpm dev:prod` | Web only | The **deployed production API** at `api.nylonimpossible.com` |
-
-- **`pnpm dev:remote`** runs your local worker code but binds it to the
-  production Cloudflare resources. The API worker runs `wrangler dev --remote`
-  and the web worker loads [`src/web/wrangler.remote.jsonc`](src/web/wrangler.remote.jsonc)
-  (via `REMOTE_BINDINGS=true`). Use this when you're changing worker/server code
-  and want it exercised against production data.
-- **`pnpm dev:prod`** skips the local API entirely and points the web client at
-  the deployed production API (it sets `VITE_API_BASE_URL=https://api.nylonimpossible.com`).
-  Use this for frontend-only work against real data. It works because an
-  explicit `VITE_API_BASE_URL` overrides the localhost default in
-  [`src/web/src/lib/config.ts`](src/web/src/lib/config.ts).
-
-> **These modes read and write real production data.** The dev environment
-> indicator (bottom-left of the web UI) turns the API line red and shows a
-> `production` badge whenever the client is pointed at the production API, so
-> it's obvious when you're not on local data.
-
 ## Repository Setup
 
 This section covers everything needed to get CI/CD working on a fresh fork or new repo. All secrets are configured under **GitHub → Settings → Secrets and variables → Actions**.
@@ -270,8 +242,6 @@ base64 -i "Nylon_Impossible_AppStore.mobileprovision" | pbcopy
 | Script | Description |
 |--------|-------------|
 | `pnpm dev` | Start web + API dev servers in parallel |
-| `pnpm dev:remote` | Same as `pnpm dev`, but both workers bind to **production** Cloudflare resources (D1, Queues, Durable Objects, AI) — see [Running against production](#running-against-production) |
-| `pnpm dev:prod` | Run the local web dev server against the **deployed production API** (`api.nylonimpossible.com`) — see [Running against production](#running-against-production) |
 | `pnpm api:probe` | Probe AI flows (enrich / fetch / research) outside the worker — see [`src/api/README.md`](src/api/README.md#probing-ai-flows) |
 | `pnpm ios:open` | Open iOS project in Xcode |
 | `pnpm ios:simulator` | Open iOS Simulator |

@@ -58,18 +58,6 @@ pnpm ios:open         # Open Xcode project
 pnpm ios:simulator    # Open iOS Simulator
 ```
 
-To do dev work against **real production data** (see the README's
-["Running against production"](README.md#running-against-production) section):
-
-```bash
-pnpm dev:remote       # Local workers bound to production Cloudflare resources
-pnpm dev:prod         # Local web client pointed at the deployed production API
-```
-
-> These modes read and write production data. The web dev environment indicator
-> flags the API line red with a `production` badge when the client is pointed at
-> production.
-
 ### Code Quality
 
 **Always run these before committing and verify they pass. CI enforces them and PRs will fail if they don't.**
