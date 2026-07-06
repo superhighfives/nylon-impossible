@@ -165,14 +165,20 @@ struct ContentView: View {
     /// synced `hideCompleted` preference.
     @ViewBuilder
     private func completedHeader(count: Int) -> some View {
+        let isCollapsed = preferencesService.hideCompleted
+
         Button {
-            Task { await preferencesService.setHideCompleted(!preferencesService.hideCompleted) }
+            // Capture the intended value synchronously so a concurrent sync
+            // flipping `hideCompleted` between tap and task can't invert it.
+            let newValue = !preferencesService.hideCompleted
+            Task { await preferencesService.setHideCompleted(newValue) }
         } label: {
             HStack(spacing: 6) {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.appSubtle)
-                    .rotationEffect(.degrees(preferencesService.hideCompleted ? 0 : 90))
+                    .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                    .accessibilityHidden(true)
 
                 Text("Completed")
                     .font(.system(size: 13, weight: .semibold))
@@ -196,6 +202,12 @@ struct ContentView: View {
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
         .moveDisabled(true)
+        // Collapse into one VoiceOver element that conveys the count and the
+        // current expanded/collapsed state (the web equivalent of aria-expanded).
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Completed")
+        .accessibilityValue("\(count) \(count == 1 ? "todo" : "todos"), \(isCollapsed ? "collapsed" : "expanded")")
+        .accessibilityHint(isCollapsed ? "Double tap to show completed todos" : "Double tap to hide completed todos")
     }
 }
 
