@@ -160,4 +160,46 @@ describe("Google Tasks import", () => {
     expect(body.importedIds).toEqual([]);
     expect(body.datedTodos).toEqual([]);
   });
+
+  it("imports more tasks than fit in one D1 insert chunk", async () => {
+    // D1 caps bound parameters at 100 per statement, so todos insert in chunks
+    // of 9. Importing 25 crosses multiple chunk boundaries — a regression to a
+    // chunk size that binds >100 params would throw a D1_ERROR mid-import.
+    mockGoogleToken("google-token");
+    mockGoogleTasksApi(
+      Array.from({ length: 25 }, (_, i) => ({
+        id: `gtask-${i}`,
+        title: `Task ${i}`,
+      })),
+    );
+
+    const res = await importRequest();
+    expect(res.status).toBe(200);
+    const body = await res.json<ImportResponse>();
+    expect(body.imported).toBe(25);
+
+    const db = getDb(env.DB);
+    const stored = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.userId, "user_test_123"));
+    expect(stored).toHaveLength(25);
+  });
+
+  it("returns the internal_error envelope when a route throws unexpectedly", async () => {
+    // Intra-batch duplicate ids bypass the dedupe (which only checks
+    // already-stored ids), so both rows hit the unique (user, google_task_id)
+    // index and the insert throws. The app-level onError should turn that
+    // unhandled throw into the structured 500 envelope, not a bare 500.
+    mockGoogleToken("google-token");
+    mockGoogleTasksApi([
+      { id: "gtask-dup", title: "First" },
+      { id: "gtask-dup", title: "Second" },
+    ]);
+
+    const res = await importRequest();
+    expect(res.status).toBe(500);
+    const body = await res.json<{ error: string; code: string }>();
+    expect(body.code).toBe("internal_error");
+  });
 });

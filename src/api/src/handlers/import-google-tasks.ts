@@ -20,16 +20,19 @@ interface GoogleTask {
   position?: string;
 }
 
-// D1 caps bound parameters at 100 per statement. Each inserted row binds 11
-// columns (id, userId, title, notes, completed, position, dueDate,
-// googleTaskId, aiStatus, createdAt, updatedAt), so cap the chunk at 9 rows
-// (99 params) to stay under the limit. A full chunk of 10 would bind 110 and
-// throw a D1_ERROR mid-import.
-const TODO_INSERT_COLUMNS = 11;
-const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 9
+// D1 caps bound parameters at 100 per statement. Each inserted todo row binds
+// 12 params: the 11 fields set below (id, userId, title, notes, completed,
+// position, dueDate, googleTaskId, aiStatus, createdAt, updatedAt) PLUS
+// `needsInput` — a NOT NULL column with a default that Drizzle still binds even
+// though we don't set it. Chunk at 8 rows (96 params) to stay under the cap; a
+// larger chunk throws a D1_ERROR mid-import. Count the generated SQL params,
+// not the fields set here — NOT NULL defaulted columns are easy to miss.
+const TODO_INSERT_COLUMNS = 12;
+const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 8
 
-// todoUrls rows bind 7 columns each; chunk under D1's 100-param cap the same
-// way as todos so a link-heavy import can't overflow a single insert.
+// todoUrls rows bind 7 params (all NOT NULL columns are set explicitly, so
+// there's no hidden defaulted column like todos' needsInput). Chunk the same
+// way so a link-heavy import can't overflow a single insert.
 const TODO_URL_INSERT_COLUMNS = 7;
 const URL_INSERT_CHUNK_SIZE = Math.floor(100 / TODO_URL_INSERT_COLUMNS); // 14
 
