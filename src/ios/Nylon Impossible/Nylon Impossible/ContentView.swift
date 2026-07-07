@@ -134,8 +134,11 @@ struct ContentView: View {
     @ViewBuilder
     private func completedAccordionHeader(count: Int) -> some View {
         Button {
+            // Capture the intended value synchronously so a concurrent sync
+            // flipping `hideCompleted` between tap and task can't invert it.
+            let newValue = !preferencesService.hideCompleted
             Task {
-                await preferencesService.setHideCompleted(!preferencesService.hideCompleted)
+                await preferencesService.setHideCompleted(newValue)
             }
         } label: {
             HStack(spacing: 6) {
