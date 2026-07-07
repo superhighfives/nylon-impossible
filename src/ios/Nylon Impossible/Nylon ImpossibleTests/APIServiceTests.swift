@@ -120,6 +120,7 @@ struct APIServiceTests {
             dueDate: nil,
             priority: nil,
             recurrence: nil,
+            completedAt: nil,
             updatedAt: Date(timeIntervalSince1970: 1700000000),
             deleted: nil,
             urls: nil
@@ -131,6 +132,10 @@ struct APIServiceTests {
         // nil fields should not be present (or be null)
         #expect(json["id"] as? String == "abc-123")
         #expect(json["completed"] as? Bool == true)
+        // completedAt is always sent explicitly (null here) so the server can
+        // distinguish "clear it" from "leave alone" — see TodoChange.encode.
+        #expect(json.keys.contains("completedAt"))
+        #expect(json["completedAt"] is NSNull)
     }
 
     @Test("APIError has correct descriptions with URL context")

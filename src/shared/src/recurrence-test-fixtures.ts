@@ -73,3 +73,47 @@ export const recurrenceFixtures: RecurrenceFixture[] = [
     expected: "2026-03-22T09:00:00Z",
   },
 ];
+
+/**
+ * Parity fixtures for `previousDueDate` (the single-step undo of a completed
+ * repeat). Mirror the same rows in `RecurrenceTests.previousFixtures`.
+ */
+export interface PreviousRecurrenceFixture {
+  name: string;
+  frequency: RecurrenceFrequency;
+  from: string;
+  expected: string;
+}
+
+export const previousDueDateFixtures: PreviousRecurrenceFixture[] = [
+  {
+    name: "daily — steps back one day",
+    frequency: "daily",
+    from: "2026-03-22T09:00:00Z",
+    expected: "2026-03-21T09:00:00Z",
+  },
+  {
+    name: "weekly — steps back seven days",
+    frequency: "weekly",
+    from: "2026-03-25T09:00:00Z",
+    expected: "2026-03-18T09:00:00Z",
+  },
+  {
+    name: "monthly — steps back one month",
+    frequency: "monthly",
+    from: "2026-04-15T09:00:00Z",
+    expected: "2026-03-15T09:00:00Z",
+  },
+  {
+    name: "monthly — clamps Mar 31 back to Feb 28 in a non-leap year",
+    frequency: "monthly",
+    from: "2027-03-31T09:00:00Z",
+    expected: "2027-02-28T09:00:00Z",
+  },
+  {
+    name: "yearly — steps back twelve months",
+    frequency: "yearly",
+    from: "2027-06-10T09:00:00Z",
+    expected: "2026-06-10T09:00:00Z",
+  },
+];

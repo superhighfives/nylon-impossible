@@ -21,6 +21,27 @@ enum RecurrenceHelper {
         return next
     }
 
+    /// Step a recurrence one occurrence backward from `from`. Used to undo a
+    /// repeat that was completed today (completing advances the dueDate, so
+    /// un-checking before local midnight rolls it back). Mirrors
+    /// `previousDueDate` in src/shared/src/recurrence.ts. Monthly/yearly clamp
+    /// is lossy in reverse, matching the forward advance.
+    static func previousDueDate(_ recurrence: Recurrence, from: Date) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
+        switch recurrence.frequency {
+        case .daily:
+            return calendar.date(byAdding: .day, value: -1, to: from)!
+        case .weekly:
+            return calendar.date(byAdding: .day, value: -7, to: from)!
+        case .monthly:
+            return addMonths(-1, to: from, calendar: calendar)
+        case .yearly:
+            return addMonths(-12, to: from, calendar: calendar)
+        }
+    }
+
     private static func advance(_ recurrence: Recurrence, from: Date) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         // Use UTC so day-of-month / day-of-week math matches the TS port,

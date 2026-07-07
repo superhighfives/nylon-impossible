@@ -15,9 +15,30 @@ struct ContentView: View {
     @Environment(UserPreferencesService.self) private var preferencesService
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @State private var viewModel = TodoViewModel()
+    // Bumped at each local midnight so repeats completed "today" derive back to
+    // active (isEffectivelyCompleted flips) without a refetch. Any @State write
+    // re-runs body, which recomputes the sorted/filtered lists.
+    @State private var midnightTick = 0
 
     private var sortedTodosList: [TodoItem] {
         viewModel.sortedTodos(from: todos)
+    }
+
+    /// Sleeps until just past the next local midnight, bumps `midnightTick`, and
+    /// repeats — so a completed repeat drops out of Completed on time.
+    private func scheduleMidnightTicks() async {
+        while !Task.isCancelled {
+            let now = Date()
+            guard let nextMidnight = Calendar.current.nextDate(
+                after: now,
+                matching: DateComponents(hour: 0, minute: 0, second: 0),
+                matchingPolicy: .nextTime
+            ) else { return }
+            let seconds = nextMidnight.timeIntervalSince(now) + 1
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            if Task.isCancelled { return }
+            midnightTick += 1
+        }
     }
 
     var body: some View {
@@ -73,11 +94,14 @@ struct ContentView: View {
         .refreshable {
             await syncService.sync()
         }
+        .task {
+            await scheduleMidnightTicks()
+        }
     }
 
     private var taskListView: some View {
-        let incomplete = sortedTodosList.filter { !$0.isCompleted }
-        let completed = sortedTodosList.filter { $0.isCompleted }
+        let incomplete = sortedTodosList.filter { !$0.isEffectivelyCompleted }
+        let completed = sortedTodosList.filter { $0.isEffectivelyCompleted }
 
         return List {
             Section {

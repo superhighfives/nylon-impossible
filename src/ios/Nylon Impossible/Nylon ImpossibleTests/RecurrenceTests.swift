@@ -73,8 +73,58 @@ struct RecurrenceTests {
 
         #expect(result == expected, "\(fixture.name)")
     }
+
+    /// Parity fixtures for `previousDueDate` — must stay in lockstep with
+    /// `previousDueDateFixtures` in src/shared/src/recurrence-test-fixtures.ts.
+    struct PreviousFixture {
+        let name: String
+        let frequency: RecurrenceFrequency
+        let from: String
+        let expected: String
+    }
+
+    static let previousFixtures: [PreviousFixture] = [
+        PreviousFixture(name: "daily — steps back one day",
+                        frequency: .daily,
+                        from: "2026-03-22T09:00:00Z",
+                        expected: "2026-03-21T09:00:00Z"),
+        PreviousFixture(name: "weekly — steps back seven days",
+                        frequency: .weekly,
+                        from: "2026-03-25T09:00:00Z",
+                        expected: "2026-03-18T09:00:00Z"),
+        PreviousFixture(name: "monthly — steps back one month",
+                        frequency: .monthly,
+                        from: "2026-04-15T09:00:00Z",
+                        expected: "2026-03-15T09:00:00Z"),
+        PreviousFixture(name: "monthly — clamps Mar 31 back to Feb 28 in a non-leap year",
+                        frequency: .monthly,
+                        from: "2027-03-31T09:00:00Z",
+                        expected: "2027-02-28T09:00:00Z"),
+        PreviousFixture(name: "yearly — steps back twelve months",
+                        frequency: .yearly,
+                        from: "2027-06-10T09:00:00Z",
+                        expected: "2026-06-10T09:00:00Z"),
+    ]
+
+    @Test("previousDueDate parity fixtures match TS implementation", arguments: previousFixtures)
+    func previousParityFixtures(fixture: PreviousFixture) throws {
+        let formatter = ISO8601DateFormatter()
+        let from = try #require(formatter.date(from: fixture.from))
+        let expected = try #require(formatter.date(from: fixture.expected))
+
+        let result = RecurrenceHelper.previousDueDate(
+            Recurrence(frequency: fixture.frequency),
+            from: from
+        )
+
+        #expect(result == expected, "\(fixture.name)")
+    }
 }
 
 extension RecurrenceTests.Fixture: CustomStringConvertible {
+    var description: String { name }
+}
+
+extension RecurrenceTests.PreviousFixture: CustomStringConvertible {
     var description: String { name }
 }

@@ -35,6 +35,9 @@ const updateTodoSchema = z.object({
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["high", "low"]).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
+  // Client-set only to undo a completed repeat (cleared to null). Normal
+  // completions are stamped server-side.
+  completedAt: z.coerce.date().nullable().optional(),
   updatedAt: z.coerce.date().optional(),
 });
 
@@ -46,6 +49,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
+    completedAt: todo.completedAt?.toISOString() ?? null,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
@@ -226,6 +230,10 @@ export async function updateTodo(c: Context<Env>) {
     updates.priority = parsed.data.priority;
   if (parsed.data.recurrence !== undefined)
     updates.recurrence = parsed.data.recurrence;
+  // completedAt is client-set only to undo a completed repeat (null); a normal
+  // completion stamps it server-side just below.
+  if (parsed.data.completedAt !== undefined)
+    updates.completedAt = parsed.data.completedAt;
 
   // Server-canonical advance: when a recurring todo is being marked complete
   // for the first time, advance dueDate to the next future occurrence and keep
@@ -241,6 +249,7 @@ export async function updateTodo(c: Context<Env>) {
     parsed.data.dueDate !== undefined ? parsed.data.dueDate : existing.dueDate;
   if (completingRow && recurrence && anchor) {
     updates.completed = false;
+    updates.completedAt = new Date();
     updates.dueDate = nextDueDate(recurrence, anchor, new Date());
   }
 

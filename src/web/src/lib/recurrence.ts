@@ -1,4 +1,5 @@
 import type { SelectItem } from "@/components/ui/Select";
+import type { Recurrence } from "@/types/database";
 
 /** "1st", "2nd", "3rd", "14th" — used to label monthly recurrence anchors. */
 export function ordinal(n: number): string {
@@ -20,21 +21,50 @@ export function buildRecurrenceItems(
   anchor: Date | null,
   timeZone: string,
 ): SelectItem[] {
-  const weeklyLabel = anchor
+  return [
+    { value: "none", label: "None" },
+    { value: "daily", label: "Daily" },
+    { value: "weekly", label: weeklyRecurrenceLabel(anchor, timeZone) },
+    { value: "monthly", label: monthlyRecurrenceLabel(anchor, timeZone) },
+    { value: "yearly", label: "Yearly" },
+  ];
+}
+
+function weeklyRecurrenceLabel(anchor: Date | null, timeZone: string): string {
+  return anchor
     ? `Weekly on ${anchor.toLocaleDateString(undefined, { weekday: "long", timeZone })}`
     : "Weekly";
-  const monthlyLabel = anchor
+}
+
+function monthlyRecurrenceLabel(anchor: Date | null, timeZone: string): string {
+  return anchor
     ? `Monthly on the ${ordinal(
         Number(
           anchor.toLocaleDateString("en-US", { day: "numeric", timeZone }),
         ),
       )}`
     : "Monthly";
-  return [
-    { value: "none", label: "None" },
-    { value: "daily", label: "Daily" },
-    { value: "weekly", label: weeklyLabel },
-    { value: "monthly", label: monthlyLabel },
-    { value: "yearly", label: "Yearly" },
-  ];
+}
+
+/**
+ * Human label for a recurrence rule, matching the "Repeat" dropdown wording
+ * ("Daily", "Weekly on Wednesday", "Monthly on the 1st", "Yearly"). `anchor`
+ * (the todo's due date) resolves the weekday / day-of-month; pass `timeZone`
+ * from `useHints()` so it doesn't shift a day when rendered on the server.
+ */
+export function recurrenceLabel(
+  recurrence: Recurrence,
+  anchor: Date | null,
+  timeZone: string,
+): string {
+  switch (recurrence.frequency) {
+    case "daily":
+      return "Daily";
+    case "weekly":
+      return weeklyRecurrenceLabel(anchor, timeZone);
+    case "monthly":
+      return monthlyRecurrenceLabel(anchor, timeZone);
+    case "yearly":
+      return "Yearly";
+  }
 }

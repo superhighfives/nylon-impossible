@@ -21,16 +21,21 @@ final class TodoViewModel {
         // Filter out soft-deleted items
         let activeTodos = todos.filter { !$0.isDeleted }
 
-        // Sort: incomplete first (by position asc), then completed (most recently completed first)
+        // Sort: incomplete first (by position asc), then completed (most recently
+        // completed first). "Effective" completion counts a repeat completed
+        // today as done so it sits in Completed until local midnight.
         return activeTodos.sorted { a, b in
-            if a.isCompleted != b.isCompleted {
-                return !a.isCompleted
+            let aDone = a.isEffectivelyCompleted
+            let bDone = b.isEffectivelyCompleted
+            if aDone != bDone {
+                return !aDone
             }
-            if !a.isCompleted {
+            if !aDone {
                 return a.position < b.position
             }
-            // Completed: most recently completed first
-            return a.updatedAt > b.updatedAt
+            // Completed: most recently completed first — completedAt for repeats,
+            // updatedAt for ordinary todos (which don't stamp completedAt).
+            return (a.completedAt ?? a.updatedAt) > (b.completedAt ?? b.updatedAt)
         }
     }
 
@@ -90,24 +95,39 @@ final class TodoViewModel {
     }
 
     func toggleTodo(_ todo: TodoItem, allTodos: [TodoItem]) {
+        // Undo a repeat sitting in Completed (completed today): clear the stamp
+        // and roll dueDate back one occurrence so it returns to active for today
+        // rather than snapping to the next occurrence. Must be checked before the
+        // completion branch below, which an effectively-completed repeat also
+        // matches. Mirrors the web undo path in TodoList.handleToggle.
+        if !todo.isCompleted,
+           todo.isEffectivelyCompleted,
+           let recurrence = todo.recurrence,
+           let anchor = todo.dueDate {
+            todo.dueDate = RecurrenceHelper.previousDueDate(recurrence, from: anchor)
+            todo.completedAt = nil
+            todo.markModified()
+            return
+        }
         // Optimistic recurrence advance: completing a repeating todo rolls its
-        // dueDate forward to the next future occurrence and keeps the
-        // completion flag clear, so it stays in the today view instead of
-        // flashing "done" and disappearing. Mirrors the server's canonical
-        // advance in updateTodo / syncTodos.
+        // dueDate forward to the next future occurrence, stamps completedAt, and
+        // keeps the completion flag clear, so it sits in Completed until local
+        // midnight instead of flashing "done" and disappearing. Mirrors the
+        // server's canonical advance in updateTodo / syncTodos.
         if !todo.isCompleted,
            let recurrence = todo.recurrence,
            let anchor = todo.dueDate {
             todo.dueDate = RecurrenceHelper.nextDueDate(
                 recurrence, from: anchor, now: Date()
             )
+            todo.completedAt = Date()
             todo.markModified()
             return
         }
         if todo.isCompleted {
             // Unchecking: move to end of incomplete list so it doesn't snap back to original position
             let incompleteTodos = allTodos
-                .filter { !$0.isDeleted && !$0.isCompleted && $0.id != todo.id }
+                .filter { !$0.isDeleted && !$0.isEffectivelyCompleted && $0.id != todo.id }
                 .sorted { $0.position < $1.position }
             todo.position = generateKeyBetween(incompleteTodos.last?.position, nil)
         }

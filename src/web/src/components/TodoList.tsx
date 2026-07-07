@@ -18,6 +18,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import {
   AlertCircle,
@@ -28,11 +29,13 @@ import {
   Inbox,
   MessageCircle,
   RefreshCw,
+  Repeat,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
 import { useImportReview } from "@/hooks/useImportReview";
+import { useLocalMidnightTick } from "@/hooks/useLocalMidnightTick";
 import {
   STALE_AI_MS,
   STALE_RESEARCH_MS,
@@ -41,7 +44,8 @@ import {
   useUpdateTodo,
 } from "@/hooks/useTodos";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
-import { formatDate } from "@/lib/date";
+import { formatDate, isEffectivelyCompleted } from "@/lib/date";
+import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
@@ -116,17 +120,23 @@ interface ExpandedSectionProps {
   deletePending: boolean;
 }
 
-/** Indicator badges for due date and priority */
+/** Indicator badges for due date, priority, and recurrence */
 function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   const { timeZone } = useHints();
   const hasDueDate = !!todo.dueDate;
   // Only show priority badge for explicit "high" or "low" values
   const hasPriority = todo.priority === "high" || todo.priority === "low";
+  const hasRecurrence = !!todo.recurrence;
 
-  if (!hasDueDate && !hasPriority) return null;
+  if (!hasDueDate && !hasPriority && !hasRecurrence) return null;
 
   const dueDate = todo.dueDate ? new Date(todo.dueDate) : null;
-  const isOverdue = dueDate && dueDate < new Date() && !todo.completed;
+  // A repeat sitting in Completed (completedAt today) has already rolled its
+  // dueDate forward, so it's never overdue; guard on effective completion too.
+  const isOverdue =
+    dueDate &&
+    dueDate < new Date() &&
+    !isEffectivelyCompleted(todo, timeZone, new Date());
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
@@ -153,6 +163,12 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
           {formatDate(dueDate, timeZone)}
         </span>
       )}
+      {todo.recurrence && (
+        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted">
+          <Repeat size={10} />
+          {recurrenceLabel(todo.recurrence, dueDate, timeZone)}
+        </span>
+      )}
     </div>
   );
 }
@@ -167,16 +183,20 @@ function TodoItemContent({
   deletePending,
   showActions = true,
 }: TodoItemProps & { showActions?: boolean }) {
+  const { timeZone } = useHints();
+  // A repeat completed today reads as done (checkbox, strike-through) until the
+  // user's local midnight, even though `completed` stays false in the DB.
+  const isCompleted = isEffectivelyCompleted(todo, timeZone, new Date());
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
         <Checkbox
-          checked={todo.completed}
-          onCheckedChange={() => onToggle(todo.id, todo.completed)}
+          checked={isCompleted}
+          onCheckedChange={() => onToggle(todo.id, isCompleted)}
           disabled={updatePending}
-          variant={todo.completed ? "subtle" : "default"}
+          variant={isCompleted ? "subtle" : "default"}
           aria-label={
-            todo.completed
+            isCompleted
               ? `Mark "${todo.title}" as not completed`
               : `Mark "${todo.title}" as completed`
           }
@@ -186,7 +206,7 @@ function TodoItemContent({
         <div className="flex items-center gap-2">
           <p
             className={`min-w-0 leading-snug wrap-anywhere ${
-              todo.completed
+              isCompleted
                 ? "text-xs line-through text-gray-muted"
                 : "text-sm text-gray"
             }`}
@@ -243,17 +263,15 @@ function TodoItemContent({
             const overflow = nonResearchUrls.length - 2;
             return (
               <div className="flex flex-col gap-1 mt-1.5">
-                {todo.completed
+                {isCompleted
                   ? null
                   : nonResearchUrls
                       .slice(0, 2)
                       .map((url) => <UrlCardCompact key={url.id} url={url} />)}
-                {(todo.completed
-                  ? nonResearchUrls.length > 0
-                  : overflow > 0) && (
+                {(isCompleted ? nonResearchUrls.length > 0 : overflow > 0) && (
                   <span className="text-xs text-gray-muted">
-                    +{todo.completed ? nonResearchUrls.length : overflow}{" "}
-                    {(todo.completed ? nonResearchUrls.length : overflow) === 1
+                    +{isCompleted ? nonResearchUrls.length : overflow}{" "}
+                    {(isCompleted ? nonResearchUrls.length : overflow) === 1
                       ? "link"
                       : "links"}
                   </span>
@@ -507,6 +525,10 @@ export function TodoList() {
   const { data: user } = useUser();
   const updateUser = useUpdateUser();
   const { highlightIds, hiddenIds } = useImportReview();
+  const { timeZone } = useHints();
+  // Re-render at each local midnight so completed repeats derive back to active
+  // (their completedAt is no longer "today") without needing a server round-trip.
+  useLocalMidnightTick();
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
@@ -543,8 +565,29 @@ export function TodoList() {
   }
 
   const handleToggle = (id: string, completed: boolean) => {
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) return;
     if (completed) {
-      // Unchecking: move to end of incomplete list so it doesn't snap back to original position
+      // Undo a repeat that's sitting in Completed (completed today): clear the
+      // stamp and roll dueDate back one occurrence so it returns to active for
+      // today, rather than snapping to the next occurrence.
+      if (
+        !todo.completed &&
+        todo.recurrence &&
+        todo.completedAt &&
+        todo.dueDate
+      ) {
+        updateTodo.mutate({
+          id,
+          input: {
+            completedAt: null,
+            dueDate: previousDueDate(todo.recurrence, new Date(todo.dueDate)),
+          },
+        });
+        return;
+      }
+      // Unchecking a normal todo: move to end of incomplete list so it doesn't
+      // snap back to its original position.
       const lastPosition =
         displayIncompleteTodos.length > 0
           ? displayIncompleteTodos[displayIncompleteTodos.length - 1].position
@@ -578,30 +621,41 @@ export function TodoList() {
       updateTodo.mutate({ id, input: updates });
     };
 
+  // "Effective" completion counts a repeat completed today as done, so it sits
+  // in Completed until the user's local midnight. Evaluated once per render; the
+  // midnight tick re-renders so it flips back to active on time.
+  const now = new Date();
+  const effectiveCompleted = (t: TodoWithUrls) =>
+    isEffectivelyCompleted(t, timeZone, now);
+
   // Sort: incomplete first (by position), then completed (most recently completed first)
   const sortedTodos = [...todos].sort((a, b) => {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1;
-    if (!a.completed) {
+    const aDone = effectiveCompleted(a);
+    const bDone = effectiveCompleted(b);
+    if (aDone !== bDone) return aDone ? 1 : -1;
+    if (!aDone) {
       const aPos = a.position ?? "a0";
       const bPos = b.position ?? "a0";
       if (aPos < bPos) return -1;
       if (aPos > bPos) return 1;
       return 0;
     }
-    const aUpdated = new Date(a.updatedAt).getTime();
-    const bUpdated = new Date(b.updatedAt).getTime();
+    // Most recently completed first — completedAt for repeats, updatedAt for
+    // ordinary todos (which don't stamp completedAt).
+    const aUpdated = new Date(a.completedAt ?? a.updatedAt).getTime();
+    const bUpdated = new Date(b.completedAt ?? b.updatedAt).getTime();
     return bUpdated - aUpdated;
   });
 
   // Imports under repeat-schedule review are held out of the list until the
   // user finishes, so they don't pop in behind the review modal.
   const incompleteTodos = sortedTodos.filter(
-    (t) => !t.completed && !hiddenIds.has(t.id),
+    (t) => !effectiveCompleted(t) && !hiddenIds.has(t.id),
   );
   // Imports under review are held out of the completed section too, so they
   // don't surface early and the accordion count stays accurate.
   const completedTodos = sortedTodos.filter(
-    (t) => t.completed && !hiddenIds.has(t.id),
+    (t) => effectiveCompleted(t) && !hiddenIds.has(t.id),
   );
   // The completed section collapses into an accordion; the collapsed/expanded
   // state is the synced `hideCompleted` preference (true = collapsed).
