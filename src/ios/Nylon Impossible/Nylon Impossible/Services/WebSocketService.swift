@@ -88,15 +88,34 @@ final class WebSocketService {
     }
 
     private func receiveLoop() {
-        task?.receive { [weak self] result in
+        guard let currentTask = task else { return }
+        currentTask.receive { [weak self] result in
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                // Ignore callbacks from a task we've already replaced (e.g. a
+                // reconnect started a new task before this stale result arrived),
+                // so we never clobber the live connection's state.
+                guard self.task === currentTask else { return }
 
                 switch result {
                 case .success(let message):
                     self.handleMessage(message)
                     self.receiveLoop()
                 case .failure(let error):
+                    // A cancelled receive is the expected result of us tearing
+                    // down the task (e.g. on backgrounding) or the OS suspending
+                    // the connection. It isn't a failure worth reporting, and the
+                    // scene-phase handler reconnects on foreground, so don't
+                    // schedule a redundant reconnect here. We still clear the
+                    // connection state, otherwise an OS/network cancellation that
+                    // didn't go through disconnect() would leave `task` non-nil
+                    // and block a future connect() (guard task == nil).
+                    if Self.isCancellation(error) {
+                        print("[WebSocket] Receive cancelled: \(error)")
+                        self.task = nil
+                        self.isConnected = false
+                        return
+                    }
                     SentrySDK.capture(error: error) { scope in
                         scope.setTag(value: "websocket", key: "area")
                         scope.setTag(value: "receive", key: "event")
@@ -120,6 +139,23 @@ final class WebSocketService {
         @unknown default:
             break
         }
+    }
+
+    private static func isCancellation(_ error: Error) -> Bool {
+        let nsError = error as NSError
+        if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+            return true
+        }
+        // POSIX ECANCELED (89) — surfaced when an in-flight receive is torn down.
+        if nsError.domain == NSPOSIXErrorDomain && nsError.code == ECANCELED {
+            return true
+        }
+        return nsError.domain == NSURLErrorDomain
+            && nsError.underlyingErrors.contains { underlying in
+                let underlyingNSError = underlying as NSError
+                return underlyingNSError.domain == NSPOSIXErrorDomain
+                    && underlyingNSError.code == ECANCELED
+            }
     }
 
     private func handleDisconnect() {
