@@ -48,7 +48,16 @@ final class AuthService: AuthProviding {
     var userEmail: String? {
         clerk.user?.primaryEmailAddress?.emailAddress
     }
-    
+
+    /// The signed-in user's avatar, mirroring the Clerk `UserButton` shown in
+    /// the web header. `nil` when there's no user or no image on the account.
+    var userImageURL: URL? {
+        guard let urlString = clerk.user?.imageUrl, !urlString.isEmpty else {
+            return nil
+        }
+        return URL(string: urlString)
+    }
+
     /// Get the current JWT token for API calls
     func getToken() async throws -> String {
         guard let token = try await clerk.auth.getToken() else {

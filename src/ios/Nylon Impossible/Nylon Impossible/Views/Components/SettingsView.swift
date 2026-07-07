@@ -131,6 +131,9 @@ struct SettingsView: View {
                     Text("System follows your device's light or dark setting.")
                 }
 
+                // Completed todos collapse via the bottom-of-list accordion
+                // (matching web), so there's no separate settings toggle here.
+
                 // AI is a paid feature, so the toggle only appears for pro users.
                 if preferencesService.isPro {
                     Section {

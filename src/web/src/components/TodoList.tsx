@@ -185,7 +185,7 @@ function TodoItemContent({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <p
-            className={`leading-snug break-words ${
+            className={`min-w-0 leading-snug wrap-anywhere ${
               todo.completed
                 ? "text-xs line-through text-gray-muted"
                 : "text-sm text-gray"
@@ -687,7 +687,13 @@ export function TodoList() {
             />
           ))}
         </SortableContext>
-        {completedTodos.length > 0 && (
+        {/* Hold the completed section until the synced `hideCompleted`
+            preference is known (i.e. `user` has loaded). Rendering before then
+            would default to expanded and flash the completed items open, then
+            collapse them once the preference arrives. Gating on `user` — rather
+            than just "not loading" — also covers the errored/signed-out cases
+            where the query settles without ever producing a preference. */}
+        {user && completedTodos.length > 0 && (
           <div className="mt-2 border-t border-gray-base pt-1">
             <button
               type="button"
