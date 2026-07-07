@@ -10,13 +10,30 @@ import Foundation
 final class UserPreferencesService {
     private let apiService: APIService
 
+    /// UserDefaults key for the locally-cached `hideCompleted` value. Reverse-DNS
+    /// prefixed to match the app's other persisted keys (e.g. SyncService's
+    /// `com.nylonimpossible.lastSyncedAt`) and avoid collisions.
+    private static let hideCompletedDefaultsKey = "com.nylonimpossible.hideCompleted"
+
     var aiEnabled: Bool = true
     var plan: String = "free"
     var location: String? = nil
     /// Appearance preference: "light" | "dark" | "system". Synced across devices.
     var theme: String = "system"
     /// When true, completed todos are hidden from the list. Synced across devices.
-    var hideCompleted: Bool = false
+    ///
+    /// Cached locally in UserDefaults and seeded from that cache so the first
+    /// render at launch already reflects the saved state. `fetchPreferences()`
+    /// runs only after the initial sync, so without this seed the list would
+    /// briefly show the default (expanded) state and then snap to the synced
+    /// value — the visible flash on cold start.
+    var hideCompleted: Bool = UserDefaults.standard.bool(
+        forKey: UserPreferencesService.hideCompletedDefaultsKey
+    ) {
+        didSet {
+            UserDefaults.standard.set(hideCompleted, forKey: Self.hideCompletedDefaultsKey)
+        }
+    }
     var isLoading: Bool = false
     var error: Error?
 
@@ -25,6 +42,15 @@ final class UserPreferencesService {
 
     init(apiService: APIService) {
         self.apiService = apiService
+    }
+
+    /// Clears locally-held preference state on sign out so a subsequent sign-in
+    /// with a different account doesn't briefly inherit the previous account's
+    /// cached `hideCompleted` (which would reintroduce the collapse-state flash
+    /// across account switches). `fetchPreferences()` re-populates it for the
+    /// new account. Resetting to `false` also write-throughs to the cache.
+    func resetLocalState() {
+        hideCompleted = false
     }
 
     func fetchPreferences() async {
