@@ -10,13 +10,28 @@ import Foundation
 final class UserPreferencesService {
     private let apiService: APIService
 
+    /// UserDefaults key for the locally-cached `hideCompleted` value.
+    private static let hideCompletedDefaultsKey = "hideCompletedPreference"
+
     var aiEnabled: Bool = true
     var plan: String = "free"
     var location: String? = nil
     /// Appearance preference: "light" | "dark" | "system". Synced across devices.
     var theme: String = "system"
     /// When true, completed todos are hidden from the list. Synced across devices.
-    var hideCompleted: Bool = false
+    ///
+    /// Cached locally in UserDefaults and seeded from that cache so the first
+    /// render at launch already reflects the saved state. `fetchPreferences()`
+    /// runs only after the initial sync, so without this seed the list would
+    /// briefly show the default (expanded) state and then snap to the synced
+    /// value — the visible flash on cold start.
+    var hideCompleted: Bool = UserDefaults.standard.bool(
+        forKey: UserPreferencesService.hideCompletedDefaultsKey
+    ) {
+        didSet {
+            UserDefaults.standard.set(hideCompleted, forKey: Self.hideCompletedDefaultsKey)
+        }
+    }
     var isLoading: Bool = false
     var error: Error?
 
