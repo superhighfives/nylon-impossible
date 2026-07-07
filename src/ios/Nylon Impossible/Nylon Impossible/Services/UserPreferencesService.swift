@@ -10,8 +10,10 @@ import Foundation
 final class UserPreferencesService {
     private let apiService: APIService
 
-    /// UserDefaults key for the locally-cached `hideCompleted` value.
-    private static let hideCompletedDefaultsKey = "hideCompletedPreference"
+    /// UserDefaults key for the locally-cached `hideCompleted` value. Reverse-DNS
+    /// prefixed to match the app's other persisted keys (e.g. SyncService's
+    /// `com.nylonimpossible.lastSyncedAt`) and avoid collisions.
+    private static let hideCompletedDefaultsKey = "com.nylonimpossible.hideCompleted"
 
     var aiEnabled: Bool = true
     var plan: String = "free"
@@ -40,6 +42,15 @@ final class UserPreferencesService {
 
     init(apiService: APIService) {
         self.apiService = apiService
+    }
+
+    /// Clears locally-held preference state on sign out so a subsequent sign-in
+    /// with a different account doesn't briefly inherit the previous account's
+    /// cached `hideCompleted` (which would reintroduce the collapse-state flash
+    /// across account switches). `fetchPreferences()` re-populates it for the
+    /// new account. Resetting to `false` also write-throughs to the cache.
+    func resetLocalState() {
+        hideCompleted = false
     }
 
     func fetchPreferences() async {

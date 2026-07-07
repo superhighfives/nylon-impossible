@@ -188,6 +188,8 @@ struct RootView: View {
                 SentrySDK.setUser(nil)
                 // Reset sync on sign out
                 syncService?.reset()
+                // Drop cached preference state so the next account doesn't inherit it
+                preferencesService?.resetLocalState()
                 hasTriggeredInitialSync = false
             }
         }
