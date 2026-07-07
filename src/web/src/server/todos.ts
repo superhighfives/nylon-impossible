@@ -197,7 +197,7 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
  * Create a new todo
  */
 export const createTodo = createServerFn({ method: "POST" })
-  .inputValidator((input: CreateTodoInput) => {
+  .validator((input: CreateTodoInput) => {
     const result = createTodoSchema.safeParse(input);
 
     if (!result.success) {
@@ -276,7 +276,7 @@ interface UpdateTodoParams {
  * Update an existing todo
  */
 export const updateTodo = createServerFn({ method: "POST" })
-  .inputValidator((data: UpdateTodoParams) => {
+  .validator((data: UpdateTodoParams) => {
     return {
       id: data.id,
       input: updateTodoSchema.parse(data.input),
@@ -304,7 +304,7 @@ export const updateTodo = createServerFn({ method: "POST" })
             }),
         });
         if (!existing) {
-          return yield* Effect.fail(new TodoNotFoundError({ id }));
+          return yield* new TodoNotFoundError({ id });
         }
 
         // Build update object dynamically
@@ -353,7 +353,7 @@ export const updateTodo = createServerFn({ method: "POST" })
         });
 
         if (!result) {
-          return yield* Effect.fail(new TodoNotFoundError({ id }));
+          return yield* new TodoNotFoundError({ id });
         }
 
         yield* Effect.log(`Updated todo ${id} for user ${user.id}`);
@@ -369,7 +369,7 @@ export const updateTodo = createServerFn({ method: "POST" })
  * Delete a todo
  */
 export const deleteTodo = createServerFn({ method: "POST" })
-  .inputValidator((id: string) => id)
+  .validator((id: string) => id)
   .handler(async (ctx) => {
     const id = ctx.data;
 
@@ -391,7 +391,7 @@ export const deleteTodo = createServerFn({ method: "POST" })
         });
 
         if (!existing || existing.userId !== user.id) {
-          return yield* Effect.fail(new TodoNotFoundError({ id }));
+          return yield* new TodoNotFoundError({ id });
         }
 
         // Delete the todo
