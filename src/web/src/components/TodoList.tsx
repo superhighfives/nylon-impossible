@@ -47,7 +47,7 @@ import { useUpdateUser, useUser } from "@/hooks/useUser";
 import { formatDate, isEffectivelyCompleted } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
-import type { TodoWithUrls } from "@/types/database";
+import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
 
@@ -568,22 +568,20 @@ export function TodoList() {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
     if (completed) {
-      // Undo a repeat that's sitting in Completed (completed today): clear the
-      // stamp and roll dueDate back one occurrence so it returns to active for
-      // today, rather than snapping to the next occurrence.
-      if (
-        !todo.completed &&
-        todo.recurrence &&
-        todo.completedAt &&
-        todo.dueDate
-      ) {
-        updateTodo.mutate({
-          id,
-          input: {
-            completedAt: null,
-            dueDate: previousDueDate(todo.recurrence, new Date(todo.dueDate)),
-          },
-        });
+      // Undo a repeat that's checked via completedAt (stamped, not persistently
+      // done). Always clear the stamp so it can never stay stuck as completed —
+      // even if the recurrence or dueDate was since removed. When both are still
+      // present, also roll dueDate back one occurrence so it returns to today's
+      // occurrence rather than the next one.
+      if (!todo.completed && todo.completedAt) {
+        const input: UpdateTodoInput = { completedAt: null };
+        if (todo.recurrence && todo.dueDate) {
+          input.dueDate = previousDueDate(
+            todo.recurrence,
+            new Date(todo.dueDate),
+          );
+        }
+        updateTodo.mutate({ id, input });
         return;
       }
       // Unchecking a normal todo: move to end of incomplete list so it doesn't
@@ -622,10 +620,16 @@ export function TodoList() {
     };
 
   // "Effective" completion counts a repeat completed today as done, so it sits
-  // in Completed until the user's local midnight. Evaluated once per render; the
-  // midnight tick re-renders so it flips back to active on time.
+  // in Completed until the user's local midnight. The midnight tick re-renders
+  // so it flips back to active on time. Computed once per todo into a map here —
+  // the sort comparator and the two filters below would otherwise re-run the
+  // (Intl-formatting) derivation many times per render.
   const now = new Date();
+  const effectiveCompletedById = new Map(
+    todos.map((t) => [t.id, isEffectivelyCompleted(t, timeZone, now)]),
+  );
   const effectiveCompleted = (t: TodoWithUrls) =>
+    effectiveCompletedById.get(t.id) ??
     isEffectivelyCompleted(t, timeZone, now);
 
   // Sort: incomplete first (by position), then completed (most recently completed first)
