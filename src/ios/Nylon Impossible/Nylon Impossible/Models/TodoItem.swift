@@ -43,6 +43,11 @@ final class TodoItem {
     var title: String
     var itemNotes: String?  // Optional notes
     var isCompleted: Bool
+    // When a repeating todo is "completed" its dueDate rolls forward instead of
+    // persisting as done; this stamps when it was checked so it stays in the
+    // Completed section until local midnight, then derives back to active. Nil
+    // for todos never completed as a repeat.
+    var completedAt: Date?
     var createdAt: Date
     var updatedAt: Date           // For sync conflict resolution
     var isSynced: Bool            // Whether this item has been synced to server
@@ -69,6 +74,7 @@ final class TodoItem {
         self.title = title
         self.itemNotes = nil
         self.isCompleted = false
+        self.completedAt = nil
         self.position = position
         self.createdAt = Date()
         self.updatedAt = Date()
@@ -117,9 +123,18 @@ final class TodoItem {
         }
     }
     
+    /// A repeat completed today reads as done until the user's local midnight,
+    /// even though `isCompleted` stays false (its dueDate rolled forward). Uses
+    /// the device's local calendar so it flips at the user's midnight.
+    var isEffectivelyCompleted: Bool {
+        if isCompleted { return true }
+        guard let completedAt else { return false }
+        return Calendar.current.isDateInToday(completedAt)
+    }
+
     /// Check if todo is overdue
     var isOverdue: Bool {
-        guard let dueDate = dueDate, !isCompleted else { return false }
+        guard let dueDate = dueDate, !isEffectivelyCompleted else { return false }
         return dueDate < Date()
     }
     

@@ -101,6 +101,7 @@ export function useCreateTodo() {
         title: input.title,
         notes: input.notes ?? null,
         completed: false,
+        completedAt: null,
         position: "a0", // placeholder — replaced when onSettled invalidates
         dueDate: input.dueDate?.toISOString() ?? null,
         priority: input.priority ?? null,
@@ -191,15 +192,19 @@ export function useUpdateTodo() {
               ...(input.recurrence !== undefined && {
                 recurrence: input.recurrence,
               }),
+              ...(input.completedAt !== undefined && {
+                completedAt: input.completedAt?.toISOString() ?? null,
+              }),
             };
             // Optimistic recurrence advance: if this update marks a recurring
-            // todo complete, roll dueDate forward and keep completed = false
-            // so the UI doesn't flash "done" and disappear from the today view.
+            // todo complete, roll dueDate forward, keep completed = false, and
+            // stamp completedAt so it shows in Completed until local midnight.
             // Mirrors the server's canonical advance in updateTodo / syncTodos.
             const becameComplete = input.completed === true && !todo.completed;
             const anchor = merged.dueDate ? new Date(merged.dueDate) : null;
             if (becameComplete && merged.recurrence && anchor) {
               merged.completed = false;
+              merged.completedAt = new Date().toISOString();
               merged.dueDate = nextDueDate(
                 merged.recurrence,
                 anchor,

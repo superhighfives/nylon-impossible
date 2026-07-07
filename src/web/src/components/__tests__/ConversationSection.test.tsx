@@ -31,6 +31,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     title: "Book a flight",
     notes: null,
     completed: false,
+    completedAt: null,
     position: "a0",
     dueDate: null,
     priority: null,

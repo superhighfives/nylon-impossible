@@ -22,6 +22,32 @@ export function nextDueDate(
   return next;
 }
 
+/**
+ * Step a recurrence one occurrence backward from `from`. Used to undo a repeat
+ * that was completed today: completing advances the dueDate, so un-checking it
+ * before local midnight rolls it back to the occurrence that was current when
+ * it was checked.
+ *
+ * Like the forward advance, monthly/yearly day-of-month clamping is lossy in
+ * reverse (e.g. Feb 28 → Jan 28, not Jan 31); this matches the forward
+ * behavior and is acceptable for a single-step undo. Mirrored in the Swift port.
+ */
+export function previousDueDate(recurrence: Recurrence, from: Date): Date {
+  const prev = new Date(from.getTime());
+  switch (recurrence.frequency) {
+    case "daily":
+      prev.setUTCDate(prev.getUTCDate() - 1);
+      return prev;
+    case "weekly":
+      prev.setUTCDate(prev.getUTCDate() - 7);
+      return prev;
+    case "monthly":
+      return addMonths(from, -1);
+    case "yearly":
+      return addMonths(from, -12);
+  }
+}
+
 function advance(recurrence: Recurrence, from: Date): Date {
   const next = new Date(from.getTime());
   switch (recurrence.frequency) {

@@ -20,4 +20,7 @@ export const updateTodoSchema = z.object({
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["high", "low"]).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
+  // Only sent to undo a completed repeat (cleared to null). Normal completions
+  // are stamped server-side, not by the client.
+  completedAt: z.coerce.date().nullable().optional(),
 });

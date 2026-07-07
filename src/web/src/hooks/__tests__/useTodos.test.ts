@@ -56,6 +56,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     title: "Buy milk",
     notes: null,
     completed: false,
+    completedAt: null,
     position: "a0",
     dueDate: null,
     priority: null,

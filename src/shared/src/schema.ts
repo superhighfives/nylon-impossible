@@ -23,7 +23,9 @@ export const users = sqliteTable(
     aiEnabled: integer("ai_enabled", { mode: "boolean" })
       .notNull()
       .default(true),
-    plan: text("plan", { enum: ["free", "pro"] }).notNull().default("free"),
+    plan: text("plan", { enum: ["free", "pro"] })
+      .notNull()
+      .default("free"),
     location: text("location"), // Used to bias location research queries
     // Appearance preference, synced across devices. "system" follows the OS.
     theme: text("theme", { enum: ["light", "dark", "system"] })
@@ -60,6 +62,12 @@ export const todos = sqliteTable(
     completed: integer("completed", { mode: "boolean" })
       .notNull()
       .default(false),
+    // When a repeating todo is "completed" it isn't persisted as done (the
+    // dueDate rolls forward instead); this records the moment it was checked so
+    // the UI can show it in the Completed section until the user's local
+    // midnight, after which it derives back to active. Null for todos that have
+    // never been completed-as-a-repeat.
+    completedAt: integer("completed_at", { mode: "timestamp" }),
     position: text("position").notNull().default("a0"),
     notes: text("notes"),
     dueDate: integer("due_date", { mode: "timestamp" }),

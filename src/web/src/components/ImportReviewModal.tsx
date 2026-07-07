@@ -94,6 +94,7 @@ export function ImportReviewModal() {
       title: review.title,
       notes: null,
       completed: false,
+      completedAt: null,
       position: "",
       dueDate: review.dueDate,
       priority: null,

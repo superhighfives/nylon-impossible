@@ -45,6 +45,10 @@ const syncRequestSchema = z.object({
       dueDate: z.coerce.date().nullable().optional(),
       priority: z.enum(["high", "low"]).nullable().optional(),
       recurrence: recurrenceSchema.nullable().optional(),
+      // When a repeat is completed, the client advances dueDate and sends the
+      // completion timestamp here (completed stays false). Cleared to null to
+      // undo before local midnight.
+      completedAt: z.coerce.date().nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
       urls: z
@@ -121,6 +125,7 @@ function serializeTodo(
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
+    completedAt: todo.completedAt?.toISOString() ?? null,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
@@ -287,8 +292,16 @@ export async function syncTodos(c: Context<Env>) {
           change.completed === true && existing.completed === false;
         let dueDateToWrite = nextDueDateValue;
         let completedToWrite = change.completed ?? existing.completed;
-        // Recurring todo being marked complete: advance the anchor and clear
-        // the completion flag. Mirrors the optimistic client advance.
+        // completedAt tracks a repeat's "done until local midnight" state. The
+        // client (iOS) stamps it itself when it advances the anchor locally; the
+        // server also stamps it on the completed=true path web uses.
+        let completedAtToWrite =
+          change.completedAt !== undefined
+            ? change.completedAt
+            : existing.completedAt;
+        // Recurring todo being marked complete: advance the anchor, keep the
+        // completion flag clear, and stamp completedAt. Mirrors the optimistic
+        // client advance.
         if (completing && nextRecurrence && nextDueDateValue) {
           dueDateToWrite = nextDueDate(
             nextRecurrence,
@@ -296,6 +309,7 @@ export async function syncTodos(c: Context<Env>) {
             new Date(),
           );
           completedToWrite = false;
+          completedAtToWrite = new Date();
         }
         await db
           .update(todos)
@@ -303,6 +317,7 @@ export async function syncTodos(c: Context<Env>) {
             title: change.title ? truncateTitle(change.title) : existing.title,
             notes: change.notes !== undefined ? change.notes : existing.notes,
             completed: completedToWrite,
+            completedAt: completedAtToWrite,
             position: change.position ?? existing.position,
             dueDate: dueDateToWrite,
             priority:
@@ -345,6 +360,7 @@ export async function syncTodos(c: Context<Env>) {
           title: truncateTitle(change.title),
           notes: change.notes ?? null,
           completed: change.completed ?? false,
+          completedAt: change.completedAt ?? null,
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
           priority: change.priority ?? null,

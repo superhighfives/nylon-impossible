@@ -27,6 +27,9 @@ export interface UpdateTodoInput {
   dueDate?: Date | null;
   priority?: "high" | "low" | null;
   recurrence?: Recurrence | null;
+  // Set explicitly only to undo a completed repeat (clear it to null). On a
+  // normal completion the server stamps this itself.
+  completedAt?: Date | null;
 }
 
 /** Fetch status for URL metadata */
@@ -86,6 +89,7 @@ export interface TodoWithUrls {
   title: string;
   notes: string | null;
   completed: boolean;
+  completedAt: string | null;
   position: string;
   dueDate: string | null;
   priority: "high" | "low" | null;

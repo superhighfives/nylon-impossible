@@ -21,12 +21,12 @@ struct TodoItemRow: View {
         urls.filter { $0.researchId == nil }
     }
 
-    /// Priority + due-date pills shown under the title, mirroring the web
-    /// `TodoIndicators` row. Only explicit priorities render a badge.
+    /// Priority + due-date + recurrence pills shown under the title, mirroring
+    /// the web `TodoIndicators` row. Only explicit priorities render a badge.
     @ViewBuilder
     private var indicatorBadges: some View {
         let priority = todo.todoPriority
-        if priority != nil || todo.dueDate != nil {
+        if priority != nil || todo.dueDate != nil || todo.recurrence != nil {
             HStack(spacing: 6) {
                 if let priority {
                     badge(
@@ -44,8 +44,51 @@ struct TodoItemRow: View {
                         systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
                     )
                 }
+
+                if let recurrenceText = recurrenceBadgeText {
+                    badge(
+                        recurrenceText,
+                        foreground: Color.appSubtle,
+                        background: Color.appTint,
+                        systemImage: "arrow.triangle.2.circlepath"
+                    )
+                }
             }
             .padding(.top, 2)
+        }
+    }
+
+    /// Human label for the recurrence rule ("Daily", "Weekly on Wednesday",
+    /// "Monthly on the 1st", "Yearly"), anchored on the due date and using the
+    /// device locale/timezone. Mirrors `recurrenceLabel` on web.
+    private var recurrenceBadgeText: String? {
+        guard let recurrence = todo.recurrence else { return nil }
+        switch recurrence.frequency {
+        case .daily:
+            return "Daily"
+        case .weekly:
+            guard let due = todo.dueDate else { return "Weekly" }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "EEEE"
+            return "Weekly on \(formatter.string(from: due))"
+        case .monthly:
+            guard let due = todo.dueDate else { return "Monthly" }
+            let day = Calendar.current.component(.day, from: due)
+            return "Monthly on the \(ordinal(day))"
+        case .yearly:
+            return "Yearly"
+        }
+    }
+
+    /// "1st", "2nd", "3rd", "14th" — matches web's `ordinal`.
+    private func ordinal(_ n: Int) -> String {
+        let mod100 = n % 100
+        if (11...13).contains(mod100) { return "\(n)th" }
+        switch n % 10 {
+        case 1: return "\(n)st"
+        case 2: return "\(n)nd"
+        case 3: return "\(n)rd"
+        default: return "\(n)th"
         }
     }
 
@@ -92,12 +135,12 @@ struct TodoItemRow: View {
                 ZStack {
                     Circle()
                         .stroke(
-                            todo.isCompleted ? Color.clear : Color.appLine,
+                            todo.isEffectivelyCompleted ? Color.clear : Color.appLine,
                             lineWidth: 2.5
                         )
                         .frame(width: 28, height: 28)
 
-                    if todo.isCompleted {
+                    if todo.isEffectivelyCompleted {
                         Circle()
                             .fill(Color.appSubtle.opacity(0.4))
                             .frame(width: 28, height: 28)
@@ -120,10 +163,10 @@ struct TodoItemRow: View {
                     // badge below the title (see indicators row), matching web.
                     HStack(spacing: 6) {
                         Text(todo.title)
-                            .font(.system(size: todo.isCompleted ? 13 : 16))
-                            .foregroundStyle(todo.isCompleted ? Color.appSubtle : Color.appDefault)
-                            .strikethrough(todo.isCompleted, color: Color.appSubtle)
-                            .animation(.easeInOut(duration: 0.2), value: todo.isCompleted)
+                            .font(.system(size: todo.isEffectivelyCompleted ? 13 : 16))
+                            .foregroundStyle(todo.isEffectivelyCompleted ? Color.appSubtle : Color.appDefault)
+                            .strikethrough(todo.isEffectivelyCompleted, color: Color.appSubtle)
+                            .animation(.easeInOut(duration: 0.2), value: todo.isEffectivelyCompleted)
                         
                         // AI processing indicator
                         if todo.isAIProcessing {
@@ -159,7 +202,7 @@ struct TodoItemRow: View {
                     
                     // URL cards (compact) — hide research URLs, limit to 2 visible
                     if !nonResearchUrls.isEmpty {
-                        if todo.isCompleted {
+                        if todo.isEffectivelyCompleted {
                             Text("+\(nonResearchUrls.count) \(nonResearchUrls.count == 1 ? "link" : "links")")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color.appSubtle)
@@ -189,7 +232,7 @@ struct TodoItemRow: View {
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
         .glassEffect(.regular, in: .rect(cornerRadius: 14))
-        .opacity(todo.isCompleted ? 0.7 : 1.0)
+        .opacity(todo.isEffectivelyCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
         .contextMenu {
             ShareLink(item: shareText(for: todo, urls: urls))

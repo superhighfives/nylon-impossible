@@ -82,6 +82,7 @@ function serializeTodoWithUrls(
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
+    completedAt: todo.completedAt?.toISOString() ?? null,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     priority: todo.priority,
@@ -321,6 +322,10 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.priority = validated.priority;
         if (validated.recurrence !== undefined)
           updates.recurrence = validated.recurrence;
+        // completedAt is client-set only to undo a completed repeat (null); a
+        // normal completion stamps it server-side just below.
+        if (validated.completedAt !== undefined)
+          updates.completedAt = validated.completedAt;
 
         const becameComplete =
           validated.completed === true && existing.completed === false;
@@ -332,8 +337,11 @@ export const updateTodo = createServerFn({ method: "POST" })
           validated.dueDate !== undefined
             ? validated.dueDate
             : existing.dueDate;
+        // Completing a repeat doesn't persist as done: roll dueDate forward and
+        // stamp completedAt so the UI keeps it in Completed until local midnight.
         if (becameComplete && recurrence && anchor) {
           updates.completed = false;
+          updates.completedAt = new Date();
           updates.dueDate = nextDueDate(recurrence, anchor, new Date());
         }
 
