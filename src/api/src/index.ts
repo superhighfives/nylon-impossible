@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/cloudflare";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
 import {
   deleteUserAsAdmin,
   getUser,
@@ -110,6 +111,22 @@ app.get("/admin/users", listUsers);
 app.get("/admin/users/:id", getUser);
 app.patch("/admin/users/:id", updateUser);
 app.delete("/admin/users/:id", deleteUserAsAdmin);
+
+// Catch-all for unhandled throws in route handlers. Hono's default onError
+// swallows these into a bare 500 that never reaches Sentry (withSentry only
+// wraps the outer fetch handler), so route bugs stay invisible — capture them
+// here and return the structured error envelope clients expect.
+app.onError((err, c) => {
+  // Intentional HTTP exceptions carry their own status/response — pass them
+  // through untouched rather than reporting them as server errors.
+  if (err instanceof HTTPException) {
+    return err.getResponse();
+  }
+  Sentry.captureException(err, {
+    tags: { area: "api", path: c.req.path, method: c.req.method },
+  });
+  return apiError(c, "internal_error");
+});
 
 const handler: ExportedHandler<Env["Bindings"], ResearchJobMessage> = {
   fetch: app.fetch,

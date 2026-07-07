@@ -20,9 +20,18 @@ interface GoogleTask {
   position?: string;
 }
 
-// D1 caps bound parameters per statement (~100); each row binds ~10, so insert
-// in small chunks to stay under the limit.
-const INSERT_CHUNK_SIZE = 10;
+// D1 caps bound parameters at 100 per statement. Each inserted row binds 11
+// columns (id, userId, title, notes, completed, position, dueDate,
+// googleTaskId, aiStatus, createdAt, updatedAt), so cap the chunk at 9 rows
+// (99 params) to stay under the limit. A full chunk of 10 would bind 110 and
+// throw a D1_ERROR mid-import.
+const TODO_INSERT_COLUMNS = 11;
+const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 9
+
+// todoUrls rows bind 7 columns each; chunk under D1's 100-param cap the same
+// way as todos so a link-heavy import can't overflow a single insert.
+const TODO_URL_INSERT_COLUMNS = 7;
+const URL_INSERT_CHUNK_SIZE = Math.floor(100 / TODO_URL_INSERT_COLUMNS); // 14
 
 /**
  * Fetch all incomplete tasks from the user's default Google Tasks list
@@ -258,7 +267,11 @@ async function fetchImportedUrlMetadata(
     updatedAt: now,
   }));
 
-  await db.insert(todoUrls).values(records);
+  for (let i = 0; i < records.length; i += URL_INSERT_CHUNK_SIZE) {
+    await db
+      .insert(todoUrls)
+      .values(records.slice(i, i + URL_INSERT_CHUNK_SIZE));
+  }
 
   await Promise.allSettled(
     records.map(async (record) => {
