@@ -276,10 +276,10 @@ function TodoItemContent({
             </Button>
           )}
         </div>
-        {isCompleted && todo.recurrence && todo.completedAt && (
+        {isCompleted && (
           <p className="text-xs text-gray-muted mt-0.5">
             Completed:{" "}
-            {formatDate(todo.completedAt, timeZone, {
+            {formatDate(todo.completedAt ?? todo.updatedAt, timeZone, {
               weekday: "short",
               day: "numeric",
               month: "short",

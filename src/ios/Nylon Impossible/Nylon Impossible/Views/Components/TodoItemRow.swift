@@ -259,11 +259,11 @@ struct TodoItemRow: View {
                         }
                     }
                     
-                    // Completion date for a completed repeat, pairing with the
-                    // "Next: …" pill below. Matches web.
-                    if todo.isEffectivelyCompleted, todo.recurrence != nil,
-                        let completedAt = todo.completedAt {
-                        Text("Completed: \(completedDateText(completedAt))")
+                    // Completion date for any completed todo. Repeats stamp
+                    // completedAt; normal/legacy todos fall back to updatedAt
+                    // (≈ completion time). Matches web.
+                    if todo.isEffectivelyCompleted {
+                        Text("Completed: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.appSubtle)
                     }
