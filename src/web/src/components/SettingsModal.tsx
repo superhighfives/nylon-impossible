@@ -301,8 +301,11 @@ export function SettingsModal() {
                         Bring across open tasks from your Google Tasks “My
                         Tasks” list, with due dates and link research. Google
                         doesn't share repeat schedules, so we'll help you set
-                        those afterwards. Already-imported tasks are skipped, so
-                        it's safe to run again.
+                        those afterwards. We only import open tasks, so a
+                        repeating to-do you've already completed in Google today
+                        won't come across — re-import once its next occurrence
+                        is due. Already-imported tasks are skipped, so it's safe
+                        to run again.
                       </p>
                       <Button
                         variant="outline"
