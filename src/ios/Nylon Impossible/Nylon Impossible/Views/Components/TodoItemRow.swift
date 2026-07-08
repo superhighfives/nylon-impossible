@@ -26,6 +26,10 @@ struct TodoItemRow: View {
     @ViewBuilder
     private var indicatorBadges: some View {
         let priority = todo.todoPriority
+        // A completed repeat has already rolled its dueDate forward to the next
+        // occurrence, so show when it next comes back ("Next: Tomorrow") in
+        // place of the schedule label and due-date pills. Mirrors web.
+        let isCompletedRecurring = todo.isEffectivelyCompleted && todo.recurrence != nil
         if priority != nil || todo.dueDate != nil || todo.recurrence != nil {
             HStack(spacing: 6) {
                 if let priority {
@@ -36,26 +40,81 @@ struct TodoItemRow: View {
                     )
                 }
 
-                if let dueDate = todo.dueDate {
-                    badge(
-                        dueDate.formatted(date: .abbreviated, time: .omitted),
-                        foreground: todo.isOverdue ? Color.appDanger : Color.appSubtle,
-                        background: todo.isOverdue ? Color.appDanger.opacity(0.15) : Color.appTint,
-                        systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
-                    )
-                }
+                if isCompletedRecurring, let dueDate = todo.dueDate {
+                    nextBadge(relativeDay(dueDate))
+                } else {
+                    if let dueDate = todo.dueDate {
+                        badge(
+                            dueDate.formatted(date: .abbreviated, time: .omitted),
+                            foreground: todo.isOverdue ? Color.appDanger : Color.appSubtle,
+                            background: todo.isOverdue ? Color.appDanger.opacity(0.15) : Color.appTint,
+                            systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
+                        )
+                    }
 
-                if let recurrenceText = recurrenceBadgeText {
-                    badge(
-                        recurrenceText,
-                        foreground: Color.appSubtle,
-                        background: Color.appTint,
-                        systemImage: "arrow.triangle.2.circlepath"
-                    )
+                    if let recurrenceText = recurrenceBadgeText {
+                        badge(
+                            recurrenceText,
+                            foreground: Color.appSubtle,
+                            background: Color.appTint,
+                            systemImage: "arrow.triangle.2.circlepath"
+                        )
+                    }
                 }
             }
             .padding(.top, 2)
         }
+    }
+
+    /// "Next: Tomorrow" pill — clock on the left, repeat glyph on the right,
+    /// outlined rather than filled — for a completed repeat's next occurrence.
+    @ViewBuilder
+    private func nextBadge(_ text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "clock")
+                .font(.system(size: 10))
+            Text("Next: \(text)")
+                .font(.system(size: 12))
+                .monospacedDigit()
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 10))
+        }
+        .foregroundStyle(Color.appSubtle)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.appLine, lineWidth: 1)
+        )
+    }
+
+    /// Relative calendar-day label: "Today", "Tomorrow", "Yesterday", a weekday
+    /// within the coming week, else an abbreviated date ("8 Jul"). Mirrors web's
+    /// `relativeDay`.
+    private func relativeDay(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Today" }
+        if cal.isDateInTomorrow(date) { return "Tomorrow" }
+        if cal.isDateInYesterday(date) { return "Yesterday" }
+        let days = cal.dateComponents(
+            [.day],
+            from: cal.startOfDay(for: Date()),
+            to: cal.startOfDay(for: date)
+        ).day ?? 0
+        let formatter = DateFormatter()
+        if days > 1 && days < 7 {
+            formatter.dateFormat = "EEEE"
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        }
+        return formatter.string(from: date)
+    }
+
+    /// "Wed 8 Jul" — completion date for the "Completed: …" line on repeats.
+    private func completedDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter.string(from: date)
     }
 
     /// Human label for the recurrence rule ("Daily", "Weekly on Wednesday",
@@ -200,6 +259,15 @@ struct TodoItemRow: View {
                         }
                     }
                     
+                    // Completion date for a completed repeat, pairing with the
+                    // "Next: …" pill below. Matches web.
+                    if todo.isEffectivelyCompleted, todo.recurrence != nil,
+                        let completedAt = todo.completedAt {
+                        Text("Completed: \(completedDateText(completedAt))")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appSubtle)
+                    }
+
                     // URL cards (compact) — hide research URLs, limit to 2 visible
                     if !nonResearchUrls.isEmpty {
                         if todo.isEffectivelyCompleted {
@@ -275,6 +343,19 @@ struct TodoItemRow: View {
                 todo: {
                     let item = TodoItem(title: "Complete project")
                     item.isCompleted = true
+                    return item
+                }(),
+                apiService: nil,
+                urls: [],
+                onToggle: {},
+                onSave: { _, _, _, _, _ in }
+            )
+            TodoItemRow(
+                todo: {
+                    let item = TodoItem(title: "Gym")
+                    item.recurrenceFrequency = "daily"
+                    item.completedAt = Date()
+                    item.dueDate = Date().addingTimeInterval(86400)
                     return item
                 }(),
                 apiService: nil,

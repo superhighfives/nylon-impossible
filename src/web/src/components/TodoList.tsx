@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Clock,
   GripVertical,
   Inbox,
   MessageCircle,
@@ -44,7 +45,7 @@ import {
   useUpdateTodo,
 } from "@/hooks/useTodos";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
-import { formatDate, isEffectivelyCompleted } from "@/lib/date";
+import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
@@ -123,6 +124,7 @@ interface ExpandedSectionProps {
 /** Indicator badges for due date, priority, and recurrence */
 function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   const { timeZone } = useHints();
+  const now = new Date();
   const hasDueDate = !!todo.dueDate;
   // Only show priority badge for explicit "high" or "low" values
   const hasPriority = todo.priority === "high" || todo.priority === "low";
@@ -131,12 +133,37 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   if (!hasDueDate && !hasPriority && !hasRecurrence) return null;
 
   const dueDate = todo.dueDate ? new Date(todo.dueDate) : null;
+  const isCompleted = isEffectivelyCompleted(todo, timeZone, now);
+
+  // A completed repeat has already rolled its dueDate forward to the next
+  // occurrence, so instead of the schedule label ("Weekly on Wednesday") show
+  // when it next comes back ("Next: Tomorrow").
+  if (isCompleted && hasRecurrence && dueDate) {
+    return (
+      <div className="flex items-center gap-1.5 mt-1">
+        {hasPriority && (
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded-md ${
+              todo.priority === "high"
+                ? "bg-yellow-base hover:bg-yellow-hover active:bg-yellow-active text-yellow-muted"
+                : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
+            }`}
+          >
+            {todo.priority === "high" ? "High" : "Low"}
+          </span>
+        )}
+        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted">
+          <Clock size={10} />
+          Next: {relativeDay(dueDate, timeZone, now)}
+          <Repeat size={10} />
+        </span>
+      </div>
+    );
+  }
+
   // A repeat sitting in Completed (completedAt today) has already rolled its
   // dueDate forward, so it's never overdue; guard on effective completion too.
-  const isOverdue =
-    dueDate &&
-    dueDate < new Date() &&
-    !isEffectivelyCompleted(todo, timeZone, new Date());
+  const isOverdue = dueDate && dueDate < now && !isCompleted;
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
@@ -249,6 +276,16 @@ function TodoItemContent({
             </Button>
           )}
         </div>
+        {isCompleted && todo.recurrence && todo.completedAt && (
+          <p className="text-xs text-gray-muted mt-0.5">
+            Completed:{" "}
+            {formatDate(todo.completedAt, timeZone, {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            })}
+          </p>
+        )}
         {!isExpanded &&
           todo.research?.status === "completed" &&
           todo.research.summary && (
