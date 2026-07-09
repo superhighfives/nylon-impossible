@@ -36,6 +36,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
 import { useImportReview } from "@/hooks/useImportReview";
@@ -281,7 +282,7 @@ function TodoItemContent({
                 : "text-sm text-gray"
             }`}
           >
-            {todo.title}
+            <LinkifiedText text={todo.title} />
           </p>
           {(todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
             Date.now() - new Date(todo.createdAt).getTime() < STALE_AI_MS && (
