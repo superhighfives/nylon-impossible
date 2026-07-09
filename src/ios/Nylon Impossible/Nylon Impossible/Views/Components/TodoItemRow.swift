@@ -66,6 +66,36 @@ struct TodoItemRow: View {
         }
     }
 
+    /// Outline badges summarizing a completed todo's content — notes, research,
+    /// links — in place of the full previews shown while it's active. Mirrors
+    /// web's `CompletedContentBadges`.
+    @ViewBuilder
+    private var completedContentBadges: some View {
+        let hasNotes = !(todo.itemNotes?
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            .isEmpty ?? true)
+        let hasResearch = todo.researchStatus == "completed"
+            && !(todo.researchSummary?.isEmpty ?? true)
+        let linkCount = nonResearchUrls.count
+        if hasNotes || hasResearch || linkCount > 0 {
+            FlowLayout(spacing: 6) {
+                if hasNotes {
+                    outlineBadge("Notes", systemImage: "doc.text")
+                }
+                if hasResearch {
+                    outlineBadge("Research", systemImage: "sparkles")
+                }
+                if linkCount > 0 {
+                    outlineBadge(
+                        "\(linkCount) \(linkCount == 1 ? "link" : "links")",
+                        systemImage: "link"
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
     /// "Next: Tomorrow" pill — clock on the left, repeat glyph on the right,
     /// outlined rather than filled — for a completed repeat's next occurrence.
     @ViewBuilder
@@ -78,6 +108,26 @@ struct TodoItemRow: View {
                 .monospacedDigit()
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.system(size: 10))
+        }
+        .foregroundStyle(Color.appSubtle)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.appLine, lineWidth: 1)
+        )
+    }
+
+    /// Single icon + label outline badge — the shared shape behind the completed
+    /// content badges.
+    @ViewBuilder
+    private func outlineBadge(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10))
+            Text(text)
+                .font(.system(size: 12))
+                .monospacedDigit()
         }
         .foregroundStyle(Color.appSubtle)
         .padding(.horizontal, 6)
@@ -259,33 +309,29 @@ struct TodoItemRow: View {
                         }
                     }
                     
-                    // Completion date for any completed todo. Repeats stamp
-                    // completedAt; normal/legacy todos fall back to updatedAt
-                    // (≈ completion time). Matches web.
                     if todo.isEffectivelyCompleted {
+                        // Completion date for any completed todo. Repeats stamp
+                        // completedAt; normal/legacy todos fall back to updatedAt
+                        // (≈ completion time). Matches web.
                         Text("Completed: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.appSubtle)
-                    }
 
-                    // URL cards (compact) — hide research URLs, limit to 2 visible
-                    if !nonResearchUrls.isEmpty {
-                        if todo.isEffectivelyCompleted {
-                            Text("+\(nonResearchUrls.count) \(nonResearchUrls.count == 1 ? "link" : "links")")
+                        // Full note/research/link previews collapse to compact
+                        // outline badges once done. Matches web.
+                        completedContentBadges
+                    } else if !nonResearchUrls.isEmpty {
+                        // URL cards (compact) — hide research URLs, limit to 2 visible
+                        FlowLayout(spacing: 6) {
+                            ForEach(Array(nonResearchUrls.prefix(2))) { url in
+                                UrlRowCompact(url: url)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if nonResearchUrls.count > 2 {
+                            Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color.appSubtle)
-                        } else {
-                            FlowLayout(spacing: 6) {
-                                ForEach(Array(nonResearchUrls.prefix(2))) { url in
-                                    UrlRowCompact(url: url)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            if nonResearchUrls.count > 2 {
-                                Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color.appSubtle)
-                            }
                         }
                     }
 
@@ -341,8 +387,12 @@ struct TodoItemRow: View {
             )
             TodoItemRow(
                 todo: {
-                    let item = TodoItem(title: "Complete project")
+                    let item = TodoItem(title: "Research dogs")
                     item.isCompleted = true
+                    item.priority = "high"
+                    item.researchStatus = "completed"
+                    item.researchSummary = "Domestic dogs evolved from wolves…"
+                    item.itemNotes = "Follow up on breed groups"
                     return item
                 }(),
                 apiService: nil,

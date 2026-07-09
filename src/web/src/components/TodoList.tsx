@@ -26,11 +26,14 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
+  FileText,
   GripVertical,
   Inbox,
+  Link2,
   MessageCircle,
   RefreshCw,
   Repeat,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
@@ -200,6 +203,46 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   );
 }
 
+/**
+ * Compact outline badges summarizing a completed todo's content — notes,
+ * research, links — in place of the full previews shown while it's active. Keeps
+ * the Completed section terse: a glance tells you what's inside, expand for more.
+ */
+function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
+  const hasNotes = !!todo.notes?.trim();
+  const hasResearch =
+    todo.research?.status === "completed" && !!todo.research.summary;
+  const linkCount = todo.urls?.filter((url) => !url.researchId).length ?? 0;
+
+  if (!hasNotes && !hasResearch && linkCount === 0) return null;
+
+  const badge =
+    "text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted";
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {hasNotes && (
+        <span className={badge}>
+          <FileText size={10} />
+          Notes
+        </span>
+      )}
+      {hasResearch && (
+        <span className={badge}>
+          <Sparkles size={10} />
+          Research
+        </span>
+      )}
+      {linkCount > 0 && (
+        <span className={badge}>
+          <Link2 size={10} />
+          {linkCount} {linkCount === 1 ? "link" : "links"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function TodoItemContent({
   todo,
   isExpanded,
@@ -286,36 +329,39 @@ function TodoItemContent({
             })}
           </p>
         )}
-        {!isExpanded &&
-          todo.research?.status === "completed" &&
-          todo.research.summary && (
-            <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
-              {todo.research.summary.replace(/\[\d+\]/g, "")}
-            </p>
-          )}
-        {todo.urls &&
-          (() => {
-            const nonResearchUrls = todo.urls.filter((url) => !url.researchId);
-            if (nonResearchUrls.length === 0) return null;
-            const overflow = nonResearchUrls.length - 2;
-            return (
-              <div className="flex flex-col gap-1 mt-1.5">
-                {isCompleted
-                  ? null
-                  : nonResearchUrls
-                      .slice(0, 2)
-                      .map((url) => <UrlCardCompact key={url.id} url={url} />)}
-                {(isCompleted ? nonResearchUrls.length > 0 : overflow > 0) && (
-                  <span className="text-xs text-gray-muted">
-                    +{isCompleted ? nonResearchUrls.length : overflow}{" "}
-                    {(isCompleted ? nonResearchUrls.length : overflow) === 1
-                      ? "link"
-                      : "links"}
-                  </span>
-                )}
-              </div>
-            );
-          })()}
+        {isCompleted ? (
+          <CompletedContentBadges todo={todo} />
+        ) : (
+          <>
+            {!isExpanded &&
+              todo.research?.status === "completed" &&
+              todo.research.summary && (
+                <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
+                  {todo.research.summary.replace(/\[\d+\]/g, "")}
+                </p>
+              )}
+            {todo.urls &&
+              (() => {
+                const nonResearchUrls = todo.urls.filter(
+                  (url) => !url.researchId,
+                );
+                if (nonResearchUrls.length === 0) return null;
+                const overflow = nonResearchUrls.length - 2;
+                return (
+                  <div className="flex flex-col gap-1 mt-1.5">
+                    {nonResearchUrls.slice(0, 2).map((url) => (
+                      <UrlCardCompact key={url.id} url={url} />
+                    ))}
+                    {overflow > 0 && (
+                      <span className="text-xs text-gray-muted">
+                        +{overflow} {overflow === 1 ? "link" : "links"}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+          </>
+        )}
         <TodoIndicators todo={todo} />
       </div>
       {/* Actions are hidden in the drag overlay clone so the lifted card
