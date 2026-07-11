@@ -4,7 +4,7 @@
 
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -262,7 +262,8 @@ export const createTodo = createServerFn({ method: "POST" })
                 completed: false,
                 dueDate: validated.dueDate ?? null,
                 priority: validated.priority ?? null,
-                recurrence: validated.recurrence ?? null,
+                // A subtask never recurs (recurrence is top-level only).
+                recurrence: parentId ? null : (validated.recurrence ?? null),
               })
               .returning(),
           catch: (error) =>
@@ -271,6 +272,30 @@ export const createTodo = createServerFn({ method: "POST" })
               cause: error,
             }),
         });
+
+        // Adding a subtask to a recurring parent clears the parent's recurrence
+        // (mutually exclusive; the explicit subtask wins). isNotNull means we
+        // only write when there's a recurrence to clear.
+        if (parentId) {
+          yield* Effect.tryPromise({
+            try: () =>
+              db
+                .update(todos)
+                .set({ recurrence: null })
+                .where(
+                  and(
+                    eq(todos.id, parentId),
+                    eq(todos.userId, user.id),
+                    isNotNull(todos.recurrence),
+                  ),
+                ),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "clearParentRecurrence",
+                cause: error,
+              }),
+          });
+        }
 
         yield* Effect.log(`Created todo ${newTodo.id} for user ${user.id}`);
 
@@ -333,19 +358,42 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.dueDate = validated.dueDate;
         if (validated.priority !== undefined)
           updates.priority = validated.priority;
-        if (validated.recurrence !== undefined)
-          updates.recurrence = validated.recurrence;
         // completedAt is client-set only to undo a completed repeat (null); a
         // normal completion stamps it server-side just below.
         if (validated.completedAt !== undefined)
           updates.completedAt = validated.completedAt;
 
-        const becameComplete =
-          validated.completed === true && existing.completed === false;
-        const recurrence =
+        // Recurrence and subtasks are mutually exclusive (server-side source of
+        // truth). A subtask never recurs, and a todo with children can't recur.
+        let recurrence =
           validated.recurrence !== undefined
             ? validated.recurrence
             : existing.recurrence;
+        if (recurrence) {
+          const isSubtask = existing.parentId != null;
+          const hasChildren = isSubtask
+            ? false
+            : !!(yield* Effect.tryPromise({
+                try: () =>
+                  db
+                    .select({ id: todos.id })
+                    .from(todos)
+                    .where(eq(todos.parentId, id))
+                    .limit(1)
+                    .get(),
+                catch: (error) =>
+                  new DatabaseError({
+                    operation: "checkSubtasks",
+                    cause: error,
+                  }),
+              }));
+          if (isSubtask || hasChildren) recurrence = null;
+        }
+        if (validated.recurrence !== undefined)
+          updates.recurrence = recurrence;
+
+        const becameComplete =
+          validated.completed === true && existing.completed === false;
         const anchor =
           validated.dueDate !== undefined
             ? validated.dueDate
@@ -375,6 +423,31 @@ export const updateTodo = createServerFn({ method: "POST" })
 
         if (!result) {
           return yield* new TodoNotFoundError({ id });
+        }
+
+        // Completion cascade: toggling a top-level todo's completed flag cascades
+        // to its subtasks (checking completes them; unchecking reopens them).
+        // Subtasks never recur, so completedAt stays null like ordinary
+        // completions ($onUpdate bumps updatedAt so they re-sync).
+        if (
+          existing.parentId == null &&
+          validated.completed !== undefined &&
+          validated.completed !== existing.completed
+        ) {
+          yield* Effect.tryPromise({
+            try: () =>
+              db
+                .update(todos)
+                .set({ completed: validated.completed })
+                .where(
+                  and(eq(todos.parentId, id), eq(todos.userId, user.id)),
+                ),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "cascadeSubtaskCompletion",
+                cause: error,
+              }),
+          });
         }
 
         yield* Effect.log(`Updated todo ${id} for user ${user.id}`);

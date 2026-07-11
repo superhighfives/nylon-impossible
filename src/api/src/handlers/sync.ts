@@ -10,6 +10,7 @@ import {
   getDb,
   gt,
   inArray,
+  isNotNull,
   lists,
   type Todo,
   type TodoMessage,
@@ -286,10 +287,25 @@ export async function syncTodos(c: Context<Env>) {
     } else if (existing) {
       // Update existing - last write wins
       if (change.updatedAt >= existing.updatedAt) {
-        const nextRecurrence =
+        let nextRecurrence =
           change.recurrence !== undefined
             ? change.recurrence
             : existing.recurrence;
+        // Recurrence and subtasks are mutually exclusive. A subtask never
+        // recurs, and a todo that has children can't recur. Enforce here so an
+        // old or direct client can't reach the illegal state.
+        if (nextRecurrence) {
+          if (existing.parentId) {
+            nextRecurrence = null;
+          } else {
+            const [child] = await db
+              .select({ id: todos.id })
+              .from(todos)
+              .where(eq(todos.parentId, normalizedId))
+              .limit(1);
+            if (child) nextRecurrence = null;
+          }
+        }
         const nextDueDateValue =
           change.dueDate !== undefined ? change.dueDate : existing.dueDate;
         const completing =
@@ -332,6 +348,20 @@ export async function syncTodos(c: Context<Env>) {
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
+        // Completion cascade: toggling a top-level todo's completed flag
+        // cascades to its subtasks (checking completes them; unchecking reopens
+        // them). Subtasks never recur, so completedAt stays null like ordinary
+        // completions. Bumping updatedAt makes children appear in the next pull.
+        if (
+          !existing.parentId &&
+          change.completed !== undefined &&
+          change.completed !== existing.completed
+        ) {
+          await db
+            .update(todos)
+            .set({ completed: change.completed, updatedAt: change.updatedAt })
+            .where(eq(todos.parentId, normalizedId));
+        }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
@@ -358,10 +388,11 @@ export async function syncTodos(c: Context<Env>) {
     } else {
       // Create new
       if (change.title) {
+        const parentId = change.parentId?.toLowerCase() ?? null;
         await db.insert(todos).values({
           id: normalizedId,
           userId,
-          parentId: change.parentId?.toLowerCase() ?? null,
+          parentId,
           title: truncateTitle(change.title),
           notes: change.notes ?? null,
           completed: change.completed ?? false,
@@ -369,10 +400,22 @@ export async function syncTodos(c: Context<Env>) {
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
           priority: change.priority ?? null,
-          recurrence: change.recurrence ?? null,
+          // A subtask never recurs (recurrence is top-level only).
+          recurrence: parentId ? null : (change.recurrence ?? null),
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });
+        // Adding a subtask to a recurring parent clears the parent's recurrence
+        // (mutually exclusive; the explicit subtask wins). The isNotNull guard
+        // means we only write — and bump updatedAt — when there's one to clear.
+        if (parentId) {
+          await db
+            .update(todos)
+            .set({ recurrence: null, updatedAt: change.updatedAt })
+            .where(
+              and(eq(todos.id, parentId), isNotNull(todos.recurrence)),
+            );
+        }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({
             todoId: normalizedId,

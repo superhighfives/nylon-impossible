@@ -6,6 +6,7 @@ import {
   eq,
   gt,
   inArray,
+  isNotNull,
   isNull,
   lt,
   sql,
@@ -41,4 +42,4 @@ export function getDb(d1: D1Database) {
   return drizzle(d1);
 }
 
-export { eq, and, gt, lt, sql, inArray, isNull, asc, count, desc };
+export { eq, and, gt, lt, sql, inArray, isNull, isNotNull, asc, count, desc };

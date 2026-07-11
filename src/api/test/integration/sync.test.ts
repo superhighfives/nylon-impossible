@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoUrls } from "../../src/lib/db";
+import { getDb, todos, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedMessage, seedTodo, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -605,5 +605,152 @@ describe("Sync endpoint", () => {
         "third",
       ]);
     });
+  });
+});
+
+describe("Sync — subtasks", () => {
+  const PARENT = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const CHILD_A = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const CHILD_B = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const future = new Date("2099-01-01T00:00:00Z").toISOString();
+
+  beforeEach(async () => {
+    await cleanDb();
+    mockVerifyToken.mockReset();
+    mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
+    await seedUser();
+  });
+
+  it("persists parentId on create and round-trips it in serialization", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent" });
+    const res = await syncRequest({
+      changes: [
+        {
+          id: CHILD_A,
+          parentId: PARENT,
+          title: "Child A",
+          position: "a0",
+          updatedAt: future,
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json<any>();
+    const child = body.todos.find((t: any) => t.id === CHILD_A);
+    expect(child.parentId).toBe(PARENT);
+  });
+
+  it("ignores parentId on update (immutable)", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent" });
+    await seedTodo(CHILD_A, "user_test_123", {
+      title: "Child A",
+      parentId: PARENT,
+    });
+    // Try to reparent CHILD_A to null via an update — should be ignored.
+    await syncRequest({
+      changes: [
+        { id: CHILD_A, parentId: null, title: "Renamed", updatedAt: future },
+      ],
+    });
+    const db = getDb(env.DB);
+    const [row] = await db.select().from(todos).where(eq(todos.id, CHILD_A));
+    expect(row.parentId).toBe(PARENT);
+    expect(row.title).toBe("Renamed");
+  });
+
+  it("cascades completion from parent to its subtasks", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent" });
+    await seedTodo(CHILD_A, "user_test_123", { parentId: PARENT });
+    await seedTodo(CHILD_B, "user_test_123", { parentId: PARENT });
+
+    await syncRequest({
+      changes: [{ id: PARENT, completed: true, updatedAt: future }],
+    });
+
+    const db = getDb(env.DB);
+    const rows = await db.select().from(todos);
+    for (const id of [PARENT, CHILD_A, CHILD_B]) {
+      expect(rows.find((r) => r.id === id)?.completed).toBe(true);
+    }
+  });
+
+  it("reopens subtasks when the parent is unchecked", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent", completed: true });
+    await seedTodo(CHILD_A, "user_test_123", {
+      parentId: PARENT,
+      completed: true,
+    });
+
+    await syncRequest({
+      changes: [{ id: PARENT, completed: false, updatedAt: future }],
+    });
+
+    const db = getDb(env.DB);
+    const [child] = await db.select().from(todos).where(eq(todos.id, CHILD_A));
+    expect(child.completed).toBe(false);
+  });
+
+  it("drops a recurrence set on a todo that has subtasks", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent" });
+    await seedTodo(CHILD_A, "user_test_123", { parentId: PARENT });
+
+    await syncRequest({
+      changes: [
+        {
+          id: PARENT,
+          recurrence: { frequency: "daily" },
+          dueDate: future,
+          updatedAt: future,
+        },
+      ],
+    });
+
+    const db = getDb(env.DB);
+    const [parent] = await db.select().from(todos).where(eq(todos.id, PARENT));
+    expect(parent.recurrence).toBeNull();
+  });
+
+  it("forces recurrence null on a newly created subtask", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent" });
+
+    await syncRequest({
+      changes: [
+        {
+          id: CHILD_A,
+          parentId: PARENT,
+          title: "Child A",
+          recurrence: { frequency: "weekly" },
+          dueDate: future,
+          updatedAt: future,
+        },
+      ],
+    });
+
+    const db = getDb(env.DB);
+    const [child] = await db.select().from(todos).where(eq(todos.id, CHILD_A));
+    expect(child.recurrence).toBeNull();
+  });
+
+  it("clears a recurring parent's recurrence when a subtask is added", async () => {
+    await seedTodo(PARENT, "user_test_123", {
+      title: "Parent",
+      recurrence: { frequency: "daily" },
+      dueDate: new Date(future),
+    });
+
+    await syncRequest({
+      changes: [
+        {
+          id: CHILD_A,
+          parentId: PARENT,
+          title: "Child A",
+          updatedAt: future,
+        },
+      ],
+    });
+
+    const db = getDb(env.DB);
+    const [parent] = await db.select().from(todos).where(eq(todos.id, PARENT));
+    expect(parent.recurrence).toBeNull();
   });
 });
