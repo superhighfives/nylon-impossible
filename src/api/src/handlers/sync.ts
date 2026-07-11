@@ -73,11 +73,12 @@ interface SyncConflict {
 function sortChangesForApply(
   changes: Array<(typeof syncRequestSchema)["_output"]["changes"][number]>,
 ) {
+  const getRank = (parentId: string | null | undefined) => (parentId ? 1 : 0);
   return changes
     .map((change, originalIndex) => ({ change, originalIndex }))
     .sort((a, b) => {
-      const aRank = a.change.parentId ? 1 : 0;
-      const bRank = b.change.parentId ? 1 : 0;
+      const aRank = getRank(a.change.parentId);
+      const bRank = getRank(b.change.parentId);
       return aRank === bRank
         ? a.originalIndex - b.originalIndex
         : aRank - bRank;
@@ -408,12 +409,12 @@ export async function syncTodos(c: Context<Env>) {
       if (change.title) {
         const parentId = change.parentId?.toLowerCase() ?? null;
         if (parentId) {
-          const [parent] = await db
+          const [parentTodo] = await db
             .select({ id: todos.id, parentId: todos.parentId })
             .from(todos)
             .where(and(eq(todos.id, parentId), eq(todos.userId, userId)))
             .limit(1);
-          if (!parent || parent.parentId !== null) {
+          if (!parentTodo || parentTodo.parentId !== null) {
             return apiError(c, "validation_failed", {
               message:
                 "parentId must reference one of the user's top-level todos",

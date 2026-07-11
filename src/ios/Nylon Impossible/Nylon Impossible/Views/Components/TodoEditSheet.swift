@@ -310,8 +310,8 @@ struct TodoEditSheet: View {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let notesValue = trimmedNotes.isEmpty ? nil : trimmedNotes
         let dueDateValue = hasDueDate ? dueDate : nil
-        let recurrenceValue: Recurrence? = (hasDueDate && recurrenceFrequency != nil && subtasks.isEmpty)
-            ? Recurrence(frequency: recurrenceFrequency!)
+        let recurrenceValue: Recurrence? = (hasDueDate && subtasks.isEmpty)
+            ? recurrenceFrequency.map { Recurrence(frequency: $0) }
             : nil
 
         onSave(trimmedTitle, notesValue, dueDateValue, priority, recurrenceValue)

@@ -220,7 +220,7 @@ export const createTodo = createServerFn({ method: "POST" })
       Effect.gen(function* () {
         const parentId = validated.parentId ?? null;
         if (parentId) {
-          const parent = yield* Effect.tryPromise({
+          const parentTodo = yield* Effect.tryPromise({
             try: () =>
               db
                 .select({ id: todos.id, parentId: todos.parentId })
@@ -234,7 +234,7 @@ export const createTodo = createServerFn({ method: "POST" })
                 cause: error,
               }),
           });
-          if (!parent || parent.parentId !== null) {
+          if (!parentTodo || parentTodo.parentId !== null) {
             return yield* new ValidationError({
               errors: [
                 {
