@@ -70,6 +70,20 @@ interface SyncConflict {
   remoteUpdatedAt: Date;
 }
 
+function sortChangesForApply(
+  changes: Array<(typeof syncRequestSchema)["_output"]["changes"][number]>,
+) {
+  return changes
+    .map((change, originalIndex) => ({ change, originalIndex }))
+    .sort((a, b) => {
+      const aRank = a.change.parentId ? 1 : 0;
+      const bRank = b.change.parentId ? 1 : 0;
+      return aRank === bRank
+        ? a.originalIndex - b.originalIndex
+        : aRank - bRank;
+    });
+}
+
 // Serialize a URL with explicit ISO8601 dates and lowercase IDs
 function serializeUrl(url: TodoUrl) {
   return {
@@ -260,7 +274,7 @@ export async function syncTodos(c: Context<Env>) {
 
   // 1. Apply client changes (with conflict resolution)
   // Normalize UUIDs to lowercase to match web-generated IDs
-  for (const change of changes) {
+  for (const { change, originalIndex } of sortChangesForApply(changes)) {
     const normalizedId = change.id.toLowerCase();
 
     const [existing] = await db
@@ -301,7 +315,9 @@ export async function syncTodos(c: Context<Env>) {
             const [child] = await db
               .select({ id: todos.id })
               .from(todos)
-              .where(eq(todos.parentId, normalizedId))
+              .where(
+                and(eq(todos.parentId, normalizedId), eq(todos.userId, userId)),
+              )
               .limit(1);
             if (child) nextRecurrence = null;
           }
@@ -360,7 +376,9 @@ export async function syncTodos(c: Context<Env>) {
           await db
             .update(todos)
             .set({ completed: change.completed, updatedAt: change.updatedAt })
-            .where(eq(todos.parentId, normalizedId));
+            .where(
+              and(eq(todos.parentId, normalizedId), eq(todos.userId, userId)),
+            );
         }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({
@@ -389,6 +407,26 @@ export async function syncTodos(c: Context<Env>) {
       // Create new
       if (change.title) {
         const parentId = change.parentId?.toLowerCase() ?? null;
+        if (parentId) {
+          const [parent] = await db
+            .select({ id: todos.id, parentId: todos.parentId })
+            .from(todos)
+            .where(and(eq(todos.id, parentId), eq(todos.userId, userId)))
+            .limit(1);
+          if (!parent || parent.parentId) {
+            return apiError(c, "validation_failed", {
+              message:
+                "parentId must reference one of the user's top-level todos",
+              details: [
+                {
+                  path: ["changes", originalIndex, "parentId"],
+                  message:
+                    "parentId must reference one of the user's top-level todos",
+                },
+              ],
+            });
+          }
+        }
         await db.insert(todos).values({
           id: normalizedId,
           userId,
@@ -412,7 +450,13 @@ export async function syncTodos(c: Context<Env>) {
           await db
             .update(todos)
             .set({ recurrence: null, updatedAt: change.updatedAt })
-            .where(and(eq(todos.id, parentId), isNotNull(todos.recurrence)));
+            .where(
+              and(
+                eq(todos.id, parentId),
+                eq(todos.userId, userId),
+                isNotNull(todos.recurrence),
+              ),
+            );
         }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({

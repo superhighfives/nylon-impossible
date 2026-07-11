@@ -640,6 +640,93 @@ describe("Sync — subtasks", () => {
     expect(child.parentId).toBe(PARENT);
   });
 
+  it("creates a parent before its child when both are uploaded in one sync", async () => {
+    const res = await syncRequest({
+      changes: [
+        {
+          id: CHILD_A,
+          parentId: PARENT,
+          title: "Child A",
+          updatedAt: future,
+        },
+        {
+          id: PARENT,
+          title: "Parent",
+          updatedAt: future,
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const db = getDb(env.DB);
+    const rows = await db.select().from(todos);
+    expect(rows.find((row) => row.id === PARENT)).toBeTruthy();
+    expect(rows.find((row) => row.id === CHILD_A)?.parentId).toBe(PARENT);
+  });
+
+  it("rejects parentId that points at another user's todo", async () => {
+    await seedUser("user_other", "other@example.com");
+    await seedTodo(PARENT, "user_other", {
+      title: "Other parent",
+      recurrence: { frequency: "daily" },
+      dueDate: new Date(future),
+    });
+
+    const res = await syncRequest({
+      changes: [
+        {
+          id: CHILD_A,
+          parentId: PARENT,
+          title: "Child A",
+          updatedAt: future,
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+
+    const body = await res.json<any>();
+    expect(body.code).toBe("validation_failed");
+
+    const db = getDb(env.DB);
+    const [otherParent] = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.id, PARENT));
+    expect(otherParent.recurrence).toEqual({ frequency: "daily" });
+    expect(
+      (await db.select().from(todos).where(eq(todos.id, CHILD_A))).length,
+    ).toBe(0);
+  });
+
+  it("rejects parentId that points at another subtask", async () => {
+    await seedTodo(PARENT, "user_test_123", { title: "Parent" });
+    await seedTodo(CHILD_A, "user_test_123", {
+      title: "Child A",
+      parentId: PARENT,
+    });
+
+    const res = await syncRequest({
+      changes: [
+        {
+          id: CHILD_B,
+          parentId: CHILD_A,
+          title: "Grandchild",
+          updatedAt: future,
+        },
+      ],
+    });
+    expect(res.status).toBe(400);
+
+    const body = await res.json<any>();
+    expect(body.code).toBe("validation_failed");
+    expect(
+      body.details.some(
+        (detail: { path: unknown[] }) =>
+          detail.path.join(".") === "changes.0.parentId",
+      ),
+    ).toBe(true);
+  });
+
   it("ignores parentId on update (immutable)", async () => {
     await seedTodo(PARENT, "user_test_123", { title: "Parent" });
     await seedTodo(CHILD_A, "user_test_123", {

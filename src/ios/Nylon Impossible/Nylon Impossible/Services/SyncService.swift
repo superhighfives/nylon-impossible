@@ -259,6 +259,7 @@ final class SyncService {
                 urls: pendingUrlChanges
             )
         }
+        .orderedForSync()
     }
 
     /// Apply all sync changes in a single atomic operation

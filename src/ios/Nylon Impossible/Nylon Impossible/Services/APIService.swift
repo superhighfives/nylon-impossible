@@ -256,6 +256,20 @@ struct TodoChange: Codable, Sendable {
     }
 }
 
+extension Array where Element == TodoChange {
+    /// Create parent todos before subtasks so self-referential parentId inserts
+    /// succeed when both were created offline before the next sync.
+    func orderedForSync() -> [TodoChange] {
+        enumerated()
+            .sorted { lhs, rhs in
+                let lhsRank = lhs.element.parentId == nil ? 0 : 1
+                let rhsRank = rhs.element.parentId == nil ? 0 : 1
+                return lhsRank == rhsRank ? lhs.offset < rhs.offset : lhsRank < rhsRank
+            }
+            .map(\.element)
+    }
+}
+
 struct SyncResponse: Codable, Sendable {
     let todos: [APITodo]
     let syncedAt: String

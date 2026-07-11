@@ -219,6 +219,33 @@ export const createTodo = createServerFn({ method: "POST" })
     const program = withAuthenticatedUser((user, db) =>
       Effect.gen(function* () {
         const parentId = validated.parentId ?? null;
+        if (parentId) {
+          const parent = yield* Effect.tryPromise({
+            try: () =>
+              db
+                .select({ id: todos.id, parentId: todos.parentId })
+                .from(todos)
+                .where(and(eq(todos.id, parentId), eq(todos.userId, user.id)))
+                .limit(1)
+                .get(),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "getParentTodo",
+                cause: error,
+              }),
+          });
+          if (!parent || parent.parentId != null) {
+            return yield* new ValidationError({
+              errors: [
+                {
+                  path: "parentId",
+                  message:
+                    "parentId must reference one of the user's top-level todos",
+                },
+              ],
+            });
+          }
+        }
 
         // Get the last position for fractional indexing, scoped to the sibling
         // group: top-level todos order among themselves (parent_id IS NULL),

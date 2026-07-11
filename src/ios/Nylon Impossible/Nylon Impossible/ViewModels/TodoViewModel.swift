@@ -201,6 +201,20 @@ final class TodoViewModel {
     }
 
     func deleteTodo(_ todo: TodoItem, context: ModelContext) {
+        let todoId = todo.id
+        let childDescriptor = FetchDescriptor<TodoItem>(
+            predicate: #Predicate { $0.parentId == todoId }
+        )
+        let children = (try? context.fetch(childDescriptor)) ?? []
+
+        for child in children {
+            deleteSingleTodo(child, context: context)
+        }
+
+        deleteSingleTodo(todo, context: context)
+    }
+
+    private func deleteSingleTodo(_ todo: TodoItem, context: ModelContext) {
         // Soft delete for sync - mark as deleted rather than removing
         if todo.userId != nil {
             todo.isDeleted = true

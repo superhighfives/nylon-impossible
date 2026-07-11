@@ -73,6 +73,7 @@ struct BackgroundSyncService {
                     urls: pendingUrlChanges
                 )
             }
+            .orderedForSync()
             return (changeList, unsyncedItems.map { $0.persistentModelID })
         }
 

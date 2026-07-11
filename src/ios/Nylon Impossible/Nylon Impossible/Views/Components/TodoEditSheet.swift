@@ -158,7 +158,7 @@ struct TodoEditSheet: View {
 
                 // Subtasks — hidden on a recurring todo (mutually exclusive with
                 // recurrence). Once a subtask is added, the Repeat section hides.
-                if todo.recurrence == nil {
+                if recurrenceFrequency == nil {
                     subtasksSection
                 }
 
@@ -298,6 +298,7 @@ struct TodoEditSheet: View {
     private func addSubtask() {
         let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        recurrenceFrequency = nil
         onAddSubtask(trimmed)
         newSubtaskTitle = ""
     }
@@ -309,7 +310,7 @@ struct TodoEditSheet: View {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let notesValue = trimmedNotes.isEmpty ? nil : trimmedNotes
         let dueDateValue = hasDueDate ? dueDate : nil
-        let recurrenceValue: Recurrence? = (hasDueDate && recurrenceFrequency != nil)
+        let recurrenceValue: Recurrence? = (hasDueDate && recurrenceFrequency != nil && subtasks.isEmpty)
             ? Recurrence(frequency: recurrenceFrequency!)
             : nil
 
