@@ -389,8 +389,7 @@ export const updateTodo = createServerFn({ method: "POST" })
               }));
           if (isSubtask || hasChildren) recurrence = null;
         }
-        if (validated.recurrence !== undefined)
-          updates.recurrence = recurrence;
+        if (validated.recurrence !== undefined) updates.recurrence = recurrence;
 
         const becameComplete =
           validated.completed === true && existing.completed === false;
@@ -439,9 +438,7 @@ export const updateTodo = createServerFn({ method: "POST" })
               db
                 .update(todos)
                 .set({ completed: validated.completed })
-                .where(
-                  and(eq(todos.parentId, id), eq(todos.userId, user.id)),
-                ),
+                .where(and(eq(todos.parentId, id), eq(todos.userId, user.id))),
             catch: (error) =>
               new DatabaseError({
                 operation: "cascadeSubtaskCompletion",

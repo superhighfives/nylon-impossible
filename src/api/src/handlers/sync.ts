@@ -412,9 +412,7 @@ export async function syncTodos(c: Context<Env>) {
           await db
             .update(todos)
             .set({ recurrence: null, updatedAt: change.updatedAt })
-            .where(
-              and(eq(todos.id, parentId), isNotNull(todos.recurrence)),
-            );
+            .where(and(eq(todos.id, parentId), isNotNull(todos.recurrence)));
         }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({
