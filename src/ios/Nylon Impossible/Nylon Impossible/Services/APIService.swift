@@ -260,11 +260,11 @@ extension Array where Element == TodoChange {
     /// Create parent todos before subtasks so self-referential parentId inserts
     /// succeed when both were created offline before the next sync.
     func orderedForSync() -> [TodoChange] {
-        let rank: (TodoChange) -> Int = { $0.parentId == nil ? 0 : 1 }
+        let parentRank: (TodoChange) -> Int = { $0.parentId == nil ? 0 : 1 }
         enumerated()
             .sorted { lhs, rhs in
-                let lhsRank = rank(lhs.element)
-                let rhsRank = rank(rhs.element)
+                let lhsRank = parentRank(lhs.element)
+                let rhsRank = parentRank(rhs.element)
                 return lhsRank == rhsRank ? lhs.offset < rhs.offset : lhsRank < rhsRank
             }
             .map(\.element)

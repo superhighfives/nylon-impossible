@@ -275,7 +275,9 @@ export async function syncTodos(c: Context<Env>) {
 
   // 1. Apply client changes (with conflict resolution)
   // Normalize UUIDs to lowercase to match web-generated IDs
-  for (const { change, originalIndex } of sortChangesForApply(changes)) {
+  for (const { change, originalIndex: changeIndex } of sortChangesForApply(
+    changes,
+  )) {
     const normalizedId = change.id.toLowerCase();
 
     const [existing] = await db
@@ -420,7 +422,7 @@ export async function syncTodos(c: Context<Env>) {
                 "parentId must reference one of the user's top-level todos",
               details: [
                 {
-                  path: ["changes", originalIndex, "parentId"],
+                  path: ["changes", changeIndex, "parentId"],
                   message:
                     "parentId must reference one of the user's top-level todos",
                 },
