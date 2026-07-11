@@ -46,6 +46,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
   return {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
+    parentId: todo.parentId?.toLowerCase() ?? null,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,

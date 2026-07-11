@@ -98,6 +98,7 @@ export function useCreateTodo() {
       const optimisticTodo: TodoWithUrls = {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
+        parentId: input.parentId ?? null,
         title: input.title,
         notes: input.notes ?? null,
         completed: false,

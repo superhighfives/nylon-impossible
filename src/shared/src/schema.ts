@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+  type AnySQLiteColumn,
   index,
   integer,
   primaryKey,
@@ -58,6 +59,14 @@ export const todos = sqliteTable(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // Parent todo id for subtasks. Null for top-level todos. Self-referential;
+    // one level only (a subtask cannot itself have subtasks). Immutable after
+    // creation — subtasks are permanently bound to their parent. Deleting a
+    // parent cascades to its children.
+    parentId: text("parent_id").references(
+      (): AnySQLiteColumn => todos.id,
+      { onDelete: "cascade" },
+    ),
     title: text("title").notNull(),
     completed: integer("completed", { mode: "boolean" })
       .notNull()
@@ -95,6 +104,13 @@ export const todos = sqliteTable(
   (table) => [
     index("idx_todos_user_id").on(table.userId),
     index("idx_todos_user_position").on(table.userId, table.position),
+    // Sibling lookups/ordering for subtasks, scoped per user to match the
+    // (user_id, parent_id) grouping.
+    index("idx_todos_user_parent_position").on(
+      table.userId,
+      table.parentId,
+      table.position,
+    ),
     // Multiple NULLs are distinct in SQLite, so in-app todos never collide;
     // this guarantees a Google task is imported at most once per user.
     uniqueIndex("idx_todos_user_google_task").on(
@@ -262,6 +278,12 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
     fields: [todos.userId],
     references: [users.id],
   }),
+  parent: one(todos, {
+    fields: [todos.parentId],
+    references: [todos.id],
+    relationName: "subtasks",
+  }),
+  subtasks: many(todos, { relationName: "subtasks" }),
   todoLists: many(todoLists),
   todoUrls: many(todoUrls),
   research: one(todoResearch),

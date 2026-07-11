@@ -10,6 +10,8 @@ export const createTodoSchema = z.object({
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["high", "low"]).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
+  // Parent todo id when creating a subtask; omit/null for a top-level todo.
+  parentId: z.string().uuid().nullable().optional(),
 });
 
 export const updateTodoSchema = z.object({

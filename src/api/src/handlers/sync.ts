@@ -38,6 +38,9 @@ const syncRequestSchema = z.object({
   changes: z.array(
     z.object({
       id: z.string().uuid(),
+      // Parent todo id for subtasks; null/absent for top-level todos. Honoured
+      // only on create — parentId is immutable, so it is ignored on update.
+      parentId: z.string().uuid().nullable().optional(),
       title: z.string().min(1).optional(),
       notes: z.string().max(10000).nullable().optional(),
       completed: z.boolean().optional(),
@@ -122,6 +125,7 @@ function serializeTodo(
   return {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
+    parentId: todo.parentId?.toLowerCase() ?? null,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -357,6 +361,7 @@ export async function syncTodos(c: Context<Env>) {
         await db.insert(todos).values({
           id: normalizedId,
           userId,
+          parentId: change.parentId?.toLowerCase() ?? null,
           title: truncateTitle(change.title),
           notes: change.notes ?? null,
           completed: change.completed ?? false,

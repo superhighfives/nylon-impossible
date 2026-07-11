@@ -4,7 +4,7 @@
 
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -79,6 +79,7 @@ function serializeTodoWithUrls(
   return {
     id: todo.id,
     userId: todo.userId,
+    parentId: todo.parentId ?? null,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -217,13 +218,24 @@ export const createTodo = createServerFn({ method: "POST" })
 
     const program = withAuthenticatedUser((user, db) =>
       Effect.gen(function* () {
-        // Get the last position for fractional indexing
+        const parentId = validated.parentId ?? null;
+
+        // Get the last position for fractional indexing, scoped to the sibling
+        // group: top-level todos order among themselves (parent_id IS NULL),
+        // subtasks among their siblings (parent_id = parentId).
         const lastTodo = yield* Effect.tryPromise({
           try: () =>
             db
               .select({ position: todos.position })
               .from(todos)
-              .where(eq(todos.userId, user.id))
+              .where(
+                and(
+                  eq(todos.userId, user.id),
+                  parentId
+                    ? eq(todos.parentId, parentId)
+                    : isNull(todos.parentId),
+                ),
+              )
               .orderBy(desc(todos.position))
               .limit(1)
               .get(),
@@ -243,6 +255,7 @@ export const createTodo = createServerFn({ method: "POST" })
               .insert(todos)
               .values({
                 userId: user.id,
+                parentId,
                 title: validated.title,
                 notes: validated.notes ?? null,
                 position,
