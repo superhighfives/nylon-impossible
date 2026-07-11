@@ -27,6 +27,7 @@ import {
   ChevronUp,
   GripVertical,
   Inbox,
+  ListTree,
   MessageCircle,
   RefreshCw,
   Repeat,
@@ -39,6 +40,7 @@ import { useLocalMidnightTick } from "@/hooks/useLocalMidnightTick";
 import {
   STALE_AI_MS,
   STALE_RESEARCH_MS,
+  useCreateTodo,
   useDeleteTodo,
   useTodos,
   useUpdateTodo,
@@ -97,8 +99,16 @@ const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
   return { x: collisionRect.left, y: above.top };
 };
 
+interface SubtaskHandlers {
+  onAdd: (parentId: string, title: string) => void;
+  onToggle: (id: string, completed: boolean) => void;
+  onDelete: (id: string) => void;
+  onReorder: (id: string, position: string) => void;
+}
+
 interface TodoItemProps {
   todo: TodoWithUrls;
+  subtasks: TodoWithUrls[];
   isExpanded: boolean;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
@@ -109,6 +119,7 @@ interface TodoItemProps {
 
 interface ExpandedSectionProps {
   todo: TodoWithUrls;
+  subtasks: TodoWithUrls[];
   onUpdate: (updates: {
     title?: string;
     notes?: string | null;
@@ -118,6 +129,7 @@ interface ExpandedSectionProps {
   isUpdating: boolean;
   onDelete: (id: string) => void;
   deletePending: boolean;
+  subtaskHandlers: SubtaskHandlers;
 }
 
 /** Indicator badges for due date, priority, and recurrence */
@@ -175,6 +187,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
 
 function TodoItemContent({
   todo,
+  subtasks,
   isExpanded,
   onToggle,
   onToggleExpand,
@@ -213,6 +226,16 @@ function TodoItemContent({
           >
             {todo.title}
           </p>
+          {subtasks.length > 0 && (
+            <span
+              role="img"
+              className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
+              aria-label={`${subtasks.filter((s) => s.completed).length} of ${subtasks.length} subtasks complete`}
+            >
+              <ListTree size={10} aria-hidden="true" />
+              {subtasks.filter((s) => s.completed).length}/{subtasks.length}
+            </span>
+          )}
           {(todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
             Date.now() - new Date(todo.createdAt).getTime() < STALE_AI_MS && (
               <output
@@ -321,18 +344,25 @@ function TodoItemContent({
 /** Wrapper that displays expanded todo details */
 function ExpandedSection({
   todo,
+  subtasks,
   onUpdate,
   isUpdating,
   onDelete,
   deletePending,
+  subtaskHandlers,
 }: ExpandedSectionProps) {
   return (
     <TodoItemExpanded
       todo={todo}
+      subtasks={subtasks}
       onUpdate={onUpdate}
       isUpdating={isUpdating}
       onDelete={onDelete}
       deletePending={deletePending}
+      onAddSubtask={subtaskHandlers.onAdd}
+      onToggleSubtask={subtaskHandlers.onToggle}
+      onDeleteSubtask={subtaskHandlers.onDelete}
+      onReorderSubtask={subtaskHandlers.onReorder}
     />
   );
 }
@@ -347,6 +377,7 @@ function SortableTodoItem(
       dueDate?: Date | null;
       priority?: "high" | "low" | null;
     }) => void;
+    subtaskHandlers: SubtaskHandlers;
   },
 ) {
   const {
@@ -433,10 +464,12 @@ function SortableTodoItem(
           {props.isExpanded && (
             <ExpandedSection
               todo={props.todo}
+              subtasks={props.subtasks}
               onUpdate={props.onUpdateExpanded}
               isUpdating={props.updatePending}
               onDelete={props.onDelete}
               deletePending={props.deletePending}
+              subtaskHandlers={props.subtaskHandlers}
             />
           )}
         </div>
@@ -522,6 +555,7 @@ export function TodoList() {
   const { data: todos, isLoading, error, refetch, isFetching } = useTodos();
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
+  const createTodo = useCreateTodo();
   const { data: user } = useUser();
   const updateUser = useUpdateUser();
   const { highlightIds, hiddenIds } = useImportReview();
@@ -619,6 +653,30 @@ export function TodoList() {
       updateTodo.mutate({ id, input: updates });
     };
 
+  // Subtask handlers. Toggling a parent cascades to children server-side (and
+  // optimistically in useUpdateTodo); a subtask toggle is a plain flip since a
+  // subtask has no children. Delete/reorder reuse the todo mutations — a
+  // subtask is a full todo.
+  const subtaskHandlers: SubtaskHandlers = {
+    onAdd: (parentId, title) => createTodo.mutate({ title, parentId }),
+    onToggle: (id, completed) =>
+      updateTodo.mutate({ id, input: { completed: !completed } }),
+    onDelete: (id) => deleteTodo.mutate(id),
+    onReorder: (id, position) => updateTodo.mutate({ id, input: { position } }),
+  };
+
+  // Subtasks live inside their parent's expanded view, not as their own rows.
+  // Group children by parent id and render only top-level todos in the list.
+  const subtasksByParent = new Map<string, TodoWithUrls[]>();
+  for (const t of todos) {
+    if (t.parentId) {
+      const siblings = subtasksByParent.get(t.parentId) ?? [];
+      siblings.push(t);
+      subtasksByParent.set(t.parentId, siblings);
+    }
+  }
+  const topLevelTodos = todos.filter((t) => t.parentId == null);
+
   // "Effective" completion counts a repeat completed today as done, so it sits
   // in Completed until the user's local midnight. The midnight tick re-renders
   // so it flips back to active on time. Computed once per todo into a map here —
@@ -633,7 +691,7 @@ export function TodoList() {
     isEffectivelyCompleted(t, timeZone, now);
 
   // Sort: incomplete first (by position), then completed (most recently completed first)
-  const sortedTodos = [...todos].sort((a, b) => {
+  const sortedTodos = [...topLevelTodos].sort((a, b) => {
     const aDone = effectiveCompleted(a);
     const bDone = effectiveCompleted(b);
     if (aDone !== bDone) return aDone ? 1 : -1;
@@ -713,6 +771,7 @@ export function TodoList() {
 
   const sharedProps = (todo: TodoWithUrls) => ({
     todo,
+    subtasks: subtasksByParent.get(todo.id) ?? [],
     isExpanded: expandedId === todo.id,
     onToggle: handleToggle,
     onDelete: handleDelete,
@@ -742,6 +801,7 @@ export function TodoList() {
               isKeyboardDragging={isKeyboardDragging}
               highlighted={highlightIds.has(todo.id)}
               onUpdateExpanded={handleUpdateExpanded(todo.id)}
+              subtaskHandlers={subtaskHandlers}
             />
           ))}
         </SortableContext>
@@ -782,10 +842,12 @@ export function TodoList() {
                       {expandedId === todo.id && (
                         <ExpandedSection
                           todo={todo}
+                          subtasks={subtasksByParent.get(todo.id) ?? []}
                           onUpdate={handleUpdateExpanded(todo.id)}
                           isUpdating={updateTodo.isPending}
                           onDelete={handleDelete}
                           deletePending={deleteTodo.isPending}
+                          subtaskHandlers={subtaskHandlers}
                         />
                       )}
                     </div>

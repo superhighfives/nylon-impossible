@@ -20,11 +20,13 @@ import type {
 } from "@/types/database";
 import { ConversationSection } from "./ConversationSection";
 import { ResearchSection } from "./ResearchSection";
+import { SubtaskSection } from "./SubtaskSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
 
 interface TodoItemExpandedProps {
   todo: TodoWithUrls;
+  subtasks: TodoWithUrls[];
   onUpdate: (updates: {
     title?: string;
     notes?: string | null;
@@ -35,6 +37,10 @@ interface TodoItemExpandedProps {
   isUpdating: boolean;
   onDelete: (id: string) => void;
   deletePending: boolean;
+  onAddSubtask: (parentId: string, title: string) => void;
+  onToggleSubtask: (id: string, completed: boolean) => void;
+  onDeleteSubtask: (id: string) => void;
+  onReorderSubtask: (id: string, position: string) => void;
 }
 
 function formatDate(isoString: string | null): string {
@@ -103,10 +109,15 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
 
 export function TodoItemExpanded({
   todo,
+  subtasks,
   onUpdate,
   isUpdating,
   onDelete,
   deletePending,
+  onAddSubtask,
+  onToggleSubtask,
+  onDeleteSubtask,
+  onReorderSubtask,
 }: TodoItemExpandedProps) {
   const { data: user } = useUser();
   const { timeZone } = useHints();
@@ -349,27 +360,44 @@ export function TodoItemExpanded({
       </div>
 
       {/* Repeat — disabled until a due date is set, since the rule has no
-          anchor without one. */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor={`repeat-${todo.id}`}
-          className="text-xs font-medium text-gray-muted"
-        >
-          Repeat
-        </label>
-        <Select
-          size="sm"
-          value={effectiveRecurrence}
-          onValueChange={handleRecurrenceChange}
-          disabled={isUpdating || recurrenceDisabled}
-          items={recurrenceItems}
+          anchor without one. Hidden when the todo has subtasks: recurrence and
+          subtasks are mutually exclusive. */}
+      {subtasks.length === 0 && (
+        <div className="space-y-1.5">
+          <label
+            htmlFor={`repeat-${todo.id}`}
+            className="text-xs font-medium text-gray-muted"
+          >
+            Repeat
+          </label>
+          <Select
+            size="sm"
+            value={effectiveRecurrence}
+            onValueChange={handleRecurrenceChange}
+            disabled={isUpdating || recurrenceDisabled}
+            items={recurrenceItems}
+          />
+          {recurrenceDisabled && (
+            <p className="text-xs text-gray-muted">
+              Set a due date to enable repeats.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Subtasks — hidden on a recurring todo (mutually exclusive with
+          recurrence). Once a subtask is added, the Repeat control above hides. */}
+      {!todo.recurrence && (
+        <SubtaskSection
+          parentId={todo.id}
+          subtasks={subtasks}
+          onAdd={onAddSubtask}
+          onToggle={onToggleSubtask}
+          onDelete={onDeleteSubtask}
+          onReorder={onReorderSubtask}
+          disabled={isUpdating}
         />
-        {recurrenceDisabled && (
-          <p className="text-xs text-gray-muted">
-            Set a due date to enable repeats.
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Save / Delete row */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-subtle">

@@ -9,6 +9,7 @@ vi.mock("@/hooks/useTodos", () => ({
   useTodos: vi.fn(),
   useUpdateTodo: vi.fn(),
   useDeleteTodo: vi.fn(),
+  useCreateTodo: vi.fn(),
 }));
 
 // TodoList reads the synced hideCompleted preference via useUser and toggles it
@@ -19,7 +20,12 @@ vi.mock("@/hooks/useUser", () => ({
   useUpdateUser: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
-import { useDeleteTodo, useTodos, useUpdateTodo } from "@/hooks/useTodos";
+import {
+  useCreateTodo,
+  useDeleteTodo,
+  useTodos,
+  useUpdateTodo,
+} from "@/hooks/useTodos";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
@@ -69,6 +75,10 @@ function stubMutations() {
     mutate: vi.fn(),
     isPending: false,
   } as unknown as ReturnType<typeof useDeleteTodo>);
+  vi.mocked(useCreateTodo).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useCreateTodo>);
 }
 
 describe("TodoList", () => {
