@@ -59,6 +59,7 @@ struct BackgroundSyncService {
                     : todo.pendingUrls.map { TodoUrlChange(url: $0) }
                 return TodoChange(
                     id: todo.id.uuidString.lowercased(),
+                    parentId: todo.isDeleted ? nil : todo.parentId?.uuidString.lowercased(),
                     title: todo.isDeleted ? nil : todo.title,
                     notes: todo.isDeleted ? nil : todo.itemNotes,
                     completed: todo.isDeleted ? nil : todo.isCompleted,

@@ -11,8 +11,17 @@ struct TodoItemRow: View {
     let todo: TodoItem
     let apiService: APIService?
     let urls: [APITodoUrl]
+    var subtasks: [TodoItem] = []
     var onToggle: () -> Void
     var onSave: (String, String?, Date?, TodoPriority?, Recurrence?) -> Void
+    var onAddSubtask: (String) -> Void = { _ in }
+    var onToggleSubtask: (TodoItem) -> Void = { _ in }
+    var onDeleteSubtask: (TodoItem) -> Void = { _ in }
+    var onMoveSubtask: (IndexSet, Int) -> Void = { _, _ in }
+
+    private var completedSubtaskCount: Int {
+        subtasks.filter { $0.isCompleted }.count
+    }
 
     @State private var checkmarkScale: CGFloat = 1.0
     @State private var showingEditSheet = false
@@ -192,6 +201,22 @@ struct TodoItemRow: View {
                                 .accessibilityLabel("The assistant has a question")
                         }
 
+                        // Subtask progress (n/m), mirroring the web badge.
+                        if !subtasks.isEmpty {
+                            HStack(spacing: 3) {
+                                Image(systemName: "list.bullet.indent")
+                                    .font(.system(size: 10))
+                                Text("\(completedSubtaskCount)/\(subtasks.count)")
+                                    .font(.system(size: 12))
+                                    .monospacedDigit()
+                            }
+                            .foregroundStyle(Color.appSubtle)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appTint, in: RoundedRectangle(cornerRadius: 6))
+                            .accessibilityLabel("\(completedSubtaskCount) of \(subtasks.count) subtasks complete")
+                        }
+
                         Spacer()
                         if !todo.isSynced {
                             Circle()
@@ -242,13 +267,18 @@ struct TodoItemRow: View {
                 todo: todo,
                 apiService: apiService,
                 initialUrls: urls,
+                subtasks: subtasks,
                 onSave: { title, notes, dueDate, priority, recurrence in
                     onSave(title, notes, dueDate, priority, recurrence)
                     showingEditSheet = false
                 },
                 onCancel: {
                     showingEditSheet = false
-                }
+                },
+                onAddSubtask: onAddSubtask,
+                onToggleSubtask: onToggleSubtask,
+                onDeleteSubtask: onDeleteSubtask,
+                onMoveSubtask: onMoveSubtask
             )
         }
     }

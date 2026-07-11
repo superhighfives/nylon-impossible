@@ -54,6 +54,7 @@ struct APITodoMessage: Codable, Sendable, Identifiable {
 struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
+    let parentId: String?  // Parent todo id for subtasks; nil for top-level
     let title: String
     let notes: String?
     let completed: Bool
@@ -71,7 +72,8 @@ struct APITodo: Codable, Sendable {
     let messages: [APITodoMessage]?  // Conversation included in sync response
 
     init(
-        id: String, userId: String, title: String, notes: String? = nil,
+        id: String, userId: String, parentId: String? = nil, title: String,
+        notes: String? = nil,
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
         priority: String? = nil, recurrence: Recurrence? = nil,
@@ -82,6 +84,7 @@ struct APITodo: Codable, Sendable {
     ) {
         self.id = id
         self.userId = userId
+        self.parentId = parentId
         self.title = title
         self.notes = notes
         self.completed = completed
@@ -209,6 +212,7 @@ struct TodoUrlChange: Codable, Sendable, Equatable {
 
 struct TodoChange: Codable, Sendable {
     let id: String
+    let parentId: String?  // Set on create for subtasks; server ignores on update
     let title: String?
     let notes: String?
     let completed: Bool?
@@ -222,7 +226,7 @@ struct TodoChange: Codable, Sendable {
     let urls: [TodoUrlChange]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, notes, completed, position, dueDate, priority,
+        case id, parentId, title, notes, completed, position, dueDate, priority,
              recurrence, completedAt, updatedAt, deleted, urls
     }
 
@@ -233,6 +237,7 @@ struct TodoChange: Codable, Sendable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
+        try c.encodeIfPresent(parentId, forKey: .parentId)
         try c.encodeIfPresent(title, forKey: .title)
         try c.encodeIfPresent(notes, forKey: .notes)
         try c.encodeIfPresent(completed, forKey: .completed)
