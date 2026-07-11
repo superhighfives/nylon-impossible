@@ -35,6 +35,10 @@ struct TodoItemRow: View {
     @ViewBuilder
     private var indicatorBadges: some View {
         let priority = todo.todoPriority
+        // A completed repeat has already rolled its dueDate forward to the next
+        // occurrence, so show when it next comes back ("Next: Tomorrow") in
+        // place of the schedule label and due-date pills. Mirrors web.
+        let isCompletedRecurring = todo.isEffectivelyCompleted && todo.recurrence != nil
         if priority != nil || todo.dueDate != nil || todo.recurrence != nil {
             HStack(spacing: 6) {
                 if let priority {
@@ -45,26 +49,131 @@ struct TodoItemRow: View {
                     )
                 }
 
-                if let dueDate = todo.dueDate {
-                    badge(
-                        dueDate.formatted(date: .abbreviated, time: .omitted),
-                        foreground: todo.isOverdue ? Color.appDanger : Color.appSubtle,
-                        background: todo.isOverdue ? Color.appDanger.opacity(0.15) : Color.appTint,
-                        systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
-                    )
-                }
+                if isCompletedRecurring, let dueDate = todo.dueDate {
+                    nextBadge(relativeDay(dueDate))
+                } else {
+                    if let dueDate = todo.dueDate {
+                        badge(
+                            dueDate.formatted(date: .abbreviated, time: .omitted),
+                            foreground: todo.isOverdue ? Color.appDanger : Color.appSubtle,
+                            background: todo.isOverdue ? Color.appDanger.opacity(0.15) : Color.appTint,
+                            systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
+                        )
+                    }
 
-                if let recurrenceText = recurrenceBadgeText {
-                    badge(
-                        recurrenceText,
-                        foreground: Color.appSubtle,
-                        background: Color.appTint,
-                        systemImage: "arrow.triangle.2.circlepath"
-                    )
+                    if let recurrenceText = recurrenceBadgeText {
+                        badge(
+                            recurrenceText,
+                            foreground: Color.appSubtle,
+                            background: Color.appTint,
+                            systemImage: "arrow.triangle.2.circlepath"
+                        )
+                    }
                 }
             }
             .padding(.top, 2)
         }
+    }
+
+    /// Outline badges summarizing a completed todo's content — notes, research,
+    /// links — in place of the full previews shown while it's active. Mirrors
+    /// web's `CompletedContentBadges`.
+    @ViewBuilder
+    private var completedContentBadges: some View {
+        let hasNotes = !(todo.itemNotes?
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            .isEmpty ?? true)
+        let hasResearch = todo.researchStatus == "completed"
+            && !(todo.researchSummary?.isEmpty ?? true)
+        let linkCount = nonResearchUrls.count
+        if hasNotes || hasResearch || linkCount > 0 {
+            FlowLayout(spacing: 6) {
+                if hasNotes {
+                    outlineBadge("Notes", systemImage: "doc.text")
+                }
+                if hasResearch {
+                    outlineBadge("Research", systemImage: "sparkles")
+                }
+                if linkCount > 0 {
+                    outlineBadge(
+                        "\(linkCount) \(linkCount == 1 ? "link" : "links")",
+                        systemImage: "link"
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// "Next: Tomorrow" pill — clock on the left, repeat glyph on the right,
+    /// outlined rather than filled — for a completed repeat's next occurrence.
+    @ViewBuilder
+    private func nextBadge(_ text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "clock")
+                .font(.system(size: 10))
+            Text("Next: \(text)")
+                .font(.system(size: 12))
+                .monospacedDigit()
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.system(size: 10))
+        }
+        .foregroundStyle(Color.appSubtle)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.appLine, lineWidth: 1)
+        )
+    }
+
+    /// Single icon + label outline badge — the shared shape behind the completed
+    /// content badges.
+    @ViewBuilder
+    private func outlineBadge(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10))
+            Text(text)
+                .font(.system(size: 12))
+                .monospacedDigit()
+        }
+        .foregroundStyle(Color.appSubtle)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.appLine, lineWidth: 1)
+        )
+    }
+
+    /// Relative calendar-day label: "Today", "Tomorrow", "Yesterday", a weekday
+    /// within the coming week, else an abbreviated date ("8 Jul"). Mirrors web's
+    /// `relativeDay`.
+    private func relativeDay(_ date: Date) -> String {
+        let cal = Calendar.current
+        if cal.isDateInToday(date) { return "Today" }
+        if cal.isDateInTomorrow(date) { return "Tomorrow" }
+        if cal.isDateInYesterday(date) { return "Yesterday" }
+        let days = cal.dateComponents(
+            [.day],
+            from: cal.startOfDay(for: Date()),
+            to: cal.startOfDay(for: date)
+        ).day ?? 0
+        let formatter = DateFormatter()
+        if days > 1 && days < 7 {
+            formatter.dateFormat = "EEEE"
+        } else {
+            formatter.setLocalizedDateFormatFromTemplate("d MMM")
+        }
+        return formatter.string(from: date)
+    }
+
+    /// "Wed 8 Jul" — completion date for the "Completed: …" line on repeats.
+    private func completedDateText(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
+        return formatter.string(from: date)
     }
 
     /// Human label for the recurrence rule ("Daily", "Weekly on Wednesday",
@@ -225,24 +334,29 @@ struct TodoItemRow: View {
                         }
                     }
                     
-                    // URL cards (compact) — hide research URLs, limit to 2 visible
-                    if !nonResearchUrls.isEmpty {
-                        if todo.isEffectivelyCompleted {
-                            Text("+\(nonResearchUrls.count) \(nonResearchUrls.count == 1 ? "link" : "links")")
+                    if todo.isEffectivelyCompleted {
+                        // Completion date for any completed todo. Repeats stamp
+                        // completedAt; normal/legacy todos fall back to updatedAt
+                        // (≈ completion time). Matches web.
+                        Text("Completed: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.appSubtle)
+
+                        // Full note/research/link previews collapse to compact
+                        // outline badges once done. Matches web.
+                        completedContentBadges
+                    } else if !nonResearchUrls.isEmpty {
+                        // URL cards (compact) — hide research URLs, limit to 2 visible
+                        FlowLayout(spacing: 6) {
+                            ForEach(Array(nonResearchUrls.prefix(2))) { url in
+                                UrlRowCompact(url: url)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        if nonResearchUrls.count > 2 {
+                            Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
                                 .font(.system(size: 12))
                                 .foregroundStyle(Color.appSubtle)
-                        } else {
-                            FlowLayout(spacing: 6) {
-                                ForEach(Array(nonResearchUrls.prefix(2))) { url in
-                                    UrlRowCompact(url: url)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            if nonResearchUrls.count > 2 {
-                                Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(Color.appSubtle)
-                            }
                         }
                     }
 
@@ -303,8 +417,25 @@ struct TodoItemRow: View {
             )
             TodoItemRow(
                 todo: {
-                    let item = TodoItem(title: "Complete project")
+                    let item = TodoItem(title: "Research dogs")
                     item.isCompleted = true
+                    item.priority = "high"
+                    item.researchStatus = "completed"
+                    item.researchSummary = "Domestic dogs evolved from wolves…"
+                    item.itemNotes = "Follow up on breed groups"
+                    return item
+                }(),
+                apiService: nil,
+                urls: [],
+                onToggle: {},
+                onSave: { _, _, _, _, _ in }
+            )
+            TodoItemRow(
+                todo: {
+                    let item = TodoItem(title: "Gym")
+                    item.recurrenceFrequency = "daily"
+                    item.completedAt = Date()
+                    item.dueDate = Date().addingTimeInterval(86400)
                     return item
                 }(),
                 apiService: nil,

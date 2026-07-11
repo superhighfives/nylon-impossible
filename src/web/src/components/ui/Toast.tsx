@@ -82,7 +82,7 @@ export function Toaster() {
   return (
     <Toast.Provider toastManager={toastManager}>
       <Toast.Viewport
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] mx-auto flex w-full max-w-sm flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:pb-4"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[100] mx-auto flex w-full max-w-sm flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:pb-4"
         style={
           {
             ["--viewport-padding" as string]: "1rem",

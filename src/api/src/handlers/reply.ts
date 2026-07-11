@@ -14,6 +14,13 @@ export async function replyToTodo(c: Context<Env>) {
   const todoId = c.req.param("id")?.toLowerCase();
   if (!todoId) return apiError(c, "todo_id_required");
 
+  // Replies re-run the AI enrichment/conversation agent, so this is Pro-only.
+  // Free users never see the conversation UI, but the endpoint is public —
+  // gate it server-side so a crafted request can't spend AI credits.
+  if (c.get("plan") !== "pro") {
+    return apiError(c, "pro_required");
+  }
+
   const json = await readJsonBody(c);
   if (!json.ok) return json.response;
   const parsed = replySchema.safeParse(json.body);

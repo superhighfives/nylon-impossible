@@ -281,7 +281,7 @@ export function TodoItemExpanded({
           >
             Notes
           </label>
-          {user?.aiEnabled && (
+          {user?.plan === "pro" && user?.aiEnabled && (
             <span className="text-xs text-gray-muted">Not used by AI</span>
           )}
         </div>

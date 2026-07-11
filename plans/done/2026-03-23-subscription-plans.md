@@ -1,8 +1,30 @@
 # Subscription Plans (Free + Pro)
 
 **Date:** 2026-03-23
-**Status:** In Progress
-**Scope:** API + Shared Schema (Web/iOS UI to follow)
+**Status:** Complete
+**Scope:** API + Shared Schema + Web UI
+
+## Overview
+
+The free/pro plan gate is fully implemented. The `plan` column exists on
+`users` (default `'free'`), the auth middleware loads it into request context,
+and every AI-spending endpoint checks `plan === "pro"` before running Workers
+AI:
+
+- `POST /todos/smart` — free users silently take the non-AI fast path.
+- `POST /todos/:id/research` (re-research) — returns `pro_required` (403) for
+  free users.
+- `POST /todos/:id/reply` (conversation) — returns `pro_required` (403) for
+  free users.
+
+On the web, the Settings AI toggle and the location field (which only feeds AI
+research) render only for pro users, and the todo editor's "Not used by AI"
+hint is likewise pro-only. Free users see a clean, AI-free todo experience.
+
+Payment processing (Stripe) and usage-based credits/trials remain out of scope
+— plan upgrades are still a manual DB update (`users.plan = 'pro'`). A future
+plan covers the payment integration and, if credits are introduced, the
+usage-tracking schema they require.
 
 ## Problem
 

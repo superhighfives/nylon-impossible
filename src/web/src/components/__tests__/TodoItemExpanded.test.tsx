@@ -135,12 +135,21 @@ describe("TodoItemExpanded", () => {
     );
   });
 
-  it("shows the AI hint when the user has AI enabled", () => {
+  it("shows the AI hint for a pro user with AI enabled", () => {
     vi.mocked(useUser).mockReturnValue({
-      data: { aiEnabled: true },
+      data: { plan: "pro", aiEnabled: true },
       isLoading: false,
     } as unknown as ReturnType<typeof useUser>);
     renderExpanded();
     expect(screen.getByText(/not used by ai/i)).toBeInTheDocument();
+  });
+
+  it("hides the AI hint for a free user even with AI enabled", () => {
+    vi.mocked(useUser).mockReturnValue({
+      data: { plan: "free", aiEnabled: true },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUser>);
+    renderExpanded();
+    expect(screen.queryByText(/not used by ai/i)).not.toBeInTheDocument();
   });
 });

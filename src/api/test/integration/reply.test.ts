@@ -55,6 +55,24 @@ describe("POST /todos/:id/reply", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 403 pro_required for a free-plan user", async () => {
+    mockVerifyToken.mockResolvedValue({ sub: "user_free" });
+    await seedUser("user_free", "free@example.com", { plan: "free" });
+    await seedTodo(TODO_ID, "user_free", { needsInput: true });
+    const res = await reply(TODO_ID, { content: "Lisbon" });
+    expect(res.status).toBe(403);
+    const body = await res.json<{ code: string }>();
+    expect(body.code).toBe("pro_required");
+
+    // The reply must not have been persisted.
+    const db = getDb(env.DB);
+    const messages = await db
+      .select()
+      .from(todoMessages)
+      .where(eq(todoMessages.todoId, TODO_ID));
+    expect(messages).toHaveLength(0);
+  });
+
   it("inserts a user message, clears flags, and bumps updatedAt", async () => {
     const oldUpdatedAt = new Date("2026-01-01T00:00:00.000Z");
     await seedTodo(TODO_ID, "user_test_123", {

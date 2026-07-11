@@ -24,6 +24,13 @@ export async function reresearchTodo(c: Context<Env>) {
   if (!idParam) {
     return apiError(c, "todo_id_required");
   }
+  // Research runs Workers AI + external search, so it's a Pro-only feature.
+  // The UI never surfaces it to free users, but this endpoint is public, so
+  // gate it server-side to keep the free-tier AI cost at zero.
+  if (c.get("plan") !== "pro") {
+    return apiError(c, "pro_required");
+  }
+
   const todoId = idParam.toLowerCase();
   const userId = c.get("userId");
   const db = getDb(c.env.DB);
