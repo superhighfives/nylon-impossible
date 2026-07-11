@@ -27,7 +27,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "^0.18.0",
     "@cloudflare/workers-types": "^4.20260701.1",
-    "miniflare": "4.20260617.1",
+    "miniflare": "4.20260708.1",
     "tsx": "^4.0.0",
     "typescript": "^6.0.3",
     "vitest": "^4.1.8",
