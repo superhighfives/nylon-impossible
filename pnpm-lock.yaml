@@ -79,8 +79,8 @@ importers:
         specifier: ^3.2.0
         version: 3.2.0
       hono:
-        specifier: ^4.12.3
-        version: 4.12.8
+        specifier: ^4.12.29
+        version: 4.12.29
       zod:
         specifier: ^4.4.3
         version: 4.4.3
@@ -3044,8 +3044,8 @@ packages:
       crossws:
         optional: true
 
-  hono@4.12.8:
-    resolution: {integrity: sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A==}
+  hono@4.12.29:
+    resolution: {integrity: sha512-1hNiRjawYrLq/4m3DQQjPGFg0VZkk4RjQJDff/excI6Dm9BiL75qxGrd7/c6YOxPdq6AscP3LiXhQ6fKFC1Waw==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@6.0.0:
@@ -6233,7 +6233,7 @@ snapshots:
       rou3: 0.8.1
       srvx: 0.11.21
 
-  hono@4.12.8: {}
+  hono@4.12.29: {}
 
   html-encoding-sniffer@6.0.0:
     dependencies:
