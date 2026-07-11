@@ -261,7 +261,7 @@ extension Array where Element == TodoChange {
     /// succeed when both were created offline before the next sync.
     func orderedForSync() -> [TodoChange] {
         let parentRank: (TodoChange) -> Int = { $0.parentId == nil ? 0 : 1 }
-        enumerated()
+        return enumerated()
             .sorted { lhs, rhs in
                 let lhsRank = parentRank(lhs.element)
                 let rhsRank = parentRank(rhs.element)
