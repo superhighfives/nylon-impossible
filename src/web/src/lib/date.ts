@@ -39,6 +39,41 @@ export function isSameLocalDay(
   );
 }
 
+/** Whole calendar days from `now` to `date` in `timeZone` (positive = future). */
+function localDayDiff(date: Date, now: Date, timeZone: string): number {
+  const key = (d: Date) =>
+    d.toLocaleDateString("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone,
+    });
+  const a = new Date(`${key(date)}T00:00:00Z`).getTime();
+  const b = new Date(`${key(now)}T00:00:00Z`).getTime();
+  return Math.round((a - b) / 86_400_000);
+}
+
+/**
+ * Relative calendar-day label in `timeZone`: "Today", "Tomorrow", "Yesterday",
+ * a weekday within the coming week ("Monday"), else an abbreviated date
+ * ("8 Jul"). Powers the "Next: …" badge on completed repeating todos, so the
+ * next occurrence reads at a glance rather than as a raw date.
+ */
+export function relativeDay(
+  date: Date | string,
+  timeZone: string,
+  now: Date,
+): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diff = localDayDiff(d, now, timeZone);
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff === -1) return "Yesterday";
+  if (diff > 1 && diff < 7)
+    return d.toLocaleDateString(undefined, { weekday: "long", timeZone });
+  return formatDate(d, timeZone, { day: "numeric", month: "short" });
+}
+
 /**
  * A repeating todo isn't persisted as done — completing it rolls dueDate forward
  * and stamps `completedAt`. It should read as completed (and sit in the

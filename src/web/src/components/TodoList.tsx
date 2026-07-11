@@ -25,13 +25,18 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  Clock,
+  FileText,
   GripVertical,
   Inbox,
+  Link2,
   MessageCircle,
   RefreshCw,
   Repeat,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
 import { useImportReview } from "@/hooks/useImportReview";
@@ -44,7 +49,7 @@ import {
   useUpdateTodo,
 } from "@/hooks/useTodos";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
-import { formatDate, isEffectivelyCompleted } from "@/lib/date";
+import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
@@ -123,6 +128,7 @@ interface ExpandedSectionProps {
 /** Indicator badges for due date, priority, and recurrence */
 function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   const { timeZone } = useHints();
+  const now = new Date();
   const hasDueDate = !!todo.dueDate;
   // Only show priority badge for explicit "high" or "low" values
   const hasPriority = todo.priority === "high" || todo.priority === "low";
@@ -131,12 +137,37 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   if (!hasDueDate && !hasPriority && !hasRecurrence) return null;
 
   const dueDate = todo.dueDate ? new Date(todo.dueDate) : null;
+  const isCompleted = isEffectivelyCompleted(todo, timeZone, now);
+
+  // A completed repeat has already rolled its dueDate forward to the next
+  // occurrence, so instead of the schedule label ("Weekly on Wednesday") show
+  // when it next comes back ("Next: Tomorrow").
+  if (isCompleted && hasRecurrence && dueDate) {
+    return (
+      <div className="flex items-center gap-1.5 mt-1">
+        {hasPriority && (
+          <span
+            className={`text-xs px-1.5 py-0.5 rounded-md ${
+              todo.priority === "high"
+                ? "bg-yellow-base hover:bg-yellow-hover active:bg-yellow-active text-yellow-muted"
+                : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
+            }`}
+          >
+            {todo.priority === "high" ? "High" : "Low"}
+          </span>
+        )}
+        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted">
+          <Clock size={10} />
+          Next: {relativeDay(dueDate, timeZone, now)}
+          <Repeat size={10} />
+        </span>
+      </div>
+    );
+  }
+
   // A repeat sitting in Completed (completedAt today) has already rolled its
   // dueDate forward, so it's never overdue; guard on effective completion too.
-  const isOverdue =
-    dueDate &&
-    dueDate < new Date() &&
-    !isEffectivelyCompleted(todo, timeZone, new Date());
+  const isOverdue = dueDate && dueDate < now && !isCompleted;
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
@@ -167,6 +198,46 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted">
           <Repeat size={10} />
           {recurrenceLabel(todo.recurrence, dueDate, timeZone)}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Compact outline badges summarizing a completed todo's content — notes,
+ * research, links — in place of the full previews shown while it's active. Keeps
+ * the Completed section terse: a glance tells you what's inside, expand for more.
+ */
+function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
+  const hasNotes = !!todo.notes?.trim();
+  const hasResearch =
+    todo.research?.status === "completed" && !!todo.research.summary;
+  const linkCount = todo.urls?.filter((url) => !url.researchId).length ?? 0;
+
+  if (!hasNotes && !hasResearch && linkCount === 0) return null;
+
+  const badge =
+    "text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted";
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+      {hasNotes && (
+        <span className={badge}>
+          <FileText size={10} />
+          Notes
+        </span>
+      )}
+      {hasResearch && (
+        <span className={badge}>
+          <Sparkles size={10} />
+          Research
+        </span>
+      )}
+      {linkCount > 0 && (
+        <span className={badge}>
+          <Link2 size={10} />
+          {linkCount} {linkCount === 1 ? "link" : "links"}
         </span>
       )}
     </div>
@@ -211,7 +282,7 @@ function TodoItemContent({
                 : "text-sm text-gray"
             }`}
           >
-            {todo.title}
+            <LinkifiedText text={todo.title} />
           </p>
           {(todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
             Date.now() - new Date(todo.createdAt).getTime() < STALE_AI_MS && (
@@ -249,36 +320,49 @@ function TodoItemContent({
             </Button>
           )}
         </div>
-        {!isExpanded &&
-          todo.research?.status === "completed" &&
-          todo.research.summary && (
-            <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
-              {todo.research.summary.replace(/\[\d+\]/g, "")}
-            </p>
-          )}
-        {todo.urls &&
-          (() => {
-            const nonResearchUrls = todo.urls.filter((url) => !url.researchId);
-            if (nonResearchUrls.length === 0) return null;
-            const overflow = nonResearchUrls.length - 2;
-            return (
-              <div className="flex flex-col gap-1 mt-1.5">
-                {isCompleted
-                  ? null
-                  : nonResearchUrls
-                      .slice(0, 2)
-                      .map((url) => <UrlCardCompact key={url.id} url={url} />)}
-                {(isCompleted ? nonResearchUrls.length > 0 : overflow > 0) && (
-                  <span className="text-xs text-gray-muted">
-                    +{isCompleted ? nonResearchUrls.length : overflow}{" "}
-                    {(isCompleted ? nonResearchUrls.length : overflow) === 1
-                      ? "link"
-                      : "links"}
-                  </span>
-                )}
-              </div>
-            );
-          })()}
+        {isCompleted && (
+          <p className="text-xs text-gray-muted mt-0.5">
+            Completed:{" "}
+            {formatDate(todo.completedAt ?? todo.updatedAt, timeZone, {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            })}
+          </p>
+        )}
+        {isCompleted ? (
+          <CompletedContentBadges todo={todo} />
+        ) : (
+          <>
+            {!isExpanded &&
+              todo.research?.status === "completed" &&
+              todo.research.summary && (
+                <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
+                  {todo.research.summary.replace(/\[\d+\]/g, "")}
+                </p>
+              )}
+            {todo.urls &&
+              (() => {
+                const nonResearchUrls = todo.urls.filter(
+                  (url) => !url.researchId,
+                );
+                if (nonResearchUrls.length === 0) return null;
+                const overflow = nonResearchUrls.length - 2;
+                return (
+                  <div className="flex flex-col gap-1 mt-1.5">
+                    {nonResearchUrls.slice(0, 2).map((url) => (
+                      <UrlCardCompact key={url.id} url={url} />
+                    ))}
+                    {overflow > 0 && (
+                      <span className="text-xs text-gray-muted">
+                        +{overflow} {overflow === 1 ? "link" : "links"}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
+          </>
+        )}
         <TodoIndicators todo={todo} />
       </div>
       {/* Actions are hidden in the drag overlay clone so the lifted card
