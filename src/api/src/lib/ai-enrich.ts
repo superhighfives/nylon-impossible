@@ -116,13 +116,20 @@ export async function enrichOrAskWithAI(
       updates.priority = enrichment.priority;
     }
 
+    // Subtasks and recurrence are mutually exclusive. If the model returned
+    // subtasks, they win — the todo becomes a project, not a repeat.
+    const subtaskTitles =
+      enrichment.subtasks && enrichment.subtasks.length > 0
+        ? enrichment.subtasks
+        : null;
+
     // Update recurrence if extracted. A recurrence rule requires a dueDate
     // anchor: either one freshly extracted here, or one the todo already has
     // (e.g. a Google Tasks import, where we preserve the existing due date and
     // so never populate updates.dueDate). If neither exists, drop the rule —
     // we can't safely guess the user's intended occurrence.
     const recurrenceAnchor = updates.dueDate ?? options?.existingDueDate;
-    if (enrichment.recurrence && recurrenceAnchor) {
+    if (enrichment.recurrence && recurrenceAnchor && !subtaskTitles) {
       updates.recurrence = enrichment.recurrence;
     }
 
@@ -130,6 +137,39 @@ export async function enrichOrAskWithAI(
 
     // Notify clients that core AI enrichment is complete
     await notifySync(env, userId);
+
+    // Insert AI-generated subtasks when the todo is a decomposable project.
+    // Each subtask is a full child todo positioned within the sibling group.
+    // Skip if the todo already has children — re-enrichment (e.g. after a
+    // conversation reply) must not duplicate a subtask list.
+    if (subtaskTitles) {
+      const [existingChild] = await db
+        .select({ id: todos.id })
+        .from(todos)
+        .where(eq(todos.parentId, todoId))
+        .limit(1);
+      if (!existingChild) {
+        const subtaskNow = new Date();
+        const positions = generateNKeysBetween(
+          null,
+          null,
+          subtaskTitles.length,
+        );
+        await db.insert(todos).values(
+          subtaskTitles.map((title, i) => ({
+            id: crypto.randomUUID(),
+            userId,
+            parentId: todoId,
+            title: truncateTitle(title),
+            completed: false,
+            position: positions[i],
+            createdAt: subtaskNow,
+            updatedAt: subtaskNow,
+          })),
+        );
+        await notifySync(env, userId);
+      }
+    }
 
     // Handle URLs if extracted
     if (enrichment.urls && enrichment.urls.length > 0) {

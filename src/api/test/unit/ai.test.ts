@@ -178,6 +178,54 @@ describe("enrichTodo", () => {
     });
   });
 
+  describe("subtasks", () => {
+    it("returns subtasks for a decomposable project", async () => {
+      const ai = createMockAi({
+        title: "Plan a birthday party",
+        subtasks: ["Pick a date", "Send invitations", "Order the cake"],
+      });
+
+      const result = await enrichTodo(ai, "Plan a birthday party");
+      expect(result).not.toBeNull();
+      expect(result!.subtasks).toEqual([
+        "Pick a date",
+        "Send invitations",
+        "Order the cake",
+      ]);
+    });
+
+    it("caps subtasks at 6", async () => {
+      const ai = createMockAi({
+        title: "Launch the website",
+        subtasks: ["a", "b", "c", "d", "e", "f", "g", "h"],
+      });
+
+      const result = await enrichTodo(ai, "Launch the website");
+      expect(result!.subtasks).toHaveLength(6);
+    });
+
+    it("trims and drops empty subtask titles", async () => {
+      const ai = createMockAi({
+        title: "Move apartments",
+        subtasks: ["  Pack boxes  ", "", "   ", "Hire movers"],
+      });
+
+      const result = await enrichTodo(ai, "Move apartments");
+      expect(result!.subtasks).toEqual(["Pack boxes", "Hire movers"]);
+    });
+
+    it("drops the subtasks field entirely when all are empty", async () => {
+      const ai = createMockAi({
+        title: "Buy milk",
+        subtasks: ["", "   "],
+      });
+
+      const result = await enrichTodo(ai, "Buy milk");
+      // Title unchanged and nothing else extracted → no enrichment.
+      expect(result).toBeNull();
+    });
+  });
+
   describe("hallucinated URL filtering", () => {
     it("drops invented domains for topic-only input", async () => {
       // Simulates the model hallucinating domains from the topic even though

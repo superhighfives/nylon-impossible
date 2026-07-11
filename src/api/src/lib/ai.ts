@@ -26,6 +26,9 @@ export interface TodoEnrichment {
   searchQuery?: string;
   // Present if the agent decided to ask the user a clarifying question.
   question?: string;
+  // Short subtask titles when the todo is a multi-step project. Mutually
+  // exclusive with recurrence. Empty/absent for simple one-step actions.
+  subtasks?: string[];
 }
 
 // A single turn in a todo's conversation thread, oldest-first, used to
@@ -129,6 +132,14 @@ export const enrichTodoTool = {
           description:
             "ONLY set when research is set. A search-engine-optimized version of the topic for Tavily. Strip imperative verbs and todo framing so the query reflects what the user wants to learn, not the meta-task of researching it. Examples: 'Research dogs' -> 'dogs'; 'Look up white chocolate recipe' -> 'white chocolate recipe'; 'How does OAuth work' -> 'how OAuth works'; 'Book dinner at San Jalisco' -> 'San Jalisco restaurant'. Keep proper nouns and topic-specific words; drop 'research', 'look up', 'find out about', 'check', 'book', etc.",
         },
+        subtasks: {
+          type: "array",
+          description:
+            "Break a multi-step PROJECT into 2-6 short, action-oriented subtasks — only when the todo clearly decomposes into distinct steps a person would tick off (e.g. 'Plan a birthday party', 'Launch the website', 'Onboard a new hire', 'Organize the garage'). Each item is a short imperative task title (e.g. 'Book the venue', 'Send invitations'). Do NOT generate subtasks for simple one-step actions ('Buy milk', 'Email Sarah', 'Call the dentist') or for research/lookup todos — return an empty array or omit. Never exceed 6. Mutually exclusive with recurrence.",
+          items: {
+            type: "string",
+          },
+        },
       },
       required: ["title"],
     },
@@ -180,6 +191,12 @@ RESEARCH DETECTION:
 - Do NOT set research for plain action items (buy, call, email, fix, etc.)
 - WHEN research IS SET, you MUST also populate searchQuery: a Tavily-optimized phrasing of the topic. Strip imperative verbs ("Research", "Look up", "Find out about", "Check", "Book") and todo framing — the query should describe what the user wants to learn, not the act of researching it. Keep proper nouns and topic words. Examples below.
 
+SUBTASKS (breaking a project into steps):
+- When the todo is a multi-step PROJECT that naturally decomposes into distinct steps (e.g. "Plan a birthday party", "Launch the new website", "Move apartments", "Onboard a new hire", "Organize the garage"), populate subtasks with 2-6 short, action-oriented titles.
+- Each subtask is a concise imperative ("Book the venue", "Send invitations", "Order the cake").
+- Do NOT generate subtasks for simple one-step actions ("Buy milk", "Call mom", "Email Sarah") or for research/lookup todos — leave subtasks empty.
+- Subtasks and recurrence are mutually exclusive: never set both on the same todo.
+
 Examples:
 - "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
 - "Research https://google.com" → { title: "Research google.com", urls: ["https://google.com"] }
@@ -201,12 +218,16 @@ Examples:
 - "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" }, searchQuery: "San Jalisco restaurant" }
 - "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" }, searchQuery: "The Rusty Nail bar" }
 - "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" }, searchQuery: "ramen Main St" }
+- "Plan a birthday party" → { title: "Plan a birthday party", subtasks: ["Pick a date", "Make a guest list", "Send invitations", "Order the cake", "Buy decorations"] }
+- "Launch the new website" → { title: "Launch the new website", subtasks: ["Finalize the copy", "Set up hosting", "Test on mobile", "Announce on social"] }
+- "Onboard the new hire" → { title: "Onboard the new hire", subtasks: ["Set up their laptop", "Create accounts", "Schedule intro meetings", "Share the handbook"] }
+- "Buy milk" → { title: "Buy milk" } (no subtasks — single action)
 
 ASKING A CLARIFYING QUESTION:
 - You may also call the ask_user tool to ask ONE short clarifying question, but ONLY when the todo is genuinely unactionable without more info and a short answer would meaningfully improve enrichment. Most todos should NOT trigger a question.
 - When you ask, still call enrich_todo too with whatever you can extract from the current text (partial info is fine).
 - If a conversation history is provided and you have ALREADY asked once, strongly prefer enriching with what you now know — only ask again if something is genuinely still blocking action.
-- Examples that SHOULD ask: "Book a flight" → ask("Where to, and when?"); "Plan birthday party" → ask("Whose birthday, and any date in mind?").
+- Examples that SHOULD ask: "Book a flight" → ask("Where to, and when?").
 - Examples that should NOT ask (enrich only): "Buy milk", "Call mom", "Email Sarah about the Q3 numbers", "Research dog breeds".
 
 Always call the enrich_todo tool with your findings.`;
@@ -474,14 +495,27 @@ export async function enrichTodo(
     }
   }
 
+  // Sanitize subtasks: keep only non-empty strings, trim, cap at 6 (matches the
+  // tool description). Drop the field entirely if nothing survives.
+  if (Array.isArray(enrichment.subtasks)) {
+    enrichment.subtasks = enrichment.subtasks
+      .filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+      .map((t) => t.trim())
+      .slice(0, 6);
+    if (enrichment.subtasks.length === 0) {
+      enrichment.subtasks = undefined;
+    }
+  }
+
   // If nothing was extracted (no URLs, no date, no priority, no research, no
-  // question), return null
+  // question, no subtasks), return null
   const hasEnrichment =
     (enrichment.urls && enrichment.urls.length > 0) ||
     enrichment.dueDate ||
     enrichment.priority ||
     enrichment.research ||
-    enrichment.question;
+    enrichment.question ||
+    (enrichment.subtasks && enrichment.subtasks.length > 0);
 
   if (!hasEnrichment && enrichment.title === text) {
     return null;
