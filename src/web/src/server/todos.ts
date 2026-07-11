@@ -405,7 +405,9 @@ export const updateTodo = createServerFn({ method: "POST" })
                   db
                     .select({ id: todos.id })
                     .from(todos)
-                    .where(eq(todos.parentId, id))
+                    .where(
+                      and(eq(todos.parentId, id), eq(todos.userId, user.id)),
+                    )
                     .limit(1)
                     .get(),
                 catch: (error) =>

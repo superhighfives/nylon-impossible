@@ -256,7 +256,7 @@ export async function updateTodo(c: Context<Env>) {
       const [child] = await db
         .select({ id: todos.id })
         .from(todos)
-        .where(eq(todos.parentId, todoId))
+        .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)))
         .limit(1);
       hasChildren = !!child;
     }

@@ -297,16 +297,20 @@ function TodoItemContent({
           >
             <LinkifiedText text={todo.title} />
           </p>
-          {subtasks.length > 0 && (
-            <span
-              role="img"
-              className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
-              aria-label={`${subtasks.filter((s) => s.completed).length} of ${subtasks.length} subtasks complete`}
-            >
-              <ListTree size={10} aria-hidden="true" />
-              {subtasks.filter((s) => s.completed).length}/{subtasks.length}
-            </span>
-          )}
+          {subtasks.length > 0 &&
+            (() => {
+              const doneSubtasks = subtasks.filter((s) => s.completed).length;
+              return (
+                <span
+                  role="img"
+                  className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
+                  aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
+                >
+                  <ListTree size={10} aria-hidden="true" />
+                  {doneSubtasks}/{subtasks.length}
+                </span>
+              );
+            })()}
           {(todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
             Date.now() - new Date(todo.createdAt).getTime() < STALE_AI_MS && (
               <output

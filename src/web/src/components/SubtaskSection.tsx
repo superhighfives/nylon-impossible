@@ -161,12 +161,12 @@ export function SubtaskSection({
 
   // Active subtasks order by position; completed sink to the bottom and are not
   // reorderable.
-  const active = subtasks
-    .filter((s) => !s.completed)
-    .sort((a, b) => (a.position < b.position ? -1 : 1));
-  const completed = subtasks
-    .filter((s) => s.completed)
-    .sort((a, b) => (a.position < b.position ? -1 : 1));
+  // Fractional-index keys are ASCII, so compare by codepoint (not locale). The
+  // 0 case keeps equal positions stable instead of forcing a reorder.
+  const byPosition = (a: TodoWithUrls, b: TodoWithUrls) =>
+    a.position < b.position ? -1 : a.position > b.position ? 1 : 0;
+  const active = subtasks.filter((s) => !s.completed).sort(byPosition);
+  const completed = subtasks.filter((s) => s.completed).sort(byPosition);
   const done = completed.length;
   const total = subtasks.length;
 
