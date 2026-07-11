@@ -4,9 +4,9 @@ import { Button } from "./ui";
 
 const features = [
   {
-    title: "AI task creation",
+    title: "Capture in a keystroke",
     description:
-      "Type naturally — due dates, priorities, and URLs are parsed automatically using Workers AI.",
+      "Jot down anything and it's saved instantly. Paste a link and get a rich preview automatically.",
   },
   {
     title: "Real-time sync",
@@ -19,7 +19,7 @@ const features = [
       "A SwiftUI app with Siri integration and Share Sheet support, synced to the same account.",
   },
   {
-    title: "Optimistic sync",
+    title: "Works offline",
     description:
       "Optimistic updates keep the UI fast. Changes sync automatically when you're back online.",
   },
@@ -49,8 +49,8 @@ export function LandingPage() {
             Nylon Impossible
           </h1>
           <p className="text-gray-muted leading-relaxed max-w-xs mx-auto">
-            A todo app for web and iOS. Describe what you need to do — AI
-            handles the rest.
+            A fast todo app for web and iOS. Capture anything, and keep it in
+            sync everywhere.
           </p>
         </div>
         <div className="flex flex-col gap-3 text-sm">

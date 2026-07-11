@@ -31,7 +31,7 @@ describe("LandingPage", () => {
     render(<LandingPage />);
     expect(
       screen.getByText(
-        "A todo app for web and iOS. Describe what you need to do — AI handles the rest.",
+        "A fast todo app for web and iOS. Capture anything, and keep it in sync everywhere.",
       ),
     ).toBeInTheDocument();
   });

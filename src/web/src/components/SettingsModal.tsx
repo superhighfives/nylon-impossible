@@ -187,26 +187,30 @@ export function SettingsModal() {
               </div>
             ) : (
               <>
-                <Field
-                  label="Your location"
-                  description="Used to find local venues when researching location todos."
-                >
-                  <Input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Los Angeles, CA"
-                    disabled={updateUser.isPending || isLocating}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleUseCurrentLocation}
-                    disabled={updateUser.isPending || isLocating}
-                    className="flex items-center gap-1.5 text-xs text-gray-muted hover:text-gray transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                {/* Location only feeds AI location research, so it's a
+                    Pro-only setting alongside the AI toggle below. */}
+                {user?.plan === "pro" && (
+                  <Field
+                    label="Your location"
+                    description="Used to find local venues when researching location todos."
                   >
-                    <MapPin size={12} />
-                    {isLocating ? "Locating…" : "Use current location"}
-                  </button>
-                </Field>
+                    <Input
+                      value={location}
+                      onChange={(e) => setLocation(e.target.value)}
+                      placeholder="e.g. Los Angeles, CA"
+                      disabled={updateUser.isPending || isLocating}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleUseCurrentLocation}
+                      disabled={updateUser.isPending || isLocating}
+                      className="flex items-center gap-1.5 text-xs text-gray-muted hover:text-gray transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                    >
+                      <MapPin size={12} />
+                      {isLocating ? "Locating…" : "Use current location"}
+                    </button>
+                  </Field>
+                )}
                 <Field
                   label="Appearance"
                   description="System follows your device's light or dark setting."

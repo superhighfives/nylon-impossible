@@ -213,6 +213,35 @@ describe("Research functionality", () => {
       expect(research.id).toBe(body.id);
     });
 
+    it("returns 403 pro_required for a free-plan user", async () => {
+      const db = getDb(env.DB);
+      const now = new Date();
+      const todoId = "550e8400-e29b-41d4-a716-446655440099";
+
+      mockVerifyToken.mockResolvedValue({ sub: "user_free" });
+      await seedUser("user_free", "free@example.com", { plan: "free" });
+      await db.insert(todos).values({
+        id: todoId,
+        userId: "user_free",
+        title: "How does OAuth work",
+        position: "a0",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const res = await reresearchRequest(todoId);
+      expect(res.status).toBe(403);
+      const body = await res.json<any>();
+      expect(body.code).toBe("pro_required");
+
+      // No research record should have been created.
+      const rows = await db
+        .select()
+        .from(todoResearch)
+        .where(eq(todoResearch.todoId, todoId));
+      expect(rows).toHaveLength(0);
+    });
+
     it("deletes existing research and creates new one", async () => {
       const db = getDb(env.DB);
       const now = new Date();
