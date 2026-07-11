@@ -10,6 +10,7 @@ import {
   getDb,
   gt,
   inArray,
+  isNotNull,
   lists,
   type Todo,
   type TodoMessage,
@@ -38,6 +39,9 @@ const syncRequestSchema = z.object({
   changes: z.array(
     z.object({
       id: z.string().uuid(),
+      // Parent todo id for subtasks; null/absent for top-level todos. Honoured
+      // only on create — parentId is immutable, so it is ignored on update.
+      parentId: z.string().uuid().nullable().optional(),
       title: z.string().min(1).optional(),
       notes: z.string().max(10000).nullable().optional(),
       completed: z.boolean().optional(),
@@ -64,6 +68,21 @@ interface SyncConflict {
   resolution: "local" | "remote";
   localUpdatedAt: Date;
   remoteUpdatedAt: Date;
+}
+
+function sortChangesForApply(
+  changes: Array<(typeof syncRequestSchema)["_output"]["changes"][number]>,
+) {
+  const getRank = (parentId: string | null | undefined) => (parentId ? 1 : 0);
+  return changes
+    .map((change, originalIndex) => ({ change, originalIndex }))
+    .sort((a, b) => {
+      const aRank = getRank(a.change.parentId);
+      const bRank = getRank(b.change.parentId);
+      return aRank === bRank
+        ? a.originalIndex - b.originalIndex
+        : aRank - bRank;
+    });
 }
 
 // Serialize a URL with explicit ISO8601 dates and lowercase IDs
@@ -122,6 +141,7 @@ function serializeTodo(
   return {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
+    parentId: todo.parentId?.toLowerCase() ?? null,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -255,7 +275,9 @@ export async function syncTodos(c: Context<Env>) {
 
   // 1. Apply client changes (with conflict resolution)
   // Normalize UUIDs to lowercase to match web-generated IDs
-  for (const change of changes) {
+  for (const { change, originalIndex: changeIndex } of sortChangesForApply(
+    changes,
+  )) {
     const normalizedId = change.id.toLowerCase();
 
     const [existing] = await db
@@ -282,10 +304,27 @@ export async function syncTodos(c: Context<Env>) {
     } else if (existing) {
       // Update existing - last write wins
       if (change.updatedAt >= existing.updatedAt) {
-        const nextRecurrence =
+        let nextRecurrence =
           change.recurrence !== undefined
             ? change.recurrence
             : existing.recurrence;
+        // Recurrence and subtasks are mutually exclusive. A subtask never
+        // recurs, and a todo that has children can't recur. Enforce here so an
+        // old or direct client can't reach the illegal state.
+        if (nextRecurrence) {
+          if (existing.parentId) {
+            nextRecurrence = null;
+          } else {
+            const [child] = await db
+              .select({ id: todos.id })
+              .from(todos)
+              .where(
+                and(eq(todos.parentId, normalizedId), eq(todos.userId, userId)),
+              )
+              .limit(1);
+            if (child) nextRecurrence = null;
+          }
+        }
         const nextDueDateValue =
           change.dueDate !== undefined ? change.dueDate : existing.dueDate;
         const completing =
@@ -328,6 +367,22 @@ export async function syncTodos(c: Context<Env>) {
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
+        // Completion cascade: toggling a top-level todo's completed flag
+        // cascades to its subtasks (checking completes them; unchecking reopens
+        // them). Subtasks never recur, so completedAt stays null like ordinary
+        // completions. Bumping updatedAt makes children appear in the next pull.
+        if (
+          !existing.parentId &&
+          change.completed !== undefined &&
+          change.completed !== existing.completed
+        ) {
+          await db
+            .update(todos)
+            .set({ completed: change.completed, updatedAt: change.updatedAt })
+            .where(
+              and(eq(todos.parentId, normalizedId), eq(todos.userId, userId)),
+            );
+        }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({
             todoId: normalizedId,
@@ -354,9 +409,31 @@ export async function syncTodos(c: Context<Env>) {
     } else {
       // Create new
       if (change.title) {
+        const parentId = change.parentId?.toLowerCase() ?? null;
+        if (parentId) {
+          const [parentTodo] = await db
+            .select({ id: todos.id, parentId: todos.parentId })
+            .from(todos)
+            .where(and(eq(todos.id, parentId), eq(todos.userId, userId)))
+            .limit(1);
+          if (!parentTodo || parentTodo.parentId !== null) {
+            return apiError(c, "validation_failed", {
+              message:
+                "parentId must reference one of the user's top-level todos",
+              details: [
+                {
+                  path: ["changes", changeIndex, "parentId"],
+                  message:
+                    "parentId must reference one of the user's top-level todos",
+                },
+              ],
+            });
+          }
+        }
         await db.insert(todos).values({
           id: normalizedId,
           userId,
+          parentId,
           title: truncateTitle(change.title),
           notes: change.notes ?? null,
           completed: change.completed ?? false,
@@ -364,10 +441,26 @@ export async function syncTodos(c: Context<Env>) {
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
           priority: change.priority ?? null,
-          recurrence: change.recurrence ?? null,
+          // A subtask never recurs (recurrence is top-level only).
+          recurrence: parentId ? null : (change.recurrence ?? null),
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });
+        // Adding a subtask to a recurring parent clears the parent's recurrence
+        // (mutually exclusive; the explicit subtask wins). The isNotNull guard
+        // means we only write — and bump updatedAt — when there's one to clear.
+        if (parentId) {
+          await db
+            .update(todos)
+            .set({ recurrence: null, updatedAt: change.updatedAt })
+            .where(
+              and(
+                eq(todos.id, parentId),
+                eq(todos.userId, userId),
+                isNotNull(todos.recurrence),
+              ),
+            );
+        }
         if (change.urls && change.urls.length > 0) {
           urlExtractionNeeded.push({
             todoId: normalizedId,

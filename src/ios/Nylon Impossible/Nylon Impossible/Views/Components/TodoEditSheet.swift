@@ -10,8 +10,13 @@ import SwiftUI
 struct TodoEditSheet: View {
     let todo: TodoItem
     let apiService: APIService?
+    let subtasks: [TodoItem]
     var onSave: (String, String?, Date?, TodoPriority?, Recurrence?) -> Void
     var onCancel: () -> Void
+    var onAddSubtask: (String) -> Void
+    var onToggleSubtask: (TodoItem) -> Void
+    var onDeleteSubtask: (TodoItem) -> Void
+    var onMoveSubtask: (IndexSet, Int) -> Void
 
     @Environment(UserPreferencesService.self) private var preferencesService
     @State private var title: String
@@ -24,18 +29,29 @@ struct TodoEditSheet: View {
     @State private var research: APIResearch?
     @State private var isLoadingUrls: Bool = false
     @State private var isReresearching: Bool = false
+    @State private var newSubtaskTitle: String = ""
 
     init(
         todo: TodoItem,
         apiService: APIService? = nil,
         initialUrls: [APITodoUrl] = [],
+        subtasks: [TodoItem] = [],
         onSave: @escaping (String, String?, Date?, TodoPriority?, Recurrence?) -> Void,
-        onCancel: @escaping () -> Void
+        onCancel: @escaping () -> Void,
+        onAddSubtask: @escaping (String) -> Void = { _ in },
+        onToggleSubtask: @escaping (TodoItem) -> Void = { _ in },
+        onDeleteSubtask: @escaping (TodoItem) -> Void = { _ in },
+        onMoveSubtask: @escaping (IndexSet, Int) -> Void = { _, _ in }
     ) {
         self.todo = todo
         self.apiService = apiService
+        self.subtasks = subtasks
         self.onSave = onSave
         self.onCancel = onCancel
+        self.onAddSubtask = onAddSubtask
+        self.onToggleSubtask = onToggleSubtask
+        self.onDeleteSubtask = onDeleteSubtask
+        self.onMoveSubtask = onMoveSubtask
 
         _title = State(initialValue: todo.title)
         _notes = State(initialValue: todo.itemNotes ?? "")
@@ -115,28 +131,37 @@ struct TodoEditSheet: View {
                 }
 
                 // Recurrence — disabled until a due date is set, since the
-                // rule has no anchor without one.
-                Section {
-                    Picker("Repeat", selection: $recurrenceFrequency) {
-                        Text("None").tag(nil as RecurrenceFrequency?)
-                        Text(weeklyLabel).tag(RecurrenceFrequency.weekly as RecurrenceFrequency?)
-                        Text("Daily").tag(RecurrenceFrequency.daily as RecurrenceFrequency?)
-                        Text(monthlyLabel).tag(RecurrenceFrequency.monthly as RecurrenceFrequency?)
-                        Text("Yearly").tag(RecurrenceFrequency.yearly as RecurrenceFrequency?)
+                // rule has no anchor without one. Hidden when the todo has
+                // subtasks: recurrence and subtasks are mutually exclusive.
+                if subtasks.isEmpty {
+                    Section {
+                        Picker("Repeat", selection: $recurrenceFrequency) {
+                            Text("None").tag(nil as RecurrenceFrequency?)
+                            Text(weeklyLabel).tag(RecurrenceFrequency.weekly as RecurrenceFrequency?)
+                            Text("Daily").tag(RecurrenceFrequency.daily as RecurrenceFrequency?)
+                            Text(monthlyLabel).tag(RecurrenceFrequency.monthly as RecurrenceFrequency?)
+                            Text("Yearly").tag(RecurrenceFrequency.yearly as RecurrenceFrequency?)
+                        }
+                        .pickerStyle(.menu)
+                        .disabled(!hasDueDate)
+                    } header: {
+                        Text("Repeat")
+                    } footer: {
+                        if !hasDueDate {
+                            Text("Set a due date to enable repeats.")
+                        }
                     }
-                    .pickerStyle(.menu)
-                    .disabled(!hasDueDate)
-                } header: {
-                    Text("Repeat")
-                } footer: {
-                    if !hasDueDate {
-                        Text("Set a due date to enable repeats.")
+                    .onChange(of: hasDueDate) { _, hasDate in
+                        if !hasDate { recurrenceFrequency = nil }
                     }
                 }
-                .onChange(of: hasDueDate) { _, hasDate in
-                    if !hasDate { recurrenceFrequency = nil }
+
+                // Subtasks — hidden on a recurring todo (mutually exclusive with
+                // recurrence). Once a subtask is added, the Repeat section hides.
+                if recurrenceFrequency == nil {
+                    subtasksSection
                 }
-                
+
                 // Research
                 if let research {
                     ResearchSection(
@@ -199,6 +224,85 @@ struct TodoEditSheet: View {
         }
     }
     
+    // Active subtasks order by position; completed sink to the bottom.
+    private var activeSubtasks: [TodoItem] {
+        subtasks.filter { !$0.isCompleted }.sorted { $0.position < $1.position }
+    }
+
+    private var completedSubtasks: [TodoItem] {
+        subtasks.filter { $0.isCompleted }.sorted { $0.position < $1.position }
+    }
+
+    @ViewBuilder
+    private var subtasksSection: some View {
+        Section {
+            ForEach(activeSubtasks) { subtask in
+                subtaskRow(subtask)
+            }
+            .onMove(perform: onMoveSubtask)
+            .onDelete { offsets in
+                for index in offsets { onDeleteSubtask(activeSubtasks[index]) }
+            }
+
+            // Completed subtasks pinned to the bottom, not reorderable.
+            ForEach(completedSubtasks) { subtask in
+                subtaskRow(subtask)
+                    .moveDisabled(true)
+            }
+            .onDelete { offsets in
+                for index in offsets { onDeleteSubtask(completedSubtasks[index]) }
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Color.appSubtle)
+                TextField("Add a subtask...", text: $newSubtaskTitle)
+                    .onSubmit(addSubtask)
+                if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button("Add", action: addSubtask)
+                        .font(.caption)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Subtasks")
+                if !subtasks.isEmpty {
+                    Spacer()
+                    Text("\(completedSubtasks.count)/\(subtasks.count)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func subtaskRow(_ subtask: TodoItem) -> some View {
+        Button {
+            onToggleSubtask(subtask)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appLine)
+                Text(subtask.title)
+                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appDefault)
+                    .strikethrough(subtask.isCompleted, color: Color.appSubtle)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addSubtask() {
+        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        recurrenceFrequency = nil
+        onAddSubtask(trimmed)
+        newSubtaskTitle = ""
+    }
+
     private func saveChanges() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
@@ -206,8 +310,8 @@ struct TodoEditSheet: View {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let notesValue = trimmedNotes.isEmpty ? nil : trimmedNotes
         let dueDateValue = hasDueDate ? dueDate : nil
-        let recurrenceValue: Recurrence? = (hasDueDate && recurrenceFrequency != nil)
-            ? Recurrence(frequency: recurrenceFrequency!)
+        let recurrenceValue: Recurrence? = (hasDueDate && subtasks.isEmpty)
+            ? recurrenceFrequency.map { Recurrence(frequency: $0) }
             : nil
 
         onSave(trimmedTitle, notesValue, dueDateValue, priority, recurrenceValue)

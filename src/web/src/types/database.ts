@@ -17,6 +17,8 @@ export interface CreateTodoInput {
   dueDate?: Date | null;
   priority?: "high" | "low" | null;
   recurrence?: Recurrence | null;
+  // Parent todo id when creating a subtask; omit/null for a top-level todo.
+  parentId?: string | null;
 }
 
 export interface UpdateTodoInput {
@@ -86,6 +88,7 @@ export interface SerializedTodoUrl {
 export interface TodoWithUrls {
   id: string;
   userId: string;
+  parentId: string | null;
   title: string;
   notes: string | null;
   completed: boolean;

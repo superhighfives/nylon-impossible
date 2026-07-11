@@ -40,6 +40,12 @@ struct Recurrence: Codable, Sendable, Equatable {
 final class TodoItem {
     var id: UUID
     var userId: String?           // Clerk user ID (nil for local-only todos)
+    // Parent todo id for subtasks; nil for top-level todos. One level only (a
+    // subtask can't have subtasks) and immutable after creation. Stored as a
+    // plain id rather than a SwiftData relationship — grouping and cascade are
+    // handled explicitly, which avoids self-referential relationship pitfalls
+    // and keeps the wire mapping trivial.
+    var parentId: UUID?
     var title: String
     var itemNotes: String?  // Optional notes
     var isCompleted: Bool
@@ -71,6 +77,7 @@ final class TodoItem {
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
         self.userId = userId
+        self.parentId = nil
         self.title = title
         self.itemNotes = nil
         self.isCompleted = false

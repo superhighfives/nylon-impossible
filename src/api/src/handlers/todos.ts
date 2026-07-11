@@ -46,6 +46,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
   return {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
+    parentId: todo.parentId?.toLowerCase() ?? null,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -215,8 +216,9 @@ export async function updateTodo(c: Context<Env>) {
     return apiError(c, "todo_not_found");
   }
 
+  const updatedAt = parsed.data.updatedAt ?? new Date();
   const updates: Record<string, unknown> = {
-    updatedAt: parsed.data.updatedAt ?? new Date(),
+    updatedAt,
   };
 
   if (parsed.data.title !== undefined) updates.title = parsed.data.title;
@@ -241,10 +243,26 @@ export async function updateTodo(c: Context<Env>) {
   // same advance optimistically; the server's result is authoritative.
   const completingRow =
     parsed.data.completed === true && existing.completed === false;
-  const recurrence =
+  // Recurrence and subtasks are mutually exclusive. A subtask never recurs, and
+  // a todo with children can't recur. Enforce server-side.
+  let recurrence =
     parsed.data.recurrence !== undefined
       ? parsed.data.recurrence
       : existing.recurrence;
+  if (recurrence) {
+    const isSubtask = existing.parentId != null;
+    let hasChildren = false;
+    if (!isSubtask) {
+      const [child] = await db
+        .select({ id: todos.id })
+        .from(todos)
+        .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)))
+        .limit(1);
+      hasChildren = !!child;
+    }
+    if (isSubtask || hasChildren) recurrence = null;
+  }
+  if (parsed.data.recurrence !== undefined) updates.recurrence = recurrence;
   const anchor =
     parsed.data.dueDate !== undefined ? parsed.data.dueDate : existing.dueDate;
   if (completingRow && recurrence && anchor) {
@@ -271,6 +289,20 @@ export async function updateTodo(c: Context<Env>) {
     .update(todos)
     .set(updates)
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
+
+  // Completion cascade: toggling a top-level todo's completed flag cascades to
+  // its subtasks (checking completes them; unchecking reopens them). Subtasks
+  // never recur, so completedAt stays null like ordinary completions.
+  if (
+    existing.parentId == null &&
+    parsed.data.completed !== undefined &&
+    parsed.data.completed !== existing.completed
+  ) {
+    await db
+      .update(todos)
+      .set({ completed: parsed.data.completed, updatedAt })
+      .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)));
+  }
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
 

@@ -244,6 +244,8 @@ final class SyncService {
             return TodoChange(
                 // Normalize UUID to lowercase to match web-generated IDs in D1
                 id: todo.id.uuidString.lowercased(),
+                // Immutable; honoured only on create, but harmless to resend.
+                parentId: todo.isDeleted ? nil : todo.parentId?.uuidString.lowercased(),
                 title: todo.isDeleted ? nil : todo.title,
                 notes: todo.isDeleted ? nil : todo.itemNotes,
                 completed: todo.isDeleted ? nil : todo.isCompleted,
@@ -257,6 +259,7 @@ final class SyncService {
                 urls: pendingUrlChanges
             )
         }
+        .orderedForSync()
     }
 
     /// Apply all sync changes in a single atomic operation
@@ -291,6 +294,7 @@ final class SyncService {
                 // Conflict: compare updatedAt, last write wins
                 if remote.updatedAt > local.updatedAt {
                     local.title = remote.title
+                    local.parentId = remote.parentId.flatMap { UUID(uuidString: $0) }
                     local.itemNotes = remote.notes
                     local.isCompleted = remote.completed
                     local.completedAt = remote.completedAt
@@ -316,6 +320,7 @@ final class SyncService {
                 // New remote item - create locally
                 let todo = TodoItem(title: remote.title, userId: userId, position: remote.position ?? "a0")
                 todo.id = remoteId
+                todo.parentId = remote.parentId.flatMap { UUID(uuidString: $0) }
                 todo.itemNotes = remote.notes
                 todo.isCompleted = remote.completed
                 todo.completedAt = remote.completedAt

@@ -20,8 +20,15 @@ struct ContentView: View {
     // re-runs body, which recomputes the sorted/filtered lists.
     @State private var midnightTick = 0
 
+    // Subtasks live inside their parent's edit sheet, not as their own rows, so
+    // the main list is top-level todos only.
     private var sortedTodosList: [TodoItem] {
-        viewModel.sortedTodos(from: todos)
+        viewModel.sortedTodos(from: todos.filter { $0.parentId == nil })
+    }
+
+    /// A todo's subtasks (active + completed), excluding soft-deleted.
+    private func subtasks(of todo: TodoItem) -> [TodoItem] {
+        todos.filter { $0.parentId == todo.id && !$0.isDeleted }
     }
 
     /// Sleeps until just past the next local midnight, bumps `midnightTick`, and
@@ -205,6 +212,7 @@ struct ContentView: View {
             todo: todo,
             apiService: syncService.apiService,
             urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
+            subtasks: subtasks(of: todo),
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: todos)
                 syncService.syncAfterAction()
@@ -217,6 +225,33 @@ struct ContentView: View {
                     dueDate: dueDate,
                     priority: priority,
                     recurrence: recurrence
+                )
+                syncService.syncAfterAction()
+            },
+            onAddSubtask: { title in
+                viewModel.addSubtask(
+                    title: title,
+                    parent: todo,
+                    context: modelContext,
+                    userId: authService.userId,
+                    allTodos: todos
+                )
+                syncService.syncAfterAction()
+            },
+            onToggleSubtask: { subtask in
+                viewModel.toggleSubtask(subtask)
+                syncService.syncAfterAction()
+            },
+            onDeleteSubtask: { subtask in
+                viewModel.deleteTodo(subtask, context: modelContext)
+                syncService.syncAfterAction()
+            },
+            onMoveSubtask: { source, destination in
+                viewModel.moveSubtask(
+                    from: source,
+                    to: destination,
+                    parent: todo,
+                    allTodos: todos
                 )
                 syncService.syncAfterAction()
             }

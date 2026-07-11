@@ -98,6 +98,7 @@ export function useCreateTodo() {
       const optimisticTodo: TodoWithUrls = {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
+        parentId: input.parentId ?? null,
         title: input.title,
         notes: input.notes ?? null,
         completed: false,
@@ -175,6 +176,16 @@ export function useUpdateTodo() {
         queryClient.setQueryData<TodoWithUrls[]>(
           TODOS_QUERY_KEY,
           previousTodos.map((todo) => {
+            // Completion cascade: toggling a parent optimistically toggles its
+            // subtasks, mirroring the server. Subtasks never recur, so this is a
+            // plain flip.
+            if (
+              todo.parentId === id &&
+              input.completed !== undefined &&
+              todo.completed !== input.completed
+            ) {
+              return { ...todo, completed: input.completed };
+            }
             if (todo.id !== id) return todo;
             // Build optimistic update, converting Date to ISO string
             const merged: TodoWithUrls = {

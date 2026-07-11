@@ -113,6 +113,7 @@ struct APIServiceTests {
         let encoder = makeEncoder()
         let change = TodoChange(
             id: "abc-123",
+            parentId: nil,
             title: nil,
             notes: nil,
             completed: true,

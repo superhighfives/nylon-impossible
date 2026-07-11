@@ -3,7 +3,7 @@ import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
-import { eq, getDb, todos, todoUrls, users } from "../lib/db";
+import { and, eq, getDb, isNull, todos, todoUrls, users } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import {
   cleanUrlString,
@@ -21,6 +21,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
   return {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
+    parentId: todo.parentId?.toLowerCase() ?? null,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -105,11 +106,13 @@ export async function smartCreate(c: Context<Env>) {
   // Free users always take the fast path regardless of their aiEnabled preference.
   const useAI = c.get("aiEnabled") && c.get("plan") === "pro";
 
-  // Get the lowest position so new todo is prepended at the start
+  // Get the lowest top-level position so the new todo is prepended at the start
+  // of the top-level list (subtasks order within their own sibling group, so
+  // exclude them here).
   const firstTodo = await db
     .select({ position: todos.position })
     .from(todos)
-    .where(eq(todos.userId, userId))
+    .where(and(eq(todos.userId, userId), isNull(todos.parentId)))
     .orderBy(todos.position)
     .limit(1)
     .then((rows) => rows[0]);

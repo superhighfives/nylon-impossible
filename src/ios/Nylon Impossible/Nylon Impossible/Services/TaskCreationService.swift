@@ -55,6 +55,44 @@ enum TaskCreationService {
         return todo
     }
     
+    /// Create a subtask under a parent todo. Positioned at the end of the
+    /// parent's active sibling group. Recurrence and subtasks are mutually
+    /// exclusive, so adding a subtask clears a recurring parent's recurrence.
+    @MainActor
+    static func createSubtask(
+        title: String,
+        parent: TodoItem,
+        userId: String?,
+        context: ModelContext,
+        allTodos: [TodoItem]
+    ) -> TodoItem {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let lastPosition = allTodos
+            .filter { $0.parentId == parent.id && !$0.isDeleted && !$0.isCompleted }
+            .max { $0.position < $1.position }?
+            .position
+
+        let position = generateKeyBetween(lastPosition, nil)
+
+        let todo = TodoItem(title: trimmedTitle, userId: userId, position: position)
+        todo.parentId = parent.id
+        context.insert(todo)
+
+        if parent.recurrence != nil {
+            parent.recurrence = nil
+            parent.markModified()
+        }
+
+        do {
+            try context.save()
+        } catch {
+            print("Failed to save subtask: \(error)")
+        }
+
+        return todo
+    }
+
     /// Create a todo item with an associated URL
     /// URL will be synced and metadata fetched by the server
     @MainActor

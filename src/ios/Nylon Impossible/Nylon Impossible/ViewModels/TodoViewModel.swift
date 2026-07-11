@@ -126,17 +126,95 @@ final class TodoViewModel {
             return
         }
         if todo.isCompleted {
-            // Unchecking: move to end of incomplete list so it doesn't snap back to original position
+            // Unchecking: move to end of the incomplete top-level list so it
+            // doesn't snap back to its original position. Scoped to top-level
+            // siblings so subtask positions don't interfere.
             let incompleteTodos = allTodos
-                .filter { !$0.isDeleted && !$0.isEffectivelyCompleted && $0.id != todo.id }
+                .filter { !$0.isDeleted && !$0.isEffectivelyCompleted && $0.parentId == nil && $0.id != todo.id }
                 .sorted { $0.position < $1.position }
             todo.position = generateKeyBetween(incompleteTodos.last?.position, nil)
         }
         todo.isCompleted.toggle()
         todo.markModified()
+        // Completion cascade: a parent is a master switch over its subtasks.
+        // Checking completes them all; unchecking reopens them. A todo with
+        // subtasks never recurs, so only this plain path reaches children.
+        let newCompleted = todo.isCompleted
+        for child in allTodos where child.parentId == todo.id && !child.isDeleted {
+            if child.isCompleted != newCompleted {
+                child.isCompleted = newCompleted
+                child.markModified()
+            }
+        }
+    }
+
+    /// Toggle a subtask's completion. A subtask never recurs and has no
+    /// children, so this is a plain flip (no repeat handling, no cascade).
+    func toggleSubtask(_ subtask: TodoItem) {
+        subtask.isCompleted.toggle()
+        subtask.completedAt = nil
+        subtask.markModified()
+    }
+
+    /// Create a subtask under `parent`.
+    func addSubtask(
+        title: String,
+        parent: TodoItem,
+        context: ModelContext,
+        userId: String?,
+        allTodos: [TodoItem]
+    ) {
+        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        _ = TaskCreationService.createSubtask(
+            title: title,
+            parent: parent,
+            userId: userId,
+            context: context,
+            allTodos: allTodos
+        )
+    }
+
+    /// Reorder active subtasks within a parent's sibling group.
+    func moveSubtask(
+        from source: IndexSet,
+        to destination: Int,
+        parent: TodoItem,
+        allTodos: [TodoItem]
+    ) {
+        var active = allTodos
+            .filter { $0.parentId == parent.id && !$0.isDeleted && !$0.isCompleted }
+            .sorted { $0.position < $1.position }
+
+        active.move(fromOffsets: source, toOffset: destination)
+
+        guard let sourceIndex = source.first else { return }
+        let actualDestination = destination > sourceIndex ? destination - 1 : destination
+
+        let movedItem = active[actualDestination]
+        let prevPosition: String? = actualDestination > 0
+            ? active[actualDestination - 1].position : nil
+        let nextPosition: String? = actualDestination < active.count - 1
+            ? active[actualDestination + 1].position : nil
+
+        movedItem.position = generateKeyBetween(prevPosition, nextPosition)
+        movedItem.markModified()
     }
 
     func deleteTodo(_ todo: TodoItem, context: ModelContext) {
+        let todoId = todo.id
+        let childDescriptor = FetchDescriptor<TodoItem>(
+            predicate: #Predicate { $0.parentId == todoId }
+        )
+        let children = (try? context.fetch(childDescriptor)) ?? []
+
+        for child in children {
+            deleteSingleTodo(child, context: context)
+        }
+
+        deleteSingleTodo(todo, context: context)
+    }
+
+    private func deleteSingleTodo(_ todo: TodoItem, context: ModelContext) {
         // Soft delete for sync - mark as deleted rather than removing
         if todo.userId != nil {
             todo.isDeleted = true

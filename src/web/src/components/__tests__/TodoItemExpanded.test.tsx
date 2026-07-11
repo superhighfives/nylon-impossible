@@ -25,6 +25,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   return {
     id: "todo-1",
     userId: "user-1",
+    parentId: null,
     title: "Buy milk",
     notes: null,
     completed: false,
@@ -50,10 +51,15 @@ function renderExpanded(overrides: Partial<TodoWithUrls> = {}) {
   render(
     <TodoItemExpanded
       todo={makeTodo(overrides)}
+      subtasks={[]}
       onUpdate={onUpdate}
       isUpdating={false}
       onDelete={onDelete}
       deletePending={false}
+      onAddSubtask={vi.fn()}
+      onToggleSubtask={vi.fn()}
+      onDeleteSubtask={vi.fn()}
+      onReorderSubtask={vi.fn()}
     />,
   );
   return { onUpdate, onDelete };
