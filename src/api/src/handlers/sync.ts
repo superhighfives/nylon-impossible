@@ -413,7 +413,7 @@ export async function syncTodos(c: Context<Env>) {
             .from(todos)
             .where(and(eq(todos.id, parentId), eq(todos.userId, userId)))
             .limit(1);
-          if (!parent || parent.parentId) {
+          if (!parent || parent.parentId !== null) {
             return apiError(c, "validation_failed", {
               message:
                 "parentId must reference one of the user's top-level todos",

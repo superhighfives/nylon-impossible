@@ -234,7 +234,7 @@ export const createTodo = createServerFn({ method: "POST" })
                 cause: error,
               }),
           });
-          if (!parent || parent.parentId != null) {
+          if (!parent || parent.parentId !== null) {
             return yield* new ValidationError({
               errors: [
                 {
