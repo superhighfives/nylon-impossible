@@ -1,3 +1,4 @@
+import { getSocialUrlInfo } from "@/lib/social-urls";
 import type { SerializedTodoUrl } from "@/types/database";
 
 export interface UrlDisplay {
@@ -48,6 +49,47 @@ export function getUrlDisplay(url: SerializedTodoUrl): UrlDisplay {
     isPending,
     isFailed,
   };
+}
+
+/**
+ * The single user-facing URL of a "URL-only" todo — one whose title is just the
+ * URL itself or the auto-generated "Check {domain}" placeholder, and that has
+ * exactly one non-research link. Returns null for todos with a real,
+ * user-written title or with zero/multiple links so their rendering is
+ * untouched.
+ */
+export function getUrlOnlyUrl(todo: {
+  title: string;
+  urls: SerializedTodoUrl[];
+}): SerializedTodoUrl | null {
+  const links = todo.urls.filter((url) => !url.researchId);
+  if (links.length !== 1) return null;
+  const url = links[0];
+  const title = todo.title.trim();
+  if (title === url.url.trim()) return url;
+
+  let domain: string | null = null;
+  try {
+    domain = new URL(url.url).hostname.replace(/^www\./, "");
+  } catch {
+    // Malformed URL — no domain to match against.
+  }
+  if (domain && title === `Check ${domain}`) return url;
+  return null;
+}
+
+/**
+ * Best human-readable title for a fetched URL — the author name for social
+ * links (parsed from "Name (@handle) …" og:titles), otherwise the page title or
+ * site name. Null when the URL hasn't been fetched or has no usable title.
+ */
+export function getFetchedPreviewTitle(url: SerializedTodoUrl): string | null {
+  if (url.fetchStatus !== "fetched") return null;
+  if (getSocialUrlInfo(url.url) && url.title) {
+    const match = url.title.match(/^(.+?)\s+\(@([^)]+)\)/);
+    return match ? match[1].trim() : url.title;
+  }
+  return url.title ?? url.siteName ?? null;
 }
 
 /**

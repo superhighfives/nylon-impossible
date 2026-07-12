@@ -54,6 +54,7 @@ import { useUpdateUser, useUser } from "@/hooks/useUser";
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
+import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
@@ -271,6 +272,13 @@ function TodoItemContent({
   // A repeat completed today reads as done (checkbox, strike-through) until the
   // user's local midnight, even though `completed` stays false in the DB.
   const isCompleted = isEffectivelyCompleted(todo, timeZone, new Date());
+  // A todo that is essentially just a captured URL renders the fetched page
+  // title as its main line with the URL as a subtitle, instead of showing the
+  // "Check {domain}" placeholder above a separate preview card. Removing the
+  // preview (showPreview = false) collapses it back to just the URL.
+  const urlOnly = isCompleted ? null : getUrlOnlyUrl(todo);
+  const previewTitle =
+    urlOnly && urlOnly.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
@@ -295,7 +303,15 @@ function TodoItemContent({
                 : "text-sm text-gray"
             }`}
           >
-            <LinkifiedText text={todo.title} />
+            {urlOnly ? (
+              previewTitle ? (
+                previewTitle
+              ) : (
+                <LinkifiedText text={urlOnly.url} />
+              )
+            ) : (
+              <LinkifiedText text={todo.title} />
+            )}
           </p>
           {subtasks.length > 0 &&
             (() => {
@@ -347,6 +363,16 @@ function TodoItemContent({
             </Button>
           )}
         </div>
+        {urlOnly && previewTitle && (
+          <a
+            href={urlOnly.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-0.5 block truncate font-mono text-xs text-gray-muted hover:text-gray hover:underline"
+          >
+            {urlOnly.url}
+          </a>
+        )}
         {isCompleted && (
           <p className="text-xs text-gray-muted mt-0.5">
             Completed:{" "}
@@ -368,7 +394,8 @@ function TodoItemContent({
                   {todo.research.summary.replace(/\[\d+\]/g, "")}
                 </p>
               )}
-            {todo.urls &&
+            {!urlOnly &&
+              todo.urls &&
               (() => {
                 const nonResearchUrls = todo.urls.filter(
                   (url) => !url.researchId,

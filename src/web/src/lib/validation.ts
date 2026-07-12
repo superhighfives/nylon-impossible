@@ -26,3 +26,8 @@ export const updateTodoSchema = z.object({
   // are stamped server-side, not by the client.
   completedAt: z.coerce.date().nullable().optional(),
 });
+
+export const updateTodoUrlSchema = z.object({
+  id: z.string(),
+  showPreview: z.boolean(),
+});

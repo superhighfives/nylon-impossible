@@ -97,6 +97,7 @@ function serializeUrl(url: TodoUrl) {
     siteName: url.siteName,
     favicon: url.favicon,
     image: url.image ?? null,
+    showPreview: url.showPreview,
     position: url.position,
     fetchStatus: url.fetchStatus,
     fetchedAt: url.fetchedAt?.toISOString() ?? null,

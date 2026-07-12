@@ -128,16 +128,23 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     let siteName: String?
     let favicon: String?
     let image: String?
+    // Optional for backward-compatible decoding: absent in payloads from older
+    // servers. Treated as true (show the preview) via `showsPreview`.
+    let showPreview: Bool?
     let position: String
     let fetchStatus: FetchStatus
     let fetchedAt: Date?
     let createdAt: Date
     let updatedAt: Date
 
+    /// Whether to render the fetched preview; defaults to true when unset.
+    var showsPreview: Bool { showPreview ?? true }
+
     init(
         id: String, todoId: String, researchId: String? = nil, url: String,
         title: String?, description: String?, siteName: String?, favicon: String?,
-        image: String? = nil, position: String, fetchStatus: FetchStatus, fetchedAt: Date?,
+        image: String? = nil, showPreview: Bool? = nil, position: String,
+        fetchStatus: FetchStatus, fetchedAt: Date?,
         createdAt: Date, updatedAt: Date
     ) {
         self.id = id
@@ -149,6 +156,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
         self.siteName = siteName
         self.favicon = favicon
         self.image = image
+        self.showPreview = showPreview
         self.position = position
         self.fetchStatus = fetchStatus
         self.fetchedAt = fetchedAt

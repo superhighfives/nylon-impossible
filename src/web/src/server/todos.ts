@@ -15,7 +15,11 @@ import {
 import type { Todo, TodoMessage, TodoResearch, TodoUrl } from "@/lib/schema";
 import { todoMessages, todoResearch, todos, todoUrls } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
-import { createTodoSchema, updateTodoSchema } from "@/lib/validation";
+import {
+  createTodoSchema,
+  updateTodoSchema,
+  updateTodoUrlSchema,
+} from "@/lib/validation";
 import type {
   CreateTodoInput,
   SerializedResearch,
@@ -37,6 +41,7 @@ function serializeUrl(url: TodoUrl): SerializedTodoUrl {
     siteName: url.siteName,
     favicon: url.favicon,
     image: url.image,
+    showPreview: url.showPreview,
     position: url.position,
     fetchStatus: url.fetchStatus,
     fetchedAt: url.fetchedAt?.toISOString() ?? null,
@@ -525,6 +530,72 @@ export const deleteTodo = createServerFn({ method: "POST" })
         });
 
         yield* Effect.log(`Deleted todo ${id} for user ${user.id}`);
+
+        return { success: true };
+      }),
+    );
+
+    return runEffect(program);
+  });
+
+/**
+ * Toggle whether a URL's fetched preview (page title/description) is shown.
+ * When showPreview is false, clients render just the raw URL.
+ */
+export const updateTodoUrlPreview = createServerFn({ method: "POST" })
+  .validator((input: { id: string; showPreview: boolean }) =>
+    updateTodoUrlSchema.parse(input),
+  )
+  .handler(async (ctx) => {
+    const { id, showPreview } = ctx.data;
+
+    const program = withAuthenticatedUser((user, db) =>
+      Effect.gen(function* () {
+        // Verify the URL exists and its parent todo belongs to the user.
+        const existing = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select({
+                urlId: todoUrls.id,
+                todoId: todoUrls.todoId,
+                userId: todos.userId,
+              })
+              .from(todoUrls)
+              .innerJoin(todos, eq(todoUrls.todoId, todos.id))
+              .where(eq(todoUrls.id, id))
+              .get(),
+          catch: (error) =>
+            new DatabaseError({ operation: "getTodoUrl", cause: error }),
+        });
+
+        if (!existing || existing.userId !== user.id) {
+          return yield* new TodoNotFoundError({ id });
+        }
+
+        yield* Effect.tryPromise({
+          try: () =>
+            db.update(todoUrls).set({ showPreview }).where(eq(todoUrls.id, id)),
+          catch: (error) =>
+            new DatabaseError({
+              operation: "updateTodoUrlPreview",
+              cause: error,
+            }),
+        });
+
+        // Bump the parent todo so other clients pull the change on next sync.
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(todos)
+              .set({ updatedAt: new Date() })
+              .where(eq(todos.id, existing.todoId)),
+          catch: (error) =>
+            new DatabaseError({ operation: "touchTodoForUrl", cause: error }),
+        });
+
+        yield* Effect.log(
+          `Updated URL ${id} showPreview=${showPreview} for user ${user.id}`,
+        );
 
         return { success: true };
       }),

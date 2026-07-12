@@ -246,6 +246,12 @@ export const todoUrls = sqliteTable(
     siteName: text("site_name"),
     favicon: text("favicon"),
     image: text("image"),
+    // Whether to render the fetched preview (page title/description) for this
+    // URL. When false, clients show just the raw URL instead. Defaults to true
+    // so existing URLs keep their rich preview.
+    showPreview: integer("show_preview", { mode: "boolean" })
+      .notNull()
+      .default(true),
     position: text("position").notNull().default("a0"),
     fetchStatus: text("fetch_status", {
       enum: ["pending", "fetched", "failed"],

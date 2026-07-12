@@ -18,6 +18,9 @@ final class TodoUrl {
     var siteName: String?
     var favicon: String?
     var image: String?
+    // When false, render just the raw URL instead of the fetched preview.
+    // Defaults to true; a new column via lightweight SwiftData migration.
+    var showPreview: Bool = true
     var position: String
     var fetchStatus: String      // "pending" | "fetched" | "failed"
     var fetchedAt: Date?
@@ -31,7 +34,8 @@ final class TodoUrl {
 
     init(
         id: String, researchId: String? = nil, url: String, title: String?, itemDescription: String?,
-        siteName: String?, favicon: String?, image: String?, position: String,
+        siteName: String?, favicon: String?, image: String?, showPreview: Bool = true,
+        position: String,
         fetchStatus: String, fetchedAt: Date?, createdAt: Date, updatedAt: Date
     ) {
         self.id = id
@@ -42,6 +46,7 @@ final class TodoUrl {
         self.siteName = siteName
         self.favicon = favicon
         self.image = image
+        self.showPreview = showPreview
         self.position = position
         self.fetchStatus = fetchStatus
         self.fetchedAt = fetchedAt

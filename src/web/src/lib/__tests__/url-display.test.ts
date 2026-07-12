@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SerializedTodoUrl } from "@/types/database";
-import { buildFaviconErrorHandler, getUrlDisplay } from "../url-display";
+import {
+  buildFaviconErrorHandler,
+  getFetchedPreviewTitle,
+  getUrlDisplay,
+  getUrlOnlyUrl,
+} from "../url-display";
 
 function makeUrl(overrides?: Partial<SerializedTodoUrl>): SerializedTodoUrl {
   return {
@@ -13,6 +18,7 @@ function makeUrl(overrides?: Partial<SerializedTodoUrl>): SerializedTodoUrl {
     siteName: null,
     favicon: null,
     image: null,
+    showPreview: true,
     position: "a0",
     fetchStatus: "fetched",
     fetchedAt: null,
@@ -71,6 +77,75 @@ describe("getUrlDisplay", () => {
     const d = getUrlDisplay(makeUrl({ url: "not a url" }));
     expect(d.hostname).toBeNull();
     expect(d.googleFaviconUrl).toBeNull();
+  });
+});
+
+describe("getUrlOnlyUrl", () => {
+  const url = makeUrl({ url: "https://www.interfacecraft.dev/" });
+
+  it("matches a todo titled with the raw URL", () => {
+    expect(
+      getUrlOnlyUrl({ title: "https://www.interfacecraft.dev/", urls: [url] }),
+    ).toBe(url);
+  });
+
+  it("matches the auto-generated 'Check {domain}' placeholder title", () => {
+    expect(
+      getUrlOnlyUrl({ title: "Check interfacecraft.dev", urls: [url] }),
+    ).toBe(url);
+  });
+
+  it("returns null when the user wrote a real title", () => {
+    expect(
+      getUrlOnlyUrl({ title: "Read this design library", urls: [url] }),
+    ).toBeNull();
+  });
+
+  it("returns null with zero or multiple non-research links", () => {
+    expect(
+      getUrlOnlyUrl({ title: "Check interfacecraft.dev", urls: [] }),
+    ).toBeNull();
+    expect(
+      getUrlOnlyUrl({
+        title: "Check interfacecraft.dev",
+        urls: [url, makeUrl({ id: "u2", url: "https://example.com" })],
+      }),
+    ).toBeNull();
+  });
+
+  it("ignores research-source URLs when counting links", () => {
+    const research = makeUrl({ id: "r", researchId: "res1" });
+    expect(
+      getUrlOnlyUrl({
+        title: "Check interfacecraft.dev",
+        urls: [url, research],
+      }),
+    ).toBe(url);
+  });
+});
+
+describe("getFetchedPreviewTitle", () => {
+  it("returns the page title when fetched", () => {
+    expect(getFetchedPreviewTitle(makeUrl({ title: "Interface Craft" }))).toBe(
+      "Interface Craft",
+    );
+  });
+
+  it("falls back to siteName, then null", () => {
+    expect(
+      getFetchedPreviewTitle(makeUrl({ title: null, siteName: "Example" })),
+    ).toBe("Example");
+    expect(
+      getFetchedPreviewTitle(makeUrl({ title: null, siteName: null })),
+    ).toBeNull();
+  });
+
+  it("returns null until the URL is fetched", () => {
+    expect(
+      getFetchedPreviewTitle(
+        makeUrl({ fetchStatus: "pending", title: "Interface Craft" }),
+      ),
+    ).toBeNull();
   });
 });
 

@@ -77,6 +77,8 @@ export interface SerializedTodoUrl {
   siteName: string | null;
   favicon: string | null;
   image: string | null;
+  /** When false, clients render just the raw URL instead of the fetched preview. */
+  showPreview: boolean;
   position: string;
   fetchStatus: FetchStatus;
   fetchedAt: string | null;
