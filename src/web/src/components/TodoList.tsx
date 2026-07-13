@@ -273,10 +273,12 @@ function TodoItemContent({
   // user's local midnight, even though `completed` stays false in the DB.
   const isCompleted = isEffectivelyCompleted(todo, timeZone, new Date());
   // A todo that is essentially just a captured URL renders the fetched page
-  // title as its main line with the URL as a subtitle, instead of showing the
-  // "Check {domain}" placeholder above a separate preview card. Removing the
-  // preview (showPreview = false) collapses it back to just the URL.
-  const urlOnly = isCompleted ? null : getUrlOnlyUrl(todo);
+  // title as its main line instead of the "Check {domain}" placeholder — for
+  // completed rows too, so the title stays consistent after completion. Active
+  // rows also get the URL as a subtitle; completed rows stay terse (the URL is
+  // summarized by the link badge below). Removing the preview (showPreview =
+  // false) collapses it back to just the URL.
+  const urlOnly = getUrlOnlyUrl(todo);
   const previewTitle =
     urlOnly && urlOnly.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
   return (
@@ -363,7 +365,7 @@ function TodoItemContent({
             </Button>
           )}
         </div>
-        {urlOnly && previewTitle && (
+        {!isCompleted && urlOnly && previewTitle && (
           <a
             href={urlOnly.url}
             target="_blank"

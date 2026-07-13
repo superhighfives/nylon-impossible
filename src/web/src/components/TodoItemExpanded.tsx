@@ -492,7 +492,10 @@ export function TodoItemExpanded({
                             showPreview: !url.showPreview,
                           })
                         }
-                        className="text-xs text-gray-muted transition-colors hover:text-gray"
+                        disabled={updateUrlPreview.isPending}
+                        // aria-pressed reflects "URL-only mode" being active.
+                        aria-pressed={!url.showPreview}
+                        className="-mx-1.5 inline-flex min-h-8 items-center px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
                       >
                         {url.showPreview ? "Show just the URL" : "Show preview"}
                       </button>
