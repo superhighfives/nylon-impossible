@@ -26,6 +26,7 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
+  ExternalLink,
   FileText,
   GripVertical,
   Inbox,
@@ -60,7 +61,11 @@ import {
   getUrlDisplay,
   getUrlOnlyUrl,
 } from "@/lib/url-display";
-import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
+import type {
+  SerializedTodoUrl,
+  TodoWithUrls,
+  UpdateTodoInput,
+} from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
 
@@ -262,6 +267,53 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
   );
 }
 
+/**
+ * The main-list treatment for an active URL-only todo: the whole
+ * favicon + fetched title + description + URL block as one big hoverable card
+ * that opens the link, mirroring the URL card in the expanded editor.
+ */
+function UrlOnlyPreviewCard({
+  url,
+  title,
+}: {
+  url: SerializedTodoUrl;
+  title: string;
+}) {
+  const { favicon, googleFaviconUrl } = getUrlDisplay(url);
+  return (
+    <a
+      href={url.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-1 flex items-start gap-3 rounded-lg bg-gray-surface p-3 shadow-sm transition-shadow hover:shadow-base group/link"
+    >
+      {favicon ? (
+        <img
+          src={favicon}
+          alt=""
+          loading="lazy"
+          className="w-4 h-4 mt-0.5 shrink-0"
+          onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
+        />
+      ) : (
+        <Link2 size={16} className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray wrap-anywhere group-hover/link:underline">
+          {title}
+        </p>
+        {url.description && (
+          <p className="mt-0.5 text-xs text-gray-muted line-clamp-2 leading-relaxed">
+            {url.description}
+          </p>
+        )}
+        <p className="mt-1 truncate text-xs text-gray-muted">{url.url}</p>
+      </div>
+      <ExternalLink size={14} className="mt-0.5 shrink-0 text-gray-muted" />
+    </a>
+  );
+}
+
 function TodoItemContent({
   todo,
   subtasks,
@@ -286,7 +338,11 @@ function TodoItemContent({
   const urlOnly = getUrlOnlyUrl(todo);
   const previewTitle =
     urlOnly && urlOnly.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
-  const urlOnlyDisplay = urlOnly ? getUrlDisplay(urlOnly) : null;
+  // Active URL-only rows with a fetched title render as a single hoverable card
+  // (favicon + title + description + URL) instead of an inline title line, for
+  // consistency with the URL card in the expanded editor. Completed rows stay
+  // terse, so they keep the inline title treatment below.
+  const showUrlOnlyCard = !isCompleted && !!urlOnly && !!previewTitle;
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
@@ -304,38 +360,25 @@ function TodoItemContent({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          {!isCompleted &&
-            urlOnly &&
-            previewTitle &&
-            urlOnlyDisplay?.favicon && (
-              <img
-                src={urlOnlyDisplay.favicon}
-                alt=""
-                loading="lazy"
-                className="w-4 h-4 shrink-0"
-                onError={buildFaviconErrorHandler(
-                  urlOnly,
-                  urlOnlyDisplay.googleFaviconUrl,
-                )}
-              />
-            )}
-          <p
-            className={`min-w-0 leading-snug wrap-anywhere ${
-              isCompleted
-                ? "text-xs line-through text-gray-muted"
-                : "text-sm text-gray"
-            }`}
-          >
-            {urlOnly ? (
-              previewTitle ? (
-                previewTitle
+          {!showUrlOnlyCard && (
+            <p
+              className={`min-w-0 leading-snug wrap-anywhere ${
+                isCompleted
+                  ? "text-xs line-through text-gray-muted"
+                  : "text-sm text-gray"
+              }`}
+            >
+              {urlOnly ? (
+                previewTitle ? (
+                  previewTitle
+                ) : (
+                  <LinkifiedText text={urlOnly.url} />
+                )
               ) : (
-                <LinkifiedText text={urlOnly.url} />
-              )
-            ) : (
-              <LinkifiedText text={todo.title} />
-            )}
-          </p>
+                <LinkifiedText text={todo.title} />
+              )}
+            </p>
+          )}
           {subtasks.length > 0 &&
             (() => {
               const doneSubtasks = subtasks.filter((s) => s.completed).length;
@@ -386,22 +429,8 @@ function TodoItemContent({
             </Button>
           )}
         </div>
-        {!isCompleted && urlOnly && previewTitle && (
-          <>
-            {urlOnly.description && (
-              <p className="mt-0.5 text-xs text-gray-muted line-clamp-2 leading-relaxed">
-                {urlOnly.description}
-              </p>
-            )}
-            <a
-              href={urlOnly.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-0.5 block truncate text-xs text-gray-muted hover:text-gray hover:underline"
-            >
-              {urlOnly.url}
-            </a>
-          </>
+        {showUrlOnlyCard && urlOnly && previewTitle && (
+          <UrlOnlyPreviewCard url={urlOnly} title={previewTitle} />
         )}
         {isCompleted && (
           <p className="text-xs text-gray-muted mt-0.5">
