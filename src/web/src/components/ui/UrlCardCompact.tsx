@@ -29,33 +29,34 @@ export function UrlCardCompact({ url }: UrlCardCompactProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group/link max-w-full"
+      className="flex items-start gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group/link max-w-full"
     >
       {isPending ? (
-        <Loader size="sm" className="w-4 h-4 shrink-0 text-gray-muted" />
+        <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
       ) : favicon ? (
         <img
           src={favicon}
           alt=""
           loading="lazy"
-          className="w-4 h-4 shrink-0"
+          className="w-4 h-4 mt-0.5 shrink-0"
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : null}
-      <span className="text-sm text-gray truncate group-hover/link:underline min-w-0">
-        {displayTitle}
-      </span>
-      {!isPending && url.description && (
-        // High shrink factor lets the description collapse first, so the title
-        // "wins" the available width and only truncates once the description
-        // has fully given way.
-        <span className="font-mono text-[11px] text-gray-muted truncate min-w-0 shrink-[1000]">
-          {url.description}
+      {/* Two lines: page title on top, description beneath. */}
+      <span className="flex flex-col min-w-0">
+        <span className="text-sm text-gray truncate group-hover/link:underline">
+          {displayTitle}
         </span>
-      )}
-      {isPending && (
-        <span className="text-xs text-gray-muted shrink-0">Fetching...</span>
-      )}
+        {isPending ? (
+          <span className="text-xs text-gray-muted">Fetching...</span>
+        ) : (
+          url.description && (
+            <span className="text-xs text-gray-muted truncate">
+              {url.description}
+            </span>
+          )
+        )}
+      </span>
     </a>
   );
 }

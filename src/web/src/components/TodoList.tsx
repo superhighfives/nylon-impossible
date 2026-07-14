@@ -54,7 +54,12 @@ import { useUpdateUser, useUser } from "@/hooks/useUser";
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
-import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
+import {
+  buildFaviconErrorHandler,
+  getFetchedPreviewTitle,
+  getUrlDisplay,
+  getUrlOnlyUrl,
+} from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
@@ -281,6 +286,7 @@ function TodoItemContent({
   const urlOnly = getUrlOnlyUrl(todo);
   const previewTitle =
     urlOnly && urlOnly.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
+  const urlOnlyDisplay = urlOnly ? getUrlDisplay(urlOnly) : null;
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
@@ -298,6 +304,21 @@ function TodoItemContent({
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
+          {!isCompleted &&
+            urlOnly &&
+            previewTitle &&
+            urlOnlyDisplay?.favicon && (
+              <img
+                src={urlOnlyDisplay.favicon}
+                alt=""
+                loading="lazy"
+                className="w-4 h-4 shrink-0"
+                onError={buildFaviconErrorHandler(
+                  urlOnly,
+                  urlOnlyDisplay.googleFaviconUrl,
+                )}
+              />
+            )}
           <p
             className={`min-w-0 leading-snug wrap-anywhere ${
               isCompleted
@@ -366,14 +387,21 @@ function TodoItemContent({
           )}
         </div>
         {!isCompleted && urlOnly && previewTitle && (
-          <a
-            href={urlOnly.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-0.5 block truncate font-mono text-xs text-gray-muted hover:text-gray hover:underline"
-          >
-            {urlOnly.url}
-          </a>
+          <>
+            {urlOnly.description && (
+              <p className="mt-0.5 text-xs text-gray-muted line-clamp-2 leading-relaxed">
+                {urlOnly.description}
+              </p>
+            )}
+            <a
+              href={urlOnly.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-0.5 block truncate text-xs text-gray-muted hover:text-gray hover:underline"
+            >
+              {urlOnly.url}
+            </a>
+          </>
         )}
         {isCompleted && (
           <p className="text-xs text-gray-muted mt-0.5">
