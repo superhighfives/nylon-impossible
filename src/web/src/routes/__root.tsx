@@ -34,11 +34,11 @@ import {
   ImportReviewContext,
   useImportReviewValue,
 } from "../hooks/useImportReview";
-import { SettingsContext, useSettingsValue } from "../hooks/useSettings";
 import {
   OnlineStatusContext,
   useOnlineStatusValue,
 } from "../hooks/useOnlineStatus";
+import { SettingsContext, useSettingsValue } from "../hooks/useSettings";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { getHints } from "../lib/client-hints";
 import { initSentry, Sentry } from "../lib/sentry";

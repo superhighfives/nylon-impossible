@@ -279,8 +279,9 @@ function TodoItemContent({
   // summarized by the link badge below). Removing the preview (showPreview =
   // false) collapses it back to just the URL.
   const urlOnly = getUrlOnlyUrl(todo);
-  const previewTitle =
-    urlOnly?.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
+  const previewTitle = urlOnly?.showPreview
+    ? getFetchedPreviewTitle(urlOnly)
+    : null;
   // Active URL-only rows with a fetched title render as a single hoverable card
   // (favicon + title + description + URL) instead of an inline title line, for
   // consistency with the URL card in the expanded editor. Completed rows stay
