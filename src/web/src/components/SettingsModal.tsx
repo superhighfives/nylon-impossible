@@ -4,6 +4,7 @@ import { MapPin, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useImportReview } from "@/hooks/useImportReview";
+import { useSettings } from "@/hooks/useSettings";
 import { useImportGoogleTasks } from "@/hooks/useTodos";
 import {
   type Theme,
@@ -12,6 +13,7 @@ import {
   useUser,
 } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
+import { DevEnvironmentDetails } from "./DevEnvironmentIndicator";
 import { Button, Field, Input, Loader } from "./ui";
 
 // Full Google scope required to read Tasks. Google rejects the shorthand
@@ -37,7 +39,7 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "System", icon: Monitor },
 ];
 
-export function SettingsModal() {
+export function SettingsModal({ origin }: { origin: string }) {
   const { data: user, isLoading: isLoadingUser } = useUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteCurrentUser();
@@ -45,9 +47,11 @@ export function SettingsModal() {
   const { startReview } = useImportReview();
   const { user: clerkUser, isLoaded: isClerkLoaded } = useClerkUser();
   const { signOut } = useClerk();
+  // Open state is shared so the nav dropdown (mobile) and the floating button
+  // (desktop) can both drive the same modal.
+  const { isOpen: open, setOpen } = useSettings();
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
-  const [open, setOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
 
@@ -160,7 +164,9 @@ export function SettingsModal() {
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
-      <div className="fixed bottom-4 right-4 z-50">
+      {/* Desktop opens from this floating button; on mobile it's opened from
+          the nav dropdown instead, so the button is hidden there. */}
+      <div className="fixed bottom-4 right-4 z-50 hidden sm:block">
         <Dialog.Trigger
           render={
             <Button variant="outline" size="sm" aria-label="Settings">
@@ -381,6 +387,11 @@ export function SettingsModal() {
                 </div>
               </>
             )}
+            {/* Mobile only: the URL/API details that live in the floating
+                indicator on desktop. Renders nothing in production. */}
+            <div className="sm:hidden empty:hidden border-t border-gray-base pt-4 mt-2 flex flex-col gap-1 text-xs font-mono text-gray-muted">
+              <DevEnvironmentDetails origin={origin} />
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close
                 render={

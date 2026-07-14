@@ -34,6 +34,7 @@ import {
   ImportReviewContext,
   useImportReviewValue,
 } from "../hooks/useImportReview";
+import { SettingsContext, useSettingsValue } from "../hooks/useSettings";
 import {
   OnlineStatusContext,
   useOnlineStatusValue,
@@ -133,6 +134,7 @@ function RootDocument() {
   const { origin, hints } = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
   const importReview = useImportReviewValue();
+  const settings = useSettingsValue();
 
   return (
     <html
@@ -156,17 +158,19 @@ function RootDocument() {
             >
               <OnlineStatusContext.Provider value={onlineStatus}>
                 <ImportReviewContext.Provider value={importReview}>
-                  <OfflineBanner />
-                  <Header />
-                  <div className="pt-header-offset">
-                    <Outlet />
-                  </div>
-                  <DevEnvironmentIndicator origin={origin} />
-                  <Show when="signed-in">
-                    <SettingsModal />
-                    <ImportReviewModal />
-                  </Show>
-                  <Toaster />
+                  <SettingsContext.Provider value={settings}>
+                    <OfflineBanner />
+                    <Header />
+                    <div className="pt-header-offset">
+                      <Outlet />
+                    </div>
+                    <DevEnvironmentIndicator origin={origin} />
+                    <Show when="signed-in">
+                      <SettingsModal origin={origin} />
+                      <ImportReviewModal />
+                    </Show>
+                    <Toaster />
+                  </SettingsContext.Provider>
                 </ImportReviewContext.Provider>
               </OnlineStatusContext.Provider>
             </Sentry.ErrorBoundary>

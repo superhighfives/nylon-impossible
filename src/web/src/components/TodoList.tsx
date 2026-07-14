@@ -26,7 +26,6 @@ import {
   ChevronRight,
   ChevronUp,
   Clock,
-  ExternalLink,
   FileText,
   GripVertical,
   Inbox,
@@ -55,19 +54,10 @@ import { useUpdateUser, useUser } from "@/hooks/useUser";
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { messageFromError, toast } from "@/lib/toast";
-import {
-  buildFaviconErrorHandler,
-  getFetchedPreviewTitle,
-  getUrlDisplay,
-  getUrlOnlyUrl,
-} from "@/lib/url-display";
-import type {
-  SerializedTodoUrl,
-  TodoWithUrls,
-  UpdateTodoInput,
-} from "@/types/database";
+import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
+import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
-import { Button, Checkbox, Loader, UrlCardCompact } from "./ui";
+import { Button, Checkbox, Loader, UrlPreviewCard } from "./ui";
 
 // This is a single-column vertical list, so lock dragging to the Y axis —
 // otherwise the lifted row drifts sideways as it tracks the pointer/keyboard.
@@ -267,53 +257,6 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
   );
 }
 
-/**
- * The main-list treatment for an active URL-only todo: the whole
- * favicon + fetched title + description + URL block as one big hoverable card
- * that opens the link, mirroring the URL card in the expanded editor.
- */
-function UrlOnlyPreviewCard({
-  url,
-  title,
-}: {
-  url: SerializedTodoUrl;
-  title: string;
-}) {
-  const { favicon, googleFaviconUrl } = getUrlDisplay(url);
-  return (
-    <a
-      href={url.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-1 flex items-start gap-3 rounded-lg bg-gray-surface p-3 shadow-sm transition-shadow hover:shadow-base group/link"
-    >
-      {favicon ? (
-        <img
-          src={favicon}
-          alt=""
-          loading="lazy"
-          className="w-4 h-4 mt-0.5 shrink-0"
-          onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
-        />
-      ) : (
-        <Link2 size={16} className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
-      )}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray wrap-anywhere group-hover/link:underline">
-          {title}
-        </p>
-        {url.description && (
-          <p className="mt-0.5 text-xs text-gray-muted line-clamp-2 leading-relaxed">
-            {url.description}
-          </p>
-        )}
-        <p className="mt-1 truncate text-xs text-gray-muted">{url.url}</p>
-      </div>
-      <ExternalLink size={14} className="mt-0.5 shrink-0 text-gray-muted" />
-    </a>
-  );
-}
-
 function TodoItemContent({
   todo,
   subtasks,
@@ -337,7 +280,7 @@ function TodoItemContent({
   // false) collapses it back to just the URL.
   const urlOnly = getUrlOnlyUrl(todo);
   const previewTitle =
-    urlOnly && urlOnly.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
+    urlOnly?.showPreview ? getFetchedPreviewTitle(urlOnly) : null;
   // Active URL-only rows with a fetched title render as a single hoverable card
   // (favicon + title + description + URL) instead of an inline title line, for
   // consistency with the URL card in the expanded editor. Completed rows stay
@@ -429,8 +372,10 @@ function TodoItemContent({
             </Button>
           )}
         </div>
-        {showUrlOnlyCard && urlOnly && previewTitle && (
-          <UrlOnlyPreviewCard url={urlOnly} title={previewTitle} />
+        {showUrlOnlyCard && urlOnly && (
+          <div className="mt-1">
+            <UrlPreviewCard url={urlOnly} />
+          </div>
         )}
         {isCompleted && (
           <p className="text-xs text-gray-muted mt-0.5">
@@ -464,7 +409,7 @@ function TodoItemContent({
                 return (
                   <div className="flex flex-col gap-1 mt-1.5">
                     {nonResearchUrls.slice(0, 2).map((url) => (
-                      <UrlCardCompact key={url.id} url={url} />
+                      <UrlPreviewCard key={url.id} url={url} />
                     ))}
                     {overflow > 0 && (
                       <span className="text-xs text-gray-muted">
