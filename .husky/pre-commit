@@ -1,1 +1,16 @@
-pnpm check:fix
+# Format/lint-fix the working tree, then re-stage the files that were staged
+# for this commit so the fixes land here. Without this, check:fix leaves the
+# fixes unstaged and CI's `biome check` (no --write) fails on the unformatted
+# committed version. Only previously-staged files are re-added, so partial or
+# unrelated working-tree changes stay out of the commit. NUL-delimited to
+# survive spaces in paths.
+tmp=$(mktemp)
+git diff --cached --name-only --diff-filter=ACMR -z >"$tmp"
+
+if ! pnpm check:fix; then
+  rm -f "$tmp"
+  exit 1
+fi
+
+[ -s "$tmp" ] && xargs -0 git add -- <"$tmp"
+rm -f "$tmp"

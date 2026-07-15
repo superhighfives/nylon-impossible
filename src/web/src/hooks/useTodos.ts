@@ -8,7 +8,13 @@ import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
-import { createTodo, deleteTodo, getTodos, updateTodo } from "@/server/todos";
+import {
+  createTodo,
+  deleteTodo,
+  getTodos,
+  updateTodo,
+  updateTodoUrlPreview,
+} from "@/server/todos";
 import type {
   CreateTodoInput,
   TodoWithUrls,
@@ -233,6 +239,54 @@ export function useUpdateTodo() {
       Sentry.captureException(_err, { tags: { mutation: "updateTodo" } });
       toast.error(messageFromError(_err, "Couldn't save changes"));
       // Rollback on error
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
+ * Toggle whether a URL shows its fetched preview (page title/description) or
+ * just the raw URL. Optimistically flips the flag on the matching URL.
+ */
+export function useUpdateUrlPreview() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+
+  return useMutation({
+    mutationFn: ({ id, showPreview }: { id: string; showPreview: boolean }) =>
+      updateTodoUrlPreview({ data: { id, showPreview } }),
+    onMutate: async ({ id, showPreview }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      if (previousTodos) {
+        queryClient.setQueryData<TodoWithUrls[]>(
+          TODOS_QUERY_KEY,
+          previousTodos.map((todo) =>
+            todo.urls.some((url) => url.id === id)
+              ? {
+                  ...todo,
+                  urls: todo.urls.map((url) =>
+                    url.id === id ? { ...url, showPreview } : url,
+                  ),
+                }
+              : todo,
+          ),
+        );
+      }
+
+      return { previousTodos };
+    },
+    onError: (err, _vars, context) => {
+      Sentry.captureException(err, { tags: { mutation: "updateUrlPreview" } });
+      toast.error(messageFromError(err, "Couldn't update link"));
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
       }

@@ -1,9 +1,16 @@
 import { Show, UserButton } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
+import { Settings } from "lucide-react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { useSettings } from "@/hooks/useSettings";
 
 export default function Header() {
   const { isOnline } = useOnlineStatus();
+  const { open: openSettings } = useSettings();
+  // On mobile, Settings opens from this dropdown instead of the floating
+  // button, which would otherwise cover the composer input.
+  const isMobile = useIsMobile();
   // When offline, push header down to make room for the offline banner (~40px)
   const topClass = isOnline === false ? "top-12" : "top-4";
 
@@ -20,7 +27,17 @@ export default function Header() {
           <img src="/logo192.png" alt="Nylon Impossible" className="size-8" />
         </Link>
         <Show when="signed-in">
-          <UserButton />
+          <UserButton>
+            {isMobile && (
+              <UserButton.MenuItems>
+                <UserButton.Action
+                  label="Settings"
+                  labelIcon={<Settings size={14} />}
+                  onClick={openSettings}
+                />
+              </UserButton.MenuItems>
+            )}
+          </UserButton>
         </Show>
       </header>
     </div>

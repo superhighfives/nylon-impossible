@@ -7,6 +7,11 @@ vi.mock("@/hooks/useUser", () => ({
   useUser: vi.fn(),
 }));
 
+const updateUrlPreviewMutate = vi.fn();
+vi.mock("@/hooks/useTodos", () => ({
+  useUpdateUrlPreview: () => ({ mutate: updateUrlPreviewMutate }),
+}));
+
 vi.mock("../ResearchSection", () => ({
   ResearchSection: ({ todoId }: { todoId: string }) => (
     <div data-testid="research-section">research:{todoId}</div>
@@ -151,5 +156,44 @@ describe("TodoItemExpanded", () => {
     } as unknown as ReturnType<typeof useUser>);
     renderExpanded();
     expect(screen.queryByText(/not used by ai/i)).not.toBeInTheDocument();
+  });
+
+  function urlFixture(overrides: Partial<TodoWithUrls["urls"][number]> = {}) {
+    return {
+      id: "url-1",
+      todoId: "todo-1",
+      researchId: null,
+      url: "https://www.interfacecraft.dev/",
+      title: "Interface Craft",
+      description: "A working library for those committed to design.",
+      siteName: "Interface Craft",
+      favicon: null,
+      image: null,
+      showPreview: true,
+      position: "a0",
+      fetchStatus: "fetched" as const,
+      fetchedAt: "2026-01-01T00:00:00.000Z",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+      ...overrides,
+    };
+  }
+
+  it("toggles a link's preview off, persisting showPreview=false", () => {
+    renderExpanded({ urls: [urlFixture()] });
+    fireEvent.click(screen.getByRole("button", { name: /show just the url/i }));
+    expect(updateUrlPreviewMutate).toHaveBeenCalledWith({
+      id: "url-1",
+      showPreview: false,
+    });
+  });
+
+  it("offers to restore the preview when it has been removed", () => {
+    renderExpanded({ urls: [urlFixture({ showPreview: false })] });
+    fireEvent.click(screen.getByRole("button", { name: /show preview/i }));
+    expect(updateUrlPreviewMutate).toHaveBeenCalledWith({
+      id: "url-1",
+      showPreview: true,
+    });
   });
 });

@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useHints } from "@/hooks/useHints";
+import { useUpdateUrlPreview } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
@@ -50,6 +51,35 @@ function formatDate(isoString: string | null): string {
 }
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
+  // Preview removed — show just the raw URL (favicon + link), no title/description.
+  if (!url.showPreview) {
+    const { favicon, googleFaviconUrl } = getUrlDisplay(url);
+    return (
+      <a
+        href={url.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link"
+      >
+        {favicon ? (
+          <img
+            src={favicon}
+            alt=""
+            loading="lazy"
+            className="w-4 h-4 shrink-0"
+            onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
+          />
+        ) : (
+          <Link2 size={16} className="w-4 h-4 shrink-0 text-gray-muted" />
+        )}
+        <span className="flex-1 min-w-0 truncate text-sm text-gray group-hover/link:underline">
+          {url.url}
+        </span>
+        <ExternalLink size={14} className="text-gray-muted shrink-0" />
+      </a>
+    );
+  }
+
   // Use rich social card for fetched social URLs
   if (url.fetchStatus === "fetched" && getSocialUrlInfo(url.url)) {
     return <SocialPreviewCard url={url} />;
@@ -121,6 +151,7 @@ export function TodoItemExpanded({
 }: TodoItemExpandedProps) {
   const { data: user } = useUser();
   const { timeZone } = useHints();
+  const updateUrlPreview = useUpdateUrlPreview();
 
   // Local state for form fields. We track which fields the user has touched
   // so that background updates to the todo (e.g. AI re-enrichment after a
@@ -449,7 +480,27 @@ export function TodoItemExpanded({
             {todo.urls
               .filter((url) => !url.researchId)
               .map((url) => (
-                <UrlCard key={url.id} url={url} />
+                <div key={url.id} className="space-y-1">
+                  <UrlCard url={url} />
+                  {url.fetchStatus === "fetched" &&
+                    (url.title || url.description) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          updateUrlPreview.mutate({
+                            id: url.id,
+                            showPreview: !url.showPreview,
+                          })
+                        }
+                        disabled={updateUrlPreview.isPending}
+                        // aria-pressed reflects "URL-only mode" being active.
+                        aria-pressed={!url.showPreview}
+                        className="-mx-1.5 inline-flex min-h-8 items-center px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
+                      >
+                        {url.showPreview ? "Show just the URL" : "Show preview"}
+                      </button>
+                    )}
+                </div>
               ))}
           </div>
         </div>

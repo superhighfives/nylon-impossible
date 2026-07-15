@@ -34,6 +34,10 @@ struct UrlRowCompact: View {
     }
     
     private var displayTitle: String {
+        // Preview removed — show just the raw URL.
+        if !url.showsPreview {
+            return url.url
+        }
         // Show hostname for pending/failed, full title when fetched
         if isPending || isFailed {
             return hostname
@@ -63,8 +67,8 @@ struct UrlRowCompact: View {
     }
 
     var body: some View {
-        // Use rich social chip for fetched social URLs
-        if !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+        // Use rich social chip for fetched social URLs (unless the preview is off)
+        if url.showsPreview, !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
             SocialPreviewCardCompact(url: url)
         } else {
             Link(destination: URL(string: url.url)!) {

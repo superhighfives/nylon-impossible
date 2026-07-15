@@ -39,6 +39,7 @@ function makeUrl(overrides?: Partial<SerializedTodoUrl>): SerializedTodoUrl {
     siteName: "Example",
     favicon: null,
     image: null,
+    showPreview: true,
     position: "a0",
     fetchStatus: "fetched",
     fetchedAt: NOW.toISOString(),
