@@ -287,6 +287,22 @@ function TodoItemContent({
   // consistency with the URL card in the expanded editor. Completed rows stay
   // terse, so they keep the inline title treatment below.
   const showUrlOnlyCard = !isCompleted && !!urlOnly && !!previewTitle;
+  const now = Date.now();
+  const aiProcessing =
+    (todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
+    now - new Date(todo.createdAt).getTime() < STALE_AI_MS;
+  const researchPending =
+    todo.research?.status === "pending" &&
+    now - new Date(todo.research.createdAt).getTime() < STALE_RESEARCH_MS;
+  // Skip the inline title line entirely for a URL-only card with no status
+  // badges, so the card sits flush at the top of the row. space-y-1 then only
+  // adds a gap when the title line is actually present.
+  const showTitleLine =
+    !showUrlOnlyCard ||
+    subtasks.length > 0 ||
+    aiProcessing ||
+    researchPending ||
+    !!todo.needsInput;
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
@@ -303,81 +319,80 @@ function TodoItemContent({
         />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          {!showUrlOnlyCard && (
-            <p
-              className={`min-w-0 leading-snug wrap-anywhere ${
-                isCompleted
-                  ? "text-xs line-through text-gray-muted"
-                  : "text-sm text-gray"
-              }`}
-            >
-              {urlOnly ? (
-                previewTitle ? (
-                  previewTitle
-                ) : (
-                  <LinkifiedText text={urlOnly.url} />
-                )
-              ) : (
-                <LinkifiedText text={todo.title} />
-              )}
-            </p>
-          )}
-          {subtasks.length > 0 &&
-            (() => {
-              const doneSubtasks = subtasks.filter((s) => s.completed).length;
-              return (
-                <span
-                  role="img"
-                  className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
-                  aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
+        <div className="space-y-1">
+          {showTitleLine && (
+            <div className="flex items-center gap-2">
+              {!showUrlOnlyCard && (
+                <p
+                  className={`min-w-0 leading-snug wrap-anywhere ${
+                    isCompleted
+                      ? "text-xs line-through text-gray-muted"
+                      : "text-sm text-gray"
+                  }`}
                 >
-                  <ListTree size={10} aria-hidden="true" />
-                  {doneSubtasks}/{subtasks.length}
-                </span>
-              );
-            })()}
-          {(todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
-            Date.now() - new Date(todo.createdAt).getTime() < STALE_AI_MS && (
-              <output
-                className="flex items-center gap-1 text-gray-muted text-xs"
-                aria-label="AI is processing"
-              >
-                <Loader size="sm" className="text-gray-muted" />
-              </output>
-            )}
-          {todo.research?.status === "pending" &&
-            Date.now() - new Date(todo.research.createdAt).getTime() <
-              STALE_RESEARCH_MS && (
-              <output
-                className="flex items-center gap-1 text-gray-muted text-xs"
-                aria-label="Researching"
-              >
-                <Loader
-                  size="sm"
-                  className="text-yellow-8 dark:text-yellowdark-8"
-                />
-              </output>
-            )}
-          {todo.needsInput && (
-            <Button
-              variant="ghost"
-              size="xs"
-              shape="circle"
-              type="button"
-              onClick={() => onToggleExpand(todo.id)}
-              aria-label="The assistant has a question — open to reply"
-              className="bg-yellow-base hover:bg-yellow-hover text-yellow"
-            >
-              <MessageCircle size={12} />
-            </Button>
+                  {urlOnly ? (
+                    previewTitle ? (
+                      previewTitle
+                    ) : (
+                      <LinkifiedText text={urlOnly.url} />
+                    )
+                  ) : (
+                    <LinkifiedText text={todo.title} />
+                  )}
+                </p>
+              )}
+              {subtasks.length > 0 &&
+                (() => {
+                  const doneSubtasks = subtasks.filter(
+                    (s) => s.completed,
+                  ).length;
+                  return (
+                    <span
+                      role="img"
+                      className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
+                      aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
+                    >
+                      <ListTree size={10} aria-hidden="true" />
+                      {doneSubtasks}/{subtasks.length}
+                    </span>
+                  );
+                })()}
+              {aiProcessing && (
+                <output
+                  className="flex items-center gap-1 text-gray-muted text-xs"
+                  aria-label="AI is processing"
+                >
+                  <Loader size="sm" className="text-gray-muted" />
+                </output>
+              )}
+              {researchPending && (
+                <output
+                  className="flex items-center gap-1 text-gray-muted text-xs"
+                  aria-label="Researching"
+                >
+                  <Loader
+                    size="sm"
+                    className="text-yellow-8 dark:text-yellowdark-8"
+                  />
+                </output>
+              )}
+              {todo.needsInput && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  shape="circle"
+                  type="button"
+                  onClick={() => onToggleExpand(todo.id)}
+                  aria-label="The assistant has a question — open to reply"
+                  className="bg-yellow-base hover:bg-yellow-hover text-yellow"
+                >
+                  <MessageCircle size={12} />
+                </Button>
+              )}
+            </div>
           )}
+          {showUrlOnlyCard && urlOnly && <UrlPreviewCard url={urlOnly} />}
         </div>
-        {showUrlOnlyCard && urlOnly && (
-          <div className="mt-1">
-            <UrlPreviewCard url={urlOnly} />
-          </div>
-        )}
         {isCompleted && (
           <p className="text-xs text-gray-muted mt-0.5">
             Completed:{" "}

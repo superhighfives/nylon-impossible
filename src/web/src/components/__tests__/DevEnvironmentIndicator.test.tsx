@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import DevEnvironmentIndicator from "../DevEnvironmentIndicator";
+import DevEnvironmentIndicator, {
+  DevEnvironmentDetails,
+} from "../DevEnvironmentIndicator";
 
 vi.mock("@tanstack/react-router", () => ({
   useLocation: () => ({ href: "/tasks" }),
@@ -10,13 +12,13 @@ vi.mock("../../lib/config", () => ({
   API_URL: "https://api.nylonimpossible.com",
 }));
 
-describe("DevEnvironmentIndicator", () => {
+describe("DevEnvironmentDetails", () => {
   afterEach(() => {
     import.meta.env.PROD = false;
   });
 
   it("shows in development builds", () => {
-    render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
+    render(<DevEnvironmentDetails origin="http://localhost:3000" />);
     expect(screen.getByText("api")).toBeInTheDocument();
     expect(
       screen.getByText("https://api.nylonimpossible.com"),
@@ -24,21 +26,21 @@ describe("DevEnvironmentIndicator", () => {
   });
 
   it("shows the full current URL", () => {
-    render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
+    render(<DevEnvironmentDetails origin="http://localhost:3000" />);
     expect(screen.getByText("http://localhost:3000/tasks")).toBeInTheDocument();
   });
 
   it("shows on preview deploy origins in production builds", () => {
     import.meta.env.PROD = true;
     render(
-      <DevEnvironmentIndicator origin="https://pr-42.nylonimpossible.com" />,
+      <DevEnvironmentDetails origin="https://pr-42.nylonimpossible.com" />,
     );
     expect(screen.getByText("api")).toBeInTheDocument();
   });
 
   it("hides on production non-preview origins", () => {
     import.meta.env.PROD = true;
-    render(<DevEnvironmentIndicator origin="https://nylonimpossible.com" />);
+    render(<DevEnvironmentDetails origin="https://nylonimpossible.com" />);
     expect(screen.queryByText("api")).not.toBeInTheDocument();
   });
 
@@ -51,7 +53,7 @@ describe("DevEnvironmentIndicator", () => {
     ];
 
     for (const origin of previewOrigins) {
-      const { unmount } = render(<DevEnvironmentIndicator origin={origin} />);
+      const { unmount } = render(<DevEnvironmentDetails origin={origin} />);
       expect(screen.getByText("api")).toBeInTheDocument();
       unmount();
     }
@@ -68,9 +70,30 @@ describe("DevEnvironmentIndicator", () => {
     ];
 
     for (const origin of nonPreviewOrigins) {
-      const { unmount } = render(<DevEnvironmentIndicator origin={origin} />);
+      const { unmount } = render(<DevEnvironmentDetails origin={origin} />);
       expect(screen.queryByText("api")).not.toBeInTheDocument();
       unmount();
     }
+  });
+});
+
+describe("DevEnvironmentIndicator", () => {
+  afterEach(() => {
+    import.meta.env.PROD = false;
+  });
+
+  it("renders a trigger button in development", () => {
+    render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
+    expect(
+      screen.getByRole("button", { name: "Environment details" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders nothing on production non-preview origins", () => {
+    import.meta.env.PROD = true;
+    render(<DevEnvironmentIndicator origin="https://nylonimpossible.com" />);
+    expect(
+      screen.queryByRole("button", { name: "Environment details" }),
+    ).not.toBeInTheDocument();
   });
 });
