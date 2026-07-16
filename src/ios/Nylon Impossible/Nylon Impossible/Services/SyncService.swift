@@ -91,8 +91,12 @@ final class SyncService {
             await sync()
             webSocketService?.notifyChanged()
         } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "smart-create", key: "area")
+            // Network failures are already reported (or dropped when transient) by
+            // APIService; skip them here to avoid a duplicate Sentry issue.
+            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                SentrySDK.capture(error: error) { scope in
+                    scope.setTag(value: "smart-create", key: "area")
+                }
             }
             print("[SmartCreate] Error: \(error), falling back to local creation")
             // Fallback: create single local todo
@@ -182,8 +186,12 @@ final class SyncService {
             state = .success(Date())
 
         } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "sync", key: "area")
+            // Network failures are already reported (or dropped when transient) by
+            // APIService; skip them here to avoid a duplicate Sentry issue.
+            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                SentrySDK.capture(error: error) { scope in
+                    scope.setTag(value: "sync", key: "area")
+                }
             }
             print("[Sync] Error: \(error)")
             state = .error(error.localizedDescription)
@@ -219,8 +227,12 @@ final class SyncService {
             await sync()
 
         } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "migration", key: "area")
+            // Network failures are already reported (or dropped when transient) by
+            // APIService; skip them here to avoid a duplicate Sentry issue.
+            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                SentrySDK.capture(error: error) { scope in
+                    scope.setTag(value: "migration", key: "area")
+                }
             }
             print("Migration error: \(error)")
         }
@@ -499,8 +511,12 @@ extension SyncService {
                 pushedIds.insert(message.id)
                 didChange = true
             } catch {
-                SentrySDK.capture(error: error) { scope in
-                    scope.setTag(value: "reply-push", key: "area")
+                // Network failures are already reported (or dropped when transient) by
+                // APIService; skip them here to avoid a duplicate Sentry issue.
+                if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                    SentrySDK.capture(error: error) { scope in
+                        scope.setTag(value: "reply-push", key: "area")
+                    }
                 }
             }
         }
