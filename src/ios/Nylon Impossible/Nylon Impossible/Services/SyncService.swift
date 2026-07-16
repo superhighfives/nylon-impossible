@@ -93,7 +93,7 @@ final class SyncService {
         } catch {
             // Network failures are already reported (or dropped when transient) by
             // APIService; skip them here to avoid a duplicate Sentry issue.
-            if !APIError.isNetworkFailure(error) {
+            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
                 SentrySDK.capture(error: error) { scope in
                     scope.setTag(value: "smart-create", key: "area")
                 }
@@ -188,7 +188,7 @@ final class SyncService {
         } catch {
             // Network failures are already reported (or dropped when transient) by
             // APIService; skip them here to avoid a duplicate Sentry issue.
-            if !APIError.isNetworkFailure(error) {
+            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
                 SentrySDK.capture(error: error) { scope in
                     scope.setTag(value: "sync", key: "area")
                 }
@@ -229,7 +229,7 @@ final class SyncService {
         } catch {
             // Network failures are already reported (or dropped when transient) by
             // APIService; skip them here to avoid a duplicate Sentry issue.
-            if !APIError.isNetworkFailure(error) {
+            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
                 SentrySDK.capture(error: error) { scope in
                     scope.setTag(value: "migration", key: "area")
                 }
@@ -513,7 +513,7 @@ extension SyncService {
             } catch {
                 // Network failures are already reported (or dropped when transient) by
                 // APIService; skip them here to avoid a duplicate Sentry issue.
-                if !APIError.isNetworkFailure(error) {
+                if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
                     SentrySDK.capture(error: error) { scope in
                         scope.setTag(value: "reply-push", key: "area")
                     }

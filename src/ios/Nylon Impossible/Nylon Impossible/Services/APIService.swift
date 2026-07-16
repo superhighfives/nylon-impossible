@@ -37,7 +37,7 @@ extension APIError {
     /// layers should not re-capture them to Sentry — doing so creates a duplicate issue for
     /// a single failure.
     static func isNetworkFailure(_ error: Error) -> Bool {
-        if case .networkError? = error as? APIError { return true }
+        if case .networkError(_, _)? = error as? APIError { return true }
         return false
     }
 
@@ -49,6 +49,9 @@ extension APIError {
         if case .networkError(let inner, _)? = error as? APIError {
             underlying = inner
         }
+        // Swift-concurrency cancellations (e.g. a sync Task torn down on
+        // backgrounding) surface as CancellationError, not URLError.
+        if underlying is CancellationError { return true }
         guard let urlError = underlying as? URLError else { return false }
         switch urlError.code {
         case .timedOut, .notConnectedToInternet, .networkConnectionLost,
