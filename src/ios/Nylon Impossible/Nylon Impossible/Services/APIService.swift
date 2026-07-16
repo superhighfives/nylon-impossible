@@ -31,6 +31,35 @@ enum APIError: Error, LocalizedError {
     }
 }
 
+extension APIError {
+    /// True when `error` is a URLSession-level failure surfaced by `APIService`. These are
+    /// reported (or intentionally dropped when transient) at the network layer, so higher
+    /// layers should not re-capture them to Sentry — doing so creates a duplicate issue for
+    /// a single failure.
+    static func isNetworkFailure(_ error: Error) -> Bool {
+        if case .networkError? = error as? APIError { return true }
+        return false
+    }
+
+    /// Expected, transient connectivity failures — request timeouts, offline, dropped
+    /// connections, cancellations. These are normal on mobile (especially for background
+    /// syncs) and are pure noise in Sentry, so we don't report them as errors.
+    static func isTransientNetworkError(_ error: Error) -> Bool {
+        var underlying = error
+        if case .networkError(let inner, _)? = error as? APIError {
+            underlying = inner
+        }
+        guard let urlError = underlying as? URLError else { return false }
+        switch urlError.code {
+        case .timedOut, .notConnectedToInternet, .networkConnectionLost,
+             .cancelled, .dataNotAllowed, .internationalRoamingOff:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 // MARK: - API Models
 
 struct APIResearch: Codable, Sendable {
@@ -620,9 +649,13 @@ final class APIService: APIProviding {
         do {
             (data, response) = try await session.data(for: request)
         } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "network", key: "area")
-                scope.setExtra(value: url, key: "endpoint")
+            // Transient connectivity failures (timeouts, offline, dropped/cancelled
+            // requests) are expected on mobile and only add noise, so don't report them.
+            if !APIError.isTransientNetworkError(error) {
+                SentrySDK.capture(error: error) { scope in
+                    scope.setTag(value: "network", key: "area")
+                    scope.setExtra(value: url, key: "endpoint")
+                }
             }
             throw APIError.networkError(error, url: url)
         }
