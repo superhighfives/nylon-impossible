@@ -58,7 +58,6 @@ function renderExpanded(overrides: Partial<TodoWithUrls> = {}) {
       todo={makeTodo(overrides)}
       subtasks={[]}
       onUpdate={onUpdate}
-      isUpdating={false}
       onDelete={onDelete}
       deletePending={false}
       onAddSubtask={vi.fn()}
@@ -79,33 +78,42 @@ describe("TodoItemExpanded", () => {
     } as unknown as ReturnType<typeof useUser>);
   });
 
-  it("disables Save when there are no pending changes", () => {
+  it("has no Save button — edits auto-save", () => {
     renderExpanded();
     expect(
-      screen.getByRole("button", { name: /save changes/i }),
-    ).toBeDisabled();
+      screen.queryByRole("button", { name: /save changes/i }),
+    ).not.toBeInTheDocument();
   });
 
-  it("enables Save after editing the title and sends only changed fields", () => {
+  it("auto-saves the title on blur, sending only the changed field", () => {
     const { onUpdate } = renderExpanded();
     const input = screen.getByLabelText("Title") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "Buy oat milk" } });
-
-    const save = screen.getByRole("button", { name: /save changes/i });
-    expect(save).not.toBeDisabled();
-    fireEvent.click(save);
+    fireEvent.blur(input);
 
     expect(onUpdate).toHaveBeenCalledWith({ title: "Buy oat milk" });
   });
 
-  it("does not submit an empty title", () => {
+  it("auto-saves the title after the debounce elapses", () => {
+    vi.useFakeTimers();
+    try {
+      const { onUpdate } = renderExpanded();
+      fireEvent.change(screen.getByLabelText("Title"), {
+        target: { value: "Buy oat milk" },
+      });
+      expect(onUpdate).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(700);
+      expect(onUpdate).toHaveBeenCalledWith({ title: "Buy oat milk" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("never auto-saves a blank title", () => {
     const { onUpdate } = renderExpanded();
-    fireEvent.change(screen.getByLabelText("Title"), {
-      target: { value: "   " },
-    });
-    expect(
-      screen.getByRole("button", { name: /save changes/i }),
-    ).toBeDisabled();
+    const input = screen.getByLabelText("Title");
+    fireEvent.change(input, { target: { value: "   " } });
+    fireEvent.blur(input);
     expect(onUpdate).not.toHaveBeenCalled();
   });
 
@@ -115,13 +123,25 @@ describe("TodoItemExpanded", () => {
     expect(onDelete).toHaveBeenCalledWith("todo-1");
   });
 
-  it("shows a clear button that wipes the due date", () => {
-    renderExpanded({ dueDate: "2026-05-01T00:00:00.000Z" });
+  it("clears the due date and auto-saves it as null", () => {
+    const { onUpdate } = renderExpanded({
+      dueDate: "2026-05-01T00:00:00.000Z",
+    });
     const input = screen.getByLabelText("Due date") as HTMLInputElement;
     expect(input.value).toBe("2026-05-01");
 
     fireEvent.click(screen.getByRole("button", { name: /clear due date/i }));
     expect(input.value).toBe("");
+    expect(onUpdate).toHaveBeenCalledWith({ dueDate: null });
+  });
+
+  it("auto-saves a due-date change immediately", () => {
+    const { onUpdate } = renderExpanded();
+    fireEvent.change(screen.getByLabelText("Due date"), {
+      target: { value: "2026-05-01" },
+    });
+    expect(onUpdate).toHaveBeenCalledTimes(1);
+    expect(onUpdate.mock.calls[0][0].dueDate).toBeInstanceOf(Date);
   });
 
   it("renders the research section when research is present", () => {

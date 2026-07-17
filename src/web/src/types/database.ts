@@ -19,6 +19,8 @@ export interface CreateTodoInput {
   recurrence?: Recurrence | null;
   // Parent todo id when creating a subtask; omit/null for a top-level todo.
   parentId?: string | null;
+  // Explicit fractional-index position; omit to append to the sibling group.
+  position?: string;
 }
 
 export interface UpdateTodoInput {

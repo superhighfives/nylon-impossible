@@ -37,6 +37,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { InlineDueDate, InlinePriority } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
@@ -106,7 +107,7 @@ const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
 };
 
 interface SubtaskHandlers {
-  onAdd: (parentId: string, title: string) => void;
+  onAdd: (parentId: string, title: string, position?: string) => void;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
   onReorder: (id: string, position: string) => void;
@@ -119,6 +120,7 @@ interface TodoItemProps {
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
   onToggleExpand: (id: string) => void;
+  onInlineUpdate: (id: string, updates: UpdateTodoInput) => void;
   updatePending: boolean;
   deletePending: boolean;
 }
@@ -132,7 +134,6 @@ interface ExpandedSectionProps {
     dueDate?: Date | null;
     priority?: "high" | "low" | null;
   }) => void;
-  isUpdating: boolean;
   onDelete: (id: string) => void;
   deletePending: boolean;
   subtaskHandlers: SubtaskHandlers;
@@ -257,6 +258,57 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
   );
 }
 
+/**
+ * Editable indicators row for an active todo: inline priority + due-date
+ * controls (set values render as badges; unset ones as faint hover affordances)
+ * plus a read-only recurrence badge. Kept at a stable min height so the row
+ * doesn't jump as controls appear on hover.
+ */
+function InlineIndicators({
+  priority,
+  onPriorityChange,
+  dueValue,
+  dueLabel,
+  isOverdue,
+  onDueChange,
+  recurrence,
+  recurrenceLabel,
+  disabled,
+}: {
+  priority: "high" | "low" | null;
+  onPriorityChange: (next: "high" | "low" | null) => void;
+  dueValue: string | null;
+  dueLabel: string | null;
+  isOverdue: boolean;
+  onDueChange: (date: Date | null) => void;
+  recurrence: TodoWithUrls["recurrence"];
+  recurrenceLabel: string | null;
+  disabled: boolean;
+}) {
+  return (
+    <div className="mt-1 flex min-h-[1.375rem] items-center gap-1.5">
+      <InlinePriority
+        value={priority}
+        onChange={onPriorityChange}
+        disabled={disabled}
+      />
+      <InlineDueDate
+        value={dueValue}
+        label={dueLabel}
+        isOverdue={isOverdue}
+        onChange={onDueChange}
+        disabled={disabled}
+      />
+      {recurrence && (
+        <span className="flex items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs text-gray-muted">
+          <Repeat size={10} aria-hidden="true" />
+          {recurrenceLabel}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function TodoItemContent({
   todo,
   subtasks,
@@ -264,6 +316,7 @@ function TodoItemContent({
   onToggle,
   onToggleExpand,
   onDelete,
+  onInlineUpdate,
   updatePending,
   deletePending,
   showActions = true,
@@ -303,6 +356,33 @@ function TodoItemContent({
     aiProcessing ||
     researchPending ||
     !!todo.needsInput;
+
+  // Inline due-date / priority editing on active rows. Set values render as
+  // editable badges (bottom-left); the quick-add affordances for unset values
+  // live in the right-side hover cluster. Recurrence stays read-only inline (its
+  // anchor logic belongs in the expanded form).
+  const dueDateObj = todo.dueDate ? new Date(todo.dueDate) : null;
+  const dueValueStr = dueDateObj
+    ? dueDateObj.toISOString().split("T")[0]
+    : null;
+  const dueLabel = dueDateObj ? formatDate(dueDateObj, timeZone) : null;
+  const isOverdue = !!dueDateObj && dueDateObj < new Date() && !isCompleted;
+  const hasRecurrence = !!todo.recurrence;
+  const showInlineEditing = !isCompleted;
+
+  const handleInlinePriority = (next: "high" | "low" | null) => {
+    onInlineUpdate(todo.id, { priority: next });
+  };
+  const handleInlineDueDate = (date: Date | null) => {
+    // Clearing a due date also clears any recurrence — a repeat has no anchor
+    // without a due date. Setting/changing a date leaves recurrence untouched.
+    if (date === null && hasRecurrence) {
+      onInlineUpdate(todo.id, { dueDate: null, recurrence: null });
+    } else {
+      onInlineUpdate(todo.id, { dueDate: date });
+    }
+  };
+
   return (
     <div className="flex items-start gap-3">
       <div className="relative -top-px">
@@ -437,7 +517,25 @@ function TodoItemContent({
               })()}
           </>
         )}
-        <TodoIndicators todo={todo} />
+        {showInlineEditing ? (
+          <InlineIndicators
+            priority={todo.priority ?? null}
+            onPriorityChange={handleInlinePriority}
+            dueValue={dueValueStr}
+            dueLabel={dueLabel}
+            isOverdue={isOverdue}
+            onDueChange={handleInlineDueDate}
+            recurrence={todo.recurrence}
+            recurrenceLabel={
+              todo.recurrence
+                ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
+                : null
+            }
+            disabled={updatePending}
+          />
+        ) : (
+          <TodoIndicators todo={todo} />
+        )}
       </div>
       {/* Actions are hidden in the drag overlay clone so the lifted card
           hugs the title instead of stretching to the taller control. */}
@@ -481,7 +579,6 @@ function ExpandedSection({
   todo,
   subtasks,
   onUpdate,
-  isUpdating,
   onDelete,
   deletePending,
   subtaskHandlers,
@@ -491,7 +588,6 @@ function ExpandedSection({
       todo={todo}
       subtasks={subtasks}
       onUpdate={onUpdate}
-      isUpdating={isUpdating}
       onDelete={onDelete}
       deletePending={deletePending}
       onAddSubtask={subtaskHandlers.onAdd}
@@ -587,7 +683,7 @@ function SortableTodoItem(
         <button
           type="button"
           disabled={props.isExpanded}
-          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none transition-transform active:scale-[0.96] disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted"
+          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted/40 hover:text-gray-muted touch-none transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted/40"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -601,7 +697,6 @@ function SortableTodoItem(
               todo={props.todo}
               subtasks={props.subtasks}
               onUpdate={props.onUpdateExpanded}
-              isUpdating={props.updatePending}
               onDelete={props.onDelete}
               deletePending={props.deletePending}
               subtaskHandlers={props.subtaskHandlers}
@@ -777,6 +872,12 @@ export function TodoList() {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
+  // Inline row edits (due date / priority) go straight through the optimistic
+  // updateTodo mutation — no expanded form, no save step.
+  const handleInlineUpdate = (id: string, updates: UpdateTodoInput) => {
+    updateTodo.mutate({ id, input: updates });
+  };
+
   const handleUpdateExpanded =
     (id: string) =>
     (updates: {
@@ -793,7 +894,8 @@ export function TodoList() {
   // subtask has no children. Delete/reorder reuse the todo mutations — a
   // subtask is a full todo.
   const subtaskHandlers: SubtaskHandlers = {
-    onAdd: (parentId, title) => createTodo.mutate({ title, parentId }),
+    onAdd: (parentId, title, position) =>
+      createTodo.mutate({ title, parentId, position }),
     onToggle: (id, completed) =>
       updateTodo.mutate({ id, input: { completed: !completed } }),
     onDelete: (id) => deleteTodo.mutate(id),
@@ -911,6 +1013,7 @@ export function TodoList() {
     onToggle: handleToggle,
     onDelete: handleDelete,
     onToggleExpand: handleToggleExpand,
+    onInlineUpdate: handleInlineUpdate,
     updatePending: updateTodo.isPending,
     deletePending: deleteTodo.isPending,
   });
@@ -979,7 +1082,6 @@ export function TodoList() {
                           todo={todo}
                           subtasks={subtasksByParent.get(todo.id) ?? []}
                           onUpdate={handleUpdateExpanded(todo.id)}
-                          isUpdating={updateTodo.isPending}
                           onDelete={handleDelete}
                           deletePending={deleteTodo.isPending}
                           subtaskHandlers={subtaskHandlers}

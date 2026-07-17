@@ -12,6 +12,10 @@ export const createTodoSchema = z.object({
   recurrence: recurrenceSchema.nullable().optional(),
   // Parent todo id when creating a subtask; omit/null for a top-level todo.
   parentId: z.string().uuid().nullable().optional(),
+  // Explicit fractional-index position. When omitted the server appends to the
+  // end of the sibling group; callers pass this to insert elsewhere (e.g. a new
+  // subtask at the top of its parent's list).
+  position: z.string().optional(),
 });
 
 export const updateTodoSchema = z.object({
