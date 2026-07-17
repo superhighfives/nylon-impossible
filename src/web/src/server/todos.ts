@@ -252,33 +252,38 @@ export const createTodo = createServerFn({ method: "POST" })
           }
         }
 
-        // Get the last position for fractional indexing, scoped to the sibling
-        // group: top-level todos order among themselves (parent_id IS NULL),
-        // subtasks among their siblings (parent_id = parentId).
-        const lastTodo = yield* Effect.tryPromise({
-          try: () =>
-            db
-              .select({ position: todos.position })
-              .from(todos)
-              .where(
-                and(
-                  eq(todos.userId, user.id),
-                  parentId
-                    ? eq(todos.parentId, parentId)
-                    : isNull(todos.parentId),
-                ),
-              )
-              .orderBy(desc(todos.position))
-              .limit(1)
-              .get(),
-          catch: (error) =>
-            new DatabaseError({
-              operation: "getLastTodo",
-              cause: error,
-            }),
-        });
+        // An explicit position wins (e.g. inserting a subtask at the top of its
+        // parent's list). Otherwise append: get the last position for fractional
+        // indexing, scoped to the sibling group — top-level todos order among
+        // themselves (parent_id IS NULL), subtasks among their siblings
+        // (parent_id = parentId).
+        let position = validated.position;
+        if (!position) {
+          const lastTodo = yield* Effect.tryPromise({
+            try: () =>
+              db
+                .select({ position: todos.position })
+                .from(todos)
+                .where(
+                  and(
+                    eq(todos.userId, user.id),
+                    parentId
+                      ? eq(todos.parentId, parentId)
+                      : isNull(todos.parentId),
+                  ),
+                )
+                .orderBy(desc(todos.position))
+                .limit(1)
+                .get(),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "getLastTodo",
+                cause: error,
+              }),
+          });
 
-        const position = generateKeyBetween(lastTodo?.position ?? null, null);
+          position = generateKeyBetween(lastTodo?.position ?? null, null);
+        }
 
         // Create todo
         const [newTodo] = yield* Effect.tryPromise({
