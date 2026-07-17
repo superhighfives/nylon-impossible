@@ -1,7 +1,7 @@
 # Pre-launch Web Polish
 
 **Date**: 2026-07-17
-**Status**: In Progress
+**Status**: Complete
 **Updated**: 2026-07-17
 
 ## Problem
@@ -438,3 +438,80 @@ time, and **explicit per-todo actions** afterward. AI never fires automatically.
   "Research" and "Enrich" are two actions or one "AI" affordance with a submenu.
 - Item 6: iOS migration — preserve via `enrich: true` now, or ship iOS opt-in in
   the same cycle?
+
+---
+
+## Overview
+
+All six polish items were built. Five are web-only quality-of-life changes
+(drag handles, inline due/priority editing, full auto-save, optimistic
+creation, subtasks-to-top); the sixth makes AI deliberate across web, API, and
+iOS. Shipped as **two stacked PRs**, not merged at time of writing:
+
+- **PR #231** `pre-launch-polish` → `main`: items 1–5 (commit `30510d7`).
+- **PR #232** `intentional-ai` → `pre-launch-polish`: item 6 (commits `2f9b086`
+  web+API, `1ff07f5` iOS). Merge #231 first.
+
+Verification at completion: web typecheck clean, web suite **166 passing**, API
+suite **301 passing**, lint clean, iOS SwiftLint clean (0 errors). The iOS app
+was **not** build/simulator-tested (SDK mismatch in the dev environment — CI
+runs SwiftLint only), so PR #232 carries a "needs a simulator pass" caveat.
+
+## Architecture
+
+**Item 1 (drag handles)** — pure Tailwind: the grip rests at
+`text-gray-muted/40` and reveals via `sm:opacity-0 sm:group-hover:opacity-100`
+(kept visible on touch), in `TodoList.tsx` and `SubtaskSection.tsx`.
+
+**Item 2 (inline due/priority)** — new `components/InlineTodoControls.tsx`
+exports `InlinePriority` (a Base UI `Menu`) and `InlineDueDate` (a hidden native
+`<input type="date">` opened via `showPicker()`). They render inside a new
+`InlineIndicators` row in `TodoItemContent`, wired to a new `onInlineUpdate`
+prop → the optimistic `updateTodo`.
+- **Deviation from the spec:** the spec floated keeping controls purely in a
+  hover-revealed zone. Shipped instead as an **always-present slim
+  `InlineIndicators` row** on active todos (set values = editable badges, unset
+  = faint hover affordances) to avoid hover-induced layout jump. Recurrence is
+  read-only inline; clearing a due date also clears recurrence. This row's
+  resting spacing is the most likely thing to want a visual tweak.
+
+**Item 3 (auto-save)** — `TodoItemExpanded` lost its Save button and the
+`canSave`/`hasChanges`/`isUpdating` machinery. Title/notes use a debounced
+committer (700ms, `useRef` timers, flush on blur and on an empty-dep unmount
+effect that fires on collapse); due/priority/repeat commit immediately in their
+handlers. The `touched` server-merge guard is retained so in-flight AI
+re-enrichment can't clobber an active edit. `isUpdating` was removed from the
+prop chain (`ExpandedSection` no longer forwards it).
+
+**Item 4 (optimistic create)** — only `useSmartCreate` needed changing (every
+other web mutation was already optimistic). It prepends a `temp-…` placeholder
+with a position sorted before the top-level minimum, rolls back in `onError`,
+and reconciles wholesale via the `onSettled` invalidation (handles
+one-line→N-todos). Its `mutationFn` variable changed from `string` to
+`SmartCreateInput` — which dovetailed with item 6's flags.
+
+**Item 5 (subtasks-to-top)** — an optional `position` was threaded through
+`createTodoSchema`, `CreateTodoInput`, the `createTodo` server fn (explicit
+position wins over the end-of-group default), and the `useCreateTodo`
+optimistic insert. `SubtaskSection.handleAdd` computes a key before the first
+active subtask.
+
+**Item 6 (intentional AI)** — the behavioural core is `smart-create.ts`:
+`useAI = enrich && aiEnabled && Pro`, replacing the old auto-fire. Research runs
+directly (`doResearch = research && Pro && !useAI`) — the `!useAI` guard avoids
+a double run when enrichment would itself detect research. New
+`handlers/enrich.ts` (`POST /todos/:id/enrich`) mirrors `reresearch.ts`.
+- Web: `TodoInput` split-button (`[Add | ↓]`, Base UI `Menu`) + a new
+  `useEnrichTodo` hook; `TodoItemExpanded` gains explicit Enrich/Research
+  actions (two separate actions, per decision), Pro + aiEnabled gated.
+- iOS: flags on `SmartCreateRequest` + the `APIProviding` protocol +
+  `SyncService`/`ContentView`; `AddTaskInputView` becomes a `Menu` with
+  `primaryAction` (plain tap adds, long-press opens enrich/research);
+  `APIService.enrich` + an `AIActionsSection` in `TodoEditSheet`.
+- **Deviations / decisions:** iOS was migrated to opt-in **this cycle** (not the
+  behaviour-preserving `enrich:true` fallback the spec floated). The
+  `AIActionsSection` was extracted to a standalone view purely to keep
+  `TodoEditSheet` under SwiftLint's `type_body_length` error threshold. The
+  inline recurring-due-date open question was resolved as **allow inline edit**
+  (setting a date just moves the anchor; the server advances recurrence on
+  completion, not on edit).
