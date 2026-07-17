@@ -328,6 +328,11 @@ struct SyncConflict: Codable, Sendable {
 
 struct SmartCreateRequest: Codable, Sendable {
     let text: String
+    // AI is opt-in per create: `enrich` runs the enrichment model, `research`
+    // runs research. Both are Pro/aiEnabled-gated server-side. Omitted (nil)
+    // means no AI — the intentional default.
+    let enrich: Bool?
+    let research: Bool?
 }
 
 struct SmartCreateResponse: Codable, Sendable {
@@ -428,12 +433,13 @@ struct ImportedDatedTodo: Codable, Sendable, Identifiable {
 @MainActor
 protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
-    func smartCreate(text: String) async throws -> SmartCreateResponse
+    func smartCreate(text: String, enrich: Bool, research: Bool) async throws -> SmartCreateResponse
     func getMe() async throws -> APIUser
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func importGoogleTasks() async throws -> GoogleTasksImportResponse
     func deleteMe() async throws
     func reresearch(todoId: String) async throws
+    func enrich(todoId: String) async throws
     func cancelResearch(todoId: String) async throws
     func replyToTodo(todoId: String, content: String) async throws -> String
     func dismissQuestion(todoId: String) async throws
@@ -506,8 +512,19 @@ final class APIService: APIProviding {
 
     // MARK: - Smart Create
 
-    func smartCreate(text: String) async throws -> SmartCreateResponse {
-        return try await post(path: "/todos/smart", body: SmartCreateRequest(text: text))
+    func smartCreate(
+        text: String,
+        enrich: Bool = false,
+        research: Bool = false
+    ) async throws -> SmartCreateResponse {
+        return try await post(
+            path: "/todos/smart",
+            body: SmartCreateRequest(
+                text: text,
+                enrich: enrich ? true : nil,
+                research: research ? true : nil
+            )
+        )
     }
 
     // MARK: - CRUD (for direct operations if needed)
@@ -549,6 +566,16 @@ final class APIService: APIProviding {
     func reresearch(todoId: String) async throws {
         struct ReresearchResponse: Decodable { let id: String }
         let _: ReresearchResponse = try await post(path: "/todos/\(todoId)/research", body: EmptyBody())
+    }
+
+    // MARK: - Enrich
+
+    /// On-demand AI enrichment for an existing todo. AI is intentional — nothing
+    /// enriches automatically — so this backs the explicit per-todo "Enrich"
+    /// action. Pro + aiEnabled gated server-side.
+    func enrich(todoId: String) async throws {
+        struct EnrichResponse: Decodable { let status: String }
+        let _: EnrichResponse = try await post(path: "/todos/\(todoId)/enrich", body: EmptyBody())
     }
 
     func cancelResearch(todoId: String) async throws {

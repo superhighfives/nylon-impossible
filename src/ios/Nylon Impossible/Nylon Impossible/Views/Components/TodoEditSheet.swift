@@ -29,6 +29,7 @@ struct TodoEditSheet: View {
     @State private var research: APIResearch?
     @State private var isLoadingUrls: Bool = false
     @State private var isReresearching: Bool = false
+    @State private var isEnriching: Bool = false
     @State private var newSubtaskTitle: String = ""
 
     init(
@@ -160,6 +161,17 @@ struct TodoEditSheet: View {
                 // recurrence). Once a subtask is added, the Repeat section hides.
                 if recurrenceFrequency == nil {
                     subtasksSection
+                }
+
+                // AI actions — explicit, opt-in enrich / research (nothing runs
+                // automatically). Pro + aiEnabled only.
+                if preferencesService.isPro && preferencesService.aiEnabled {
+                    AIActionsSection(
+                        isEnriching: isEnriching,
+                        isReresearching: isReresearching,
+                        onEnrich: { Task { await enrichTodo() } },
+                        onResearch: { Task { await reresearch() } }
+                    )
                 }
 
                 // Research
@@ -357,6 +369,20 @@ struct TodoEditSheet: View {
         }
     }
 
+    private func enrichTodo() async {
+        guard let apiService else { return }
+        isEnriching = true
+        defer { isEnriching = false }
+        do {
+            try await apiService.enrich(todoId: todo.id.uuidString.lowercased())
+            // Enrichment runs in the background server-side; the enriched fields
+            // arrive via the next sync. Reload detail to pick up any research.
+            await loadUrls()
+        } catch {
+            print("[AI] Enrich error: \(error)")
+        }
+    }
+
     private func cancelResearch() async {
         guard let apiService else { return }
         do {
@@ -524,4 +550,29 @@ struct UrlRow: View {
         onCancel: {}
     )
     .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))
+}
+
+/// Explicit, opt-in AI actions for a todo — enrich and research. AI never runs
+/// automatically; this is the deliberate per-todo affordance (Pro + aiEnabled,
+/// gated by the caller).
+private struct AIActionsSection: View {
+    let isEnriching: Bool
+    let isReresearching: Bool
+    let onEnrich: () -> Void
+    let onResearch: () -> Void
+
+    var body: some View {
+        Section {
+            Button(action: onEnrich) {
+                Label("Enrich", systemImage: "sparkles")
+            }
+            .disabled(isEnriching)
+            Button(action: onResearch) {
+                Label("Research", systemImage: "magnifyingglass")
+            }
+            .disabled(isReresearching)
+        } header: {
+            Text("AI")
+        }
+    }
 }
