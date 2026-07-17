@@ -1,7 +1,7 @@
 # iOS launch parity: Google Tasks import, account deletion, legal links
 
 **Date**: 2026-07-03
-**Status**: In Progress
+**Status**: Complete
 
 ## Problem
 
@@ -163,8 +163,9 @@ clients, so it's now threaded through:
 - [x] `ImportReviewSheet`: post-import repeat-schedule review.
 - [x] AI toggle gated to paid users across API + web + iOS.
 - [x] Web + API: typecheck, tests (135 web / 272 api), Biome check all green.
-- [ ] Xcode build + manual test (connect, import, re-import, review, delete;
-      confirm AI section hidden for a free user, shown for pro).
+- [x] Xcode build + manual test (connect, import, re-import, review, delete;
+      confirm AI section hidden for a free user, shown for pro). Verified and
+      shipped in #194 (follow-up fixes #216/#217).
 
 ## Dependencies
 
