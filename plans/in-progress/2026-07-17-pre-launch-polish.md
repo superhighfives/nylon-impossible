@@ -59,8 +59,26 @@ model; treat it as its own PR.
       commits due/priority/repeat immediately; Save button + `canSave`/`isUpdating`
       gating removed; empty title never persists; `touched` merge-guard kept.
       Tests rewritten for auto-save; suite green (162).
-- [ ] **Item 6 — Intentional AI (own PR; iOS opt-in this cycle).**
-      Decision: iOS migrates to opt-in this cycle (not just `enrich:true`).
+- [x] **Item 6 — Intentional AI (own branch `intentional-ai`).**
+      - [x] **API + web** (commit `2f9b086`): `smart-create` takes `enrich` /
+        `research` flags (no more auto-fire); new `POST /todos/:id/enrich`;
+        `[Add | ↓]` split-button on the web input; per-todo Enrich/Research in
+        the expanded view (two separate actions). api (301) + web (166) green.
+      - [x] **iOS opt-in** (commit `1ff07f5`): flags threaded through
+        `SmartCreateRequest` / `APIProviding` / `SyncService` / `ContentView`;
+        `AddTaskInputView` split add-button (long-press menu) when AI available;
+        new `APIService.enrich` + `AIActionsSection` in `TodoEditSheet`.
+        SwiftLint clean (0 errors). **NOT build/simulator-tested** in this env —
+        needs an Xcode build + manual pass before merge.
+
+## Branches / PRs
+
+- `pre-launch-polish` (off `main`): items 1–5 (`30510d7`).
+- `intentional-ai` (stacked on `pre-launch-polish`): item 6 web+API (`2f9b086`)
+  + iOS (`1ff07f5`).
+
+Intended as two PRs: merge `pre-launch-polish` first, then `intentional-ai`.
+Nothing pushed yet.
 
 ---
 
