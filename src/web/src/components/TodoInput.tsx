@@ -60,8 +60,13 @@ export function TodoInput() {
           variant="primary"
           size="xs"
           shape="square"
-          className={`transition-[background-color,color,transform] active:scale-[0.96] before:absolute before:inset-[-6px] before:content-[''] ${
-            aiAvailable ? "rounded-r-none" : ""
+          // `relative` scopes the tap-target pseudo-element to this button; in
+          // split mode it stays flush on the right (before:right-0) so it never
+          // overlays the adjacent menu trigger and steals its clicks.
+          className={`relative transition-[background-color,color,transform] active:scale-[0.96] before:absolute before:content-[''] before:-top-[6px] before:-bottom-[6px] before:-left-[6px] ${
+            aiAvailable
+              ? "rounded-r-none before:right-0"
+              : "before:-right-[6px]"
           }`}
           aria-label="Add todo"
         >
@@ -76,7 +81,10 @@ export function TodoInput() {
                   variant="primary"
                   size="xs"
                   shape="square"
-                  className="rounded-l-none border-l border-yellow-solid-hover"
+                  // Its own tap-target pseudo-element, flush on the left
+                  // (before:left-0) so it meets — but never overlaps — the
+                  // submit button at the seam.
+                  className="relative rounded-l-none border-l border-yellow-solid-hover before:absolute before:content-[''] before:-top-[6px] before:-bottom-[6px] before:-right-[6px] before:left-0"
                   aria-label="Add with AI"
                 >
                   <ChevronDown size={12} />
