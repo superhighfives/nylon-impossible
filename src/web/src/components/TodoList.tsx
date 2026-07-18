@@ -259,10 +259,10 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
 }
 
 /**
- * Editable indicators row for an active todo: inline priority + due-date
- * controls (set values render as badges; unset ones as faint hover affordances)
- * plus a read-only recurrence badge. Kept at a stable min height so the row
- * doesn't jump as controls appear on hover.
+ * Editable indicators for an active todo: inline priority + due-date controls
+ * (set values render as badges; unset ones as faint hover affordances) plus a
+ * read-only recurrence badge. Rendered inline in the row's right-hand action
+ * cluster, next to the expand control.
  */
 function InlineIndicators({
   priority,
@@ -286,7 +286,7 @@ function InlineIndicators({
   disabled: boolean;
 }) {
   return (
-    <div className="mt-1 flex min-h-[1.375rem] items-center gap-1.5">
+    <div className="flex items-center gap-1.5">
       <InlinePriority
         value={priority}
         onChange={onPriorityChange}
@@ -517,30 +517,34 @@ function TodoItemContent({
               })()}
           </>
         )}
-        {showInlineEditing ? (
-          <InlineIndicators
-            priority={todo.priority ?? null}
-            onPriorityChange={handleInlinePriority}
-            dueValue={dueValueStr}
-            dueLabel={dueLabel}
-            isOverdue={isOverdue}
-            onDueChange={handleInlineDueDate}
-            recurrence={todo.recurrence}
-            recurrenceLabel={
-              todo.recurrence
-                ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
-                : null
-            }
-            disabled={updatePending}
-          />
-        ) : (
-          <TodoIndicators todo={todo} />
-        )}
+        {/* Active rows edit priority/due inline in the right-hand cluster; only
+            completed rows keep the read-only indicators below the title. */}
+        {!showInlineEditing && <TodoIndicators todo={todo} />}
       </div>
       {/* Actions are hidden in the drag overlay clone so the lifted card
           hugs the title instead of stretching to the taller control. */}
       {showActions && (
-        <>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Inline priority + due-date controls sit on one line with the
+              expand control. Hidden when expanded — the expanded form has its
+              own full editors. */}
+          {showInlineEditing && !isExpanded && (
+            <InlineIndicators
+              priority={todo.priority ?? null}
+              onPriorityChange={handleInlinePriority}
+              dueValue={dueValueStr}
+              dueLabel={dueLabel}
+              isOverdue={isOverdue}
+              onDueChange={handleInlineDueDate}
+              recurrence={todo.recurrence}
+              recurrenceLabel={
+                todo.recurrence
+                  ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
+                  : null
+              }
+              disabled={updatePending}
+            />
+          )}
           {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
               control on the title line so it doesn't stretch the row height on
               todos without a description. */}
@@ -568,7 +572,7 @@ function TodoItemContent({
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </Button>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -683,7 +687,7 @@ function SortableTodoItem(
         <button
           type="button"
           disabled={props.isExpanded}
-          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted/40 hover:text-gray-muted touch-none transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted/40"
+          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-50 sm:hover:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted"
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
