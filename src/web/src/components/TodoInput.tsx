@@ -16,9 +16,9 @@ export function TodoInput() {
   const { data: user } = useUser();
   const trimmed = text.trim();
 
-  // AI is opt-in and Pro-gated; the split-button menu only appears when it's
-  // actually available so free / AI-off users see a plain Add button.
-  const aiAvailable = user?.plan === "pro" && user?.aiEnabled === true;
+  // AI is opt-in and gated on the aiEnabled master switch; the split-button
+  // menu only appears when AI is on, so AI-off users see a plain Add button.
+  const aiAvailable = user?.aiEnabled === true;
 
   const submit = (opts: { enrich?: boolean; research?: boolean } = {}) => {
     if (!trimmed || smartCreate.isPending) return;

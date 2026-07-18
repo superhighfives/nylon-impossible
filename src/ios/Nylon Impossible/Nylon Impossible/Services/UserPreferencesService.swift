@@ -37,7 +37,8 @@ final class UserPreferencesService {
     var isLoading: Bool = false
     var error: Error?
 
-    /// AI is a paid feature — only pro users see the toggle.
+    /// Whether the user is on the paid plan. AI is no longer gated on this —
+    /// it follows the `aiEnabled` toggle — but the plan is still tracked.
     var isPro: Bool { plan == "pro" }
 
     init(apiService: APIService) {

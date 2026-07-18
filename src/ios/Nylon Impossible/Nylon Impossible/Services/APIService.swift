@@ -329,8 +329,8 @@ struct SyncConflict: Codable, Sendable {
 struct SmartCreateRequest: Codable, Sendable {
     let text: String
     // AI is opt-in per create: `enrich` runs the enrichment model, `research`
-    // runs research. Both are Pro/aiEnabled-gated server-side. Omitted (nil)
-    // means no AI — the intentional default.
+    // runs research. Both are gated on the aiEnabled switch server-side. Omitted
+    // (nil) means no AI — the intentional default.
     let enrich: Bool?
     let research: Bool?
 }
@@ -572,7 +572,7 @@ final class APIService: APIProviding {
 
     /// On-demand AI enrichment for an existing todo. AI is intentional — nothing
     /// enriches automatically — so this backs the explicit per-todo "Enrich"
-    /// action. Pro + aiEnabled gated server-side.
+    /// action. Gated on the aiEnabled switch server-side.
     func enrich(todoId: String) async throws {
         struct EnrichResponse: Decodable { let status: String }
         let _: EnrichResponse = try await post(path: "/todos/\(todoId)/enrich", body: EmptyBody())

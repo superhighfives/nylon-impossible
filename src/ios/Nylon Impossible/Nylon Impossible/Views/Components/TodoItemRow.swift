@@ -368,9 +368,11 @@ struct TodoItemRow: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.vertical, 12)
-        .padding(.horizontal, 16)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .padding(.vertical, 10)
+        .padding(.horizontal, 4)
+        // No persistent box — rows sit directly on the background so they read
+        // as floating (matching web, where the surface/ring only appears while
+        // a row is being dragged; SwiftUI's List provides that lift on reorder).
         .opacity(todo.isEffectivelyCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
         .contextMenu {

@@ -15,6 +15,10 @@ export const API_ERRORS = {
     status: 403,
     message: "This feature requires a Pro plan",
   },
+  ai_disabled: {
+    status: 403,
+    message: "AI features are turned off",
+  },
   invalid_signature: { status: 401, message: "Invalid webhook signature" },
   websocket_upgrade_required: {
     status: 400,

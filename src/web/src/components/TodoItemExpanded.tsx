@@ -159,9 +159,9 @@ export function TodoItemExpanded({
   const enrichTodo = useEnrichTodo();
   const reresearch = useReresearch();
 
-  // AI is intentional and Pro-gated; the enrich/research actions only appear
-  // when AI is actually available to this user.
-  const aiAvailable = user?.plan === "pro" && user?.aiEnabled === true;
+  // AI is intentional and gated on the aiEnabled master switch; the
+  // enrich/research actions only appear when AI is turned on for this user.
+  const aiAvailable = user?.aiEnabled === true;
   const aiProcessing =
     todo.aiStatus === "pending" || todo.aiStatus === "processing";
 
@@ -362,7 +362,7 @@ export function TodoItemExpanded({
           >
             Notes
           </label>
-          {user?.plan === "pro" && user?.aiEnabled && (
+          {aiAvailable && (
             <span className="text-xs text-gray-muted">Not used by AI</span>
           )}
         </div>

@@ -135,9 +135,9 @@ describe("Smart create endpoint", () => {
     });
   });
 
-  describe("free-tier plan gate", () => {
+  describe("plan-independent AI", () => {
     beforeEach(async () => {
-      // aiEnabled true so the only thing preventing AI is the plan gate.
+      // AI is gated on aiEnabled only — plan no longer matters.
       await enableAI();
       const db = getDb(env.DB);
       await db
@@ -146,7 +146,7 @@ describe("Smart create endpoint", () => {
         .where(eq(users.id, "user_test_123"));
     });
 
-    it("forces free users onto the fast path even when enrich is requested", async () => {
+    it("runs AI for free-plan users when enrich is requested", async () => {
       const res = await smartCreate("buy milk and eggs tomorrow", {
         enrich: true,
       });
@@ -154,8 +154,8 @@ describe("Smart create endpoint", () => {
 
       const body = await res.json<{ todos: any[]; ai: boolean }>();
       expect(body.todos).toHaveLength(1);
-      expect(body.todos[0].aiStatus).toBeNull();
-      expect(body.ai).toBe(false);
+      expect(body.todos[0].aiStatus).toBe("pending");
+      expect(body.ai).toBe(true);
     });
   });
 

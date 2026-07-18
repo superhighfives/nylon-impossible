@@ -134,28 +134,27 @@ struct SettingsView: View {
                 // Completed todos collapse via the bottom-of-list accordion
                 // (matching web), so there's no separate settings toggle here.
 
-                // AI is a paid feature, so the toggle only appears for pro users.
-                if preferencesService.isPro {
-                    Section {
-                        Toggle("Use AI", isOn: Binding(
-                            get: { preferencesService.aiEnabled },
-                            set: { newValue in
-                                Task {
-                                    await preferencesService.setAI(enabled: newValue)
-                                }
+                // AI features are gated on this toggle (not the plan), so it's
+                // available to every user to turn on or off.
+                Section {
+                    Toggle("Use AI", isOn: Binding(
+                        get: { preferencesService.aiEnabled },
+                        set: { newValue in
+                            Task {
+                                await preferencesService.setAI(enabled: newValue)
                             }
-                        ))
-
-                        if let error = preferencesService.error {
-                            Text(error.localizedDescription)
-                                .font(.caption)
-                                .foregroundStyle(.red)
                         }
-                    } header: {
-                        Text("AI Features")
-                    } footer: {
-                        Text("When enabled, AI helps enrich todos by doing research tasks, pulling out metadata, and finding locations.")
+                    ))
+
+                    if let error = preferencesService.error {
+                        Text(error.localizedDescription)
+                            .font(.caption)
+                            .foregroundStyle(.red)
                     }
+                } header: {
+                    Text("AI Features")
+                } footer: {
+                    Text("When enabled, AI helps enrich todos by doing research tasks, pulling out metadata, and finding locations.")
                 }
 
                 Section {

@@ -90,8 +90,9 @@ function parseGoogleDueDate(due: string | undefined): Date | null {
 // POST /todos/import/google-tasks
 export async function importGoogleTasks(c: Context<Env>) {
   const userId = c.get("userId");
-  // Free users always take the fast path regardless of their aiEnabled preference.
-  const useAI = c.get("aiEnabled") && c.get("plan") === "pro";
+  // AI enrichment on import follows the aiEnabled master switch; plan no longer
+  // gates it. AI-off users take the fast path.
+  const useAI = c.get("aiEnabled");
 
   // Exchange the Clerk-held Google connection for an access token.
   let accessToken: string | undefined;

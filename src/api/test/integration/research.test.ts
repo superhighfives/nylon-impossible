@@ -213,13 +213,45 @@ describe("Research functionality", () => {
       expect(research.id).toBe(body.id);
     });
 
-    it("returns 403 pro_required for a free-plan user", async () => {
+    it("returns 403 ai_disabled when AI is turned off", async () => {
       const db = getDb(env.DB);
       const now = new Date();
       const todoId = "550e8400-e29b-41d4-a716-446655440099";
 
+      mockVerifyToken.mockResolvedValue({ sub: "user_noai" });
+      await seedUser("user_noai", "noai@example.com", { aiEnabled: false });
+      await db.insert(todos).values({
+        id: todoId,
+        userId: "user_noai",
+        title: "How does OAuth work",
+        position: "a0",
+        createdAt: now,
+        updatedAt: now,
+      });
+
+      const res = await reresearchRequest(todoId);
+      expect(res.status).toBe(403);
+      const body = await res.json<any>();
+      expect(body.code).toBe("ai_disabled");
+
+      // No research record should have been created.
+      const rows = await db
+        .select()
+        .from(todoResearch)
+        .where(eq(todoResearch.todoId, todoId));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("allows re-research for a free-plan user when AI is enabled", async () => {
+      const db = getDb(env.DB);
+      const now = new Date();
+      const todoId = "550e8400-e29b-41d4-a716-446655440098";
+
       mockVerifyToken.mockResolvedValue({ sub: "user_free" });
-      await seedUser("user_free", "free@example.com", { plan: "free" });
+      await seedUser("user_free", "free@example.com", {
+        plan: "free",
+        aiEnabled: true,
+      });
       await db.insert(todos).values({
         id: todoId,
         userId: "user_free",
@@ -230,16 +262,7 @@ describe("Research functionality", () => {
       });
 
       const res = await reresearchRequest(todoId);
-      expect(res.status).toBe(403);
-      const body = await res.json<any>();
-      expect(body.code).toBe("pro_required");
-
-      // No research record should have been created.
-      const rows = await db
-        .select()
-        .from(todoResearch)
-        .where(eq(todoResearch.todoId, todoId));
-      expect(rows).toHaveLength(0);
+      expect(res.status).toBe(200);
     });
 
     it("deletes existing research and creates new one", async () => {

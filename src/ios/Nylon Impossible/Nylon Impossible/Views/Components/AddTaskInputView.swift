@@ -18,7 +18,7 @@ enum AICreateOption {
 struct AddTaskInputView: View {
     @Binding var text: String
     var canAdd: Bool
-    // When true (Pro + aiEnabled), the add button becomes a split button whose
+    // When true (aiEnabled), the add button becomes a split button whose
     // long-press menu offers enrich / research. A plain tap always adds with no AI.
     var aiAvailable: Bool = false
     var onAdd: (AICreateOption) -> Void
