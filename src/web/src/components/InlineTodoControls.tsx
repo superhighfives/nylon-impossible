@@ -129,7 +129,14 @@ function DueDateCalendar({
   onSelect: (ymd: string) => void;
   onClear: () => void;
 }) {
-  const todayYmd = new Date().toLocaleDateString("en-CA", { timeZone });
+  // Force explicit 2-digit Y/M/D (matching src/lib/date.ts) so this is always a
+  // parseable `yyyy-mm-dd`, not a locale-default format that could break parseYmd.
+  const todayYmd = new Date().toLocaleDateString("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone,
+  });
   const initial = parseYmd(value ?? todayYmd);
   const [view, setView] = useState({ y: initial.y, m: initial.m });
 
@@ -291,7 +298,7 @@ export function InlineDueDate({
           <button
             type="button"
             disabled={disabled}
-            onClick={() => onChange(null)}
+            onClick={handleClear}
             aria-label="Clear due date"
             className="rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50"
           >
