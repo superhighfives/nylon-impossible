@@ -164,8 +164,8 @@ struct TodoEditSheet: View {
                 }
 
                 // AI actions — explicit, opt-in enrich / research (nothing runs
-                // automatically). Pro + aiEnabled only.
-                if preferencesService.isPro && preferencesService.aiEnabled {
+                // automatically). Gated on the aiEnabled master switch.
+                if preferencesService.aiEnabled {
                     AIActionsSection(
                         isEnriching: isEnriching,
                         isReresearching: isReresearching,

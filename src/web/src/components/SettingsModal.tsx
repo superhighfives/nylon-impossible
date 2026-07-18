@@ -193,9 +193,9 @@ export function SettingsModal({ origin }: { origin: string }) {
               </div>
             ) : (
               <>
-                {/* Location only feeds AI location research, so it's a
-                    Pro-only setting alongside the AI toggle below. */}
-                {user?.plan === "pro" && (
+                {/* Location only feeds AI location research, so it shows
+                    alongside the AI toggle below once AI is enabled. */}
+                {aiEnabled && (
                   <Field
                     label="Your location"
                     description="Used to find local venues when researching location todos."
@@ -260,39 +260,37 @@ export function SettingsModal({ origin }: { origin: string }) {
                     })}
                   </div>
                 </Field>
-                {/* AI is a paid feature, so the toggle only appears for pro
-                    users. Free users' aiEnabled is ignored server-side. */}
-                {user?.plan === "pro" && (
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-1">
-                      <span className="text-sm font-medium text-gray">
-                        AI features
-                      </span>
-                      <p className="text-xs text-gray-muted">
-                        When enabled, AI helps enrich todos by doing research
-                        tasks, pulling out metadata, and finding locations.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={aiEnabled}
-                      aria-label={
-                        aiEnabled ? "Disable AI features" : "Enable AI features"
-                      }
-                      onClick={() => setAiEnabled(!aiEnabled)}
-                      disabled={updateUser.isPending}
-                      // The visual track stays 16×28px; a -inset-3 pseudo-element
-                      // extends the clickable area to ~40×52px for an accessible
-                      // touch target without changing the design.
-                      className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${aiEnabled ? "bg-yellow-solid" : "bg-gray-base"}`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
-                      />
-                    </button>
+                {/* AI features are gated on this toggle (not the plan), so it's
+                    available to every user to turn on or off. */}
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="text-sm font-medium text-gray">
+                      AI features
+                    </span>
+                    <p className="text-xs text-gray-muted">
+                      When enabled, AI helps enrich todos by doing research
+                      tasks, pulling out metadata, and finding locations.
+                    </p>
                   </div>
-                )}
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={aiEnabled}
+                    aria-label={
+                      aiEnabled ? "Disable AI features" : "Enable AI features"
+                    }
+                    onClick={() => setAiEnabled(!aiEnabled)}
+                    disabled={updateUser.isPending}
+                    // The visual track stays 16×28px; a -inset-3 pseudo-element
+                    // extends the clickable area to ~40×52px for an accessible
+                    // touch target without changing the design.
+                    className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50 ${aiEnabled ? "bg-yellow-solid" : "bg-gray-base"}`}
+                  >
+                    <span
+                      className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
+                    />
+                  </button>
+                </div>
                 <div className="border-t border-gray-base pt-4 mt-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-muted mb-2">
                     Import

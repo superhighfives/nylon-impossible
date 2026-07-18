@@ -52,20 +52,17 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
             GradientBackground()
 
-            VStack(spacing: 24) {
-                HeaderView(
-                    onSignOut: {
-                        Task { await authService.signOut() }
-                    },
-                    syncState: syncService.state
-                )
-
-                // Task list or empty state
+            // Task list or empty state. Fills the screen and scrolls *behind*
+            // the floating header and input bar (liquid glass), so nothing sits
+            // in an opaque box. Ignores the keyboard so the list doesn't jump
+            // when the input bar rises to meet it.
+            Group {
                 if sortedTodosList.isEmpty {
                     ScrollView {
                         EmptyStateView()
                             .transition(.opacity)
                             .frame(maxWidth: .infinity)
+                            .padding(.top, 96)
                             .padding(.bottom, 100)
                     }
                 } else {
@@ -73,32 +70,47 @@ struct ContentView: View {
                 }
             }
             .padding(.horizontal, 16)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
-            // Floating input bar — liquid glass, always fixed to bottom
+            // Floating header — pinned to the top, overlapping the scrolling
+            // list beneath it. Its glass pill is the only opaque element; the
+            // list shows through around it so it reads as floating, not boxed.
             VStack(spacing: 0) {
-                AddTaskInputView(
-                    text: $viewModel.newTaskText,
-                    canAdd: viewModel.canAddTask,
-                    aiAvailable: preferencesService.isPro && preferencesService.aiEnabled
-                ) { option in
-                    let text = viewModel.newTaskText
-                    viewModel.newTaskText = ""
-                    Task {
-                        await syncService.smartCreate(
-                            text: text,
-                            enrich: option == .enrich,
-                            research: option == .research,
-                            context: modelContext,
-                            userId: authService.userId,
-                            allTodos: todos
-                        )
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                HeaderView(
+                    onSignOut: {
+                        Task { await authService.signOut() }
+                    },
+                    syncState: syncService.state
+                )
+                Spacer(minLength: 0)
             }
-            .ignoresSafeArea(edges: .bottom)
+            .padding(.horizontal, 16)
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+
+            // Floating input bar — liquid glass, anchored to the bottom and
+            // rising with the keyboard (like Discord) since it does not ignore
+            // the keyboard safe area.
+            AddTaskInputView(
+                text: $viewModel.newTaskText,
+                canAdd: viewModel.canAddTask,
+                aiAvailable: preferencesService.aiEnabled
+            ) { option in
+                let text = viewModel.newTaskText
+                viewModel.newTaskText = ""
+                Task {
+                    await syncService.smartCreate(
+                        text: text,
+                        enrich: option == .enrich,
+                        research: option == .research,
+                        context: modelContext,
+                        userId: authService.userId,
+                        allTodos: todos
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
         }
         .animation(.easeInOut(duration: 0.3), value: sortedTodosList.count)
         .refreshable {
@@ -161,7 +173,10 @@ struct ContentView: View {
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
         .scrollDismissesKeyboard(.interactively)
-        // Extra bottom padding so content clears the floating input bar
+        // Top inset so the first row starts below the floating header (rows
+        // still scroll up behind it), bottom inset so content clears the
+        // floating input bar.
+        .contentMargins(.top, 72, for: .scrollContent)
         .contentMargins(.bottom, 100, for: .scrollContent)
     }
 

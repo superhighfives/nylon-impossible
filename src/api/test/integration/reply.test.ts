@@ -55,14 +55,25 @@ describe("POST /todos/:id/reply", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns 403 pro_required for a free-plan user", async () => {
+  it("allows a free-plan user when AI is enabled", async () => {
     mockVerifyToken.mockResolvedValue({ sub: "user_free" });
-    await seedUser("user_free", "free@example.com", { plan: "free" });
+    await seedUser("user_free", "free@example.com", {
+      plan: "free",
+      aiEnabled: true,
+    });
     await seedTodo(TODO_ID, "user_free", { needsInput: true });
+    const res = await reply(TODO_ID, { content: "Lisbon" });
+    expect(res.status).toBe(201);
+  });
+
+  it("returns 403 ai_disabled when AI is turned off", async () => {
+    mockVerifyToken.mockResolvedValue({ sub: "user_noai" });
+    await seedUser("user_noai", "noai@example.com", { aiEnabled: false });
+    await seedTodo(TODO_ID, "user_noai", { needsInput: true });
     const res = await reply(TODO_ID, { content: "Lisbon" });
     expect(res.status).toBe(403);
     const body = await res.json<{ code: string }>();
-    expect(body.code).toBe("pro_required");
+    expect(body.code).toBe("ai_disabled");
 
     // The reply must not have been persisted.
     const db = getDb(env.DB);

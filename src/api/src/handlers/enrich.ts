@@ -10,19 +10,18 @@ import type { Env } from "../types";
  *
  * On-demand AI enrichment for an existing todo. AI is intentional — nothing
  * enriches automatically — so this backs the explicit per-todo "Enrich" action.
- * Pro + aiEnabled gated (the UI hides it otherwise, but the endpoint is public
- * so we enforce it here). Runs enrichment in the background against the todo's
- * current title, preserving any due date the user already set.
+ * Gated on the `aiEnabled` master switch (the UI hides it otherwise, but the
+ * endpoint is public so we enforce it here). Runs enrichment in the background
+ * against the todo's current title, preserving any due date the user already set.
  */
 export async function enrichTodo(c: Context<Env>) {
   const idParam = c.req.param("id");
   if (!idParam) {
     return apiError(c, "todo_id_required");
   }
-  // Enrichment runs Workers AI, so it's a Pro feature and honours the aiEnabled
-  // master switch.
-  if (c.get("plan") !== "pro" || !c.get("aiEnabled")) {
-    return apiError(c, "pro_required");
+  // Enrichment runs Workers AI, so it honours the aiEnabled master switch.
+  if (!c.get("aiEnabled")) {
+    return apiError(c, "ai_disabled");
   }
 
   const todoId = idParam.toLowerCase();

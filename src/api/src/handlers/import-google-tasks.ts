@@ -90,8 +90,9 @@ function parseGoogleDueDate(due: string | undefined): Date | null {
 // POST /todos/import/google-tasks
 export async function importGoogleTasks(c: Context<Env>) {
   const userId = c.get("userId");
-  // Free users always take the fast path regardless of their aiEnabled preference.
-  const useAI = c.get("aiEnabled") && c.get("plan") === "pro";
+  // AI enrichment on import follows the aiEnabled master switch; plan no longer
+  // gates it. AI-off users take the fast path.
+  const useAI = c.get("aiEnabled");
 
   // Exchange the Clerk-held Google connection for an access token.
   let accessToken: string | undefined;
@@ -189,9 +190,9 @@ export async function importGoogleTasks(c: Context<Env>) {
     await db.insert(todos).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
   }
 
-  // Enrich each imported todo the same way typed todos are. Pro + AI users get
-  // full AI enrichment (research, URL metadata); everyone else gets URL
-  // metadata so links still resolve to favicons/titles.
+  // Enrich each imported todo the same way typed todos are. With AI on
+  // (aiEnabled) todos get full AI enrichment (research, URL metadata); with AI
+  // off they still get URL metadata so links resolve to favicons/titles.
   const userLocation = useAI
     ? await db
         .select({ location: users.location })

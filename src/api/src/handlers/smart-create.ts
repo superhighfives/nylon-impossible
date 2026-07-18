@@ -25,8 +25,8 @@ import type { Env, ResearchJobMessage } from "../types";
 const smartCreateSchema = z.object({
   text: z.string().min(1, "Text is required").max(10000, "Text is too long"),
   // AI is opt-in per request. `enrich` runs the enrichment model (which may in
-  // turn detect and run research); `research` runs research directly. Both are
-  // Pro-gated server-side regardless of the client.
+  // turn detect and run research); `research` runs research directly. Both
+  // require the `aiEnabled` master switch server-side, regardless of the client.
   enrich: z.boolean().optional(),
   research: z.boolean().optional(),
 });
@@ -117,14 +117,15 @@ export async function smartCreate(c: Context<Env>) {
 
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
-  const isPro = c.get("plan") === "pro";
-  // AI is intentional: it only runs when the request explicitly asks for it.
-  // Enrichment additionally requires the aiEnabled master switch and Pro.
-  const useAI = parsed.data.enrich === true && c.get("aiEnabled") && isPro;
+  const aiEnabled = c.get("aiEnabled");
+  // AI is intentional: it only runs when the request explicitly asks for it,
+  // and only while the user's `aiEnabled` master switch is on. Plan no longer
+  // gates AI — it's available to anyone with AI turned on.
+  const useAI = parsed.data.enrich === true && aiEnabled;
   // Explicit research runs independently of the enrichment model's own
   // detection. When enrich is also requested, let enrichment decide (it can
   // trigger research itself) so we don't double-run.
-  const doResearch = parsed.data.research === true && isPro && !useAI;
+  const doResearch = parsed.data.research === true && aiEnabled && !useAI;
 
   // Get the lowest top-level position so the new todo is prepended at the start
   // of the top-level list (subtasks order within their own sibling group, so

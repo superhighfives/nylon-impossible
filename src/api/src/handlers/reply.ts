@@ -14,11 +14,12 @@ export async function replyToTodo(c: Context<Env>) {
   const todoId = c.req.param("id")?.toLowerCase();
   if (!todoId) return apiError(c, "todo_id_required");
 
-  // Replies re-run the AI enrichment/conversation agent, so this is Pro-only.
-  // Free users never see the conversation UI, but the endpoint is public —
-  // gate it server-side so a crafted request can't spend AI credits.
-  if (c.get("plan") !== "pro") {
-    return apiError(c, "pro_required");
+  // Replies re-run the AI enrichment/conversation agent, so this honours the
+  // aiEnabled master switch. The conversation UI is hidden when AI is off, but
+  // the endpoint is public — gate it server-side so a crafted request can't
+  // spend AI credits while AI is disabled.
+  if (!c.get("aiEnabled")) {
+    return apiError(c, "ai_disabled");
   }
 
   const json = await readJsonBody(c);
