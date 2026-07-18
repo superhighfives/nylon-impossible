@@ -3,7 +3,16 @@ import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
-import { and, eq, getDb, isNull, todos, todoUrls, users } from "../lib/db";
+import {
+  and,
+  eq,
+  getDb,
+  isNull,
+  todoResearch,
+  todos,
+  todoUrls,
+  users,
+} from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import {
   cleanUrlString,
@@ -11,10 +20,15 @@ import {
   truncateTitle,
 } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
-import type { Env } from "../types";
+import type { Env, ResearchJobMessage } from "../types";
 
 const smartCreateSchema = z.object({
   text: z.string().min(1, "Text is required").max(10000, "Text is too long"),
+  // AI is opt-in per request. `enrich` runs the enrichment model (which may in
+  // turn detect and run research); `research` runs research directly. Both are
+  // Pro-gated server-side regardless of the client.
+  enrich: z.boolean().optional(),
+  research: z.boolean().optional(),
 });
 
 function serializeTodo(todo: typeof todos.$inferSelect) {
@@ -103,8 +117,14 @@ export async function smartCreate(c: Context<Env>) {
 
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
-  // Free users always take the fast path regardless of their aiEnabled preference.
-  const useAI = c.get("aiEnabled") && c.get("plan") === "pro";
+  const isPro = c.get("plan") === "pro";
+  // AI is intentional: it only runs when the request explicitly asks for it.
+  // Enrichment additionally requires the aiEnabled master switch and Pro.
+  const useAI = parsed.data.enrich === true && c.get("aiEnabled") && isPro;
+  // Explicit research runs independently of the enrichment model's own
+  // detection. When enrich is also requested, let enrichment decide (it can
+  // trigger research itself) so we don't double-run.
+  const doResearch = parsed.data.research === true && isPro && !useAI;
 
   // Get the lowest top-level position so the new todo is prepended at the start
   // of the top-level list (subtasks order within their own sibling group, so
@@ -181,6 +201,36 @@ export async function smartCreate(c: Context<Env>) {
         user?.location,
       ),
     );
+  }
+
+  // Explicit research requested at creation (without enrich): create a pending
+  // research record and enqueue it directly, using the todo title as the query.
+  if (doResearch) {
+    const researchId = crypto.randomUUID();
+    await db.insert(todoResearch).values({
+      id: researchId,
+      todoId,
+      researchType: "general",
+      status: "pending",
+      searchQuery: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    const user = await db
+      .select({ location: users.location })
+      .from(users)
+      .where(eq(users.id, userId))
+      .then((rows) => rows[0]);
+
+    await c.env.RESEARCH_QUEUE.send({
+      todoId,
+      userId,
+      query: initial.title,
+      researchType: "general",
+      researchId,
+      userLocation: user?.location ?? null,
+    } satisfies ResearchJobMessage);
   }
 
   // Fetch the created todo to return

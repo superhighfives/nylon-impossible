@@ -1,6 +1,7 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { generateKeyBetween } from "fractional-indexing";
 import { useEffect } from "react";
 import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
@@ -109,7 +110,10 @@ export function useCreateTodo() {
         notes: input.notes ?? null,
         completed: false,
         completedAt: null,
-        position: "a0", // placeholder — replaced when onSettled invalidates
+        // Use the caller's explicit position when given (e.g. a subtask inserted
+        // at the top of its parent's list) so the optimistic row lands in the
+        // right place; otherwise a placeholder replaced when onSettled invalidates.
+        position: input.position ?? "a0",
         dueDate: input.dueDate?.toISOString() ?? null,
         priority: input.priority ?? null,
         recurrence: input.recurrence ?? null,
@@ -371,6 +375,14 @@ interface SmartCreateResponse {
   ai: boolean;
 }
 
+export interface SmartCreateInput {
+  text: string;
+  // AI is opt-in per create: `enrich` runs the enrichment model, `research`
+  // runs research. Both are Pro/aiEnabled-gated server-side.
+  enrich?: boolean;
+  research?: boolean;
+}
+
 /**
  * Hook to create todos via the smart create API endpoint.
  * Routes through AI extraction when the text contains multiple items or dates.
@@ -378,10 +390,14 @@ interface SmartCreateResponse {
 export function useSmartCreate() {
   const queryClient = useQueryClient();
   const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
 
   return useMutation({
-    mutationFn: async (text: string): Promise<SmartCreateResponse> => {
+    mutationFn: async ({
+      text,
+      enrich,
+      research,
+    }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
         method: "POST",
@@ -389,7 +405,7 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, enrich, research }),
       });
 
       if (!response.ok) {
@@ -399,9 +415,73 @@ export function useSmartCreate() {
 
       return response.json();
     },
+    onMutate: async ({ text }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      // Prepend a single placeholder so the row appears instantly. Smart-create
+      // may expand one line into several todos and rewrite the title/URLs, so
+      // this is a stand-in reconciled wholesale by the onSettled refetch — not
+      // patched in place. Position sorts before the current top-level minimum so
+      // it lands at the top of the incomplete list, matching the server prepend.
+      const minPosition = (previousTodos ?? [])
+        .filter((t) => t.parentId == null && !t.completed)
+        .reduce<string | null>(
+          (min, t) => (min === null || t.position < min ? t.position : min),
+          null,
+        );
+
+      const optimisticTodo: TodoWithUrls = {
+        id: `temp-${crypto.randomUUID()}`,
+        userId: userId ?? "",
+        parentId: null,
+        title: text.trim(),
+        notes: null,
+        completed: false,
+        completedAt: null,
+        position: generateKeyBetween(null, minPosition),
+        dueDate: null,
+        priority: null,
+        recurrence: null,
+        aiStatus: null,
+        needsInput: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        research: null,
+        messages: [],
+        urls: [],
+      };
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
+        optimisticTodo,
+        ...(previousTodos ?? []),
+      ]);
+
+      return { previousTodos, optimisticId: optimisticTodo.id };
+    },
+    onError: (err, _text, context) => {
+      Sentry.captureException(err, { tags: { mutation: "smartCreate" } });
+      // Toasting is handled by the caller (TodoInput) which restores the input
+      // text; here we just roll the cache back to before the optimistic insert.
+      if (context?.previousTodos !== undefined) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+        return;
+      }
+      if (context?.optimisticId) {
+        queryClient.setQueryData<TodoWithUrls[] | undefined>(
+          TODOS_QUERY_KEY,
+          (current) =>
+            current?.filter((todo) => todo.id !== context.optimisticId) ??
+            current,
+        );
+      }
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
     },
   });
 }
@@ -454,6 +534,44 @@ export function useImportGoogleTasks() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to run AI enrichment on an existing todo on demand. AI is intentional —
+ * nothing enriches automatically — so this backs the explicit per-todo "Enrich"
+ * action. Marks the todo pending server-side; the result arrives via sync.
+ */
+export function useEnrichTodo() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/enrich`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "enrichTodo" } });
+      toast.error(messageFromError(err, "Couldn't enrich todo"));
     },
   });
 }

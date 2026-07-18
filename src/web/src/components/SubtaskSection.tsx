@@ -96,7 +96,7 @@ function ActiveSubtaskRow({
       <button
         type="button"
         disabled={disabled}
-        className="cursor-grab touch-none text-gray-muted transition-transform hover:text-gray active:scale-[0.96] active:cursor-grabbing disabled:opacity-50"
+        className="cursor-grab touch-none text-gray-muted/40 transition-[transform,opacity,color] hover:text-gray-muted active:scale-[0.96] active:cursor-grabbing sm:opacity-0 sm:group-hover/sub:opacity-100 disabled:opacity-50"
         aria-label={`Reorder "${subtask.title}"`}
         {...attributes}
         {...listeners}
@@ -131,7 +131,7 @@ function ActiveSubtaskRow({
 interface SubtaskSectionProps {
   parentId: string;
   subtasks: TodoWithUrls[];
-  onAdd: (parentId: string, title: string) => void;
+  onAdd: (parentId: string, title: string, position?: string) => void;
   onToggle: (id: string, completed: boolean) => void;
   onDelete: (id: string) => void;
   onReorder: (id: string, position: string) => void;
@@ -173,7 +173,10 @@ export function SubtaskSection({
   const handleAdd = () => {
     const trimmed = newTitle.trim();
     if (!trimmed) return;
-    onAdd(parentId, trimmed);
+    // Insert at the top of the active subtask list: a key before the current
+    // first active subtask (or null/null when the list is empty).
+    const position = generateKeyBetween(null, active[0]?.position ?? null);
+    onAdd(parentId, trimmed, position);
     setNewTitle("");
   };
 

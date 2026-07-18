@@ -65,8 +65,28 @@ describe("SubtaskSection", () => {
     fireEvent.change(input, { target: { value: "  Buy candles  " } });
     fireEvent.click(screen.getByRole("button", { name: /add subtask/i }));
 
-    expect(onAdd).toHaveBeenCalledWith("parent-1", "Buy candles");
+    // Empty list: position is a key between null/null.
+    expect(onAdd).toHaveBeenCalledWith(
+      "parent-1",
+      "Buy candles",
+      expect.any(String),
+    );
     expect(input.value).toBe("");
+  });
+
+  it("inserts a new subtask above the current first active subtask", () => {
+    const { onAdd } = renderSection([
+      makeSubtask({ id: "a", completed: false, position: "a1" }),
+      makeSubtask({ id: "b", completed: false, position: "a2" }),
+    ]);
+    fireEvent.change(screen.getByPlaceholderText("Add a subtask..."), {
+      target: { value: "Buy candles" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add subtask/i }));
+
+    const position = onAdd.mock.calls[0][2] as string;
+    // Sorts before the current first active subtask ("a1").
+    expect(position < "a1").toBe(true);
   });
 
   it("does not add an empty subtask", () => {

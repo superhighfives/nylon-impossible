@@ -3,12 +3,18 @@ import {
   Calendar,
   ExternalLink,
   Link2,
+  Search,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useHints } from "@/hooks/useHints";
-import { useUpdateUrlPreview } from "@/hooks/useTodos";
+import {
+  useEnrichTodo,
+  useReresearch,
+  useUpdateUrlPreview,
+} from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
@@ -35,7 +41,6 @@ interface TodoItemExpandedProps {
     priority?: "high" | "low" | null;
     recurrence?: Recurrence | null;
   }) => void;
-  isUpdating: boolean;
   onDelete: (id: string) => void;
   deletePending: boolean;
   onAddSubtask: (parentId: string, title: string) => void;
@@ -141,7 +146,6 @@ export function TodoItemExpanded({
   todo,
   subtasks,
   onUpdate,
-  isUpdating,
   onDelete,
   deletePending,
   onAddSubtask,
@@ -152,6 +156,14 @@ export function TodoItemExpanded({
   const { data: user } = useUser();
   const { timeZone } = useHints();
   const updateUrlPreview = useUpdateUrlPreview();
+  const enrichTodo = useEnrichTodo();
+  const reresearch = useReresearch();
+
+  // AI is intentional and Pro-gated; the enrich/research actions only appear
+  // when AI is actually available to this user.
+  const aiAvailable = user?.plan === "pro" && user?.aiEnabled === true;
+  const aiProcessing =
+    todo.aiStatus === "pending" || todo.aiStatus === "processing";
 
   // Local state for form fields. We track which fields the user has touched
   // so that background updates to the todo (e.g. AI re-enrichment after a
@@ -205,72 +217,109 @@ export function TodoItemExpanded({
     ? "none"
     : recurrence;
 
-  // Only fields the user has touched count as "changes" — untouched fields
-  // are kept in sync with the server via the effects above.
-  const hasChanges =
-    (touched.title && title.trim() !== todoTitle) ||
-    (touched.notes && notes.trim() !== todoNotes) ||
-    (touched.dueDate && dueDate !== todoDueDate) ||
-    (touched.priority && priority !== todoPriority) ||
-    (touched.recurrence && effectiveRecurrence !== todoRecurrence);
+  // Auto-save. There's no Save button: discrete fields (due date, priority,
+  // repeat) commit immediately in their handlers; free-text fields (title,
+  // notes) debounce while typing and flush on blur / when the row collapses.
+  // `touched` still guards each field so an in-flight server update (e.g. AI
+  // re-enrichment) can't clobber a value being edited; committing clears it.
+  const AUTOSAVE_DELAY = 700;
+  const timers = useRef<{
+    title?: ReturnType<typeof setTimeout>;
+    notes?: ReturnType<typeof setTimeout>;
+  }>({});
+  // Latest values / callbacks for the unmount flush, which captures the
+  // first-render closure.
+  const titleRef = useRef(title);
+  titleRef.current = title;
+  const notesRef = useRef(notes);
+  notesRef.current = notes;
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+  const todoRef = useRef(todo);
+  todoRef.current = todo;
 
-  const canSave = hasChanges && title.trim().length > 0;
-
-  const handleSave = () => {
-    const updates: {
-      title?: string;
-      notes?: string | null;
-      dueDate?: Date | null;
-      priority?: "high" | "low" | null;
-      recurrence?: Recurrence | null;
-    } = {};
-
-    if (touched.title) {
-      const trimmedTitle = title.trim();
-      if (trimmedTitle !== todoTitle) updates.title = trimmedTitle;
-    }
-
-    if (touched.notes) {
-      const trimmedNotes = notes.trim();
-      if (trimmedNotes !== todoNotes) updates.notes = trimmedNotes || null;
-    }
-
-    if (touched.dueDate && dueDate !== todoDueDate) {
-      updates.dueDate = dueDate ? new Date(dueDate) : null;
-    }
-
-    if (touched.priority && priority !== todoPriority) {
-      updates.priority = priority === "none" ? null : priority;
-    }
-
-    if (touched.recurrence && effectiveRecurrence !== todoRecurrence) {
-      updates.recurrence =
-        effectiveRecurrence === "none"
-          ? null
-          : { frequency: effectiveRecurrence };
-    }
-
-    if (Object.keys(updates).length > 0) {
-      onUpdate(updates);
-    }
-    setTouched({});
+  const commitTitle = (value: string) => {
+    const trimmed = value.trim();
+    // Title is required — never persist a blank; keep the last good value.
+    if (!trimmed || trimmed === (todoRef.current.title ?? "")) return;
+    onUpdateRef.current({ title: trimmed });
   };
+  const commitNotes = (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed === (todoRef.current.notes ?? "")) return;
+    onUpdateRef.current({ notes: trimmed || null });
+  };
+
+  const scheduleTextCommit = (field: "title" | "notes", value: string) => {
+    const pending = timers.current[field];
+    if (pending) clearTimeout(pending);
+    timers.current[field] = setTimeout(() => {
+      timers.current[field] = undefined;
+      if (field === "title") commitTitle(value);
+      else commitNotes(value);
+      setTouched((t) => ({ ...t, [field]: false }));
+    }, AUTOSAVE_DELAY);
+  };
+
+  const flushTextCommit = (field: "title" | "notes") => {
+    const pending = timers.current[field];
+    if (!pending) return;
+    clearTimeout(pending);
+    timers.current[field] = undefined;
+    if (field === "title") commitTitle(titleRef.current);
+    else commitNotes(notesRef.current);
+    setTouched((t) => ({ ...t, [field]: false }));
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once; the cleanup flushes pending text edits via refs when the row unmounts (collapses).
+  useEffect(() => {
+    return () => {
+      if (timers.current.title) {
+        clearTimeout(timers.current.title);
+        commitTitle(titleRef.current);
+      }
+      if (timers.current.notes) {
+        clearTimeout(timers.current.notes);
+        commitNotes(notesRef.current);
+      }
+    };
+  }, []);
 
   const handleClearDueDate = () => {
     setDueDate("");
-    setTouched((t) => ({ ...t, dueDate: true }));
+    // Clearing the due date also clears any recurrence (a repeat has no anchor
+    // without a due date).
+    if (todo.recurrence) {
+      setRecurrence("none");
+      onUpdate({ dueDate: null, recurrence: null });
+    } else {
+      onUpdate({ dueDate: null });
+    }
+  };
+
+  const handleDueDateChange = (value: string) => {
+    setDueDate(value);
+    if (!value) {
+      handleClearDueDate();
+      return;
+    }
+    onUpdate({ dueDate: new Date(value) });
   };
 
   const handlePriorityChange = (value: unknown) => {
     if (value === null || value === undefined) return;
-    setPriority(value as "high" | "low" | "none");
-    setTouched((t) => ({ ...t, priority: true }));
+    const next = value as "high" | "low" | "none";
+    setPriority(next);
+    onUpdate({ priority: next === "none" ? null : next });
   };
 
   const handleRecurrenceChange = (value: unknown) => {
     if (value === null || value === undefined) return;
-    setRecurrence(value as RecurrenceFrequency | "none");
-    setTouched((t) => ({ ...t, recurrence: true }));
+    const next = value as RecurrenceFrequency | "none";
+    setRecurrence(next);
+    // The Repeat control is disabled without a due date, so a change always has
+    // an anchor.
+    onUpdate({ recurrence: next === "none" ? null : { frequency: next } });
   };
 
   // Label reflects the anchor — "Weekly on Wednesday", "Monthly on the 14th".
@@ -296,10 +345,11 @@ export function TodoItemExpanded({
           onChange={(e) => {
             setTitle(e.target.value);
             setTouched((t) => ({ ...t, title: true }));
+            scheduleTextCommit("title", e.target.value);
           }}
+          onBlur={() => flushTextCommit("title")}
           className="w-full"
           inputSize="sm"
-          disabled={isUpdating}
         />
       </div>
 
@@ -322,10 +372,11 @@ export function TodoItemExpanded({
           onChange={(e) => {
             setNotes(e.target.value);
             setTouched((t) => ({ ...t, notes: true }));
+            scheduleTextCommit("notes", e.target.value);
           }}
+          onBlur={() => flushTextCommit("notes")}
           placeholder="Add a note..."
           className="resize-y"
-          disabled={isUpdating}
         />
       </div>
 
@@ -345,13 +396,9 @@ export function TodoItemExpanded({
               id={`due-${todo.id}`}
               type="date"
               value={dueDate}
-              onChange={(e) => {
-                setDueDate(e.target.value);
-                setTouched((t) => ({ ...t, dueDate: true }));
-              }}
+              onChange={(e) => handleDueDateChange(e.target.value)}
               className="flex-1 min-w-0"
               inputSize="sm"
-              disabled={isUpdating}
             />
             {dueDate && (
               <Button
@@ -359,7 +406,6 @@ export function TodoItemExpanded({
                 size="sm"
                 shape="square"
                 onClick={handleClearDueDate}
-                disabled={isUpdating}
                 aria-label="Clear due date"
               >
                 <X size={14} />
@@ -380,7 +426,6 @@ export function TodoItemExpanded({
             size="sm"
             value={priority}
             onValueChange={handlePriorityChange}
-            disabled={isUpdating}
             items={[
               { value: "none", label: "None" },
               { value: "high", label: "High" },
@@ -405,7 +450,7 @@ export function TodoItemExpanded({
             size="sm"
             value={effectiveRecurrence}
             onValueChange={handleRecurrenceChange}
-            disabled={isUpdating || recurrenceDisabled}
+            disabled={recurrenceDisabled}
             items={recurrenceItems}
           />
           {recurrenceDisabled && (
@@ -426,11 +471,43 @@ export function TodoItemExpanded({
           onToggle={onToggleSubtask}
           onDelete={onDeleteSubtask}
           onReorder={onReorderSubtask}
-          disabled={isUpdating}
         />
       )}
 
-      {/* Save / Delete row */}
+      {/* AI actions — explicit, opt-in enrich / research (nothing runs
+          automatically). Pro + aiEnabled only. */}
+      {aiAvailable && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-gray-muted">AI</p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => enrichTodo.mutate(todo.id)}
+              disabled={enrichTodo.isPending || aiProcessing}
+              loading={enrichTodo.isPending}
+            >
+              {!enrichTodo.isPending && <Sparkles size={14} />}
+              Enrich
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => reresearch.mutate(todo.id)}
+              disabled={reresearch.isPending}
+              loading={reresearch.isPending}
+            >
+              {!reresearch.isPending && <Search size={14} />}
+              Research
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete row. Edits auto-save (no Save button); the toast in
+          useUpdateTodo surfaces any failure. */}
       <div className="flex items-center justify-between pt-4 border-t border-gray-subtle">
         <Button
           variant="ghost"
@@ -443,15 +520,6 @@ export function TodoItemExpanded({
         >
           <Trash2 size={14} />
           Delete
-        </Button>
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleSave}
-          disabled={!canSave || isUpdating}
-          loading={isUpdating}
-        >
-          Save changes
         </Button>
       </div>
 

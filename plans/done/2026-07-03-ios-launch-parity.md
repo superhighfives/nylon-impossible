@@ -2,6 +2,7 @@
 
 **Date**: 2026-07-03
 **Status**: Complete
+**Updated**: 2026-07-17
 
 ## Problem
 
@@ -172,3 +173,25 @@ clients, so it's now threaded through:
 - Related to: `plans/done/2026-03-21-repeating-todos.md` (recurrence types
   reused by the review sheet), web #193 (Google Tasks import), web #191
   (self-serve account deletion).
+
+---
+
+## Overview
+
+This work brought the iOS client up to feature parity with the web app for a public, todo-only launch, and made two supporting changes across the stack. The launch was deliberately scoped to the todo experience: AI and other paid features were held back, so the visible surface needed to match web while the paid machinery stayed dormant. Three iOS gaps were closed: **Google Tasks import** (the headline feature, letting people bring existing tasks across), **in-app account deletion** (an App Store Review Guideline 5.1.1(v) requirement for any app with account creation — without it the build would likely be rejected), and **Privacy / Terms links** (App Store requires a reachable privacy policy). Alongside the iOS work, **AI was gated to paid (`plan === "pro"`) users** everywhere so the toggle is hidden at launch, and the **admin user-edit endpoint was generalized** so an operator can adjust plan/AI/location from the admin panel. No database schema or migration changes were needed — the backend already supported import and deletion; the only server change was threading `plan` out to clients and broadening the admin endpoint.
+
+## Architecture
+
+The import flow keeps Google tokens entirely server-side, mirroring web. iOS connects the account and triggers the import, but never touches OAuth tokens itself:
+
+- **iOS import (`SettingsView.swift`, `APIService.swift`, `ImportReviewSheet.swift`):** The client connects Google via Clerk's `user.createExternalAccount(additionalScopes: ["https://www.googleapis.com/auth/tasks.readonly"])` followed by `account.reauthorize()` (which drives the `ASWebAuthenticationSession` and refreshes `approvedScopes`). Import readiness is derived by checking the connected Google account's space-separated `approvedScopes` for the Tasks scope. Import calls `POST /todos/import/google-tasks` (no body) returning `GoogleTasksImportResponse { imported, skipped, importedIds, datedTodos }`, then runs a sync to pull the new rows into SwiftData. Because Google doesn't export repeat schedules, `datedTodos` feed a post-import `ImportReviewSheet` where each dated import gets an optional frequency; results are written to SwiftData immediately but the network sync is deferred to a single `syncAfterAction()` on sheet dismiss (a Copilot-review perf fix). Status/errors surface as inline `Text` and `.alert` (no toast system on iOS).
+- **iOS deletion:** `APIService.deleteMe()` → `DELETE /users/me` (server also removes the Clerk user), then a destructive confirmation `.alert` → `clearLocalData()` → `syncService.reset()` → `authService.signOut()`. Deletion errors render in their own Danger-zone state rather than reusing the import status (a review fix).
+- **Paid-AI gating:** `GET`/`PATCH /users/me` (`src/api/src/handlers/users.ts`) now return `plan`. Web `useUser.ts` adds `User.plan` and `SettingsModal.tsx` renders the AI block only when `user.plan === "pro"`. iOS adds `APIUser.plan` (optional String, so it decodes against an older API and is treated as free when absent), surfaced via `UserPreferencesService.isPro`, gating the AI section in `SettingsView`.
+- **Admin edit:** `PATCH /admin/users/:id/plan` (`updateUserPlan`) was generalized into `PATCH /admin/users/:id` (`updateUser`) in `src/api/src/handlers/admin.ts`, accepting optional `plan`, `aiEnabled`, and `location`, applying only present fields (rejecting empty updates with `no_valid_fields`) and returning the full updated row. The route change is in `src/api/src/index.ts`; `src/admin/src/api.ts` and `UserDetailPanel.tsx` add an inline Edit form. Email is intentionally left read-only (Clerk-sourced).
+
+**Deviations from the original plan:**
+- **Clerk OAuth approach changed.** The plan proposed the prebuilt `UserProfileView` + `.userProfileOAuthConfig` modifier for the Google connect flow. On inspection the pinned `clerk-ios` 1.0.1 can't request per-connection scopes (no `userProfileOAuthConfig` modifier; its add-account view calls `createExternalAccount(provider:)` with no scopes). The implementation switched to the **custom** `createExternalAccount(additionalScopes:)` + `reauthorize()` flow, which also yields a native, on-brand Settings UI.
+- **Scope of PR grew beyond the plan.** The original plan document covered only the three iOS gaps. As shipped, the same PR also added **paid-AI gating** (API + web + iOS) and the **admin user-edit generalization** — both documented in later-added plan sections ("AI toggle gating", plus the admin work). These were not in the initial "Solution" and were folded in.
+- **Repeat-schedule review was built, not deferred.** The plan marked `ImportReviewSheet` as "optional / cuttable for a first pass"; it shipped in full.
+- **`googleTaskId` handling matched the plan.** As predicted, no `googleTaskId` field was added to the iOS `TodoItem` model — dedupe stays server-side, and the plan verified `src/api/src/handlers/sync.ts` never nulls it on field-level updates, so re-import stays idempotent.
+- **Manual iOS testing remained open at merge.** The PR could not be built in the CI-less environment (xcodebuild SPM resolution issues), so web (135) and API (274) tests plus typecheck/Biome were green, but the iOS connect/import/re-import/review/delete and AI-visibility paths were merged as still-needs-manual-testing checklist items rather than verified.

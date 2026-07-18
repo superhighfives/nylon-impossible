@@ -78,13 +78,16 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 AddTaskInputView(
                     text: $viewModel.newTaskText,
-                    canAdd: viewModel.canAddTask
-                ) {
+                    canAdd: viewModel.canAddTask,
+                    aiAvailable: preferencesService.isPro && preferencesService.aiEnabled
+                ) { option in
                     let text = viewModel.newTaskText
                     viewModel.newTaskText = ""
                     Task {
                         await syncService.smartCreate(
                             text: text,
+                            enrich: option == .enrich,
+                            research: option == .research,
                             context: modelContext,
                             userId: authService.userId,
                             allTodos: todos

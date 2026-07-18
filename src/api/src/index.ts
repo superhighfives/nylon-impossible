@@ -10,6 +10,7 @@ import {
 } from "./handlers/admin";
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
+import { enrichTodo } from "./handlers/enrich";
 import { importGoogleTasks } from "./handlers/import-google-tasks";
 import { replyToTodo } from "./handlers/reply";
 import { reresearchTodo } from "./handlers/reresearch";
@@ -98,6 +99,7 @@ app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
 app.post("/todos/:id/research", reresearchTodo);
 app.delete("/todos/:id/research", cancelResearch);
+app.post("/todos/:id/enrich", enrichTodo);
 app.post("/todos/:id/reply", replyToTodo);
 app.delete("/todos/:id/question", dismissQuestion);
 
