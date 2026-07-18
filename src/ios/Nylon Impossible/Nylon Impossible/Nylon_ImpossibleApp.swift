@@ -66,8 +66,13 @@ struct Nylon_ImpossibleApp: App {
                     try await svc.sync(modelContainer: container)
                     completion.complete(success: true)
                 } catch {
-                    SentrySDK.capture(error: error) { scope in
-                        scope.setTag(value: "background-sync", key: "area")
+                    // Timeouts and dropped connections are expected when syncing from a
+                    // BGTask and are pure noise in Sentry — skip them like APIService and
+                    // SyncService do. The task simply reports failure so iOS reschedules.
+                    if !APIError.isTransientNetworkError(error) {
+                        SentrySDK.capture(error: error) { scope in
+                            scope.setTag(value: "background-sync", key: "area")
+                        }
                     }
                     print("[BGTask] Sync error: \(error)")
                     completion.complete(success: false)
