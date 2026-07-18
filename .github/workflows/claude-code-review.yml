@@ -16,9 +16,9 @@ permissions:
 
 jobs:
   review:
-    # Standard lives in superhighfives/claude-code-reviews so every repo
+    # Standard lives in superhighfives/control-room so every repo
     # reviews the same way. Repo-specific rules go in CLAUDE.md.
-    uses: superhighfives/claude-code-reviews/.github/workflows/review.yml@main
+    uses: superhighfives/control-room/.github/workflows/review.yml@main
     with:
       setup_command: pnpm install --frozen-lockfile
       verify_commands: |
