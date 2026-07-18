@@ -68,7 +68,14 @@ final class SyncService {
 
     /// Create todos via the smart create API endpoint, then sync results into SwiftData.
     /// Falls back to local creation if not signed in.
-    func smartCreate(text: String, context: ModelContext, userId: String?, allTodos: [TodoItem]) async {
+    func smartCreate(
+        text: String,
+        enrich: Bool = false,
+        research: Bool = false,
+        context: ModelContext,
+        userId: String?,
+        allTodos: [TodoItem]
+    ) async {
         // Offline fallback: create locally
         guard authService.isSignedIn, userId != nil, let apiService = _apiService else {
             // Create a single local todo
@@ -86,7 +93,7 @@ final class SyncService {
         }
 
         do {
-            _ = try await apiService.smartCreate(text: text)
+            _ = try await apiService.smartCreate(text: text, enrich: enrich, research: research)
             // Sync to pull the created todos into SwiftData
             await sync()
             webSocketService?.notifyChanged()

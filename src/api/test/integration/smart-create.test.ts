@@ -12,11 +12,14 @@ const mockVerifyToken = verifyToken as ReturnType<
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 
-async function smartCreate(text: string) {
+async function smartCreate(
+  text: string,
+  opts: { enrich?: boolean; research?: boolean } = {},
+) {
   return SELF.fetch("http://localhost/todos/smart", {
     method: "POST",
     headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, ...opts }),
   });
 }
 
@@ -90,13 +93,15 @@ describe("Smart create endpoint", () => {
     });
   });
 
-  describe("immediate creation (AI enabled)", () => {
+  describe("immediate creation (AI enabled + enrich requested)", () => {
     beforeEach(async () => {
       await enableAI();
     });
 
-    it("creates todo immediately with aiStatus pending when AI enabled", async () => {
-      const res = await smartCreate("buy milk and eggs tomorrow");
+    it("creates todo immediately with aiStatus pending when enrich is requested", async () => {
+      const res = await smartCreate("buy milk and eggs tomorrow", {
+        enrich: true,
+      });
       expect(res.status).toBe(200);
 
       const body = await res.json<{ todos: any[]; ai: boolean }>();
@@ -109,7 +114,7 @@ describe("Smart create endpoint", () => {
     });
 
     it("creates todo with aiStatus pending for multi-line text", async () => {
-      const res = await smartCreate("Buy milk\nCall mom");
+      const res = await smartCreate("Buy milk\nCall mom", { enrich: true });
       expect(res.status).toBe(200);
 
       const body = await res.json<{ todos: any[]; ai: boolean }>();
@@ -117,6 +122,16 @@ describe("Smart create endpoint", () => {
       expect(body.todos).toHaveLength(1);
       expect(body.todos[0].aiStatus).toBe("pending");
       expect(body.ai).toBe(true);
+    });
+
+    it("does NOT run AI when enrich is not requested (intentional opt-in)", async () => {
+      const res = await smartCreate("buy milk and eggs tomorrow");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      expect(body.todos).toHaveLength(1);
+      expect(body.todos[0].aiStatus).toBeNull();
+      expect(body.ai).toBe(false);
     });
   });
 
@@ -131,8 +146,10 @@ describe("Smart create endpoint", () => {
         .where(eq(users.id, "user_test_123"));
     });
 
-    it("forces free users onto the fast path even with aiEnabled true", async () => {
-      const res = await smartCreate("buy milk and eggs tomorrow");
+    it("forces free users onto the fast path even when enrich is requested", async () => {
+      const res = await smartCreate("buy milk and eggs tomorrow", {
+        enrich: true,
+      });
       expect(res.status).toBe(200);
 
       const body = await res.json<{ todos: any[]; ai: boolean }>();

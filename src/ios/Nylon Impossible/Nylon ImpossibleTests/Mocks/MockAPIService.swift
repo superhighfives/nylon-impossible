@@ -17,6 +17,8 @@ final class MockAPIService: APIProviding {
     )
     var smartCreateError: Error?
     var lastSmartCreateText: String?
+    var lastSmartCreateEnrich: Bool?
+    var lastSmartCreateResearch: Bool?
 
     var getMeResponse: APIUser = APIUser(
         id: "mock-user-id",
@@ -43,8 +45,14 @@ final class MockAPIService: APIProviding {
         return syncResponse
     }
 
-    func smartCreate(text: String) async throws -> SmartCreateResponse {
+    func smartCreate(
+        text: String,
+        enrich: Bool = false,
+        research: Bool = false
+    ) async throws -> SmartCreateResponse {
         lastSmartCreateText = text
+        lastSmartCreateEnrich = enrich
+        lastSmartCreateResearch = research
         if let error = smartCreateError {
             throw error
         }
@@ -115,6 +123,16 @@ final class MockAPIService: APIProviding {
     func reresearch(todoId: String) async throws {
         lastReresearchTodoId = todoId
         if let error = reresearchError {
+            throw error
+        }
+    }
+
+    var enrichError: Error?
+    var lastEnrichTodoId: String?
+
+    func enrich(todoId: String) async throws {
+        lastEnrichTodoId = todoId
+        if let error = enrichError {
             throw error
         }
     }

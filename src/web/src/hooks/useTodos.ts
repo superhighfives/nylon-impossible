@@ -375,6 +375,14 @@ interface SmartCreateResponse {
   ai: boolean;
 }
 
+export interface SmartCreateInput {
+  text: string;
+  // AI is opt-in per create: `enrich` runs the enrichment model, `research`
+  // runs research. Both are Pro/aiEnabled-gated server-side.
+  enrich?: boolean;
+  research?: boolean;
+}
+
 /**
  * Hook to create todos via the smart create API endpoint.
  * Routes through AI extraction when the text contains multiple items or dates.
@@ -385,7 +393,11 @@ export function useSmartCreate() {
   const { getToken, userId } = useAuth();
 
   return useMutation({
-    mutationFn: async (text: string): Promise<SmartCreateResponse> => {
+    mutationFn: async ({
+      text,
+      enrich,
+      research,
+    }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
         method: "POST",
@@ -393,7 +405,7 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, enrich, research }),
       });
 
       if (!response.ok) {
@@ -403,7 +415,7 @@ export function useSmartCreate() {
 
       return response.json();
     },
-    onMutate: async (text) => {
+    onMutate: async ({ text }) => {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
       const previousTodos =
         queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
@@ -522,6 +534,44 @@ export function useImportGoogleTasks() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * Hook to run AI enrichment on an existing todo on demand. AI is intentional —
+ * nothing enriches automatically — so this backs the explicit per-todo "Enrich"
+ * action. Marks the todo pending server-side; the result arrives via sync.
+ */
+export function useEnrichTodo() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/enrich`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "enrichTodo" } });
+      toast.error(messageFromError(err, "Couldn't enrich todo"));
     },
   });
 }

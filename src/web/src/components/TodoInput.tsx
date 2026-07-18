@@ -1,30 +1,46 @@
-import { Plus } from "lucide-react";
+import { Menu as BaseMenu } from "@base-ui/react/menu";
+import { ChevronDown, Plus, Search, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
+import { useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { Button, Loader, Textarea } from "./ui";
+
+const menuItemBase =
+  "flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-hover focus:bg-gray-hover data-disabled:pointer-events-none data-disabled:opacity-50";
 
 export function TodoInput() {
   const [text, setText] = useState("");
 
   const smartCreate = useSmartCreate();
+  const { data: user } = useUser();
   const trimmed = text.trim();
+
+  // AI is opt-in and Pro-gated; the split-button menu only appears when it's
+  // actually available so free / AI-off users see a plain Add button.
+  const aiAvailable = user?.plan === "pro" && user?.aiEnabled === true;
+
+  const submit = (opts: { enrich?: boolean; research?: boolean } = {}) => {
+    if (!trimmed || smartCreate.isPending) return;
+    smartCreate.mutate(
+      { text: trimmed, ...opts },
+      {
+        onSuccess: (result) => {
+          setText("");
+          if (result.todos.length > 1) {
+            toast.success(`Added ${result.todos.length} items`);
+          }
+        },
+        onError: (err) => {
+          toast.error(messageFromError(err, "Couldn't add todo"));
+        },
+      },
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!trimmed || smartCreate.isPending) return;
-
-    smartCreate.mutate(trimmed, {
-      onSuccess: (result) => {
-        setText("");
-        if (result.todos.length > 1) {
-          toast.success(`Added ${result.todos.length} items`);
-        }
-      },
-      onError: (err) => {
-        toast.error(messageFromError(err, "Couldn't add todo"));
-      },
-    });
+    submit();
   };
 
   function renderTrailing() {
@@ -35,21 +51,62 @@ export function TodoInput() {
         </div>
       );
     }
-    if (trimmed) {
-      return (
+    if (!trimmed) return null;
+
+    return (
+      <div className="absolute right-2 bottom-2 flex items-center">
         <Button
           type="submit"
           variant="primary"
           size="xs"
           shape="square"
-          className="absolute right-2 bottom-2 transition-[background-color,color,transform] active:scale-[0.96] before:absolute before:inset-[-6px] before:content-['']"
+          className={`transition-[background-color,color,transform] active:scale-[0.96] before:absolute before:inset-[-6px] before:content-[''] ${
+            aiAvailable ? "rounded-r-none" : ""
+          }`}
           aria-label="Add todo"
         >
           <Plus size={14} />
         </Button>
-      );
-    }
-    return null;
+        {aiAvailable && (
+          <BaseMenu.Root>
+            <BaseMenu.Trigger
+              render={
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="xs"
+                  shape="square"
+                  className="rounded-l-none border-l border-yellow-solid-hover"
+                  aria-label="Add with AI"
+                >
+                  <ChevronDown size={12} />
+                </Button>
+              }
+            />
+            <BaseMenu.Portal>
+              <BaseMenu.Positioner sideOffset={4} align="end">
+                <BaseMenu.Popup className="z-50 min-w-40 overflow-hidden rounded-lg border border-gray-subtle bg-gray-surface p-1 shadow-lg">
+                  <BaseMenu.Item
+                    className={`${menuItemBase} text-gray`}
+                    onClick={() => submit({ enrich: true })}
+                  >
+                    <Sparkles size={14} />
+                    Add + enrich
+                  </BaseMenu.Item>
+                  <BaseMenu.Item
+                    className={`${menuItemBase} text-gray`}
+                    onClick={() => submit({ research: true })}
+                  >
+                    <Search size={14} />
+                    Add + research
+                  </BaseMenu.Item>
+                </BaseMenu.Popup>
+              </BaseMenu.Positioner>
+            </BaseMenu.Portal>
+          </BaseMenu.Root>
+        )}
+      </div>
+    );
   }
 
   return (

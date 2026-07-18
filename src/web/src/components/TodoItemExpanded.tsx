@@ -3,12 +3,18 @@ import {
   Calendar,
   ExternalLink,
   Link2,
+  Search,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useHints } from "@/hooks/useHints";
-import { useUpdateUrlPreview } from "@/hooks/useTodos";
+import {
+  useEnrichTodo,
+  useReresearch,
+  useUpdateUrlPreview,
+} from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
@@ -150,6 +156,14 @@ export function TodoItemExpanded({
   const { data: user } = useUser();
   const { timeZone } = useHints();
   const updateUrlPreview = useUpdateUrlPreview();
+  const enrichTodo = useEnrichTodo();
+  const reresearch = useReresearch();
+
+  // AI is intentional and Pro-gated; the enrich/research actions only appear
+  // when AI is actually available to this user.
+  const aiAvailable = user?.plan === "pro" && user?.aiEnabled === true;
+  const aiProcessing =
+    todo.aiStatus === "pending" || todo.aiStatus === "processing";
 
   // Local state for form fields. We track which fields the user has touched
   // so that background updates to the todo (e.g. AI re-enrichment after a
@@ -458,6 +472,38 @@ export function TodoItemExpanded({
           onDelete={onDeleteSubtask}
           onReorder={onReorderSubtask}
         />
+      )}
+
+      {/* AI actions — explicit, opt-in enrich / research (nothing runs
+          automatically). Pro + aiEnabled only. */}
+      {aiAvailable && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-gray-muted">AI</p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => enrichTodo.mutate(todo.id)}
+              disabled={enrichTodo.isPending || aiProcessing}
+              loading={enrichTodo.isPending}
+            >
+              {!enrichTodo.isPending && <Sparkles size={14} />}
+              Enrich
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => reresearch.mutate(todo.id)}
+              disabled={reresearch.isPending}
+              loading={reresearch.isPending}
+            >
+              {!reresearch.isPending && <Search size={14} />}
+              Research
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* Delete row. Edits auto-save (no Save button); the toast in

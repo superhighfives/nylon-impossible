@@ -8,8 +8,12 @@ vi.mock("@/hooks/useUser", () => ({
 }));
 
 const updateUrlPreviewMutate = vi.fn();
+const enrichMutate = vi.fn();
+const reresearchMutate = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
   useUpdateUrlPreview: () => ({ mutate: updateUrlPreviewMutate }),
+  useEnrichTodo: () => ({ mutate: enrichMutate, isPending: false }),
+  useReresearch: () => ({ mutate: reresearchMutate, isPending: false }),
 }));
 
 vi.mock("../ResearchSection", () => ({
@@ -176,6 +180,28 @@ describe("TodoItemExpanded", () => {
     } as unknown as ReturnType<typeof useUser>);
     renderExpanded();
     expect(screen.queryByText(/not used by ai/i)).not.toBeInTheDocument();
+  });
+
+  it("runs enrich and research from the AI actions for a pro user", () => {
+    vi.mocked(useUser).mockReturnValue({
+      data: { plan: "pro", aiEnabled: true },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUser>);
+    renderExpanded();
+
+    fireEvent.click(screen.getByRole("button", { name: /enrich/i }));
+    expect(enrichMutate).toHaveBeenCalledWith("todo-1");
+
+    fireEvent.click(screen.getByRole("button", { name: /research/i }));
+    expect(reresearchMutate).toHaveBeenCalledWith("todo-1");
+  });
+
+  it("hides the AI actions when AI is unavailable", () => {
+    // beforeEach sets aiEnabled:false → AI unavailable.
+    renderExpanded();
+    expect(
+      screen.queryByRole("button", { name: /enrich/i }),
+    ).not.toBeInTheDocument();
   });
 
   function urlFixture(overrides: Partial<TodoWithUrls["urls"][number]> = {}) {
