@@ -1,7 +1,8 @@
 # Admin Interface
 
 **Date:** 2026-06-22
-**Status:** In Progress
+**Status:** Complete
+**Updated:** 2026-07-17
 **Scope:** Standalone admin app + admin API endpoints + bundled self-serve account deletion
 
 ## Problem
@@ -157,3 +158,25 @@ Settings page: "Delete account" button → confirmation modal → `DELETE /users
 - Bundled with: `plans/ready/2026-03-23-subscription-plans.md` (same PR — admin UI is the way to flip plans)
 - New env vars: `CLERK_WEBHOOK_SECRET` (set via `wrangler secret put`)
 - New deploy target: `admin.nylon-impossible.com` Cloudflare Worker/Pages project
+
+---
+
+## Overview
+
+This work landed three intertwined features in a single PR (#191) so that admins could flip subscription plans the moment the free/pro gate went live. First, a **subscription plan model**: a `plan` column (`text`, enum `free`/`pro`, `NOT NULL DEFAULT 'free'`, migration `0011_add_user_plan.sql`) on `users`, with the `/todos/smart` AI enrichment path gated on `plan === "pro"` (free users get a single fast-path todo, link previews still work). Second, an **admin surface** for viewing users, inspecting per-user diagnostics, toggling plan/settings, and cascade-deleting accounts — split across new API endpoints and a standalone `src/admin` app. Third, **self-serve and out-of-band account deletion**: a shared cascade helper feeding an admin delete, a new `DELETE /users/me`, and a new Clerk `user.deleted` webhook so deletions initiated in the Clerk dashboard sync back to the local DB. This is the first real operational tooling for the product; without it, plan changes and deletions required direct D1/Clerk-dashboard access.
+
+## Architecture
+
+**Auth / admin gating** (`src/api/src/lib/auth.ts`): `verifyClerkJWT` now returns an `AuthResult` of `{ userId, role }`. Role is extracted from the verified JWT payload's metadata — notably it reads **both** `public_metadata` (the real snake_case claim Clerk emits) and `publicMetadata`, a correction over the plan's assumption of camelCase. `authMiddleware` sets `role` (and `plan`) into context; `requireAdmin` is a pure token check returning `403` with no extra Clerk API call, as designed. `/admin/*` is mounted with `authMiddleware + requireAdmin` in `src/api/src/index.ts`; `/webhooks/clerk` is mounted outside auth (Svix signature is the auth).
+
+**Cascade delete** (`src/api/src/lib/delete-user.ts`): `deleteUserCascade(env, userId, { deleteClerk })` deletes the DB row (children cascade via FK constraints) and optionally deletes the Clerk user. It went beyond the plan with real error handling — Clerk 404s are swallowed as "already gone" (idempotency for webhook retries), but any other Clerk failure is reported to Sentry and rethrown so DB/Clerk don't silently drift. Three callers: admin delete (`deleteClerk: true`), `DELETE /users/me` (`deleteClerk: true`), webhook (`deleteClerk: false`). `src/api/src/lib/clerk.ts` wraps `@clerk/backend`'s client as planned.
+
+**Admin endpoints** (`src/api/src/handlers/admin.ts`): `GET /admin/users` (cursor pagination, default 50 / max 200, `createdAt`-ms cursor, per-user `todoCount` via a correlated subquery — with an inline comment about Drizzle rendering unqualified column refs), `GET /admin/users/:id` (diagnostics: `todoCount`, `messageCount`, `researchCount` from `todoResearch`, and `lastTodoUpdatedAt` — the plan's vaguer "last sync / research usage counters"), and `DELETE /admin/users/:id`. **Deviation:** the plan's plan-only `PATCH /admin/users/:id/plan` became a general `PATCH /admin/users/:id` accepting `plan`, `aiEnabled`, and `location` (zod-validated). `DELETE /users/me` (`deleteMe`) was added to `src/api/src/handlers/users.ts` as planned.
+
+**Webhook** (`src/api/src/handlers/webhooks.ts`): Svix verification is implemented **inline** rather than via the `svix` SDK (kept deps lean, auditable in one place) — HMAC-SHA256 over `${id}.${timestamp}.${body}` using the base64-decoded `whsec_` secret, a 5-minute timestamp tolerance, multi-signature support, and a length-independent constant-time compare. Only `user.deleted` is acted on; other events are acknowledged. Missing `CLERK_WEBHOOK_SECRET` returns `forbidden`.
+
+**Standalone admin app** (`src/admin`): Vite + React + Clerk deployed as its own Worker `nylon-impossible-admin` via **Workers Static Assets** (SPA `not_found_handling`), custom domain `admin.nylonimpossible.com` — not Cloudflare Pages, and note the real apex is `nylonimpossible.com` (no hyphen), unlike the plan text's `nylon-impossible.com`. **Deviation:** it is *not* a react-router app with `/users` and `/users/:id` routes as proposed; it is a single-page master/detail layout (`App.tsx` → `UsersTable` + a `UserDetailPanel` side drawer, selection held in local state). Auth uses `@clerk/react` with `<SignIn routing="hash">`, and the UI does a client-side `role === "admin"` check in addition to the server gate. API calls use plain `fetch` with the Clerk JWT (`src/admin/src/api.ts`). Deployment is wired through a new GitHub Actions workflow `.github/workflows/admin-deploy.yml` (lint/typecheck then `wrangler deploy`, path-filtered to `src/admin/**`) — an addition beyond the plan, which only mentioned an `admin:deploy` script. Root `package.json` gained the full `admin:*` script family and `admin` was added to `pnpm-workspace.yaml` and the aggregate `lint`/`check`/`typecheck` tasks.
+
+**Web self-serve delete** (`src/web`): `SettingsModal.tsx` has a danger-zone "Delete account" button using a `window.confirm` guard and a `useDeleteCurrentUser` hook (`src/web/src/hooks/useUser.ts`) that calls `DELETE /users/me` then signs out.
+
+**Not shipped / follow-ups** (per PR body): Stripe/payment integration (plan flipping remains admin-only), iOS self-serve delete UI, and the actual production deploy — the admin Worker DNS, `wrangler secret put CLERK_WEBHOOK_SECRET`, and configuring the Clerk webhook endpoint were all left as post-merge operational steps. Tests were added (`admin.test.ts`, `webhooks.test.ts`, `auth.test.ts`, `smart-create.test.ts`), which the plan did not enumerate.
