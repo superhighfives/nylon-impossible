@@ -190,9 +190,9 @@ export async function importGoogleTasks(c: Context<Env>) {
     await db.insert(todos).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
   }
 
-  // Enrich each imported todo the same way typed todos are. Pro + AI users get
-  // full AI enrichment (research, URL metadata); everyone else gets URL
-  // metadata so links still resolve to favicons/titles.
+  // Enrich each imported todo the same way typed todos are. With AI on
+  // (aiEnabled) todos get full AI enrichment (research, URL metadata); with AI
+  // off they still get URL metadata so links resolve to favicons/titles.
   const userLocation = useAI
     ? await db
         .select({ location: users.location })
