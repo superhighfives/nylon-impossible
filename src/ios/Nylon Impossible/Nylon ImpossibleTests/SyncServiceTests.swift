@@ -547,4 +547,112 @@ struct SyncServiceTests {
         let items = try context.fetch(descriptor)
         #expect(items.count == 0)
     }
+
+    /// Build a sync response echoing a single todo back so the delete-sweep in
+    /// applySync doesn't remove it before processPendingAI runs.
+    @MainActor
+    private func echoResponse(for todo: TodoItem) -> SyncResponse {
+        SyncResponse(
+            todos: [APITodo(
+                id: todo.id.uuidString.lowercased(),
+                userId: todo.userId ?? "user_test_123",
+                title: todo.title,
+                notes: nil,
+                completed: false,
+                position: todo.position,
+                dueDate: nil,
+                priority: nil,
+                aiStatus: nil,
+                createdAt: todo.createdAt,
+                updatedAt: todo.updatedAt,
+                urls: nil
+            )],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+    }
+
+    @Test("Fires a pending enrich once the todo has synced")
+    @MainActor
+    func firesPendingEnrichAfterSync() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // A todo already on the server with an enrich still pending (e.g. the
+        // option was chosen while offline).
+        let todo = TodoItem(title: "Plan trip", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        todo.pendingEnrich = true
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        #expect(api.lastEnrichTodoId == todo.id.uuidString.lowercased())
+        #expect(todo.pendingEnrich == false)
+        // Spinner stays up until the server reports enrichment complete.
+        #expect(todo.aiStatus == TodoAIStatus.pending.rawValue)
+    }
+
+    @Test("Fires a pending research once the todo has synced")
+    @MainActor
+    func firesPendingResearchAfterSync() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Best cameras 2026", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        todo.pendingResearch = true
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
+        #expect(todo.pendingResearch == false)
+    }
+
+    @Test("Leaves the pending enrich flag set when the enrich call fails")
+    @MainActor
+    func retainsPendingEnrichOnFailure() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        api.enrichError = APIError.networkError(
+            URLError(.notConnectedToInternet),
+            url: "https://api.example.com/todos/x/enrich"
+        )
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Plan trip", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        todo.pendingEnrich = true
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        // Attempted, but the flag stays set so the next sync retries it.
+        #expect(api.lastEnrichTodoId == todo.id.uuidString.lowercased())
+        #expect(todo.pendingEnrich == true)
+    }
 }

@@ -324,38 +324,6 @@ struct SyncConflict: Codable, Sendable {
     let remoteUpdatedAt: Date
 }
 
-// MARK: - Smart Create Models
-
-struct SmartCreateRequest: Codable, Sendable {
-    let text: String
-    // AI is opt-in per create: `enrich` runs the enrichment model, `research`
-    // runs research. Both are gated on the aiEnabled switch server-side. Omitted
-    // (nil) means no AI — the intentional default.
-    let enrich: Bool?
-    let research: Bool?
-}
-
-struct SmartCreateResponse: Codable, Sendable {
-    let todos: [SmartCreateTodo]
-    let ai: Bool
-}
-
-struct SmartCreateTodo: Codable, Sendable {
-    let id: String
-    let userId: String
-    let title: String
-    let notes: String?
-    let completed: Bool
-    let completedAt: Date?
-    let position: String?
-    let dueDate: Date?
-    let priority: String?
-    let recurrence: Recurrence?
-    let aiStatus: AIStatus?
-    let createdAt: Date
-    let updatedAt: Date
-}
-
 // MARK: - User Models
 
 struct APIUser: Codable, Sendable {
@@ -433,7 +401,6 @@ struct ImportedDatedTodo: Codable, Sendable, Identifiable {
 @MainActor
 protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
-    func smartCreate(text: String, enrich: Bool, research: Bool) async throws -> SmartCreateResponse
     func getMe() async throws -> APIUser
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func importGoogleTasks() async throws -> GoogleTasksImportResponse
@@ -508,23 +475,6 @@ final class APIService: APIProviding {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse {
         let request = SyncRequest(lastSyncedAt: lastSyncedAt, changes: changes)
         return try await post(path: "/todos/sync", body: request)
-    }
-
-    // MARK: - Smart Create
-
-    func smartCreate(
-        text: String,
-        enrich: Bool = false,
-        research: Bool = false
-    ) async throws -> SmartCreateResponse {
-        return try await post(
-            path: "/todos/smart",
-            body: SmartCreateRequest(
-                text: text,
-                enrich: enrich ? true : nil,
-                research: research ? true : nil
-            )
-        )
     }
 
     // MARK: - CRUD (for direct operations if needed)

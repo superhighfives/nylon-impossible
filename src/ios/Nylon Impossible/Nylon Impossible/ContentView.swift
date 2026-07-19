@@ -97,16 +97,35 @@ struct ContentView: View {
             ) { option in
                 let text = viewModel.newTaskText
                 viewModel.newTaskText = ""
-                Task {
-                    await syncService.smartCreate(
-                        text: text,
-                        enrich: option == .enrich,
-                        research: option == .research,
-                        context: modelContext,
-                        userId: authService.userId,
-                        allTodos: todos
-                    )
+
+                // Create instantly and locally so the todo appears and persists
+                // even with no connection; sync (and any requested AI) run in
+                // the background. Enrich/research is recorded on the todo and
+                // fired once it has synced (SyncService.processPendingAI), so
+                // choosing it offline still takes effect on reconnect.
+                guard let todo = TaskCreationService.createSmart(
+                    text: text,
+                    userId: authService.userId,
+                    context: modelContext,
+                    allTodos: todos
+                ) else { return }
+
+                if preferencesService.aiEnabled {
+                    switch option {
+                    case .enrich:
+                        // Show the AI spinner immediately; the server flips this
+                        // through processing → complete once enrichment runs.
+                        todo.aiStatus = TodoAIStatus.pending.rawValue
+                        todo.pendingEnrich = true
+                    case .research:
+                        todo.pendingResearch = true
+                    case .plain:
+                        break
+                    }
+                    try? modelContext.save()
                 }
+
+                syncService.syncAfterAction()
             }
             .padding(.horizontal, 16)
             .padding(.top, 10)

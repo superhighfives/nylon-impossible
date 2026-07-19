@@ -11,15 +11,6 @@ final class MockAPIService: APIProviding {
     var syncError: Error?
     var lastSyncRequest: (lastSyncedAt: Date?, changes: [TodoChange])?
 
-    var smartCreateResponse: SmartCreateResponse = SmartCreateResponse(
-        todos: [],
-        ai: false
-    )
-    var smartCreateError: Error?
-    var lastSmartCreateText: String?
-    var lastSmartCreateEnrich: Bool?
-    var lastSmartCreateResearch: Bool?
-
     var getMeResponse: APIUser = APIUser(
         id: "mock-user-id",
         email: "test@example.com",
@@ -43,20 +34,6 @@ final class MockAPIService: APIProviding {
             throw error
         }
         return syncResponse
-    }
-
-    func smartCreate(
-        text: String,
-        enrich: Bool = false,
-        research: Bool = false
-    ) async throws -> SmartCreateResponse {
-        lastSmartCreateText = text
-        lastSmartCreateEnrich = enrich
-        lastSmartCreateResearch = research
-        if let error = smartCreateError {
-            throw error
-        }
-        return smartCreateResponse
     }
 
     func getMe() async throws -> APIUser {

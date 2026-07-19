@@ -274,9 +274,112 @@ struct TaskCreationServiceTests {
         try context.save()
         
         let todos = TaskCreationService.fetchAllTodos(userId: nil, context: context)
-        
+
         #expect(todos[0].title == "A")
         #expect(todos[1].title == "B")
         #expect(todos[2].title == "C")
+    }
+
+    // MARK: - parseSmartInput
+
+    @Test("parseSmartInput: plain text becomes the title with no URLs")
+    func parseSmartInputPlainText() {
+        let parsed = TaskCreationService.parseSmartInput("Buy groceries")
+        #expect(parsed.title == "Buy groceries")
+        #expect(parsed.urls.isEmpty)
+    }
+
+    @Test("parseSmartInput: a bare URL becomes a Check domain.com title")
+    func parseSmartInputUrlOnly() {
+        let parsed = TaskCreationService.parseSmartInput("https://www.example.com/article")
+        #expect(parsed.title == "Check example.com")
+        #expect(parsed.urls == ["https://www.example.com/article"])
+    }
+
+    @Test("parseSmartInput: text with a URL keeps the text as title and extracts the URL")
+    func parseSmartInputTextWithUrl() {
+        let parsed = TaskCreationService.parseSmartInput("Read this later https://example.com/post")
+        #expect(parsed.title == "Read this later https://example.com/post")
+        #expect(parsed.urls == ["https://example.com/post"])
+    }
+
+    @Test("parseSmartInput: trailing punctuation is stripped from extracted URLs")
+    func parseSmartInputStripsTrailingPunctuation() {
+        let parsed = TaskCreationService.parseSmartInput("Check out https://example.com/page.")
+        #expect(parsed.urls == ["https://example.com/page"])
+    }
+
+    @Test("parseSmartInput: duplicate URLs are de-duplicated")
+    func parseSmartInputDedupesUrls() {
+        let parsed = TaskCreationService.parseSmartInput(
+            "compare https://a.com and https://a.com again"
+        )
+        #expect(parsed.urls == ["https://a.com"])
+    }
+
+    @Test("truncateTitle: appends an ellipsis past the limit")
+    func truncateTitleTruncates() {
+        let long = String(repeating: "a", count: 600)
+        let result = TaskCreationService.truncateTitle(long)
+        #expect(result.count == 500)
+        #expect(result.hasSuffix("..."))
+    }
+
+    @Test("truncateTitle: leaves short titles untouched")
+    func truncateTitleShort() {
+        #expect(TaskCreationService.truncateTitle("Short") == "Short")
+    }
+
+    // MARK: - createSmart
+
+    @Test("createSmart returns nil for empty input")
+    @MainActor
+    func createSmartEmpty() throws {
+        let container = try makeContainer()
+        let todo = TaskCreationService.createSmart(
+            text: "   ",
+            userId: nil,
+            context: container.mainContext,
+            allTodos: []
+        )
+        #expect(todo == nil)
+    }
+
+    @Test("createSmart inserts a plain todo with no pending URLs")
+    @MainActor
+    func createSmartPlain() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TaskCreationService.createSmart(
+            text: "Water the plants",
+            userId: "user_123",
+            context: context,
+            allTodos: []
+        )
+
+        #expect(todo?.title == "Water the plants")
+        #expect(todo?.pendingUrls.isEmpty == true)
+        #expect(todo?.isSynced == false)
+
+        let saved = TaskCreationService.fetchAllTodos(userId: "user_123", context: context)
+        #expect(saved.count == 1)
+    }
+
+    @Test("createSmart stores extracted URLs in pendingUrls")
+    @MainActor
+    func createSmartWithUrl() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TaskCreationService.createSmart(
+            text: "https://www.example.com",
+            userId: "user_123",
+            context: context,
+            allTodos: []
+        )
+
+        #expect(todo?.title == "Check example.com")
+        #expect(todo?.pendingUrls == ["https://www.example.com"])
     }
 }
