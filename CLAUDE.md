@@ -5,9 +5,12 @@ This file is the repo-specific part.
 
 ## Layout
 
-pnpm workspaces: `src/web`, `src/api`, `src/admin`. Root scripts fan out to all
-three — `pnpm typecheck` and `pnpm lint` each run the full set, and per-package
-variants are prefixed (`pnpm api:test`, `pnpm web:typecheck`).
+pnpm workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
+`src/marketing`. `@nylon-impossible/shared` is consumed by both `web` and `api`.
+
+Only `web`, `api`, and `admin` have their own check scripts, so `pnpm typecheck`
+and `pnpm lint` fan out to those three. Per-package variants are prefixed
+(`pnpm api:test`, `pnpm web:typecheck`).
 
 Biome config lives at the root; each workspace invokes it with
 `--config-path ../..`. Don't add a per-workspace `biome.json`.
@@ -35,9 +38,14 @@ export async function enrichTodo(c: Context<{ Bindings: Env }>) {
 
 ## Bindings
 
-Anything reached via `c.env.*` must exist in `Env["Bindings"]` **and** in the
-relevant `wrangler.jsonc`. A binding that type-checks because someone widened
-the type but isn't in the wrangler config will fail at runtime, not at build.
+Resource bindings reached via `c.env.*` — D1, Durable Objects, Queues, AI, and
+plain `vars` — must exist in `Env["Bindings"]` **and** in the relevant
+`wrangler.jsonc`. One that type-checks because someone widened the type but
+isn't in the wrangler config will fail at runtime, not at build.
+
+Secrets are the exception: `CLERK_SECRET_KEY`, `TAVILY_API_KEY`, `SENTRY_DSN`
+and friends are typed in `Env["Bindings"]` but set with `wrangler secret put`,
+so they deliberately don't appear in `wrangler.jsonc`.
 
 ## Errors
 
