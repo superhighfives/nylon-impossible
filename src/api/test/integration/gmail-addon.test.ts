@@ -149,6 +149,39 @@ describe("Gmail add-on", () => {
       expect(openSection.widgets[0].decoratedText.text).toBe("Open one");
     });
 
+    it("does not auto-link when the Google email is unverified", async () => {
+      // A Clerk user with a matching Google account exists...
+      mockGetUserList.mockResolvedValue({
+        data: [
+          {
+            id: "user_test_123",
+            externalAccounts: [
+              {
+                provider: "oauth_google",
+                providerUserId: GOOGLE_SUB,
+                emailAddress: "test@example.com",
+              },
+            ],
+          },
+        ],
+        totalCount: 1,
+      });
+      // ...but the token's email isn't verified, so auto-link must not proceed.
+      const token = await idToken({ email_verified: false });
+      const res = await post("/gmail-addon/homepage", token);
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      expect(body.action.navigations[0].pushCard.header.title).toBe(
+        "Connect Nylon",
+      );
+      const db = getDb(env.DB);
+      const links = await db
+        .select()
+        .from(gmailAddonLinks)
+        .where(eq(gmailAddonLinks.googleSub, GOOGLE_SUB));
+      expect(links).toHaveLength(0);
+    });
+
     it("lists only open top-level todos for a linked user", async () => {
       await linkUser();
       await seedTodo("22222222-2222-2222-2222-222222222222", "user_test_123", {
