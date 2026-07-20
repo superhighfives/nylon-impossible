@@ -685,4 +685,72 @@ struct SyncServiceTests {
         #expect(api.lastEnrichTodoId == todo.id.uuidString.lowercased())
         #expect(todo.pendingEnrich == true)
     }
+
+    @Test("Gives up the pending enrich on a permanent (non-transient) failure")
+    @MainActor
+    func clearsPendingEnrichOnPermanentFailure() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        // ai_disabled etc. surface as a serverError, which is neither a network
+        // nor a transient failure — retrying will never succeed.
+        api.enrichError = APIError.serverError(
+            403,
+            "ai_disabled",
+            url: "https://api.example.com/todos/x/enrich"
+        )
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Plan trip", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        todo.pendingEnrich = true
+        todo.aiStatus = TodoAIStatus.pending.rawValue
+        todo.aiStartedAt = Date()
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        // Flag cleared so it won't retry the doomed call on every future sync,
+        // and the optimistic spinner state is dropped.
+        #expect(api.lastEnrichTodoId == todo.id.uuidString.lowercased())
+        #expect(todo.pendingEnrich == false)
+        #expect(todo.aiStatus == nil)
+        #expect(todo.isAIProcessing == false)
+    }
+
+    @Test("Gives up the pending research on a permanent failure")
+    @MainActor
+    func clearsPendingResearchOnPermanentFailure() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        api.reresearchError = APIError.serverError(
+            403,
+            "ai_disabled",
+            url: "https://api.example.com/todos/x/research"
+        )
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Best cameras 2026", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        todo.pendingResearch = true
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
+        #expect(todo.pendingResearch == false)
+    }
 }

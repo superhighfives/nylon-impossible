@@ -160,8 +160,12 @@ enum TaskCreationService {
     }
 
     /// Truncate a title to `maxLength`, preferring a trailing word boundary and
-    /// appending an ellipsis. Mirrors the server's `truncateTitle`. Operates on
-    /// grapheme clusters so it never splits an emoji.
+    /// appending an ellipsis. Follows the server's `truncateTitle` word-boundary
+    /// logic, but counts/cuts by grapheme cluster where the server counts UTF-16
+    /// length and cuts by Unicode code point — so at an exact-boundary title
+    /// containing a multi-scalar cluster (ZWJ/skin-tone/flag) the two can pick a
+    /// slightly different cut. Chosen deliberately: graphemes never split a
+    /// visible glyph. Practically moot for real titles, which sit well under 500.
     static func truncateTitle(_ title: String, maxLength: Int = 500) -> String {
         guard title.count > maxLength else { return title }
 

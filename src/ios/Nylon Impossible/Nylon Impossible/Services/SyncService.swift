@@ -520,7 +520,18 @@ extension SyncService {
                     todo.aiStartedAt = Date()
                     didChange = true
                 } catch {
+                    // Transient failures stay pending to retry next sync. A
+                    // permanent one (e.g. ai_disabled when the account's AI
+                    // switch is off, or todo_not_found) will never succeed, so
+                    // give up: clear the flag, drop the optimistic spinner, and
+                    // report once. Otherwise every future sync — which runs on
+                    // nearly every user action — would re-fire the doomed call
+                    // and re-report it to Sentry indefinitely.
                     if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                        todo.pendingEnrich = false
+                        todo.aiStatus = nil
+                        todo.aiStartedAt = nil
+                        didChange = true
                         SentrySDK.capture(error: error) { scope in
                             scope.setTag(value: "pending-enrich", key: "area")
                         }
@@ -534,7 +545,12 @@ extension SyncService {
                     todo.pendingResearch = false
                     didChange = true
                 } catch {
+                    // Same policy as enrich: retry transient failures, give up on
+                    // permanent ones so a never-succeeding call doesn't retry and
+                    // re-report on every sync.
                     if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                        todo.pendingResearch = false
+                        didChange = true
                         SentrySDK.capture(error: error) { scope in
                             scope.setTag(value: "pending-research", key: "area")
                         }
