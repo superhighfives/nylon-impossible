@@ -366,6 +366,31 @@ struct TaskCreationServiceTests {
         #expect(saved.count == 1)
     }
 
+    @Test("createSubtask positions new subtasks at the top of the group")
+    @MainActor
+    func createSubtaskPrependsToGroup() throws {
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let parent = TaskCreationService.createTask(
+            title: "Parent", userId: nil, context: context, allTodos: []
+        )
+
+        let first = TaskCreationService.createSubtask(
+            title: "First", parent: parent, userId: nil, context: context,
+            allTodos: TaskCreationService.fetchAllTodos(userId: nil, context: context)
+        )
+        let second = TaskCreationService.createSubtask(
+            title: "Second", parent: parent, userId: nil, context: context,
+            allTodos: TaskCreationService.fetchAllTodos(userId: nil, context: context)
+        )
+
+        // Newest subtask sorts before the earlier one — top of the group.
+        #expect(second.position < first.position)
+        #expect(first.parentId == parent.id)
+        #expect(second.parentId == parent.id)
+    }
+
     @Test("createSmart stores extracted URLs in pendingUrls")
     @MainActor
     func createSmartWithUrl() throws {

@@ -55,9 +55,11 @@ enum TaskCreationService {
         return todo
     }
     
-    /// Create a subtask under a parent todo. Positioned at the end of the
-    /// parent's active sibling group. Recurrence and subtasks are mutually
-    /// exclusive, so adding a subtask clears a recurring parent's recurrence.
+    /// Create a subtask under a parent todo. Positioned before the first active
+    /// sibling so a new subtask lands at the top of its group — matching
+    /// top-level creation and the web SubtaskSection. Recurrence and subtasks
+    /// are mutually exclusive, so adding a subtask clears a recurring parent's
+    /// recurrence.
     @MainActor
     static func createSubtask(
         title: String,
@@ -68,12 +70,12 @@ enum TaskCreationService {
     ) -> TodoItem {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        let lastPosition = allTodos
+        let firstPosition = allTodos
             .filter { $0.parentId == parent.id && !$0.isDeleted && !$0.isCompleted }
-            .max { $0.position < $1.position }?
+            .min { $0.position < $1.position }?
             .position
 
-        let position = generateKeyBetween(lastPosition, nil)
+        let position = generateKeyBetween(nil, firstPosition)
 
         let todo = TodoItem(title: trimmedTitle, userId: userId, position: position)
         todo.parentId = parent.id
