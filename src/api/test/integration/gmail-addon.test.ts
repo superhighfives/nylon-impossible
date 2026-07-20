@@ -295,6 +295,34 @@ describe("Gmail add-on", () => {
       );
     });
 
+    it("drops a non-http permalink instead of persisting a javascript: URL", async () => {
+      await linkUser();
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/add-from-message", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: ["Reply to Sam"] } },
+          },
+          // A caller-supplied permalink is untrusted input; a javascript: URL
+          // must not reach a persisted, clickable todo URL.
+          parameters: { permalink: "javascript:alert(document.cookie)" },
+        },
+      });
+      expect(res.status).toBe(200);
+
+      const db = getDb(env.DB);
+      const [todo] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(todo.title).toBe("Reply to Sam");
+      const urls = await db
+        .select()
+        .from(todoUrls)
+        .where(eq(todoUrls.todoId, todo.id));
+      expect(urls).toHaveLength(0);
+    });
+
     it("toggle marks an open todo complete", async () => {
       await linkUser();
       const todoId = "44444444-4444-4444-4444-444444444444";

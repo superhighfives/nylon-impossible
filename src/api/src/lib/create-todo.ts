@@ -49,6 +49,25 @@ const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
 const TRAILING_PUNCT = /[.,;:!?)]+$/;
 
 /**
+ * Normalize a raw URL string to an `http:`/`https:` href, or null if it's not a
+ * valid web URL. This is the single gate every URL we persist passes through, so
+ * a `javascript:`/`data:` (or otherwise malformed) value can never reach the
+ * `todoUrls.url` column and later render as a clickable link.
+ */
+function normalizeHttpUrl(raw: string): string | null {
+  const cleaned = raw.replace(TRAILING_PUNCT, "");
+  try {
+    const parsed = new URL(cleaned);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return parsed.href;
+    }
+  } catch {
+    // Invalid URL, skip
+  }
+  return null;
+}
+
+/**
  * Create initial todo data from input text.
  * Handles URL-only input specially by extracting domain for title.
  */
@@ -69,18 +88,7 @@ function createInitialTodo(text: string): {
   // Extract any URLs from text
   const rawMatches = text.match(URL_REGEX) ?? [];
   const urls = rawMatches
-    .map((url) => {
-      const cleaned = url.replace(TRAILING_PUNCT, "");
-      try {
-        const parsed = new URL(cleaned);
-        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-          return parsed.href;
-        }
-      } catch {
-        // Invalid URL, skip
-      }
-      return null;
-    })
+    .map(normalizeHttpUrl)
     .filter((url): url is string => url !== null);
 
   return {
@@ -162,10 +170,14 @@ export async function createSmartTodo(
   const initial = createInitialTodo(trimmed);
 
   // Merge any caller-supplied URLs (e.g. a Gmail thread permalink) with those
-  // parsed from the text, keeping order (parsed first) and deduping.
-  const urls = Array.from(
-    new Set([...initial.urls, ...(options.extraUrls ?? [])]),
-  );
+  // parsed from the text, keeping order (parsed first) and deduping. extraUrls
+  // passes the same http/https gate as parsed URLs — a caller-supplied value is
+  // untrusted input, so a `javascript:`/`data:` string can't slip through to a
+  // persisted, clickable link.
+  const extraUrls = (options.extraUrls ?? [])
+    .map(normalizeHttpUrl)
+    .filter((url): url is string => url !== null);
+  const urls = Array.from(new Set([...initial.urls, ...extraUrls]));
 
   const todoId = crypto.randomUUID();
 
