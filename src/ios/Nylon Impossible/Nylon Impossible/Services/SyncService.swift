@@ -66,61 +66,6 @@ final class SyncService {
         self.modelContext = context
     }
 
-    /// Create todos via the smart create API endpoint, then sync results into SwiftData.
-    /// Falls back to local creation if not signed in.
-    func smartCreate(
-        text: String,
-        enrich: Bool = false,
-        research: Bool = false,
-        context: ModelContext,
-        userId: String?,
-        allTodos: [TodoItem]
-    ) async {
-        // Offline fallback: create locally
-        guard authService.isSignedIn, userId != nil, let apiService = _apiService else {
-            // Create a single local todo
-            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedText.isEmpty else { return }
-            let lastPosition = allTodos
-                .filter { !$0.isDeleted && !$0.isCompleted }
-                .map { $0.position }
-                .sorted()
-                .last
-            let position = generateKeyBetween(lastPosition, nil)
-            let todo = TodoItem(title: trimmedText, userId: userId, position: position)
-            context.insert(todo)
-            return
-        }
-
-        do {
-            _ = try await apiService.smartCreate(text: text, enrich: enrich, research: research)
-            // Sync to pull the created todos into SwiftData
-            await sync()
-            webSocketService?.notifyChanged()
-        } catch {
-            // Network failures are already reported (or dropped when transient) by
-            // APIService; skip them here to avoid a duplicate Sentry issue.
-            if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
-                SentrySDK.capture(error: error) { scope in
-                    scope.setTag(value: "smart-create", key: "area")
-                }
-            }
-            print("[SmartCreate] Error: \(error), falling back to local creation")
-            // Fallback: create single local todo
-            let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmedText.isEmpty else { return }
-            let lastPosition = allTodos
-                .filter { !$0.isDeleted && !$0.isCompleted }
-                .map { $0.position }
-                .sorted()
-                .last
-            let position = generateKeyBetween(lastPosition, nil)
-            let todo = TodoItem(title: trimmedText, userId: userId, position: position)
-            context.insert(todo)
-            syncAfterAction()
-        }
-    }
-
     /// Trigger a sync after a user action, then notify other clients via WebSocket.
     func syncAfterAction() {
         Task { @MainActor in
@@ -175,6 +120,11 @@ final class SyncService {
             if let modelContext {
                 BadgeService.refresh(modelContext: modelContext)
             }
+
+            // Fire any AI actions requested at creation now that their todos
+            // exist server-side. Deferred to here so an enrich/research chosen
+            // offline runs as soon as the todo reaches the server.
+            await processPendingAI(apiService: apiService, userId: userId)
 
             // 4. Update sync timestamp
             if let syncedAt = ISO8601DateFormatter().date(from: response.syncedAt) {
@@ -532,5 +482,85 @@ extension SyncService {
             try? modelContext.save()
         }
         return pushedIds
+    }
+
+    /// Fire enrich/research actions recorded on todos at creation, once those
+    /// todos have synced (so the server knows them). Runs only for synced,
+    /// non-deleted todos owned by this user. Clears the flag on success and
+    /// leaves it set to retry next sync on failure — a single failed call must
+    /// not abort the whole sync.
+    fileprivate func processPendingAI(apiService: any APIProviding, userId: String) async {
+        guard let modelContext else { return }
+
+        let descriptor = FetchDescriptor<TodoItem>(
+            predicate: #Predicate {
+                $0.userId == userId
+                    && $0.isSynced
+                    && !$0.isDeleted
+                    && ($0.pendingEnrich || $0.pendingResearch)
+            }
+        )
+        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else {
+            return
+        }
+
+        var didChange = false
+        for todo in pending {
+            let todoId = todo.id.uuidString.lowercased()
+
+            if todo.pendingEnrich {
+                do {
+                    try await apiService.enrich(todoId: todoId)
+                    todo.pendingEnrich = false
+                    // Keep the spinner up until the server reports back, and
+                    // re-stamp the start so the 60s window tracks when enrichment
+                    // actually began — not the (possibly much earlier) creation
+                    // time, which would leave the spinner already expired.
+                    todo.aiStatus = TodoAIStatus.pending.rawValue
+                    todo.aiStartedAt = Date()
+                    didChange = true
+                } catch {
+                    // Transient failures stay pending to retry next sync. A
+                    // permanent one (e.g. ai_disabled when the account's AI
+                    // switch is off, or todo_not_found) will never succeed, so
+                    // give up: clear the flag, drop the optimistic spinner, and
+                    // report once. Otherwise every future sync — which runs on
+                    // nearly every user action — would re-fire the doomed call
+                    // and re-report it to Sentry indefinitely.
+                    if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                        todo.pendingEnrich = false
+                        todo.aiStatus = nil
+                        todo.aiStartedAt = nil
+                        didChange = true
+                        SentrySDK.capture(error: error) { scope in
+                            scope.setTag(value: "pending-enrich", key: "area")
+                        }
+                    }
+                }
+            }
+
+            if todo.pendingResearch {
+                do {
+                    try await apiService.reresearch(todoId: todoId)
+                    todo.pendingResearch = false
+                    didChange = true
+                } catch {
+                    // Same policy as enrich: retry transient failures, give up on
+                    // permanent ones so a never-succeeding call doesn't retry and
+                    // re-report on every sync.
+                    if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
+                        todo.pendingResearch = false
+                        didChange = true
+                        SentrySDK.capture(error: error) { scope in
+                            scope.setTag(value: "pending-research", key: "area")
+                        }
+                    }
+                }
+            }
+        }
+
+        if didChange {
+            try? modelContext.save()
+        }
     }
 }

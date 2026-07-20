@@ -252,14 +252,16 @@ export const createTodo = createServerFn({ method: "POST" })
           }
         }
 
-        // An explicit position wins (e.g. inserting a subtask at the top of its
-        // parent's list). Otherwise append: get the last position for fractional
+        // An explicit position wins (e.g. inserting a subtask at a specific
+        // spot). Otherwise prepend: get the first position for fractional
         // indexing, scoped to the sibling group — top-level todos order among
         // themselves (parent_id IS NULL), subtasks among their siblings
-        // (parent_id = parentId).
+        // (parent_id = parentId). New items land at the top on both web and iOS,
+        // so the default here matches even though current callers always pass a
+        // position.
         let position = validated.position;
         if (!position) {
-          const lastTodo = yield* Effect.tryPromise({
+          const firstTodo = yield* Effect.tryPromise({
             try: () =>
               db
                 .select({ position: todos.position })
@@ -272,17 +274,17 @@ export const createTodo = createServerFn({ method: "POST" })
                       : isNull(todos.parentId),
                   ),
                 )
-                .orderBy(desc(todos.position))
+                .orderBy(asc(todos.position))
                 .limit(1)
                 .get(),
             catch: (error) =>
               new DatabaseError({
-                operation: "getLastTodo",
+                operation: "getFirstTodo",
                 cause: error,
               }),
           });
 
-          position = generateKeyBetween(lastTodo?.position ?? null, null);
+          position = generateKeyBetween(null, firstTodo?.position ?? null);
         }
 
         // Create todo
