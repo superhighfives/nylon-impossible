@@ -56,4 +56,45 @@ struct TodoItemTests {
 
         #expect(todo.isSynced == false)
     }
+
+    // MARK: - isAIProcessing
+
+    @Test("isAIProcessing is false without a pending/processing status")
+    func aiProcessingRequiresStatus() {
+        let todo = TodoItem(title: "Test")
+        todo.aiStatus = nil
+        #expect(todo.isAIProcessing == false)
+
+        todo.aiStatus = TodoAIStatus.complete.rawValue
+        #expect(todo.isAIProcessing == false)
+    }
+
+    @Test("isAIProcessing uses aiStartedAt, not createdAt, for the time window")
+    func aiProcessingWindowsOffStartedAt() {
+        let todo = TodoItem(title: "Test")
+        todo.aiStatus = TodoAIStatus.pending.rawValue
+
+        // Created long ago (old flow would have expired the spinner)...
+        todo.createdAt = Date(timeIntervalSinceNow: -600)
+        // ...but enrichment only just started, so the spinner should be visible.
+        todo.aiStartedAt = Date()
+        #expect(todo.isAIProcessing == true)
+
+        // A start time past the 60s window expires it (server never reported back).
+        todo.aiStartedAt = Date(timeIntervalSinceNow: -120)
+        #expect(todo.isAIProcessing == false)
+    }
+
+    @Test("isAIProcessing falls back to createdAt when aiStartedAt is unset")
+    func aiProcessingFallsBackToCreatedAt() {
+        let todo = TodoItem(title: "Test")
+        todo.aiStatus = TodoAIStatus.processing.rawValue
+        todo.aiStartedAt = nil
+
+        // Fresh createdAt (server-driven status on a just-synced todo) → visible.
+        #expect(todo.isAIProcessing == true)
+
+        todo.createdAt = Date(timeIntervalSinceNow: -120)
+        #expect(todo.isAIProcessing == false)
+    }
 }

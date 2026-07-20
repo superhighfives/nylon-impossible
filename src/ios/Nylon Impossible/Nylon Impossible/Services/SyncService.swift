@@ -512,8 +512,12 @@ extension SyncService {
                 do {
                     try await apiService.enrich(todoId: todoId)
                     todo.pendingEnrich = false
-                    // Keep the spinner up until the server reports back.
+                    // Keep the spinner up until the server reports back, and
+                    // re-stamp the start so the 60s window tracks when enrichment
+                    // actually began — not the (possibly much earlier) creation
+                    // time, which would leave the spinner already expired.
                     todo.aiStatus = TodoAIStatus.pending.rawValue
+                    todo.aiStartedAt = Date()
                     didChange = true
                 } catch {
                     if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {

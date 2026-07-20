@@ -63,6 +63,10 @@ final class TodoItem {
     var priority: String?         // "high" or "low", stored as String for SwiftData
     var recurrenceFrequency: String?  // RecurrenceFrequency raw value; nil = non-repeating
     var aiStatus: String?         // AI processing status: pending, processing, complete, failed
+    // When enrichment actually kicked off, used to time-box the spinner. Distinct
+    // from `createdAt`: enrichment is deferred (fired in SyncService once the todo
+    // syncs), so for an offline-created todo it can start long after creation.
+    var aiStartedAt: Date?
     var researchId: String?           // Research record ID from server
     var researchStatus: String?       // "pending" | "completed" | "failed"
     var researchType: String?         // "general" | "location"
@@ -107,6 +111,7 @@ final class TodoItem {
         self.pendingUrls = []
         self.pendingEnrich = false
         self.pendingResearch = false
+        self.aiStartedAt = nil
     }
     
     /// Mark as modified (for sync tracking)
@@ -167,9 +172,14 @@ final class TodoItem {
     /// Check if AI is currently processing this todo.
     /// Considered stale after 60 seconds (2x the 30s enrichment timeout)
     /// so the spinner auto-hides if the server failed to update the status.
+    /// Timed from `aiStartedAt` (when enrichment was actually kicked off) rather
+    /// than `createdAt`, so an enrich deferred past creation — e.g. requested
+    /// offline and fired minutes later on reconnect — still shows the spinner.
+    /// Falls back to `createdAt` for AI status arriving from the server (web /
+    /// another device), where no local start time was stamped.
     var isAIProcessing: Bool {
         guard todoAIStatus == .pending || todoAIStatus == .processing else { return false }
-        return Date().timeIntervalSince(createdAt) < 60
+        return Date().timeIntervalSince(aiStartedAt ?? createdAt) < 60
     }
 
     /// Check if research is currently pending

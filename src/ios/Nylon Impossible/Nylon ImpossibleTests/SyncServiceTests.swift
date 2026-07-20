@@ -601,6 +601,36 @@ struct SyncServiceTests {
         #expect(todo.aiStatus == TodoAIStatus.pending.rawValue)
     }
 
+    @Test("Deferred enrich re-stamps the AI start so the spinner shows long after creation")
+    @MainActor
+    func deferredEnrichKeepsSpinnerVisible() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // Created well past the 60s spinner window ago — e.g. added offline and
+        // reconnecting minutes later.
+        let todo = TodoItem(title: "Plan trip", userId: "user_test_123", position: "a0")
+        todo.createdAt = Date(timeIntervalSinceNow: -120)
+        todo.isSynced = true
+        todo.pendingEnrich = true
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        // Window is timed from when enrichment actually fired, not the stale
+        // createdAt, so the spinner is visible even though the todo is old.
+        #expect(todo.aiStatus == TodoAIStatus.pending.rawValue)
+        #expect(todo.isAIProcessing == true)
+    }
+
     @Test("Fires a pending research once the todo has synced")
     @MainActor
     func firesPendingResearchAfterSync() async throws {

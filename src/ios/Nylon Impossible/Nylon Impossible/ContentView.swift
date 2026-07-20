@@ -115,7 +115,11 @@ struct ContentView: View {
                     case .enrich:
                         // Show the AI spinner immediately; the server flips this
                         // through processing → complete once enrichment runs.
+                        // aiStartedAt is re-stamped when the enrich call actually
+                        // fires (processPendingAI), so the spinner stays honest
+                        // even if syncing is delayed while offline.
                         todo.aiStatus = TodoAIStatus.pending.rawValue
+                        todo.aiStartedAt = Date()
                         todo.pendingEnrich = true
                     case .research:
                         todo.pendingResearch = true
