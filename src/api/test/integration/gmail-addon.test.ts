@@ -220,6 +220,50 @@ describe("Gmail add-on", () => {
       expect(rows[0].title).toBe("Buy stamps");
     });
 
+    it("rejects an over-length quick-add without creating a todo", async () => {
+      await linkUser();
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/quick-add", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: ["a".repeat(10001)] } },
+          },
+        },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe(
+        "That todo is too long",
+      );
+      const db = getDb(env.DB);
+      const rows = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("normalizes a bare-string form input value instead of indexing a char", async () => {
+      await linkUser();
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/quick-add", token, {
+        commonEventObject: {
+          formInputs: {
+            // Google normally sends an array; a bare string must not become "B".
+            todoText: { stringInputs: { value: "Bare string todo" } },
+          },
+        },
+      });
+      expect(res.status).toBe(200);
+      const db = getDb(env.DB);
+      const rows = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(rows).toHaveLength(1);
+      expect(rows[0].title).toBe("Bare string todo");
+    });
+
     it("add-from-message attaches the permalink as the todo URL", async () => {
       await linkUser();
       const token = await idToken();

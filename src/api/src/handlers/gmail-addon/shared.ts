@@ -1,6 +1,7 @@
 import { signAddonState } from "@nylon-impossible/shared/addon-state";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
+import { z } from "zod/v4";
 import {
   buildConnectCard,
   type Card,
@@ -11,28 +12,51 @@ import type { Env, GoogleIdTokenClaims } from "../../types";
 
 const DEFAULT_WEB_BASE_URL = "https://www.nylonimpossible.com";
 
+/** Longest todo text accepted from a card, matching `smartCreateSchema`. */
+export const MAX_ADDON_TODO_TEXT = 10000;
+
 /**
- * The Google Workspace add-on event object POSTed to our endpoints. Only the
- * fields we read are typed; everything is optional because triggers, actions,
- * and hosts populate different subsets.
+ * Schema for the Google Workspace add-on event object POSTed to our endpoints.
+ * We validate rather than cast: the bearer token proves the *caller* is Google,
+ * but not that the *body* matches this shape (and the exact shape is still being
+ * pinned against a live deployment — see the plan's identity spike). Every field
+ * is optional because triggers, actions, and hosts populate different subsets.
+ *
+ * `value` is normalized to a string array — Google sends `string[]`, but a bare
+ * string is tolerated so `value[0]` can never silently index into a character.
  */
-export interface AddonEvent {
-  commonEventObject?: {
-    hostApp?: string;
-    formInputs?: Record<
-      string,
-      { stringInputs?: { value?: string[] } } | undefined
-    >;
-    parameters?: Record<string, string>;
-  };
-  gmail?: {
-    messageId?: string;
-    threadId?: string;
-    // Present only in some token/scope configurations — see the identity spike
-    // in the plan. Read defensively; the card falls back when it's absent.
-    subject?: string;
-  };
-}
+const stringInputsSchema = z.object({
+  value: z
+    .union([z.array(z.string()), z.string()])
+    .transform((v) => (Array.isArray(v) ? v : [v]))
+    .optional(),
+});
+
+const addonEventSchema = z.object({
+  commonEventObject: z
+    .object({
+      hostApp: z.string().optional(),
+      formInputs: z
+        .record(
+          z.string(),
+          z.object({ stringInputs: stringInputsSchema.optional() }),
+        )
+        .optional(),
+      parameters: z.record(z.string(), z.string()).optional(),
+    })
+    .optional(),
+  gmail: z
+    .object({
+      messageId: z.string().optional(),
+      threadId: z.string().optional(),
+      // Present only in some token/scope configurations — see the identity
+      // spike in the plan. Read defensively; the card falls back if absent.
+      subject: z.string().optional(),
+    })
+    .optional(),
+});
+
+export type AddonEvent = z.infer<typeof addonEventSchema>;
 
 /** The origin (scheme + host) this request arrived on — the add-on's base URL. */
 export function requestBaseUrl(c: Context<Env>): string {
@@ -76,13 +100,20 @@ export function extractMessageContext(event: AddonEvent): {
   return { subject, permalink };
 }
 
-/** Parse the POSTed event body, tolerating an empty/invalid body. */
+/**
+ * Parse and validate the POSTed event body against `addonEventSchema`. A
+ * missing, non-JSON, or schema-mismatched body yields an empty event, so
+ * handlers fall back to their empty-state card instead of trusting raw input.
+ */
 export async function readAddonEvent(c: Context<Env>): Promise<AddonEvent> {
+  let raw: unknown;
   try {
-    return (await c.req.json()) as AddonEvent;
+    raw = await c.req.json();
   } catch {
     return {};
   }
+  const parsed = addonEventSchema.safeParse(raw);
+  return parsed.success ? parsed.data : {};
 }
 
 /**

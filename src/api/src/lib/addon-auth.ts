@@ -134,8 +134,11 @@ export async function resolveNylonUser(
     return { status: "linked", userId: existing.clerkUserId };
   }
 
-  // 2. Email fast-path. Only attempt when Google asserts a verified email.
-  if (email && claims.email_verified !== false) {
+  // 2. Email fast-path. Only attempt when Google explicitly asserts a verified
+  // email — absence is not trust, since this gates binding a Gmail identity to
+  // an existing Nylon account. An unverified/absent claim falls through to the
+  // connect card.
+  if (email && claims.email_verified === true) {
     const clerkUserId = await findClerkUserByGoogleIdentity(
       env,
       googleSub,

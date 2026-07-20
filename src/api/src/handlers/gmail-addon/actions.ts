@@ -8,6 +8,7 @@ import type { Env } from "../../types";
 import {
   cardResponse,
   connectResponse,
+  MAX_ADDON_TODO_TEXT,
   readAddonEvent,
   readFormInput,
   readParameter,
@@ -61,6 +62,9 @@ export async function gmailAddonQuickAdd(c: Context<Env>) {
   if (!text) {
     return refreshedHomepage(c, resolved.userId, "Type a todo first");
   }
+  if (text.length > MAX_ADDON_TODO_TEXT) {
+    return refreshedHomepage(c, resolved.userId, "That todo is too long");
+  }
 
   await createSmartTodo(db, c.env, resolved.userId, text, {
     aiEnabled: await loadAiEnabled(db, resolved.userId),
@@ -85,6 +89,9 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
   const text = readFormInput(event, QUICK_ADD_INPUT);
   if (!text) {
     return refreshedHomepage(c, resolved.userId, "Add a title first");
+  }
+  if (text.length > MAX_ADDON_TODO_TEXT) {
+    return refreshedHomepage(c, resolved.userId, "That todo is too long");
   }
   const permalink = readParameter(event, "permalink");
 
