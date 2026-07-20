@@ -686,6 +686,36 @@ struct SyncServiceTests {
         #expect(todo.pendingEnrich == true)
     }
 
+    @Test("Leaves the pending research flag set when the research call fails transiently")
+    @MainActor
+    func retainsPendingResearchOnFailure() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        api.reresearchError = APIError.networkError(
+            URLError(.notConnectedToInternet),
+            url: "https://api.example.com/todos/x/research"
+        )
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Best cameras 2026", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        todo.pendingResearch = true
+        context.insert(todo)
+        try context.save()
+
+        api.syncResponse = echoResponse(for: todo)
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        // Attempted, but the flag stays set so the next sync retries it.
+        #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
+        #expect(todo.pendingResearch == true)
+    }
+
     @Test("Gives up the pending enrich on a permanent (non-transient) failure")
     @MainActor
     func clearsPendingEnrichOnPermanentFailure() async throws {
