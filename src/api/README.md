@@ -30,6 +30,9 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 | `POST` | `/todos/sync` | Sync todos (bulk create/update/delete) | Yes |
 | `PUT` | `/todos/:id` | Update todo | Yes |
 | `DELETE` | `/todos/:id` | Delete todo | Yes |
+| `POST` | `/gmail-addon/homepage` | Gmail add-on homepage card | Google ID token |
+| `POST` | `/gmail-addon/contextual` | Gmail add-on message card | Google ID token |
+| `POST` | `/gmail-addon/actions/*` | Gmail add-on card actions | Google ID token |
 
 ### Sync Protocol
 
@@ -48,6 +51,26 @@ Clients connect to `/ws?token=<jwt>` for real-time notifications. The Durable Ob
 - Broadcasts `{"type": "sync"}` to all connections when a client sends `{"type": "changed"}`
 - Excludes the sender from the broadcast
 - Handles reconnection gracefully
+
+### Gmail / Workspace add-on
+
+The `/gmail-addon/*` routes back a Google Workspace Add-on that lives in Gmail's
+side panel (quick-add, list open todos, add-from-message). They are **not**
+wrapped in the Clerk `authMiddleware`; instead a Google-signed ID token is the
+credential, verified by `verifyGoogleIdToken` (`src/lib/addon-auth.ts`) against
+Google's JWKS with an `aud`/`iss` check — the same "signature is the auth"
+pattern as the Clerk webhook route.
+
+Card actions reuse the exact REST code paths (`createSmartTodo`,
+`listOpenTodos`, `setTodoCompleted`), so AI/URL handling, positioning, and
+`notifySync` stay identical to the web/iOS surfaces. A verified Google identity
+is mapped to a Nylon Clerk user by `resolveNylonUser` (existing link →
+email auto-link → "Connect Nylon" card). Requesting only current-message
+**metadata** scope keeps message bodies out of reach.
+
+Configure `GMAIL_ADDON_AUDIENCE` and `WEB_BASE_URL` (vars) plus the
+`GMAIL_ADDON_STATE_SECRET` secret. The full Google Cloud runbook and the
+deployment manifest live in [`src/gmail-addon/`](../gmail-addon/README.md).
 
 ## Getting Started
 
@@ -112,16 +135,22 @@ src/api/
 │   │   ├── todos.ts              # CRUD endpoint handlers
 │   │   ├── sync.ts               # Sync endpoint with conflict resolution
 │   │   ├── users.ts              # Current-user endpoints
-│   │   ├── smart-create.ts       # Create todo and trigger background AI enrichment
+│   │   ├── smart-create.ts       # Thin wrapper over createSmartTodo (background AI enrichment)
 │   │   ├── reresearch.ts         # Manually re-run research for a todo
-│   │   └── cancel-research.ts    # Cancel an in-flight research job
+│   │   ├── cancel-research.ts    # Cancel an in-flight research job
+│   │   └── gmail-addon/          # Gmail add-on card handlers (homepage, contextual, actions)
 │   ├── lib/
 │   │   ├── ai.ts                 # enrichTodo classifier + tool schema
 │   │   ├── ai-enrich.ts          # Background enrichment orchestration (DB writes, queue dispatch)
 │   │   ├── research.ts           # Tavily search + summarization for research-typed todos
 │   │   ├── auth.ts               # Clerk JWT verification middleware
+│   │   ├── addon-auth.ts         # Google ID-token verification + resolveNylonUser (Gmail add-on)
+│   │   ├── addon-cards.ts        # Pure JSON card builders + response envelopes
+│   │   ├── create-todo.ts        # Shared smart-create core (REST + add-on)
+│   │   ├── todos-core.ts         # Shared listOpenTodos + setTodoCompleted
 │   │   ├── db.ts                 # Drizzle schema and database client
 │   │   ├── errors.ts             # Shared error types
+│   │   ├── notify-sync.ts        # Poke the sync Durable Object after writes
 │   │   ├── url-helpers.ts        # URL parsing / title-truncation utilities
 │   │   └── url-metadata.ts       # OG metadata fetching for extracted URLs
 │   └── durable-objects/
