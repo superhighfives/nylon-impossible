@@ -1,3 +1,10 @@
+---
+title: Rich Todos
+status: Complete
+created: 2026-03-02
+updated: 2026-03-02
+---
+
 # Rich Todos
 
 **Date**: 2026-03-02

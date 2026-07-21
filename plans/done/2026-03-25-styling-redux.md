@@ -1,3 +1,10 @@
+---
+title: Styling Redux – 2026-03-25
+status: Complete
+created: 2026-03-25
+updated: 2026-03-25
+---
+
 # Styling Redux – 2026-03-25
 
 ## iOS

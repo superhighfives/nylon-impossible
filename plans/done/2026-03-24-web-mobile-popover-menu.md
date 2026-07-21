@@ -1,3 +1,10 @@
+---
+title: Web Mobile Popover Menu
+status: Complete
+created: 2026-03-24
+updated: 2026-03-24
+---
+
 # Web Mobile Popover Menu
 
 **Date:** 2026-03-24

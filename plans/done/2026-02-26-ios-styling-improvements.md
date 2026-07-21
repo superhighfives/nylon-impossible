@@ -1,3 +1,10 @@
+---
+title: iOS Styling Improvements
+status: Complete
+created: 2026-02-26
+updated: 2026-02-26
+---
+
 # iOS Styling Improvements
 
 **Date**: 2026-02-26

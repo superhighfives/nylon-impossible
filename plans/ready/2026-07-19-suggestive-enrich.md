@@ -1,3 +1,10 @@
+---
+title: Suggestive Enrich
+status: Ready
+created: 2026-07-19
+updated: 2026-07-19
+---
+
 # Suggestive Enrich
 
 **Date**: 2026-07-19

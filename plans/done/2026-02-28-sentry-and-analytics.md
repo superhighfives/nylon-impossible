@@ -1,3 +1,10 @@
+---
+title: Sentry and Analytics
+status: Complete
+created: 2026-02-28
+updated: 2026-02-28
+---
+
 # Sentry and Analytics
 
 **Date:** 2026-02-28

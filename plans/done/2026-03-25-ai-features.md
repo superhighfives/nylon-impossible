@@ -1,3 +1,10 @@
+---
+title: AI Features
+status: Complete
+created: 2026-03-25
+updated: 2026-03-25
+---
+
 # AI Features
 
 **Date:** 2026-03-25

@@ -1,3 +1,10 @@
+---
+title: Admin Interface
+status: Complete
+created: 2026-06-22
+updated: 2026-06-22
+---
+
 # Admin Interface
 
 **Date:** 2026-06-22

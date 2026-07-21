@@ -1,3 +1,10 @@
+---
+title: Siri Integration Fix
+status: Complete
+created: 2026-03-09
+updated: 2026-03-09
+---
+
 # Siri Integration Fix
 
 Adding items to Nylon via Siri wasn't working despite the share sheet working correctly.

@@ -1,3 +1,10 @@
+---
+title: Per-Todo Agents (Flue Framework)
+status: Backlog
+created: 2026-07-17
+updated: 2026-07-17
+---
+
 # Per-Todo Agents (Flue Framework)
 
 **Date**: 2026-07-17

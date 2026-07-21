@@ -1,3 +1,10 @@
+---
+title: Smart create URL handling and test coverage
+status: Complete
+created: 2026-03-16
+updated: 2026-03-16
+---
+
 # Smart create URL handling and test coverage
 
 **Date**: 2026-03-16

@@ -1,7 +1,9 @@
 ---
-status: not-started
-phase: 1
+title: Kumo to Radix Migration Plan
+status: Complete
+created: 2026-03-05
 updated: 2026-03-05
+phase: 1
 ---
 
 # Kumo to Radix Migration Plan

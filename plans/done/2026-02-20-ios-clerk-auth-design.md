@@ -1,3 +1,10 @@
+---
+title: iOS Clerk authentication and data sync
+status: Complete
+created: 2026-02-20
+updated: 2026-02-20
+---
+
 # iOS Clerk authentication and data sync
 
 **Date**: 2026-02-20

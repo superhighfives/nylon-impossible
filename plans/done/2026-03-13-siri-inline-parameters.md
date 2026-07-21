@@ -1,3 +1,10 @@
+---
+title: Siri Inline Parameters
+status: Complete
+created: 2026-03-13
+updated: 2026-03-13
+---
+
 # Siri Inline Parameters
 
 Enable users to say "Add buy milk to Nylon" instead of the two-step flow where Siri asks "What would you like to add?"

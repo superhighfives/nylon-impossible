@@ -1,3 +1,10 @@
+---
+title: Conversational Todo Refinement
+status: Complete
+created: 2026-06-04
+updated: 2026-06-04
+---
+
 # Conversational Todo Refinement
 
 **Date**: 2026-06-04

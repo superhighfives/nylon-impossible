@@ -1,3 +1,10 @@
+---
+title: Research Agent for Todos
+status: Complete
+created: 2026-03-13
+updated: 2026-03-13
+---
+
 # Research Agent for Todos
 
 **Date:** 2026-03-13  

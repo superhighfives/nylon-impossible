@@ -1,3 +1,10 @@
+---
+title: Web Styling Overhaul
+status: Complete
+created: 2026-03-16
+updated: 2026-03-16
+---
+
 # Web Styling Overhaul
 
 **Date:** 2026-03-16
