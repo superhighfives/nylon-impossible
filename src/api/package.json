@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --persist-to ../../.wrangler/state",
+    "dev": "set -a; [ -f .env ] && . ./.env; set +a; wrangler dev --persist-to ../../.wrangler/state",
     "deploy": "wrangler deploy",
     "test": "node scripts/test.mjs",
     "typecheck": "tsc --noEmit",
