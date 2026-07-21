@@ -1,3 +1,10 @@
+---
+title: iOS 26 Location Modernisation
+status: Complete
+created: 2026-03-28
+updated: 2026-03-28
+---
+
 # iOS 26 Location Modernisation
 
 **Date:** 2026-03-28

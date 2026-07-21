@@ -1,3 +1,10 @@
+---
+title: AI-Powered Todo Extraction
+status: Complete
+created: 2026-02-10
+updated: 2026-02-10
+---
+
 # AI-Powered Todo Extraction
 
 **Date**: 2026-02-10

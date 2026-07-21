@@ -1,3 +1,10 @@
+---
+title: "Plan: Fix iOS URL Title Causing 400 Server Error"
+status: Complete
+created: 2026-03-18
+updated: 2026-03-18
+---
+
 # Plan: Fix iOS URL Title Causing 400 Server Error
 
 ## Problem

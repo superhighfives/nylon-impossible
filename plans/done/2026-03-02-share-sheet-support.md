@@ -1,3 +1,10 @@
+---
+title: iOS Share Sheet Support
+status: Complete
+created: 2026-03-02
+updated: 2026-03-02
+---
+
 # iOS Share Sheet Support
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.

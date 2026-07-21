@@ -1,3 +1,10 @@
+---
+title: Linting & Typechecking
+status: Complete
+created: 2026-02-26
+updated: 2026-02-26
+---
+
 # Linting & Typechecking
 
 **Date**: 2026-02-26

@@ -1,3 +1,10 @@
+---
+title: Wire Preview Deployments to Use Preview API + Consolidate CI
+status: Complete
+created: 2026-02-27
+updated: 2026-02-27
+---
+
 # Wire Preview Deployments to Use Preview API + Consolidate CI
 
 **Date**: 2026-02-27

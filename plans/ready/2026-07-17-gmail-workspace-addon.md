@@ -1,3 +1,10 @@
+---
+title: Gmail / Workspace Side-Panel Add-on
+status: Ready
+created: 2026-07-17
+updated: 2026-07-17
+---
+
 # Gmail / Workspace Side-Panel Add-on
 
 **Date**: 2026-07-17

@@ -1,3 +1,10 @@
+---
+title: Logo as Favicon, App Icons, and README Branding
+status: Complete
+created: 2026-02-27
+updated: 2026-02-27
+---
+
 # Logo as Favicon, App Icons, and README Branding
 
 **Date**: 2026-02-27

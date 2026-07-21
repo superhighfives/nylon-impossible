@@ -1,3 +1,10 @@
+---
+title: Pre-launch Web Polish
+status: Complete
+created: 2026-07-17
+updated: 2026-07-17
+---
+
 # Pre-launch Web Polish
 
 **Date**: 2026-07-17

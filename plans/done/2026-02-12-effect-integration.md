@@ -1,3 +1,10 @@
+---
+title: Effect Integration
+status: Complete
+created: 2026-02-12
+updated: 2026-02-12
+---
+
 # Effect Integration
 
 **Date**: 2026-02-12

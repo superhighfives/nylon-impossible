@@ -1,3 +1,10 @@
+---
+title: Optimistic UI Parity
+status: Complete
+created: 2026-03-18
+updated: 2026-03-18
+---
+
 # Optimistic UI Parity
 
 **Date:** 2026-03-18

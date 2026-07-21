@@ -1,3 +1,10 @@
+---
+title: Add Durable Objects + WebSocket for Real-Time Sync
+status: Complete
+created: 2026-02-25
+updated: 2026-02-25
+---
+
 # Add Durable Objects + WebSocket for Real-Time Sync
 
 **Date**: 2026-02-25

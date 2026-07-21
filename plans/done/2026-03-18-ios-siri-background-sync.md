@@ -1,3 +1,10 @@
+---
+title: iOS Siri Background Sync
+status: Complete
+created: 2026-03-18
+updated: 2026-03-18
+---
+
 # iOS Siri Background Sync
 
 **Date:** 2026-03-18

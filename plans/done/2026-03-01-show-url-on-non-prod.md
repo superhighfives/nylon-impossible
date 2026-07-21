@@ -1,3 +1,10 @@
+---
+title: Show Current URL and API URL on Non-Production Environments
+status: Complete
+created: 2026-03-01
+updated: 2026-03-01
+---
+
 # Show Current URL and API URL on Non-Production Environments
 
 **Date**: 2026-03-01

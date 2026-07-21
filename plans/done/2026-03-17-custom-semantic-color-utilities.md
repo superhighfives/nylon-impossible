@@ -1,3 +1,10 @@
+---
+title: Custom Semantic Color Utilities
+status: Complete
+created: 2026-03-17
+updated: 2026-03-17
+---
+
 # Custom Semantic Color Utilities
 
 **Date:** 2026-03-17

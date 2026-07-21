@@ -1,3 +1,10 @@
+---
+title: Centralise AI in the API with Smart Todo Input
+status: Complete
+created: 2026-02-26
+updated: 2026-02-26
+---
+
 # Centralise AI in the API with Smart Todo Input
 
 **Date**: 2026-02-26

@@ -1,3 +1,10 @@
+---
+title: iOS Share Todo
+status: Complete
+created: 2026-03-20
+updated: 2026-03-20
+---
+
 # iOS Share Todo
 
 **Date:** 2026-03-20

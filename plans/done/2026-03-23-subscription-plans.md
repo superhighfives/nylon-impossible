@@ -1,3 +1,10 @@
+---
+title: Subscription Plans (Free + Pro)
+status: Complete
+created: 2026-03-23
+updated: 2026-03-23
+---
+
 # Subscription Plans (Free + Pro)
 
 **Date:** 2026-03-23
