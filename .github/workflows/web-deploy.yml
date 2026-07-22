@@ -102,6 +102,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+  # Regenerate marketing screenshots after a production deploy. Skipped on PRs
+  # because deploy-production only runs on push/workflow_dispatch, and a job
+  # that `needs` a skipped job is skipped too. Runs on its own macos-26 runner.
+  screenshots:
+    needs: [deploy-production]
+    uses: ./.github/workflows/marketing.yml
+    secrets: inherit
+
   deploy-preview:
     needs: [test]
     if: >-
