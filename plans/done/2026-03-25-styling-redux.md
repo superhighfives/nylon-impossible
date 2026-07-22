@@ -5,8 +5,6 @@ created: 2026-03-25
 updated: 2026-03-25
 ---
 
-# Styling Redux – 2026-03-25
-
 ## iOS
 
 - [x] Fix bug where wide URLs push the button out of the frame

@@ -5,10 +5,6 @@ created: 2026-07-03
 updated: 2026-07-03
 ---
 
-# iOS launch parity: Google Tasks import, account deletion, legal links
-
-**Date**: 2026-07-03
-**Status**: Complete
 **Updated**: 2026-07-17
 
 ## Problem

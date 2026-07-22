@@ -5,11 +5,6 @@ created: 2026-03-02
 updated: 2026-03-02
 ---
 
-# Rich Todos
-
-**Date**: 2026-03-02
-**Status**: Complete
-
 ## Overview
 
 Expanded the todo schema to support description, URLs with metadata, due dates, priority, and lists. Added AI extraction for URLs and relative dates from natural language input. Implemented inline expansion UI on web and full edit sheet on iOS.

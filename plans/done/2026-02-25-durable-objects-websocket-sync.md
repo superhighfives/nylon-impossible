@@ -5,11 +5,6 @@ created: 2026-02-25
 updated: 2026-02-25
 ---
 
-# Add Durable Objects + WebSocket for Real-Time Sync
-
-**Date**: 2026-02-25
-**Status**: Complete
-
 ## Context
 
 Currently, real-time sync uses polling: web polls every 3s via React Query `refetchInterval`, iOS polls every 5s via `SyncService.startPolling()`. This introduces latency for cross-device updates and generates unnecessary API calls when nothing has changed. We're replacing polling entirely with WebSocket push via Cloudflare Durable Objects.

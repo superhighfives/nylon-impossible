@@ -5,10 +5,6 @@ created: 2026-03-18
 updated: 2026-03-18
 ---
 
-# Optimistic UI Parity
-
-**Date:** 2026-03-18
-**Status:** Complete
 **Completed:** 2026-03-26
 **PR:** #93
 **Last refined:** 2026-03-21 — plan-only corrections to address PR #45 Copilot review: added inverse SwiftData relationship to `TodoUrl`, updated `APITodoUrl(from:)` init signature to pass `todoId` explicitly, fixed `TodoEditSheet.swift` table entry (param type unchanged). No source files modified.

@@ -5,11 +5,6 @@ created: 2026-02-26
 updated: 2026-02-26
 ---
 
-# Centralise AI in the API with Smart Todo Input
-
-**Date**: 2026-02-26
-**Status**: Complete
-
 ## Context
 
 AI-powered todo extraction currently lives in the web app (`src/web/src/server/ai.ts`) as a TanStack server function. It uses the OpenAI SDK pointed at Cloudflare AI Gateway, with secrets (`CF_ACCOUNT_ID`, `CF_API_TOKEN`, `AI_GATEWAY_NAME`) stored on the web worker. There's a separate "Extract with AI" button and a multi-step preview flow — users have to explicitly choose between "Add" (single todo) and "Extract with AI" (multiple), then confirm extracted items before creation.

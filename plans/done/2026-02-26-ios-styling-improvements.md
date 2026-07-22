@@ -5,11 +5,6 @@ created: 2026-02-26
 updated: 2026-02-26
 ---
 
-# iOS Styling Improvements
-
-**Date**: 2026-02-26
-**Status**: Complete
-
 ## Context
 
 The iOS app is functional but its styling needs polish. The current UI uses always-active edit mode (showing system reorder handles permanently), has no due date display, and uses a somewhat basic card design. This plan addresses visual refinements to bring the iOS app closer to the quality of the web version while keeping things idiomatically SwiftUI.

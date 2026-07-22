@@ -5,11 +5,6 @@ created: 2026-07-19
 updated: 2026-07-19
 ---
 
-# Suggestive Enrich
-
-**Date**: 2026-07-19
-**Status**: Ready
-
 ## Problem
 
 Today enrichment is "automagical": when a user opts a todo into AI enrichment,

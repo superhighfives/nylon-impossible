@@ -5,10 +5,6 @@ created: 2026-06-22
 updated: 2026-06-22
 ---
 
-# Admin Interface
-
-**Date:** 2026-06-22
-**Status:** Complete
 **Updated:** 2026-07-17
 **Scope:** Standalone admin app + admin API endpoints + bundled self-serve account deletion
 

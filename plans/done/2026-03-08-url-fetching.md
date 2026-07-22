@@ -5,8 +5,6 @@ created: 2026-03-08
 updated: 2026-03-08
 ---
 
-# URL Fetching
-
 URL fetching has two issues: no optimistic UI while fetching, and fetching doesn't work on web (only iOS).
 
 ## Problem

@@ -5,8 +5,6 @@ created: 2026-03-18
 updated: 2026-03-18
 ---
 
-# Plan: Fix iOS URL Title Causing 400 Server Error
-
 ## Problem
 
 When a user shares a URL from Safari (or another app) to Nylon Impossible via the iOS Share Extension, the app sets the task title to `"Check: <full URL>"`. For long URLs (e.g. Google Search result URLs), this title easily exceeds 500 characters.

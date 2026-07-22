@@ -5,10 +5,6 @@ created: 2026-03-23
 updated: 2026-03-23
 ---
 
-# Subscription Plans (Free + Pro)
-
-**Date:** 2026-03-23
-**Status:** Complete
 **Scope:** API + Shared Schema + Web UI
 
 ## Overview

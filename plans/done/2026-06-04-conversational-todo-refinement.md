@@ -5,10 +5,6 @@ created: 2026-06-04
 updated: 2026-06-04
 ---
 
-# Conversational Todo Refinement
-
-**Date**: 2026-06-04
-**Status**: Done
 **Scope**: API + Web + iOS
 
 ## Phase 0 outcome (2026-06-05): Fall back — do NOT adopt Flue

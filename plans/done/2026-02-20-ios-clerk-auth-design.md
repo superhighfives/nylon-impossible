@@ -5,11 +5,6 @@ created: 2026-02-20
 updated: 2026-02-20
 ---
 
-# iOS Clerk authentication and data sync
-
-**Date**: 2026-02-20
-**Status**: Complete
-
 Add Clerk authentication to the iOS app and sync todos between web and iOS via a shared D1 database.
 
 ## Goals

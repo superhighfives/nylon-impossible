@@ -5,10 +5,6 @@ created: 2026-02-27
 updated: 2026-02-27
 ---
 
-# Security Hardening
-
-**Date**: 2026-02-27
-**Status**: Complete
 **Scope**: API + Web + iOS
 
 ## Overview

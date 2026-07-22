@@ -5,8 +5,6 @@ created: 2026-03-13
 updated: 2026-03-13
 ---
 
-# URL Fetching Optimistic UI
-
 Show compact URL cards in the main todo list view with loading states while metadata is being fetched.
 
 ## Result
