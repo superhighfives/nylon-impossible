@@ -48,7 +48,12 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
-    "CF_AI_GATEWAY_ID": "nylon-impossible"
+    "CF_AI_GATEWAY_ID": "nylon-impossible",
+    // Target audience for the Gmail add-on's Google-signed ID tokens (the
+    // add-on endpoint URL registered in Google Cloud). Public, not a secret.
+    // GMAIL_ADDON_STATE_SECRET is a secret — set via `wrangler secret put`.
+    "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon",
+    "WEB_BASE_URL": "https://www.nylonimpossible.com"
   },
   "observability": {
     "enabled": true

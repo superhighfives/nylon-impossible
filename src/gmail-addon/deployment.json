@@ -1,0 +1,26 @@
+{
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.metadata"
+  ],
+  "addOns": {
+    "common": {
+      "name": "Nylon",
+      "logoUrl": "https://www.nylonimpossible.com/logo192.png",
+      "homepageTrigger": {
+        "runFunction": "https://api.nylonimpossible.com/gmail-addon/homepage"
+      }
+    },
+    "gmail": {
+      "homepageTrigger": {
+        "runFunction": "https://api.nylonimpossible.com/gmail-addon/homepage"
+      },
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "https://api.nylonimpossible.com/gmail-addon/contextual"
+        }
+      ]
+    }
+  }
+}

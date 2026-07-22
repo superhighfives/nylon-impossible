@@ -120,6 +120,28 @@ export const todos = sqliteTable(
   ],
 );
 
+// Links a Google identity (from the Gmail side-panel add-on) to a Nylon Clerk
+// user. The add-on runs as a Google identity; card actions need the matching
+// Clerk `userId` to reuse the same create/list/update code paths as the REST
+// API. Keyed on the Google `sub` (stable per-user), with the verified email
+// kept for the auto-link fast path and for support/debugging.
+export const gmailAddonLinks = sqliteTable(
+  "gmail_addon_links",
+  {
+    googleSub: text("google_sub").primaryKey(),
+    clerkUserId: text("clerk_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+  },
+  (table) => [
+    index("idx_gmail_addon_links_clerk_user").on(table.clerkUserId),
+  ],
+);
+
 // Conversation thread on a todo. Append-only and immutable except for
 // awaitingReply, which clears (to false) when the user replies or dismisses.
 export const todoMessages = sqliteTable(
@@ -359,3 +381,5 @@ export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
 export type TodoMessage = typeof todoMessages.$inferSelect;
 export type NewTodoMessage = typeof todoMessages.$inferInsert;
+export type GmailAddonLink = typeof gmailAddonLinks.$inferSelect;
+export type NewGmailAddonLink = typeof gmailAddonLinks.$inferInsert;

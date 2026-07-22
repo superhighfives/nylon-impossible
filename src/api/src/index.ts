@@ -11,6 +11,13 @@ import {
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
 import { enrichTodo } from "./handlers/enrich";
+import {
+  gmailAddonAddFromMessage,
+  gmailAddonQuickAdd,
+  gmailAddonToggle,
+} from "./handlers/gmail-addon/actions";
+import { gmailAddonContextual } from "./handlers/gmail-addon/contextual";
+import { gmailAddonHomepage } from "./handlers/gmail-addon/homepage";
 import { importGoogleTasks } from "./handlers/import-google-tasks";
 import { replyToTodo } from "./handlers/reply";
 import { reresearchTodo } from "./handlers/reresearch";
@@ -25,6 +32,7 @@ import {
 } from "./handlers/todos";
 import { deleteMe, getMe, updateMe } from "./handlers/users";
 import { clerkWebhook } from "./handlers/webhooks";
+import { verifyGoogleIdToken } from "./lib/addon-auth";
 import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
@@ -87,6 +95,16 @@ app.use("/admin/*", authMiddleware, requireAdmin);
 
 // Clerk webhooks (Svix signature is the auth — NOT wrapped in authMiddleware)
 app.post("/webhooks/clerk", clerkWebhook);
+
+// Gmail add-on: Google-signed ID token is the auth (like the Clerk webhook,
+// deliberately NOT wrapped in authMiddleware). Google's calls are
+// server-to-server, so CORS/ALLOWED_ORIGINS doesn't apply.
+app.use("/gmail-addon/*", verifyGoogleIdToken);
+app.post("/gmail-addon/homepage", gmailAddonHomepage);
+app.post("/gmail-addon/contextual", gmailAddonContextual);
+app.post("/gmail-addon/actions/quick-add", gmailAddonQuickAdd);
+app.post("/gmail-addon/actions/add-from-message", gmailAddonAddFromMessage);
+app.post("/gmail-addon/actions/toggle", gmailAddonToggle);
 
 // Todo routes
 app.post("/todos/smart", smartCreate);
