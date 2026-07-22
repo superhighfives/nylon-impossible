@@ -5,11 +5,6 @@ created: 2026-02-26
 updated: 2026-02-26
 ---
 
-# Linting & Typechecking
-
-**Date**: 2026-02-26
-**Status**: Complete
-
 ## Context
 
 The monorepo had inconsistent linting and typechecking across its three projects. Web had Biome configured but errors weren't enforced in CI. API had no linter. iOS had no SwiftLint. Typechecking existed for web and API but wasn't run in CI.

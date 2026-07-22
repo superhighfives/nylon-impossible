@@ -5,11 +5,6 @@ created: 2026-02-10
 updated: 2026-02-10
 ---
 
-# AI-Powered Todo Extraction
-
-**Date**: 2026-02-10
-**Status**: Complete
-
 ## Overview
 
 Extract todos from natural language text using Workers AI with tool calling, routed through AI Gateway for observability and caching.

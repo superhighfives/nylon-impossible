@@ -6,8 +6,6 @@ updated: 2026-03-05
 phase: 1
 ---
 
-# Kumo to Radix Migration Plan
-
 ## Goal
 Replace `@cloudflare/kumo` with Radix Themes for UI components and `tailwindcss-radix-colors` for Tailwind color utilities.
 

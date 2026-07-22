@@ -5,11 +5,6 @@ created: 2026-03-16
 updated: 2026-03-16
 ---
 
-# Smart create URL handling and test coverage
-
-**Date**: 2026-03-16
-**Status**: Done
-
 ## Problem
 
 When a long URL (>500 characters) is shared to the iOS app, the user gets a 400 error with no clear feedback. This happens because:

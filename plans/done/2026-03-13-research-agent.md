@@ -5,11 +5,7 @@ created: 2026-03-13
 updated: 2026-03-13
 ---
 
-# Research Agent for Todos
-
-**Date:** 2026-03-13  
 **Updated:** 2026-03-27  
-**Status:** Complete  
 **Scope:** API + Web (iOS out of scope for this plan)
 
 ## Overview

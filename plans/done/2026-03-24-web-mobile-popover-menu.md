@@ -5,11 +5,6 @@ created: 2026-03-24
 updated: 2026-03-24
 ---
 
-# Web Mobile Popover Menu
-
-**Date:** 2026-03-24
-**Status:** Complete
-
 ## Problem
 
 On web, each todo row shows Edit and Delete buttons. On desktop these are hidden until hover (`sm:opacity-0 sm:group-hover:opacity-100`), so they don't clutter the list. On mobile there is no hover state, which means the buttons are always visible on every row — taking up horizontal space and competing visually with the todo title.

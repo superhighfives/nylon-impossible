@@ -5,8 +5,6 @@ created: 2026-03-02
 updated: 2026-03-02
 ---
 
-# Siri Integration
-
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add Siri support to Nylon so users can create tasks using voice commands like "Hey Siri, tell Nylon to remind me to get dog food" or "Hey Siri, add 'feed cat' to Nylon".

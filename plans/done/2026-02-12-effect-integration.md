@@ -5,11 +5,6 @@ created: 2026-02-12
 updated: 2026-02-12
 ---
 
-# Effect Integration
-
-**Date**: 2026-02-12
-**Status**: Complete
-
 ## Overview
 
 Adopted the [Effect](https://effect.website) library for type-safe error handling, dependency injection, and composable server function patterns in the web app.

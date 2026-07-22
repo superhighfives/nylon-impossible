@@ -5,11 +5,6 @@ created: 2026-02-27
 updated: 2026-02-27
 ---
 
-# Logo as Favicon, App Icons, and README Branding
-
-**Date**: 2026-02-27
-**Status**: Complete
-
 ## Context
 
 The project uses placeholder TanStack branding (favicon, PWA icons, manifest names). The iOS app icon is also a placeholder. The source logo SVG exists at `plans/assets/logo.svg` — a 240x240 pixel-art style logo with yellow (#F7D71C) paths on a transparent background. This plan adds proper branding across web, iOS, and the README.

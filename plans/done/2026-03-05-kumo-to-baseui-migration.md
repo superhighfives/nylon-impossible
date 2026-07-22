@@ -6,8 +6,6 @@ updated: 2026-03-05
 phase: 1
 ---
 
-# Kumo to Base UI + Radix Colors Migration Plan
-
 ## Goal
 
 Replace `@cloudflare/kumo` with `@base-ui/react` (unstyled components) and `tailwindcss-radix-colors` for a fully customizable UI with fresh design.

@@ -5,11 +5,6 @@ created: 2026-07-17
 updated: 2026-07-17
 ---
 
-# Per-Todo Agents (Flue Framework)
-
-**Date**: 2026-07-17
-**Status**: Backlog
-
 ## Problem / Opportunity
 
 A todo is often the tip of something larger — "book the DMV visit", "compare the

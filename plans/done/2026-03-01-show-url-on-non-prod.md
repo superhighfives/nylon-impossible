@@ -5,11 +5,6 @@ created: 2026-03-01
 updated: 2026-03-01
 ---
 
-# Show Current URL and API URL on Non-Production Environments
-
-**Date**: 2026-03-01
-**Status**: Complete
-
 ## Overview
 
 Added a dev-only environment indicator to both the web app and iOS app, showing the active API URL (and current page URL on web) so it's always clear which environment you're connected to during development and testing.

@@ -5,11 +5,6 @@ created: 2026-02-28
 updated: 2026-02-28
 ---
 
-# AI Tool Calling
-
-**Date**: 2026-02-28
-**Status**: Complete
-
 ## Overview
 
 Implemented AI-powered smart task creation that extracts structured todos from natural language input. The system uses Workers AI with tool calling to parse user input and create one or more todos automatically.

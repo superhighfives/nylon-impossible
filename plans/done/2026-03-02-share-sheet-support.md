@@ -5,8 +5,6 @@ created: 2026-03-02
 updated: 2026-03-02
 ---
 
-# iOS Share Sheet Support
-
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Add support for the iOS share sheet so users can send URLs and content from other apps (Safari, Twitter, etc.) directly to Nylon as tasks.

@@ -5,11 +5,6 @@ created: 2026-03-21
 updated: 2026-03-21
 ---
 
-# Repeating Todos
-
-**Date:** 2026-03-21
-**Status:** Ready
-
 ## Problem
 
 Todos cannot currently repeat. Users who have recurring tasks (weekly reviews, monthly bill payments, daily habits) must manually recreate the same todo each time, which is tedious and easy to forget.

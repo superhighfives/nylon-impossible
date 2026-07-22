@@ -5,10 +5,6 @@ created: 2026-03-18
 updated: 2026-03-18
 ---
 
-# iOS Siri Background Sync
-
-**Date:** 2026-03-18
-**Status:** Complete
 **Completed:** 2026-03-26
 **PR:** #92
 **Scope:** iOS

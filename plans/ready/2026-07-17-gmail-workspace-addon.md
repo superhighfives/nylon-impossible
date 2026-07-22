@@ -5,11 +5,6 @@ created: 2026-07-17
 updated: 2026-07-17
 ---
 
-# Gmail / Workspace Side-Panel Add-on
-
-**Date**: 2026-07-17
-**Status**: Ready
-
 ## Problem
 
 A lot of todos are born inside email — "reply to this", "book the thing they

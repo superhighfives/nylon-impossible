@@ -5,11 +5,6 @@ created: 2026-03-20
 updated: 2026-03-20
 ---
 
-# iOS Share Todo
-
-**Date:** 2026-03-20
-**Status:** Complete
-
 ## Problem
 
 Users can share URLs *into* Nylon Impossible via the iOS Share Sheet to create todos, but there
