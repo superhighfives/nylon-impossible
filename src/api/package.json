@@ -20,7 +20,7 @@
     "@nylon-impossible/shared": "workspace:*",
     "@sentry/cloudflare": "^10.47.0",
     "drizzle-orm": "^0.45.2",
-    "fractional-indexing": "^3.2.0",
+    "fractional-indexing": "^4.0.0",
     "hono": "^4.12.29",
     "jose": "^6.0.0",
     "zod": "^4.4.3"
