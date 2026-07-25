@@ -1,26 +1,9 @@
-import * as Sentry from "@sentry/cloudflare";
-import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { enrichOrAskWithAI } from "../lib/ai-enrich";
-import {
-  and,
-  eq,
-  getDb,
-  isNull,
-  todoResearch,
-  todos,
-  todoUrls,
-  users,
-} from "../lib/db";
+import { createSmartTodo } from "../lib/create-todo";
+import { getDb } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
-import {
-  cleanUrlString,
-  createFallbackFromUrl,
-  truncateTitle,
-} from "../lib/url-helpers";
-import { fetchUrlMetadata } from "../lib/url-metadata";
-import type { Env, ResearchJobMessage } from "../types";
+import type { Env } from "../types";
 
 const smartCreateSchema = z.object({
   text: z.string().min(1, "Text is required").max(10000, "Text is too long"),
@@ -31,75 +14,8 @@ const smartCreateSchema = z.object({
   research: z.boolean().optional(),
 });
 
-function serializeTodo(todo: typeof todos.$inferSelect) {
-  return {
-    id: todo.id.toLowerCase(),
-    userId: todo.userId,
-    parentId: todo.parentId?.toLowerCase() ?? null,
-    title: todo.title,
-    notes: todo.notes,
-    completed: todo.completed,
-    position: todo.position,
-    dueDate: todo.dueDate?.toISOString() ?? null,
-    priority: todo.priority,
-    recurrence: todo.recurrence,
-    aiStatus: todo.aiStatus,
-    createdAt: todo.createdAt.toISOString(),
-    updatedAt: todo.updatedAt.toISOString(),
-  };
-}
-
-/** URL regex to extract URLs from text */
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
-
-/** Common trailing punctuation that shouldn't be part of URLs */
-const TRAILING_PUNCT = /[.,;:!?)]+$/;
-
-/**
- * Create initial todo data from input text.
- * Handles URL-only input specially by extracting domain for title.
- */
-function createInitialTodo(text: string): {
-  title: string;
-  urls?: string[];
-} {
-  // Check if input is primarily a URL (URL takes up >80% of the text)
-  const urlMatch = text.match(URL_REGEX);
-  if (urlMatch && urlMatch[0].length > text.length * 0.8) {
-    const cleanedUrl = cleanUrlString(urlMatch[0]);
-    const fallback = createFallbackFromUrl(cleanedUrl);
-    if (fallback) {
-      return { title: fallback.title, urls: [fallback.url] };
-    }
-  }
-
-  // Extract any URLs from text
-  const rawMatches = text.match(URL_REGEX) ?? [];
-  const urls = rawMatches
-    .map((url) => {
-      const cleaned = url.replace(TRAILING_PUNCT, "");
-      try {
-        const parsed = new URL(cleaned);
-        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-          return parsed.href;
-        }
-      } catch {
-        // Invalid URL, skip
-      }
-      return null;
-    })
-    .filter((url): url is string => url !== null);
-
-  // Deduplicate URLs
-  const uniqueUrls = Array.from(new Set(urls));
-
-  return {
-    title: truncateTitle(text),
-    urls: uniqueUrls.length > 0 ? uniqueUrls : undefined,
-  };
-}
-
-// POST /todos/smart
+// POST /todos/smart — thin wrapper over the shared createSmartTodo core so the
+// REST endpoint and the Gmail add-on stay on the exact same create path.
 export async function smartCreate(c: Context<Env>) {
   const json = await readJsonBody(c);
   if (!json.ok) return json.response;
@@ -115,203 +31,18 @@ export async function smartCreate(c: Context<Env>) {
     return apiError(c, "text_required");
   }
 
-  const db = getDb(c.env.DB);
-  const userId = c.get("userId");
-  const aiEnabled = c.get("aiEnabled");
-  // AI is intentional: it only runs when the request explicitly asks for it,
-  // and only while the user's `aiEnabled` master switch is on. Plan no longer
-  // gates AI — it's available to anyone with AI turned on.
-  const useAI = parsed.data.enrich === true && aiEnabled;
-  // Explicit research runs independently of the enrichment model's own
-  // detection. When enrich is also requested, let enrichment decide (it can
-  // trigger research itself) so we don't double-run.
-  const doResearch = parsed.data.research === true && aiEnabled && !useAI;
-
-  // Get the lowest top-level position so the new todo is prepended at the start
-  // of the top-level list (subtasks order within their own sibling group, so
-  // exclude them here).
-  const firstTodo = await db
-    .select({ position: todos.position })
-    .from(todos)
-    .where(and(eq(todos.userId, userId), isNull(todos.parentId)))
-    .orderBy(todos.position)
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  const position = generateNKeysBetween(
-    null,
-    firstTodo?.position ?? null,
-    1,
-  )[0];
-  const now = new Date();
-
-  // Create initial todo data
-  const initial = createInitialTodo(text);
-  const todoId = crypto.randomUUID();
-
-  // Insert todo immediately - this is the fast path
-  await db.insert(todos).values({
-    id: todoId,
-    userId,
-    title: initial.title,
-    completed: false,
-    position,
-    aiStatus: useAI ? "pending" : null,
-    createdAt: now,
-    updatedAt: now,
-  });
-
-  // Insert any extracted URLs
-  if (initial.urls && initial.urls.length > 0) {
-    const urlPositions = generateNKeysBetween(null, null, initial.urls.length);
-    await db.insert(todoUrls).values(
-      initial.urls.map((url, i) => ({
-        id: crypto.randomUUID(),
-        todoId,
-        url,
-        position: urlPositions[i],
-        fetchStatus: "pending" as const,
-        createdAt: now,
-        updatedAt: now,
-      })),
-    );
-
-    // Fetch URL metadata in background
-    c.executionCtx.waitUntil(
-      fetchUrlMetadataBackground(db, todoId, c.env, userId),
-    );
-  }
-
-  // If AI is enabled, enrich in background
-  if (useAI) {
-    // Fetch user's location for location research context
-    const user = await db
-      .select({ location: users.location })
-      .from(users)
-      .where(eq(users.id, userId))
-      .then((rows) => rows[0]);
-
-    c.executionCtx.waitUntil(
-      enrichOrAskWithAI(
-        db,
-        c.env.AI,
-        c.env,
-        todoId,
-        userId,
-        text,
-        user?.location,
-      ),
-    );
-  }
-
-  // Explicit research requested at creation (without enrich): create a pending
-  // research record and enqueue it directly, using the todo title as the query.
-  if (doResearch) {
-    const researchId = crypto.randomUUID();
-    await db.insert(todoResearch).values({
-      id: researchId,
-      todoId,
-      researchType: "general",
-      status: "pending",
-      searchQuery: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const user = await db
-      .select({ location: users.location })
-      .from(users)
-      .where(eq(users.id, userId))
-      .then((rows) => rows[0]);
-
-    await c.env.RESEARCH_QUEUE.send({
-      todoId,
-      userId,
-      query: initial.title,
-      researchType: "general",
-      researchId,
-      userLocation: user?.location ?? null,
-    } satisfies ResearchJobMessage);
-  }
-
-  // Fetch the created todo to return
-  const created = await db
-    .select()
-    .from(todos)
-    .where(eq(todos.id, todoId))
-    .then((rows) => rows[0]);
-
-  Sentry.addBreadcrumb({
-    category: "todo",
-    message: "todo.created",
-    data: { method: "smart" },
-    level: "info",
-  });
-
-  await notifySync(c.env, userId);
-
-  return c.json({ todos: [serializeTodo(created)], ai: useAI });
-}
-
-/** Fetch metadata for URLs in background */
-async function fetchUrlMetadataBackground(
-  db: ReturnType<typeof getDb>,
-  todoId: string,
-  env: { USER_SYNC: DurableObjectNamespace },
-  userId: string,
-): Promise<void> {
-  // Get the URL records we just created
-  const urlRecords = await db
-    .select()
-    .from(todoUrls)
-    .where(eq(todoUrls.todoId, todoId));
-
-  await Promise.allSettled(
-    urlRecords.map(async (record) => {
-      try {
-        const metadata = await fetchUrlMetadata(record.url);
-        await db
-          .update(todoUrls)
-          .set({
-            title: metadata.title,
-            description: metadata.description,
-            siteName: metadata.siteName,
-            favicon: metadata.favicon,
-            image: metadata.image,
-            fetchStatus: "fetched" as const,
-            fetchedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(todoUrls.id, record.id));
-      } catch (error) {
-        Sentry.captureException(error, {
-          tags: { area: "url-metadata" },
-        });
-        await db
-          .update(todoUrls)
-          .set({
-            fetchStatus: "failed" as const,
-            updatedAt: new Date(),
-          })
-          .where(eq(todoUrls.id, record.id));
-      }
-    }),
+  const { todo, ai } = await createSmartTodo(
+    getDb(c.env.DB),
+    c.env,
+    c.get("userId"),
+    text,
+    {
+      aiEnabled: c.get("aiEnabled"),
+      enrich: parsed.data.enrich,
+      research: parsed.data.research,
+      waitUntil: (p) => c.executionCtx.waitUntil(p),
+    },
   );
 
-  // Notify clients that metadata is ready
-  await notifySync(env, userId);
-}
-
-/** Notify all connected WebSocket clients for this user to sync */
-async function notifySync(
-  env: { USER_SYNC: DurableObjectNamespace },
-  userId: string,
-): Promise<void> {
-  try {
-    const id = env.USER_SYNC.idFromName(userId);
-    const stub = env.USER_SYNC.get(id);
-    await stub.fetch(new Request("http://internal/notify", { method: "POST" }));
-  } catch {
-    // Non-critical
-  }
+  return c.json({ todos: [todo], ai });
 }

@@ -15,8 +15,11 @@ import { drizzle } from "drizzle-orm/d1";
 
 // Re-export schema from shared package
 export {
+  type GmailAddonLink,
+  gmailAddonLinks,
   type List,
   lists,
+  type NewGmailAddonLink,
   type NewList,
   type NewTodo,
   type NewTodoList,

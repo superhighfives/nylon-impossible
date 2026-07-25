@@ -148,7 +148,9 @@ jobs:
             const name = `nylon-impossible-api-pr-${pr}`;
             const domain = `api-pr-${pr}.nylonimpossible.com`;
             const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
-            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            // Strip only whole-line // comments so URLs (https://...) inside
+            // string values survive; then drop trailing commas.
+            const stripped = raw.replace(/^\s*\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
             const config = JSON.parse(stripped);
             config.name = name;
             config.routes = [{ pattern: domain, custom_domain: true }];
@@ -176,7 +178,9 @@ jobs:
             const name = `nylon-impossible-pr-${pr}`;
             const domain = `pr-${pr}.nylonimpossible.com`;
             const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
-            const stripped = raw.replace(/\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            // Strip only whole-line // comments so URLs (https://...) inside
+            // string values survive; then drop trailing commas.
+            const stripped = raw.replace(/^\s*\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
             const config = JSON.parse(stripped);
             config.name = name;
             config.routes = [{ pattern: domain, custom_domain: true }];
