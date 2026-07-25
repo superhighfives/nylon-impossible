@@ -232,7 +232,10 @@ export function buildContextualCard(
                         ADDON_ACTIONS.addFromMessage,
                       ),
                       parameters: message.permalink
-                        ? [{ key: "permalink", value: message.permalink }]
+                        ? [
+                            { key: "permalink", value: message.permalink },
+                            { key: "subject", value: message.subject },
+                          ]
                         : [],
                     },
                   },

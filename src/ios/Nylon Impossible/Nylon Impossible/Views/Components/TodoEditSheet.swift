@@ -472,8 +472,11 @@ struct UrlRow: View {
     }
 
     var body: some View {
-        // Use rich social preview card for fetched social URLs
-        if !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+        // Attached email links (e.g. a Gmail thread) render as the subject
+        if emailUrlInfo(for: url.url) != nil {
+            EmailRow(url: url)
+        } else if !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+            // Use rich social preview card for fetched social URLs
             SocialPreviewCard(url: url)
         } else {
             Link(destination: URL(string: url.url)!) {

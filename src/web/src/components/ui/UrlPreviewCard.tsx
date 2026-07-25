@@ -1,7 +1,9 @@
 import { ExternalLink, Link2 } from "lucide-react";
+import { getEmailUrlInfo } from "@/lib/email-urls";
 import { getSocialUrlInfo } from "@/lib/social-urls";
 import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
 import type { SerializedTodoUrl } from "@/types/database";
+import { EmailPreviewCardCompact } from "./EmailPreviewCard";
 import { Loader } from "./Loader";
 import { SocialPreviewCardCompact } from "./SocialPreviewCard";
 
@@ -46,6 +48,11 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
         <ExternalLink size={14} className="shrink-0 text-gray-muted" />
       </a>
     );
+  }
+
+  // Attached email links (e.g. a Gmail thread) render as the message subject.
+  if (getEmailUrlInfo(url.url)) {
+    return <EmailPreviewCardCompact url={url} />;
   }
 
   // Rich social links keep their compact platform card in the dense list.

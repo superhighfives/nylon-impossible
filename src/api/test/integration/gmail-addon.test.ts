@@ -221,10 +221,13 @@ describe("Gmail add-on", () => {
       expect(card.header.title).toBe("Add to Nylon");
       expect(card.sections[0].widgets[0].textInput.value).toBe("Reply to Sam");
       const button = card.sections[0].widgets.at(-1).buttonList.buttons[0];
-      expect(button.onClick.action.parameters[0]).toEqual({
-        key: "permalink",
-        value: "https://mail.google.com/mail/u/0/#all/thread-xyz",
-      });
+      expect(button.onClick.action.parameters).toEqual([
+        {
+          key: "permalink",
+          value: "https://mail.google.com/mail/u/0/#all/thread-xyz",
+        },
+        { key: "subject", value: "Reply to Sam" },
+      ]);
     });
   });
 
@@ -297,7 +300,7 @@ describe("Gmail add-on", () => {
       expect(rows[0].title).toBe("Bare string todo");
     });
 
-    it("add-from-message attaches the permalink as the todo URL", async () => {
+    it("add-from-message attaches the permalink as the todo URL with the subject", async () => {
       await linkUser();
       const token = await idToken();
       const res = await post("/gmail-addon/actions/add-from-message", token, {
@@ -307,6 +310,7 @@ describe("Gmail add-on", () => {
           },
           parameters: {
             permalink: "https://mail.google.com/mail/u/0/#all/thread-xyz",
+            subject: "Q3 planning notes",
           },
         },
       });
@@ -326,6 +330,11 @@ describe("Gmail add-on", () => {
       expect(urls[0].url).toBe(
         "https://mail.google.com/mail/u/0/#all/thread-xyz",
       );
+      // The subject rides through as the link's title/siteName, and the link is
+      // stored already-settled so no doomed metadata fetch runs against Gmail.
+      expect(urls[0].title).toBe("Q3 planning notes");
+      expect(urls[0].siteName).toBe("Gmail");
+      expect(urls[0].fetchStatus).toBe("fetched");
     });
 
     it("drops a non-http permalink instead of persisting a javascript: URL", async () => {

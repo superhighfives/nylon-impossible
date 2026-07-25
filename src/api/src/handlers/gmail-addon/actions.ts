@@ -94,11 +94,18 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
     return refreshedHomepage(c, resolved.userId, "That todo is too long");
   }
   const permalink = readParameter(event, "permalink");
+  // The original email subject, carried as a hidden parameter so the attached
+  // link keeps the subject as its label even if the user edits the todo title.
+  const subject = readParameter(event, "subject");
 
   await createSmartTodo(db, c.env, resolved.userId, text, {
     aiEnabled: await loadAiEnabled(db, resolved.userId),
     enrich: true,
-    extraUrls: permalink ? [permalink] : undefined,
+    // Attach the thread permalink with the subject as its title so it renders
+    // as an email link (subject + Gmail icon) without a doomed metadata fetch.
+    attachedUrls: permalink
+      ? [{ url: permalink, title: subject ?? text, siteName: "Gmail" }]
+      : undefined,
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 

@@ -16,6 +16,7 @@ import {
   useUpdateUrlPreview,
 } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
+import { getEmailUrlInfo } from "@/lib/email-urls";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
 import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
@@ -29,6 +30,7 @@ import { ConversationSection } from "./ConversationSection";
 import { ResearchSection } from "./ResearchSection";
 import { SubtaskSection } from "./SubtaskSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
+import { EmailPreviewCard } from "./ui/EmailPreviewCard";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
 
 interface TodoItemExpandedProps {
@@ -83,6 +85,11 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
         <ExternalLink size={14} className="text-gray-muted shrink-0" />
       </a>
     );
+  }
+
+  // Attached email links (e.g. a Gmail thread) render as the message subject.
+  if (getEmailUrlInfo(url.url)) {
+    return <EmailPreviewCard url={url} />;
   }
 
   // Use rich social card for fetched social URLs
