@@ -67,8 +67,11 @@ struct UrlRowCompact: View {
     }
 
     var body: some View {
-        // Use rich social chip for fetched social URLs (unless the preview is off)
-        if url.showsPreview, !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+        // Attached email links (e.g. a Gmail thread) render as the subject
+        if url.showsPreview, emailUrlInfo(for: url.url) != nil {
+            EmailRowCompact(url: url)
+        } else if url.showsPreview, !isPending && !isFailed, socialUrlInfo(for: url.url) != nil {
+            // Use rich social chip for fetched social URLs (unless the preview is off)
             SocialPreviewCardCompact(url: url)
         } else {
             Link(destination: URL(string: url.url)!) {

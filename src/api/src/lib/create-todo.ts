@@ -105,11 +105,19 @@ export interface CreateSmartTodoOptions {
   /** Run research directly (independent of the enrichment model). */
   research?: boolean;
   /**
-   * Extra URLs to attach beyond those parsed from `text` — e.g. the Gmail
-   * thread permalink when adding a todo from a message. Deduped against parsed
-   * URLs; never affects the title.
+   * Extra URLs to attach beyond those parsed from `text` — e.g. a link the
+   * caller wants fetched for metadata. Deduped against parsed URLs; never
+   * affects the title.
    */
   extraUrls?: string[];
+  /**
+   * URLs attached with a title already known, which should NOT be fetched for
+   * metadata — e.g. a Gmail thread permalink, where the subject is known up
+   * front and a fetch would just hit an auth wall. Stored as already-`fetched`
+   * so clients render the title (and their email treatment) immediately.
+   * Deduped against parsed URLs and `extraUrls`.
+   */
+  attachedUrls?: { url: string; title?: string; siteName?: string }[];
   /**
    * Schedule background work (URL metadata fetch, AI enrichment). In a Worker
    * request this is `c.executionCtx.waitUntil`. Callers with no execution
@@ -177,7 +185,27 @@ export async function createSmartTodo(
   const extraUrls = (options.extraUrls ?? [])
     .map(normalizeHttpUrl)
     .filter((url): url is string => url !== null);
-  const urls = Array.from(new Set([...initial.urls, ...extraUrls]));
+  // URLs we fetch metadata for in the background (parsed from text + plain extras).
+  const fetchedUrls = Array.from(new Set([...initial.urls, ...extraUrls]));
+
+  // Pre-titled attachments (e.g. a Gmail thread permalink) skip the fetch: the
+  // title is already known and the target sits behind auth. Normalize through
+  // the same http/https gate, then dedupe within the group and against the
+  // fetched set so a URL never lands in both places.
+  const attachedUrls = (options.attachedUrls ?? [])
+    .map((a) => {
+      const url = normalizeHttpUrl(a.url);
+      return url ? { ...a, url } : null;
+    })
+    .filter(
+      (a): a is { url: string; title?: string; siteName?: string } =>
+        a !== null,
+    )
+    .filter(
+      (a, i, list) =>
+        !fetchedUrls.includes(a.url) &&
+        list.findIndex((b) => b.url === a.url) === i,
+    );
 
   const todoId = crypto.randomUUID();
 
@@ -193,11 +221,12 @@ export async function createSmartTodo(
     updatedAt: now,
   });
 
-  // Insert any URLs
-  if (urls.length > 0) {
-    const urlPositions = generateNKeysBetween(null, null, urls.length);
-    await db.insert(todoUrls).values(
-      urls.map((url, i) => ({
+  // Insert any URLs — fetched ones start pending, attachments start settled.
+  const totalUrls = fetchedUrls.length + attachedUrls.length;
+  if (totalUrls > 0) {
+    const urlPositions = generateNKeysBetween(null, null, totalUrls);
+    await db.insert(todoUrls).values([
+      ...fetchedUrls.map((url, i) => ({
         id: crypto.randomUUID(),
         todoId,
         url,
@@ -206,10 +235,25 @@ export async function createSmartTodo(
         createdAt: now,
         updatedAt: now,
       })),
-    );
+      ...attachedUrls.map((a, i) => ({
+        id: crypto.randomUUID(),
+        todoId,
+        url: a.url,
+        title: a.title ?? null,
+        siteName: a.siteName ?? null,
+        position: urlPositions[fetchedUrls.length + i],
+        fetchStatus: "fetched" as const,
+        fetchedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      })),
+    ]);
 
-    // Fetch URL metadata in background
-    options.waitUntil(fetchUrlMetadataBackground(db, todoId, env, userId));
+    // Fetch URL metadata in background — only when there are pending URLs;
+    // attachments already carry their title and must not be re-fetched.
+    if (fetchedUrls.length > 0) {
+      options.waitUntil(fetchUrlMetadataBackground(db, todoId, env, userId));
+    }
   }
 
   // If AI is enabled, enrich in background
@@ -290,11 +334,14 @@ async function fetchUrlMetadataBackground(
   env: { USER_SYNC: DurableObjectNamespace },
   userId: string,
 ): Promise<void> {
-  // Get the URL records we just created
+  // Get the pending URL records we just created — attachments (e.g. a Gmail
+  // permalink) are inserted already `fetched` and must not be fetched over.
   const urlRecords = await db
     .select()
     .from(todoUrls)
-    .where(eq(todoUrls.todoId, todoId));
+    .where(
+      and(eq(todoUrls.todoId, todoId), eq(todoUrls.fetchStatus, "pending")),
+    );
 
   await Promise.allSettled(
     urlRecords.map(async (record) => {
