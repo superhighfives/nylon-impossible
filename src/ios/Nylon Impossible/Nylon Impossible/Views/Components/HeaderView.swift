@@ -77,6 +77,10 @@ struct HeaderView: View {
             .resizable()
             .scaledToFit()
             .frame(width: 20, height: 20)
+            // The mark always sits on the fixed yellow appBrand circle, so it must
+            // stay in its dark form. Without this, dark mode resolves the inverted
+            // (light) Logo variant and renders a near-invisible white mark on yellow.
+            .environment(\.colorScheme, .light)
             .padding(6)
             .frame(width: 32, height: 32)
             .background(Color.appBrand)
