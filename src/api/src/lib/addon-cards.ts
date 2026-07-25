@@ -96,6 +96,7 @@ export const ADDON_ACTIONS = {
   quickAdd: "/gmail-addon/actions/quick-add",
   addFromMessage: "/gmail-addon/actions/add-from-message",
   toggle: "/gmail-addon/actions/toggle",
+  refresh: "/gmail-addon/actions/refresh",
 } as const;
 
 function actionUrl(baseUrl: string, path: string): string {
@@ -248,10 +249,13 @@ export function buildContextualCard(
 
 /**
  * "Connect Nylon" card shown when the Google identity isn't linked to any Nylon
- * account. The button opens the web connect flow, where the user authenticates
- * with Clerk and the link is recorded; they then reload the panel.
+ * account. "Connect Nylon" opens the web connect flow (Clerk auth + link) in the
+ * browser; since the panel can't refresh itself once linking completes there,
+ * "I've connected" re-invokes the add-on so it re-resolves the identity and
+ * swaps in the homepage card. `refreshUrl` is the absolute URL of the refresh
+ * action endpoint.
  */
-export function buildConnectCard(connectUrl: string): Card {
+export function buildConnectCard(connectUrl: string, refreshUrl: string): Card {
   return {
     header: { title: "Connect Nylon" },
     sections: [
@@ -259,7 +263,7 @@ export function buildConnectCard(connectUrl: string): Card {
         widgets: [
           {
             textParagraph: {
-              text: "Connect your Nylon account to add and manage todos from Gmail.",
+              text: "Connect your Nylon account to add and manage todos from Gmail. After connecting in the browser, tap “I've connected” to refresh.",
             },
           },
           {
@@ -268,6 +272,10 @@ export function buildConnectCard(connectUrl: string): Card {
                 {
                   text: "Connect Nylon",
                   onClick: { openLink: { url: connectUrl } },
+                },
+                {
+                  text: "I've connected",
+                  onClick: { action: { function: refreshUrl } },
                 },
               ],
             },

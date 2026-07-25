@@ -16,6 +16,7 @@ There is no Apps Script project. All the code lives in `src/api`:
 | Quick-add submit | `POST /gmail-addon/actions/quick-add` |
 | Add-from-message submit | `POST /gmail-addon/actions/add-from-message` |
 | Tick-to-complete | `POST /gmail-addon/actions/toggle` |
+| Refresh after connecting | `POST /gmail-addon/actions/refresh` |
 
 Each request carries a Google-signed ID token in `Authorization: Bearer` and is
 verified by the `verifyGoogleIdToken` middleware (`src/api/src/lib/addon-auth.ts`)
@@ -98,9 +99,10 @@ isolated so the rest of the code is unaffected:
    verifies the ID token and reads `sub`/`email` from it; if a deployment carries
    the end-user identity elsewhere (e.g. the event object's user fields under a
    system token), only `resolveNylonUser`'s inputs change.
-2. **The ID-token audience.** If Google sends the *endpoint URL* as the audience
-   rather than one configured value, list every endpoint URL in
-   `GMAIL_ADDON_AUDIENCE` (comma-separated) — no code change needed.
+2. **The ID-token audience.** Confirmed against a live deployment: Google sends
+   the *endpoint URL* as the `aud`, so `GMAIL_ADDON_AUDIENCE` lists every endpoint
+   URL (comma-separated). Add the URL to that var whenever you add a route — no
+   code change needed.
 
 The card-response envelope in `addon-cards.ts` (`renderCard` / `updateCard`) is
 the other live-verifiable surface; adjust it there in one place if the panel

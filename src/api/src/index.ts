@@ -14,6 +14,7 @@ import { enrichTodo } from "./handlers/enrich";
 import {
   gmailAddonAddFromMessage,
   gmailAddonQuickAdd,
+  gmailAddonRefresh,
   gmailAddonToggle,
 } from "./handlers/gmail-addon/actions";
 import { gmailAddonContextual } from "./handlers/gmail-addon/contextual";
@@ -105,6 +106,7 @@ app.post("/gmail-addon/contextual", gmailAddonContextual);
 app.post("/gmail-addon/actions/quick-add", gmailAddonQuickAdd);
 app.post("/gmail-addon/actions/add-from-message", gmailAddonAddFromMessage);
 app.post("/gmail-addon/actions/toggle", gmailAddonToggle);
+app.post("/gmail-addon/actions/refresh", gmailAddonRefresh);
 
 // Todo routes
 app.post("/todos/smart", smartCreate);
