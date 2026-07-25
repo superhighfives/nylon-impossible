@@ -168,3 +168,10 @@ jobs:
         if: always()
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
+
+  # Regenerate marketing screenshots after an App Store release, so the iOS
+  # shots on superhighfives.com/nylon reflect the released build.
+  screenshots:
+    needs: [deploy]
+    uses: ./.github/workflows/marketing.yml
+    secrets: inherit
