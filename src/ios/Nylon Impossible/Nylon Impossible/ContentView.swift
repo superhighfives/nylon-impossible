@@ -19,6 +19,9 @@ struct ContentView: View {
     // active (isEffectivelyCompleted flips) without a refetch. Any @State write
     // re-runs body, which recomputes the sorted/filtered lists.
     @State private var midnightTick = 0
+    // The incomplete row a drag is currently hovering over. Drives the thin
+    // "drop here" line — the iOS analogue of web's yellow reorder line.
+    @State private var dropTargetId: UUID?
 
     // Subtasks live inside their parent's edit sheet, not as their own rows, so
     // the main list is top-level todos only.
@@ -150,12 +153,38 @@ struct ContentView: View {
 
         return List {
             Section {
-                ForEach(incomplete) { todo in
+                // Reordering is driven by `.draggable`/`.dropDestination` rather
+                // than `.onMove`. `.onMove`'s lift is a system-managed opaque
+                // platter that can't be restyled; owning the drag lets the
+                // lifted row render as Liquid Glass (see `dragPreview`), matching
+                // web's translucent, blurred, ringed drag card.
+                ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
                     todoRow(todo)
-                }
-                .onMove { source, destination in
-                    viewModel.moveTodo(from: source, to: destination, in: sortedTodosList)
-                    syncService.syncAfterAction()
+                        // Thin brand line on the hovered row's leading edge — the
+                        // "it'll land here" cue, mirroring web's drop line.
+                        .overlay(alignment: .top) {
+                            if dropTargetId == todo.id {
+                                Capsule()
+                                    .fill(Color.appBrand)
+                                    .frame(height: 2)
+                                    .padding(.horizontal, 4)
+                                    .transition(.opacity)
+                            }
+                        }
+                        .draggable(todo.id.uuidString) {
+                            dragPreview(for: todo)
+                        }
+                        .dropDestination(for: String.self) { items, _ in
+                            handleReorderDrop(items, ontoIndex: index, in: incomplete)
+                        } isTargeted: { targeted in
+                            withAnimation(.easeInOut(duration: 0.15)) {
+                                if targeted {
+                                    dropTargetId = todo.id
+                                } else if dropTargetId == todo.id {
+                                    dropTargetId = nil
+                                }
+                            }
+                        }
                 }
                 .onDelete { offsets in
                     for index in offsets {
@@ -304,6 +333,61 @@ struct ContentView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
+    }
+
+    /// The lifted row while it's being dragged: the row content floated onto a
+    /// Liquid Glass card with a hairline ring. This is what makes the drag read
+    /// as glass — SwiftUI's default `.onMove` lift is an opaque platter we can't
+    /// restyle, so we render our own preview. Interactivity is irrelevant here
+    /// (the system snapshots it into a static image), so the row's handlers are
+    /// no-ops.
+    @ViewBuilder
+    private func dragPreview(for todo: TodoItem) -> some View {
+        TodoItemRow(
+            todo: todo,
+            apiService: syncService.apiService,
+            urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
+            subtasks: subtasks(of: todo),
+            onToggle: {},
+            onSave: { _, _, _, _, _ in }
+        )
+        .padding(.horizontal, 12)
+        .padding(.vertical, 2)
+        .frame(maxWidth: 360, alignment: .leading)
+        .glassEffect(.regular, in: .rect(cornerRadius: 16))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
+        )
+    }
+
+    /// Land a dragged incomplete row at the dropped-on row's slot. `targetIndex`
+    /// is the drop target's index within `incomplete`; a drag downward inserts
+    /// after it, upward inserts before it — matching `List.onMove`'s offset
+    /// semantics so `viewModel.moveTodo` behaves exactly as it did under
+    /// `.onMove`.
+    private func handleReorderDrop(
+        _ items: [String],
+        ontoIndex targetIndex: Int,
+        in incomplete: [TodoItem]
+    ) -> Bool {
+        dropTargetId = nil
+        guard let draggedId = items.first,
+              let sourceIndex = incomplete.firstIndex(where: {
+                  $0.id.uuidString == draggedId
+              }),
+              sourceIndex != targetIndex else { return false }
+
+        let destination = sourceIndex < targetIndex ? targetIndex + 1 : targetIndex
+        withAnimation(.easeInOut(duration: 0.25)) {
+            viewModel.moveTodo(
+                from: IndexSet(integer: sourceIndex),
+                to: destination,
+                in: sortedTodosList
+            )
+        }
+        syncService.syncAfterAction()
+        return true
     }
 }
 

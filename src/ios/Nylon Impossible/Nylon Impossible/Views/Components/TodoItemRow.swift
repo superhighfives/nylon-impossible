@@ -372,7 +372,8 @@ struct TodoItemRow: View {
         .padding(.horizontal, 4)
         // No persistent box — rows sit directly on the background so they read
         // as floating (matching web, where the surface/ring only appears while
-        // a row is being dragged; SwiftUI's List provides that lift on reorder).
+        // a row is being dragged). The Liquid Glass drag lift is supplied by
+        // `ContentView.dragPreview`, not by a box on the resting row.
         .opacity(todo.isEffectivelyCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
         .contextMenu {
