@@ -191,7 +191,8 @@ export async function createSmartTodo(
   // Pre-titled attachments (e.g. a Gmail thread permalink) skip the fetch: the
   // title is already known and the target sits behind auth. Normalize through
   // the same http/https gate, then dedupe within the group and against the
-  // fetched set so a URL never lands in both places.
+  // fetched set (via a running `Set`) so a URL never lands in both places.
+  const seenUrls = new Set(fetchedUrls);
   const attachedUrls = (options.attachedUrls ?? [])
     .map((a) => {
       const url = normalizeHttpUrl(a.url);
@@ -201,11 +202,11 @@ export async function createSmartTodo(
       (a): a is { url: string; title?: string; siteName?: string } =>
         a !== null,
     )
-    .filter(
-      (a, i, list) =>
-        !fetchedUrls.includes(a.url) &&
-        list.findIndex((b) => b.url === a.url) === i,
-    );
+    .filter((a) => {
+      if (seenUrls.has(a.url)) return false;
+      seenUrls.add(a.url);
+      return true;
+    });
 
   const todoId = crypto.randomUUID();
 
