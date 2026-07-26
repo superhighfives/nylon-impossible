@@ -47,6 +47,22 @@ async function refreshedHomepage(
   return cardResponse(c, card, { asAction: true, notification });
 }
 
+// POST /gmail-addon/actions/refresh — re-resolve the identity after the user
+// links in the browser. The connect card can't refresh itself once linking
+// finishes on the web side, so this button lets the user pull the linked state
+// in: linked → swap in the homepage card; still unlinked → re-show connect.
+export async function gmailAddonRefresh(c: Context<Env>) {
+  const claims = c.get("googleClaims");
+  const db = getDb(c.env.DB);
+
+  const resolved = await resolveNylonUser(db, c.env, claims);
+  if (resolved.status !== "linked") {
+    return connectResponse(c, claims, { asAction: true });
+  }
+
+  return refreshedHomepage(c, resolved.userId, "Connected");
+}
+
 // POST /gmail-addon/actions/quick-add — submit the homepage quick-add box.
 export async function gmailAddonQuickAdd(c: Context<Env>) {
   const claims = c.get("googleClaims");

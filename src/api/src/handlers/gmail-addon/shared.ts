@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import {
+  ADDON_ACTIONS,
   buildConnectCard,
   type Card,
   renderCard,
@@ -163,5 +164,6 @@ export async function connectResponse(
   opts: { asAction?: boolean } = {},
 ) {
   const connectUrl = await buildConnectUrl(c, claims);
-  return cardResponse(c, buildConnectCard(connectUrl), opts);
+  const refreshUrl = `${requestBaseUrl(c)}${ADDON_ACTIONS.refresh}`;
+  return cardResponse(c, buildConnectCard(connectUrl, refreshUrl), opts);
 }

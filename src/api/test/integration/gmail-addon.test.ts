@@ -103,9 +103,14 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
       expect(card.header.title).toBe("Connect Nylon");
-      const buttonUrl =
-        card.sections[0].widgets[1].buttonList.buttons[0].onClick.openLink.url;
-      expect(buttonUrl).toContain("/connect/gmail-addon?state=");
+      const buttons = card.sections[0].widgets[1].buttonList.buttons;
+      expect(buttons[0].onClick.openLink.url).toContain(
+        "/connect/gmail-addon?state=",
+      );
+      // A refresh button re-invokes the add-on after linking in the browser.
+      expect(buttons[1].onClick.action.function).toContain(
+        "/gmail-addon/actions/refresh",
+      );
     });
 
     it("auto-links by matching Google external account, then lists open todos", async () => {
@@ -384,6 +389,36 @@ describe("Gmail add-on", () => {
       const db = getDb(env.DB);
       const [todo] = await db.select().from(todos).where(eq(todos.id, todoId));
       expect(todo.completed).toBe(true);
+    });
+
+    it("refresh re-shows the connect card when still unlinked", async () => {
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/refresh", token);
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      // Action responses update the current card in place.
+      const card = body.renderActions.action.navigations[0].updateCard;
+      expect(card.header.title).toBe("Connect Nylon");
+    });
+
+    it("refresh swaps in the homepage card once linked", async () => {
+      await linkUser();
+      await seedTodo("55555555-5555-5555-5555-555555555555", "user_test_123", {
+        title: "Now visible",
+        position: "a0",
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/refresh", token);
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      const card = body.renderActions.action.navigations[0].updateCard;
+      expect(card.header.title).toBe("Nylon");
+      expect(body.renderActions.action.notification.text).toBe("Connected");
+      const openSection = card.sections.find(
+        (s: any) => s.header === "Open todos",
+      );
+      expect(openSection.widgets[0].decoratedText.text).toBe("Now visible");
     });
   });
 });
