@@ -7,34 +7,34 @@
   "routes": [
     {
       "pattern": "api.nylonimpossible.com",
-      "custom_domain": true
-    }
+      "custom_domain": true,
+    },
   ],
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "nylon-impossible-db",
       "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
-      "migrations_dir": "./migrations"
-    }
+      "migrations_dir": "./migrations",
+    },
   ],
   "durable_objects": {
     "bindings": [
       {
         "name": "USER_SYNC",
-        "class_name": "UserSync"
-      }
-    ]
+        "class_name": "UserSync",
+      },
+    ],
   },
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": ["UserSync"]
-    }
+      "new_classes": ["UserSync"],
+    },
   ],
   "queues": {
     "producers": [
-      { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" }
+      { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },
     ],
     "consumers": [
       {
@@ -42,9 +42,9 @@
         "max_batch_size": 1,
         "max_batch_timeout": 0,
         "max_retries": 2,
-        "dead_letter_queue": "nylon-impossible-research-dlq"
-      }
-    ]
+        "dead_letter_queue": "nylon-impossible-research-dlq",
+      },
+    ],
   },
   "vars": {
     "ENVIRONMENT": "development",
@@ -52,17 +52,16 @@
     // Target audience(s) for the Gmail add-on's Google-signed ID tokens. For the
     // Workspace add-on alternate runtime, Google sets each token's `aud` to the
     // exact endpoint URL it POSTs to — so this is the comma-separated allow-list
-    // of every endpoint Google calls (the two triggers plus the three card
-    // actions), not the base path. Public, not a secret.
+    // of every endpoint Google calls, not the base path. Public, not a secret.
     // GMAIL_ADDON_STATE_SECRET is a secret — set via `wrangler secret put`.
     "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
-    "WEB_BASE_URL": "https://www.nylonimpossible.com"
+    "WEB_BASE_URL": "https://www.nylonimpossible.com",
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
   },
   "ai": {
-    "binding": "AI"
-  }
+    "binding": "AI",
+  },
   // Note: SENTRY_DSN should be configured as a secret via `wrangler secret put SENTRY_DSN`
 }
