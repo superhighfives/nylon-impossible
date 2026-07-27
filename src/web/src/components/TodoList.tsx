@@ -24,7 +24,6 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
-  ChevronUp,
   Clock,
   FileText,
   GripVertical,
