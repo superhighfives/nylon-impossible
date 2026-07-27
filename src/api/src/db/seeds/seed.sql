@@ -20,7 +20,7 @@ INSERT INTO lists (id, user_id, name, position, created_at, updated_at) VALUES
   ('list_4', 'user_test_123', 'Work', 'a3', unixepoch(), unixepoch());
 
 -- Insert sample todos
-INSERT INTO todos (id, user_id, title, description, completed, priority, position, created_at, updated_at) VALUES
+INSERT INTO todos (id, user_id, title, notes, completed, priority, position, created_at, updated_at) VALUES
   ('todo_1', 'user_test_123', 'Buy groceries', 'Milk, eggs, bread, and vegetables', 0, 'high', 'a0', unixepoch(), unixepoch()),
   ('todo_2', 'user_test_123', 'Pay electricity bill', 'Due by the end of the month', 0, 'high', 'a1', unixepoch(), unixepoch()),
   ('todo_3', 'user_test_123', 'Review project proposal', 'Check the Q2 roadmap document', 1, 'low', 'a2', unixepoch(), unixepoch()),
