@@ -59,12 +59,7 @@ export interface FileRouteTypes {
   fullPaths: '/' | '/privacy' | '/terms' | '/connect/gmail-addon'
   fileRoutesByTo: FileRoutesByTo
   to: '/' | '/privacy' | '/terms' | '/connect/gmail-addon'
-  id:
-    | '__root__'
-    | '/'
-    | '/privacy'
-    | '/terms'
-    | '/connect/gmail-addon'
+  id: '__root__' | '/' | '/privacy' | '/terms' | '/connect/gmail-addon'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
