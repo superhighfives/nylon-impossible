@@ -58,7 +58,7 @@ import { messageFromError, toast } from "@/lib/toast";
 import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
-import { Button, Checkbox, Loader, UrlPreviewCard } from "./ui";
+import { Button, Checkbox, focusRing, Loader, UrlPreviewCard } from "./ui";
 
 // This is a single-column vertical list, so lock dragging to the Y axis —
 // otherwise the lifted row drifts sideways as it tracks the pointer/keyboard.
@@ -558,20 +558,6 @@ function TodoItemContent({
               deletePending={deletePending}
             />
           </div>
-
-          {/* Desktop: inline button revealed on hover */}
-          <div className="hidden h-5 items-center sm:flex sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="xs"
-              shape="square"
-              type="button"
-              onClick={() => onToggleExpand(todo.id)}
-              aria-label={isExpanded ? "Collapse details" : "Expand details"}
-            >
-              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </Button>
-          </div>
         </div>
       )}
     </div>
@@ -683,11 +669,32 @@ function SortableTodoItem(
           }`}
         />
       )}
-      <div className="flex items-start gap-2">
+      {/* Desktop: expand toggle hangs off the left edge, revealed when the row
+          is hovered or any control in it is focused. Styled as a bare icon
+          button to match the grip and checkbox rather than a filled box. */}
+      {!isDragging && (
+        <div className="pointer-events-none absolute left-0 top-2 hidden -translate-x-full sm:block">
+          <button
+            type="button"
+            onClick={() => props.onToggleExpand(props.todo.id)}
+            aria-label={
+              props.isExpanded ? "Collapse details" : "Expand details"
+            }
+            className={`pointer-events-auto flex rounded-md p-0.5 text-gray-muted transition-[opacity,color] hover:text-gray sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing}`}
+          >
+            {props.isExpanded ? (
+              <ChevronRight size={16} className="block" />
+            ) : (
+              <ChevronDown size={16} className="block" />
+            )}
+          </button>
+        </div>
+      )}
+      <div className="flex items-start">
         <button
           type="button"
           disabled={props.isExpanded}
-          className="pt-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-50 sm:hover:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted"
+          className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}

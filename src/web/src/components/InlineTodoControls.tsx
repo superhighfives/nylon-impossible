@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import { focusRing } from "@/components/ui";
 import { useHints } from "@/hooks/useHints";
 
 const menuItemBase =
@@ -39,7 +40,7 @@ export function InlinePriority({
         type="button"
         disabled={disabled}
         aria-label={`Priority: ${value === "high" ? "High" : "Low"}. Change priority`}
-        className={`rounded-md px-1.5 py-0.5 text-xs transition-colors disabled:opacity-50 ${
+        className={`rounded-md px-1.5 py-0.5 text-xs transition-colors disabled:opacity-50 ${focusRing} ${
           value === "high"
             ? "bg-yellow-base hover:bg-yellow-hover text-yellow-muted"
             : "bg-gray-base hover:bg-gray-hover text-gray-muted"
@@ -52,7 +53,7 @@ export function InlinePriority({
         type="button"
         disabled={disabled}
         aria-label="Set priority"
-        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+        className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing}`}
       >
         <Flag size={11} aria-hidden="true" />
       </button>
@@ -288,7 +289,7 @@ export function InlineDueDate({
                 type="button"
                 disabled={disabled}
                 aria-label={`Due ${label}. Change due date`}
-                className="inline-flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-1 transition-colors disabled:opacity-50"
+                className={`inline-flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-1 transition-colors disabled:opacity-50 ${focusRing}`}
               >
                 {isOverdue && <AlertCircle size={10} aria-hidden="true" />}
                 {label}
@@ -300,7 +301,7 @@ export function InlineDueDate({
             disabled={disabled}
             onClick={handleClear}
             aria-label="Clear due date"
-            className="rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50"
+            className={`rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50 ${focusRing}`}
           >
             <X size={11} aria-hidden="true" />
           </button>
@@ -312,7 +313,7 @@ export function InlineDueDate({
               type="button"
               disabled={disabled}
               aria-label="Set due date"
-              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+              className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing}`}
             >
               <Calendar size={11} aria-hidden="true" />
             </button>
