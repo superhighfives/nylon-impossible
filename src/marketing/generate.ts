@@ -252,11 +252,25 @@ async function captureWebScreenshots(): Promise<void> {
     }
   );
 
-  server.stderr?.on("data", () => {});
-  server.stdout?.on("data", () => {});
+  // Buffer the server's output (capped) so we can surface it if the server
+  // never comes up — otherwise a boot failure is invisible in CI logs.
+  const serverLog: string[] = [];
+  const captureLine = (chunk: Buffer) => {
+    serverLog.push(chunk.toString());
+    if (serverLog.length > 200) serverLog.splice(0, serverLog.length - 200);
+  };
+  server.stderr?.on("data", captureLine);
+  server.stdout?.on("data", captureLine);
 
   try {
-    await waitForUrl(manifest.web.url, 60_000);
+    try {
+      await waitForUrl(manifest.web.url, 120_000);
+    } catch (err) {
+      const tail = serverLog.join("").trimEnd();
+      console.error("  Dev server never became ready. Recent output:");
+      console.error(tail ? tail : "  (server produced no output)");
+      throw err;
+    }
     console.log(`  Dev server ready at ${manifest.web.url}`);
 
     const { chromium } = await import("playwright");
