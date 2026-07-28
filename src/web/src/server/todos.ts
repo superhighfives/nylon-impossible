@@ -29,6 +29,20 @@ import type {
   UpdateTodoInput,
 } from "@/types/database";
 
+// D1 caps a single statement at 100 bound parameters. An `inArray(col, ids)`
+// binds one parameter per id, so a user with more than 100 todos overflows the
+// limit and D1 rejects the query. Split the id list into batches that stay
+// under the cap and run one statement per batch.
+const D1_MAX_BOUND_PARAMS = 100;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    batches.push(items.slice(i, i + size));
+  }
+  return batches;
+}
+
 /** Serialize a todo URL for JSON response */
 function serializeUrl(url: TodoUrl): SerializedTodoUrl {
   return {
@@ -130,23 +144,40 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
       let allResearch: TodoResearch[] = [];
       let allMessages: TodoMessage[] = [];
       if (todoIds.length > 0) {
+        // Batch the id list so each statement stays within D1's bound-param
+        // cap. A given todoId lands in exactly one batch, so per-todo ordering
+        // (urls by position, messages by createdAt) is preserved once results
+        // are grouped by todoId below.
+        const idBatches = chunk(todoIds, D1_MAX_BOUND_PARAMS);
         const [urls, research, messages] = yield* Effect.tryPromise({
           try: () =>
             Promise.all([
-              db
-                .select()
-                .from(todoUrls)
-                .where(inArray(todoUrls.todoId, todoIds))
-                .orderBy(asc(todoUrls.position)),
-              db
-                .select()
-                .from(todoResearch)
-                .where(inArray(todoResearch.todoId, todoIds)),
-              db
-                .select()
-                .from(todoMessages)
-                .where(inArray(todoMessages.todoId, todoIds))
-                .orderBy(asc(todoMessages.createdAt)),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoUrls)
+                    .where(inArray(todoUrls.todoId, ids))
+                    .orderBy(asc(todoUrls.position)),
+                ),
+              ).then((batches) => batches.flat()),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoResearch)
+                    .where(inArray(todoResearch.todoId, ids)),
+                ),
+              ).then((batches) => batches.flat()),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoMessages)
+                    .where(inArray(todoMessages.todoId, ids))
+                    .orderBy(asc(todoMessages.createdAt)),
+                ),
+              ).then((batches) => batches.flat()),
             ]),
           catch: (error) =>
             new DatabaseError({
