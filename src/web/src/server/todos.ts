@@ -2,6 +2,7 @@
  * Server functions for todos using Effect for type-safe error handling
  */
 
+import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -28,20 +29,6 @@ import type {
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
-
-// D1 caps a single statement at 100 bound parameters. An `inArray(col, ids)`
-// binds one parameter per id, so a user with more than 100 todos overflows the
-// limit and D1 rejects the query. Split the id list into batches that stay
-// under the cap and run one statement per batch.
-const D1_MAX_BOUND_PARAMS = 100;
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const batches: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    batches.push(items.slice(i, i + size));
-  }
-  return batches;
-}
 
 /** Serialize a todo URL for JSON response */
 function serializeUrl(url: TodoUrl): SerializedTodoUrl {
@@ -148,7 +135,7 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         // cap. A given todoId lands in exactly one batch, so per-todo ordering
         // (urls by position, messages by createdAt) is preserved once results
         // are grouped by todoId below.
-        const idBatches = chunk(todoIds, D1_MAX_BOUND_PARAMS);
+        const idBatches = chunkForD1(todoIds);
         const [urls, research, messages] = yield* Effect.tryPromise({
           try: () =>
             Promise.all([

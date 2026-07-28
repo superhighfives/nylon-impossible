@@ -46,6 +46,32 @@ describe("Sync endpoint", () => {
     expect(body.conflicts).toEqual([]);
   });
 
+  it("returns all todos when the user has more than D1's 100-bound-param cap", async () => {
+    // Regression for the production outage: the related-row fetch binds one
+    // `inArray` param per todoId, so >100 todos overflowed a single D1
+    // statement and the whole sync threw. Without chunking this test fails with
+    // a D1 "too many SQL variables" error rather than an assertion.
+    const TODO_COUNT = 101;
+    for (let i = 0; i < TODO_COUNT; i++) {
+      await seedTodo(crypto.randomUUID(), "user_test_123", {
+        title: `Todo ${i}`,
+      });
+    }
+    // Exercise the messages join too (the query that threw in production logs).
+    const withMessage = await seedTodo(crypto.randomUUID(), "user_test_123", {
+      title: "Has message",
+    });
+    await seedMessage(withMessage.id);
+
+    const res = await syncRequest({ changes: [] });
+    expect(res.status).toBe(200);
+
+    const body = await res.json<any>();
+    expect(body.todos).toHaveLength(TODO_COUNT + 1);
+    const messaged = body.todos.find((t: any) => t.id === withMessage.id);
+    expect(messaged?.messages).toHaveLength(1);
+  });
+
   it("creates a new todo via sync", async () => {
     const now = new Date().toISOString();
     const res = await syncRequest({
