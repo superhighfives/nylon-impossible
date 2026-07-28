@@ -376,9 +376,9 @@ struct TodoItemRow: View {
         // `ContentView.dragPreview`, not by a box on the resting row.
         .opacity(todo.isEffectivelyCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
-        .contextMenu {
-            ShareLink(item: shareText(for: todo, urls: urls))
-        }
+        // No `.contextMenu` here: its long-press gesture collides with the
+        // row's `.draggable` lift (also long-press), so the share popover
+        // would hijack a drag. Sharing stays available from the edit sheet.
         .sheet(isPresented: $showingEditSheet) {
             TodoEditSheet(
                 todo: todo,

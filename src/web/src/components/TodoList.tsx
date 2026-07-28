@@ -693,7 +693,7 @@ function SortableTodoItem(
         <button
           type="button"
           disabled={props.isExpanded}
-          className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+          className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}

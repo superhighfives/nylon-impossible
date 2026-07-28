@@ -8,7 +8,7 @@
 INSERT OR IGNORE INTO users (id, email, created_at, updated_at)
 VALUES ('user_3BPJATg8w4djAPJd71AUARo3vJ7', 'marketing@nylonimpossible.com', unixepoch(), unixepoch());
 
-INSERT OR IGNORE INTO todos (id, user_id, title, description, completed, priority, position, due_date, created_at, updated_at)
+INSERT OR IGNORE INTO todos (id, user_id, title, notes, completed, priority, position, due_date, created_at, updated_at)
 VALUES
   ('mktg_1', 'user_3BPJATg8w4djAPJd71AUARo3vJ7',
    'Finish quarterly report',
