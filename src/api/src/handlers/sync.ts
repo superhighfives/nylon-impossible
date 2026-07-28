@@ -1,4 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
+import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
@@ -486,17 +487,27 @@ export async function syncTodos(c: Context<Env>) {
     const now = new Date();
     const urlsToFetch: Array<{ id: string; todoId: string; url: string }> = [];
 
-    // Batch-fetch all existing URLs for all todos in one query
+    // Batch-fetch all existing URLs for these todos, chunked to stay within
+    // D1's bound-param cap (a large import can need URL extraction for far more
+    // than 100 todos at once).
     const extractionTodoIds = urlExtractionNeeded.map((t) => t.todoId);
-    const existingUrlRows = await db
-      .select({
-        todoId: todoUrls.todoId,
-        url: todoUrls.url,
-        position: todoUrls.position,
-      })
-      .from(todoUrls)
-      .where(inArray(todoUrls.todoId, extractionTodoIds))
-      .orderBy(asc(todoUrls.position));
+    const existingUrlRows: {
+      todoId: string;
+      url: string;
+      position: string;
+    }[] = [];
+    for (const chunkIds of chunkForD1(extractionTodoIds)) {
+      const rows = await db
+        .select({
+          todoId: todoUrls.todoId,
+          url: todoUrls.url,
+          position: todoUrls.position,
+        })
+        .from(todoUrls)
+        .where(inArray(todoUrls.todoId, chunkIds))
+        .orderBy(asc(todoUrls.position));
+      existingUrlRows.push(...rows);
+    }
 
     // Group by todoId for O(1) lookup
     const existingByTodo = new Map<
@@ -590,26 +601,34 @@ export async function syncTodos(c: Context<Env>) {
 
   // 3. Fetch all URLs for the returned todos
   const todoIds = serverTodos.map((t) => t.id);
-  let allUrls: TodoUrl[] = [];
-  let allResearch: TodoResearch[] = [];
-  let allMessages: TodoMessage[] = [];
+  const allUrls: TodoUrl[] = [];
+  const allResearch: TodoResearch[] = [];
+  const allMessages: TodoMessage[] = [];
   if (todoIds.length > 0) {
-    [allUrls, allResearch, allMessages] = await Promise.all([
-      db
-        .select()
-        .from(todoUrls)
-        .where(inArray(todoUrls.todoId, todoIds))
-        .orderBy(asc(todoUrls.position)),
-      db
-        .select()
-        .from(todoResearch)
-        .where(inArray(todoResearch.todoId, todoIds)),
-      db
-        .select()
-        .from(todoMessages)
-        .where(inArray(todoMessages.todoId, todoIds))
-        .orderBy(asc(todoMessages.createdAt)),
-    ]);
+    // Batch by D1's bound-param cap: one `inArray` param per todoId, so a user
+    // with >100 todos would otherwise overflow a single statement. Each todoId
+    // lands in one batch, so per-todo ordering survives grouping below.
+    for (const chunkIds of chunkForD1(todoIds)) {
+      const [urls, research, messages] = await Promise.all([
+        db
+          .select()
+          .from(todoUrls)
+          .where(inArray(todoUrls.todoId, chunkIds))
+          .orderBy(asc(todoUrls.position)),
+        db
+          .select()
+          .from(todoResearch)
+          .where(inArray(todoResearch.todoId, chunkIds)),
+        db
+          .select()
+          .from(todoMessages)
+          .where(inArray(todoMessages.todoId, chunkIds))
+          .orderBy(asc(todoMessages.createdAt)),
+      ]);
+      allUrls.push(...urls);
+      allResearch.push(...research);
+      allMessages.push(...messages);
+    }
   }
 
   // Group URLs by todoId

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/cloudflare";
 import { Effect, Layer } from "effect";
 import type { User } from "./auth";
 import { AuthService, AuthServiceLive, ensureUserExists } from "./auth";
@@ -156,6 +157,18 @@ export const errorToResponse = (
 
       case "DatabaseError":
         console.error("Database error:", error);
+        // Server fault (5xx) — report it. Auth/validation/not-found above are
+        // expected client errors and deliberately aren't sent to Sentry. This
+        // is the funnel that previously swallowed the D1 bound-param overflow.
+        Sentry.captureException(error, {
+          tags: {
+            area: "web-server-fn",
+            operation:
+              "operation" in error && typeof error.operation === "string"
+                ? error.operation
+                : "unknown",
+          },
+        });
         return Effect.fail(
           new Response("Internal Server Error", {
             status: 500,
@@ -167,6 +180,7 @@ export const errorToResponse = (
 
   // Handle unknown errors
   console.error("Unknown error:", error);
+  Sentry.captureException(error, { tags: { area: "web-server-fn" } });
   return Effect.fail(
     new Response("Internal Server Error", {
       status: 500,

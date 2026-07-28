@@ -1,3 +1,4 @@
+import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
@@ -94,9 +95,7 @@ export async function listTodos(c: Context<Env>) {
   const todoIds = userTodos.map((t) => t.id);
   const allUrls: (typeof todoUrls.$inferSelect)[] = [];
   if (todoIds.length > 0) {
-    const CHUNK_SIZE = 100;
-    for (let i = 0; i < todoIds.length; i += CHUNK_SIZE) {
-      const chunkIds = todoIds.slice(i, i + CHUNK_SIZE);
+    for (const chunkIds of chunkForD1(todoIds)) {
       const chunkUrls = await db
         .select()
         .from(todoUrls)

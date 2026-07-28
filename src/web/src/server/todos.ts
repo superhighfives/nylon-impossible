@@ -2,6 +2,7 @@
  * Server functions for todos using Effect for type-safe error handling
  */
 
+import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
@@ -130,23 +131,40 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
       let allResearch: TodoResearch[] = [];
       let allMessages: TodoMessage[] = [];
       if (todoIds.length > 0) {
+        // Batch the id list so each statement stays within D1's bound-param
+        // cap. A given todoId lands in exactly one batch, so per-todo ordering
+        // (urls by position, messages by createdAt) is preserved once results
+        // are grouped by todoId below.
+        const idBatches = chunkForD1(todoIds);
         const [urls, research, messages] = yield* Effect.tryPromise({
           try: () =>
             Promise.all([
-              db
-                .select()
-                .from(todoUrls)
-                .where(inArray(todoUrls.todoId, todoIds))
-                .orderBy(asc(todoUrls.position)),
-              db
-                .select()
-                .from(todoResearch)
-                .where(inArray(todoResearch.todoId, todoIds)),
-              db
-                .select()
-                .from(todoMessages)
-                .where(inArray(todoMessages.todoId, todoIds))
-                .orderBy(asc(todoMessages.createdAt)),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoUrls)
+                    .where(inArray(todoUrls.todoId, ids))
+                    .orderBy(asc(todoUrls.position)),
+                ),
+              ).then((batches) => batches.flat()),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoResearch)
+                    .where(inArray(todoResearch.todoId, ids)),
+                ),
+              ).then((batches) => batches.flat()),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoMessages)
+                    .where(inArray(todoMessages.todoId, ids))
+                    .orderBy(asc(todoMessages.createdAt)),
+                ),
+              ).then((batches) => batches.flat()),
             ]),
           catch: (error) =>
             new DatabaseError({

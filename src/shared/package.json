@@ -6,6 +6,7 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./d1": "./src/d1.ts",
     "./schema": "./src/schema.ts",
     "./recurrence": "./src/recurrence.ts",
     "./recurrence-test-fixtures": "./src/recurrence-test-fixtures.ts",
