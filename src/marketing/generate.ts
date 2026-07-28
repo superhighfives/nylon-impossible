@@ -304,6 +304,53 @@ async function captureWebScreenshots(): Promise<void> {
 // Capture — iOS simulator
 // ---------------------------------------------------------------------------
 
+/** Current CoreSimulator state ("Booted", "Shutdown", …) for a device. */
+function simulatorState(udid: string): string {
+  const raw = execSync("xcrun simctl list devices -j", { encoding: "utf8" });
+  const allDevices = Object.values(
+    (
+      JSON.parse(raw) as {
+        devices: Record<string, Array<{ udid: string; state: string }>>;
+      }
+    ).devices,
+  ).flat();
+  return allDevices.find((d) => d.udid === udid)?.state ?? "unknown";
+}
+
+/**
+ * Boot a simulator and block until it is *fully* booted, throwing if it can't
+ * get there. Under CI load CoreSimulator can drop a freshly-booted device back
+ * to Shutdown; the old code polled `simctl list` for a "Booted" string and then
+ * silently proceeded when the deadline passed, so it tried to install into a
+ * Shutdown device and failed with SimError 405 "Unable to lookup in current
+ * state: Shutdown". Instead we lean on `simctl bootstatus -b` (which boots if
+ * needed and blocks until the device reports booted), verify the state, and
+ * retry the whole cycle a few times before giving up loudly.
+ */
+async function ensureBooted(udid: string): Promise<void> {
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    // `boot` errors if the device is already booted; that's fine, ignore it.
+    spawnSync("xcrun", ["simctl", "boot", udid], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
+    // `-b` boots the device if it isn't already, then blocks until it's fully
+    // booted — far more reliable than polling the device list ourselves.
+    spawnSync("xcrun", ["simctl", "bootstatus", udid, "-b"], {
+      stdio: "pipe",
+      timeout: 120_000,
+    });
+    const state = simulatorState(udid);
+    console.log(`  Simulator state: ${state}`);
+    if (state === "Booted") return;
+    console.log(`  boot attempt ${attempt} did not reach Booted, retrying…`);
+    // Reset to a known state before the next attempt so bootstatus starts clean.
+    spawnSync("xcrun", ["simctl", "shutdown", udid], { stdio: "pipe" });
+    await sleep(5000);
+  }
+  throw new Error(`Simulator ${udid} failed to reach Booted state`);
+}
+
 async function captureIOSScreenshots(): Promise<void> {
   const { project, scheme, bundleId } = manifest.ios;
   const projectPath = join(WORKSPACE_ROOT, project);
@@ -388,21 +435,7 @@ async function captureIOSScreenshots(): Promise<void> {
   await sleep(2000); // extra settle time for the window server connection
 
   console.log(`  Booting simulator: ${device} (${udid})…`);
-  // simctl boot normally exits in <1s (boot is async). Timeout at 30s in case
-  // the CoreSimulator daemon is unresponsive.
-  spawnSync("xcrun", ["simctl", "boot", udid], { stdio: "pipe", timeout: 30_000 });
-  console.log("  Waiting for Booted state…");
-  const bootDeadline = Date.now() + 120_000;
-  while (Date.now() < bootDeadline) {
-    const raw = execSync("xcrun simctl list devices -j", { encoding: "utf8" });
-    const allDevices = Object.values(
-      (JSON.parse(raw) as { devices: Record<string, Array<{ udid: string; state: string }>> }).devices
-    ).flat();
-    const state = allDevices.find((d) => d.udid === udid)?.state ?? "unknown";
-    console.log(`  Simulator state: ${state}`);
-    if (state === "Booted") break;
-    await sleep(2000);
-  }
+  await ensureBooted(udid);
 
   console.log("  Installing app…");
   let installErr: unknown;
@@ -415,6 +448,9 @@ async function captureIOSScreenshots(): Promise<void> {
       installErr = err;
       console.log(`  install attempt ${attempt} failed, retrying…`);
       await sleep(5000);
+      // Install fails with SimError 405 when the device has slipped back to
+      // Shutdown, so make sure it's booted again before the next attempt.
+      await ensureBooted(udid);
     }
   }
   if (installErr) throw installErr;
