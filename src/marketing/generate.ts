@@ -329,11 +329,6 @@ function simulatorState(udid: string): string {
  */
 async function ensureBooted(udid: string): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
-    // `boot` errors if the device is already booted; that's fine, ignore it.
-    spawnSync("xcrun", ["simctl", "boot", udid], {
-      stdio: "pipe",
-      timeout: 30_000,
-    });
     // `-b` boots the device if it isn't already, then blocks until it's fully
     // booted — far more reliable than polling the device list ourselves.
     spawnSync("xcrun", ["simctl", "bootstatus", udid, "-b"], {
@@ -345,7 +340,11 @@ async function ensureBooted(udid: string): Promise<void> {
     if (state === "Booted") return;
     console.log(`  boot attempt ${attempt} did not reach Booted, retrying…`);
     // Reset to a known state before the next attempt so bootstatus starts clean.
-    spawnSync("xcrun", ["simctl", "shutdown", udid], { stdio: "pipe" });
+    // Timed like its siblings so a hung shutdown can't wedge the retry loop.
+    spawnSync("xcrun", ["simctl", "shutdown", udid], {
+      stdio: "pipe",
+      timeout: 30_000,
+    });
     await sleep(5000);
   }
   throw new Error(`Simulator ${udid} failed to reach Booted state`);
