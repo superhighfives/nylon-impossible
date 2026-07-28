@@ -146,7 +146,12 @@ function RootDocument() {
         {/* Must run before paint to reconcile the client-hint cookies. */}
         <ClientHintCheck />
         <HeadContent />
-        <meta name="theme-color" content={THEME_COLOR[hints.colorScheme]} />
+        <meta
+          name="theme-color"
+          content={
+            hints.colorScheme === "dark" ? THEME_COLOR.dark : THEME_COLOR.light
+          }
+        />
       </head>
       <body className="min-h-full bg-gray-app text-gray antialiased">
         <HintsProvider hints={hints}>
