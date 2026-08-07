@@ -141,10 +141,23 @@ jobs:
 
       - name: Ensure preview research queue exists
         working-directory: src/api
-        run: pnpm exec wrangler queues create nylon-impossible-research-pr-${{ github.event.pull_request.number }} 2>&1 || true
+        run: |
+          set +e
+          output=$(pnpm exec wrangler queues create "nylon-impossible-research-pr-$PR" 2>&1)
+          status=$?
+          echo "$output"
+          # "already taken" means a prior deploy of this same PR already created
+          # it — expected on re-push, not a real failure. Anything else (auth,
+          # rate limit, quota) should fail the job instead of deploying a
+          # preview silently missing its queue.
+          if [ $status -ne 0 ] && ! echo "$output" | grep -qi "already taken"; then
+            echo "::error::Failed to create the preview research queue for an unexpected reason (see output above)."
+            exit 1
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR: ${{ github.event.pull_request.number }}
 
       - name: Rewrite API wrangler config for preview
         uses: actions/github-script@v9
@@ -308,26 +321,71 @@ jobs:
       contents: read
 
     steps:
-      - name: Delete preview API worker
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: delete --name nylon-impossible-api-pr-${{ github.event.pull_request.number }} --force
-        continue-on-error: true
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
 
-      - name: Delete preview Web worker
-        uses: cloudflare/wrangler-action@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: delete --name nylon-impossible-pr-${{ github.event.pull_request.number }} --force
-        continue-on-error: true
+          node-version: 22
 
-      - name: Delete preview research queue
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: queues delete nylon-impossible-research-pr-${{ github.event.pull_request.number }}
-        continue-on-error: true
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install dependencies
+        working-directory: src/api
+        run: pnpm install
+
+      # A Worker can't be deleted while it's a registered consumer of a Queue,
+      # and a Queue can't be deleted while any Worker still has a binding
+      # (producer or consumer) referencing it — so this has to happen in this
+      # exact order: unregister the consumer, delete the workers (which also
+      # clears their producer bindings, since those live in the worker's own
+      # config), then delete the queue.
+      #
+      # "does not exist" from any of these steps is expected and benign — the
+      # PR may have closed before deploy-preview ever ran, or a prior run of
+      # this same job may have already cleaned it up. Anything else is a real
+      # failure and should fail the job so it's visible, instead of silently
+      # leaking a Worker or Queue the way the old continue-on-error version did
+      # for months (see plans/done/2026-08-07-clean-up-orphaned-preview-resources.md).
+      - name: Clean up preview resources
+        working-directory: src/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          set +e
+          failed=0
+
+          run_step() {
+            local desc="$1"; shift
+            echo "::group::$desc"
+            output=$("$@" 2>&1)
+            status=$?
+            echo "$output"
+            echo "::endgroup::"
+            if [ $status -ne 0 ]; then
+              if echo "$output" | grep -qi "does not exist"; then
+                echo "$desc: already gone, ok"
+              else
+                echo "::error::$desc failed unexpectedly"
+                failed=1
+              fi
+            fi
+          }
+
+          run_step "Remove queue consumer" \
+            pnpm exec wrangler queues consumer remove "nylon-impossible-research-pr-$PR" "nylon-impossible-api-pr-$PR"
+
+          run_step "Delete API worker" \
+            pnpm exec wrangler delete --name "nylon-impossible-api-pr-$PR" --force
+
+          run_step "Delete Web worker" \
+            pnpm exec wrangler delete --name "nylon-impossible-pr-$PR" --force
+
+          run_step "Delete research queue" \
+            pnpm exec wrangler queues delete "nylon-impossible-research-pr-$PR"
+
+          exit $failed
