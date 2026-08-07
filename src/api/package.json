@@ -13,7 +13,8 @@
     "check": "biome check --config-path ../..",
     "check:fix": "biome check --write --config-path ../..",
     "cf-typegen": "wrangler types",
-    "probe": "tsx scripts/probe-research.ts"
+    "probe": "tsx scripts/probe-research.ts",
+    "db:check-meta": "node scripts/check-migrations-meta.mjs"
   },
   "dependencies": {
     "@clerk/backend": "^3.10.0",

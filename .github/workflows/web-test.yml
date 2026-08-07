@@ -48,6 +48,10 @@ jobs:
         if: steps.changes.outputs.src == 'true'
         run: pnpm api:check && pnpm api:typecheck
 
+      - name: Check migration metadata
+        if: steps.changes.outputs.src == 'true'
+        run: pnpm --filter @nylon-impossible/api db:check-meta
+
       - name: Lint & typecheck Web
         if: steps.changes.outputs.src == 'true'
         run: pnpm web:check && pnpm web:typecheck

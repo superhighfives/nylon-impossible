@@ -15,6 +15,7 @@
     "db:migrate": "CI=true wrangler d1 migrations apply nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote -c src/api/wrangler.jsonc",
     "db:generate": "drizzle-kit generate --config src/api/drizzle.config.ts",
+    "db:check-meta": "pnpm --filter @nylon-impossible/api db:check-meta",
     "db:studio": "drizzle-kit studio --config src/api/drizzle.config.ts",
     "db:push": "drizzle-kit push --config src/api/drizzle.config.ts",
     "db:reset": "./scripts/db-reset.sh",
