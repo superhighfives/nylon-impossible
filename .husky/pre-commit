@@ -12,5 +12,10 @@ if ! pnpm check:fix; then
   exit 1
 fi
 
+if ! pnpm db:check-meta; then
+  rm -f "$tmp"
+  exit 1
+fi
+
 [ -s "$tmp" ] && xargs -0 git add -- <"$tmp"
 rm -f "$tmp"

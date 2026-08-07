@@ -5,15 +5,148 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1772579435050,
+      "when": 1772579856000,
       "tag": "0000_sticky_bushwacker",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "6",
-      "when": 1772635240743,
+      "when": 1772644746000,
       "tag": "0001_nifty_thunderbolts",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1774488984000,
+      "tag": "0002_add_user_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1774566479000,
+      "tag": "0003_add_ai_processing_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1774651117000,
+      "tag": "0004_add_todo_research",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1774651117000,
+      "tag": "0005_add_research_id_to_todo_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1774651117000,
+      "tag": "0006_add_user_location",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1774896210000,
+      "tag": "0007_add_image_to_todo_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1774968443000,
+      "tag": "0007_rename_description_to_notes",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1777964499000,
+      "tag": "0008_add_search_query_to_todo_research",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1780682183000,
+      "tag": "0009_add_recurrence_to_todos",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1781999608000,
+      "tag": "0010_add_todo_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1782956130000,
+      "tag": "0011_add_user_plan",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1783114277000,
+      "tag": "0012_add_google_task_id_to_todos",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1783233721000,
+      "tag": "0013_add_user_theme",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1783313138000,
+      "tag": "0014_unique_user_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1783313138000,
+      "tag": "0015_add_user_hide_completed",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1783394416000,
+      "tag": "0016_add_completed_at_to_todos",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1783790750000,
+      "tag": "0017_add_parent_id_to_todos",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1784143018000,
+      "tag": "0018_add_show_preview_to_todo_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1784947718000,
+      "tag": "0019_add_gmail_addon_links",
       "breakpoints": true
     }
   ]
