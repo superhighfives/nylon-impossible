@@ -1,8 +1,8 @@
 ---
 title: Gmail / Workspace Side-Panel Add-on
-status: Ready
+status: Complete
 created: 2026-07-17
-updated: 2026-07-17
+updated: 2026-07-26
 ---
 
 ## Problem
@@ -276,3 +276,50 @@ Marketplace review entirely while validating; pursue a Marketplace listing later
 - [projects.deployments REST resource](https://developers.google.com/workspace/add-ons/reference/rest/v1/projects.deployments)
 - In-repo prior art: `src/api/src/handlers/import-google-tasks.ts`,
   `src/api/src/handlers/smart-create.ts`, `src/api/src/lib/auth.ts`.
+
+## Overview
+
+Shipped as specced: a Google Workspace Add-on for Gmail on the HTTP-endpoint
+model, with a homepage card (open todos + quick-add) and a contextual "Add to
+Nylon" card pre-filled from the open message, both living on the API Worker
+with no Apps Script or second language. Two follow-up rounds landed after the
+initial ship: attaching the source Gmail message as a rich preview inside the
+created todo (not just a bare URL), and two live-deployment fixes (token
+audience handling, connect-card refresh) found once the add-on was actually
+installed against Google's real infrastructure.
+
+## Architecture
+
+- **Core PR** (`82f81da` / #247): matches the plan's file layout closely —
+  `handlers/gmail-addon/{homepage,contextual,actions,shared}.ts`,
+  `lib/addon-auth.ts` (`verifyGoogleIdToken` + `resolveNylonUser`),
+  `lib/addon-cards.ts` (pure card builders), `lib/create-todo.ts` (extracted
+  `createSmartTodo`), `lib/todos-core.ts` (`listOpenTodos` /
+  `setTodoCompleted`), migration `0019_add_gmail_addon_links.sql`. `smart-create.ts`
+  was reduced to a thin wrapper as planned. Auth verification used `jose` +
+  JWKS as anticipated.
+- **Deviation — state signing.** The plan's connect flow used a "signed
+  state" param without specifying the mechanism; shipped as an HMAC-signed
+  state via a shared `addon-state` helper so a Google `sub` can't be bound to
+  someone else's Clerk account.
+- **Deviation — audience config.** The plan assumed one endpoint URL for
+  `GMAIL_ADDON_AUDIENCE`. In practice Google signs each alternate-runtime
+  request with `aud` set to the *exact* endpoint it POSTs to (homepage vs.
+  contextual vs. actions all differ), so `GMAIL_ADDON_AUDIENCE` had to become
+  a comma-separated allow-list of every endpoint (`1d1067d` / #259) — found
+  only after a real deployment started 401-ing on every card, confirming the
+  plan's own flagged "implementation spike" risk around token/claim
+  specifics.
+- **Addition — connect-card refresh.** The plan's connect card sent the user
+  to the web to link accounts but had no way to reflect that back into the
+  still-open Gmail panel. Added an "I've connected" button backed by a new
+  `/gmail-addon/actions/refresh` endpoint that re-resolves identity in place.
+- **Addition — rich email attachment (#258).** Beyond the plan's "thread
+  permalink as the todo URL," the contextual card's created todo now carries
+  a structured email preview (subject, sender) rendered as its own
+  `EmailPreviewCard` on both web and iOS, via a small `email-urls.ts` helper
+  that distinguishes Gmail message URLs from generic links.
+- Scopes stayed light as planned: current-message metadata + addon execute
+  only, no `gmail.readonly`, no message body persistence.
+- iOS parity for the email-preview addition was included in the same PR
+  (`EmailPreviewCard.swift`), not deferred.
