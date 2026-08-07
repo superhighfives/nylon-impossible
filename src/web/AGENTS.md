@@ -148,10 +148,10 @@ import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui"
 ```tsx
 <Select
   size="sm"
-  items={[{ value: "low", label: "Low" }, { value: "high", label: "High" }]}
+  items={[{ value: "a", label: "Option A" }, { value: "b", label: "Option B" }]}
   placeholder="Select an option"
-  value={status}
-  onValueChange={setStatus}
+  value={value}
+  onValueChange={setValue}
 />
 ```
 
