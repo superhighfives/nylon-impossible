@@ -36,7 +36,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { InlineDueDate, InlinePriority } from "@/components/InlineTodoControls";
+import { InlineDueDate } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
@@ -131,23 +131,20 @@ interface ExpandedSectionProps {
     title?: string;
     notes?: string | null;
     dueDate?: Date | null;
-    priority?: "high" | "low" | null;
   }) => void;
   onDelete: (id: string) => void;
   deletePending: boolean;
   subtaskHandlers: SubtaskHandlers;
 }
 
-/** Indicator badges for due date, priority, and recurrence */
+/** Indicator badges for due date and recurrence */
 function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   const { timeZone } = useHints();
   const now = new Date();
   const hasDueDate = !!todo.dueDate;
-  // Only show priority badge for explicit "high" or "low" values
-  const hasPriority = todo.priority === "high" || todo.priority === "low";
   const hasRecurrence = !!todo.recurrence;
 
-  if (!hasDueDate && !hasPriority && !hasRecurrence) return null;
+  if (!hasDueDate && !hasRecurrence) return null;
 
   const dueDate = todo.dueDate ? new Date(todo.dueDate) : null;
   const isCompleted = isEffectivelyCompleted(todo, timeZone, now);
@@ -158,17 +155,6 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
   if (isCompleted && hasRecurrence && dueDate) {
     return (
       <div className="flex items-center gap-1.5 mt-1">
-        {hasPriority && (
-          <span
-            className={`text-xs px-1.5 py-0.5 rounded-md ${
-              todo.priority === "high"
-                ? "bg-yellow-base hover:bg-yellow-hover active:bg-yellow-active text-yellow-muted"
-                : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
-            }`}
-          >
-            {todo.priority === "high" ? "High" : "Low"}
-          </span>
-        )}
         <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted">
           <Clock size={10} />
           Next: {relativeDay(dueDate, timeZone, now)}
@@ -184,17 +170,6 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
-      {hasPriority && (
-        <span
-          className={`text-xs px-1.5 py-0.5 rounded-md ${
-            todo.priority === "high"
-              ? "bg-yellow-base hover:bg-yellow-hover active:bg-yellow-active text-yellow-muted"
-              : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
-          }`}
-        >
-          {todo.priority === "high" ? "High" : "Low"}
-        </span>
-      )}
       {hasDueDate && dueDate && (
         <span
           className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
@@ -258,14 +233,12 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
 }
 
 /**
- * Editable indicators for an active todo: inline priority + due-date controls
- * (set values render as badges; unset ones as faint hover affordances) plus a
- * read-only recurrence badge. Rendered inline in the row's right-hand action
- * cluster, next to the expand control.
+ * Editable indicators for an active todo: inline due-date control (set values
+ * render as badges; unset ones as faint hover affordances) plus a read-only
+ * recurrence badge. Rendered inline in the row's right-hand action cluster,
+ * next to the expand control.
  */
 function InlineIndicators({
-  priority,
-  onPriorityChange,
   dueValue,
   dueLabel,
   isOverdue,
@@ -274,8 +247,6 @@ function InlineIndicators({
   recurrenceLabel,
   disabled,
 }: {
-  priority: "high" | "low" | null;
-  onPriorityChange: (next: "high" | "low" | null) => void;
   dueValue: string | null;
   dueLabel: string | null;
   isOverdue: boolean;
@@ -286,11 +257,6 @@ function InlineIndicators({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <InlinePriority
-        value={priority}
-        onChange={onPriorityChange}
-        disabled={disabled}
-      />
       <InlineDueDate
         value={dueValue}
         label={dueLabel}
@@ -356,9 +322,9 @@ function TodoItemContent({
     researchPending ||
     !!todo.needsInput;
 
-  // Inline due-date / priority editing on active rows. Set values render as
-  // editable badges (bottom-left); the quick-add affordances for unset values
-  // live in the right-side hover cluster. Recurrence stays read-only inline (its
+  // Inline due-date editing on active rows. Set values render as editable
+  // badges (bottom-left); the quick-add affordances for unset values live in
+  // the right-side hover cluster. Recurrence stays read-only inline (its
   // anchor logic belongs in the expanded form).
   const dueDateObj = todo.dueDate ? new Date(todo.dueDate) : null;
   const dueValueStr = dueDateObj
@@ -369,9 +335,6 @@ function TodoItemContent({
   const hasRecurrence = !!todo.recurrence;
   const showInlineEditing = !isCompleted;
 
-  const handleInlinePriority = (next: "high" | "low" | null) => {
-    onInlineUpdate(todo.id, { priority: next });
-  };
   const handleInlineDueDate = (date: Date | null) => {
     // Clearing a due date also clears any recurrence — a repeat has no anchor
     // without a due date. Setting/changing a date leaves recurrence untouched.
@@ -516,7 +479,7 @@ function TodoItemContent({
               })()}
           </>
         )}
-        {/* Active rows edit priority/due inline in the right-hand cluster; only
+        {/* Active rows edit due date inline in the right-hand cluster; only
             completed rows keep the read-only indicators below the title. */}
         {!showInlineEditing && <TodoIndicators todo={todo} />}
       </div>
@@ -524,13 +487,11 @@ function TodoItemContent({
           hugs the title instead of stretching to the taller control. */}
       {showActions && (
         <div className="flex shrink-0 items-center gap-1.5">
-          {/* Inline priority + due-date controls sit on one line with the
-              expand control. Hidden when expanded — the expanded form has its
-              own full editors. */}
+          {/* Inline due-date control sits on one line with the expand
+              control. Hidden when expanded — the expanded form has its own
+              full editors. */}
           {showInlineEditing && !isExpanded && (
             <InlineIndicators
-              priority={todo.priority ?? null}
-              onPriorityChange={handleInlinePriority}
               dueValue={dueValueStr}
               dueLabel={dueLabel}
               isOverdue={isOverdue}
@@ -595,7 +556,6 @@ function SortableTodoItem(
       title?: string;
       notes?: string | null;
       dueDate?: Date | null;
-      priority?: "high" | "low" | null;
     }) => void;
     subtaskHandlers: SubtaskHandlers;
   },
@@ -882,7 +842,7 @@ export function TodoList() {
     setExpandedId((prev) => (prev === id ? null : id));
   };
 
-  // Inline row edits (due date / priority) go straight through the optimistic
+  // Inline row edits (due date) go straight through the optimistic
   // updateTodo mutation — no expanded form, no save step.
   const handleInlineUpdate = (id: string, updates: UpdateTodoInput) => {
     updateTodo.mutate({ id, input: updates });
@@ -894,7 +854,6 @@ export function TodoList() {
       title?: string;
       notes?: string | null;
       dueDate?: Date | null;
-      priority?: "high" | "low" | null;
     }) => {
       updateTodo.mutate({ id, input: updates });
     };

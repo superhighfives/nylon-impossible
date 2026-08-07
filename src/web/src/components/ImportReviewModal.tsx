@@ -98,7 +98,6 @@ export function ImportReviewModal() {
       completedAt: null,
       position: "",
       dueDate: review.dueDate,
-      priority: null,
       recurrence: null,
       aiStatus: "pending",
       needsInput: false,

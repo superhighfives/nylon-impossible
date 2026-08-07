@@ -48,7 +48,6 @@ const syncRequestSchema = z.object({
       completed: z.boolean().optional(),
       position: z.string().optional(),
       dueDate: z.coerce.date().nullable().optional(),
-      priority: z.enum(["high", "low"]).nullable().optional(),
       recurrence: recurrenceSchema.nullable().optional(),
       // When a repeat is completed, the client advances dueDate and sends the
       // completion timestamp here (completed stays false). Cleared to null to
@@ -150,7 +149,6 @@ function serializeTodo(
     completedAt: todo.completedAt?.toISOString() ?? null,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
-    priority: todo.priority,
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus,
     needsInput: todo.needsInput,
@@ -361,10 +359,6 @@ export async function syncTodos(c: Context<Env>) {
             completedAt: completedAtToWrite,
             position: change.position ?? existing.position,
             dueDate: dueDateToWrite,
-            priority:
-              change.priority !== undefined
-                ? change.priority
-                : existing.priority,
             recurrence: nextRecurrence,
             updatedAt: change.updatedAt,
           })
@@ -442,7 +436,6 @@ export async function syncTodos(c: Context<Env>) {
           completedAt: change.completedAt ?? null,
           position: change.position ?? generateKeyBetween(null, null),
           dueDate: change.dueDate ?? null,
-          priority: change.priority ?? null,
           // A subtask never recurs (recurrence is top-level only).
           recurrence: parentId ? null : (change.recurrence ?? null),
           createdAt: change.updatedAt,

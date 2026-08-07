@@ -4,7 +4,6 @@
  * This module ONLY extracts metadata from todo text:
  * - URLs/domains (removed from title, returned separately)
  * - Due dates from natural language
- * - Priority if mentioned
  *
  * It does NOT rephrase or rewrite the title - only cleans out URLs.
  */
@@ -13,7 +12,6 @@ export interface TodoEnrichment {
   title: string; // Original title with URLs removed
   urls?: string[];
   dueDate?: string; // ISO date string YYYY-MM-DD
-  priority?: "high" | "low";
   recurrence?: {
     frequency: "daily" | "weekly" | "monthly" | "yearly";
   };
@@ -71,7 +69,7 @@ export const enrichTodoTool = {
   function: {
     name: "enrich_todo",
     description:
-      "Extract metadata from a todo item. Find URLs/domains and remove them from the title. Extract due dates and priority. Do NOT rephrase or rewrite the title - only remove URLs from it.",
+      "Extract metadata from a todo item. Find URLs/domains and remove them from the title. Extract due dates. Do NOT rephrase or rewrite the title - only remove URLs from it.",
     parameters: {
       type: "object",
       properties: {
@@ -92,12 +90,6 @@ export const enrichTodoTool = {
           type: "string",
           description:
             "Due date in ISO format (YYYY-MM-DD). Convert relative dates like 'tomorrow', 'next week', 'Friday' to absolute ISO dates based on today's date.",
-        },
-        priority: {
-          type: "string",
-          enum: ["high", "low"],
-          description:
-            "Extract priority if mentioned. Look for words like 'urgent', 'important', 'high priority', 'asap' (high) or 'low priority', 'whenever', 'not urgent' (low).",
         },
         recurrence: {
           type: "object",
@@ -173,9 +165,8 @@ export function getSystemPrompt(): string {
 Your ONLY job is to extract metadata from the user's text:
 1. URLs/domains - find them and remove them from the title
 2. Due dates - convert relative dates to ISO format
-3. Priority - if mentioned
-4. Recurrence - "every day"/"daily", "every Monday"/"weekly", "monthly", "yearly". Pair with a dueDate for the next matching occurrence.
-5. Research intent - questions, comparisons, "look up", "how to", venue references
+3. Recurrence - "every day"/"daily", "every Monday"/"weekly", "monthly", "yearly". Pair with a dueDate for the next matching occurrence.
+4. Research intent - questions, comparisons, "look up", "how to", venue references
 
 CRITICAL RULES:
 - Do NOT rephrase, reword, or rewrite the title
@@ -202,9 +193,7 @@ Examples:
 - "Research https://google.com" → { title: "Research google.com", urls: ["https://google.com"] }
 - "Check out https://example.com/page tomorrow" → { title: "Check out tomorrow", urls: ["https://example.com/page"], dueDate: "${today}" }
 - "Buy milk" → { title: "Buy milk" } (no research - plain action)
-- "Urgent: call mom" → { title: "Urgent: call mom", priority: "high" } (no research - plain action)
 - "github.com/user/repo review this" → { title: "review this", urls: ["https://github.com/user/repo"] }
-- "Low priority fix the bug" → { title: "Low priority fix the bug", priority: "low" } (no research - plain action)
 - "Meeting next Friday" → { title: "Meeting next Friday", dueDate: "[next Friday's date]" }
 - "Every Monday review backlog" → { title: "review backlog", dueDate: "[next Monday]", recurrence: { frequency: "weekly" } }
 - "Daily standup at 10am" → { title: "Daily standup at 10am", dueDate: "${today}", recurrence: { frequency: "daily" } }
@@ -380,7 +369,7 @@ function runWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 }
 
 /**
- * Enrich a todo with extracted metadata (URLs, due date, priority).
+ * Enrich a todo with extracted metadata (URLs, due date).
  * Does NOT rephrase the title - only removes URLs from it.
  */
 export async function enrichTodo(
@@ -461,7 +450,6 @@ export async function enrichTodo(
       keys: Object.keys(enrichment ?? {}),
       hasUrls: Array.isArray(enrichment?.urls) && enrichment.urls.length > 0,
       hasDueDate: Boolean(enrichment?.dueDate),
-      hasPriority: Boolean(enrichment?.priority),
       hasResearch: Boolean(enrichment?.research),
       titleChanged: enrichment?.title !== text,
     });
@@ -507,12 +495,11 @@ export async function enrichTodo(
     }
   }
 
-  // If nothing was extracted (no URLs, no date, no priority, no research, no
+  // If nothing was extracted (no URLs, no date, no research, no
   // question, no subtasks), return null
   const hasEnrichment =
     (enrichment.urls && enrichment.urls.length > 0) ||
     enrichment.dueDate ||
-    enrichment.priority ||
     enrichment.research ||
     enrichment.question ||
     (enrichment.subtasks && enrichment.subtasks.length > 0);

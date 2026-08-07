@@ -83,13 +83,11 @@ final class TodoViewModel {
         title: String,
         notes: String?,
         dueDate: Date?,
-        priority: TodoPriority?,
         recurrence: Recurrence?
     ) {
         todo.title = title
         todo.itemNotes = notes
         todo.dueDate = dueDate
-        todo.todoPriority = priority
         todo.recurrence = recurrence
         todo.markModified()
     }

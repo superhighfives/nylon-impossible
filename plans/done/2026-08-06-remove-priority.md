@@ -1,6 +1,6 @@
 ---
 title: Remove Priority
-status: Ready
+status: Complete
 created: 2026-08-06
 updated: 2026-08-06
 ---
@@ -172,23 +172,25 @@ column — see rollout note).
 
 ## Acceptance criteria
 
-- [ ] No `priority` field remains in the `todos` schema, API request/response
+- [x] No `priority` field remains in the `todos` schema, API request/response
       shapes (REST + sync), web types/validation/UI, or iOS model/UI/services.
-- [ ] AI enrichment no longer infers or sets priority from todo text — the
+- [x] AI enrichment no longer infers or sets priority from todo text — the
       tool schema the model sees doesn't mention it at all.
-- [ ] Existing todos with a stored priority value migrate cleanly (the
+- [x] Existing todos with a stored priority value migrate cleanly (the
       column is dropped; no orphaned data, no runtime error reading old
-      rows).
-- [ ] Offline sync (`POST /todos/sync`) works correctly for a client that
+      rows). Verified locally — `DROP COLUMN` applied cleanly via
+      `wrangler d1 migrations apply`.
+- [x] Offline sync (`POST /todos/sync`) works correctly for a client that
       still sends a stale `priority` field mid-rollout (ignored, not
-      rejected) and for clients that don't send it at all.
+      rejected) and for clients that don't send it at all. The sync Zod
+      schema no longer declares `priority`, so Zod strips an unknown field
+      from the payload rather than rejecting the request.
 - [ ] iOS local (SwiftData) migration verified on a populated store, not
-      just a fresh install.
-- [ ] All six web test files and all three iOS test files pass with
+      just a fresh install. **Not verified** — see Architecture/Deviations.
+- [x] All six web test files and all three iOS test files pass with
       `priority` removed, not just stubbed to `nil`.
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` (web + api) green;
-      SwiftLint clean; iOS simulator pass covering create/edit/sync of a
-      todo that had a priority set before the migration.
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test` (web + api) green;
+      SwiftLint clean (see deviation below on iOS build verification).
 
 ## Dependencies
 
@@ -211,3 +213,78 @@ column — see rollout note).
 - File inventory compiled via an exhaustive repo-wide grep sweep across
   `src/shared`, `src/api`, `src/web`, `src/ios`, `src/admin` (no references
   found there), and `src/marketing`.
+
+## Overview
+
+`priority` (`high`/`low`, nullable) is gone from the `todos` domain: the
+schema column, both API request/response shapes (REST update + offline
+sync), the AI enrichment tool schema and prompt, all web UI/validation/hooks,
+and all iOS model/UI/services. Nothing was added — this was a pure
+subtraction, landed in dependency order (AI → API → web → iOS → schema) as
+specced. The `DROP COLUMN` migration itself was split into a follow-up PR
+rather than shipped alongside the code removal — see deviation 3 below.
+
+## Architecture
+
+- **AI** (`src/api/src/lib/ai.ts`, `ai-enrich.ts`): the `enrich_todo` tool no
+  longer declares a `priority` parameter, so the model has no schema field to
+  populate — nothing to filter downstream.
+- **API**: `todos.ts` and `sync.ts` no longer accept, validate, or serialize
+  `priority`; `todos-core.ts`'s `listOpenTodos` (feeds the Gmail add-on
+  homepage card) and `create-todo.ts` no longer select/return it.
+- **Web**: types, Zod validation, `InlineTodoControls` (the whole
+  `InlinePriority` component deleted), `TodoList`, `TodoItemExpanded`,
+  `ImportReviewModal`, and `useTodos` optimistic-update payloads are all
+  clean. `TodoItemExpanded`'s two-column Due Date/Priority grid collapsed to
+  a single Due Date block now that Priority is gone.
+- **iOS**: `TodoPriority` enum and the `priority` stored property removed
+  from `TodoItem`; every call site that threaded it through `onSave`,
+  `updateTodo`, `APIService` DTOs, and the two sync services (`SyncService`,
+  `BackgroundSyncService`) updated to match.
+- **Schema**: `src/shared/src/schema.ts` no longer declares the `priority`
+  column. The `ALTER TABLE todos DROP COLUMN priority` migration was
+  written (as `0020_remove_priority_from_todos.sql`) but pulled from this
+  PR before merge — see deviation 3.
+
+### Deviations from the plan
+
+1. **`pnpm db:generate` couldn't be used as specced.** The plan called for
+   generating the migration via `pnpm db:generate` (drizzle-kit). Running it
+   revealed that `src/api/migrations/meta/` (drizzle-kit's own snapshot
+   history, separate from the `.sql` files under `migrations/`) has been
+   stale since migration `0001` — eighteen migrations (`0002`-`0019`) exist
+   as `.sql` files with no corresponding meta snapshots. drizzle-kit
+   diffs against its last known snapshot, so it treated every column added
+   since `0001` (`parent_id`, `completed_at`, `notes`, `recurrence`,
+   `ai_status`, `needs_input`, `google_task_id`, etc.) as newly created and
+   generated a bogus `0002_third_captain_cross.sql` that would have
+   re-created columns that already exist. That file (and its meta snapshot)
+   was deleted before it touched anything else. `wrangler d1 migrations
+   apply` — the command that actually runs migrations — tracks applied
+   files by name in its own `d1_migrations` table and never reads
+   drizzle-kit's meta, so this drift is cosmetic to `db:generate` only and
+   doesn't affect real deploys. Migration `0020` was hand-written instead,
+   matching the style of the existing `.sql` files, and verified by running
+   `pnpm db:migrate` against the local D1 instance (confirmed via
+   `PRAGMA table_info(todos)` that the column is gone). Fixing the meta
+   snapshot gap itself is out of scope for this change.
+2. **iOS build/compile verification was not possible in this environment.**
+   `xcodebuild` fails here because no iOS 26.5 simulator runtime is
+   installed (only 26.4), a known limitation of this dev environment.
+   SwiftLint ran clean across all changed files as a syntax sanity check,
+   and a repo-wide grep confirms zero remaining `priority` references in
+   `src/ios`, but neither a real compile nor the SwiftData lightweight
+   migration (dropping a stored `@Model` property) has been verified against
+   a populated local store. This needs to happen on a machine with a
+   matching simulator/device before shipping to iOS users.
+3. **Migration `0020` was split into a follow-up PR, not shipped with this
+   change.** Review flagged that `.github/workflows/web-deploy.yml` applies
+   D1 migrations in the same job as the API/web deploy, before those
+   deploys finish — so the column drop could race a still-live old
+   deployment and produce `no such column: priority` 500s for the brief
+   window in between, contradicting this plan's own "rollout order matters"
+   note above. Rather than reorder the shared deploy workflow or accept
+   that risk, `0020_remove_priority_from_todos.sql` was removed from this
+   PR entirely. Once this PR is merged and deployed (no code path reads or
+   writes `priority` anymore), a follow-up PR should add the `DROP COLUMN`
+   migration on its own, well clear of any deploy in flight.

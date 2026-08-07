@@ -13,7 +13,7 @@ struct TodoItemRow: View {
     let urls: [APITodoUrl]
     var subtasks: [TodoItem] = []
     var onToggle: () -> Void
-    var onSave: (String, String?, Date?, TodoPriority?, Recurrence?) -> Void
+    var onSave: (String, String?, Date?, Recurrence?) -> Void
     var onAddSubtask: (String) -> Void = { _ in }
     var onToggleSubtask: (TodoItem) -> Void = { _ in }
     var onDeleteSubtask: (TodoItem) -> Void = { _ in }
@@ -30,25 +30,16 @@ struct TodoItemRow: View {
         urls.filter { $0.researchId == nil }
     }
 
-    /// Priority + due-date + recurrence pills shown under the title, mirroring
-    /// the web `TodoIndicators` row. Only explicit priorities render a badge.
+    /// Due-date + recurrence pills shown under the title, mirroring
+    /// the web `TodoIndicators` row.
     @ViewBuilder
     private var indicatorBadges: some View {
-        let priority = todo.todoPriority
         // A completed repeat has already rolled its dueDate forward to the next
         // occurrence, so show when it next comes back ("Next: Tomorrow") in
         // place of the schedule label and due-date pills. Mirrors web.
         let isCompletedRecurring = todo.isEffectivelyCompleted && todo.recurrence != nil
-        if priority != nil || todo.dueDate != nil || todo.recurrence != nil {
+        if todo.dueDate != nil || todo.recurrence != nil {
             HStack(spacing: 6) {
-                if let priority {
-                    badge(
-                        priority == .high ? "High" : "Low",
-                        foreground: priority == .high ? Color.appAccent : Color.appSubtle,
-                        background: priority == .high ? Color.appBrand.opacity(0.22) : Color.appTint
-                    )
-                }
-
                 if isCompletedRecurring, let dueDate = todo.dueDate {
                     nextBadge(relativeDay(dueDate))
                 } else {
@@ -277,8 +268,7 @@ struct TodoItemRow: View {
                 showingEditSheet = true
             }) {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Title row with AI status. Priority is shown as a labeled
-                    // badge below the title (see indicators row), matching web.
+                    // Title row with AI status.
                     HStack(spacing: 6) {
                         Text(todo.title)
                             .font(.system(size: todo.isEffectivelyCompleted ? 13 : 16))
@@ -360,7 +350,7 @@ struct TodoItemRow: View {
                         }
                     }
 
-                    // Priority and due-date badges — labeled pills, matching
+                    // Due-date badges — labeled pills, matching
                     // web's indicator row.
                     indicatorBadges
                 }
@@ -385,8 +375,8 @@ struct TodoItemRow: View {
                 apiService: apiService,
                 initialUrls: urls,
                 subtasks: subtasks,
-                onSave: { title, notes, dueDate, priority, recurrence in
-                    onSave(title, notes, dueDate, priority, recurrence)
+                onSave: { title, notes, dueDate, recurrence in
+                    onSave(title, notes, dueDate, recurrence)
                     showingEditSheet = false
                 },
                 onCancel: {
@@ -410,19 +400,17 @@ struct TodoItemRow: View {
                 todo: {
                     let item = TodoItem(title: "Buy groceries")
                     item.dueDate = Date().addingTimeInterval(86400)
-                    item.priority = "high"
                     return item
                 }(),
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _, _ in }
+                onSave: { _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
                     let item = TodoItem(title: "Research dogs")
                     item.isCompleted = true
-                    item.priority = "high"
                     item.researchStatus = "completed"
                     item.researchSummary = "Domestic dogs evolved from wolves…"
                     item.itemNotes = "Follow up on breed groups"
@@ -431,7 +419,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _, _ in }
+                onSave: { _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -444,7 +432,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _, _ in }
+                onSave: { _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -455,7 +443,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _, _ in }
+                onSave: { _, _, _, _ in }
             )
         }
         .padding()

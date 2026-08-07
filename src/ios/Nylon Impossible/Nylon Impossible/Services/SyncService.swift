@@ -220,7 +220,6 @@ final class SyncService {
                 completed: todo.isDeleted ? nil : todo.isCompleted,
                 position: todo.isDeleted ? nil : todo.position,
                 dueDate: todo.isDeleted ? nil : todo.dueDate,
-                priority: todo.isDeleted ? nil : todo.priority,
                 recurrence: todo.isDeleted ? nil : todo.recurrence,
                 completedAt: todo.isDeleted ? nil : todo.completedAt,
                 updatedAt: todo.updatedAt,
@@ -269,7 +268,6 @@ final class SyncService {
                     local.completedAt = remote.completedAt
                     local.position = remote.position ?? local.position
                     local.dueDate = remote.dueDate
-                    local.priority = remote.priority
                     local.recurrence = remote.recurrence
                     local.aiStatus = remote.aiStatus?.rawValue
                     local.updatedAt = remote.updatedAt
@@ -294,7 +292,6 @@ final class SyncService {
                 todo.isCompleted = remote.completed
                 todo.completedAt = remote.completedAt
                 todo.dueDate = remote.dueDate
-                todo.priority = remote.priority
                 todo.recurrence = remote.recurrence
                 todo.aiStatus = remote.aiStatus?.rawValue
                 todo.researchId = remote.research?.id

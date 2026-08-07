@@ -42,7 +42,7 @@ describe("enrichTodo", () => {
       const ai = createMockAi({ title: "Buy milk" });
 
       const result = await enrichTodo(ai, "Buy milk");
-      // No enrichment (same title, no urls/date/priority) returns null
+      // No enrichment (same title, no urls/date) returns null
       expect(result).toBeNull();
     });
 
@@ -79,42 +79,20 @@ describe("enrichTodo", () => {
       expect(result!.dueDate).toBe("2026-03-28");
     });
 
-    it("extracts high priority", async () => {
-      const ai = createMockAi({
-        title: "Urgent: call mom",
-        priority: "high",
-      });
-
-      const result = await enrichTodo(ai, "Urgent: call mom");
-      expect(result!.priority).toBe("high");
-    });
-
-    it("extracts low priority", async () => {
-      const ai = createMockAi({
-        title: "Low priority fix the bug",
-        priority: "low",
-      });
-
-      const result = await enrichTodo(ai, "Low priority fix the bug");
-      expect(result!.priority).toBe("low");
-    });
-
     it("extracts multiple metadata fields at once", async () => {
       const ai = createMockAi({
         title: "Review this tomorrow",
         urls: ["https://github.com/user/repo/pull/1"],
         dueDate: "2026-03-28",
-        priority: "high",
       });
 
       const result = await enrichTodo(
         ai,
-        "Review https://github.com/user/repo/pull/1 tomorrow urgent",
+        "Review https://github.com/user/repo/pull/1 tomorrow",
       );
       expect(result!.title).toBe("Review this tomorrow");
       expect(result!.urls).toEqual(["https://github.com/user/repo/pull/1"]);
       expect(result!.dueDate).toBe("2026-03-28");
-      expect(result!.priority).toBe("high");
     });
 
     it("detects general research intent for questions", async () => {
@@ -159,7 +137,7 @@ describe("enrichTodo", () => {
       expect(result).toBeNull();
     });
 
-    it("returns research-only enrichment (no URLs, date, or priority)", async () => {
+    it("returns research-only enrichment (no URLs or date)", async () => {
       const ai = createMockAi({
         title: "Best practices for React Server Components",
         research: { type: "general" },
@@ -174,7 +152,6 @@ describe("enrichTodo", () => {
       expect(result!.research).toEqual({ type: "general" });
       expect(result!.urls).toBeUndefined();
       expect(result!.dueDate).toBeUndefined();
-      expect(result!.priority).toBeUndefined();
     });
   });
 
@@ -302,7 +279,7 @@ describe("enrichTodo", () => {
     });
 
     it("returns null when only hallucinated URLs were extracted from plain text", async () => {
-      // No research, no date, no priority, and all urls filtered — equivalent
+      // No research, no date, and all urls filtered — equivalent
       // to the model returning nothing useful.
       const ai = createMockAi({
         title: "Back pain remedies",
@@ -436,14 +413,14 @@ describe("enrichTodo", () => {
         tool_calls: [
           {
             name: "enrich_todo",
-            arguments: { title: "Book a flight", priority: "high" },
+            arguments: { title: "Book a flight", dueDate: "2026-03-28" },
           },
           { name: "ask_user", arguments: { question: "Where to?" } },
         ],
       });
 
-      const result = await enrichTodo(ai, "Book a flight urgently");
-      expect(result?.priority).toBe("high");
+      const result = await enrichTodo(ai, "Book a flight next week");
+      expect(result?.dueDate).toBe("2026-03-28");
       expect(result?.question).toBe("Where to?");
     });
 
@@ -453,13 +430,13 @@ describe("enrichTodo", () => {
         tool_calls: [
           {
             name: "enrich_todo",
-            arguments: { title: "Buy milk", priority: "low" },
+            arguments: { title: "Buy milk", dueDate: "2026-03-28" },
           },
         ],
       });
 
       const result = await enrichTodo(ai, "Buy milk");
-      expect(result?.priority).toBe("low");
+      expect(result?.dueDate).toBe("2026-03-28");
       expect(result?.question).toBeUndefined();
     });
 

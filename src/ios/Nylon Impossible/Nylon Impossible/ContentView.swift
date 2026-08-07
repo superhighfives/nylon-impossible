@@ -287,13 +287,12 @@ struct ContentView: View {
                 viewModel.toggleTodo(todo, allTodos: todos)
                 syncService.syncAfterAction()
             },
-            onSave: { title, notes, dueDate, priority, recurrence in
+            onSave: { title, notes, dueDate, recurrence in
                 viewModel.updateTodo(
                     todo,
                     title: title,
                     notes: notes,
                     dueDate: dueDate,
-                    priority: priority,
                     recurrence: recurrence
                 )
                 syncService.syncAfterAction()
@@ -349,7 +348,7 @@ struct ContentView: View {
             urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
             subtasks: subtasks(of: todo),
             onToggle: {},
-            onSave: { _, _, _, _, _ in }
+            onSave: { _, _, _, _ in }
         )
         .padding(.horizontal, 12)
         .padding(.vertical, 2)

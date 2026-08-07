@@ -11,7 +11,7 @@ struct TodoEditSheet: View {
     let todo: TodoItem
     let apiService: APIService?
     let subtasks: [TodoItem]
-    var onSave: (String, String?, Date?, TodoPriority?, Recurrence?) -> Void
+    var onSave: (String, String?, Date?, Recurrence?) -> Void
     var onCancel: () -> Void
     var onAddSubtask: (String) -> Void
     var onToggleSubtask: (TodoItem) -> Void
@@ -23,7 +23,6 @@ struct TodoEditSheet: View {
     @State private var notes: String
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
-    @State private var priority: TodoPriority?
     @State private var recurrenceFrequency: RecurrenceFrequency?
     @State private var urls: [APITodoUrl] = []
     @State private var research: APIResearch?
@@ -37,7 +36,7 @@ struct TodoEditSheet: View {
         apiService: APIService? = nil,
         initialUrls: [APITodoUrl] = [],
         subtasks: [TodoItem] = [],
-        onSave: @escaping (String, String?, Date?, TodoPriority?, Recurrence?) -> Void,
+        onSave: @escaping (String, String?, Date?, Recurrence?) -> Void,
         onCancel: @escaping () -> Void,
         onAddSubtask: @escaping (String) -> Void = { _ in },
         onToggleSubtask: @escaping (TodoItem) -> Void = { _ in },
@@ -58,7 +57,6 @@ struct TodoEditSheet: View {
         _notes = State(initialValue: todo.itemNotes ?? "")
         _hasDueDate = State(initialValue: todo.dueDate != nil)
         _dueDate = State(initialValue: todo.dueDate ?? Date())
-        _priority = State(initialValue: todo.todoPriority)
         _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
         _urls = State(initialValue: initialUrls)
         let initialResearch: APIResearch?
@@ -119,18 +117,6 @@ struct TodoEditSheet: View {
                     Text("Due Date")
                 }
                 
-                // Priority
-                Section {
-                    Picker("Priority", selection: $priority) {
-                        Text("None").tag(nil as TodoPriority?)
-                        Text("High").tag(TodoPriority.high as TodoPriority?)
-                        Text("Low").tag(TodoPriority.low as TodoPriority?)
-                    }
-                    .pickerStyle(.segmented)
-                } header: {
-                    Text("Priority")
-                }
-
                 // Recurrence — disabled until a due date is set, since the
                 // rule has no anchor without one. Hidden when the todo has
                 // subtasks: recurrence and subtasks are mutually exclusive.
@@ -326,7 +312,7 @@ struct TodoEditSheet: View {
             ? recurrenceFrequency.map { Recurrence(frequency: $0) }
             : nil
 
-        onSave(trimmedTitle, notesValue, dueDateValue, priority, recurrenceValue)
+        onSave(trimmedTitle, notesValue, dueDateValue, recurrenceValue)
     }
 
     /// "Weekly on Wednesday" — anchor is derived from the due date so the user
@@ -546,10 +532,9 @@ struct UrlRow: View {
             let item = TodoItem(title: "Buy groceries")
             item.itemNotes = "Get milk, eggs, and bread"
             item.dueDate = Date().addingTimeInterval(86400) // Tomorrow
-            item.priority = "high"
             return item
         }(),
-        onSave: { _, _, _, _, _ in },
+        onSave: { _, _, _, _ in },
         onCancel: {}
     )
     .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))

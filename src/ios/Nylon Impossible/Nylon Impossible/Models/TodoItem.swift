@@ -8,12 +8,6 @@
 import Foundation
 import SwiftData
 
-/// Priority levels for todos
-enum TodoPriority: String, Codable, CaseIterable {
-    case high
-    case low
-}
-
 /// AI processing status for todos
 enum TodoAIStatus: String, Codable, CaseIterable {
     case pending
@@ -60,7 +54,6 @@ final class TodoItem {
     var isDeleted: Bool           // Soft delete for sync
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
-    var priority: String?         // "high" or "low", stored as String for SwiftData
     var recurrenceFrequency: String?  // RecurrenceFrequency raw value; nil = non-repeating
     var aiStatus: String?         // AI processing status: pending, processing, complete, failed
     // When enrichment actually kicked off, used to time-box the spinner. Distinct
@@ -98,7 +91,6 @@ final class TodoItem {
         self.isSynced = false
         self.isDeleted = false
         self.dueDate = nil
-        self.priority = nil
         self.recurrenceFrequency = nil
         self.aiStatus = nil
         self.researchId = nil
@@ -120,17 +112,6 @@ final class TodoItem {
         isSynced = false
     }
     
-    /// Get priority as enum
-    var todoPriority: TodoPriority? {
-        get {
-            guard let priority = priority else { return nil }
-            return TodoPriority(rawValue: priority)
-        }
-        set {
-            priority = newValue?.rawValue
-        }
-    }
-
     /// Recurrence rule as a typed value. Mirrors the server's JSON shape.
     var recurrence: Recurrence? {
         get {

@@ -35,7 +35,6 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     completedAt: null,
     position: "a0",
     dueDate: null,
-    priority: null,
     recurrence: null,
     aiStatus: null,
     needsInput: false,

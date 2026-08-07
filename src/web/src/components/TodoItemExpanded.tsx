@@ -40,7 +40,6 @@ interface TodoItemExpandedProps {
     title?: string;
     notes?: string | null;
     dueDate?: Date | null;
-    priority?: "high" | "low" | null;
     recurrence?: Recurrence | null;
   }) => void;
   onDelete: (id: string) => void;
@@ -179,9 +178,6 @@ export function TodoItemExpanded({
   const [title, setTitle] = useState(todo.title);
   const [notes, setNotes] = useState(todo.notes ?? "");
   const [dueDate, setDueDate] = useState(formatDate(todo.dueDate));
-  const [priority, setPriority] = useState<"high" | "low" | "none">(
-    todo.priority ?? "none",
-  );
   const [recurrence, setRecurrence] = useState<RecurrenceFrequency | "none">(
     todo.recurrence?.frequency ?? "none",
   );
@@ -189,14 +185,12 @@ export function TodoItemExpanded({
     title?: boolean;
     notes?: boolean;
     dueDate?: boolean;
-    priority?: boolean;
     recurrence?: boolean;
   }>({});
 
   const todoTitle = todo.title;
   const todoNotes = todo.notes ?? "";
   const todoDueDate = formatDate(todo.dueDate);
-  const todoPriority = todo.priority ?? "none";
   const todoRecurrence = todo.recurrence?.frequency ?? "none";
 
   useEffect(() => {
@@ -208,9 +202,6 @@ export function TodoItemExpanded({
   useEffect(() => {
     if (!touched.dueDate) setDueDate(todoDueDate);
   }, [todoDueDate, touched.dueDate]);
-  useEffect(() => {
-    if (!touched.priority) setPriority(todoPriority);
-  }, [todoPriority, touched.priority]);
   useEffect(() => {
     if (!touched.recurrence) setRecurrence(todoRecurrence);
   }, [todoRecurrence, touched.recurrence]);
@@ -224,8 +215,8 @@ export function TodoItemExpanded({
     ? "none"
     : recurrence;
 
-  // Auto-save. There's no Save button: discrete fields (due date, priority,
-  // repeat) commit immediately in their handlers; free-text fields (title,
+  // Auto-save. There's no Save button: discrete fields (due date, repeat)
+  // commit immediately in their handlers; free-text fields (title,
   // notes) debounce while typing and flush on blur / when the row collapses.
   // `touched` still guards each field so an in-flight server update (e.g. AI
   // re-enrichment) can't clobber a value being edited; committing clears it.
@@ -313,13 +304,6 @@ export function TodoItemExpanded({
     onUpdate({ dueDate: new Date(value) });
   };
 
-  const handlePriorityChange = (value: unknown) => {
-    if (value === null || value === undefined) return;
-    const next = value as "high" | "low" | "none";
-    setPriority(next);
-    onUpdate({ priority: next === "none" ? null : next });
-  };
-
   const handleRecurrenceChange = (value: unknown) => {
     if (value === null || value === undefined) return;
     const next = value as RecurrenceFrequency | "none";
@@ -387,58 +371,35 @@ export function TodoItemExpanded({
         />
       </div>
 
-      {/* Due Date and Priority row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {/* Due Date */}
-        <div className="space-y-1.5">
-          <label
-            htmlFor={`due-${todo.id}`}
-            className="text-xs font-medium text-gray-muted flex items-center gap-1.5"
-          >
-            <Calendar size={12} />
-            Due date
-          </label>
-          <div className="flex items-center gap-1.5">
-            <Input
-              id={`due-${todo.id}`}
-              type="date"
-              value={dueDate}
-              onChange={(e) => handleDueDateChange(e.target.value)}
-              className="flex-1 min-w-0"
-              inputSize="sm"
-            />
-            {dueDate && (
-              <Button
-                variant="ghost"
-                size="sm"
-                shape="square"
-                onClick={handleClearDueDate}
-                aria-label="Clear due date"
-              >
-                <X size={14} />
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Priority */}
-        <div className="space-y-1.5">
-          <label
-            htmlFor={`priority-${todo.id}`}
-            className="text-xs font-medium text-gray-muted"
-          >
-            Priority
-          </label>
-          <Select
-            size="sm"
-            value={priority}
-            onValueChange={handlePriorityChange}
-            items={[
-              { value: "none", label: "None" },
-              { value: "high", label: "High" },
-              { value: "low", label: "Low" },
-            ]}
+      {/* Due Date */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={`due-${todo.id}`}
+          className="text-xs font-medium text-gray-muted flex items-center gap-1.5"
+        >
+          <Calendar size={12} />
+          Due date
+        </label>
+        <div className="flex items-center gap-1.5">
+          <Input
+            id={`due-${todo.id}`}
+            type="date"
+            value={dueDate}
+            onChange={(e) => handleDueDateChange(e.target.value)}
+            className="flex-1 min-w-0"
+            inputSize="sm"
           />
+          {dueDate && (
+            <Button
+              variant="ghost"
+              size="sm"
+              shape="square"
+              onClick={handleClearDueDate}
+              aria-label="Clear due date"
+            >
+              <X size={14} />
+            </Button>
+          )}
         </div>
       </div>
 
