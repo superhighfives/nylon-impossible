@@ -115,7 +115,6 @@ export function useCreateTodo() {
         // right place; otherwise a placeholder replaced when onSettled invalidates.
         position: input.position ?? "a0",
         dueDate: input.dueDate?.toISOString() ?? null,
-        priority: input.priority ?? null,
         recurrence: input.recurrence ?? null,
         aiStatus: null,
         needsInput: false,
@@ -209,7 +208,6 @@ export function useUpdateTodo() {
               ...(input.dueDate !== undefined && {
                 dueDate: input.dueDate?.toISOString() ?? null,
               }),
-              ...(input.priority !== undefined && { priority: input.priority }),
               ...(input.recurrence !== undefined && {
                 recurrence: input.recurrence,
               }),
@@ -442,7 +440,6 @@ export function useSmartCreate() {
         completedAt: null,
         position: generateKeyBetween(null, minPosition),
         dueDate: null,
-        priority: null,
         recurrence: null,
         aiStatus: null,
         needsInput: false,

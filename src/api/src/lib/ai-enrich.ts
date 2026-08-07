@@ -4,7 +4,6 @@
  * Takes an existing todo and enriches it with AI-extracted metadata:
  * - URLs extracted and removed from title
  * - Due date from natural language
- * - Priority if mentioned
  * - Research intent detection (triggers background research)
  *
  * Does NOT rephrase or rewrite the title - only removes URLs.
@@ -109,11 +108,6 @@ export async function enrichOrAskWithAI(
     // one (e.g. a Google Tasks import) that AI shouldn't overwrite.
     if (enrichment.dueDate && !options?.preserveExistingDueDate) {
       updates.dueDate = new Date(enrichment.dueDate);
-    }
-
-    // Update priority if extracted
-    if (enrichment.priority) {
-      updates.priority = enrichment.priority;
     }
 
     // Subtasks and recurrence are mutually exclusive. If the model returned

@@ -92,7 +92,6 @@ function serializeTodoWithUrls(
     completedAt: todo.completedAt?.toISOString() ?? null,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
-    priority: todo.priority,
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus ?? null,
     needsInput: todo.needsInput,
@@ -318,7 +317,6 @@ export const createTodo = createServerFn({ method: "POST" })
                 position,
                 completed: false,
                 dueDate: validated.dueDate ?? null,
-                priority: validated.priority ?? null,
                 // A subtask never recurs (recurrence is top-level only).
                 recurrence: parentId ? null : (validated.recurrence ?? null),
               })
@@ -413,8 +411,6 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.position = validated.position;
         if (validated.dueDate !== undefined)
           updates.dueDate = validated.dueDate;
-        if (validated.priority !== undefined)
-          updates.priority = validated.priority;
         // completedAt is client-set only to undo a completed repeat (null); a
         // normal completion stamps it server-side just below.
         if (validated.completedAt !== undefined)

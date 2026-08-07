@@ -8,21 +8,21 @@
 INSERT OR IGNORE INTO users (id, email, created_at, updated_at)
 VALUES ('user_3BPJATg8w4djAPJd71AUARo3vJ7', 'marketing@nylonimpossible.com', unixepoch(), unixepoch());
 
-INSERT OR IGNORE INTO todos (id, user_id, title, notes, completed, priority, position, due_date, created_at, updated_at)
+INSERT OR IGNORE INTO todos (id, user_id, title, notes, completed, position, due_date, created_at, updated_at)
 VALUES
   ('mktg_1', 'user_3BPJATg8w4djAPJd71AUARo3vJ7',
    'Finish quarterly report',
    'Needs sign-off from the finance team before end of month',
-   0, 'high', 'a0', strftime('%s', '2026-03-28'), unixepoch(), unixepoch()),
+   0, 'a0', strftime('%s', '2026-03-28'), unixepoch(), unixepoch()),
   ('mktg_2', 'user_3BPJATg8w4djAPJd71AUARo3vJ7',
    'Book dentist appointment',
    NULL,
-   0, NULL, 'a1', strftime('%s', '2026-03-19'), unixepoch(), unixepoch()),
+   0, 'a1', strftime('%s', '2026-03-19'), unixepoch(), unixepoch()),
   ('mktg_3', 'user_3BPJATg8w4djAPJd71AUARo3vJ7',
    'Read ''Atomic Habits''',
    NULL,
-   0, 'low', 'a2', NULL, unixepoch(), unixepoch()),
+   0, 'a2', NULL, unixepoch(), unixepoch()),
   ('mktg_4', 'user_3BPJATg8w4djAPJd71AUARo3vJ7',
    'Buy groceries for the week',
    NULL,
-   1, NULL, 'a3', NULL, unixepoch(), unixepoch());
+   1, 'a3', NULL, unixepoch(), unixepoch());

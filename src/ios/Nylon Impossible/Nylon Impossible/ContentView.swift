@@ -287,13 +287,12 @@ struct ContentView: View {
                 viewModel.toggleTodo(todo, allTodos: todos)
                 syncService.syncAfterAction()
             },
-            onSave: { title, notes, dueDate, priority, recurrence in
+            onSave: { title, notes, dueDate, recurrence in
                 viewModel.updateTodo(
                     todo,
                     title: title,
                     notes: notes,
                     dueDate: dueDate,
-                    priority: priority,
                     recurrence: recurrence
                 )
                 syncService.syncAfterAction()

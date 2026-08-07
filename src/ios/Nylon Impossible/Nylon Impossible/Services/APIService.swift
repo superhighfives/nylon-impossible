@@ -93,7 +93,6 @@ struct APITodo: Codable, Sendable {
     let completedAt: Date?
     let position: String?
     let dueDate: Date?
-    let priority: String?
     let recurrence: Recurrence?
     let aiStatus: AIStatus?
     let needsInput: Bool?
@@ -108,7 +107,7 @@ struct APITodo: Codable, Sendable {
         notes: String? = nil,
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
-        priority: String? = nil, recurrence: Recurrence? = nil,
+        recurrence: Recurrence? = nil,
         aiStatus: AIStatus? = nil, needsInput: Bool? = nil,
         createdAt: Date, updatedAt: Date,
         urls: [APITodoUrl]? = nil, research: APIResearch? = nil,
@@ -123,7 +122,6 @@ struct APITodo: Codable, Sendable {
         self.completedAt = completedAt
         self.position = position
         self.dueDate = dueDate
-        self.priority = priority
         self.recurrence = recurrence
         self.aiStatus = aiStatus
         self.needsInput = needsInput
@@ -206,7 +204,6 @@ struct APITodoWithUrls: Codable, Sendable {
     let completedAt: Date?
     let position: String?
     let dueDate: Date?
-    let priority: String?
     let recurrence: Recurrence?
     let aiStatus: AIStatus?
     let createdAt: Date
@@ -218,7 +215,7 @@ struct APITodoWithUrls: Codable, Sendable {
         id: String, userId: String, title: String, notes: String? = nil,
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
-        priority: String? = nil, recurrence: Recurrence? = nil,
+        recurrence: Recurrence? = nil,
         aiStatus: AIStatus? = nil,
         createdAt: Date, updatedAt: Date,
         urls: [APITodoUrl] = [], research: APIResearch? = nil
@@ -231,7 +228,6 @@ struct APITodoWithUrls: Codable, Sendable {
         self.completedAt = completedAt
         self.position = position
         self.dueDate = dueDate
-        self.priority = priority
         self.recurrence = recurrence
         self.aiStatus = aiStatus
         self.createdAt = createdAt
@@ -258,7 +254,6 @@ struct TodoChange: Codable, Sendable {
     let completed: Bool?
     let position: String?
     let dueDate: Date?
-    let priority: String?
     let recurrence: Recurrence?
     let completedAt: Date?
     let updatedAt: Date
@@ -266,7 +261,7 @@ struct TodoChange: Codable, Sendable {
     let urls: [TodoUrlChange]?
 
     enum CodingKeys: String, CodingKey {
-        case id, parentId, title, notes, completed, position, dueDate, priority,
+        case id, parentId, title, notes, completed, position, dueDate,
              recurrence, completedAt, updatedAt, deleted, urls
     }
 
@@ -283,7 +278,6 @@ struct TodoChange: Codable, Sendable {
         try c.encodeIfPresent(completed, forKey: .completed)
         try c.encodeIfPresent(position, forKey: .position)
         try c.encodeIfPresent(dueDate, forKey: .dueDate)
-        try c.encodeIfPresent(priority, forKey: .priority)
         try c.encodeIfPresent(recurrence, forKey: .recurrence)
         // A delete carries no field updates, so only send completedAt for live
         // todos — otherwise a delete would spuriously null it.

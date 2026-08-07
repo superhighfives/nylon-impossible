@@ -1,92 +1,14 @@
-import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { Popover } from "@base-ui/react/popover";
 import {
   AlertCircle,
   Calendar,
   ChevronLeft,
   ChevronRight,
-  Flag,
   X,
 } from "lucide-react";
 import { useState } from "react";
 import { focusRing } from "@/components/ui";
 import { useHints } from "@/hooks/useHints";
-
-const menuItemBase =
-  "flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-hover focus:bg-gray-hover data-disabled:pointer-events-none data-disabled:opacity-50";
-
-type Priority = "high" | "low" | null;
-
-interface InlinePriorityProps {
-  value: Priority;
-  onChange: (next: Priority) => void;
-  disabled?: boolean;
-}
-
-/**
- * Quick priority editor for a todo row. When a priority is set it renders as the
- * coloured badge (matching the read-only indicators); when unset it's a faint
- * flag that only appears on row hover (`group-hover`), keeping resting rows
- * clean. Opens a small menu to pick None / High / Low.
- */
-export function InlinePriority({
-  value,
-  onChange,
-  disabled = false,
-}: InlinePriorityProps) {
-  const trigger =
-    value === "high" || value === "low" ? (
-      <button
-        type="button"
-        disabled={disabled}
-        aria-label={`Priority: ${value === "high" ? "High" : "Low"}. Change priority`}
-        className={`rounded-md px-1.5 py-0.5 text-xs transition-colors disabled:opacity-50 ${focusRing} ${
-          value === "high"
-            ? "bg-yellow-base hover:bg-yellow-hover text-yellow-muted"
-            : "bg-gray-base hover:bg-gray-hover text-gray-muted"
-        }`}
-      >
-        {value === "high" ? "High" : "Low"}
-      </button>
-    ) : (
-      <button
-        type="button"
-        disabled={disabled}
-        aria-label="Set priority"
-        className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing}`}
-      >
-        <Flag size={11} aria-hidden="true" />
-      </button>
-    );
-
-  return (
-    <BaseMenu.Root>
-      <BaseMenu.Trigger render={trigger} />
-      <BaseMenu.Portal>
-        <BaseMenu.Positioner sideOffset={4}>
-          <BaseMenu.Popup className="z-50 min-w-28 overflow-hidden rounded-lg border border-gray-subtle bg-gray-surface p-1 shadow-lg">
-            {(
-              [
-                { label: "None", next: null },
-                { label: "High", next: "high" },
-                { label: "Low", next: "low" },
-              ] as const
-            ).map((item) => (
-              <BaseMenu.Item
-                key={item.label}
-                className={`${menuItemBase} text-gray`}
-                onClick={() => onChange(item.next)}
-              >
-                <Flag size={13} aria-hidden="true" />
-                {item.label}
-              </BaseMenu.Item>
-            ))}
-          </BaseMenu.Popup>
-        </BaseMenu.Positioner>
-      </BaseMenu.Portal>
-    </BaseMenu.Root>
-  );
-}
 
 // --- Date helpers -----------------------------------------------------------
 // Due dates are treated as calendar days, not instants. We move values around

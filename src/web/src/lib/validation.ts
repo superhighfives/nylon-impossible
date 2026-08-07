@@ -8,7 +8,6 @@ export const createTodoSchema = z.object({
   title: z.string().min(1, "Title is required").max(500),
   notes: z.string().max(10000).nullable().optional(),
   dueDate: z.coerce.date().nullable().optional(),
-  priority: z.enum(["high", "low"]).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   // Parent todo id when creating a subtask; omit/null for a top-level todo.
   parentId: z.string().uuid().nullable().optional(),
@@ -24,7 +23,6 @@ export const updateTodoSchema = z.object({
   completed: z.boolean().optional(),
   position: z.string().optional(),
   dueDate: z.coerce.date().nullable().optional(),
-  priority: z.enum(["high", "low"]).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   // Only sent to undo a completed repeat (cleared to null). Normal completions
   // are stamped server-side, not by the client.

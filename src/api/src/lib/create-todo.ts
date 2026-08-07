@@ -34,7 +34,6 @@ export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
     completed: todo.completed,
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
-    priority: todo.priority,
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),

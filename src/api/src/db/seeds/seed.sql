@@ -20,12 +20,12 @@ INSERT INTO lists (id, user_id, name, position, created_at, updated_at) VALUES
   ('list_4', 'user_test_123', 'Work', 'a3', unixepoch(), unixepoch());
 
 -- Insert sample todos
-INSERT INTO todos (id, user_id, title, notes, completed, priority, position, created_at, updated_at) VALUES
-  ('todo_1', 'user_test_123', 'Buy groceries', 'Milk, eggs, bread, and vegetables', 0, 'high', 'a0', unixepoch(), unixepoch()),
-  ('todo_2', 'user_test_123', 'Pay electricity bill', 'Due by the end of the month', 0, 'high', 'a1', unixepoch(), unixepoch()),
-  ('todo_3', 'user_test_123', 'Review project proposal', 'Check the Q2 roadmap document', 1, 'low', 'a2', unixepoch(), unixepoch()),
-  ('todo_4', 'user_test_123', 'Call dentist', 'Schedule annual checkup', 0, 'low', 'a3', unixepoch(), unixepoch()),
-  ('todo_5', 'user_test_123', 'Fix navigation bug', 'Mobile menu not closing on route change', 0, 'high', 'a4', unixepoch(), unixepoch());
+INSERT INTO todos (id, user_id, title, notes, completed, position, created_at, updated_at) VALUES
+  ('todo_1', 'user_test_123', 'Buy groceries', 'Milk, eggs, bread, and vegetables', 0, 'a0', unixepoch(), unixepoch()),
+  ('todo_2', 'user_test_123', 'Pay electricity bill', 'Due by the end of the month', 0, 'a1', unixepoch(), unixepoch()),
+  ('todo_3', 'user_test_123', 'Review project proposal', 'Check the Q2 roadmap document', 1, 'a2', unixepoch(), unixepoch()),
+  ('todo_4', 'user_test_123', 'Call dentist', 'Schedule annual checkup', 0, 'a3', unixepoch(), unixepoch()),
+  ('todo_5', 'user_test_123', 'Fix navigation bug', 'Mobile menu not closing on route change', 0, 'a4', unixepoch(), unixepoch());
 
 -- Link todos to lists
 INSERT INTO todo_lists (todo_id, list_id, created_at) VALUES

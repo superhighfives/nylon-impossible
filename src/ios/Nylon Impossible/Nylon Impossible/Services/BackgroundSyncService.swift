@@ -65,7 +65,6 @@ struct BackgroundSyncService {
                     completed: todo.isDeleted ? nil : todo.isCompleted,
                     position: todo.isDeleted ? nil : todo.position,
                     dueDate: todo.isDeleted ? nil : todo.dueDate,
-                    priority: todo.isDeleted ? nil : todo.priority,
                     recurrence: todo.isDeleted ? nil : todo.recurrence,
                     completedAt: todo.isDeleted ? nil : todo.completedAt,
                     updatedAt: todo.updatedAt,

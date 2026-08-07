@@ -149,9 +149,9 @@ import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui"
 <Select
   size="sm"
   items={[{ value: "low", label: "Low" }, { value: "high", label: "High" }]}
-  placeholder="Select priority"
-  value={priority}
-  onValueChange={setPriority}
+  placeholder="Select an option"
+  value={status}
+  onValueChange={setStatus}
 />
 ```
 

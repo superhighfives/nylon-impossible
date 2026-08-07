@@ -15,7 +15,6 @@ export interface CreateTodoInput {
   title: string;
   notes?: string | null;
   dueDate?: Date | null;
-  priority?: "high" | "low" | null;
   recurrence?: Recurrence | null;
   // Parent todo id when creating a subtask; omit/null for a top-level todo.
   parentId?: string | null;
@@ -29,7 +28,6 @@ export interface UpdateTodoInput {
   completed?: boolean;
   position?: string;
   dueDate?: Date | null;
-  priority?: "high" | "low" | null;
   recurrence?: Recurrence | null;
   // Set explicitly only to undo a completed repeat (clear it to null). On a
   // normal completion the server stamps this itself.
@@ -99,7 +97,6 @@ export interface TodoWithUrls {
   completedAt: string | null;
   position: string;
   dueDate: string | null;
-  priority: "high" | "low" | null;
   recurrence: Recurrence | null;
   aiStatus: AiStatus | null;
   needsInput: boolean;

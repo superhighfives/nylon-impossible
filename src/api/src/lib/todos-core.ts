@@ -19,7 +19,6 @@ export function listOpenTodos(db: Db, userId: string) {
       title: todos.title,
       position: todos.position,
       dueDate: todos.dueDate,
-      priority: todos.priority,
     })
     .from(todos)
     .where(

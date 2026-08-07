@@ -26,7 +26,6 @@ struct ConversationSyncTests {
             completed: false,
             position: "a0",
             dueDate: nil,
-            priority: nil,
             aiStatus: nil,
             needsInput: needsInput,
             createdAt: updatedAt,

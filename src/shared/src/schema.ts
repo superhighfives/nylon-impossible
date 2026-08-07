@@ -80,7 +80,6 @@ export const todos = sqliteTable(
     position: text("position").notNull().default("a0"),
     notes: text("notes"),
     dueDate: integer("due_date", { mode: "timestamp" }),
-    priority: text("priority", { enum: ["high", "low"] }),
     recurrence: text("recurrence", { mode: "json" }).$type<Recurrence>(),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
