@@ -219,9 +219,10 @@ column — see rollout note).
 `priority` (`high`/`low`, nullable) is gone from the `todos` domain: the
 schema column, both API request/response shapes (REST update + offline
 sync), the AI enrichment tool schema and prompt, all web UI/validation/hooks,
-and all iOS model/UI/services. The column was dropped via migration `0020`.
-Nothing was added — this was a pure subtraction, landed in dependency order
-(AI → API → web → iOS → schema) as specced.
+and all iOS model/UI/services. Nothing was added — this was a pure
+subtraction, landed in dependency order (AI → API → web → iOS → schema) as
+specced. The `DROP COLUMN` migration itself was split into a follow-up PR
+rather than shipped alongside the code removal — see deviation 3 below.
 
 ## Architecture
 
@@ -241,8 +242,9 @@ Nothing was added — this was a pure subtraction, landed in dependency order
   `updateTodo`, `APIService` DTOs, and the two sync services (`SyncService`,
   `BackgroundSyncService`) updated to match.
 - **Schema**: `src/shared/src/schema.ts` no longer declares the `priority`
-  column; `src/api/migrations/0020_remove_priority_from_todos.sql` drops it
-  with `ALTER TABLE todos DROP COLUMN priority`.
+  column. The `ALTER TABLE todos DROP COLUMN priority` migration was
+  written (as `0020_remove_priority_from_todos.sql`) but pulled from this
+  PR before merge — see deviation 3.
 
 ### Deviations from the plan
 
@@ -275,3 +277,14 @@ Nothing was added — this was a pure subtraction, landed in dependency order
    migration (dropping a stored `@Model` property) has been verified against
    a populated local store. This needs to happen on a machine with a
    matching simulator/device before shipping to iOS users.
+3. **Migration `0020` was split into a follow-up PR, not shipped with this
+   change.** Review flagged that `.github/workflows/web-deploy.yml` applies
+   D1 migrations in the same job as the API/web deploy, before those
+   deploys finish — so the column drop could race a still-live old
+   deployment and produce `no such column: priority` 500s for the brief
+   window in between, contradicting this plan's own "rollout order matters"
+   note above. Rather than reorder the shared deploy workflow or accept
+   that risk, `0020_remove_priority_from_todos.sql` was removed from this
+   PR entirely. Once this PR is merged and deployed (no code path reads or
+   writes `priority` anymore), a follow-up PR should add the `DROP COLUMN`
+   migration on its own, well clear of any deploy in flight.
