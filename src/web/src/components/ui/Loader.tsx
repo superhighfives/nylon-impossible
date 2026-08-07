@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { HTMLAttributes } from "react";
 
+// Spinner variants, sized by badge/button context.
 const loaderVariants = cva(
   "inline-block animate-spin rounded-full border-2 border-current border-t-transparent",
   {
