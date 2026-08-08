@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Repeat,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { InlineDueDate } from "@/components/InlineTodoControls";
@@ -57,7 +58,15 @@ import { messageFromError, toast } from "@/lib/toast";
 import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
-import { Button, Checkbox, focusRing, Loader, UrlPreviewCard } from "./ui";
+import {
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  focusRing,
+  Loader,
+  SidePanel,
+  UrlPreviewCard,
+} from "./ui";
 
 // This is a single-column vertical list, so lock dragging to the Y axis —
 // otherwise the lifted row drifts sideways as it tracks the pointer/keyboard.
@@ -505,6 +514,23 @@ function TodoItemContent({
               disabled={updatePending}
             />
           )}
+          {/* Desktop: row-level delete, next to the priority/date icons.
+              Mobile keeps delete inside TodoActionsMenu instead of
+              duplicating the affordance here. */}
+          {showInlineEditing && !isExpanded && (
+            <Button
+              variant="ghost"
+              size="xs"
+              shape="square"
+              type="button"
+              onClick={() => onDelete(todo.id)}
+              disabled={deletePending}
+              aria-label={`Delete "${todo.title}"`}
+              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
           {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
               control on the title line so it doesn't stretch the row height on
               todos without a description. */}
@@ -605,6 +631,9 @@ function SortableTodoItem(
         // once the highlight clears — a gentle "these are new" cue.
         !isDragging && props.highlighted ? "bg-yellow-base" : ""
       } ${
+        // Stays visually selected while its side panel is open, for context.
+        !isDragging && props.isExpanded ? "bg-gray-base" : ""
+      } ${
         isDragging
           ? `z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl backdrop-blur-sm ${
               // Yellow border only for keyboard drags — it flags the selected
@@ -662,16 +691,6 @@ function SortableTodoItem(
         </button>
         <div className="flex-1 min-w-0">
           <TodoItemContent {...props} showActions={!isDragging} />
-          {props.isExpanded && (
-            <ExpandedSection
-              todo={props.todo}
-              subtasks={props.subtasks}
-              onUpdate={props.onUpdateExpanded}
-              onDelete={props.onDelete}
-              deletePending={props.deletePending}
-              subtaskHandlers={props.subtaskHandlers}
-            />
-          )}
         </div>
       </div>
     </div>
@@ -764,6 +783,7 @@ export function TodoList() {
   // (their completedAt is no longer "today") without needing a server round-trip.
   useLocalMidnightTick();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     TodoWithUrls[] | null
@@ -834,8 +854,16 @@ export function TodoList() {
     }
   };
 
+  // Row-level delete affordances open a confirm dialog first; the actual
+  // mutation only runs once the user confirms (see confirmDeleteId below).
   const handleDelete = (id: string) => {
-    deleteTodo.mutate(id);
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!confirmDeleteId) return;
+    deleteTodo.mutate(confirmDeleteId);
+    setConfirmDeleteId(null);
   };
 
   const handleToggleExpand = (id: string) => {
@@ -987,6 +1015,13 @@ export function TodoList() {
     deletePending: deleteTodo.isPending,
   });
 
+  const confirmDeleteTodo = confirmDeleteId
+    ? (todos.find((t) => t.id === confirmDeleteId) ?? null)
+    : null;
+  const expandedTodo = expandedId
+    ? (todos.find((t) => t.id === expandedId) ?? null)
+    : null;
+
   return (
     <DndContext
       sensors={sensors}
@@ -1041,21 +1076,16 @@ export function TodoList() {
             </button>
             {!completedCollapsed &&
               completedTodos.map((todo) => (
-                <div key={todo.id} className="group py-2">
+                <div
+                  key={todo.id}
+                  className={`group rounded-lg py-2 ${
+                    expandedId === todo.id ? "bg-gray-base" : ""
+                  }`}
+                >
                   <div className="flex items-start gap-2">
                     <div className="w-4 shrink-0" aria-hidden="true" />
                     <div className="flex-1 min-w-0">
                       <TodoItemContent {...sharedProps(todo)} />
-                      {expandedId === todo.id && (
-                        <ExpandedSection
-                          todo={todo}
-                          subtasks={subtasksByParent.get(todo.id) ?? []}
-                          onUpdate={handleUpdateExpanded(todo.id)}
-                          onDelete={handleDelete}
-                          deletePending={deleteTodo.isPending}
-                          subtaskHandlers={subtaskHandlers}
-                        />
-                      )}
                     </div>
                   </div>
                 </div>
@@ -1063,6 +1093,38 @@ export function TodoList() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+        title="Delete this todo?"
+        description={
+          confirmDeleteTodo
+            ? `"${confirmDeleteTodo.title}" and any subtasks will be deleted. This can't be undone.`
+            : "This can't be undone."
+        }
+        onConfirm={handleConfirmDelete}
+        confirmPending={deleteTodo.isPending}
+      />
+      <SidePanel
+        open={expandedTodo !== null}
+        onOpenChange={(open) => {
+          if (!open) setExpandedId(null);
+        }}
+        title={expandedTodo?.title ?? "Todo details"}
+      >
+        {expandedTodo && (
+          <ExpandedSection
+            todo={expandedTodo}
+            subtasks={subtasksByParent.get(expandedTodo.id) ?? []}
+            onUpdate={handleUpdateExpanded(expandedTodo.id)}
+            onDelete={handleDelete}
+            deletePending={deleteTodo.isPending}
+            subtaskHandlers={subtaskHandlers}
+          />
+        )}
+      </SidePanel>
     </DndContext>
   );
 }

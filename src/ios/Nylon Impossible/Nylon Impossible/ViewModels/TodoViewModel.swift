@@ -52,10 +52,17 @@ final class TodoViewModel {
         newTaskText = ""
     }
 
-    func moveTodo(from source: IndexSet, to destination: Int, in todos: [TodoItem]) {
-        // Only operate on incomplete todos sorted by position
-        var incomplete = todos.filter { !$0.isDeleted && !$0.isCompleted }
-            .sorted { $0.position < $1.position }
+    /// Reorders a dragged todo within its incomplete siblings.
+    /// - Parameter incompleteTodos: the exact position-ordered list the
+    ///   `source`/`destination` indices were computed against (e.g.
+    ///   `ContentView`'s `incomplete`, filtered by `isEffectivelyCompleted`).
+    ///   This must not be re-derived independently here: re-filtering with a
+    ///   different completion check (e.g. `isCompleted` instead of
+    ///   `isEffectivelyCompleted`) than whatever produced the indices would
+    ///   silently reorder the wrong todo whenever a completed-today repeat
+    ///   sits among the incomplete rows.
+    func moveTodo(from source: IndexSet, to destination: Int, in incompleteTodos: [TodoItem]) {
+        var incomplete = incompleteTodos
 
         incomplete.move(fromOffsets: source, toOffset: destination)
 

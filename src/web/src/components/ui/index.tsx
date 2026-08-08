@@ -1,9 +1,11 @@
 export { Button, type ButtonProps } from "./Button";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
+export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 export { Field, type FieldProps, Textarea, type TextareaProps } from "./Field";
 export { focusRing } from "./focus";
 export { Input, type InputProps } from "./Input";
 export { Loader, type LoaderProps } from "./Loader";
 export { Select, type SelectProps } from "./Select";
+export { SidePanel, type SidePanelProps } from "./SidePanel";
 export { Toaster } from "./Toast";
 export { UrlPreviewCard } from "./UrlPreviewCard";
