@@ -64,6 +64,7 @@ import {
   ConfirmDialog,
   focusRing,
   Loader,
+  SidePanel,
   UrlPreviewCard,
 } from "./ui";
 
@@ -630,6 +631,9 @@ function SortableTodoItem(
         // once the highlight clears — a gentle "these are new" cue.
         !isDragging && props.highlighted ? "bg-yellow-base" : ""
       } ${
+        // Stays visually selected while its side panel is open, for context.
+        !isDragging && props.isExpanded ? "bg-gray-base" : ""
+      } ${
         isDragging
           ? `z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl backdrop-blur-sm ${
               // Yellow border only for keyboard drags — it flags the selected
@@ -687,16 +691,6 @@ function SortableTodoItem(
         </button>
         <div className="flex-1 min-w-0">
           <TodoItemContent {...props} showActions={!isDragging} />
-          {props.isExpanded && (
-            <ExpandedSection
-              todo={props.todo}
-              subtasks={props.subtasks}
-              onUpdate={props.onUpdateExpanded}
-              onDelete={props.onDelete}
-              deletePending={props.deletePending}
-              subtaskHandlers={props.subtaskHandlers}
-            />
-          )}
         </div>
       </div>
     </div>
@@ -1024,6 +1018,9 @@ export function TodoList() {
   const confirmDeleteTodo = confirmDeleteId
     ? (todos.find((t) => t.id === confirmDeleteId) ?? null)
     : null;
+  const expandedTodo = expandedId
+    ? (todos.find((t) => t.id === expandedId) ?? null)
+    : null;
 
   return (
     <DndContext
@@ -1079,21 +1076,16 @@ export function TodoList() {
             </button>
             {!completedCollapsed &&
               completedTodos.map((todo) => (
-                <div key={todo.id} className="group py-2">
+                <div
+                  key={todo.id}
+                  className={`group rounded-lg py-2 ${
+                    expandedId === todo.id ? "bg-gray-base" : ""
+                  }`}
+                >
                   <div className="flex items-start gap-2">
                     <div className="w-4 shrink-0" aria-hidden="true" />
                     <div className="flex-1 min-w-0">
                       <TodoItemContent {...sharedProps(todo)} />
-                      {expandedId === todo.id && (
-                        <ExpandedSection
-                          todo={todo}
-                          subtasks={subtasksByParent.get(todo.id) ?? []}
-                          onUpdate={handleUpdateExpanded(todo.id)}
-                          onDelete={handleDelete}
-                          deletePending={deleteTodo.isPending}
-                          subtaskHandlers={subtaskHandlers}
-                        />
-                      )}
                     </div>
                   </div>
                 </div>
@@ -1115,6 +1107,24 @@ export function TodoList() {
         onConfirm={handleConfirmDelete}
         confirmPending={deleteTodo.isPending}
       />
+      <SidePanel
+        open={expandedTodo !== null}
+        onOpenChange={(open) => {
+          if (!open) setExpandedId(null);
+        }}
+        title={expandedTodo?.title ?? "Todo details"}
+      >
+        {expandedTodo && (
+          <ExpandedSection
+            todo={expandedTodo}
+            subtasks={subtasksByParent.get(expandedTodo.id) ?? []}
+            onUpdate={handleUpdateExpanded(expandedTodo.id)}
+            onDelete={handleDelete}
+            deletePending={deleteTodo.isPending}
+            subtaskHandlers={subtaskHandlers}
+          />
+        )}
+      </SidePanel>
     </DndContext>
   );
 }

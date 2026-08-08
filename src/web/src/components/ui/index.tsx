@@ -6,5 +6,6 @@ export { focusRing } from "./focus";
 export { Input, type InputProps } from "./Input";
 export { Loader, type LoaderProps } from "./Loader";
 export { Select, type SelectProps } from "./Select";
+export { SidePanel, type SidePanelProps } from "./SidePanel";
 export { Toaster } from "./Toast";
 export { UrlPreviewCard } from "./UrlPreviewCard";
