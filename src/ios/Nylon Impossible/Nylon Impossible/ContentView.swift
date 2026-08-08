@@ -396,7 +396,7 @@ struct ContentView: View {
             viewModel.moveTodo(
                 from: IndexSet(integer: sourceIndex),
                 to: destination,
-                in: sortedTodosList
+                in: incomplete
             )
         }
         syncService.syncAfterAction()

@@ -444,21 +444,35 @@ the one the plan suspected going in.
   standalone `swift` script exercising the port's `generateKeyBetween`
   against both comparators across the full BASE_62 alphabet and hundreds of
   randomly generated multi-character keys. No mismatch reproduced; the
-  hypothesis was false. Continuing to investigate per the plan's own
-  fallback instructions turned up a real, verified defect in
-  `TaskCreationService.fetchAllTodos`: its `FetchDescriptor` sorted with
-  `SortDescriptor(\.position)`, whose default String comparator is not a
-  plain codepoint comparison (confirmed with a script showing it reorders
-  mixed-case fractional-index keys relative to `<`). Fixed by sorting in
-  memory with `<` instead, matching every other position comparison in the
-  app, with a regression test that fails under the old behavior. This bug
-  didn't reach the visible list today (`ContentView`'s list never calls
-  `fetchAllTodos`; the two callers that do — the Share Extension and Siri's
-  `AddTaskIntent` — only use the result via `.min(by:)`, which is
-  order-independent), so it's a latent-but-real fix rather than a confirmed
-  repro of what the user actually saw. No other ordering defect was found in
-  the paths investigated; if broken ordering is still visible in the live
-  app, it needs a fresh repro to chase further.
+  hypothesis was false. Along the way this surfaced a real but narrower
+  defect in `TaskCreationService.fetchAllTodos` (its `FetchDescriptor` sorted
+  with `SortDescriptor(\.position)`, whose default String comparator
+  reorders mixed-case fractional-index keys relative to `<`) — fixed by
+  sorting in memory with `<` instead, with a regression test — but this
+  wasn't the reported bug: `fetchAllTodos` isn't in the main list's render
+  path, so it couldn't have caused user-visible reordering.
+
+  The actual repro, given after the first pass: **drag-and-drop reordering
+  didn't work**. Root cause was in `ContentView.handleReorderDrop` /
+  `TodoViewModel.moveTodo`. `ContentView`'s `incomplete` array (what the
+  dragged row's index is computed against) is filtered by
+  `isEffectivelyCompleted` — it excludes a recurring todo completed today
+  even though its `isCompleted` flag is still `false` (`completedAt` is
+  today; it rolls to the next occurrence and shows in Completed until local
+  midnight). But the old `handleReorderDrop` passed `sortedTodosList` (the
+  *unfiltered* list) into `moveTodo`, which then re-derived its own
+  "incomplete" list filtering on `!isCompleted` — a different, looser check
+  that still included that completed-today repeat. Whenever one was mixed in
+  among the incomplete rows, the two lists disagreed on both membership and
+  index positions, so `moveTodo` read `source`/`destination` indices meant
+  for one array against a different array — landing the position update on
+  the wrong todo (or silently doing nothing useful), which is exactly
+  "dragging doesn't work." Fixed by changing `moveTodo` to trust the array
+  it's given rather than re-deriving one, and by passing the same `incomplete`
+  array `handleReorderDrop` already computed indices against, so there is
+  exactly one source of truth for "what's reorderable" instead of two that
+  could drift. Added `TodoViewModelTests` coverage for both a plain reorder
+  and a completed-today repeat sitting outside the passed-in list.
 - No iOS item was verified in a simulator — `xcodebuild` scheme/test builds
   don't run cleanly in this dev environment (SDK 26.5 vs. runtime 26.4
   mismatch, the same known limitation `pre-launch-polish` carried). Verified

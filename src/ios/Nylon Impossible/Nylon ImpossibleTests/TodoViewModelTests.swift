@@ -130,6 +130,53 @@ struct TodoViewModelTests {
         #expect(todo.position > second.position)
     }
 
+    @Test("moveTodo reorders the dragged item within the given list")
+    func moveTodoReordersWithinList() {
+        let a = TodoItem(title: "A", position: "a0")
+        let b = TodoItem(title: "B", position: "a1")
+        let c = TodoItem(title: "C", position: "a2")
+        let incomplete = [a, b, c]
+
+        let vm = TodoViewModel()
+        // Drag A (index 0) to drop onto C (index 2): matches ContentView's
+        // handleReorderDrop for a downward drag (destination = targetIndex + 1).
+        vm.moveTodo(from: IndexSet(integer: 0), to: 3, in: incomplete)
+
+        #expect(a.position > c.position)
+        #expect(b.position < c.position)
+    }
+
+    /// Regression test: `moveTodo` must reorder within the exact list its
+    /// `source`/`destination` indices were computed against, not re-derive
+    /// its own "incomplete" list with a different completion check. A
+    /// recurring todo completed today is `isEffectivelyCompleted` (excluded
+    /// from the incomplete rows shown/dragged in the UI) but not
+    /// `isCompleted` — passing an unfiltered-by-completedAt list here would
+    /// make indices point at the wrong todo, silently moving something the
+    /// user never touched instead of (or in addition to) the dragged row.
+    @Test("moveTodo is unaffected by a completed-today repeat mixed into the source list")
+    func moveTodoIgnoresCompletedTodayRepeatOutsideItsList() {
+        let a = TodoItem(title: "A", position: "a0")
+        let doneRepeat = TodoItem(title: "Done today repeat", position: "a1")
+        doneRepeat.recurrenceFrequency = "daily"
+        doneRepeat.completedAt = Date()
+        let b = TodoItem(title: "B", position: "a2")
+        #expect(doneRepeat.isEffectivelyCompleted == true)
+        #expect(doneRepeat.isCompleted == false)
+
+        // Matches what ContentView actually passes: the list filtered by
+        // isEffectivelyCompleted, excluding the completed-today repeat.
+        let incomplete = [a, b]
+
+        let vm = TodoViewModel()
+        // Drag A (index 0) to drop onto B (index 1): downward drag.
+        vm.moveTodo(from: IndexSet(integer: 0), to: 2, in: incomplete)
+
+        #expect(a.position > b.position)
+        // The repeat sitting outside the reordered list must be untouched.
+        #expect(doneRepeat.position == "a1")
+    }
+
     @Test("addTodo with SwiftData creates item and clears input")
     @MainActor
     func addTodoCreatesItem() throws {
