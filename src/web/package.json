@@ -45,7 +45,7 @@
     "effect": "^3.22.0",
     "fractional-indexing": "^4.0.0",
     "lucide-react": "^1.28.0",
-    "react": "^19.2.5",
+    "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.1",
     "tailwindcss-radix-colors": "^2.1.0",
