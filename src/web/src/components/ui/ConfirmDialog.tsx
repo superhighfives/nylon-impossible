@@ -25,8 +25,8 @@ export function ConfirmDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-70" />
-        <Dialog.Popup className="fixed inset-0 z-80 flex items-center justify-center p-4">
+        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-90" />
+        <Dialog.Popup className="fixed inset-0 z-100 flex items-center justify-center p-4">
           <div className="w-full max-w-sm bg-gray-surface rounded-xl shadow-lg p-6 space-y-4">
             <div className="space-y-1.5">
               <Dialog.Title className="text-base font-semibold text-gray">

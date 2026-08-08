@@ -39,9 +39,13 @@ struct AddTaskInputView: View {
                 }
                 // A vertical-axis TextField's Return key inserts a newline
                 // instead of firing onSubmit, so submit-on-Return is driven
-                // by detecting that trailing "\n" here instead.
-                .onChange(of: text) { _, newValue in
-                    guard newValue.hasSuffix("\n") else { return }
+                // by detecting that trailing "\n" here instead. Gated on a
+                // one-character delta so a paste ending in "\n" (which lands
+                // as a multi-character change) doesn't auto-submit.
+                .onChange(of: text) { oldValue, newValue in
+                    guard newValue.hasSuffix("\n"),
+                        newValue.count == oldValue.count + 1
+                    else { return }
                     text = String(newValue.dropLast())
                     if canAdd {
                         onAdd(.plain)
