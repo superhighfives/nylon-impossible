@@ -1,6 +1,6 @@
 ---
 title: Todo Row & List Polish (delete confirm, side panel, iOS fixes)
-status: In Progress
+status: Complete
 created: 2026-08-06
 updated: 2026-08-07
 ---
@@ -67,11 +67,11 @@ menu — don't duplicate the affordance there).
 
 **Acceptance**
 
-- [ ] On desktop, a delete icon appears in the row next to the priority/date
+- [x] On desktop, a delete icon appears in the row next to the priority/date
       indicators.
-- [ ] Clicking it goes through the item 2 confirm step, not an immediate
+- [x] Clicking it goes through the item 2 confirm step, not an immediate
       delete.
-- [ ] Mobile is unchanged (delete still lives in `TodoActionsMenu`).
+- [x] Mobile is unchanged (delete still lives in `TodoActionsMenu`).
 
 ---
 
@@ -118,13 +118,15 @@ lives).
 
 **Acceptance**
 
-- [ ] Every delete affordance on web (row icon, expanded form, mobile menu)
+- [x] Every delete affordance on web (row icon, expanded form, mobile menu)
       opens the shared `ConfirmDialog` before deleting; cancelling leaves the
       todo untouched.
-- [ ] Every delete affordance on iOS (swipe action, edit sheet) opens a
+- [x] Every delete affordance on iOS (swipe action) opens a
       `.confirmationDialog` before deleting; cancelling leaves the todo
-      untouched.
-- [ ] No `window.confirm()` remains in the todo delete path (the
+      untouched. `TodoEditSheet.swift` turned out to have no delete-the-parent
+      button (only `onDeleteSubtask`) — that part of the plan's premise was
+      stale, so there was nothing to wire there.
+- [x] No `window.confirm()` remains in the todo delete path (the
       `SettingsModal` account-deletion one is out of scope — leave it).
 
 ---
@@ -172,14 +174,16 @@ primitives to `ui/`).
 
 **Acceptance**
 
-- [ ] Expanding a todo opens a panel sliding in from the side, not an inline
+- [x] Expanding a todo opens a panel sliding in from the side, not an inline
       block that pushes the list.
-- [ ] The list behind the panel doesn't reflow while it's open.
-- [ ] Escape and backdrop-click close the panel; the previously-focused row
-      regains focus.
-- [ ] All existing expanded-form functionality (auto-save fields, delete via
+- [x] The list behind the panel doesn't reflow while it's open.
+- [x] Escape and backdrop-click close the panel; the previously-focused row
+      regains focus. Verified live: Escape closes it and focus lands back on
+      the triggering row's expand button.
+- [x] All existing expanded-form functionality (auto-save fields, delete via
       item 2's confirm, research/enrich actions) still works inside the
-      panel unchanged.
+      panel unchanged. Verified live: delete-from-panel opens the confirm
+      dialog stacked above the side panel correctly.
 
 ---
 
@@ -344,12 +348,12 @@ where new items actually land.
 
 **Acceptance**
 
-- [ ] The "Add subtask" input renders directly under the "Subtasks" header,
+- [x] The "Add subtask" input renders directly under the "Subtasks" header,
       above the active subtask list.
-- [ ] Adding a subtask still inserts it at the top of the active list
+- [x] Adding a subtask still inserts it at the top of the active list
       (unchanged behavior, just now visually adjacent to the form that
       created it).
-- [ ] Completed subtasks still render below active ones, unaffected.
+- [x] Completed subtasks still render below active ones, unaffected.
 
 ---
 
@@ -385,3 +389,78 @@ where new items actually land.
   container (inline block → side panel).
 - Any other iOS sort/data-model changes beyond the specific ordering bug in
   item 4.
+
+---
+
+## Overview
+
+All six items shipped, each as its own commit. Web: a desktop-only row
+delete button, a shared `ConfirmDialog` wired through every delete path, a
+sliding side panel replacing the inline expanded form, and the add-subtask
+form moved above the active list. iOS: swipe-to-delete now confirms before
+deleting, Return submits a new todo despite the auto-growing input, and a
+real (if narrow) ordering bug was found and fixed along the way — though not
+the one the plan suspected going in.
+
+## Architecture
+
+**Web (items 1, 2, 3, 6 — `TodoList.tsx`, `TodoItemExpanded.tsx`,
+`SubtaskSection.tsx`, and two new `ui/` primitives):**
+
+- `src/web/src/components/ui/ConfirmDialog.tsx` (new) — generic title/
+  description/confirm-destructive dialog on `@base-ui/react/dialog`. `TodoList`
+  owns a single `confirmDeleteId` state; every delete call site (the new
+  desktop row button, `TodoItemExpanded`'s delete button, `TodoActionsMenu`'s
+  mobile delete item) already funneled through one `handleDelete` prop, so
+  centralizing the confirm step there meant no per-callsite plumbing — just
+  changing what `handleDelete` does.
+- `src/web/src/components/ui/SidePanel.tsx` (new) — right-anchored
+  `@base-ui/react/dialog` variant using Base UI's `data-starting-style`/
+  `data-ending-style` attributes (via Tailwind's bare `data-*` variant
+  shorthand, already used elsewhere in this codebase for `data-disabled`)
+  for the slide/backdrop-fade transition, no extra animation library. Reuses
+  the existing `expandedId` state as-is — the panel just replaced where
+  `ExpandedSection` mounted, not the state model. Expanded rows get a subtle
+  `bg-gray-base` tint so they stay visually "selected" while the panel is
+  open, per the plan's "likely yes" call.
+- `SubtaskSection.tsx`'s change was a pure JSX block move, no logic touched.
+
+**iOS (items 2, 4, 5):**
+
+- `ContentView.swift` — swipe-to-delete no longer deletes directly; the swipe
+  action now only stages a `pendingDeleteTodo`, and a single
+  `.confirmationDialog` on the view actually deletes on confirm. **Deviation**:
+  the plan also expected a delete button inside `TodoEditSheet.swift` needing
+  the same treatment — that turned out not to exist (the sheet only has
+  `onDeleteSubtask`, no delete-the-parent-todo action), so there was nothing
+  to wire there.
+- `AddTaskInputView.swift` — kept the auto-growing `axis: .vertical`
+  `TextField` and added an `.onChange(of: text)` handler that detects a
+  trailing `"\n"` (what Return actually produces in a vertical-axis field),
+  strips it, and submits through the existing `onAdd(.plain)` path.
+- **Deviation, item 4**: the plan's leading hypothesis — that
+  `FractionalIndexing.swift`'s use of Swift's native `String <` diverges from
+  the JS/UTF-16 comparison the server uses — was tested directly with a
+  standalone `swift` script exercising the port's `generateKeyBetween`
+  against both comparators across the full BASE_62 alphabet and hundreds of
+  randomly generated multi-character keys. No mismatch reproduced; the
+  hypothesis was false. Continuing to investigate per the plan's own
+  fallback instructions turned up a real, verified defect in
+  `TaskCreationService.fetchAllTodos`: its `FetchDescriptor` sorted with
+  `SortDescriptor(\.position)`, whose default String comparator is not a
+  plain codepoint comparison (confirmed with a script showing it reorders
+  mixed-case fractional-index keys relative to `<`). Fixed by sorting in
+  memory with `<` instead, matching every other position comparison in the
+  app, with a regression test that fails under the old behavior. This bug
+  didn't reach the visible list today (`ContentView`'s list never calls
+  `fetchAllTodos`; the two callers that do — the Share Extension and Siri's
+  `AddTaskIntent` — only use the result via `.min(by:)`, which is
+  order-independent), so it's a latent-but-real fix rather than a confirmed
+  repro of what the user actually saw. No other ordering defect was found in
+  the paths investigated; if broken ordering is still visible in the live
+  app, it needs a fresh repro to chase further.
+- No iOS item was verified in a simulator — `xcodebuild` scheme/test builds
+  don't run cleanly in this dev environment (SDK 26.5 vs. runtime 26.4
+  mismatch, the same known limitation `pre-launch-polish` carried). Verified
+  instead via SwiftLint, balanced-braces checks, and (for item 4) standalone
+  `swift` scripts exercising the actual production code directly.
