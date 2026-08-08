@@ -56,6 +56,8 @@
 			membershipExceptions = (
 				Models/TodoItem.swift,
 				Models/TodoMessage.swift,
+				Models/TodoSuggestion.swift,
+				"Models/TodoSuggestion+APIConversion.swift",
 				Models/TodoUrl.swift,
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
