@@ -8,8 +8,10 @@ import {
   listUsers,
   updateUser,
 } from "./handlers/admin";
+import { acceptSuggestion } from "./handlers/apply-suggestion";
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
+import { dismissSuggestion } from "./handlers/dismiss-suggestion";
 import { enrichTodo } from "./handlers/enrich";
 import {
   gmailAddonAddFromMessage,
@@ -122,6 +124,8 @@ app.delete("/todos/:id/research", cancelResearch);
 app.post("/todos/:id/enrich", enrichTodo);
 app.post("/todos/:id/reply", replyToTodo);
 app.delete("/todos/:id/question", dismissQuestion);
+app.post("/todos/:id/suggestions/:sid/accept", acceptSuggestion);
+app.post("/todos/:id/suggestions/:sid/dismiss", dismissSuggestion);
 
 // User routes
 app.get("/users/me", getMe);

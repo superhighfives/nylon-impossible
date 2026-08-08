@@ -43,6 +43,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     research: null,
     messages: [],
     urls: [],
+    suggestions: [],
     ...overrides,
   };
 }

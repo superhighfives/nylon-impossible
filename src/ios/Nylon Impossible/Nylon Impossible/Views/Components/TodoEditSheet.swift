@@ -160,6 +160,9 @@ struct TodoEditSheet: View {
                     )
                 }
 
+                // Suggestions — proposed AI enrichment changes awaiting consent
+                SuggestionsSection(todo: todo, apiService: apiService)
+
                 // Research
                 if let research {
                     ResearchSection(

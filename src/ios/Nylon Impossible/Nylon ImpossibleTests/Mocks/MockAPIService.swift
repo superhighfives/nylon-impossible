@@ -145,4 +145,24 @@ final class MockAPIService: APIProviding {
             throw error
         }
     }
+
+    var acceptSuggestionError: Error?
+    var lastAcceptSuggestion: (todoId: String, suggestionId: String)?
+
+    func acceptSuggestion(todoId: String, suggestionId: String) async throws {
+        lastAcceptSuggestion = (todoId, suggestionId)
+        if let error = acceptSuggestionError {
+            throw error
+        }
+    }
+
+    var dismissSuggestionError: Error?
+    var lastDismissSuggestion: (todoId: String, suggestionId: String)?
+
+    func dismissSuggestion(todoId: String, suggestionId: String) async throws {
+        lastDismissSuggestion = (todoId, suggestionId)
+        if let error = dismissSuggestionError {
+            throw error
+        }
+    }
 }

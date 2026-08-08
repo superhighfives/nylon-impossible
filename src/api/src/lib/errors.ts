@@ -27,6 +27,16 @@ export const API_ERRORS = {
   todo_id_required: { status: 400, message: "Todo ID required" },
   user_id_required: { status: 400, message: "User ID required" },
   todo_not_found: { status: 404, message: "Todo not found" },
+  suggestion_id_required: { status: 400, message: "Suggestion ID required" },
+  suggestion_not_found: { status: 404, message: "Suggestion not found" },
+  suggestion_not_pending: {
+    status: 409,
+    message: "Suggestion has already been acted on",
+  },
+  suggestion_conflict: {
+    status: 409,
+    message: "Todo has changed since this suggestion was proposed",
+  },
   user_not_found: { status: 404, message: "User not found" },
   email_already_registered: {
     status: 409,

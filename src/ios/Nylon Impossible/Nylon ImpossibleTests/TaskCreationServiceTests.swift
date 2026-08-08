@@ -7,7 +7,7 @@ import SwiftData
 struct TaskCreationServiceTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(for: TodoItem.self, configurations: config)
+        return try ModelContainer(for: TodoItem.self, TodoSuggestion.self, configurations: config)
     }
     
     @Test("createTask creates todo with correct title")

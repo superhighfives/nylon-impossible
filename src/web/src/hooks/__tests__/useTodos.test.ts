@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodoWithUrls } from "@/types/database";
 import {
   hasPendingNonStaleWork,
+  useAcceptSuggestion,
   useCreateTodo,
   useDeleteTodo,
+  useDismissSuggestion,
   useDismissTodoQuestion,
   useReplyToTodo,
   useReresearch,
@@ -68,6 +70,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     research: null,
     messages: [],
     urls: [],
+    suggestions: [],
     ...overrides,
   };
 }
@@ -630,5 +633,193 @@ describe("useDismissTodoQuestion", () => {
     await waitFor(() => expect(result.current.isError).toBe(true));
     const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
     expect(cached?.[0]?.needsInput).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useAcceptSuggestion – optimistic field apply + mark accepted
+// ---------------------------------------------------------------------------
+
+describe("useAcceptSuggestion", () => {
+  const TODO_QUERY_KEY = ["todos"];
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("optimistically applies a title suggestion and marks it accepted", async () => {
+    let resolveFetch!: (v: Response) => void;
+    vi.mocked(global.fetch).mockReturnValue(
+      new Promise<Response>((res) => {
+        resolveFetch = res;
+      }),
+    );
+
+    const initial = makeTodo({
+      title: "buy milk https://example.com",
+      suggestions: [
+        {
+          id: "s1",
+          todoId: "todo-1",
+          type: "title",
+          payload: { title: "buy milk" },
+          label: 'Rename to "buy milk"',
+          status: "pending",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useAcceptSuggestion(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ todoId: "todo-1", suggestionId: "s1" });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+      expect(cached?.[0]?.title).toBe("buy milk");
+      expect(cached?.[0]?.suggestions[0]?.status).toBe("accepted");
+    });
+
+    resolveFetch({
+      ok: true,
+      json: () => Promise.resolve({ id: "s1", status: "accepted" }),
+    } as Response);
+  });
+
+  it("rolls back to the snapshot when accept errors", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "boom" }),
+    } as Response);
+
+    const initial = makeTodo({
+      title: "buy milk https://example.com",
+      suggestions: [
+        {
+          id: "s1",
+          todoId: "todo-1",
+          type: "title",
+          payload: { title: "buy milk" },
+          label: 'Rename to "buy milk"',
+          status: "pending",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useAcceptSuggestion(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ todoId: "todo-1", suggestionId: "s1" });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+    expect(cached?.[0]?.title).toBe("buy milk https://example.com");
+    expect(cached?.[0]?.suggestions[0]?.status).toBe("pending");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useDismissSuggestion – optimistic mark dismissed, no field change
+// ---------------------------------------------------------------------------
+
+describe("useDismissSuggestion", () => {
+  const TODO_QUERY_KEY = ["todos"];
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it("optimistically marks the suggestion dismissed without touching the todo", async () => {
+    let resolveFetch!: (v: Response) => void;
+    vi.mocked(global.fetch).mockReturnValue(
+      new Promise<Response>((res) => {
+        resolveFetch = res;
+      }),
+    );
+
+    const initial = makeTodo({
+      title: "buy milk https://example.com",
+      suggestions: [
+        {
+          id: "s1",
+          todoId: "todo-1",
+          type: "title",
+          payload: { title: "buy milk" },
+          label: 'Rename to "buy milk"',
+          status: "pending",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useDismissSuggestion(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ todoId: "todo-1", suggestionId: "s1" });
+
+    await waitFor(() => {
+      const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+      expect(cached?.[0]?.suggestions[0]?.status).toBe("dismissed");
+      expect(cached?.[0]?.title).toBe("buy milk https://example.com");
+    });
+
+    resolveFetch({
+      ok: true,
+      json: () => Promise.resolve({ id: "s1", status: "dismissed" }),
+    } as Response);
+  });
+
+  it("rolls back when dismiss errors", async () => {
+    vi.mocked(global.fetch).mockResolvedValue({
+      ok: false,
+      status: 500,
+      json: () => Promise.resolve({ error: "boom" }),
+    } as Response);
+
+    const initial = makeTodo({
+      suggestions: [
+        {
+          id: "s1",
+          todoId: "todo-1",
+          type: "title",
+          payload: { title: "buy milk" },
+          label: 'Rename to "buy milk"',
+          status: "pending",
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(TODO_QUERY_KEY, [initial]);
+
+    const { result } = renderHook(() => useDismissSuggestion(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ todoId: "todo-1", suggestionId: "s1" });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
+    expect(cached?.[0]?.suggestions[0]?.status).toBe("pending");
   });
 });

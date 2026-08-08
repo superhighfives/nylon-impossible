@@ -29,6 +29,7 @@ import type {
 import { ConversationSection } from "./ConversationSection";
 import { ResearchSection } from "./ResearchSection";
 import { SubtaskSection } from "./SubtaskSection";
+import { SuggestionsSection } from "./SuggestionsSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 import { EmailPreviewCard } from "./ui/EmailPreviewCard";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
@@ -490,6 +491,9 @@ export function TodoItemExpanded({
           Delete
         </Button>
       </div>
+
+      {/* Suggestions Section — proposed AI enrichment changes awaiting consent */}
+      <SuggestionsSection todo={todo} />
 
       {/* Research Section */}
       {todo.research && (

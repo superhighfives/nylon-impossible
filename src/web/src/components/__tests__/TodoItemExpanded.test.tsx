@@ -28,6 +28,12 @@ vi.mock("../ConversationSection", () => ({
   ),
 }));
 
+vi.mock("../SuggestionsSection", () => ({
+  SuggestionsSection: ({ todo }: { todo: { id: string } }) => (
+    <div data-testid="suggestions-section">suggestions:{todo.id}</div>
+  ),
+}));
+
 import { useUser } from "@/hooks/useUser";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
@@ -49,6 +55,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     research: null,
     messages: [],
     urls: [],
+    suggestions: [],
     ...overrides,
   };
 }

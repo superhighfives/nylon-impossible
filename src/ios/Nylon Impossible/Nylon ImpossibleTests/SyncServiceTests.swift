@@ -7,7 +7,7 @@ import SwiftData
 struct SyncServiceTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        return try ModelContainer(for: TodoItem.self, TodoUrl.self, TodoMessage.self, configurations: config)
+        return try ModelContainer(for: TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self, configurations: config)
     }
 
     @Test("Skips sync when not signed in")
@@ -773,5 +773,122 @@ struct SyncServiceTests {
 
         #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
         #expect(todo.pendingResearch == false)
+    }
+
+    @Test("Persists a pending suggestion on the related TodoItem after sync")
+    @MainActor
+    func persistsSuggestionsOnTodoItem() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let remoteDate = Date(timeIntervalSince1970: 1700000000)
+        let suggestionId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        let todoId = "11111111-1111-1111-1111-111111111111"
+
+        api.syncResponse = SyncResponse(
+            todos: [APITodo(
+                id: todoId,
+                userId: "user_test_123",
+                title: "Book DMV appointment",
+                notes: nil,
+                completed: false,
+                position: "a0",
+                dueDate: nil,
+                aiStatus: .complete,
+                createdAt: remoteDate,
+                updatedAt: remoteDate,
+                urls: nil,
+                suggestions: [APITodoSuggestion(
+                    id: suggestionId,
+                    todoId: todoId,
+                    type: "due_date",
+                    payload: APISuggestionPayload(
+                        dueDate: "2026-07-25",
+                        recurrence: nil,
+                        title: nil,
+                        titles: nil,
+                        searchQuery: nil,
+                        researchType: nil
+                    ),
+                    label: "Set due date to Fri 25 Jul",
+                    status: "pending",
+                    createdAt: remoteDate,
+                    updatedAt: remoteDate
+                )]
+            )],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        let descriptor = FetchDescriptor<TodoItem>()
+        let items = try context.fetch(descriptor)
+        #expect(items.count == 1)
+        #expect(items[0].suggestions.count == 1)
+        #expect(items[0].hasPendingSuggestions == true)
+        #expect(items[0].suggestions.first?.label == "Set due date to Fri 25 Jul")
+        #expect(items[0].suggestions.first?.payloadDueDate == "2026-07-25")
+    }
+
+    @Test("Prunes a suggestion once the server no longer returns it")
+    @MainActor
+    func prunesRemovedSuggestions() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todo = TodoItem(title: "Book DMV appointment", userId: "user_test_123", position: "a0")
+        todo.isSynced = true
+        let suggestion = TodoSuggestion(
+            id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+            type: "title",
+            label: "Rename to \"Book DMV\"",
+            status: "accepted",
+            createdAt: Date(timeIntervalSince1970: 1700000000),
+            updatedAt: Date(timeIntervalSince1970: 1700000000)
+        )
+        suggestion.todo = todo
+        context.insert(todo)
+        context.insert(suggestion)
+        try context.save()
+
+        // Server response for this todo no longer includes the suggestion
+        // (e.g. re-enrich superseded it, or it was accepted/dismissed and
+        // aged out).
+        api.syncResponse = SyncResponse(
+            todos: [APITodo(
+                id: todo.id.uuidString.lowercased(),
+                userId: "user_test_123",
+                title: "Book DMV appointment",
+                notes: nil,
+                completed: false,
+                position: "a0",
+                dueDate: nil,
+                aiStatus: nil,
+                createdAt: todo.createdAt,
+                updatedAt: todo.updatedAt,
+                urls: nil,
+                suggestions: []
+            )],
+            syncedAt: "2025-06-01T00:00:00.000Z",
+            conflicts: []
+        )
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        let descriptor = FetchDescriptor<TodoItem>()
+        let items = try context.fetch(descriptor)
+        #expect(items.count == 1)
+        #expect(items[0].suggestions.isEmpty)
     }
 }

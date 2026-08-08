@@ -16,9 +16,11 @@ import {
   type Todo,
   type TodoMessage,
   type TodoResearch,
+  type TodoSuggestion,
   type TodoUrl,
   todoMessages,
   todoResearch,
+  todoSuggestions,
   todos,
   todoUrls,
   users,
@@ -132,12 +134,27 @@ function serializeMessage(m: TodoMessage) {
   };
 }
 
+// Serialize a suggestion with ISO8601 dates and lowercase IDs
+function serializeSuggestion(s: TodoSuggestion) {
+  return {
+    id: s.id.toLowerCase(),
+    todoId: s.todoId.toLowerCase(),
+    type: s.type,
+    payload: s.payload,
+    label: s.label,
+    status: s.status,
+    createdAt: s.createdAt.toISOString(),
+    updatedAt: s.updatedAt.toISOString(),
+  };
+}
+
 // Serialize a todo with explicit ISO8601 dates and lowercase ID
 function serializeTodo(
   todo: typeof todos.$inferSelect,
   urls: ReturnType<typeof serializeUrl>[] = [],
   research: TodoResearch | null = null,
   messages: ReturnType<typeof serializeMessage>[] = [],
+  suggestions: ReturnType<typeof serializeSuggestion>[] = [],
 ) {
   return {
     id: todo.id.toLowerCase(),
@@ -157,6 +174,7 @@ function serializeTodo(
     research: serializeResearch(research),
     messages,
     urls,
+    suggestions,
   };
 }
 
@@ -597,12 +615,13 @@ export async function syncTodos(c: Context<Env>) {
   const allUrls: TodoUrl[] = [];
   const allResearch: TodoResearch[] = [];
   const allMessages: TodoMessage[] = [];
+  const allSuggestions: TodoSuggestion[] = [];
   if (todoIds.length > 0) {
     // Batch by D1's bound-param cap: one `inArray` param per todoId, so a user
     // with >100 todos would otherwise overflow a single statement. Each todoId
     // lands in one batch, so per-todo ordering survives grouping below.
     for (const chunkIds of chunkForD1(todoIds)) {
-      const [urls, research, messages] = await Promise.all([
+      const [urls, research, messages, suggestions] = await Promise.all([
         db
           .select()
           .from(todoUrls)
@@ -617,10 +636,16 @@ export async function syncTodos(c: Context<Env>) {
           .from(todoMessages)
           .where(inArray(todoMessages.todoId, chunkIds))
           .orderBy(asc(todoMessages.createdAt)),
+        db
+          .select()
+          .from(todoSuggestions)
+          .where(inArray(todoSuggestions.todoId, chunkIds))
+          .orderBy(asc(todoSuggestions.createdAt)),
       ]);
       allUrls.push(...urls);
       allResearch.push(...research);
       allMessages.push(...messages);
+      allSuggestions.push(...suggestions);
     }
   }
 
@@ -651,6 +676,18 @@ export async function syncTodos(c: Context<Env>) {
     messagesByTodoId.set(message.todoId, existing);
   }
 
+  // Group suggestions by todoId (already ordered by createdAt asc)
+  const suggestionsByTodoId = new Map<
+    string,
+    ReturnType<typeof serializeSuggestion>[]
+  >();
+  for (const suggestion of allSuggestions) {
+    const serialized = serializeSuggestion(suggestion);
+    const existing = suggestionsByTodoId.get(suggestion.todoId) ?? [];
+    existing.push(serialized);
+    suggestionsByTodoId.set(suggestion.todoId, existing);
+  }
+
   return c.json({
     todos: serverTodos.map((todo) =>
       serializeTodo(
@@ -658,6 +695,7 @@ export async function syncTodos(c: Context<Env>) {
         urlsByTodoId.get(todo.id) ?? [],
         researchByTodoId.get(todo.id) ?? null,
         messagesByTodoId.get(todo.id) ?? [],
+        suggestionsByTodoId.get(todo.id) ?? [],
       ),
     ),
     syncedAt: syncedAt.toISOString(),

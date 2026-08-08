@@ -1,7 +1,7 @@
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
-import { and, eq, getDb, todos, users } from "../lib/db";
+import { and, eq, getDb, todos } from "../lib/db";
 import { apiError } from "../lib/errors";
 import type { Env } from "../types";
 
@@ -49,11 +49,6 @@ export async function enrichTodo(c: Context<Env>) {
     .set({ aiStatus: "pending", updatedAt: now })
     .where(eq(todos.id, todoId));
 
-  const [user] = await db
-    .select({ location: users.location })
-    .from(users)
-    .where(eq(users.id, userId));
-
   c.executionCtx.waitUntil(
     enrichOrAskWithAI(
       db,
@@ -62,7 +57,6 @@ export async function enrichTodo(c: Context<Env>) {
       todoId,
       userId,
       todo.title,
-      user?.location,
       undefined,
       // Manual enrichment must not clobber a due date the user already set.
       { preserveExistingDueDate: true, existingDueDate: todo.dueDate },

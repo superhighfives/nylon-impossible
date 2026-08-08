@@ -321,6 +321,9 @@ function TodoItemContent({
   const researchPending =
     todo.research?.status === "pending" &&
     now - new Date(todo.research.createdAt).getTime() < STALE_RESEARCH_MS;
+  const hasPendingSuggestions = todo.suggestions.some(
+    (s) => s.status === "pending",
+  );
   // Skip the inline title line entirely for a URL-only card with no status
   // badges, so the card sits flush at the top of the row. space-y-1 then only
   // adds a gap when the title line is actually present.
@@ -329,7 +332,8 @@ function TodoItemContent({
     subtasks.length > 0 ||
     aiProcessing ||
     researchPending ||
-    !!todo.needsInput;
+    !!todo.needsInput ||
+    hasPendingSuggestions;
 
   // Inline due-date editing on active rows. Set values render as editable
   // badges (bottom-left); the quick-add affordances for unset values live in
@@ -439,6 +443,19 @@ function TodoItemContent({
                 >
                   <MessageCircle size={12} />
                 </Button>
+              )}
+              {hasPendingSuggestions && (
+                <button
+                  type="button"
+                  onClick={() => onToggleExpand(todo.id)}
+                  aria-label="AI has suggestions — open to review"
+                  className="flex shrink-0 items-center justify-center p-1"
+                >
+                  <span
+                    className="block size-2 rounded-full bg-yellow-8 dark:bg-yellowdark-8"
+                    aria-hidden="true"
+                  />
+                </button>
               )}
             </div>
           )}
