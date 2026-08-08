@@ -1,5 +1,12 @@
 import { env } from "cloudflare:test";
-import { getDb, todoMessages, todos, todoUrls, users } from "../src/lib/db";
+import {
+  getDb,
+  todoMessages,
+  todoSuggestions,
+  todos,
+  todoUrls,
+  users,
+} from "../src/lib/db";
 
 export async function seedUser(
   userId = "user_test_123",
@@ -62,8 +69,29 @@ export async function seedMessage(
   return inserted;
 }
 
+export async function seedSuggestion(
+  todoId: string,
+  overrides: Partial<typeof todoSuggestions.$inferInsert> = {},
+) {
+  const db = getDb(env.DB);
+  const [inserted] = await db
+    .insert(todoSuggestions)
+    .values({
+      id: crypto.randomUUID(),
+      todoId,
+      type: "title",
+      payload: { title: "Buy milk" },
+      label: 'Rename to "Buy milk"',
+      status: "pending",
+      ...overrides,
+    })
+    .returning();
+  return inserted;
+}
+
 export async function cleanDb() {
   await env.DB.exec("DELETE FROM todo_messages");
+  await env.DB.exec("DELETE FROM todo_suggestions");
   await env.DB.exec("DELETE FROM todo_urls");
   await env.DB.exec("DELETE FROM todo_research");
   await env.DB.exec("DELETE FROM todos");

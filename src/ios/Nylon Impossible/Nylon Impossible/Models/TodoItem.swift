@@ -76,6 +76,7 @@ final class TodoItem {
     var pendingResearch: Bool = false
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
     @Relationship(deleteRule: .cascade) var messages: [TodoMessage] = []
+    @Relationship(deleteRule: .cascade) var suggestions: [TodoSuggestion] = []
 
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
@@ -172,5 +173,11 @@ final class TodoItem {
     var researchAge: TimeInterval? {
         guard let createdAt = researchCreatedAt else { return nil }
         return Date().timeIntervalSince(createdAt)
+    }
+
+    /// True when the agent has proposed changes the user hasn't reviewed yet.
+    /// Drives the yellow "needs attention" dot in the list row.
+    var hasPendingSuggestions: Bool {
+        suggestions.contains { $0.isPending }
     }
 }

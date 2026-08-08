@@ -3,13 +3,19 @@ export type {
   List,
   Recurrence,
   RecurrenceFrequency,
+  SuggestionPayload,
+  SuggestionType,
   Todo,
   TodoList,
   TodoUrl,
   User,
 } from "@/lib/schema";
 
-import type { Recurrence } from "@/lib/schema";
+import type {
+  Recurrence,
+  SuggestionPayload,
+  SuggestionType,
+} from "@/lib/schema";
 
 export interface CreateTodoInput {
   title: string;
@@ -86,6 +92,21 @@ export interface SerializedTodoUrl {
   updatedAt: string;
 }
 
+/** Status of a proposed AI enrichment change */
+export type SuggestionStatus = "pending" | "accepted" | "dismissed";
+
+/** Serialized enrichment suggestion from the API */
+export interface SerializedTodoSuggestion {
+  id: string;
+  todoId: string;
+  type: SuggestionType;
+  payload: SuggestionPayload;
+  label: string;
+  status: SuggestionStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** A todo with its associated URLs */
 export interface TodoWithUrls {
   id: string;
@@ -105,4 +126,5 @@ export interface TodoWithUrls {
   research: SerializedResearch | null;
   messages: SerializedTodoMessage[];
   urls: SerializedTodoUrl[];
+  suggestions: SerializedTodoSuggestion[];
 }

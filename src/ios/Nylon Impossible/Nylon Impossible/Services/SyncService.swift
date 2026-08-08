@@ -424,6 +424,38 @@ final class SyncService {
             }
         }
 
+        // Step 7: Sync suggestions (server authoritative — upsert, like URLs).
+        // Unlike messages, suggestions have no local unsynced state to preserve:
+        // clients only ever push accept/dismiss, never create one.
+        for remote in remoteTodos {
+            guard let remoteId = UUID(uuidString: remote.id) else { continue }
+
+            let itemDescriptor = FetchDescriptor<TodoItem>(
+                predicate: #Predicate { $0.id == remoteId }
+            )
+            guard let todo = try modelContext.fetch(itemDescriptor).first else { continue }
+
+            let remoteSuggestions = remote.suggestions ?? []
+            let remoteSuggestionIds = Set(remoteSuggestions.map { $0.id })
+            let existingById = todo.suggestions.reduce(into: [:]) { dict, s in dict[s.id] = s }
+
+            for suggestion in todo.suggestions where !remoteSuggestionIds.contains(suggestion.id) {
+                modelContext.delete(suggestion)
+            }
+
+            for remoteSuggestion in remoteSuggestions {
+                if let existing = existingById[remoteSuggestion.id] {
+                    existing.status = remoteSuggestion.status
+                    existing.label = remoteSuggestion.label
+                    existing.updatedAt = remoteSuggestion.updatedAt
+                } else {
+                    let newSuggestion = TodoSuggestion(from: remoteSuggestion)
+                    newSuggestion.todo = todo
+                    modelContext.insert(newSuggestion)
+                }
+            }
+        }
+
         // Single save for the entire operation
         try modelContext.save()
     }

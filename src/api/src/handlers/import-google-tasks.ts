@@ -3,7 +3,7 @@ import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
 import { clerkClient } from "../lib/clerk";
-import { eq, getDb, todos, todoUrls, users } from "../lib/db";
+import { eq, getDb, todos, todoUrls } from "../lib/db";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
@@ -193,14 +193,6 @@ export async function importGoogleTasks(c: Context<Env>) {
   // Enrich each imported todo the same way typed todos are. With AI on
   // (aiEnabled) todos get full AI enrichment (research, URL metadata); with AI
   // off they still get URL metadata so links resolve to favicons/titles.
-  const userLocation = useAI
-    ? await db
-        .select({ location: users.location })
-        .from(users)
-        .where(eq(users.id, userId))
-        .then((r) => r[0]?.location)
-    : undefined;
-
   for (const row of rows) {
     if (useAI) {
       c.executionCtx.waitUntil(
@@ -211,7 +203,6 @@ export async function importGoogleTasks(c: Context<Env>) {
           row.id,
           userId,
           row.title,
-          userLocation,
           undefined,
           // The imported task already carries an authoritative due date from
           // Google — don't let AI extraction overwrite it, but pass it through

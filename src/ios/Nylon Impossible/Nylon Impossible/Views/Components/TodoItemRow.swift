@@ -300,6 +300,14 @@ struct TodoItemRow: View {
                                 .accessibilityLabel("The assistant has a question")
                         }
 
+                        // Agent has proposed changes awaiting review
+                        if todo.hasPendingSuggestions {
+                            Circle()
+                                .fill(Color.appAccent)
+                                .frame(width: 8, height: 8)
+                                .accessibilityLabel("AI has suggestions")
+                        }
+
                         // Subtask progress (n/m), mirroring the web badge.
                         if !subtasks.isEmpty {
                             HStack(spacing: 3) {

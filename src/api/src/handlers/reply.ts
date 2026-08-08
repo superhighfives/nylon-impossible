@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
-import { and, asc, eq, getDb, todoMessages, todos, users } from "../lib/db";
+import { and, asc, eq, getDb, todoMessages, todos } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
@@ -76,12 +76,6 @@ export async function replyToTodo(c: Context<Env>) {
     .where(eq(todoMessages.todoId, todoId))
     .orderBy(asc(todoMessages.createdAt));
 
-  // Fetch user location for research bias.
-  const [user] = await db
-    .select({ location: users.location })
-    .from(users)
-    .where(eq(users.id, userId));
-
   // Notify sync immediately so the user sees their message, then re-enrich in
   // the background with the full conversation.
   await notifySync(c.env, userId);
@@ -94,7 +88,6 @@ export async function replyToTodo(c: Context<Env>) {
       todoId,
       userId,
       todo.title,
-      user?.location ?? null,
       history.map((m) => ({ role: m.role, content: m.content })),
     ),
   );

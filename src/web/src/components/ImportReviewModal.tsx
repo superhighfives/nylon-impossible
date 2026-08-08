@@ -106,6 +106,7 @@ export function ImportReviewModal() {
       research: null,
       messages: [],
       urls: [],
+      suggestions: [],
     };
   });
 

@@ -83,6 +83,31 @@ struct APITodoMessage: Codable, Sendable, Identifiable {
     let awaitingReply: Bool
 }
 
+/// Union of every shape a suggestion's payload can take. Which fields are set
+/// depends on `APITodoSuggestion.type`; unrelated fields decode as nil since
+/// every property is optional. Mirrors the server's `SuggestionPayload` type.
+struct APISuggestionPayload: Codable, Sendable, Equatable {
+    let dueDate: String?
+    let recurrence: Recurrence?
+    let title: String?
+    let titles: [String]?
+    let searchQuery: String?
+    let researchType: String?
+}
+
+/// Proposed AI enrichment change for a todo. Server-authoritative and terminal
+/// once accepted/dismissed — clients upsert on sync, never generate these.
+struct APITodoSuggestion: Codable, Sendable, Identifiable {
+    let id: String
+    let todoId: String
+    let type: String       // "due_date" | "recurrence" | "title" | "subtasks" | "research"
+    let payload: APISuggestionPayload
+    let label: String      // Pre-rendered human string for the button
+    let status: String     // "pending" | "accepted" | "dismissed"
+    let createdAt: Date
+    let updatedAt: Date
+}
+
 struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
@@ -101,6 +126,7 @@ struct APITodo: Codable, Sendable {
     let urls: [APITodoUrl]?  // URLs included in sync response
     let research: APIResearch?
     let messages: [APITodoMessage]?  // Conversation included in sync response
+    let suggestions: [APITodoSuggestion]?  // Enrichment proposals included in sync response
 
     init(
         id: String, userId: String, parentId: String? = nil, title: String,
@@ -111,7 +137,8 @@ struct APITodo: Codable, Sendable {
         aiStatus: AIStatus? = nil, needsInput: Bool? = nil,
         createdAt: Date, updatedAt: Date,
         urls: [APITodoUrl]? = nil, research: APIResearch? = nil,
-        messages: [APITodoMessage]? = nil
+        messages: [APITodoMessage]? = nil,
+        suggestions: [APITodoSuggestion]? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -130,6 +157,7 @@ struct APITodo: Codable, Sendable {
         self.urls = urls
         self.research = research
         self.messages = messages
+        self.suggestions = suggestions
     }
 }
 
@@ -404,6 +432,8 @@ protocol APIProviding: Sendable {
     func cancelResearch(todoId: String) async throws
     func replyToTodo(todoId: String, content: String) async throws -> String
     func dismissQuestion(todoId: String) async throws
+    func acceptSuggestion(todoId: String, suggestionId: String) async throws
+    func dismissSuggestion(todoId: String, suggestionId: String) async throws
 }
 
 // MARK: - API Service
@@ -542,6 +572,28 @@ final class APIService: APIProviding {
     /// Dismiss the agent's open question without answering.
     func dismissQuestion(todoId: String) async throws {
         let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/question")
+    }
+
+    // MARK: - Suggestions
+
+    /// Accept an enrichment suggestion. Applies exactly that change server-side
+    /// and marks it accepted — terminal, it never reapplies.
+    func acceptSuggestion(todoId: String, suggestionId: String) async throws {
+        struct AcceptResponse: Decodable { let id: String; let status: String }
+        let _: AcceptResponse = try await post(
+            path: "/todos/\(todoId)/suggestions/\(suggestionId)/accept",
+            body: EmptyBody()
+        )
+    }
+
+    /// Dismiss an enrichment suggestion without applying it. Terminal — never
+    /// reappears, including across future re-enrich runs.
+    func dismissSuggestion(todoId: String, suggestionId: String) async throws {
+        struct DismissResponse: Decodable { let id: String; let status: String }
+        let _: DismissResponse = try await post(
+            path: "/todos/\(todoId)/suggestions/\(suggestionId)/dismiss",
+            body: EmptyBody()
+        )
     }
 
     // MARK: - User Preferences

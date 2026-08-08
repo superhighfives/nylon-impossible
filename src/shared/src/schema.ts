@@ -15,6 +15,20 @@ import {
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 export type Recurrence = { frequency: RecurrenceFrequency };
 
+// Proposed change carried by a todoSuggestions row. Shape depends on `type`.
+export type SuggestionType =
+  | "due_date"
+  | "recurrence"
+  | "title"
+  | "subtasks"
+  | "research";
+export type SuggestionPayload =
+  | { dueDate: string }
+  | { recurrence: Recurrence }
+  | { title: string }
+  | { titles: string[] }
+  | { searchQuery: string | null; researchType: "general" | "location" };
+
 // Users table
 export const users = sqliteTable(
   "users",
@@ -294,6 +308,51 @@ export const todoUrls = sqliteTable(
   ],
 );
 
+// AI enrichment proposals for a todo. Server-authoritative: enrichment inserts
+// pending rows instead of mutating the todo directly; the user accepts or
+// dismisses each individually. Accept/dismiss is terminal — a dismissed or
+// accepted suggestion never reappears; re-running enrich only replaces rows
+// still `pending`.
+export const todoSuggestions = sqliteTable(
+  "todo_suggestions",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    todoId: text("todo_id")
+      .notNull()
+      .references(() => todos.id, { onDelete: "cascade" }),
+    type: text("type", {
+      enum: ["due_date", "recurrence", "title", "subtasks", "research"],
+    }).$type<SuggestionType>().notNull(),
+    // JSON payload of the proposed value, e.g. {"dueDate":"2026-07-25"},
+    // {"titles":["...","..."]}. Shape depends on `type`.
+    payload: text("payload", { mode: "json" })
+      .$type<SuggestionPayload>()
+      .notNull(),
+    // Pre-rendered human string for the button, e.g. "Set due date to Fri 25 Jul".
+    // Server renders this so web and iOS stay identical without duplicating
+    // formatting logic.
+    label: text("label").notNull(),
+    status: text("status", {
+      enum: ["pending", "accepted", "dismissed"],
+    })
+      .notNull()
+      .default("pending"),
+    createdAt: integer("created_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
+    updatedAt: integer("updated_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`)
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("idx_todo_suggestions_todo_id").on(table.todoId),
+    index("idx_todo_suggestions_status").on(table.status),
+  ],
+);
+
 // Relations (for relational query API)
 export const usersRelations = relations(users, ({ many }) => ({
   todos: many(todos),
@@ -315,7 +374,18 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
   todoUrls: many(todoUrls),
   research: one(todoResearch),
   messages: many(todoMessages),
+  suggestions: many(todoSuggestions),
 }));
+
+export const todoSuggestionsRelations = relations(
+  todoSuggestions,
+  ({ one }) => ({
+    todo: one(todos, {
+      fields: [todoSuggestions.todoId],
+      references: [todos.id],
+    }),
+  }),
+);
 
 export const todoMessagesRelations = relations(todoMessages, ({ one }) => ({
   todo: one(todos, {
@@ -380,5 +450,7 @@ export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
 export type TodoMessage = typeof todoMessages.$inferSelect;
 export type NewTodoMessage = typeof todoMessages.$inferInsert;
+export type TodoSuggestion = typeof todoSuggestions.$inferSelect;
+export type NewTodoSuggestion = typeof todoSuggestions.$inferInsert;
 export type GmailAddonLink = typeof gmailAddonLinks.$inferSelect;
 export type NewGmailAddonLink = typeof gmailAddonLinks.$inferInsert;

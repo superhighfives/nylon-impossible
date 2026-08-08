@@ -18,6 +18,7 @@ import {
 } from "@/server/todos";
 import type {
   CreateTodoInput,
+  SuggestionType,
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
@@ -123,6 +124,7 @@ export function useCreateTodo() {
         research: null,
         messages: [],
         urls: [],
+        suggestions: [],
       };
 
       queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
@@ -448,6 +450,7 @@ export function useSmartCreate() {
         research: null,
         messages: [],
         urls: [],
+        suggestions: [],
       };
 
       queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
@@ -777,6 +780,180 @@ export function useDismissTodoQuestion() {
       }
       Sentry.captureException(err, { tags: { mutation: "dismissQuestion" } });
       toast.error(messageFromError(err, "Couldn't dismiss question"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
+ * Apply a suggestion's field change to a todo locally, for optimistic accept.
+ * Mirrors exactly what the server's accept handler does for the types that
+ * map onto a single todo field (title/due_date/recurrence) — subtasks and
+ * research create new rows server-side, so those are left for the settled
+ * refetch instead of being synthesized here.
+ */
+function applySuggestionLocally(
+  todo: TodoWithUrls,
+  type: SuggestionType,
+  payload: unknown,
+): TodoWithUrls {
+  switch (type) {
+    case "title":
+      return { ...todo, title: (payload as { title: string }).title };
+    case "due_date":
+      return { ...todo, dueDate: (payload as { dueDate: string }).dueDate };
+    case "recurrence":
+      return {
+        ...todo,
+        recurrence: (payload as { recurrence: TodoWithUrls["recurrence"] })
+          .recurrence,
+      };
+    default:
+      return todo;
+  }
+}
+
+/**
+ * Hook to accept an enrichment suggestion. Optimistically applies the
+ * suggested field change (where it maps onto a single todo field) and marks
+ * the suggestion accepted; the settled refetch reconciles subtasks/research
+ * rows and anything the optimistic apply simplified.
+ */
+export function useAcceptSuggestion() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      todoId,
+      suggestionId,
+    }: {
+      todoId: string;
+      suggestionId: string;
+    }) => {
+      const token = await getToken();
+      const response = await fetch(
+        `${API_URL}/todos/${todoId}/suggestions/${suggestionId}/accept`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onMutate: async ({ todoId, suggestionId }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
+        old?.map((todo) => {
+          if (todo.id !== todoId) return todo;
+          const suggestion = todo.suggestions.find(
+            (s) => s.id === suggestionId,
+          );
+          if (!suggestion) return todo;
+          const applied = applySuggestionLocally(
+            todo,
+            suggestion.type,
+            suggestion.payload,
+          );
+          return {
+            ...applied,
+            suggestions: applied.suggestions.map((s) =>
+              s.id === suggestionId ? { ...s, status: "accepted" } : s,
+            ),
+          };
+        }),
+      );
+
+      return { previousTodos };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+      Sentry.captureException(err, { tags: { mutation: "acceptSuggestion" } });
+      toast.error(messageFromError(err, "Couldn't apply suggestion"));
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
+ * Hook to dismiss an enrichment suggestion. Terminal — a dismissed
+ * suggestion never reappears, including across future re-enrich runs.
+ */
+export function useDismissSuggestion() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      todoId,
+      suggestionId,
+    }: {
+      todoId: string;
+      suggestionId: string;
+    }) => {
+      const token = await getToken();
+      const response = await fetch(
+        `${API_URL}/todos/${todoId}/suggestions/${suggestionId}/dismiss`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onMutate: async ({ todoId, suggestionId }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
+        old?.map((todo) =>
+          todo.id === todoId
+            ? {
+                ...todo,
+                suggestions: todo.suggestions.map((s) =>
+                  s.id === suggestionId ? { ...s, status: "dismissed" } : s,
+                ),
+              }
+            : todo,
+        ),
+      );
+
+      return { previousTodos };
+    },
+    onError: (err, _vars, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+      Sentry.captureException(err, {
+        tags: { mutation: "dismissSuggestion" },
+      });
+      toast.error(messageFromError(err, "Couldn't dismiss suggestion"));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });

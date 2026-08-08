@@ -47,6 +47,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     research: null,
     messages: [],
     urls: [],
+    suggestions: [],
     ...overrides,
   };
 }
@@ -144,6 +145,41 @@ describe("TodoList", () => {
     render(<TodoList />);
     expect(screen.getByText("First thing")).toBeInTheDocument();
     expect(screen.getByText("Second thing")).toBeInTheDocument();
+  });
+
+  it("shows a yellow dot only when a todo has a pending suggestion", () => {
+    vi.mocked(useTodos).mockReturnValue({
+      data: [
+        makeTodo({
+          id: "a",
+          title: "Has a suggestion",
+          suggestions: [
+            {
+              id: "s1",
+              todoId: "a",
+              type: "title",
+              payload: { title: "Renamed" },
+              label: 'Rename to "Renamed"',
+              status: "pending",
+              createdAt: "2026-01-01T00:00:00.000Z",
+              updatedAt: "2026-01-01T00:00:00.000Z",
+            },
+          ],
+        }),
+        makeTodo({ id: "b", title: "No suggestions", suggestions: [] }),
+      ],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    } as unknown as ReturnType<typeof useTodos>);
+
+    render(<TodoList />);
+    expect(
+      screen.getByRole("button", {
+        name: "AI has suggestions — open to review",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("shows completed todos when hideCompleted is false", () => {

@@ -22,6 +22,7 @@ function makeSubtask(overrides: Partial<TodoWithUrls> = {}): TodoWithUrls {
     research: null,
     messages: [],
     urls: [],
+    suggestions: [],
     ...overrides,
   };
 }

@@ -258,23 +258,8 @@ export async function createSmartTodo(
 
   // If AI is enabled, enrich in background
   if (useAI) {
-    // Fetch user's location for location research context
-    const user = await db
-      .select({ location: users.location })
-      .from(users)
-      .where(eq(users.id, userId))
-      .then((rows) => rows[0]);
-
     options.waitUntil(
-      enrichOrAskWithAI(
-        db,
-        env.AI,
-        env,
-        todoId,
-        userId,
-        trimmed,
-        user?.location,
-      ),
+      enrichOrAskWithAI(db, env.AI, env, todoId, userId, trimmed),
     );
   }
 
