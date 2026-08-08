@@ -296,12 +296,20 @@ same way it already does on web.
 
 **Acceptance**
 
-- [ ] Pressing Return on the keyboard while composing a new todo submits it
+- [x] Pressing Return on the keyboard while composing a new todo submits it
       (when `canAdd` is true), without requiring a tap on the Add button.
-- [ ] An empty/whitespace-only title still doesn't submit on Return.
-- [ ] Whatever visual growth behavior is kept (single-line vs.
+- [x] An empty/whitespace-only title still doesn't submit on Return.
+- [x] Whatever visual growth behavior is kept (single-line vs.
       auto-growing) is a deliberate choice, noted here, not an accidental
       regression.
+
+**What actually happened**: went with option (a) — kept `axis: .vertical`
+(auto-growing input is preserved) and added an `.onChange(of: text)` handler
+that detects a trailing `"\n"`, strips it, and calls the existing
+`onAdd(.plain)` path (gated on `canAdd`, which already trims whitespace
+including newlines, so an empty/whitespace-only title still doesn't submit).
+The pre-existing `.onSubmit` handler was left in place as a harmless no-op
+fallback rather than removed.
 
 ---
 

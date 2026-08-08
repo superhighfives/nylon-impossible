@@ -37,6 +37,16 @@ struct AddTaskInputView: View {
                         onAdd(.plain)
                     }
                 }
+                // A vertical-axis TextField's Return key inserts a newline
+                // instead of firing onSubmit, so submit-on-Return is driven
+                // by detecting that trailing "\n" here instead.
+                .onChange(of: text) { _, newValue in
+                    guard newValue.hasSuffix("\n") else { return }
+                    text = String(newValue.dropLast())
+                    if canAdd {
+                        onAdd(.plain)
+                    }
+                }
                 // Dictation is enabled by default on iOS TextField; keyboardType
                 // defaults to .default which allows the dictation mic key
                 .padding(.leading, 16)
