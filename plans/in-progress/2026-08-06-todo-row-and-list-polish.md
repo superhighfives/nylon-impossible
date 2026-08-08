@@ -1,8 +1,8 @@
 ---
 title: Todo Row & List Polish (delete confirm, side panel, iOS fixes)
-status: Ready
+status: In Progress
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-08-07
 ---
 
 ## Problem

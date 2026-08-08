@@ -22,6 +22,8 @@ struct ContentView: View {
     // The incomplete row a drag is currently hovering over. Drives the thin
     // "drop here" line — the iOS analogue of web's yellow reorder line.
     @State private var dropTargetId: UUID?
+    // Staged by swipe-to-delete; the row only actually deletes once confirmed.
+    @State private var pendingDeleteTodo: TodoItem?
 
     // Subtasks live inside their parent's edit sheet, not as their own rows, so
     // the main list is top-level todos only.
@@ -145,6 +147,19 @@ struct ContentView: View {
         .task {
             await scheduleMidnightTicks()
         }
+        .confirmationDialog(
+            "Delete this todo?",
+            isPresented: Binding(
+                get: { pendingDeleteTodo != nil },
+                set: { if !$0 { pendingDeleteTodo = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { confirmPendingDelete() }
+            Button("Cancel", role: .cancel) { pendingDeleteTodo = nil }
+        } message: {
+            Text("This can't be undone.")
+        }
     }
 
     private var taskListView: some View {
@@ -186,14 +201,6 @@ struct ContentView: View {
                             }
                         }
                 }
-                .onDelete { offsets in
-                    for index in offsets {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            viewModel.deleteTodo(incomplete[index], context: modelContext)
-                        }
-                    }
-                    syncService.syncAfterAction()
-                }
             }
 
             // Completed items collapse into a bottom-of-list accordion, matching
@@ -208,14 +215,6 @@ struct ContentView: View {
                         ForEach(completed) { todo in
                             todoRow(todo)
                                 .moveDisabled(true)
-                        }
-                        .onDelete { offsets in
-                            for index in offsets {
-                                withAnimation(.easeInOut(duration: 0.3)) {
-                                    viewModel.deleteTodo(completed[index], context: modelContext)
-                                }
-                            }
-                            syncService.syncAfterAction()
                         }
                     }
                 }
@@ -332,6 +331,21 @@ struct ContentView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
+        // Stages the delete for confirmation instead of removing immediately.
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { pendingDeleteTodo = todo } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func confirmPendingDelete() {
+        guard let todo = pendingDeleteTodo else { return }
+        withAnimation(.easeInOut(duration: 0.3)) {
+            viewModel.deleteTodo(todo, context: modelContext)
+        }
+        syncService.syncAfterAction()
+        pendingDeleteTodo = nil
     }
 
     /// The lifted row while it's being dragged: the row content floated onto a

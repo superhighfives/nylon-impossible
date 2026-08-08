@@ -1,5 +1,6 @@
 export { Button, type ButtonProps } from "./Button";
 export { Checkbox, type CheckboxProps } from "./Checkbox";
+export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 export { Field, type FieldProps, Textarea, type TextareaProps } from "./Field";
 export { focusRing } from "./focus";
 export { Input, type InputProps } from "./Input";

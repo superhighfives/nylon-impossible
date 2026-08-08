@@ -34,6 +34,7 @@ import {
   RefreshCw,
   Repeat,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { InlineDueDate } from "@/components/InlineTodoControls";
@@ -57,7 +58,14 @@ import { messageFromError, toast } from "@/lib/toast";
 import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { TodoActionsMenu } from "./TodoActionsMenu";
-import { Button, Checkbox, focusRing, Loader, UrlPreviewCard } from "./ui";
+import {
+  Button,
+  Checkbox,
+  ConfirmDialog,
+  focusRing,
+  Loader,
+  UrlPreviewCard,
+} from "./ui";
 
 // This is a single-column vertical list, so lock dragging to the Y axis —
 // otherwise the lifted row drifts sideways as it tracks the pointer/keyboard.
@@ -505,6 +513,23 @@ function TodoItemContent({
               disabled={updatePending}
             />
           )}
+          {/* Desktop: row-level delete, next to the priority/date icons.
+              Mobile keeps delete inside TodoActionsMenu instead of
+              duplicating the affordance here. */}
+          {showInlineEditing && !isExpanded && (
+            <Button
+              variant="ghost"
+              size="xs"
+              shape="square"
+              type="button"
+              onClick={() => onDelete(todo.id)}
+              disabled={deletePending}
+              aria-label={`Delete "${todo.title}"`}
+              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex"
+            >
+              <Trash2 size={14} />
+            </Button>
+          )}
           {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
               control on the title line so it doesn't stretch the row height on
               todos without a description. */}
@@ -764,6 +789,7 @@ export function TodoList() {
   // (their completedAt is no longer "today") without needing a server round-trip.
   useLocalMidnightTick();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [localIncompleteTodos, setLocalIncompleteTodos] = useState<
     TodoWithUrls[] | null
@@ -834,8 +860,16 @@ export function TodoList() {
     }
   };
 
+  // Row-level delete affordances open a confirm dialog first; the actual
+  // mutation only runs once the user confirms (see confirmDeleteId below).
   const handleDelete = (id: string) => {
-    deleteTodo.mutate(id);
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!confirmDeleteId) return;
+    deleteTodo.mutate(confirmDeleteId);
+    setConfirmDeleteId(null);
   };
 
   const handleToggleExpand = (id: string) => {
@@ -987,6 +1021,10 @@ export function TodoList() {
     deletePending: deleteTodo.isPending,
   });
 
+  const confirmDeleteTodo = confirmDeleteId
+    ? (todos.find((t) => t.id === confirmDeleteId) ?? null)
+    : null;
+
   return (
     <DndContext
       sensors={sensors}
@@ -1063,6 +1101,20 @@ export function TodoList() {
           </div>
         )}
       </div>
+      <ConfirmDialog
+        open={confirmDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteId(null);
+        }}
+        title="Delete this todo?"
+        description={
+          confirmDeleteTodo
+            ? `"${confirmDeleteTodo.title}" and any subtasks will be deleted. This can't be undone.`
+            : "This can't be undone."
+        }
+        onConfirm={handleConfirmDelete}
+        confirmPending={deleteTodo.isPending}
+      />
     </DndContext>
   );
 }
