@@ -207,6 +207,37 @@ export function SubtaskSection({
         )}
       </div>
 
+      {/* Add subtask — sits above the active list, next to where a newly
+          added subtask actually lands (see handleAdd's position insert). */}
+      <div className="flex items-center gap-1.5 pl-6">
+        <Input
+          type="text"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleAdd();
+            }
+          }}
+          placeholder="Add a subtask..."
+          className="flex-1 min-w-0"
+          inputSize="sm"
+          disabled={disabled}
+        />
+        <Button
+          variant="ghost"
+          size="sm"
+          shape="square"
+          type="button"
+          onClick={handleAdd}
+          disabled={disabled || !newTitle.trim()}
+          aria-label="Add subtask"
+        >
+          <Plus size={14} />
+        </Button>
+      </div>
+
       <div>
         <DndContext
           sensors={sensors}
@@ -239,36 +270,6 @@ export function SubtaskSection({
             disabled={disabled}
           />
         ))}
-      </div>
-
-      {/* Add subtask */}
-      <div className="flex items-center gap-1.5 pl-6">
-        <Input
-          type="text"
-          value={newTitle}
-          onChange={(e) => setNewTitle(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              handleAdd();
-            }
-          }}
-          placeholder="Add a subtask..."
-          className="flex-1 min-w-0"
-          inputSize="sm"
-          disabled={disabled}
-        />
-        <Button
-          variant="ghost"
-          size="sm"
-          shape="square"
-          type="button"
-          onClick={handleAdd}
-          disabled={disabled || !newTitle.trim()}
-          aria-label="Add subtask"
-        >
-          <Plus size={14} />
-        </Button>
       </div>
     </div>
   );
