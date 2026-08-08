@@ -18,12 +18,12 @@
     "@clerk/react": "^6.11.1",
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5",
+    "react-dom": "^19.2.8",
     "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
+    "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.3",
