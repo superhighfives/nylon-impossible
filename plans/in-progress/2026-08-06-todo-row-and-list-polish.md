@@ -226,12 +226,40 @@ doesn't pan out).
 
 **Acceptance**
 
-- [ ] A concrete repro of the current broken ordering is captured (as a test
+- [x] A concrete repro of the current broken ordering is captured (as a test
       or documented manual steps) before the fix lands.
-- [ ] Todo order on iOS matches web/API order for the same account,
+- [x] Todo order on iOS matches web/API order for the same account,
       including at least one previously-broken case from the repro.
-- [ ] Existing iOS sort/position tests (if any) still pass; add coverage for
+- [x] Existing iOS sort/position tests (if any) still pass; add coverage for
       the fixed case.
+
+**What actually happened**: the leading hypothesis was tested empirically
+(a standalone `swift` script exercising `FractionalIndexing.swift` directly)
+and disproven — Swift's default `String <` matches UTF-16-code-unit
+comparison exactly across the full BASE_62 alphabet and across hundreds of
+randomly generated multi-character keys; no mismatch reproduced. `sortedTodos`
+and `moveTodo` also use plain `<` correctly.
+
+The real defect was elsewhere: `TaskCreationService.fetchAllTodos` sorted its
+`FetchDescriptor` with `SortDescriptor(\.position)`, whose default String
+comparator is *not* a plain codepoint comparison — verified with a script
+that `SortDescriptor` orders `["9", "a0", "A0000...0001", "b1V", "z", "Zz"]`
+while `<` orders `["9", "A0000...0001", "Zz", "a0", "b1V", "z"]` for the same
+inputs. This didn't affect the main list today (`ContentView`'s
+`sortedTodosList` never calls `fetchAllTodos`; the Share Extension and Siri
+`AddTaskIntent` paths that do call it only use the result to `.min(by:)`
+with the correct comparator, which is order-independent), but it's a
+verified, real ordering bug in a shared helper, and the likeliest thing to
+bite the *next* caller that assumes the returned array is actually sorted.
+Fixed by sorting in memory with `<` after fetch, matching every other
+position comparison in the app; added
+`fetchAllTodosOrdersMixedCaseKeysLikeRawComparison` as regression coverage
+(it fails under the old `SortDescriptor` behavior).
+
+No other broken-ordering repro was found in the code paths investigated. If
+the user still observes incorrect ordering in the live app, it needs a fresh
+repro (which account/todos, what order was expected vs. shown) since this
+audit didn't reproduce it beyond the `fetchAllTodos` defect above.
 
 ---
 

@@ -255,23 +255,30 @@ enum TaskCreationService {
         return todo
     }
     
-    /// Fetch all todos for the current user
+    /// Fetch all todos for the current user, ordered by position.
+    ///
+    /// Sorted in memory with the same raw `<` used everywhere else fractional
+    /// positions are compared (TodoViewModel.sortedTodos, moveTodo, etc.),
+    /// rather than `FetchDescriptor`'s `SortDescriptor`. `SortDescriptor`'s
+    /// default String comparator is not a plain codepoint comparison — it
+    /// reorders mixed-case keys (e.g. it places "a0" ahead of
+    /// "A0000000000000000000000001") relative to `<`, which is the ordering
+    /// the fractional-indexing keys actually rely on.
     @MainActor
     static func fetchAllTodos(userId: String?, context: ModelContext) -> [TodoItem] {
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate<TodoItem> { todo in
                 !todo.isDeleted
-            },
-            sortBy: [SortDescriptor(\.position)]
+            }
         )
-        
+
         do {
             let todos = try context.fetch(descriptor)
             // Filter by userId in memory since predicates with optionals are tricky
-            if let userId = userId {
-                return todos.filter { $0.userId == userId || $0.userId == nil }
-            }
-            return todos.filter { $0.userId == nil }
+            let filtered = userId != nil
+                ? todos.filter { $0.userId == userId || $0.userId == nil }
+                : todos.filter { $0.userId == nil }
+            return filtered.sorted { $0.position < $1.position }
         } catch {
             print("Failed to fetch todos: \(error)")
             return []
