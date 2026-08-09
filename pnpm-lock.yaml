@@ -153,6 +153,9 @@ importers:
       hono:
         specifier: ^4.12.29
         version: 4.12.29
+      valibot:
+        specifier: ^1.1.0
+        version: 1.4.2(typescript@6.0.3)
     devDependencies:
       '@cloudflare/vite-plugin':
         specifier: ^1.51.1

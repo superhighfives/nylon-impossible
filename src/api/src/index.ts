@@ -8,6 +8,12 @@ import {
   listUsers,
   updateUser,
 } from "./handlers/admin";
+import {
+  agentAddSubtask,
+  agentCompleteTodo,
+  agentUpdateTodo,
+  internalAgentAuthMiddleware,
+} from "./handlers/agent-internal";
 import { acceptSuggestion } from "./handlers/apply-suggestion";
 import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
@@ -126,6 +132,13 @@ app.post("/todos/:id/reply", replyToTodo);
 app.delete("/todos/:id/question", dismissQuestion);
 app.post("/todos/:id/suggestions/:sid/accept", acceptSuggestion);
 app.post("/todos/:id/suggestions/:sid/dismiss", dismissSuggestion);
+
+// Internal routes for the todo-agent Worker's tools (bearer-secret auth,
+// see handlers/agent-internal.ts for why this can't rely on "no route" alone).
+app.use("/internal/agent/*", internalAgentAuthMiddleware);
+app.post("/internal/agent/todos/:id/update", agentUpdateTodo);
+app.post("/internal/agent/todos/:id/complete", agentCompleteTodo);
+app.post("/internal/agent/todos/:id/subtasks", agentAddSubtask);
 
 // User routes
 app.get("/users/me", getMe);

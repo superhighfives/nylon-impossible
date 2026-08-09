@@ -372,11 +372,38 @@ well on web.
    this extraction (REST or core) — left that way rather than growing test
    infra unrelated to this step's goal.
 4. **Tool layer** — `src/todo-agent/tools/todo-tools.ts`: `updateTodo`,
-   `addSubtask`, `setDueDate`, `setPriority`, `completeTodo`,
+   `addSubtask`, `setDueDate`, ~~`setPriority`~~ (dropped, see the
+   priority-removal note at the top of this plan), `completeTodo`,
    `proposeDelete`. Each tool's `run()` does a service-binding fetch to a new
    internal route on `src/api` (see next item), not a direct DB call — the
    agent Worker has no D1 binding of its own, on purpose, so the todo's data
-   model has exactly one writer path.
+   model has exactly one writer path. **Done 2026-08-09.**
+
+   Built as `src/todo-agent/src/tools/todo-tools.ts` (`updateTodoTool`,
+   `setDueDateTool`, `addSubtaskTool`, `completeTodoTool` — each a factory
+   closing over `{ todoId, userId }`) plus `propose_delete` defined inline in
+   `TodoAgent.ts` (it needs `usePersistentState`/`useDataWriter`, which are
+   render-scoped hooks, not something a plain imported function can call
+   from outside the agent's render). `userId` reaches the tools via
+   `useInitialData()` — Flue's own documented mechanism for exactly this
+   ("when the id encodes several structured facts, don't parse them back out
+   of it — pass them as `initialData`"), not something the original plan
+   worked out. `TodoAgent.initialData` is a required valibot schema
+   (`{ userId: string }`); `app.ts`'s dispatch route now takes `userId` in
+   its body and passes it through.
+
+   `addSubtask` needed one piece of new shared surface the plan assumed
+   already existed: `createSmartTodo` had **no `parentId` support at all**
+   before this (checked directly — its `CreateSmartTodoOptions` had no such
+   field). The plan's "mirrors `SubtaskSection`'s existing client path" was
+   describing a different code path than it thought: that path is
+   `src/web/src/server/todos.ts`, web's own TanStack Start server function
+   that writes to D1 directly and never goes through `src/api` at all — not
+   reachable from a Cloudflare Worker via Service Binding. Added `parentId`
+   to `CreateSmartTodoOptions` (position scoped to the parent's siblings,
+   ownership + top-level-only validation mirroring web's own subtask
+   validation, throws `InvalidParentTodoError` on a bad parent) rather than
+   duplicating subtask-creation logic in the internal route handler.
 5. **Internal route on `src/api`** — `src/api/src/handlers/agent-internal.ts`,
    mounted at `/internal/agent/*`, reachable only via the Service Binding
    (no public DNS route in `wrangler.jsonc`, so it's unreachable except
@@ -384,6 +411,50 @@ well on web.
    which is genuinely public-internet-facing). Thin wrappers over
    `updateTodoCore`, `createSmartTodo`, `setTodoCompleted`, each taking
    `userId` + `todoId` + the specific patch, matching the tool signatures.
+   **Done 2026-08-09 — but not as originally specified; the "no bearer-token
+   scheme needed" premise was wrong, and this needed one.**
+
+   `src/api`'s `wrangler.jsonc` binds a Cloudflare **custom domain**
+   (`api.nylonimpossible.com`) to the whole Worker — that routes every path
+   the Hono app defines, not just ones an explicit route table opts in.
+   "No public DNS route" isn't a real protection for one path on a Worker
+   that already has a custom domain covering all of it, and a Service
+   Binding call isn't otherwise distinguishable from a public request
+   arriving over that domain. Without a check, `/internal/agent/*` would
+   have been a real, publicly-reachable vulnerability — anyone could `POST
+   /internal/agent/todos/:id/update` with an arbitrary `userId` in the body
+   and mutate a stranger's todo. Added a bearer-secret check
+   (`internalAgentAuthMiddleware`, `INTERNAL_AGENT_SECRET`), same shape as
+   the Gmail add-on's own non-Clerk auth, set via `wrangler secret put` on
+   **both** `src/api` and `src/todo-agent` (same value). Handlers still
+   scope every query by `userId` on top of that.
+
+   Three routes, matching the three core functions: `POST
+   /internal/agent/todos/:id/update` (→ `updateTodoCore`, used by both
+   `updateTodo` and `setDueDate` tools), `POST
+   /internal/agent/todos/:id/complete` (→ `setTodoCompleted`, always
+   completes — the tool only ever means "mark done"), `POST
+   /internal/agent/todos/:id/subtasks` (→ `createSmartTodo` with `parentId`,
+   `aiEnabled: false` — the agent conversation already did the "smart" part).
+   Added `invalid_parent_todo` to `API_ERRORS`. Test coverage:
+   `agent-internal.test.ts` (auth rejection, each route's happy path, 404 on
+   wrong-owner, 400 on an invalid parent) plus the `INTERNAL_AGENT_SECRET`
+   test var in `wrangler.test.jsonc`. All typecheck/`check`/tests green
+   (374 passing, up from 360 before steps 3–5).
+
+   **Verified live** (build + `wrangler dev`, two local Workers, Service
+   Binding auto-discovered via wrangler's dev registry): the todo-agent
+   Worker boots, `POST /dispatch/:id` reaches the DO, and a bare
+   (tool-free) message got as far as a real Workers AI call before hitting
+   `402 Insufficient balance` on the account's AI Gateway — an account
+   billing/credit constraint, not a code issue (confirmed by reproducing it
+   both with and without tools registered; identical failure either way,
+   before any tool would even be reached). The Service-Binding→internal
+   route→core-function path itself is exercised end-to-end by
+   `agent-internal.test.ts`, just not by a live model turn actually calling
+   a tool — that needs the account's AI Gateway credit topped up (or BYOK)
+   to verify for real. Flagging this as a live-account constraint worth
+   knowing about before this ships, not a step-4/5 blocker.
 6. **Dispatch route on `src/api`** — `POST /todos/:id/agent/message` (under
    existing `authMiddleware`) resolves `userId`, confirms the todo belongs to
    them, then calls `env.TODO_AGENT` (service binding) to `dispatch()`; a
@@ -400,23 +471,44 @@ well on web.
 
 ### Files to create
 
-- `src/todo-agent/` (new package): `vite.config.ts`, `flue.config.ts`,
-  `wrangler.jsonc`, `app.ts`, `agents/TodoAgent.ts`, `tools/todo-tools.ts`.
-- `src/api/src/handlers/agent-internal.ts` — internal tool-call targets
-  (update, add-subtask, set-due, set-priority, complete).
+- `src/todo-agent/` (new package, **done**): `vite.config.ts`,
+  `flue.config.ts`, `wrangler.jsonc`, `tsconfig.json`, `package.json`,
+  `src/app.ts`, `src/agents/TodoAgent.ts`, `src/tools/todo-tools.ts`,
+  `src/env.d.ts` (hand-written `Cloudflare.Env` augmentation for `AI`/`API`
+  bindings — not in the original file list, needed once tools touched
+  `env` directly).
+- `src/api/src/handlers/agent-internal.ts` (**done**) — internal tool-call
+  targets: update (also covers set-due), add-subtask, complete. No
+  set-priority target (dropped with `priority`).
 - `src/api/src/handlers/todo-agent.ts` — `POST /todos/:id/agent/message`,
   `GET /todos/:id/agent/messages`, `POST /todos/:id/agent/confirm-delete`.
-- `src/web/src/components/TodoAgentChat.tsx` (or similar) — chat UI.
-- `src/web/src/hooks/useTodoAgent.ts` — send/poll hooks.
+  **Not yet — step 6.**
+- `src/web/src/components/TodoAgentChat.tsx` (or similar) — chat UI. **Not
+  yet — step 7.**
+- `src/web/src/hooks/useTodoAgent.ts` — send/poll hooks. **Not yet — step 7.**
+- `src/api/test/integration/agent-internal.test.ts` — not in the original
+  file list; added alongside the internal route.
 
 ### Files to modify
 
-- `src/api/src/lib/todos-core.ts` — add `updateTodoCore`.
+- `src/api/src/lib/todos-core.ts` — add `updateTodoCore`. **Done (step 3).**
 - `src/api/src/handlers/todos.ts` — `updateTodo` becomes a thin wrapper.
+  **Done (step 3).**
+- `src/api/src/lib/create-todo.ts` — add `parentId` support to
+  `createSmartTodo` (not in the original file list — needed once
+  `addSubtask` turned out to have no existing core support to reuse; see
+  step 4's note above). **Done.**
+- `src/api/src/lib/errors.ts` — add `invalid_parent_todo`. **Done.**
+- `src/api/src/types.ts` — add `INTERNAL_AGENT_SECRET`. **Done.**
 - `src/api/src/index.ts` — mount the new routes, add the internal-route
-  group.
-- `src/api/wrangler.jsonc` — add the `TODO_AGENT` service binding.
+  group (with its auth middleware). **Done.**
+- `src/api/wrangler.jsonc` — add the `TODO_AGENT` service binding (for step
+  6/8, not yet), plus a secret-config comment for `INTERNAL_AGENT_SECRET`
+  (**done**, ahead of schedule since step 5 needed it now).
+- `src/api/wrangler.test.jsonc` — add `INTERNAL_AGENT_SECRET` test var.
+  **Done** (not in the original file list).
 - `src/web/src/components/TodoItemExpanded.tsx` — mount the chat section.
+  **Not yet — step 7.**
 
 ## Acceptance criteria
 

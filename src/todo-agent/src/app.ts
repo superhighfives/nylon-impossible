@@ -11,8 +11,14 @@ const app = new Hono();
 
 app.post("/dispatch/:id", async (c) => {
   const id = c.req.param("id");
-  const { message } = await c.req.json();
-  const receipt = await dispatch(TodoAgent, { id, message });
+  const { message, userId } = await c.req.json();
+  // initialData only seeds the instance on the send that creates it — safe
+  // to send unconditionally on every message, later ones just ignore it.
+  const receipt = await dispatch(TodoAgent, {
+    id,
+    message,
+    initialData: { userId },
+  });
   return c.json({ receipt });
 });
 

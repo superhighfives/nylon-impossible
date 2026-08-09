@@ -15,7 +15,8 @@
   },
   "dependencies": {
     "@flue/runtime": "2.0.3",
-    "hono": "^4.12.29"
+    "hono": "^4.12.29",
+    "valibot": "^1.1.0"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.51.1",

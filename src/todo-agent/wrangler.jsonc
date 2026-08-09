@@ -25,7 +25,16 @@
   "ai": {
     "binding": "AI",
   },
+  "services": [
+    {
+      "binding": "API",
+      "service": "nylon-impossible-api",
+    },
+  ],
   "observability": {
     "enabled": true,
   },
+  // Note: INTERNAL_AGENT_SECRET should be configured as a secret via
+  // `wrangler secret put INTERNAL_AGENT_SECRET` — the same value must also
+  // be set as a secret on src/api (checked on its /internal/agent/* routes).
 }

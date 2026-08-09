@@ -38,7 +38,8 @@
     "CLOUDFLARE_API_TOKEN": "test-token",
     "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon",
     "WEB_BASE_URL": "https://www.nylonimpossible.com",
-    "GMAIL_ADDON_STATE_SECRET": "test-addon-state-secret"
+    "GMAIL_ADDON_STATE_SECRET": "test-addon-state-secret",
+    "INTERNAL_AGENT_SECRET": "test-internal-agent-secret"
   },
   "observability": {
     "enabled": true

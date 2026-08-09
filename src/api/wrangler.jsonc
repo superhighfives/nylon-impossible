@@ -64,4 +64,8 @@
     "binding": "AI",
   },
   // Note: SENTRY_DSN should be configured as a secret via `wrangler secret put SENTRY_DSN`
+  // Note: INTERNAL_AGENT_SECRET (checked on /internal/agent/*, called by
+  // src/todo-agent) should be configured as a secret via `wrangler secret
+  // put INTERNAL_AGENT_SECRET` — the same value must also be set as a
+  // secret on the src/todo-agent Worker.
 }

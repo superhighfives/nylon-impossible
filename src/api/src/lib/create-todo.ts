@@ -118,6 +118,16 @@ export interface CreateSmartTodoOptions {
    */
   attachedUrls?: { url: string; title?: string; siteName?: string }[];
   /**
+   * Create as a subtask of this todo instead of a top-level todo. Must
+   * belong to `userId` and be itself top-level (subtasks can't nest) —
+   * mirrors the validation `src/web/src/server/todos.ts`'s own subtask
+   * creation already does. Position is scoped to the parent's existing
+   * subtasks (prepended) instead of the user's top-level list, and the new
+   * todo can never carry a recurrence (recurrence and subtasks are
+   * mutually exclusive, enforced elsewhere in `updateTodoCore` too).
+   */
+  parentId?: string;
+  /**
    * Schedule background work (URL metadata fetch, AI enrichment). In a Worker
    * request this is `c.executionCtx.waitUntil`. Callers with no execution
    * context can pass a function that awaits or ignores the promise.
@@ -131,12 +141,26 @@ export interface CreateSmartTodoResult {
 }
 
 /**
+ * Thrown when `parentId` doesn't resolve to a top-level todo owned by
+ * `userId` — either it doesn't exist, belongs to someone else, or is itself
+ * a subtask.
+ */
+export class InvalidParentTodoError extends Error {
+  constructor() {
+    super("parentId must reference one of the user's top-level todos");
+    this.name = "InvalidParentTodoError";
+  }
+}
+
+/**
  * Core of the smart-create path, shared by the `POST /todos/smart` REST
- * handler and the Gmail add-on. Given a resolved `userId` and free text, it
- * creates a top-level todo (prepended to the list), extracts + attaches URLs,
- * optionally kicks off AI enrichment / research in the background, and pokes
- * connected clients to sync. Keeping this in one place means AI/Pro gating,
- * URL handling, positioning, and `notifySync` behave identically everywhere.
+ * handler, the Gmail add-on, and the todo-agent's `addSubtask` tool. Given a
+ * resolved `userId` and free text, it creates a todo (prepended to its list —
+ * the user's top-level list, or a parent's subtasks when `parentId` is set),
+ * extracts + attaches URLs, optionally kicks off AI enrichment / research in
+ * the background, and pokes connected clients to sync. Keeping this in one
+ * place means AI/Pro gating, URL handling, positioning, and `notifySync`
+ * behave identically everywhere.
  */
 export async function createSmartTodo(
   db: Db,
@@ -156,13 +180,29 @@ export async function createSmartTodo(
   // trigger research itself) so we don't double-run.
   const doResearch = options.research === true && options.aiEnabled && !useAI;
 
-  // Get the lowest top-level position so the new todo is prepended at the start
-  // of the top-level list (subtasks order within their own sibling group, so
-  // exclude them here).
+  const parentId = options.parentId ?? null;
+  if (parentId) {
+    const [parent] = await db
+      .select({ id: todos.id, parentId: todos.parentId })
+      .from(todos)
+      .where(and(eq(todos.id, parentId), eq(todos.userId, userId)));
+    if (!parent || parent.parentId !== null) {
+      throw new InvalidParentTodoError();
+    }
+  }
+
+  // Get the lowest position in the target list so the new todo is prepended:
+  // the user's top-level list, or (when parentId is set) that parent's
+  // existing subtasks.
   const firstTodo = await db
     .select({ position: todos.position })
     .from(todos)
-    .where(and(eq(todos.userId, userId), isNull(todos.parentId)))
+    .where(
+      and(
+        eq(todos.userId, userId),
+        parentId ? eq(todos.parentId, parentId) : isNull(todos.parentId),
+      ),
+    )
     .orderBy(todos.position)
     .limit(1)
     .then((rows) => rows[0]);
@@ -213,6 +253,7 @@ export async function createSmartTodo(
   await db.insert(todos).values({
     id: todoId,
     userId,
+    parentId,
     title: initial.title,
     completed: false,
     position,
