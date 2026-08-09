@@ -1,6 +1,6 @@
 ---
 title: Per-Todo Agents (Flue Framework)
-status: In Progress
+status: Complete
 created: 2026-07-17
 updated: 2026-08-09
 ---
@@ -618,27 +618,32 @@ well on web.
       floor was bumped to fix the `flue.config.ts` load failure; the one
       gotcha still to carry forward is gateway-form (no `@cf/`) model IDs in
       `useModel()`.
-- [ ] Opening a todo's Chat section and sending a message gets a reply from
+- [x] Opening a todo's Chat section and sending a message gets a reply from
       the model, using the account's existing Workers AI binding (no new
-      Anthropic key/secret). **Built, not demonstrated end-to-end.** Every
-      layer (UI → src/api proxy → Service Binding → todo-agent → Workers AI)
-      has been verified individually — steps 4/6 confirmed the model call
-      itself works (a real "PONG" reply, before the account's AI Gateway ran
-      out of credit) and step 6 confirmed send/read wiring live. What hasn't
-      happened is one unbroken click-through in the actual browser UI,
-      because the AI Gateway 402 from steps 4–6 would just make it fail at
-      the same point regardless. Re-check this box once the account has AI
-      Gateway credit (or BYOK) — this is an account/billing gate, not
-      remaining engineering work.
-- [ ] The agent can update title/notes/due date/priority and complete the
+      Anthropic key/secret). **Verified live 2026-08-09** (after AI Gateway
+      credit was added): sent a real message from the actual browser UI on
+      a real todo ("Gym"), watched it settle, got a real model reply
+      rendered in the Chat section. No new secret involved — same account
+      `AI` binding throughout.
+- [x] The agent can update title/notes/due date/priority and complete the
       todo directly from the conversation; changes appear live in an open
       web client via the existing sync path (same `notifySync` as REST
-      edits). **Built and unit-tested** (`updateTodoCore`/`setTodoCompleted`
-      calling `notifySync`, tool layer wired to the internal routes,
-      `agent-internal.test.ts` covers each mutation) **but not observed via
-      an actual model tool call** — same AI Gateway gate as above; a tool
-      only runs if the model decides to call it mid-turn. No priority
-      (dropped, see the note at the top of this plan).
+      edits). **Verified live 2026-08-09**: asked the agent (in the browser,
+      on the real "Gym" todo) to set its notes to "verified via chat" — the
+      model called `update_todo`, the call succeeded, and the Notes field in
+      the open web client updated to exactly that text, no manual refresh
+      needed. No priority (dropped, see the note at the top of this plan).
+
+      Local-dev-only wrinkle hit while verifying, worth recording since it
+      cost real debugging time and isn't an app bug: running three local
+      `wrangler dev` processes (api, todo-agent, web) across repeated
+      restarts left stale `workerd` child processes holding old ports and a
+      corrupted `.env` (an `>>` append landed on a line with no trailing
+      newline, silently merging `INTERNAL_AGENT_SECRET` into
+      `TAVILY_API_KEY`'s value) — worth a beat of care next time: check for
+      a trailing newline before appending to `.env`/`.dev.vars`, and prefer
+      `pkill -9 -f workerd` over trusting `wrangler dev`'s own process to
+      exit cleanly when force-restarting local Workers.
 - [x] Deleting the todo is never autonomous — the agent can only propose it,
       and a distinct user confirmation is required to actually delete.
       Structural, not just observed behavior: no tool maps to delete,
@@ -691,3 +696,107 @@ well on web.
   (core-helper extraction discipline, service-style internal auth),
   `src/api/src/lib/create-todo.ts`, `src/api/src/lib/todos-core.ts`,
   `src/api/src/lib/ai-enrich.ts`, `src/api/src/lib/notify-sync.ts`.
+
+## Overview
+
+Each todo now has its own chat agent. Open a todo, type a message in the
+new "Chat" section, and a per-todo AI assistant (built on `@flue/runtime`
+2.0.3, running as its own Cloudflare Worker, one Durable Object per todo)
+can research, update the todo's title/notes/due date, add subtasks, and
+mark it complete — all through the exact same mutation path REST edits
+already use, so an agent-driven edit behaves identically to a user editing
+the row by hand and syncs live to any open client. Deleting a todo is the
+one thing the agent can never do autonomously: it can only propose it, and
+a human has to click confirm on a distinct, model-inaccessible endpoint.
+Shipped web-only for v1, matching the plan's original scope — no iOS
+surface this round.
+
+This re-opens and supersedes the earlier verdict against Flue
+(`2026-06-04-conversational-todo-refinement.md`, spiked against `0.9.2`
+and rejected for native-module build failures and no clean Cloudflare run
+path). None of that reproduced against `2.0.3`; the re-spike is written
+into step 1 above.
+
+## Architecture
+
+**`src/todo-agent`** — a new, independent Cloudflare Worker package (own
+`wrangler.jsonc`, own Vite + `@flue/vite` + `@cloudflare/vite-plugin`
+build, deployed separately from `src/api`). Hosts one Flue agent,
+`TodoAgent` (`src/todo-agent/src/agents/TodoAgent.ts`), addressed by todo
+id — Flue generates one Durable Object instance per todo automatically.
+`src/todo-agent/src/app.ts` mounts `@flue/runtime/routing`'s
+`createAgentRouter(TodoAgent)` at the Worker root, which is Flue's own
+production HTTP surface (send, resumable AI-SDK-style conversation read,
+abort) rather than a hand-rolled dispatch/read pair. Tools live in
+`src/todo-agent/src/tools/todo-tools.ts` and call back into `src/api` over
+a Service Binding (`env.API`), never touching D1 directly — the agent
+Worker has no D1 binding of its own, on purpose, so the todo data model
+has exactly one writer path. `userId` reaches the agent and its tools via
+Flue's `initialData` mechanism (`useInitialData()`), set once at the first
+dispatch and durable for the instance's whole life — not parsed out of the
+id, per Flue's own documented guidance for this exact case.
+
+**`src/api`** gained `/internal/agent/*` (three routes: update, complete,
+subtasks — thin wrappers over `updateTodoCore`/`setTodoCompleted`/
+`createSmartTodo`) and `/todos/:id/agent/{message,messages,confirm-delete}`
+(the web-facing proxy to `src/todo-agent`, plus the human-only delete
+confirmation, which just reuses the existing `deleteTodo` handler on a
+second URL). `updateTodoCore` was extracted from the `PUT /todos/:id`
+handler into `src/api/src/lib/todos-core.ts` alongside the pre-existing
+`setTodoCompleted`, so REST and the agent's tools share one mutation path.
+
+**`src/web`** gained a "Chat" section (`TodoAgentChat.tsx`) in the expanded
+todo view, gated by the same `aiAvailable` flag as the other AI actions,
+plus `useTodoAgent.ts` (send/poll hooks) and `useConfirmTodoAgentDelete`
+in the existing `useTodos.ts`.
+
+**Deviations from the plan, and why:**
+
+- **The "no bearer-token needed" premise was wrong.** The plan assumed
+  `/internal/agent/*` was safe because no route table entry advertised it
+  publicly. It isn't: `src/api` has a Cloudflare custom domain
+  (`api.nylonimpossible.com`) that routes *every* path on the Worker, and a
+  Service Binding caller isn't otherwise distinguishable from a public
+  request. Added a shared bearer secret (`INTERNAL_AGENT_SECRET`) on both
+  Workers, same shape as the Gmail add-on's existing non-Clerk auth. This
+  was a real, if narrow, vulnerability in the original design — not
+  optional hardening.
+- **`createSmartTodo` had no subtask support to "reuse."** The plan's
+  reference for `addSubtask` — "mirrors `SubtaskSection`'s existing client
+  path" — turned out to describe a different, unreachable code path: web's
+  own TanStack Start server function that writes to D1 directly, never
+  going through `src/api`. Added real `parentId` support to
+  `CreateSmartTodoOptions` (ownership + top-level-only validation, position
+  scoped to the parent's siblings) instead of duplicating subtask-creation
+  logic in the internal route handler.
+- **Two Flue wire-format gotchas only a live request round-trip caught,**
+  not typecheck or the docs: (1) the generated Durable Object class name
+  comes from `agentName` (PascalCased), not the function name —
+  `"todo-agent"` double-suffixed into `FlueTodoAgentAgent` and crashed the
+  Worker at boot; fixed by using `"todo"` to land on `FlueTodoAgent`. (2)
+  `createAgentRouter`'s POST body is the delivered message **flat** at the
+  top level (`{ kind, body, initialData }`), not wrapped in a `message` key
+  like the JS `dispatch()` function's shape — an easy wrong guess by
+  analogy.
+- **Gateway-form model IDs, not native ones.** `useModel('cloudflare/@cf/openai/gpt-oss-120b')`
+  (the form `src/api/src/lib/ai.ts` already uses for Workers AI) 400s
+  through Flue's Cloudflare provider — it sends content-block-array
+  message content that native `@cf/...` models reject. The working form
+  drops the `@cf/` prefix: `'cloudflare/openai/gpt-oss-120b'`, which routes
+  through Workers AI's gateway path instead.
+- **Priority dropped entirely.** `plans/done/2026-08-06-remove-priority.md`
+  deleted the `priority` field from the schema after this plan was written
+  but before it was implemented — every `setPriority` reference in the
+  original spec was stale and simply skipped.
+- **`updateTodoCore` now calls `notifySync`**, which REST's `updateTodo`
+  never did before this plan. Necessary, not incidental: the todo-agent's
+  tools aren't themselves a polling client, so without this, agent-driven
+  edits would be invisible to an already-open web/iOS session until its
+  next poll. Extends the same behavior `setTodoCompleted` already had to
+  the general update path too.
+
+Verified end-to-end live in a real browser session on 2026-08-09 (after
+the account's AI Gateway was topped up): sent a message asking the agent
+to set a real todo's notes, watched the model reason, call `update_todo`,
+succeed, and the Notes field update live in the open web client with no
+manual refresh.
