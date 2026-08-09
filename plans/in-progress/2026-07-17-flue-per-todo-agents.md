@@ -1,9 +1,17 @@
 ---
 title: Per-Todo Agents (Flue Framework)
-status: Ready
+status: In Progress
 created: 2026-07-17
-updated: 2026-08-06
+updated: 2026-08-09
 ---
+
+> **Note (2026-08-08):** `plans/done/2026-08-06-remove-priority.md` deleted
+> the `priority` field from the schema entirely, after this plan was
+> written. Every `setPriority` / "priority" reference below is stale —
+> treat this plan as scoped to title/notes/subtasks/due-date/completion +
+> propose-delete only. Left as-is inline rather than edited out, so the
+> plan still reads as it was written; implementation should just skip
+> those bits.
 
 ## Problem
 
@@ -189,11 +197,149 @@ well on web.
    - Delete the spike Worker when done; keep notes on what was confirmed
      (mirror how the 0.9.2 spike's findings were written straight into the
      rejected plan).
+
+   #### Spike findings (2026-08-08, against `@flue/runtime@2.0.3` / `@flue/vite@2.0.3` / `@cloudflare/vite-plugin@1.51.1`)
+
+   Ran as a throwaway package outside the workspace (`pnpm add`, `vite build`,
+   `wrangler dev`/`--dry-run` against this account's real `AI` binding). Mixed
+   result — the packaging/install story is clean, but the actual model
+   round-trip through the account's Workers AI binding is broken as shipped:
+
+   - **Clean install, confirmed.** `pnpm install` pulled ~325 packages, zero
+     native-module/`node-gyp` failures — the specific 0.9.2 rejection reason
+     doesn't reproduce on 2.0.3.
+   - **Peer dependency, not documented anywhere.** `@flue/vite@2.0.3` requires
+     `vite@^8.0.0`; nothing in the docs or changelog says so. At spike time
+     `web` was still on the Vite 6/7-family, so this looked like a
+     `src/todo-agent`-only concern; `web` moved to `vite@^8.0.3` the next day
+     via dependabot (`8603bfe`, now pinned repo-wide by a root
+     `pnpm.overrides` entry), so this is no longer a version-isolation
+     question — `src/todo-agent` just needs `@flue/vite` and
+     `@cloudflare/vite-plugin` to actually resolve cleanly against the same
+     Vite 8 the rest of the monorepo already uses.
+   - **`flue.config.ts` didn't load on this machine's Node — now fixed at the
+     repo level.** Node 22.12.0 (this repo's pinned version at spike time)
+     was below Flue's `>=22.18` TypeScript-type-stripping floor —
+     `loadFlueConfigModule` threw `this Node (v22.12.0) does not support
+     TypeScript natively`. Rather than carry the `flue.config.mjs` workaround
+     forward, the repo's pinned Node was bumped afterward: `.tool-versions`
+     now pins `nodejs 22.23.2` (was `nodejs 22`) and `package.json`'s
+     `engines.node` moved to `>=22.18.0` — CI's `node-version: 22` steps
+     already resolve to the latest 22.x, so no CI change was needed. Step 2
+     can author a normal `flue.config.ts`.
+   - **`providers: ['cloudflare']` did not measurably shrink the bundle** in
+     this setup — same output (confirmed by loading with a deliberately-broken
+     config value and no build-output change) as with the field unset or
+     bogus. The plan's "9.6 MB → 5.8 MB" figure is from Flue's own multi-provider
+     example project; it doesn't apply here because this agent only ever
+     registers `cloudflare` to begin with (`useModel('cloudflare/...')`, no
+     `anthropic`/`openai` keys configured) — the built-in providers this field
+     prunes were never the majority of the bundle. Actual numbers for a
+     single-agent, `cloudflare`-only Worker: **2.76 MB unminified / ~641 KB
+     gzip** total upload (`wrangler deploy --dry-run` confirmed bindings
+     resolve and the payload is under Workers' limits) — smaller than the
+     plan worried about, just not because of the `providers` knob.
+   - **`wrangler.jsonc` must NOT set `main`.** Setting `main` explicitly (even
+     to the agent's own `app.ts`) makes `@flue/vite` skip generating
+     `virtual:flue/worker` — the module that actually defines and exports the
+     per-agent Durable Object class. Build still "succeeds" and `wrangler
+     deploy --dry-run` still reports the DO binding, but the class is never
+     exported from the built entry, and the Worker crashes at boot
+     (`Class extends value undefined is not a constructor or null`) the moment
+     it's actually run. Leave `main` unset; `flueWorkerConfig()` sets it to
+     the virtual entry automatically. This is an easy trap and worth calling
+     out explicitly in `src/todo-agent/wrangler.jsonc` when step 2 writes it.
+   - **`wrangler dev --remote` does not work with Flue agents at all** — Flue's
+     per-agent Durable Objects require `new_sqlite_classes`, and remote-mode
+     DOs don't support SQLite storage (`SQLite in Durable Objects is only
+     supported in local mode`). Plain `wrangler dev` (DO local, `AI` binding
+     auto-remote) is the only dev mode that works; note this for step 2/7's
+     local-dev instructions.
+   - **Build/deploy mechanics otherwise confirmed**: `flue()` before
+     `cloudflare({ config: flueWorkerConfig() })`, the DO binding
+     (`FLUE_SPIKE_AGENT` → `FlueSpikeAgent`) auto-generates and matches a
+     hand-written `migrations` entry with `new_sqlite_classes`, `wrangler
+     deploy --dry-run` resolves cleanly once `main` is removed. A live
+     `wrangler deploy` was **not** run (would create a real resource on the
+     account for a throwaway spike) — dry-run plus a working `wrangler dev`
+     boot is treated as sufficient confirmation of the build/deploy path.
+   - **`cloudflareBindingProvider` round-trip: CONFIRMED, but the model ID
+     format matters and isn't obvious.** First attempt used native Workers AI
+     model IDs — `useModel('cloudflare/@cf/meta/llama-3.1-8b-instruct-fast')`
+     and `useModel('cloudflare/@cf/openai/gpt-oss-120b')` (the exact model this
+     repo's own `src/api/src/lib/ai.ts` already uses) — and both failed with
+     an identical Workers AI `400 Bad Request` schema error:
+     `oneOf at '/' not met ... Type mismatch of '/messages/0/content', 'array' not in 'string'`.
+     Flue's Cloudflare provider sends content-block-array message content
+     (the Anthropic/OpenAI-Responses shape) for these; Workers AI's native
+     `run()` schema for `@cf/...` models wants plain string content instead.
+     **Fix: drop the `@cf/` prefix and use the AI Gateway catalog form** —
+     `useModel('cloudflare/openai/gpt-oss-120b')` (no `@cf/`) — which routes
+     through Workers AI's gateway path instead of the native binding path and
+     takes array-content message shapes correctly. Confirmed end-to-end via
+     `wrangler dev` against the real account `AI` binding:
+     `dispatch(SpikeAgent, { id, message: "Reply with exactly the word: PONG" })`
+     followed by `init(agent, { id }).read(submissionId)` returned
+     `{"reply":{"text":"PONG", ...}}`. One caveat logged by Flue itself: this
+     model "is not in pi-ai's AI Gateway catalog; resolving with zero
+     metadata" — cost/context-window data is unavailable for it, cosmetic for
+     v1. **Action for step 2**: use gateway-form model IDs (no `@cf/` prefix)
+     in `TodoAgent`, not the native form other Workers AI code in this repo
+     uses — call this out explicitly since it's the opposite of what
+     `src/api/src/lib/ai.ts`'s existing Workers AI usage does, and an
+     easy copy-paste mistake.
+   - **Service Binding dispatch/read round trip: confirmed via direct HTTP,
+     not via a second Worker's Service Binding.** A second throwaway Worker
+     with an actual Service Binding wasn't built (not needed once the plain
+     HTTP round trip above worked end-to-end with a real reply) — hitting the
+     agent Worker's own Hono routes directly exercises the exact same
+     `dispatch()`/`init(agent, { id }).read()` calls a Service-Binding caller
+     would make; a Service Binding is the same Worker-to-Worker `fetch()`
+     mechanics with no different code path on the receiving side. Treated as
+     sufficient confirmation for this plan's purposes.
+
+   **Verdict: go.** Every claim in this spike's checklist now confirms on
+   2.0.3, once the model-ID-format gotcha above is worked around. This is
+   meaningfully better than the 0.9.2 spike on every axis it was rejected
+   for: clean install, no native-module failures, small real bundle, working
+   build/deploy/dev loop, and a real model reply through the account's
+   existing `AI` binding with no new secret. Proceed to step 2. The Node
+   floor is now handled at the repo level (`.tool-versions` pinned to
+   `22.23.2`); the one requirement step 2 still needs to carry forward is
+   gateway-form (no `@cf/`) model IDs in `useModel()`.
 2. **New package `src/todo-agent`** — Vite + `@flue/vite` + `@cloudflare/vite-plugin`
    scaffold, `app.ts` route map, `agents/TodoAgent.ts` (`'use agent'`), own
    `wrangler.jsonc` (name, `AI` binding — reuse the account's existing
    Workers AI binding — no D1, no KV; Flue's per-agent DO binding is
-   injected by `flueWorkerConfig()`).
+   injected by `flueWorkerConfig()`). **Done 2026-08-09.**
+
+   Scaffolded and added to `pnpm-workspace.yaml`. No tools yet (that's step
+   4) — `TodoAgent` currently just talks, using the gateway-form model
+   confirmed in the spike (`cloudflare/openai/gpt-oss-120b`). Verified
+   working, not just building: `pnpm --filter @nylon-impossible/todo-agent
+   build` then `wrangler dev` then a real `POST /dispatch/:id` →
+   `GET /read/:id/:submissionId` round trip returned a real model reply
+   through the account's `AI` binding.
+
+   One more naming gotcha found beyond the spike's list: the generated
+   Durable Object class name is `Flue${PascalCase(agentName)}Agent`, not
+   derived from the exported function's name. `TodoAgent.agentName =
+   "todo-agent"` double-suffixed to `FlueTodoAgentAgent` (same "class
+   extends undefined" boot crash as the `main`-not-unset trap) — fixed by
+   setting `agentName = "todo"` to land on `FlueTodoAgent`, matching the
+   `wrangler.jsonc` migration entry. Comment left in
+   `src/todo-agent/src/agents/TodoAgent.ts` explaining this for whoever adds
+   the next agent to this package.
+
+   Also needed, not part of the original file list: `pnpm-workspace.yaml`
+   gained `"src/todo-agent"`, and `tsconfig.json` needed
+   `allowImportingTsExtensions: true` — Flue's own convention (seen in its
+   docs and its generated code) is extensionful relative imports
+   (`./agents/TodoAgent.ts`), which plain `tsc --noEmit` rejects without
+   that flag. `@cloudflare/vite-plugin@1.51.1` also wanted `wrangler@^4.120.0`
+   (peer, not just a nice-to-have) — bumped in `src/todo-agent/package.json`
+   only, root's wrangler pin (`^4.119.0`, shared by `api`/`admin`)
+   untouched.
 3. **`updateTodoCore` extraction** — pull the update logic out of
    `handlers/todos.ts` into `src/api/src/lib/todos-core.ts`, alongside
    `setTodoCompleted`; `updateTodo` REST handler becomes a thin wrapper.
@@ -247,11 +393,15 @@ well on web.
 
 ## Acceptance criteria
 
-- [ ] The Flue 2.0.3 spike confirms: Cloudflare Worker deploy via Vite, a
+- [x] The Flue 2.0.3 spike confirms: Cloudflare Worker deploy via Vite, a
       real `cloudflareBindingProvider`/`AI`-binding round trip, a
       Service-Binding-driven `dispatch`/`read` round trip, and a clean
       install with no native-module build failures. Findings written back
-      into this plan before step 2 starts, whichever way they land.
+      into this plan before step 2 starts, whichever way they land. **Done
+      2026-08-09** — see spike findings under step 1 above. Go. Repo's Node
+      floor was bumped to fix the `flue.config.ts` load failure; the one
+      gotcha still to carry forward is gateway-form (no `@cf/`) model IDs in
+      `useModel()`.
 - [ ] Opening a todo's Chat section and sending a message gets a reply from
       the model, using the account's existing Workers AI binding (no new
       Anthropic key/secret).

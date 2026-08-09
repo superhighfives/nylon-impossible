@@ -1,0 +1,28 @@
+{
+  "name": "@nylon-impossible/todo-agent",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --persist-to ../../.wrangler/state",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint --config-path ../..",
+    "lint:fix": "biome lint --write --config-path ../..",
+    "format": "biome format --write --config-path ../..",
+    "check": "biome check --config-path ../..",
+    "check:fix": "biome check --write --config-path ../..",
+    "deploy": "pnpm build && wrangler deploy"
+  },
+  "dependencies": {
+    "@flue/runtime": "2.0.3",
+    "hono": "^4.12.29"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.51.1",
+    "@cloudflare/workers-types": "^4.20260701.1",
+    "@flue/vite": "2.0.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.3",
+    "wrangler": "^4.120.0"
+  }
+}

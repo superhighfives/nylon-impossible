@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nylon-impossible-todo-agent",
+  // No `main` here on purpose: Flue's Vite plugin needs to own it (points
+  // it at the generated `virtual:flue/worker` entry, which is where the
+  // per-agent Durable Object class is actually defined and exported).
+  // Setting `main` explicitly makes @flue/vite skip that generation step —
+  // the build still "succeeds" and this file's `durable_objects` binding
+  // still resolves, but the Worker crashes at boot with "Class extends
+  // value undefined is not a constructor or null". Confirmed in the 2.0.3
+  // spike (see plans/in-progress/2026-07-17-flue-per-todo-agents.md).
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // No `durable_objects.bindings` block here either: @flue/vite injects it
+  // itself from the scanned `'use agent'` set (binding name/class name
+  // derived from the agent function's name — `TodoAgent` -> class
+  // `FlueTodoAgent` -> binding `FLUE_TODO_AGENT`). We only own the
+  // migration history, which Flue doesn't generate.
+  "migrations": [
+    {
+      "tag": "flue-class-FlueTodoAgent",
+      "new_sqlite_classes": ["FlueTodoAgent"],
+    },
+  ],
+  "ai": {
+    "binding": "AI",
+  },
+  "observability": {
+    "enabled": true,
+  },
+}
