@@ -55,6 +55,9 @@ export type Env = {
     // add-on does. Same value set via `wrangler secret put` on both this
     // Worker and src/todo-agent.
     INTERNAL_AGENT_SECRET?: string;
+    // Service Binding to src/todo-agent's Worker — its POST/GET/:id surface
+    // (Flue's own createAgentRouter) sends/reads the per-todo agent chat.
+    TODO_AGENT: Fetcher;
   };
   Variables: {
     userId: string;

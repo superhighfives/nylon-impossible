@@ -460,14 +460,57 @@ well on web.
    them, then calls `env.TODO_AGENT` (service binding) to `dispatch()`; a
    paired `GET /todos/:id/agent/messages` (or SSE/poll, TBD in the spike) to
    read the conversation back for the chat UI. `POST /todos/:id/agent/confirm-delete`
-   as its own human-only endpoint (see blast-radius section).
+   as its own human-only endpoint (see blast-radius section). **Done
+   2026-08-09**, including step 8's binding wiring (pulled forward — step 6
+   can't work without it).
+
+   Not a hand-rolled `dispatch()`/`init().read()` pair after all (the spike's
+   throwaway `app.ts` had one; it was for the spike question, not meant to
+   ship). `@flue/runtime/routing`'s `createAgentRouter(agent)` gives the
+   whole HTTP surface for free — `POST /:id` (send), `GET|HEAD /:id`
+   (resumable AI-SDK-style conversation stream read, with settlement/error
+   info inline per message — the chat UI can render a failed turn straight
+   from this response, no separate error channel needed), `POST /:id/abort`.
+   `src/todo-agent/src/app.ts` now just mounts it at root; `src/api`'s two
+   routes (`sendAgentMessage`, `readAgentMessages` in the new
+   `handlers/todo-agent.ts`) are thin ownership-checked proxies over the
+   `TODO_AGENT` Service Binding, streaming the response straight through
+   (`new Response(res.body, res)`).
+
+   One real wire-format bug caught only by testing directly against a live
+   todo-agent Worker (not something typecheck or the plan's own text would
+   have caught): the POST body for `createAgentRouter`'s HTTP layer is the
+   delivered message **flat at the top level** —
+   `{ kind: "user", body: string, initialData? }` — not
+   `{ message: {...}, initialData }`. The router peels off only
+   `initialData`/`uid`/`idempotencyKey` and treats everything else as the
+   message itself; wrapping it in a `message` key (a reasonable guess by
+   analogy with the JS `dispatch()` function's `{ id, message, initialData }`
+   shape) 400s with "Delivered messages must be { kind: 'user', body:
+   string, ... }". Fixed and re-verified live.
+
+   `POST /todos/:id/agent/confirm-delete` reuses the existing `deleteTodo`
+   handler directly (`app.post(..., deleteTodo)`) rather than new code — same
+   ownership check, same cascade, just a second URL the model has no tool
+   path to.
+
+   **Verified live**: direct HTTP against a running todo-agent Worker
+   (bypassing Clerk, which isn't what's under test here) — send → 202
+   admission with `Location`/`Stream-Next-Offset` headers → read → full
+   conversation JSON including the user message, the assistant's (empty,
+   since it failed) turn, and a `settlements[]` entry with the same AI
+   Gateway 402 from steps 4/5 surfaced cleanly. `src/api`'s own auth/
+   ownership/validation gating (401 unauthenticated, 404 wrong-owner, 400
+   empty message, confirm-delete's full happy path) covered by
+   `todo-agent.test.ts` — the actual proxy-forwards-to-a-live-worker path
+   isn't exercised by the vitest suite (no `TODO_AGENT` binding in
+   `wrangler.test.jsonc`; every test that would reach it short-circuits
+   first on auth/ownership), so that's covered by the live check instead,
+   same split as steps 4/5.
 7. **Web chat UI** — a new "Chat" section in `TodoItemExpanded.tsx` (or a
    sibling component), message list + input, wired to the two routes above.
    No optimistic local state needed beyond a sending spinner — the model's
-   turn is inherently async.
-8. **Wrangler + service binding wiring** — add the `TODO_AGENT` service
-   binding to `src/api/wrangler.jsonc`, matching the naming already used for
-   other bindings.
+   turn is inherently async. **Not started.**
 
 ### Files to create
 
@@ -481,13 +524,15 @@ well on web.
   targets: update (also covers set-due), add-subtask, complete. No
   set-priority target (dropped with `priority`).
 - `src/api/src/handlers/todo-agent.ts` — `POST /todos/:id/agent/message`,
-  `GET /todos/:id/agent/messages`, `POST /todos/:id/agent/confirm-delete`.
-  **Not yet — step 6.**
+  `GET /todos/:id/agent/messages`, `POST /todos/:id/agent/confirm-delete`
+  (the last is `deleteTodo` reused on a second route, not new code). **Done.**
 - `src/web/src/components/TodoAgentChat.tsx` (or similar) — chat UI. **Not
   yet — step 7.**
 - `src/web/src/hooks/useTodoAgent.ts` — send/poll hooks. **Not yet — step 7.**
 - `src/api/test/integration/agent-internal.test.ts` — not in the original
   file list; added alongside the internal route.
+- `src/api/test/integration/todo-agent.test.ts` — not in the original file
+  list; added alongside the dispatch/read/confirm-delete routes.
 
 ### Files to modify
 
@@ -502,9 +547,9 @@ well on web.
 - `src/api/src/types.ts` — add `INTERNAL_AGENT_SECRET`. **Done.**
 - `src/api/src/index.ts` — mount the new routes, add the internal-route
   group (with its auth middleware). **Done.**
-- `src/api/wrangler.jsonc` — add the `TODO_AGENT` service binding (for step
-  6/8, not yet), plus a secret-config comment for `INTERNAL_AGENT_SECRET`
-  (**done**, ahead of schedule since step 5 needed it now).
+- `src/api/wrangler.jsonc` — add the `TODO_AGENT` service binding (step 8,
+  pulled forward into step 6), plus a secret-config comment for
+  `INTERNAL_AGENT_SECRET` (step 5). **Both done.**
 - `src/api/wrangler.test.jsonc` — add `INTERNAL_AGENT_SECRET` test var.
   **Done** (not in the original file list).
 - `src/web/src/components/TodoItemExpanded.tsx` — mount the chat section.

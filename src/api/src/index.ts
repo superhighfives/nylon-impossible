@@ -32,6 +32,7 @@ import { replyToTodo } from "./handlers/reply";
 import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
+import { readAgentMessages, sendAgentMessage } from "./handlers/todo-agent";
 import {
   createTodo,
   deleteTodo,
@@ -132,6 +133,14 @@ app.post("/todos/:id/reply", replyToTodo);
 app.delete("/todos/:id/question", dismissQuestion);
 app.post("/todos/:id/suggestions/:sid/accept", acceptSuggestion);
 app.post("/todos/:id/suggestions/:sid/dismiss", dismissSuggestion);
+app.post("/todos/:id/agent/message", sendAgentMessage);
+app.on(["GET", "HEAD"], "/todos/:id/agent/messages", readAgentMessages);
+// Human-only confirm for the agent's propose-delete flow — the agent can
+// never call this itself (no tool maps to it), only a human clicking
+// confirm in the chat UI. Identical to DELETE /todos/:id under the hood
+// (same ownership check, same cascade); a distinct URL only so the model
+// has no path to it.
+app.post("/todos/:id/agent/confirm-delete", deleteTodo);
 
 // Internal routes for the todo-agent Worker's tools (bearer-secret auth,
 // see handlers/agent-internal.ts for why this can't rely on "no route" alone).
