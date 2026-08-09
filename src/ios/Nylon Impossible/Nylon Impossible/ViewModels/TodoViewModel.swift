@@ -21,9 +21,11 @@ final class TodoViewModel {
         // Filter out soft-deleted items
         let activeTodos = todos.filter { !$0.isDeleted }
 
-        // Sort: incomplete first (by position asc), then completed (most recently
-        // completed first). "Effective" completion counts a repeat completed
-        // today as done so it sits in Completed until local midnight.
+        // Sort: sticky-first among incomplete (by position asc within each
+        // tier), then completed (most recently completed first). "Effective"
+        // completion counts a repeat completed today as done so it sits in
+        // Completed until local midnight. Completing a todo clears sticky, so
+        // only incomplete todos ever participate in the sticky tier.
         return activeTodos.sorted { a, b in
             let aDone = a.isEffectivelyCompleted
             let bDone = b.isEffectivelyCompleted
@@ -31,6 +33,9 @@ final class TodoViewModel {
                 return !aDone
             }
             if !aDone {
+                if a.sticky != b.sticky {
+                    return a.sticky
+                }
                 return a.position < b.position
             }
             // Completed: most recently completed first — completedAt for repeats,
@@ -90,12 +95,14 @@ final class TodoViewModel {
         title: String,
         notes: String?,
         dueDate: Date?,
-        recurrence: Recurrence?
+        recurrence: Recurrence?,
+        sticky: Bool
     ) {
         todo.title = title
         todo.itemNotes = notes
         todo.dueDate = dueDate
         todo.recurrence = recurrence
+        todo.sticky = sticky
         todo.markModified()
     }
 
@@ -127,6 +134,9 @@ final class TodoViewModel {
                 recurrence, from: anchor, now: Date()
             )
             todo.completedAt = Date()
+            // Completing a sticky todo unsticks it — matches the server-side
+            // clear in updateTodo / syncTodos.
+            todo.sticky = false
             todo.markModified()
             return
         }
@@ -138,6 +148,10 @@ final class TodoViewModel {
                 .filter { !$0.isDeleted && !$0.isEffectivelyCompleted && $0.parentId == nil && $0.id != todo.id }
                 .sorted { $0.position < $1.position }
             todo.position = generateKeyBetween(incompleteTodos.last?.position, nil)
+        }
+        // Completing a sticky todo unsticks it — matches the server-side clear.
+        if !todo.isCompleted && todo.sticky {
+            todo.sticky = false
         }
         todo.isCompleted.toggle()
         todo.markModified()
@@ -151,6 +165,13 @@ final class TodoViewModel {
                 child.markModified()
             }
         }
+    }
+
+    /// Toggle sticky. Non-destructive and instantly reversible, so this is a
+    /// plain flip with no confirm step — mirrors the web pin button.
+    func toggleSticky(_ todo: TodoItem) {
+        todo.sticky.toggle()
+        todo.markModified()
     }
 
     /// Toggle a subtask's completion. A subtask never recurs and has no

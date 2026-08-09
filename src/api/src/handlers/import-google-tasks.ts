@@ -21,14 +21,15 @@ interface GoogleTask {
 }
 
 // D1 caps bound parameters at 100 per statement. Each inserted todo row binds
-// 12 params: the 11 fields set below (id, userId, title, notes, completed,
+// 13 params: the 11 fields set below (id, userId, title, notes, completed,
 // position, dueDate, googleTaskId, aiStatus, createdAt, updatedAt) PLUS
-// `needsInput` — a NOT NULL column with a default that Drizzle still binds even
-// though we don't set it. Chunk at 8 rows (96 params) to stay under the cap; a
-// larger chunk throws a D1_ERROR mid-import. Count the generated SQL params,
-// not the fields set here — NOT NULL defaulted columns are easy to miss.
-const TODO_INSERT_COLUMNS = 12;
-const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 8
+// `needsInput` and `sticky` — NOT NULL columns with defaults that Drizzle
+// still binds even though we don't set them. Chunk at 7 rows (91 params) to
+// stay under the cap; a larger chunk throws a D1_ERROR mid-import. Count the
+// generated SQL params, not the fields set here — NOT NULL defaulted columns
+// are easy to miss.
+const TODO_INSERT_COLUMNS = 13;
+const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 7
 
 // todoUrls rows bind 7 params (all NOT NULL columns are set explicitly, so
 // there's no hidden defaulted column like todos' needsInput). Chunk the same

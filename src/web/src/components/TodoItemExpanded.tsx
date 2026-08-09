@@ -3,6 +3,8 @@ import {
   Calendar,
   ExternalLink,
   Link2,
+  Pin,
+  PinOff,
   Search,
   Sparkles,
   Trash2,
@@ -42,6 +44,7 @@ interface TodoItemExpandedProps {
     notes?: string | null;
     dueDate?: Date | null;
     recurrence?: Recurrence | null;
+    sticky?: boolean;
   }) => void;
   onDelete: (id: string) => void;
   deletePending: boolean;
@@ -402,6 +405,30 @@ export function TodoItemExpanded({
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Sticky — pins the todo above non-sticky ones. Instantly reversible,
+          so this commits on click with no debounce, matching how the Repeat
+          select commits immediately. */}
+      <div className="space-y-1.5">
+        <label
+          htmlFor={`sticky-${todo.id}`}
+          className="text-xs font-medium text-gray-muted"
+        >
+          Sticky
+        </label>
+        <Button
+          id={`sticky-${todo.id}`}
+          variant="secondary"
+          size="sm"
+          type="button"
+          onClick={() => onUpdate({ sticky: !todo.sticky })}
+          aria-pressed={todo.sticky}
+          className="w-fit"
+        >
+          {todo.sticky ? <Pin size={14} /> : <PinOff size={14} />}
+          {todo.sticky ? "Pinned to top" : "Pin to top"}
+        </Button>
       </div>
 
       {/* Repeat — disabled until a due date is set, since the rule has no

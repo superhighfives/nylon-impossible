@@ -101,6 +101,7 @@ export function ImportReviewModal() {
       recurrence: null,
       aiStatus: "pending",
       needsInput: false,
+      sticky: false,
       createdAt: review.dueDate,
       updatedAt: review.dueDate,
       research: null,

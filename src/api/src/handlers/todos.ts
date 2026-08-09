@@ -39,6 +39,7 @@ const updateTodoSchema = z.object({
   // completions are stamped server-side.
   completedAt: z.coerce.date().nullable().optional(),
   updatedAt: z.coerce.date().optional(),
+  sticky: z.boolean().optional(),
 });
 
 // Serialize a todo with ISO dates
@@ -54,6 +55,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
+    sticky: todo.sticky,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -231,6 +233,7 @@ export async function updateTodo(c: Context<Env>) {
   // completion stamps it server-side just below.
   if (parsed.data.completedAt !== undefined)
     updates.completedAt = parsed.data.completedAt;
+  if (parsed.data.sticky !== undefined) updates.sticky = parsed.data.sticky;
 
   // Server-canonical advance: when a recurring todo is being marked complete
   // for the first time, advance dueDate to the next future occurrence and keep
@@ -279,6 +282,10 @@ export async function updateTodo(c: Context<Env>) {
         ),
       );
   }
+
+  // Completing a sticky todo unsticks it — it sorts as an ordinary completed
+  // todo, not pinned.
+  if (completingRow && existing.sticky) updates.sticky = false;
 
   await db
     .update(todos)

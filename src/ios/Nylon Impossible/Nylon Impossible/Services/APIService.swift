@@ -121,6 +121,7 @@ struct APITodo: Codable, Sendable {
     let recurrence: Recurrence?
     let aiStatus: AIStatus?
     let needsInput: Bool?
+    let sticky: Bool?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
@@ -134,7 +135,7 @@ struct APITodo: Codable, Sendable {
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
         recurrence: Recurrence? = nil,
-        aiStatus: AIStatus? = nil, needsInput: Bool? = nil,
+        aiStatus: AIStatus? = nil, needsInput: Bool? = nil, sticky: Bool? = nil,
         createdAt: Date, updatedAt: Date,
         urls: [APITodoUrl]? = nil, research: APIResearch? = nil,
         messages: [APITodoMessage]? = nil,
@@ -152,6 +153,7 @@ struct APITodo: Codable, Sendable {
         self.recurrence = recurrence
         self.aiStatus = aiStatus
         self.needsInput = needsInput
+        self.sticky = sticky
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls
@@ -286,11 +288,12 @@ struct TodoChange: Codable, Sendable {
     let completedAt: Date?
     let updatedAt: Date
     let deleted: Bool?
+    let sticky: Bool?
     let urls: [TodoUrlChange]?
 
     enum CodingKeys: String, CodingKey {
         case id, parentId, title, notes, completed, position, dueDate,
-             recurrence, completedAt, updatedAt, deleted, urls
+             recurrence, completedAt, updatedAt, deleted, sticky, urls
     }
 
     // Custom encode so `completedAt` is sent explicitly — as JSON null when nil —
@@ -314,6 +317,7 @@ struct TodoChange: Codable, Sendable {
         }
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encodeIfPresent(deleted, forKey: .deleted)
+        try c.encodeIfPresent(sticky, forKey: .sticky)
         try c.encodeIfPresent(urls, forKey: .urls)
     }
 }
