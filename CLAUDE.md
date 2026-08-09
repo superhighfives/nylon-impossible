@@ -8,9 +8,9 @@ This file is the repo-specific part.
 pnpm workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
 `src/marketing`. `@nylon-impossible/shared` is consumed by both `web` and `api`.
 
-Only `web`, `api`, and `admin` have their own check scripts, so `pnpm typecheck`
-and `pnpm lint` fan out to those three. Per-package variants are prefixed
-(`pnpm api:test`, `pnpm web:typecheck`).
+`web`, `api`, `admin`, and `todo-agent` have their own check scripts, so `pnpm
+typecheck` and `pnpm lint` fan out to those four. Per-package variants are
+prefixed (`pnpm api:test`, `pnpm web:typecheck`).
 
 Biome config lives at the root; each workspace invokes it with
 `--config-path ../..`. Don't add a per-workspace `biome.json`.

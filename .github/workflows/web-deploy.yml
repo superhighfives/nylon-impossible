@@ -6,6 +6,7 @@ on:
     paths:
       - "src/web/**"
       - "src/api/**"
+      - "src/todo-agent/**"
       - "package.json"
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -36,6 +37,9 @@ jobs:
 
       - name: Lint & typecheck Web
         run: pnpm web:check && pnpm web:typecheck
+
+      - name: Lint & typecheck todo-agent
+        run: pnpm todo-agent:check && pnpm todo-agent:typecheck
 
       - name: Test API
         run: pnpm --filter @nylon-impossible/api test
@@ -85,6 +89,27 @@ jobs:
             CLOUDFLARE_API_TOKEN
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Deploy todo-agent
+        working-directory: src/todo-agent
+        run: pnpm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # INTERNAL_AGENT_SECRET is optional here: it isn't set as a repo secret
+      # yet, and both workers boot fine without it (the /internal/agent/*
+      # routes just reject calls until a value is set on both sides via
+      # `wrangler secret put`, matching the note in src/api/wrangler.jsonc).
+      - name: Set INTERNAL_AGENT_SECRET on API and todo-agent
+        if: ${{ secrets.INTERNAL_AGENT_SECRET != '' }}
+        run: |
+          printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm --filter @nylon-impossible/api exec wrangler secret put INTERNAL_AGENT_SECRET
+          printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm --filter @nylon-impossible/todo-agent exec wrangler secret put INTERNAL_AGENT_SECRET
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
       - name: Build Web
         run: pnpm --filter @nylon-impossible/web run build
@@ -187,6 +212,31 @@ jobs:
                 config.queues.consumers = config.queues.consumers.map(({ dead_letter_queue, ...c }) => ({ ...c, queue: previewQueue }));
               }
             }
+            // Point the TODO_AGENT service binding at this PR's todo-agent
+            // worker instead of the shared production one.
+            if (config.services) {
+              config.services = config.services.map(s =>
+                s.binding === 'TODO_AGENT'
+                  ? { ...s, service: `nylon-impossible-todo-agent-pr-${pr}` }
+                  : s
+              );
+            }
+            fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
+
+      - name: Rewrite todo-agent wrangler config for preview
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require('fs');
+            const pr = context.payload.pull_request.number;
+            const dir = 'src/todo-agent';
+            const name = `nylon-impossible-todo-agent-pr-${pr}`;
+            const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
+            // Strip only whole-line // comments so URLs (https://...) inside
+            // string values survive; then drop trailing commas.
+            const stripped = raw.replace(/^\s*\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
+            const config = JSON.parse(stripped);
+            config.name = name;
             fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
 
       - name: Rewrite Web wrangler config for preview
@@ -215,6 +265,22 @@ jobs:
           workingDirectory: src/api
           command: d1 migrations apply nylon-impossible-db --remote
 
+      - name: Deploy preview todo-agent
+        working-directory: src/todo-agent
+        run: pnpm run deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Set preview todo-agent secrets
+        if: ${{ secrets.INTERNAL_AGENT_SECRET != '' }}
+        working-directory: src/todo-agent
+        run: printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler secret put INTERNAL_AGENT_SECRET
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
+
       - name: Deploy preview API
         uses: cloudflare/wrangler-action@v4
         with:
@@ -232,11 +298,15 @@ jobs:
           if [ -n "$TAVILY_API_KEY" ]; then
             printf '%s' "$TAVILY_API_KEY" | pnpm exec wrangler secret put TAVILY_API_KEY
           fi
+          if [ -n "$INTERNAL_AGENT_SECRET" ]; then
+            printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler secret put INTERNAL_AGENT_SECRET
+          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
       - name: Upload preview Web secrets
         working-directory: src/web
@@ -384,6 +454,9 @@ jobs:
 
           run_step "Delete Web worker" \
             pnpm exec wrangler delete --name "nylon-impossible-pr-$PR" --force
+
+          run_step "Delete todo-agent worker" \
+            pnpm exec wrangler delete --name "nylon-impossible-todo-agent-pr-$PR" --force
 
           run_step "Delete research queue" \
             pnpm exec wrangler queues delete "nylon-impossible-research-pr-$PR"
