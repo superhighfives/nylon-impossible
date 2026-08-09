@@ -54,6 +54,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+    env:
+      INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
     steps:
       - name: Checkout
@@ -102,14 +104,13 @@ jobs:
       # routes just reject calls until a value is set on both sides via
       # `wrangler secret put`, matching the note in src/api/wrangler.jsonc).
       - name: Set INTERNAL_AGENT_SECRET on API and todo-agent
-        if: ${{ secrets.INTERNAL_AGENT_SECRET != '' }}
+        if: ${{ env.INTERNAL_AGENT_SECRET != '' }}
         run: |
           printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm --filter @nylon-impossible/api exec wrangler secret put INTERNAL_AGENT_SECRET
           printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm --filter @nylon-impossible/todo-agent exec wrangler secret put INTERNAL_AGENT_SECRET
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
       - name: Build Web
         run: pnpm --filter @nylon-impossible/web run build
@@ -148,6 +149,8 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+    env:
+      INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
     steps:
       - name: Checkout
@@ -273,13 +276,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Set preview todo-agent secrets
-        if: ${{ secrets.INTERNAL_AGENT_SECRET != '' }}
+        if: ${{ env.INTERNAL_AGENT_SECRET != '' }}
         working-directory: src/todo-agent
         run: printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler secret put INTERNAL_AGENT_SECRET
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
       - name: Deploy preview API
         uses: cloudflare/wrangler-action@v4
