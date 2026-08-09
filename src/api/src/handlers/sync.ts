@@ -57,6 +57,7 @@ const syncRequestSchema = z.object({
       completedAt: z.coerce.date().nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
+      sticky: z.boolean().optional(),
       urls: z
         .array(z.object({ url: z.string().url().max(2048) }))
         .max(10)
@@ -169,6 +170,7 @@ function serializeTodo(
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus,
     needsInput: todo.needsInput,
+    sticky: todo.sticky,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     research: serializeResearch(research),
@@ -368,6 +370,10 @@ export async function syncTodos(c: Context<Env>) {
           completedToWrite = false;
           completedAtToWrite = new Date();
         }
+        // Completing a sticky todo unsticks it, same as the REST update path.
+        let stickyToWrite =
+          change.sticky !== undefined ? change.sticky : existing.sticky;
+        if (completing && stickyToWrite) stickyToWrite = false;
         await db
           .update(todos)
           .set({
@@ -378,6 +384,7 @@ export async function syncTodos(c: Context<Env>) {
             position: change.position ?? existing.position,
             dueDate: dueDateToWrite,
             recurrence: nextRecurrence,
+            sticky: stickyToWrite,
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
@@ -456,6 +463,7 @@ export async function syncTodos(c: Context<Env>) {
           dueDate: change.dueDate ?? null,
           // A subtask never recurs (recurrence is top-level only).
           recurrence: parentId ? null : (change.recurrence ?? null),
+          sticky: change.sticky ?? false,
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });

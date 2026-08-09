@@ -1,6 +1,15 @@
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import type { Env } from "../types";
-import { and, asc, eq, type getDb, isNull, todoMessages, todos } from "./db";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  type getDb,
+  isNull,
+  todoMessages,
+  todos,
+} from "./db";
 import { notifySync } from "./notify-sync";
 
 type Db = ReturnType<typeof getDb>;
@@ -28,7 +37,7 @@ export function listOpenTodos(db: Db, userId: string) {
         eq(todos.completed, false),
       ),
     )
-    .orderBy(asc(todos.position));
+    .orderBy(desc(todos.sticky), asc(todos.position));
 }
 
 /**
@@ -37,6 +46,7 @@ export function listOpenTodos(db: Db, userId: string) {
  *   - a recurring todo being completed rolls its dueDate forward instead of
  *     persisting the completion (completed stays false, completedAt stamped),
  *   - completing a todo with an open question clears needsInput + awaitingReply,
+ *   - completing a sticky todo clears sticky,
  *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
  * null if the todo doesn't exist or isn't owned by `userId`.
@@ -96,6 +106,10 @@ export async function setTodoCompleted(
         ),
       );
   }
+
+  // Completing a sticky todo unsticks it — it sorts as an ordinary completed
+  // todo, not pinned.
+  if (completingRow && existing.sticky) updates.sticky = false;
 
   await db
     .update(todos)

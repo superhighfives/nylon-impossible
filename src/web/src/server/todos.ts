@@ -125,6 +125,7 @@ function serializeTodoWithUrls(
     recurrence: todo.recurrence,
     aiStatus: todo.aiStatus ?? null,
     needsInput: todo.needsInput,
+    sticky: todo.sticky,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     research: research ? serializeResearch(research) : null,
@@ -467,6 +468,7 @@ export const updateTodo = createServerFn({ method: "POST" })
         // normal completion stamps it server-side just below.
         if (validated.completedAt !== undefined)
           updates.completedAt = validated.completedAt;
+        if (validated.sticky !== undefined) updates.sticky = validated.sticky;
 
         // Recurrence and subtasks are mutually exclusive (server-side source of
         // truth). A subtask never recurs, and a todo with children can't recur.
@@ -511,6 +513,10 @@ export const updateTodo = createServerFn({ method: "POST" })
           updates.completedAt = new Date();
           updates.dueDate = nextDueDate(recurrence, anchor, new Date());
         }
+
+        // Completing a sticky todo unsticks it — it sorts as an ordinary
+        // completed todo, not pinned.
+        if (becameComplete && existing.sticky) updates.sticky = false;
 
         // Update todo with compound where clause for authorization
         const [result] = yield* Effect.tryPromise({

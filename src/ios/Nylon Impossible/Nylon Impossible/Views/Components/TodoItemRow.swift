@@ -13,7 +13,8 @@ struct TodoItemRow: View {
     let urls: [APITodoUrl]
     var subtasks: [TodoItem] = []
     var onToggle: () -> Void
-    var onSave: (String, String?, Date?, Recurrence?) -> Void
+    var onToggleSticky: () -> Void = {}
+    var onSave: (String, String?, Date?, Recurrence?, Bool) -> Void
     var onAddSubtask: (String) -> Void = { _ in }
     var onToggleSubtask: (TodoItem) -> Void = { _ in }
     var onDeleteSubtask: (TodoItem) -> Void = { _ in }
@@ -365,6 +366,21 @@ struct TodoItemRow: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
+
+            // Sticky pin toggle — a sibling of the title/edit Button rather
+            // than nested inside it, so tapping the pin doesn't also open the
+            // edit sheet. Subtasks never get this (no toggle passed in from
+            // the subtask row builder). Hidden once completed — completing
+            // clears sticky server-side, so it wouldn't do anything.
+            if !todo.isEffectivelyCompleted {
+                Button(action: onToggleSticky) {
+                    Image(systemName: todo.sticky ? "pin.fill" : "pin")
+                        .font(.system(size: 14))
+                        .foregroundStyle(todo.sticky ? Color.appAccent : Color.appSubtle)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(todo.sticky ? "Unpin todo" : "Pin todo to top")
+            }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 4)
@@ -383,8 +399,8 @@ struct TodoItemRow: View {
                 apiService: apiService,
                 initialUrls: urls,
                 subtasks: subtasks,
-                onSave: { title, notes, dueDate, recurrence in
-                    onSave(title, notes, dueDate, recurrence)
+                onSave: { title, notes, dueDate, recurrence, sticky in
+                    onSave(title, notes, dueDate, recurrence, sticky)
                     showingEditSheet = false
                 },
                 onCancel: {
@@ -413,7 +429,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -427,7 +443,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -440,7 +456,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
             TodoItemRow(
                 todo: {
@@ -451,7 +467,7 @@ struct TodoItemRow: View {
                 apiService: nil,
                 urls: [],
                 onToggle: {},
-                onSave: { _, _, _, _ in }
+                onSave: { _, _, _, _, _ in }
             )
         }
         .padding()

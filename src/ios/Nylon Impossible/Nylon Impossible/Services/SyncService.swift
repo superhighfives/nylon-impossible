@@ -224,6 +224,7 @@ final class SyncService {
                 completedAt: todo.isDeleted ? nil : todo.completedAt,
                 updatedAt: todo.updatedAt,
                 deleted: todo.isDeleted ? true : nil,
+                sticky: todo.isDeleted ? nil : todo.sticky,
                 urls: pendingUrlChanges
             )
         }
@@ -270,6 +271,10 @@ final class SyncService {
                     local.dueDate = remote.dueDate
                     local.recurrence = remote.recurrence
                     local.aiStatus = remote.aiStatus?.rawValue
+                    // sticky is user-toggled (unlike needsInput below, which is
+                    // server-only), so it follows the same last-write-wins
+                    // resolution as the other user-editable fields here.
+                    local.sticky = remote.sticky ?? false
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
@@ -294,6 +299,7 @@ final class SyncService {
                 todo.dueDate = remote.dueDate
                 todo.recurrence = remote.recurrence
                 todo.aiStatus = remote.aiStatus?.rawValue
+                todo.sticky = remote.sticky ?? false
                 todo.researchId = remote.research?.id
                 todo.researchStatus = remote.research?.status
                 todo.researchType = remote.research?.researchType

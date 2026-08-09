@@ -31,6 +31,8 @@ import {
   Link2,
   ListTree,
   MessageCircle,
+  Pin,
+  PinOff,
   RefreshCw,
   Repeat,
   Sparkles,
@@ -140,6 +142,7 @@ interface ExpandedSectionProps {
     title?: string;
     notes?: string | null;
     dueDate?: Date | null;
+    sticky?: boolean;
   }) => void;
   onDelete: (id: string) => void;
   deletePending: boolean;
@@ -254,6 +257,8 @@ function InlineIndicators({
   onDueChange,
   recurrence,
   recurrenceLabel,
+  sticky,
+  onStickyToggle,
   disabled,
 }: {
   dueValue: string | null;
@@ -262,6 +267,8 @@ function InlineIndicators({
   onDueChange: (date: Date | null) => void;
   recurrence: TodoWithUrls["recurrence"];
   recurrenceLabel: string | null;
+  sticky: boolean;
+  onStickyToggle: () => void;
   disabled: boolean;
 }) {
   return (
@@ -279,6 +286,23 @@ function InlineIndicators({
           {recurrenceLabel}
         </span>
       )}
+      <Button
+        variant="ghost"
+        size="xs"
+        shape="square"
+        type="button"
+        onClick={onStickyToggle}
+        disabled={disabled}
+        aria-label={sticky ? "Unpin todo" : "Pin todo to top"}
+        aria-pressed={sticky}
+        className={
+          sticky
+            ? "text-gray hover:bg-gray-base"
+            : "text-gray-muted hover:bg-gray-base"
+        }
+      >
+        {sticky ? <Pin size={14} /> : <PinOff size={14} />}
+      </Button>
     </div>
   );
 }
@@ -356,6 +380,11 @@ function TodoItemContent({
     } else {
       onInlineUpdate(todo.id, { dueDate: date });
     }
+  };
+
+  // Non-destructive, instantly reversible — toggle directly, no confirm step.
+  const handleStickyToggle = () => {
+    onInlineUpdate(todo.id, { sticky: !todo.sticky });
   };
 
   return (
@@ -528,6 +557,8 @@ function TodoItemContent({
                   ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
                   : null
               }
+              sticky={todo.sticky}
+              onStickyToggle={handleStickyToggle}
               disabled={updatePending}
             />
           )}
@@ -899,6 +930,7 @@ export function TodoList() {
       title?: string;
       notes?: string | null;
       dueDate?: Date | null;
+      sticky?: boolean;
     }) => {
       updateTodo.mutate({ id, input: updates });
     };
@@ -941,12 +973,16 @@ export function TodoList() {
     effectiveCompletedById.get(t.id) ??
     isEffectivelyCompleted(t, timeZone, now);
 
-  // Sort: incomplete first (by position), then completed (most recently completed first)
+  // Sort: sticky-first among incomplete (by position within each tier), then
+  // completed (most recently completed first). Only incomplete todos
+  // participate in the sticky tier — completing a todo clears sticky, so it
+  // falls into the ordinary completed sort below regardless.
   const sortedTodos = [...topLevelTodos].sort((a, b) => {
     const aDone = effectiveCompleted(a);
     const bDone = effectiveCompleted(b);
     if (aDone !== bDone) return aDone ? 1 : -1;
     if (!aDone) {
+      if (a.sticky !== b.sticky) return a.sticky ? -1 : 1;
       const aPos = a.position ?? "a0";
       const bPos = b.position ?? "a0";
       if (aPos < bPos) return -1;
@@ -1002,16 +1038,39 @@ export function TodoList() {
     if (!over || active.id === over.id) return;
 
     const currentItems = localIncompleteTodos ?? incompleteTodos;
-    const oldIndex = currentItems.findIndex((t) => t.id === active.id);
-    const newIndex = currentItems.findIndex((t) => t.id === over.id);
-    if (oldIndex === -1 || newIndex === -1) return;
+    const draggedItem = currentItems.find((t) => t.id === active.id);
+    if (!draggedItem) return;
 
-    const reordered = arrayMove(currentItems, oldIndex, newIndex);
+    // Sticky and non-sticky todos share one position space but reorder within
+    // their own tier only — a drag can't cross the sticky/non-sticky boundary
+    // (mirrors how subtask drag is scoped to parentId). currentItems is
+    // already sticky-first sorted, so a drop onto the other tier clamps to
+    // this tier's nearest edge instead of crossing it.
+    const tierItems = currentItems.filter(
+      (t) => t.sticky === draggedItem.sticky,
+    );
+    const oldIndex = tierItems.findIndex((t) => t.id === active.id);
+    if (oldIndex === -1) return;
+    let newIndex = tierItems.findIndex((t) => t.id === over.id);
+    if (newIndex === -1) {
+      const overIndexInAll = currentItems.findIndex((t) => t.id === over.id);
+      const oldIndexInAll = currentItems.findIndex((t) => t.id === active.id);
+      if (overIndexInAll === -1) return;
+      newIndex = overIndexInAll > oldIndexInAll ? tierItems.length - 1 : 0;
+    }
+
+    const reorderedTier = arrayMove(tierItems, oldIndex, newIndex);
+    let tierCursor = 0;
+    const reordered = currentItems.map((t) =>
+      t.sticky === draggedItem.sticky ? reorderedTier[tierCursor++] : t,
+    );
     setLocalIncompleteTodos(reordered);
 
-    const prev = newIndex > 0 ? reordered[newIndex - 1].position : null;
+    const prev = newIndex > 0 ? reorderedTier[newIndex - 1].position : null;
     const next =
-      newIndex < reordered.length - 1 ? reordered[newIndex + 1].position : null;
+      newIndex < reorderedTier.length - 1
+        ? reorderedTier[newIndex + 1].position
+        : null;
     const newPosition = generateKeyBetween(prev ?? null, next ?? null);
 
     updateTodo.mutate({

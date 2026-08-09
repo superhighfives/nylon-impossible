@@ -113,6 +113,9 @@ export const todos = sqliteTable(
     // Source task id when this todo was imported from Google Tasks. Null for
     // todos created in-app. Used to dedupe on re-import.
     googleTaskId: text("google_task_id"),
+    // Sticky todos render above non-sticky ones and are reordered within
+    // their own tier only. Clears back to false when the todo is completed.
+    sticky: integer("sticky", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [
     index("idx_todos_user_id").on(table.userId),

@@ -11,7 +11,7 @@ struct TodoEditSheet: View {
     let todo: TodoItem
     let apiService: APIService?
     let subtasks: [TodoItem]
-    var onSave: (String, String?, Date?, Recurrence?) -> Void
+    var onSave: (String, String?, Date?, Recurrence?, Bool) -> Void
     var onCancel: () -> Void
     var onAddSubtask: (String) -> Void
     var onToggleSubtask: (TodoItem) -> Void
@@ -24,6 +24,7 @@ struct TodoEditSheet: View {
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var recurrenceFrequency: RecurrenceFrequency?
+    @State private var sticky: Bool
     @State private var urls: [APITodoUrl] = []
     @State private var research: APIResearch?
     @State private var isLoadingUrls: Bool = false
@@ -36,7 +37,7 @@ struct TodoEditSheet: View {
         apiService: APIService? = nil,
         initialUrls: [APITodoUrl] = [],
         subtasks: [TodoItem] = [],
-        onSave: @escaping (String, String?, Date?, Recurrence?) -> Void,
+        onSave: @escaping (String, String?, Date?, Recurrence?, Bool) -> Void,
         onCancel: @escaping () -> Void,
         onAddSubtask: @escaping (String) -> Void = { _ in },
         onToggleSubtask: @escaping (TodoItem) -> Void = { _ in },
@@ -58,6 +59,7 @@ struct TodoEditSheet: View {
         _hasDueDate = State(initialValue: todo.dueDate != nil)
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
+        _sticky = State(initialValue: todo.sticky)
         _urls = State(initialValue: initialUrls)
         let initialResearch: APIResearch?
         if let researchId = todo.researchId {
@@ -117,6 +119,14 @@ struct TodoEditSheet: View {
                     Text("Due Date")
                 }
                 
+                // Sticky — pins the todo above non-sticky ones. Instantly
+                // reversible, no confirm needed.
+                Section {
+                    Toggle("Sticky", isOn: $sticky)
+                } footer: {
+                    Text("Pinned todos always show above non-pinned ones.")
+                }
+
                 // Recurrence — disabled until a due date is set, since the
                 // rule has no anchor without one. Hidden when the todo has
                 // subtasks: recurrence and subtasks are mutually exclusive.
@@ -315,7 +325,7 @@ struct TodoEditSheet: View {
             ? recurrenceFrequency.map { Recurrence(frequency: $0) }
             : nil
 
-        onSave(trimmedTitle, notesValue, dueDateValue, recurrenceValue)
+        onSave(trimmedTitle, notesValue, dueDateValue, recurrenceValue, sticky)
     }
 
     /// "Weekly on Wednesday" — anchor is derived from the due date so the user
@@ -537,7 +547,7 @@ struct UrlRow: View {
             item.dueDate = Date().addingTimeInterval(86400) // Tomorrow
             return item
         }(),
-        onSave: { _, _, _, _ in },
+        onSave: { _, _, _, _, _ in },
         onCancel: {}
     )
     .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))

@@ -119,6 +119,7 @@ export function useCreateTodo() {
         recurrence: input.recurrence ?? null,
         aiStatus: null,
         needsInput: false,
+        sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         research: null,
@@ -216,6 +217,7 @@ export function useUpdateTodo() {
               ...(input.completedAt !== undefined && {
                 completedAt: input.completedAt?.toISOString() ?? null,
               }),
+              ...(input.sticky !== undefined && { sticky: input.sticky }),
             };
             // Optimistic recurrence advance: if this update marks a recurring
             // todo complete, roll dueDate forward, keep completed = false, and
@@ -231,6 +233,9 @@ export function useUpdateTodo() {
                 anchor,
                 new Date(),
               ).toISOString();
+            }
+            if (becameComplete && merged.sticky) {
+              merged.sticky = false;
             }
             return merged;
           }),
@@ -445,6 +450,7 @@ export function useSmartCreate() {
         recurrence: null,
         aiStatus: null,
         needsInput: false,
+        sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         research: null,

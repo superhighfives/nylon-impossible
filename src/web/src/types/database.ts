@@ -38,6 +38,7 @@ export interface UpdateTodoInput {
   // Set explicitly only to undo a completed repeat (clear it to null). On a
   // normal completion the server stamps this itself.
   completedAt?: Date | null;
+  sticky?: boolean;
 }
 
 /** Fetch status for URL metadata */
@@ -121,6 +122,7 @@ export interface TodoWithUrls {
   recurrence: Recurrence | null;
   aiStatus: AiStatus | null;
   needsInput: boolean;
+  sticky: boolean;
   createdAt: string;
   updatedAt: string;
   research: SerializedResearch | null;

@@ -67,6 +67,10 @@ final class TodoItem {
     var researchedAt: Date?
     var researchCreatedAt: Date?      // When research was started (for stale detection)
     var needsInput: Bool = false  // Agent has posted a question awaiting the user's reply
+    // Sticky todos render above non-sticky ones and are reordered within their
+    // own tier only. Clears to false when the todo is completed. Subtasks
+    // never get this — no row toggle, no edit-sheet option.
+    var sticky: Bool = false
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
     // AI actions the user requested when creating the todo, but which can only
     // run once the todo exists on the server. Set locally at creation and fired
@@ -101,6 +105,7 @@ final class TodoItem {
         self.researchedAt = nil
         self.researchCreatedAt = nil
         self.needsInput = false
+        self.sticky = false
         self.pendingUrls = []
         self.pendingEnrich = false
         self.pendingResearch = false

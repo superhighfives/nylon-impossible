@@ -1,8 +1,8 @@
 ---
 title: Sticky Todos
-status: Ready
+status: Complete
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-08-08
 ---
 
 ## Problem
@@ -80,6 +80,46 @@ identical apart from which neighbor set it reads.
   homepage card) orders by `position` directly — add `sticky` as the primary
   `ORDER BY` column there (`orderBy(desc(todos.sticky), asc(todos.position))`)
   so the Gmail panel's list reflects sticky-first too.
+- **Deviation from plan**: `src/api/src/handlers/sync.ts` (`POST
+  /todos/sync`, the offline-sync endpoint iOS's `SyncService` actually talks
+  to) wasn't listed above but needs the same threading as any other
+  client-writable field (`completed`, `dueDate`, `notes`) — unlike
+  `needsInput` (server-only), `sticky` is user-toggled from iOS too, so it
+  must round-trip through sync or an offline sticky toggle would never
+  persist. Added `sticky` to `syncRequestSchema`, the update-merge branch
+  (with the same completing-clears-sticky rule as the REST path), the
+  insert-on-create branch, and `serializeTodo`.
+- **Deviation from plan**: `src/api/src/handlers/import-google-tasks.ts`'s
+  `TODO_INSERT_COLUMNS` bound-param accounting (D1's 100-param cap; see
+  `plans/done/*` notes on this) needed bumping from 12 to 13 — `sticky` is
+  another NOT NULL defaulted column Drizzle binds on every insert row even
+  though the import path never sets it explicitly, same as `needsInput`.
+  `INSERT_CHUNK_SIZE` dropped from 8 to 7 rows per statement. Caught by the
+  existing `imports more tasks than fit in one D1 insert chunk` test failing
+  with a D1 param-overflow 500 after adding the column.
+- **Deviation from plan (iOS)**: `SyncService.swift`'s two merge points
+  handle `sticky` differently from the plan's literal
+  `local.sticky = remote.sticky ?? false` (which mirrors `needsInput`'s
+  unconditional, server-always-wins overwrite). `needsInput` is
+  server/AI-only — the client never sets it directly — so overwriting it
+  unconditionally on every sync is safe. `sticky` is user-toggled from the
+  client (like `title`/`completed`/`dueDate`), so it needed the same
+  last-write-wins resolution as those fields: it's set inside the
+  `if remote.updatedAt > local.updatedAt` block (existing-todo merge) rather
+  than unconditionally, so a newer unsynced local toggle isn't clobbered by
+  a stale remote value. The create-new-todo branch (`todo.sticky = remote.sticky
+  ?? false`) matches the plan as written since there's no local state to
+  protect there. Also threaded `sticky` through `TodoChange`/`APITodo`
+  (`APIService.swift`) and the outbound `gatherLocalChanges`/
+  `BackgroundSyncService.sync` serialize paths, which the plan's line
+  references implied but didn't spell out as separate edits.
+- **Deviation from plan (iOS UI)**: the pin toggle button
+  (`TodoItemRow.swift`) was placed as a sibling in the row's outer `HStack`
+  rather than inside `indicatorBadges` — `indicatorBadges` renders inside the
+  same `Button` that opens the edit sheet on tap, and SwiftUI doesn't
+  reliably route taps to a nested interactive `Button` inside another
+  `Button`'s label. Placing it as a sibling (like the checkbox) avoids that
+  and keeps it independently tappable.
 
 ### 3. Web — types, sort, drag reorder
 
@@ -152,22 +192,25 @@ identical apart from which neighbor set it reads.
 
 ## Acceptance criteria
 
-- [ ] Toggling the row-level pin icon (web and iOS) marks a todo sticky
+- [x] Toggling the row-level pin icon (web and iOS) marks a todo sticky
       instantly (optimistic, no confirm) and it moves to the top tier of the
-      list without a page/app reload.
-- [ ] The expanded view (web) / edit sheet (iOS) has an explicit sticky
+      list without a page/app reload. **Verified in-browser for web**; iOS
+      implemented but not compiled/run — see Architecture note below.
+- [x] The expanded view (web) / edit sheet (iOS) has an explicit sticky
       toggle that reflects and controls the same flag as the row button.
-- [ ] Sticky incomplete todos always render above non-sticky incomplete
+      **Verified in-browser for web** (bidirectional: row ↔ panel).
+- [x] Sticky incomplete todos always render above non-sticky incomplete
       todos, on web, iOS, and the Gmail add-on homepage card.
-- [ ] Dragging to reorder only moves a todo within its own tier — a sticky
+- [x] Dragging to reorder only moves a todo within its own tier — a sticky
       todo can't be dropped below a non-sticky one, and dragging a
       non-sticky todo can't place it above a sticky one.
-- [ ] Un-stickying a todo drops it out of the sticky tier into its normal
-      position-sorted place among non-sticky todos.
-- [ ] Completing a sticky todo unsticks it (`sticky` clears to `false`) on
+- [x] Un-stickying a todo drops it out of the sticky tier into its normal
+      position-sorted place among non-sticky todos. **Verified in-browser**.
+- [x] Completing a sticky todo unsticks it (`sticky` clears to `false`) on
       both web and iOS, and via the Gmail add-on's toggle action — it then
-      sorts as an ordinary completed todo, not pinned.
-- [ ] Subtasks never get a sticky toggle or sticky sort behavior — no row
+      sorts as an ordinary completed todo, not pinned. **Verified in-browser
+      for web**, including the recurring-todo completion path.
+- [x] Subtasks never get a sticky toggle or sticky sort behavior — no row
       button, no expanded-view/edit-sheet option, on either platform. Existing
       subtask position scoping (`parentId`-scoped drag) is unaffected.
 
@@ -193,3 +236,87 @@ something enforced in code.
 - A cap or warning UI for "too many sticky todos."
 - Any cross-device "sticky todos" summary/count surface — this is purely a
   sort-order + toggle feature, no new views.
+
+## Overview
+
+Added a `sticky` boolean to `todos`, threaded end-to-end through the same
+schema → API → web → iOS path `needsInput` established as the precedent for
+a new boolean flag. Sticky todos render in their own tier above non-sticky
+incomplete todos on web, iOS, and the Gmail add-on homepage card; dragging
+reorders within a tier only; completing a todo clears `sticky`. Toggled from
+a pin icon in the row's action cluster and from an explicit toggle in the
+expanded/edit view, on both platforms.
+
+## Architecture
+
+- **Schema/migration**: `sticky` added to `src/shared/src/schema.ts`'s
+  `todos` table, migration `0022_add_sticky_to_todos.sql`. `drizzle-kit
+  generate` couldn't run non-interactively in this environment (needs a
+  TTY for its column-conflict prompt), so the migration `.sql` and its
+  `meta/` snapshot/journal entries were hand-authored following the existing
+  file pattern, then verified by running `pnpm db:generate` for real
+  afterward (confirmed it diffed cleanly against the new snapshot) and
+  applying the migration to a local D1 instance.
+- **API**: `sticky` threaded through `handlers/todos.ts` (`updateTodo`'s
+  patch, `serializeTodo`, completion-clears-sticky) and
+  `lib/todos-core.ts` (`setTodoCompleted`'s clear, `listOpenTodos`'s
+  `ORDER BY sticky DESC, position ASC` for the Gmail add-on card) as
+  specced. Also threaded through `handlers/sync.ts` (request schema,
+  update-merge, insert-on-create, response serialization) — not called out
+  in the original plan, but required since `sticky` is client-writable from
+  iOS and `sync.ts` is the actual endpoint iOS's offline sync talks to.
+- **Web**: types (`types/database.ts`), validation (`lib/validation.ts`),
+  server functions (`server/todos.ts`, including its own
+  completion-clears-sticky since web doesn't route through the API's
+  `updateTodo` handler), optimistic updates (`hooks/useTodos.ts`), sort +
+  drag scoping and the pin toggle/expanded-view toggle
+  (`TodoList.tsx`, `TodoItemExpanded.tsx`). Manually verified in-browser:
+  row toggle, expanded-panel toggle (bidirectional with the row), sort
+  reorder, and completion-clears-sticky (including the recurring-todo
+  completion path, which stamps `completedAt` without setting
+  `completed: true`).
+- **iOS**: `sticky` added to `TodoItem` (SwiftData model), `APITodo`/
+  `TodoChange` (`APIService.swift`), both `SyncService.swift` merge
+  directions and the outbound serialize path, `TodoViewModel.swift`
+  (`sortedTodos`, `updateTodo`, new `toggleSticky`, completion-clears-sticky
+  in `toggleTodo`), a pin-icon row button (`TodoItemRow.swift`), and a
+  `Toggle("Sticky", ...)` in `TodoEditSheet.swift`.
+
+### Deviations from the plan
+
+1. **`sync.ts` needed `sticky` threading the plan didn't call out** (see
+   above) — the plan's API section only listed `handlers/todos.ts` and
+   `lib/todos-core.ts`.
+2. **iOS `SyncService.swift` merge semantics differ from the plan's literal
+   instruction.** The plan said to mirror `needsInput`'s unconditional
+   `local.sticky = remote.sticky ?? false` overwrite on every sync. But
+   `needsInput` is server/AI-only (the client never sets it directly), so
+   unconditional overwrite is safe for it; `sticky` is user-toggled from the
+   client like `title`/`completed`/`dueDate`. It was placed inside the
+   existing `if remote.updatedAt > local.updatedAt` last-write-wins block
+   instead, so a newer unsynced local toggle isn't clobbered by a stale
+   remote value on the next sync round. The create-new-todo branch does
+   match the plan as written (no local state to protect there).
+3. **iOS pin button placed as a row sibling, not inside `indicatorBadges`.**
+   The plan pointed at `TodoItemRow.swift:42-48` (the due-date/recurrence
+   `HStack`), but that `HStack` renders inside the same `Button` that opens
+   the edit sheet on tap — SwiftUI doesn't reliably route taps to a nested
+   interactive `Button` inside another `Button`'s label. The pin toggle was
+   added as a sibling of that content `Button` in the row's outer `HStack`
+   instead (same pattern as the checkbox), so it's independently tappable.
+4. **`import-google-tasks.ts`'s D1 bound-param chunk size needed updating.**
+   `sticky` is another NOT NULL defaulted column Drizzle binds on every
+   insert row even though the import path never sets it — the same
+   "hidden param" issue `needsInput` already caused there. Caught by the
+   existing `imports more tasks than fit in one D1 insert chunk` test
+   failing with a param-overflow 500 after adding the column;
+   `TODO_INSERT_COLUMNS` bumped 12 → 13, `INSERT_CHUNK_SIZE` 8 → 7 rows.
+5. **iOS was not compiled or run.** Same environment limitation as prior
+   iOS work in this repo (`xcodebuild` fails — iOS 26.5 SDK isn't
+   installed, only 26.4 is available). All iOS changes were written by
+   inspection and cross-referenced for signature consistency across every
+   call site (`TodoChange`/`APITodo` construction, `onSave`/`updateTodo`
+   signatures in `TodoItemRow.swift`, `TodoEditSheet.swift`,
+   `ContentView.swift`, and their `#Preview`/test call sites), and
+   SwiftLint ran clean on every changed file, but a real compile and
+   on-device/simulator check are still needed before shipping to iOS users.
