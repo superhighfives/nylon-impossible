@@ -347,6 +347,64 @@ export function useDeleteTodo() {
 }
 
 /**
+ * Hook to delete a todo via the per-todo agent's confirm-delete flow —
+ * distinct from `useDeleteTodo` (which calls the plain server-function
+ * delete path) because this one goes through src/api's
+ * `POST /todos/:id/agent/confirm-delete`, the human-only endpoint the agent
+ * itself has no tool path to (see ChatSection / the propose-delete tool).
+ * Same optimistic-removal shape as `useDeleteTodo` otherwise.
+ */
+export function useConfirmTodoAgentDelete() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(
+        `${API_URL}/todos/${todoId}/agent/confirm-delete`,
+        { method: "POST", headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json();
+    },
+    onMutate: async (todoId) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+
+      if (previousTodos) {
+        queryClient.setQueryData<TodoWithUrls[]>(
+          TODOS_QUERY_KEY,
+          previousTodos.filter((todo) => todo.id !== todoId),
+        );
+      }
+
+      return { previousTodos };
+    },
+    onError: (err, _todoId, context) => {
+      Sentry.captureException(err, {
+        tags: { mutation: "confirmAgentDelete" },
+      });
+      toast.error(messageFromError(err, "Couldn't delete todo"));
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
  * Hook to fetch a single todo with its URLs.
  * Only fetches when todoId is provided and enabled.
  */

@@ -32,6 +32,7 @@ import { ConversationSection } from "./ConversationSection";
 import { ResearchSection } from "./ResearchSection";
 import { SubtaskSection } from "./SubtaskSection";
 import { SuggestionsSection } from "./SuggestionsSection";
+import { TodoAgentChat } from "./TodoAgentChat";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 import { EmailPreviewCard } from "./ui/EmailPreviewCard";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
@@ -535,6 +536,13 @@ export function TodoItemExpanded({
 
       {/* Conversation Section — agent questions and the user's replies */}
       <ConversationSection todo={todo} />
+
+      {/* Chat — talk to this todo's own agent (research, edits, subtasks,
+          completion; delete only ever proposed, never autonomous). Distinct
+          from the Conversation section above: this is user-opened, not
+          agent-initiated, and backed by src/todo-agent rather than
+          todoMessages. Gated the same as the other AI actions. */}
+      {aiAvailable && <TodoAgentChat todo={todo} />}
 
       {/* URLs (user-provided, not research sources) */}
       {todo.urls && todo.urls.filter((url) => !url.researchId).length > 0 && (

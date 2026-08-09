@@ -510,7 +510,50 @@ well on web.
 7. **Web chat UI** — a new "Chat" section in `TodoItemExpanded.tsx` (or a
    sibling component), message list + input, wired to the two routes above.
    No optimistic local state needed beyond a sending spinner — the model's
-   turn is inherently async. **Not started.**
+   turn is inherently async. **Done 2026-08-09.**
+
+   `TodoAgentChat.tsx` mounted in `TodoItemExpanded.tsx` right after
+   `ConversationSection`, gated by the same `aiAvailable` flag as the other
+   AI actions. `useTodoAgent.ts` has the two chat-specific hooks
+   (`useTodoAgentMessages` — polls `GET .../agent/messages` at 2s while any
+   turn looks unsettled, stops once everything has a reply or a failure;
+   `useSendTodoAgentMessage` — posts `{ message }`, fire-and-forget
+   admission, reply arrives via the poll). `useConfirmTodoAgentDelete`
+   landed in `useTodos.ts` instead, alongside `useDeleteTodo` (same
+   optimistic-removal shape, just a different endpoint) rather than in the
+   new file — it's a todo-deletion concern more than a chat concern.
+
+   Propose-delete is read straight off the conversation: the tool's
+   `useDataWriter("pendingDelete", true)` write lands as a
+   `data-pendingDelete` part on the AI-SDK-shaped assistant message (per
+   Flue's documented "`data-<name>`" convention); the UI checks only the
+   *last* message for it, so the confirm bar disappears on its own once the
+   conversation moves past that turn — no explicit cancel/clear call needed.
+   Confirming reuses the existing `ConfirmDialog` component and calls
+   `POST /todos/:id/agent/confirm-delete` (step 6).
+
+   Kept intentionally lean per the plan's own steer (no optimistic local
+   state beyond the spinner): message list, input, a "Thinking…" indicator,
+   inline per-message error text sourced from `settlements[].error` (the
+   same field the step-6 live check showed already carries a readable AI
+   Gateway failure), and the delete-confirm bar. No streaming token-by-token
+   render — it polls until settled, matching `useReplyToTodo`'s existing
+   pattern for the (different, narrower) clarifying-question flow rather
+   than introducing a new realtime mechanism for one feature.
+
+   Test coverage: extended `TodoItemExpanded.test.tsx` with a
+   `TodoAgentChat` stub mock (the existing AI-enabled tests started
+   exercising it once `aiAvailable` renders it, and it needs `useAuth()` —
+   no `ClerkProvider` in that test's tree, same reason `ConversationSection`
+   and `SuggestionsSection` are already stubbed there); new
+   `useTodoAgent.test.ts` covers the 404-as-empty-conversation handling,
+   the disabled-query no-fetch case, and the send mutation's request shape
+   and error path. Full component-level interaction (typing, sending,
+   watching a reply render) wasn't separately tested — covered by the
+   hook-level tests plus the same live-Worker verification approach used
+   in steps 4/6, not by a browser click-through (the AI Gateway credit
+   constraint from steps 4/5/6 means a real reply still can't be observed
+   end-to-end regardless of which layer is doing the checking).
 
 ### Files to create
 
@@ -526,13 +569,15 @@ well on web.
 - `src/api/src/handlers/todo-agent.ts` — `POST /todos/:id/agent/message`,
   `GET /todos/:id/agent/messages`, `POST /todos/:id/agent/confirm-delete`
   (the last is `deleteTodo` reused on a second route, not new code). **Done.**
-- `src/web/src/components/TodoAgentChat.tsx` (or similar) — chat UI. **Not
-  yet — step 7.**
-- `src/web/src/hooks/useTodoAgent.ts` — send/poll hooks. **Not yet — step 7.**
+- `src/web/src/components/TodoAgentChat.tsx` — chat UI. **Done.**
+- `src/web/src/hooks/useTodoAgent.ts` — send/poll hooks (`useConfirmTodoAgentDelete`
+  landed in `useTodos.ts` instead — see step 7's note). **Done.**
 - `src/api/test/integration/agent-internal.test.ts` — not in the original
   file list; added alongside the internal route.
 - `src/api/test/integration/todo-agent.test.ts` — not in the original file
   list; added alongside the dispatch/read/confirm-delete routes.
+- `src/web/src/hooks/__tests__/useTodoAgent.test.ts` — not in the original
+  file list; added alongside the new hooks.
 
 ### Files to modify
 
@@ -553,7 +598,14 @@ well on web.
 - `src/api/wrangler.test.jsonc` — add `INTERNAL_AGENT_SECRET` test var.
   **Done** (not in the original file list).
 - `src/web/src/components/TodoItemExpanded.tsx` — mount the chat section.
-  **Not yet — step 7.**
+  **Done.**
+- `src/web/src/hooks/useTodos.ts` — add `useConfirmTodoAgentDelete` (not in
+  the original file list — see step 7's note on why it landed here instead
+  of `useTodoAgent.ts`). **Done.**
+- `src/web/src/components/__tests__/TodoItemExpanded.test.tsx` — stub-mock
+  `TodoAgentChat` (not in the original file list — the existing AI-enabled
+  tests now render it, and it needs `useAuth()` with no `ClerkProvider` in
+  that test's tree). **Done.**
 
 ## Acceptance criteria
 
@@ -568,18 +620,40 @@ well on web.
       `useModel()`.
 - [ ] Opening a todo's Chat section and sending a message gets a reply from
       the model, using the account's existing Workers AI binding (no new
-      Anthropic key/secret).
+      Anthropic key/secret). **Built, not demonstrated end-to-end.** Every
+      layer (UI → src/api proxy → Service Binding → todo-agent → Workers AI)
+      has been verified individually — steps 4/6 confirmed the model call
+      itself works (a real "PONG" reply, before the account's AI Gateway ran
+      out of credit) and step 6 confirmed send/read wiring live. What hasn't
+      happened is one unbroken click-through in the actual browser UI,
+      because the AI Gateway 402 from steps 4–6 would just make it fail at
+      the same point regardless. Re-check this box once the account has AI
+      Gateway credit (or BYOK) — this is an account/billing gate, not
+      remaining engineering work.
 - [ ] The agent can update title/notes/due date/priority and complete the
       todo directly from the conversation; changes appear live in an open
       web client via the existing sync path (same `notifySync` as REST
-      edits).
-- [ ] Deleting the todo is never autonomous — the agent can only propose it,
+      edits). **Built and unit-tested** (`updateTodoCore`/`setTodoCompleted`
+      calling `notifySync`, tool layer wired to the internal routes,
+      `agent-internal.test.ts` covers each mutation) **but not observed via
+      an actual model tool call** — same AI Gateway gate as above; a tool
+      only runs if the model decides to call it mid-turn. No priority
+      (dropped, see the note at the top of this plan).
+- [x] Deleting the todo is never autonomous — the agent can only propose it,
       and a distinct user confirmation is required to actually delete.
-- [ ] The existing `todoMessages`/`POST /todos/:id/reply` clarifying-question
-      flow is untouched and still works.
-- [ ] `src/api` still deploys via plain `wrangler deploy` — no Vite build
-      step was forced onto it.
-- [ ] iOS is unaffected (no agent surface shipped there this round).
+      Structural, not just observed behavior: no tool maps to delete,
+      `propose_delete` only sets a flag, `POST .../confirm-delete` is a
+      separate human-only route the model has no path to.
+- [x] The existing `todoMessages`/`POST /todos/:id/reply` clarifying-question
+      flow is untouched and still works. Not modified by any step of this
+      plan; its full test suite (reply/dismiss-question handlers,
+      `ConversationSection.tsx`) still passes unchanged.
+- [x] `src/api` still deploys via plain `wrangler deploy` — no Vite build
+      step was forced onto it. `src/api/package.json`'s `deploy` script is
+      still bare `wrangler deploy`; Vite/`@flue/vite` only exist in
+      `src/todo-agent`'s own `package.json`.
+- [x] iOS is unaffected (no agent surface shipped there this round). No
+      `src/ios` files touched by any step of this plan.
 
 ## Dependencies
 
