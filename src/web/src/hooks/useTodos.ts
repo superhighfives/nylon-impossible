@@ -234,6 +234,9 @@ export function useUpdateTodo() {
                 new Date(),
               ).toISOString();
             }
+            if (becameComplete && merged.sticky) {
+              merged.sticky = false;
+            }
             return merged;
           }),
         );
