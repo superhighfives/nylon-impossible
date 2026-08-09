@@ -11,7 +11,7 @@
     "check": "pnpm web:check && pnpm api:check && pnpm admin:check && pnpm todo-agent:check",
     "check:fix": "pnpm web:check:fix && pnpm api:check:fix && pnpm admin:check:fix && pnpm todo-agent:check:fix",
     "typecheck": "pnpm web:typecheck && pnpm api:typecheck && pnpm admin:typecheck && pnpm todo-agent:typecheck",
-    "deploy": "pnpm web:deploy && pnpm api:deploy && pnpm todo-agent:deploy",
+    "deploy": "pnpm todo-agent:deploy && pnpm api:deploy && pnpm web:deploy",
     "db:migrate": "CI=true wrangler d1 migrations apply nylon-impossible-db --local --persist-to .wrangler/state -c src/api/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply nylon-impossible-db --remote -c src/api/wrangler.jsonc",
     "db:generate": "drizzle-kit generate --config src/api/drizzle.config.ts",
