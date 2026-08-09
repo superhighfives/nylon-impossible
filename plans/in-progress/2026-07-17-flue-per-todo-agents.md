@@ -343,7 +343,34 @@ well on web.
 3. **`updateTodoCore` extraction** — pull the update logic out of
    `handlers/todos.ts` into `src/api/src/lib/todos-core.ts`, alongside
    `setTodoCompleted`; `updateTodo` REST handler becomes a thin wrapper.
-   Keep existing REST tests green.
+   Keep existing REST tests green. **Done 2026-08-09.**
+
+   Extracted as designed: `updateTodoCore(db, env, userId, todoId, patch)`
+   in `todos-core.ts`, taking an `UpdateTodoPatch` (no zod — validation stays
+   the caller's job, matching how `setTodoCompleted` already splits
+   validation from mutation). `updateTodo` (REST) is now a thin wrapper:
+   parse with `updateTodoSchema`, call the core function, 404 on `null`,
+   serialize otherwise. All prior behavior carried over verbatim (recurrence
+   rollover, subtask/recurrence mutual exclusion, needsInput clearing,
+   sticky-unsticks-on-complete, completion cascade, title-change re-fires
+   research).
+
+   One deliberate behavior change, not just a refactor: `updateTodoCore` now
+   calls `notifySync` at the end (previously, REST's `updateTodo` never did —
+   direct field edits didn't poke the `USER_SYNC` DO at all, unlike
+   `setTodoCompleted`, `createSmartTodo`, and every AI-driven mutation path,
+   which already did). This was necessary, not incidental: the todo-agent's
+   tools (step 4) are a mutator that isn't itself a polling client, so
+   without this, agent-driven edits would be invisible to any already-open
+   web/iOS session until its next poll. Extending it to REST too just makes
+   direct edits behave the same way completion already did — best-effort,
+   swallows its own errors, so this can't newly fail a request. All 360
+   pre-existing API tests plus 5 new `updateTodoCore` unit tests
+   (`todos-core.test.ts`, mirroring `setTodoCompleted`'s coverage: ownership,
+   a plain field patch, recurrence rollover, subtask cascade, needsInput
+   clearing) pass. Title-change research re-fire was already untested before
+   this extraction (REST or core) — left that way rather than growing test
+   infra unrelated to this step's goal.
 4. **Tool layer** — `src/todo-agent/tools/todo-tools.ts`: `updateTodo`,
    `addSubtask`, `setDueDate`, `setPriority`, `completeTodo`,
    `proposeDelete`. Each tool's `run()` does a service-binding fetch to a new
