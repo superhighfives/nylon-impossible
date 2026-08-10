@@ -34,6 +34,12 @@ vi.mock("../SuggestionsSection", () => ({
   ),
 }));
 
+vi.mock("../TodoAgentChat", () => ({
+  TodoAgentChat: ({ todo }: { todo: { id: string } }) => (
+    <div data-testid="todo-agent-chat">chat:{todo.id}</div>
+  ),
+}));
+
 import { useUser } from "@/hooks/useUser";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {

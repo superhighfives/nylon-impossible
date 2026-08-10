@@ -1,5 +1,4 @@
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
-import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -9,14 +8,13 @@ import {
   eq,
   getDb,
   inArray,
-  todoMessages,
   todoResearch,
   todos,
   todoUrls,
-  users,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
-import type { Env, ResearchJobMessage } from "../types";
+import { updateTodoCore } from "../lib/todos-core";
+import type { Env } from "../types";
 
 const recurrenceSchema = z.object({
   frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
@@ -205,154 +203,10 @@ export async function updateTodo(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  // Check ownership
-  const [existing] = await db
-    .select()
-    .from(todos)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
+  const updated = await updateTodoCore(db, c.env, userId, todoId, parsed.data);
 
-  if (!existing) {
+  if (!updated) {
     return apiError(c, "todo_not_found");
-  }
-
-  const updatedAt = parsed.data.updatedAt ?? new Date();
-  const updates: Record<string, unknown> = {
-    updatedAt,
-  };
-
-  if (parsed.data.title !== undefined) updates.title = parsed.data.title;
-  if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes;
-  if (parsed.data.completed !== undefined)
-    updates.completed = parsed.data.completed;
-  if (parsed.data.position !== undefined)
-    updates.position = parsed.data.position;
-  if (parsed.data.dueDate !== undefined) updates.dueDate = parsed.data.dueDate;
-  if (parsed.data.recurrence !== undefined)
-    updates.recurrence = parsed.data.recurrence;
-  // completedAt is client-set only to undo a completed repeat (null); a normal
-  // completion stamps it server-side just below.
-  if (parsed.data.completedAt !== undefined)
-    updates.completedAt = parsed.data.completedAt;
-  if (parsed.data.sticky !== undefined) updates.sticky = parsed.data.sticky;
-
-  // Server-canonical advance: when a recurring todo is being marked complete
-  // for the first time, advance dueDate to the next future occurrence and keep
-  // completed = false instead of persisting the completion. The client does the
-  // same advance optimistically; the server's result is authoritative.
-  const completingRow =
-    parsed.data.completed === true && existing.completed === false;
-  // Recurrence and subtasks are mutually exclusive. A subtask never recurs, and
-  // a todo with children can't recur. Enforce server-side.
-  let recurrence =
-    parsed.data.recurrence !== undefined
-      ? parsed.data.recurrence
-      : existing.recurrence;
-  if (recurrence) {
-    const isSubtask = existing.parentId != null;
-    let hasChildren = false;
-    if (!isSubtask) {
-      const [child] = await db
-        .select({ id: todos.id })
-        .from(todos)
-        .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)))
-        .limit(1);
-      hasChildren = !!child;
-    }
-    if (isSubtask || hasChildren) recurrence = null;
-  }
-  if (parsed.data.recurrence !== undefined) updates.recurrence = recurrence;
-  const anchor =
-    parsed.data.dueDate !== undefined ? parsed.data.dueDate : existing.dueDate;
-  if (completingRow && recurrence && anchor) {
-    updates.completed = false;
-    updates.completedAt = new Date();
-    updates.dueDate = nextDueDate(recurrence, anchor, new Date());
-  }
-
-  // Completing a todo with an open question clears the question automatically.
-  if (completingRow && existing.needsInput) {
-    updates.needsInput = false;
-    await db
-      .update(todoMessages)
-      .set({ awaitingReply: false })
-      .where(
-        and(
-          eq(todoMessages.todoId, todoId),
-          eq(todoMessages.awaitingReply, true),
-        ),
-      );
-  }
-
-  // Completing a sticky todo unsticks it — it sorts as an ordinary completed
-  // todo, not pinned.
-  if (completingRow && existing.sticky) updates.sticky = false;
-
-  await db
-    .update(todos)
-    .set(updates)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
-
-  // Completion cascade: toggling a top-level todo's completed flag cascades to
-  // its subtasks (checking completes them; unchecking reopens them). Subtasks
-  // never recur, so completedAt stays null like ordinary completions.
-  if (
-    existing.parentId == null &&
-    parsed.data.completed !== undefined &&
-    parsed.data.completed !== existing.completed
-  ) {
-    await db
-      .update(todos)
-      .set({ completed: parsed.data.completed, updatedAt })
-      .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)));
-  }
-
-  const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
-
-  // Re-fire research when the title changes and research already exists
-  const titleChanged =
-    parsed.data.title !== undefined && parsed.data.title !== existing.title;
-
-  if (titleChanged) {
-    const [research] = await db
-      .select({ id: todoResearch.id, researchType: todoResearch.researchType })
-      .from(todoResearch)
-      .where(eq(todoResearch.todoId, todoId));
-
-    if (research) {
-      await db.delete(todoUrls).where(eq(todoUrls.researchId, research.id));
-      await db.delete(todoResearch).where(eq(todoResearch.id, research.id));
-
-      const newResearchId = crypto.randomUUID();
-      const now = new Date();
-      await db.insert(todoResearch).values({
-        id: newResearchId,
-        todoId,
-        researchType: research.researchType,
-        status: "pending",
-        // Title-edit changed the topic — discard the previous searchQuery
-        // and let this run fall back to the new title until the user
-        // re-enriches. (No LLM call here to keep edits cheap.)
-        searchQuery: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      const [user] = await db
-        .select({ location: users.location })
-        .from(users)
-        .where(eq(users.id, userId));
-
-      const query = parsed.data.title ?? existing.title;
-
-      await c.env.RESEARCH_QUEUE.send({
-        todoId,
-        userId,
-        query,
-        researchType: research.researchType,
-        researchId: newResearchId,
-        userLocation: user?.location ?? null,
-      } satisfies ResearchJobMessage);
-    }
   }
 
   return c.json(serializeTodo(updated));

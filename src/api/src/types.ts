@@ -47,6 +47,17 @@ export type Env = {
     // state (prevents binding an attacker's Gmail identity to a victim's
     // account). Set via `wrangler secret put`, so it's absent from wrangler.jsonc.
     GMAIL_ADDON_STATE_SECRET?: string;
+    // Shared secret checked on /internal/agent/* (the todo-agent Worker's
+    // tool-call routes). A Cloudflare custom domain routes every path on
+    // this Worker, not just the ones explicitly listed here — a Service
+    // Binding caller isn't otherwise distinguishable from the public
+    // internet, so this route group needs its own auth like the Gmail
+    // add-on does. Same value set via `wrangler secret put` on both this
+    // Worker and src/todo-agent.
+    INTERNAL_AGENT_SECRET?: string;
+    // Service Binding to src/todo-agent's Worker — its POST/GET/:id surface
+    // (Flue's own createAgentRouter) sends/reads the per-todo agent chat.
+    TODO_AGENT: Fetcher;
   };
   Variables: {
     userId: string;

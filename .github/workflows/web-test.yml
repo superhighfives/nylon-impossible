@@ -30,6 +30,7 @@ jobs:
             src:
               - 'src/web/**'
               - 'src/api/**'
+              - 'src/todo-agent/**'
               - 'package.json'
               - '.github/workflows/web-test.yml'
 
@@ -55,6 +56,10 @@ jobs:
       - name: Lint & typecheck Web
         if: steps.changes.outputs.src == 'true'
         run: pnpm web:check && pnpm web:typecheck
+
+      - name: Lint & typecheck todo-agent
+        if: steps.changes.outputs.src == 'true'
+        run: pnpm todo-agent:check && pnpm todo-agent:typecheck
 
       - name: Test API
         if: steps.changes.outputs.src == 'true'
