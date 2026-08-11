@@ -13,6 +13,7 @@ import {
   todoUrls,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
+import { getSystemListId } from "../lib/lists";
 import { updateTodoCore } from "../lib/todos-core";
 import type { Env } from "../types";
 
@@ -24,6 +25,7 @@ const recurrenceSchema = z.object({
 const createTodoSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().min(1).max(500),
+  listId: z.string().uuid().optional(),
 });
 
 const updateTodoSchema = z.object({
@@ -38,6 +40,7 @@ const updateTodoSchema = z.object({
   completedAt: z.coerce.date().nullable().optional(),
   updatedAt: z.coerce.date().optional(),
   sticky: z.boolean().optional(),
+  listId: z.string().uuid().optional(),
 });
 
 // Serialize a todo with ISO dates
@@ -46,6 +49,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     parentId: todo.parentId?.toLowerCase() ?? null,
+    listId: todo.listId,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -165,9 +169,17 @@ export async function createTodo(c: Context<Env>) {
   const id = parsed.data.id ?? crypto.randomUUID();
   const now = new Date();
 
+  const listId =
+    parsed.data.listId ?? (await getSystemListId(db, userId, "today"));
+  if (!listId) {
+    return apiError(c, "list_not_found");
+  }
+
   await db.insert(todos).values({
     id,
     userId,
+    listId,
+    listEnteredAt: now,
     title: parsed.data.title,
     completed: false,
     createdAt: now,

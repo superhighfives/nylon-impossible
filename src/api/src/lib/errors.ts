@@ -41,6 +41,12 @@ export const API_ERRORS = {
     status: 409,
     message: "Todo has changed since this suggestion was proposed",
   },
+  list_id_required: { status: 400, message: "List ID required" },
+  list_not_found: { status: 404, message: "List not found" },
+  system_list_immutable: {
+    status: 403,
+    message: "System lists can't be renamed, deleted, or reordered",
+  },
   user_not_found: { status: 404, message: "User not found" },
   email_already_registered: {
     status: 409,

@@ -50,3 +50,20 @@ export class ForbiddenError extends Data.TaggedError("ForbiddenError")<{
   readonly resource: string;
   readonly userId: string;
 }> {}
+
+/**
+ * Thrown when a list is not found
+ */
+export class ListNotFoundError extends Data.TaggedError("ListNotFoundError")<{
+  readonly id: string;
+}> {}
+
+/**
+ * Thrown when an operation tries to rename, delete, or reorder a system list
+ * (Today/This Week/Sometime), which is immutable from the client.
+ */
+export class SystemListImmutableError extends Data.TaggedError(
+  "SystemListImmutableError",
+)<{
+  readonly id: string;
+}> {}

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TodoWithUrls } from "@/types/database";
-import { TodoList } from "../TodoList";
+import type { SerializedList, TodoWithUrls } from "@/types/database";
+import { TodoGrid } from "../TodoGrid";
 
 vi.mock("@/hooks/useTodos", () => ({
   STALE_AI_MS: 60_000,
@@ -12,14 +12,27 @@ vi.mock("@/hooks/useTodos", () => ({
   useCreateTodo: vi.fn(),
 }));
 
-// TodoList reads the synced hideCompleted preference via useUser and toggles it
-// via useUpdateUser (both call Clerk's useAuth); mock them so the component
-// renders without a ClerkProvider.
+vi.mock("@/hooks/useLists", () => ({
+  useLists: vi.fn(),
+  useCreateList: vi.fn(),
+  useUpdateList: vi.fn(),
+  useDeleteList: vi.fn(),
+}));
+
+// TodoGrid reads the synced hideCompleted preference via useUser and toggles
+// it via useUpdateUser (both call Clerk's useAuth); mock them so the
+// component renders without a ClerkProvider.
 vi.mock("@/hooks/useUser", () => ({
   useUser: vi.fn(() => ({ data: undefined })),
   useUpdateUser: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+import {
+  useCreateList,
+  useDeleteList,
+  useLists,
+  useUpdateList,
+} from "@/hooks/useLists";
 import {
   useCreateTodo,
   useDeleteTodo,
@@ -28,11 +41,23 @@ import {
 } from "@/hooks/useTodos";
 import { useUpdateUser, useUser } from "@/hooks/useUser";
 
+const TODAY_LIST: SerializedList = {
+  id: "list-today",
+  userId: "user-1",
+  name: "Today",
+  kind: "system",
+  systemKind: "today",
+  position: "a0",
+  createdAt: "2026-01-01T00:00:00.000Z",
+  updatedAt: "2026-01-01T00:00:00.000Z",
+};
+
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   return {
     id: "todo-1",
     userId: "user-1",
     parentId: null,
+    listId: "list-today",
     title: "Buy milk",
     notes: null,
     completed: false,
@@ -60,11 +85,25 @@ function stubUser(hideCompleted?: boolean) {
   } as unknown as ReturnType<typeof useUser>);
 }
 
-function stubUserLoading() {
-  vi.mocked(useUser).mockReturnValue({
-    data: undefined,
-    isLoading: true,
-  } as unknown as ReturnType<typeof useUser>);
+function stubLists(lists: SerializedList[] = [TODAY_LIST]) {
+  vi.mocked(useLists).mockReturnValue({
+    data: lists,
+    isLoading: false,
+  } as unknown as ReturnType<typeof useLists>);
+}
+
+function stubTodos(
+  data: TodoWithUrls[] | undefined,
+  overrides: Partial<ReturnType<typeof useTodos>> = {},
+) {
+  vi.mocked(useTodos).mockReturnValue({
+    data,
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+    isFetching: false,
+    ...overrides,
+  } as unknown as ReturnType<typeof useTodos>);
 }
 
 function stubMutations() {
@@ -80,102 +119,78 @@ function stubMutations() {
     mutate: vi.fn(),
     isPending: false,
   } as unknown as ReturnType<typeof useCreateTodo>);
+  vi.mocked(useCreateList).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useCreateList>);
+  vi.mocked(useUpdateList).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useUpdateList>);
+  vi.mocked(useDeleteList).mockReturnValue({
+    mutate: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useDeleteList>);
 }
 
-describe("TodoList", () => {
+describe("TodoGrid", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     stubMutations();
     stubUser();
+    stubLists();
   });
 
   it("renders a skeleton while loading", () => {
-    vi.mocked(useTodos).mockReturnValue({
-      data: undefined,
-      isLoading: true,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: true,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos(undefined, { isLoading: true, isFetching: true });
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(screen.getByLabelText("Loading todos")).toBeInTheDocument();
   });
 
   it("renders an error state with a working retry button", () => {
     const refetch = vi.fn();
-    vi.mocked(useTodos).mockReturnValue({
-      data: undefined,
-      isLoading: false,
-      error: new Error("offline"),
-      refetch,
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos(undefined, { error: new Error("offline"), refetch });
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(screen.getByText(/couldn't load todos/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it("renders an empty state when there are no todos", () => {
-    vi.mocked(useTodos).mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
-
-    render(<TodoList />);
-    expect(screen.getByText("Nothing to do yet")).toBeInTheDocument();
-  });
-
   it("renders each todo title when data is present", () => {
-    vi.mocked(useTodos).mockReturnValue({
-      data: [
-        makeTodo({ id: "a", title: "First thing", position: "a0" }),
-        makeTodo({ id: "b", title: "Second thing", position: "a1" }),
-      ],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([
+      makeTodo({ id: "a", title: "First thing", position: "a0" }),
+      makeTodo({ id: "b", title: "Second thing", position: "a1" }),
+    ]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(screen.getByText("First thing")).toBeInTheDocument();
     expect(screen.getByText("Second thing")).toBeInTheDocument();
   });
 
   it("shows a yellow dot only when a todo has a pending suggestion", () => {
-    vi.mocked(useTodos).mockReturnValue({
-      data: [
-        makeTodo({
-          id: "a",
-          title: "Has a suggestion",
-          suggestions: [
-            {
-              id: "s1",
-              todoId: "a",
-              type: "title",
-              payload: { title: "Renamed" },
-              label: 'Rename to "Renamed"',
-              status: "pending",
-              createdAt: "2026-01-01T00:00:00.000Z",
-              updatedAt: "2026-01-01T00:00:00.000Z",
-            },
-          ],
-        }),
-        makeTodo({ id: "b", title: "No suggestions", suggestions: [] }),
-      ],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([
+      makeTodo({
+        id: "a",
+        title: "Has a suggestion",
+        suggestions: [
+          {
+            id: "s1",
+            todoId: "a",
+            type: "title",
+            payload: { title: "Renamed" },
+            label: 'Rename to "Renamed"',
+            status: "pending",
+            createdAt: "2026-01-01T00:00:00.000Z",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+          },
+        ],
+      }),
+      makeTodo({ id: "b", title: "No suggestions", suggestions: [] }),
+    ]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(
       screen.getByRole("button", {
         name: "AI has suggestions — open to review",
@@ -185,55 +200,37 @@ describe("TodoList", () => {
 
   it("shows completed todos when hideCompleted is false", () => {
     stubUser(false);
-    vi.mocked(useTodos).mockReturnValue({
-      data: [
-        makeTodo({ id: "a", title: "Active thing", completed: false }),
-        makeTodo({ id: "b", title: "Done thing", completed: true }),
-      ],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([
+      makeTodo({ id: "a", title: "Active thing", completed: false }),
+      makeTodo({ id: "b", title: "Done thing", completed: true }),
+    ]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(screen.getByText("Active thing")).toBeInTheDocument();
     expect(screen.getByText("Done thing")).toBeInTheDocument();
   });
 
   it("hides completed todos when hideCompleted is true", () => {
     stubUser(true);
-    vi.mocked(useTodos).mockReturnValue({
-      data: [
-        makeTodo({ id: "a", title: "Active thing", completed: false }),
-        makeTodo({ id: "b", title: "Done thing", completed: true }),
-      ],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([
+      makeTodo({ id: "a", title: "Active thing", completed: false }),
+      makeTodo({ id: "b", title: "Done thing", completed: true }),
+    ]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(screen.getByText("Active thing")).toBeInTheDocument();
     expect(screen.queryByText("Done thing")).not.toBeInTheDocument();
   });
 
   it("shows a collapsed completed accordion with a count when hideCompleted is true", () => {
     stubUser(true);
-    vi.mocked(useTodos).mockReturnValue({
-      data: [
-        makeTodo({ id: "a", title: "Active thing", completed: false }),
-        makeTodo({ id: "b", title: "Done one", completed: true }),
-        makeTodo({ id: "c", title: "Done two", completed: true }),
-      ],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([
+      makeTodo({ id: "a", title: "Active thing", completed: false }),
+      makeTodo({ id: "b", title: "Done one", completed: true }),
+      makeTodo({ id: "c", title: "Done two", completed: true }),
+    ]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     const accordion = screen.getByRole("button", { name: /completed/i });
     expect(accordion).toHaveAttribute("aria-expanded", "false");
     expect(accordion).toHaveTextContent("2");
@@ -247,15 +244,9 @@ describe("TodoList", () => {
       isPending: false,
     } as unknown as ReturnType<typeof useUpdateUser>);
     stubUser(false);
-    vi.mocked(useTodos).mockReturnValue({
-      data: [makeTodo({ id: "b", title: "Done thing", completed: true })],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([makeTodo({ id: "b", title: "Done thing", completed: true })]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     fireEvent.click(screen.getByRole("button", { name: /completed/i }));
     expect(mutate).toHaveBeenCalledWith(
       { hideCompleted: true },
@@ -264,19 +255,13 @@ describe("TodoList", () => {
   });
 
   it("does not flash completed todos while the hideCompleted preference is loading", () => {
-    stubUserLoading();
-    vi.mocked(useTodos).mockReturnValue({
-      data: [
-        makeTodo({ id: "a", title: "Active thing", completed: false }),
-        makeTodo({ id: "b", title: "Done thing", completed: true }),
-      ],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubUser(undefined);
+    stubTodos([
+      makeTodo({ id: "a", title: "Active thing", completed: false }),
+      makeTodo({ id: "b", title: "Done thing", completed: true }),
+    ]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     // Incomplete todos render immediately, but the completed section stays out
     // of the DOM until the preference resolves so it can't flash open.
     expect(screen.getByText("Active thing")).toBeInTheDocument();
@@ -288,15 +273,9 @@ describe("TodoList", () => {
 
   it("renders no completed accordion when there are no completed todos", () => {
     stubUser(false);
-    vi.mocked(useTodos).mockReturnValue({
-      data: [makeTodo({ id: "a", title: "Active thing", completed: false })],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-      isFetching: false,
-    } as unknown as ReturnType<typeof useTodos>);
+    stubTodos([makeTodo({ id: "a", title: "Active thing", completed: false })]);
 
-    render(<TodoList />);
+    render(<TodoGrid />);
     expect(
       screen.queryByRole("button", { name: /completed/i }),
     ).not.toBeInTheDocument();

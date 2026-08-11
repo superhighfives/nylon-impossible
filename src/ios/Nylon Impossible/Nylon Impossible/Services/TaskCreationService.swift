@@ -26,24 +26,34 @@ enum TaskCreationService {
         title: String,
         userId: String?,
         context: ModelContext,
-        allTodos: [TodoItem]
+        allTodos: [TodoItem],
+        // Which list to create into; nil defaults to Today server-side once
+        // this syncs (mirrors the web/API default for an omitted listId).
+        listId: UUID? = nil
     ) -> TodoItem {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Generate position before the first incomplete todo so the new task appears at the top
+
+        // Generate position before the first incomplete todo *in the target
+        // list* so the new task appears at the top of its own list —
+        // positions are only meaningfully ordered within a list
+        // (`TodoViewModel.sortedTodos` scopes by `listId`), so comparing
+        // against another list's items here could land it anywhere once
+        // that list is sorted.
         let firstPosition = allTodos
-            .filter { !$0.isDeleted && !$0.isCompleted }
+            .filter { !$0.isDeleted && !$0.isCompleted && $0.parentId == nil && $0.listId == listId }
             .min { $0.position < $1.position }?
             .position
 
         let position = generateKeyBetween(nil, firstPosition)
-        
+
         let todo = TodoItem(
             title: trimmedTitle,
             userId: userId,
             position: position
         )
-        
+        todo.listId = listId
+        todo.listEnteredAt = Date()
+
         context.insert(todo)
         
         do {
@@ -79,6 +89,10 @@ enum TaskCreationService {
 
         let todo = TodoItem(title: trimmedTitle, userId: userId, position: position)
         todo.parentId = parent.id
+        // Subtasks are implicitly scoped to their parent's list — no
+        // independent list membership.
+        todo.listId = parent.listId
+        todo.listEnteredAt = Date()
         context.insert(todo)
 
         if parent.recurrence != nil {
@@ -105,7 +119,8 @@ enum TaskCreationService {
         text: String,
         userId: String?,
         context: ModelContext,
-        allTodos: [TodoItem]
+        allTodos: [TodoItem],
+        listId: UUID? = nil
     ) -> TodoItem? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -115,7 +130,8 @@ enum TaskCreationService {
             title: parsed.title,
             userId: userId,
             context: context,
-            allTodos: allTodos
+            allTodos: allTodos,
+            listId: listId
         )
 
         if !parsed.urls.isEmpty {

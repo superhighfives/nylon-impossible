@@ -107,6 +107,10 @@ export function useCreateTodo() {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
         parentId: input.parentId ?? null,
+        // Caller-supplied (each list column's "+ New Todo" passes its own
+        // listId; the `n` shortcut passes the Today list). Falls back to ""
+        // only if omitted — resolved for real once the server responds.
+        listId: input.listId ?? "",
         title: input.title,
         notes: input.notes ?? null,
         completed: false,
@@ -499,6 +503,9 @@ export function useSmartCreate() {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
         parentId: null,
+        // Smart-create defaults to Today server-side; the placeholder is
+        // reconciled wholesale by the onSettled refetch regardless.
+        listId: "",
         title: text.trim(),
         notes: null,
         completed: false,

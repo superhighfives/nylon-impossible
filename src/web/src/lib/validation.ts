@@ -15,6 +15,8 @@ export const createTodoSchema = z.object({
   // end of the sibling group; callers pass this to insert elsewhere (e.g. a new
   // subtask at the top of its parent's list).
   position: z.string().optional(),
+  // Which list to create into; omit to default to Today.
+  listId: z.string().uuid().optional(),
 });
 
 export const updateTodoSchema = z.object({
@@ -28,9 +30,20 @@ export const updateTodoSchema = z.object({
   // are stamped server-side, not by the client.
   completedAt: z.coerce.date().nullable().optional(),
   sticky: z.boolean().optional(),
+  listId: z.string().uuid().optional(),
 });
 
 export const updateTodoUrlSchema = z.object({
   id: z.string(),
   showPreview: z.boolean(),
+});
+
+export const createListSchema = z.object({
+  name: z.string().min(1, "Name is required").max(200),
+  position: z.string().optional(),
+});
+
+export const updateListSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  position: z.string().optional(),
 });

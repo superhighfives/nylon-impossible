@@ -92,6 +92,7 @@ export function ImportReviewModal() {
       id: review.id,
       userId: "",
       parentId: null,
+      listId: "",
       title: review.title,
       notes: null,
       completed: false,

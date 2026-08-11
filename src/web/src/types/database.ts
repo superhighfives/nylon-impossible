@@ -1,12 +1,10 @@
 // Re-export Drizzle-inferred types for convenience
 export type {
-  List,
   Recurrence,
   RecurrenceFrequency,
   SuggestionPayload,
   SuggestionType,
   Todo,
-  TodoList,
   TodoUrl,
   User,
 } from "@/lib/schema";
@@ -26,6 +24,8 @@ export interface CreateTodoInput {
   parentId?: string | null;
   // Explicit fractional-index position; omit to append to the sibling group.
   position?: string;
+  // Which list to create into; omit to default to Today.
+  listId?: string;
 }
 
 export interface UpdateTodoInput {
@@ -39,6 +39,32 @@ export interface UpdateTodoInput {
   // normal completion the server stamps this itself.
   completedAt?: Date | null;
   sticky?: boolean;
+  listId?: string;
+}
+
+/** Which built-in bucket a system list represents. */
+export type SystemListKind = "today" | "thisWeek" | "sometime";
+
+export interface CreateListInput {
+  name: string;
+  position?: string;
+}
+
+export interface UpdateListInput {
+  name?: string;
+  position?: string;
+}
+
+/** A list (Today/This Week/Sometime, or a custom list) as returned by the server. */
+export interface SerializedList {
+  id: string;
+  userId: string;
+  name: string;
+  kind: "system" | "custom";
+  systemKind: SystemListKind | null;
+  position: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 /** Fetch status for URL metadata */
@@ -113,6 +139,7 @@ export interface TodoWithUrls {
   id: string;
   userId: string;
   parentId: string | null;
+  listId: string;
   title: string;
   notes: string | null;
   completed: boolean;

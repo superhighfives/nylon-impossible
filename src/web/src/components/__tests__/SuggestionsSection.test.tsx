@@ -31,6 +31,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     id: "t1",
     userId: "u1",
     parentId: null,
+    listId: "list-today",
     title: "Book DMV appointment https://dmv.ca.gov",
     notes: null,
     completed: false,

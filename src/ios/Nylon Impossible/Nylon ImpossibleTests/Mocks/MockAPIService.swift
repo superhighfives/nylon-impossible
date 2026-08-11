@@ -165,4 +165,50 @@ final class MockAPIService: APIProviding {
             throw error
         }
     }
+
+    var listsToReturn: [APIList] = []
+    var listListsError: Error?
+
+    func listLists() async throws -> [APIList] {
+        if let error = listListsError { throw error }
+        return listsToReturn
+    }
+
+    var createListError: Error?
+    var lastCreateList: (name: String, position: String?)?
+
+    func createList(name: String, position: String?) async throws -> APIList {
+        lastCreateList = (name, position)
+        if let error = createListError { throw error }
+        let now = Date()
+        return APIList(
+            id: UUID().uuidString, userId: "test-user", name: name,
+            kind: "custom", systemKind: nil, position: position ?? "a0",
+            createdAt: now, updatedAt: now
+        )
+    }
+
+    var updateListError: Error?
+    var lastUpdateList: (id: String, name: String?, position: String?)?
+
+    func updateList(id: String, name: String?, position: String?) async throws -> APIList {
+        lastUpdateList = (id, name, position)
+        if let error = updateListError { throw error }
+        let now = Date()
+        return APIList(
+            id: id, userId: "test-user", name: name ?? "List",
+            kind: "custom", systemKind: nil, position: position ?? "a0",
+            createdAt: now, updatedAt: now
+        )
+    }
+
+    var deleteListError: Error?
+    var lastDeleteListId: String?
+    var deleteListTodoCount: Int = 0
+
+    func deleteList(id: String) async throws -> Int {
+        lastDeleteListId = id
+        if let error = deleteListError { throw error }
+        return deleteListTodoCount
+    }
 }

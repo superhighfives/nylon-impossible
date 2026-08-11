@@ -11,12 +11,20 @@ struct TodoEditSheet: View {
     let todo: TodoItem
     let apiService: APIService?
     let subtasks: [TodoItem]
+    // Every list the user can move this todo into, in the fixed
+    // Today/This Week/Sometime-then-custom order. Empty until lists have
+    // synced at least once.
+    let availableLists: [TodoListModel]
     var onSave: (String, String?, Date?, Recurrence?, Bool) -> Void
     var onCancel: () -> Void
     var onAddSubtask: (String) -> Void
     var onToggleSubtask: (TodoItem) -> Void
     var onDeleteSubtask: (TodoItem) -> Void
     var onMoveSubtask: (IndexSet, Int) -> Void
+    // Manual cross-list move. Fires immediately on picker change — there's no
+    // drag-and-drop grid on iOS, so this is the only way to move a todo.
+    // Subtasks never get this (implicitly scoped to their parent's list).
+    var onMoveToList: (String) -> Void
 
     @Environment(UserPreferencesService.self) private var preferencesService
     @State private var title: String
@@ -25,6 +33,7 @@ struct TodoEditSheet: View {
     @State private var dueDate: Date
     @State private var recurrenceFrequency: RecurrenceFrequency?
     @State private var sticky: Bool
+    @State private var selectedListId: String?
     @State private var urls: [APITodoUrl] = []
     @State private var research: APIResearch?
     @State private var isLoadingUrls: Bool = false
@@ -37,22 +46,26 @@ struct TodoEditSheet: View {
         apiService: APIService? = nil,
         initialUrls: [APITodoUrl] = [],
         subtasks: [TodoItem] = [],
+        availableLists: [TodoListModel] = [],
         onSave: @escaping (String, String?, Date?, Recurrence?, Bool) -> Void,
         onCancel: @escaping () -> Void,
         onAddSubtask: @escaping (String) -> Void = { _ in },
         onToggleSubtask: @escaping (TodoItem) -> Void = { _ in },
         onDeleteSubtask: @escaping (TodoItem) -> Void = { _ in },
-        onMoveSubtask: @escaping (IndexSet, Int) -> Void = { _, _ in }
+        onMoveSubtask: @escaping (IndexSet, Int) -> Void = { _, _ in },
+        onMoveToList: @escaping (String) -> Void = { _ in }
     ) {
         self.todo = todo
         self.apiService = apiService
         self.subtasks = subtasks
+        self.availableLists = availableLists
         self.onSave = onSave
         self.onCancel = onCancel
         self.onAddSubtask = onAddSubtask
         self.onToggleSubtask = onToggleSubtask
         self.onDeleteSubtask = onDeleteSubtask
         self.onMoveSubtask = onMoveSubtask
+        self.onMoveToList = onMoveToList
 
         _title = State(initialValue: todo.title)
         _notes = State(initialValue: todo.itemNotes ?? "")
@@ -60,6 +73,7 @@ struct TodoEditSheet: View {
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
         _sticky = State(initialValue: todo.sticky)
+        _selectedListId = State(initialValue: todo.listId?.uuidString.lowercased())
         _urls = State(initialValue: initialUrls)
         let initialResearch: APIResearch?
         if let researchId = todo.researchId {
@@ -127,6 +141,19 @@ struct TodoEditSheet: View {
                     Text("Pinned todos always show above non-pinned ones.")
                 }
 
+                // List — the only way to move a todo cross-list on iOS (no
+                // drag-and-drop grid). Subtasks are implicitly scoped to
+                // their parent's list, so this only shows for top-level
+                // todos, and only once lists have synced at least once
+                // (`availableLists` is empty until then).
+                if todo.parentId == nil && !availableLists.isEmpty {
+                    ListPickerSection(
+                        availableLists: availableLists,
+                        selectedListId: $selectedListId,
+                        onMoveToList: onMoveToList
+                    )
+                }
+
                 // Recurrence — disabled until a due date is set, since the
                 // rule has no anchor without one. Hidden when the todo has
                 // subtasks: recurrence and subtasks are mutually exclusive.
@@ -187,27 +214,10 @@ struct TodoEditSheet: View {
                 ConversationSection(todo: todo, apiService: apiService)
 
                 // Links (non-research URLs only)
-                let regularUrls = urls.filter { $0.researchId == nil }
-                if isLoadingUrls && urls.isEmpty {
-                    Section {
-                        HStack {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Loading links...")
-                                .foregroundStyle(.secondary)
-                        }
-                    } header: {
-                        Text("Links")
-                    }
-                } else if !regularUrls.isEmpty {
-                    Section {
-                        ForEach(regularUrls) { url in
-                            UrlRow(url: url)
-                        }
-                    } header: {
-                        Text("Links (\(regularUrls.count))")
-                    }
-                }
+                LinksSection(
+                    regularUrls: urls.filter { $0.researchId == nil },
+                    isLoading: isLoadingUrls && urls.isEmpty
+                )
             }
             .task {
                 await loadUrls()
@@ -574,6 +584,62 @@ private struct AIActionsSection: View {
             .disabled(isReresearching)
         } header: {
             Text("AI")
+        }
+    }
+}
+
+/// Non-research URL links attached to a todo, or a loading state before the
+/// first fetch resolves.
+private struct LinksSection: View {
+    let regularUrls: [APITodoUrl]
+    let isLoading: Bool
+
+    var body: some View {
+        if isLoading {
+            Section {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Loading links...")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Links")
+            }
+        } else if !regularUrls.isEmpty {
+            Section {
+                ForEach(regularUrls) { url in
+                    UrlRow(url: url)
+                }
+            } header: {
+                Text("Links (\(regularUrls.count))")
+            }
+        }
+    }
+}
+
+/// List picker for moving a top-level todo between lists. Fires immediately
+/// on change rather than waiting for Save, mirroring the sticky/checkbox
+/// toggles' instant-effect feel.
+private struct ListPickerSection: View {
+    let availableLists: [TodoListModel]
+    @Binding var selectedListId: String?
+    let onMoveToList: (String) -> Void
+
+    var body: some View {
+        Section {
+            Picker("List", selection: $selectedListId) {
+                ForEach(availableLists) { list in
+                    Text(list.name).tag(Optional(list.id))
+                }
+            }
+            .pickerStyle(.menu)
+            .onChange(of: selectedListId) { _, newValue in
+                guard let newValue else { return }
+                onMoveToList(newValue)
+            }
+        } header: {
+            Text("List")
         }
     }
 }

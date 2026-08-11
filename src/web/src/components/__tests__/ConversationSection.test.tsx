@@ -29,6 +29,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     id: "t1",
     userId: "u1",
     parentId: null,
+    listId: "list-today",
     title: "Book a flight",
     notes: null,
     completed: false,

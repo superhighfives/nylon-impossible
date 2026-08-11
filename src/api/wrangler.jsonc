@@ -32,6 +32,12 @@
       "new_classes": ["UserSync"],
     },
   ],
+  "triggers": {
+    // Hourly, not daily — the sweep checks per-user whether it's currently
+    // local midnight in *that user's* timezone, so it must run often enough
+    // to catch every timezone's midnight within an hour.
+    "crons": ["0 * * * *"],
+  },
   "queues": {
     "producers": [
       { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },

@@ -14,7 +14,16 @@ import {
 } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { DevEnvironmentDetails } from "./DevEnvironmentIndicator";
-import { Button, Field, Input, Loader } from "./ui";
+import { Button, Field, Input, Loader, Select } from "./ui";
+
+// Full IANA timezone list from the runtime — avoids hand-maintaining a
+// curated subset, and every value round-trips through Intl.DateTimeFormat
+// the aging sweep already relies on.
+const TIMEZONE_ITEMS = (
+  typeof Intl.supportedValuesOf === "function"
+    ? Intl.supportedValuesOf("timeZone")
+    : ["UTC"]
+).map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") }));
 
 // Full Google scope required to read Tasks. Google rejects the shorthand
 // (`tasks.readonly`) with invalid_scope, so the fully-qualified URL is used
@@ -52,6 +61,7 @@ export function SettingsModal({ origin }: { origin: string }) {
   const { isOpen: open, setOpen } = useSettings();
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
+  const [timezone, setTimezone] = useState("UTC");
   const [isLocating, setIsLocating] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
 
@@ -108,13 +118,21 @@ export function SettingsModal({ origin }: { origin: string }) {
     if (user && open) {
       setLocation(user.location ?? "");
       setAiEnabled(user.aiEnabled);
+      // "UTC" is the migration/creation default, not a deliberate choice —
+      // default to the browser's detected zone the first time settings are
+      // opened rather than leaving a new user stuck on UTC.
+      setTimezone(
+        user.timezone === "UTC"
+          ? Intl.DateTimeFormat().resolvedOptions().timeZone
+          : user.timezone,
+      );
     }
   }, [user, open]);
 
   const handleSave = () => {
     const trimmedLocation = location.trim();
     updateUser.mutate(
-      { location: trimmedLocation || null, aiEnabled },
+      { location: trimmedLocation || null, aiEnabled, timezone },
       {
         onSuccess: () => setOpen(false),
         onError: (err) => {
@@ -160,7 +178,9 @@ export function SettingsModal({ origin }: { origin: string }) {
   };
 
   const hasChanges =
-    location.trim() !== (user?.location ?? "") || aiEnabled !== user?.aiEnabled;
+    location.trim() !== (user?.location ?? "") ||
+    aiEnabled !== user?.aiEnabled ||
+    (user !== undefined && timezone !== user?.timezone);
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -259,6 +279,18 @@ export function SettingsModal({ origin }: { origin: string }) {
                       );
                     })}
                   </div>
+                </Field>
+                <Field
+                  label="Timezone"
+                  description="Drives when Today's todos age into This Week, and This Week into Sometime — always at your local midnight."
+                >
+                  <Select
+                    items={TIMEZONE_ITEMS}
+                    value={timezone}
+                    onValueChange={(value) => setTimezone(value as string)}
+                    disabled={updateUser.isPending}
+                    size="sm"
+                  />
                 </Field>
                 {/* AI features are gated on this toggle (not the plan), so it's
                     available to every user to turn on or off. */}

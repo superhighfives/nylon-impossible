@@ -28,6 +28,13 @@ import {
 import { gmailAddonContextual } from "./handlers/gmail-addon/contextual";
 import { gmailAddonHomepage } from "./handlers/gmail-addon/homepage";
 import { importGoogleTasks } from "./handlers/import-google-tasks";
+import {
+  createList,
+  deleteList,
+  getList,
+  getLists,
+  updateList,
+} from "./handlers/lists";
 import { replyToTodo } from "./handlers/reply";
 import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
@@ -46,6 +53,7 @@ import { verifyGoogleIdToken } from "./lib/addon-auth";
 import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
+import { runListSweep } from "./lib/list-sweep";
 import { executeResearch } from "./lib/research";
 import type { Env, ResearchJobMessage } from "./types";
 
@@ -97,6 +105,10 @@ app.get("/ws", async (c) => {
 app.use("/todos/*", authMiddleware);
 app.use("/todos", authMiddleware);
 
+// Auth middleware for list routes
+app.use("/lists/*", authMiddleware);
+app.use("/lists", authMiddleware);
+
 // Auth middleware for user routes
 app.use("/users/*", authMiddleware);
 
@@ -142,6 +154,13 @@ app.on(["GET", "HEAD"], "/todos/:id/agent/messages", readAgentMessages);
 // has no path to it.
 app.post("/todos/:id/agent/confirm-delete", deleteTodo);
 
+// List routes
+app.get("/lists", getLists);
+app.post("/lists", createList);
+app.get("/lists/:id", getList);
+app.patch("/lists/:id", updateList);
+app.delete("/lists/:id", deleteList);
+
 // Internal routes for the todo-agent Worker's tools (bearer-secret auth,
 // see handlers/agent-internal.ts for why this can't rely on "no route" alone).
 app.use("/internal/agent/*", internalAgentAuthMiddleware);
@@ -178,6 +197,16 @@ app.onError((err, c) => {
 
 const handler: ExportedHandler<Env["Bindings"], ResearchJobMessage> = {
   fetch: app.fetch,
+  async scheduled(_event, env): Promise<void> {
+    try {
+      const db = getDb(env.DB);
+      await runListSweep(db, env, new Date());
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { area: "cron-list-sweep" },
+      });
+    }
+  },
   async queue(batch, env): Promise<void> {
     const db = getDb(env.DB);
     for (const message of batch.messages) {

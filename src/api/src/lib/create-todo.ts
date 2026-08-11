@@ -12,6 +12,7 @@ import {
   todoUrls,
   users,
 } from "./db";
+import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 import {
   cleanUrlString,
@@ -29,6 +30,7 @@ export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     parentId: todo.parentId?.toLowerCase() ?? null,
+    listId: todo.listId,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -181,14 +183,24 @@ export async function createSmartTodo(
   const doResearch = options.research === true && options.aiEnabled && !useAI;
 
   const parentId = options.parentId ?? null;
+  // Subtasks are implicitly scoped to their parent's list. Top-level todos
+  // created via this path (smart-create, AI-added subtasks) default to
+  // Today, same as a plain create.
+  let listId: string | null = null;
   if (parentId) {
     const [parent] = await db
-      .select({ id: todos.id, parentId: todos.parentId })
+      .select({ id: todos.id, parentId: todos.parentId, listId: todos.listId })
       .from(todos)
       .where(and(eq(todos.id, parentId), eq(todos.userId, userId)));
     if (!parent || parent.parentId !== null) {
       throw new InvalidParentTodoError();
     }
+    listId = parent.listId;
+  } else {
+    listId = await getSystemListId(db, userId, "today");
+  }
+  if (!listId) {
+    throw new Error(`No list found to place todo into for user ${userId}`);
   }
 
   // Get the lowest position in the target list so the new todo is prepended:
@@ -254,6 +266,8 @@ export async function createSmartTodo(
     id: todoId,
     userId,
     parentId,
+    listId,
+    listEnteredAt: now,
     title: initial.title,
     completed: false,
     position,

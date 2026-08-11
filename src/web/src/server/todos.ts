@@ -3,7 +3,10 @@
  */
 
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
-import { nextDueDate } from "@nylon-impossible/shared/recurrence";
+import {
+  nextDueDate,
+  placementForDueDate,
+} from "@nylon-impossible/shared/recurrence";
 import { createServerFn } from "@tanstack/react-start";
 import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { Effect } from "effect";
@@ -13,6 +16,7 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
+import { getSystemListId } from "@/lib/lists";
 import type {
   Todo,
   TodoMessage,
@@ -116,6 +120,7 @@ function serializeTodoWithUrls(
     id: todo.id,
     userId: todo.userId,
     parentId: todo.parentId ?? null,
+    listId: todo.listId,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -294,11 +299,18 @@ export const createTodo = createServerFn({ method: "POST" })
     const program = withAuthenticatedUser((user, db) =>
       Effect.gen(function* () {
         const parentId = validated.parentId ?? null;
+        // Subtasks are implicitly scoped to their parent's list — no
+        // independent list membership. Top-level todos default to Today.
+        let listId: string | null = null;
         if (parentId) {
           const parentTodo = yield* Effect.tryPromise({
             try: () =>
               db
-                .select({ id: todos.id, parentId: todos.parentId })
+                .select({
+                  id: todos.id,
+                  parentId: todos.parentId,
+                  listId: todos.listId,
+                })
                 .from(todos)
                 .where(and(eq(todos.id, parentId), eq(todos.userId, user.id)))
                 .limit(1)
@@ -320,6 +332,36 @@ export const createTodo = createServerFn({ method: "POST" })
               ],
             });
           }
+          listId = parentTodo.listId;
+        } else if (validated.listId) {
+          listId = validated.listId;
+        } else if (validated.recurrence && validated.dueDate) {
+          // A new recurring todo (which always has a due date) is placed by
+          // that due date's distance instead of defaulting to Today.
+          listId = yield* Effect.tryPromise({
+            try: () =>
+              getSystemListId(
+                db,
+                user.id,
+                placementForDueDate(validated.dueDate as Date, new Date()),
+              ),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "getPlacementList",
+                cause: error,
+              }),
+          });
+        } else {
+          listId = yield* Effect.tryPromise({
+            try: () => getSystemListId(db, user.id, "today"),
+            catch: (error) =>
+              new DatabaseError({ operation: "getTodayList", cause: error }),
+          });
+        }
+        if (!listId) {
+          return yield* new ValidationError({
+            errors: [{ path: "listId", message: "No list found" }],
+          });
         }
 
         // An explicit position wins (e.g. inserting a subtask at a specific
@@ -365,6 +407,8 @@ export const createTodo = createServerFn({ method: "POST" })
               .values({
                 userId: user.id,
                 parentId,
+                listId,
+                listEnteredAt: new Date(),
                 title: validated.title,
                 notes: validated.notes ?? null,
                 position,
@@ -469,6 +513,13 @@ export const updateTodo = createServerFn({ method: "POST" })
         if (validated.completedAt !== undefined)
           updates.completedAt = validated.completedAt;
         if (validated.sticky !== undefined) updates.sticky = validated.sticky;
+        if (
+          validated.listId !== undefined &&
+          validated.listId !== existing.listId
+        ) {
+          updates.listId = validated.listId;
+          updates.listEnteredAt = new Date();
+        }
 
         // Recurrence and subtasks are mutually exclusive (server-side source of
         // truth). A subtask never recurs, and a todo with children can't recur.
@@ -509,9 +560,29 @@ export const updateTodo = createServerFn({ method: "POST" })
         // Completing a repeat doesn't persist as done: roll dueDate forward and
         // stamp completedAt so the UI keeps it in Completed until local midnight.
         if (becameComplete && recurrence && anchor) {
+          const now = new Date();
+          const nextDue = nextDueDate(recurrence, anchor, now);
           updates.completed = false;
-          updates.completedAt = new Date();
-          updates.dueDate = nextDueDate(recurrence, anchor, new Date());
+          updates.completedAt = now;
+          updates.dueDate = nextDue;
+          // The new occurrence is placed by its due date's distance, per the
+          // settled recurrence heuristic — unless the caller also explicitly
+          // moved it in this same patch, which wins.
+          if (validated.listId === undefined) {
+            const placementListId = yield* Effect.tryPromise({
+              try: () =>
+                getSystemListId(db, user.id, placementForDueDate(nextDue, now)),
+              catch: (error) =>
+                new DatabaseError({
+                  operation: "getPlacementList",
+                  cause: error,
+                }),
+            });
+            if (placementListId && placementListId !== existing.listId) {
+              updates.listId = placementListId;
+              updates.listEnteredAt = now;
+            }
+          }
         }
 
         // Completing a sticky todo unsticks it — it sorts as an ordinary

@@ -131,6 +131,9 @@ export async function acceptSuggestion(c: Context<Env>) {
           id: crypto.randomUUID(),
           userId,
           parentId: todoId,
+          // Subtasks are implicitly scoped to their parent's list.
+          listId: todo.listId,
+          listEnteredAt: now,
           title: truncateTitle(title),
           completed: false,
           position: positions[i],
