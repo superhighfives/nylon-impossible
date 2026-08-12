@@ -13,7 +13,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
  * is equivalent to "did local midnight fall within the last hour" — no need
  * to persist a per-user last-run timestamp.
  */
-function isLocalMidnightHour(timezone: string, now: Date): boolean {
+export function isLocalMidnightHour(timezone: string, now: Date): boolean {
   try {
     const hour = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,

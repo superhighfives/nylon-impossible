@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todos, todoUrls } from "../../src/lib/db";
+import { getDb, lists, todos, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedMessage, seedTodo, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -549,6 +549,77 @@ describe("Sync endpoint", () => {
     });
     // min(1) validation should still catch empty titles
     expect(res.status).toBe(400);
+  });
+
+  describe("listId ownership", () => {
+    it("rejects creating a todo in another user's list", async () => {
+      mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
+      await seedUser("user_other", "other@example.com");
+      const [otherUsersList] = await getDb(env.DB)
+        .select()
+        .from(lists)
+        .where(eq(lists.userId, "user_other"));
+      mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
+
+      const todoId = "550e8400-e29b-41d4-a716-446655440010";
+      const res = await syncRequest({
+        changes: [
+          {
+            id: todoId,
+            title: "Sneaky todo",
+            listId: otherUsersList.id,
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json<{ code: string }>()).code).toBe(
+        "list_not_found",
+      );
+
+      const db = getDb(env.DB);
+      const [stored] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.id, todoId));
+      expect(stored).toBeUndefined();
+    });
+
+    it("rejects moving an existing todo into another user's list", async () => {
+      const todoId = "550e8400-e29b-41d4-a716-446655440011";
+      const created = await seedTodo(todoId, "user_test_123", {
+        title: "My todo",
+      });
+
+      mockVerifyToken.mockResolvedValue({ sub: "user_other" } as any);
+      await seedUser("user_other", "other@example.com");
+      const [otherUsersList] = await getDb(env.DB)
+        .select()
+        .from(lists)
+        .where(eq(lists.userId, "user_other"));
+      mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
+
+      const res = await syncRequest({
+        changes: [
+          {
+            id: todoId,
+            listId: otherUsersList.id,
+            updatedAt: new Date().toISOString(),
+          },
+        ],
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json<{ code: string }>()).code).toBe(
+        "list_not_found",
+      );
+
+      const db = getDb(env.DB);
+      const [stored] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.id, todoId));
+      expect(stored.listId).toBe(created?.listId);
+    });
   });
 
   describe("conversation messages and needsInput", () => {

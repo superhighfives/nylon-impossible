@@ -16,7 +16,7 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
-import { getSystemListId } from "@/lib/lists";
+import { getSystemListId, verifyListOwnership } from "@/lib/lists";
 import type {
   Todo,
   TodoMessage,
@@ -334,7 +334,28 @@ export const createTodo = createServerFn({ method: "POST" })
           }
           listId = parentTodo.listId;
         } else if (validated.listId) {
-          listId = validated.listId;
+          // A client-supplied listId only ever passes a UUID-format check at
+          // the request boundary — verify it belongs to this user before
+          // writing it.
+          listId = yield* Effect.tryPromise({
+            try: () =>
+              verifyListOwnership(db, user.id, validated.listId as string),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "verifyListOwnership",
+                cause: error,
+              }),
+          });
+          if (!listId) {
+            return yield* new ValidationError({
+              errors: [
+                {
+                  path: "listId",
+                  message: "listId must reference one of your own lists",
+                },
+              ],
+            });
+          }
         } else if (validated.recurrence && validated.dueDate) {
           // A new recurring todo (which always has a due date) is placed by
           // that due date's distance instead of defaulting to Today.
@@ -517,7 +538,29 @@ export const updateTodo = createServerFn({ method: "POST" })
           validated.listId !== undefined &&
           validated.listId !== existing.listId
         ) {
-          updates.listId = validated.listId;
+          // A client-supplied listId only ever passes a UUID-format check at
+          // the request boundary — verify it belongs to this user before
+          // writing it.
+          const ownedListId = yield* Effect.tryPromise({
+            try: () =>
+              verifyListOwnership(db, user.id, validated.listId as string),
+            catch: (error) =>
+              new DatabaseError({
+                operation: "verifyListOwnership",
+                cause: error,
+              }),
+          });
+          if (!ownedListId) {
+            return yield* new ValidationError({
+              errors: [
+                {
+                  path: "listId",
+                  message: "listId must reference one of your own lists",
+                },
+              ],
+            });
+          }
+          updates.listId = ownedListId;
           updates.listEnteredAt = new Date();
         }
 

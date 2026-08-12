@@ -387,9 +387,11 @@ final class TodoViewModel {
         list.updatedAt = api.updatedAt
     }
 
-    /// Delete a custom list. The server reassigns any todos still in it (see
-    /// `deleteList`'s returned count) — sync picks up their new `listId` on
-    /// the next pass, so this only needs to remove the list row itself.
+    /// Delete a custom list. The server cascade-deletes any todos still in it
+    /// (the `list_id` FK is `ON DELETE cascade`) — `deleteList`'s returned
+    /// count is how many. Locally, the next full sync's snapshot diff removes
+    /// those todos since the server no longer returns them, so this only
+    /// needs to remove the list row itself.
     @MainActor
     func deleteList(_ list: TodoListModel, apiService: any APIProviding, context: ModelContext) async throws {
         guard list.kind == "custom" else { return }

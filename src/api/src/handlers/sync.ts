@@ -29,7 +29,7 @@ import {
   users,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
-import { getSystemListId } from "../lib/lists";
+import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
@@ -399,8 +399,20 @@ export async function syncTodos(c: Context<Env>) {
         let stickyToWrite =
           change.sticky !== undefined ? change.sticky : existing.sticky;
         if (completing && stickyToWrite) stickyToWrite = false;
+        // A client-supplied listId only ever passes a UUID-format check at
+        // the request boundary — verify it actually belongs to this user
+        // before writing it, or a leaked/guessed list id from another
+        // account could be pointed at by this todo (see InvalidListError's
+        // doc in todos-core.ts for the cascade-delete consequence).
+        const ownedListId =
+          change.listId !== undefined
+            ? await verifyListOwnership(db, userId, change.listId)
+            : undefined;
+        if (change.listId !== undefined && !ownedListId) {
+          return apiError(c, "list_not_found");
+        }
         const listIdToWrite =
-          change.listId ?? recurrencePlacementListId ?? existing.listId;
+          ownedListId ?? recurrencePlacementListId ?? existing.listId;
         const listChanged = listIdToWrite !== existing.listId;
         await db
           .update(todos)
@@ -494,9 +506,17 @@ export async function syncTodos(c: Context<Env>) {
         // has a due date) is placed by that due date's distance instead of
         // defaulting to Today. Other top-level todos default to Today.
         const isRecurring = !parentId && change.recurrence && change.dueDate;
+        // A client-supplied listId only ever passes a UUID-format check at
+        // the request boundary — verify ownership before writing it.
+        const ownedCreateListId = change.listId
+          ? await verifyListOwnership(db, userId, change.listId)
+          : null;
+        if (change.listId && !ownedCreateListId) {
+          return apiError(c, "list_not_found");
+        }
         const listId =
           parentListId ??
-          change.listId ??
+          ownedCreateListId ??
           (isRecurring && change.dueDate
             ? await getSystemListId(
                 db,

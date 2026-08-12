@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, todoMessages, todos } from "../../src/lib/db";
 import {
   cleanDb,
+  getTodayListId,
   seedMessage,
   seedTodo,
   seedTodoUrl,
@@ -128,6 +129,31 @@ describe("Todos CRUD", () => {
         body: JSON.stringify({ title: "a".repeat(501) }),
       });
       expect(res.status).toBe(400);
+    });
+
+    it("rejects a listId belonging to another user", async () => {
+      await seedUser("other_user", "other@example.com");
+      const otherUsersListId = await getTodayListId("other_user");
+
+      const res = await SELF.fetch("http://localhost/todos", {
+        method: "POST",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Sneaky todo",
+          listId: otherUsersListId,
+        }),
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json<{ code: string }>()).code).toBe(
+        "list_not_found",
+      );
+
+      const db = getDb(env.DB);
+      const stored = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(stored).toHaveLength(0);
     });
   });
 
@@ -358,6 +384,32 @@ describe("Todos CRUD", () => {
       const todosA = await resA.json<any[]>();
       expect(todosA).toHaveLength(1);
       expect(todosA[0].title).toBe("User A todo");
+    });
+
+    it("PUT /todos/:id rejects moving a todo into another user's list", async () => {
+      const createRes = await createTodoViaAPI("My todo");
+      const created = await createRes.json<{ id: string; listId: string }>();
+
+      await seedUser("user_other", "other@example.com");
+      const otherUsersListId = await getTodayListId("user_other");
+
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ listId: otherUsersListId }),
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json<{ code: string }>()).code).toBe(
+        "list_not_found",
+      );
+
+      // The todo's listId is untouched.
+      const db = getDb(env.DB);
+      const [stored] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.id, created.id));
+      expect(stored.listId).toBe(created.listId);
     });
   });
 

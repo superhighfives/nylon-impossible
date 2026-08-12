@@ -13,8 +13,8 @@ import {
   todoUrls,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
-import { getSystemListId } from "../lib/lists";
-import { updateTodoCore } from "../lib/todos-core";
+import { getSystemListId, verifyListOwnership } from "../lib/lists";
+import { InvalidListError, updateTodoCore } from "../lib/todos-core";
 import type { Env } from "../types";
 
 const recurrenceSchema = z.object({
@@ -169,8 +169,9 @@ export async function createTodo(c: Context<Env>) {
   const id = parsed.data.id ?? crypto.randomUUID();
   const now = new Date();
 
-  const listId =
-    parsed.data.listId ?? (await getSystemListId(db, userId, "today"));
+  const listId = parsed.data.listId
+    ? await verifyListOwnership(db, userId, parsed.data.listId)
+    : await getSystemListId(db, userId, "today");
   if (!listId) {
     return apiError(c, "list_not_found");
   }
@@ -215,7 +216,15 @@ export async function updateTodo(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  const updated = await updateTodoCore(db, c.env, userId, todoId, parsed.data);
+  let updated: Awaited<ReturnType<typeof updateTodoCore>>;
+  try {
+    updated = await updateTodoCore(db, c.env, userId, todoId, parsed.data);
+  } catch (error) {
+    if (error instanceof InvalidListError) {
+      return apiError(c, "list_not_found");
+    }
+    throw error;
+  }
 
   if (!updated) {
     return apiError(c, "todo_not_found");

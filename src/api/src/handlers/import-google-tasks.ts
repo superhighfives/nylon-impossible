@@ -4,6 +4,7 @@ import type { Context } from "hono";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
 import { clerkClient } from "../lib/clerk";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
+import { apiError } from "../lib/errors";
 import { getSystemListId } from "../lib/lists";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
@@ -177,7 +178,7 @@ export async function importGoogleTasks(c: Context<Env>) {
   // "I want to work this today" intent that a manually-placed Today todo has.
   const sometimeListId = await getSystemListId(db, userId, "sometime");
   if (!sometimeListId) {
-    return c.json({ error: "Couldn't find your Sometime list." }, 500);
+    return apiError(c, "list_not_found");
   }
 
   const now = new Date();

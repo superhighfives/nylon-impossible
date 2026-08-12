@@ -16,12 +16,23 @@ import {
   todoUrls,
   users,
 } from "./db";
-import { getSystemListId } from "./lists";
+import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
 type Todo = typeof todos.$inferSelect;
+
+/**
+ * Thrown when a patch's `listId` doesn't resolve to a list owned by the
+ * caller — either it doesn't exist, or it belongs to someone else.
+ */
+export class InvalidListError extends Error {
+  constructor() {
+    super("listId must reference one of the user's own lists");
+    this.name = "InvalidListError";
+  }
+}
 
 /**
  * Fields `updateTodoCore` accepts. Mirrors the REST `PUT /todos/:id` body,
@@ -224,7 +235,9 @@ export async function updateTodoCore(
   if (patch.completedAt !== undefined) updates.completedAt = patch.completedAt;
   if (patch.sticky !== undefined) updates.sticky = patch.sticky;
   if (patch.listId !== undefined && patch.listId !== existing.listId) {
-    updates.listId = patch.listId;
+    const ownedListId = await verifyListOwnership(db, userId, patch.listId);
+    if (!ownedListId) throw new InvalidListError();
+    updates.listId = ownedListId;
     updates.listEnteredAt = updatedAt;
   }
 
