@@ -10,6 +10,7 @@ const updatePreferencesSchema = z.object({
   location: z.string().max(200).nullable().optional(),
   theme: z.enum(["light", "dark", "system"]).optional(),
   hideCompleted: z.boolean().optional(),
+  timezone: z.string().min(1).max(100).optional(),
 });
 
 // GET /users/me
@@ -26,6 +27,7 @@ export async function getMe(c: Context<Env>) {
       location: users.location,
       theme: users.theme,
       hideCompleted: users.hideCompleted,
+      timezone: users.timezone,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -46,6 +48,7 @@ export async function getMe(c: Context<Env>) {
     location: user.location,
     theme: user.theme,
     hideCompleted: user.hideCompleted,
+    timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });
@@ -69,6 +72,7 @@ export async function updateMe(c: Context<Env>) {
     location: string | null;
     theme: "light" | "dark" | "system";
     hideCompleted: boolean;
+    timezone: string;
   }> = {};
   if (parsed.data.aiEnabled !== undefined) {
     updates.aiEnabled = parsed.data.aiEnabled;
@@ -81,6 +85,9 @@ export async function updateMe(c: Context<Env>) {
   }
   if (parsed.data.hideCompleted !== undefined) {
     updates.hideCompleted = parsed.data.hideCompleted;
+  }
+  if (parsed.data.timezone !== undefined) {
+    updates.timezone = parsed.data.timezone;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -102,6 +109,7 @@ export async function updateMe(c: Context<Env>) {
       location: users.location,
       theme: users.theme,
       hideCompleted: users.hideCompleted,
+      timezone: users.timezone,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
     })
@@ -122,6 +130,7 @@ export async function updateMe(c: Context<Env>) {
     location: user.location,
     theme: user.theme,
     hideCompleted: user.hideCompleted,
+    timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   });

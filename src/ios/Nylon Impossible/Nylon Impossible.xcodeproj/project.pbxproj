@@ -54,7 +54,9 @@
 		23ABA41F2F593791004D3D1A /* Exceptions for "Nylon Impossible" folder in "Nylon Share" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Models/APIList.swift,
 				Models/TodoItem.swift,
+				Models/TodoListModel.swift,
 				Models/TodoMessage.swift,
 				Models/TodoSuggestion.swift,
 				Models/TodoUrl.swift,

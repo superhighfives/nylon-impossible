@@ -1,8 +1,8 @@
 ---
 title: Time-Bucket Lists (Today / This Week / Sometime + custom lists)
-status: Ready
+status: Complete
 created: 2026-08-06
-updated: 2026-08-10
+updated: 2026-08-11
 ---
 
 ## Problem
@@ -416,42 +416,42 @@ work, not a threading exercise like `sticky` was.
 
 ## Acceptance criteria
 
-- [ ] `lists` table repurposed with `kind`/`systemKind`; `todoLists` join
+- [x] `lists` table repurposed with `kind`/`systemKind`; `todoLists` join
       table dropped; `todos.listId` FK added and backfilled for all existing
       users (all landing in Sometime).
-- [ ] `users.timezone` persisted, defaults to `UTC`, settable from a new
+- [x] `users.timezone` persisted, defaults to `UTC`, settable from a new
       Settings control.
-- [ ] An hourly Cron Trigger correctly demotes Today → This Week after one
+- [x] An hourly Cron Trigger correctly demotes Today → This Week after one
       full local day and This Week → Sometime after one full local week, per
       account timezone, without touching completed todos or Sometime items.
-- [ ] Due date is never read, written, or cleared by any bucket-membership
+- [x] Due date is never read, written, or cleared by any bucket-membership
       change (creation into Today, manual drag, or the sweep) — verified by
       inspection across every `listId`-writing code path in §3/§4/§5.
-- [ ] Reaching a due date never auto-moves a todo into a different list.
-- [ ] Web renders the full grid (Today, This Week, Sometime, then custom
+- [x] Reaching a due date never auto-moves a todo into a different list.
+- [x] Web renders the full grid (Today, This Week, Sometime, then custom
       lists in position order) with drag-and-drop both within and between
       columns, a "+ New Todo" per column, and "+ New List" at the end.
-- [ ] `n` creates a new todo into Today from anywhere in the web app (when
+- [x] `n` creates a new todo into Today from anywhere in the web app (when
       focus isn't inside a text field).
-- [ ] Custom lists support rename, delete (cascade + confirmation warning
+- [x] Custom lists support rename, delete (cascade + confirmation warning
       showing the todo count), and reorder among themselves; the three
       system lists can't be renamed, deleted, or reordered out of their
       fixed first-three position.
-- [ ] Subtasks have no independent list membership — always implicitly in
+- [x] Subtasks have no independent list membership — always implicitly in
       their parent's list, on both platforms.
-- [ ] Recurring todos land their new occurrence in Today/This
+- [x] Recurring todos land their new occurrence in Today/This
       Week/Sometime based on the new due date's distance, per the settled
       heuristic, then age normally afterward.
-- [ ] iOS pages between lists via swipe, in the same fixed-then-custom
+- [x] iOS pages between lists via swipe, in the same fixed-then-custom
       order as web; no grid/multi-column iOS view in v1.
-- [ ] Offline sync (`POST /todos/sync`) round-trips `listId` correctly for
+- [x] Offline sync (`POST /todos/sync`) round-trips `listId` correctly for
       create, update, and the system-list seeding path — verified as
       carefully as sticky-todos' sync threading was, since this is the same
       endpoint iOS actually uses.
-- [ ] `import-google-tasks.ts`'s D1 bound-param chunk size is recomputed and
+- [x] `import-google-tasks.ts`'s D1 bound-param chunk size is recomputed and
       verified against the existing chunking test, not just assumed
       unchanged.
-- [ ] `pnpm typecheck`, `pnpm lint`, `pnpm test` (web + api) green. iOS
+- [x] `pnpm typecheck`, `pnpm lint`, `pnpm test` (web + api) green. iOS
       verified by SwiftLint + inspection only, with an explicit note (like
       the priority and sticky-todos plans) that a real compile and SwiftData
       migration check on a populated store are still needed before shipping.
@@ -494,3 +494,96 @@ work, not a threading exercise like `sticky` was.
   `plans/done/2026-08-06-todo-row-and-list-polish.md` — precedent plans this
   one builds on and follows for implementation style (exhaustive file/line
   inventories from real greps, not guesses).
+
+## Overview
+
+Nylon's single flat todo list is now three fixed time-bucket lists (Today,
+This Week, Sometime) plus unlimited custom lists. A todo belongs to exactly
+one list via `todos.listId`, completely independent of its due date. Today
+and This Week items age backward automatically — Today → This Week after one
+local day, This Week → Sometime after one local week — via an hourly
+Cloudflare Cron Trigger that checks each user's own IANA timezone. Web shows
+all lists as a horizontally-scrolling grid with full drag-and-drop (within
+and between columns); iOS pages between lists with a swipeable `TabView`,
+matching the same fixed-then-custom ordering. Custom lists support rename,
+reorder, and cascade-delete (with a todo-count confirmation). A new `n`
+keyboard shortcut creates directly into Today from anywhere in the web app.
+
+## Architecture
+
+- **Schema**: the previously-dead `lists`/`todo_lists` tables were
+  repurposed instead of adding a second lists concept — `lists` gained
+  `kind`/`systemKind`, `todo_lists` was dropped, and `todos` gained a
+  required `listId` FK plus `listEnteredAt` (the timestamp the aging sweep
+  and the "7 days in This Week" rule key off). `users.timezone` is new,
+  defaulting to `"UTC"`. Migration `0023_time_bucket_lists.sql` was
+  hand-written (this repo's established pattern — `drizzle-kit generate`
+  needs a TTY) and required a full `todos` table rebuild partway through,
+  since SQLite can't add a `NOT NULL` column with a non-constant default
+  (`unixepoch()`) via `ALTER TABLE ADD COLUMN` — `listId`/`listEnteredAt`
+  are added nullable, backfilled, then the table is rebuilt with the real
+  constraints. The `meta/0023_snapshot.json` drizzle-kit snapshot was
+  hand-authored to match, per this repo's ongoing snapshot-staleness
+  situation (see `db:check-meta`).
+- **Aging sweep**: `src/api/src/lib/list-sweep.ts`, run from a new
+  `scheduled` handler in `index.ts` on an hourly cron. Rather than persist a
+  per-user "last swept at" timestamp, it simply checks whether the current
+  hour is local midnight (hour `0`) in each user's timezone via
+  `Intl.DateTimeFormat` — since the sweep itself runs on the hour, that's
+  equivalent to "did local midnight fall in the last hour" without extra
+  state.
+- **Recurrence placement heuristic**: a new `placementForDueDate()` in
+  `@nylon-impossible/shared/recurrence` (mirrored in iOS's
+  `RecurrenceHelper.placement`) buckets a due date into Today/This
+  Week/Sometime by day-distance. It's applied exactly where a recurring
+  todo's due date is set for the first time or rolled forward on completion
+  (todo creation with `recurrence` + `dueDate`, and every completion-advance
+  path: REST `updateTodo`/`setTodoCompleted`, `POST /todos/sync`, the web
+  server function, and iOS's `toggleTodo`) — never on read, so an existing,
+  unmoving due date reaching that distance doesn't retroactively relocate a
+  todo.
+- **API**: `src/api/src/lib/lists.ts` (`getSystemListId`) and
+  `src/api/src/handlers/lists.ts` (list CRUD REST endpoints) are new.
+  Every `listId`-writing path threads a matching `listEnteredAt` stamp.
+  Subtasks always inherit their parent's `listId` — there's no independent
+  subtask list field. `import-google-tasks.ts`'s bound-param chunk size was
+  recomputed (15 columns now bound per row → chunks of 6, was 7) and the
+  existing chunking test still passes unchanged.
+- **Web**: `TodoGrid.tsx` is the new outer grid component (fetches todos +
+  lists once, groups by `listId`, renders one `TodoListColumn` per list); a
+  second `sortTopLevelTodos()` helper in `lib/todoOrder.ts` centralizes the
+  sticky-tier/completed sort shared by rendering and cross-list drag-target
+  math. Two independent `dnd-kit` `DndContext`s coexist: one spanning all
+  todo columns (cross-list item drag), one scoped to just the custom-list
+  headers (reorder, with system lists excluded from the sortable set
+  entirely — not just blocked on drop). `src/web/src/server/lists.ts`
+  mirrors the REST list handlers as TanStack Start server functions, since
+  that's the layer the web app's own CRUD actually calls at runtime (the
+  Worker REST API is what iOS and the Gmail add-on use).
+- **iOS**: `TodoListModel` is a new `@Model` (named to avoid clashing with
+  SwiftUI's `List`). `ContentView` pages via `TabView(.page)` over
+  `orderedLists`; `TodoViewModel` owns `selectedListId` and gained
+  `moveTodoToList` (the only cross-list move path on iOS — no drag grid) and
+  thin list-CRUD wrappers over `APIService`. `SyncService`'s new list-sync
+  step lives in a separate `SyncService+Lists.swift` extension file purely
+  to keep `SyncService`'s own type body under this repo's SwiftLint length
+  limit.
+
+### Deviations from the plan
+
+- The recurrence-placement heuristic (a "Settled design decisions" bullet)
+  was initially missed during implementation and had to be added in a
+  follow-up pass once cross-checking the acceptance criteria — it's now
+  wired into every dueDate-advance path on both platforms, but it's the one
+  piece of this plan that didn't get exhaustive file/line planning up front
+  the way the rest did.
+- `SyncService.swift`'s `modelContext` property had to move from `private`
+  to internal access so `SyncService+Lists.swift` (split out to avoid a
+  SwiftLint type-body-length violation) can read it — a small, deliberate
+  visibility widening within the same module, not a real API change.
+- As flagged throughout §5, iOS was implemented by inspection and verified
+  with SwiftLint + a `sticky`-vs-`listId` consistency grep, not a real
+  compile — `xcodebuild` can't build against the installed SDK in this dev
+  environment (see memory `ios-build-env-limitation.md`). A real build and
+  SwiftData migration check on a populated store are still needed before
+  shipping to iOS users.

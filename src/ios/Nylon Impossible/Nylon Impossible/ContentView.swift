@@ -14,6 +14,7 @@ struct ContentView: View {
     @Environment(SyncService.self) private var syncService
     @Environment(UserPreferencesService.self) private var preferencesService
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
+    @Query(sort: \TodoListModel.position) private var lists: [TodoListModel]
     @State private var viewModel = TodoViewModel()
     // Bumped at each local midnight so repeats completed "today" derive back to
     // active (isEffectivelyCompleted flips) without a refetch. Any @State write
@@ -25,10 +26,23 @@ struct ContentView: View {
     // Staged by swipe-to-delete; the row only actually deletes once confirmed.
     @State private var pendingDeleteTodo: TodoItem?
 
-    // Subtasks live inside their parent's edit sheet, not as their own rows, so
-    // the main list is top-level todos only.
-    private var sortedTodosList: [TodoItem] {
-        viewModel.sortedTodos(from: todos.filter { $0.parentId == nil })
+    /// Lists in the fixed order: Today, This Week, Sometime, then custom
+    /// lists by position. Mirrors web's `TodoGrid` ordering.
+    private var orderedLists: [TodoListModel] {
+        lists.sorted { a, b in
+            if a.isSystem != b.isSystem { return a.isSystem }
+            if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
+            return a.position < b.position
+        }
+    }
+
+    /// Subtasks live inside their parent's edit sheet, not as their own rows,
+    /// so a list's page is top-level todos only, scoped to that list. List
+    /// scoping itself lives in `TodoViewModel.sortedTodos` — this only needs
+    /// to strip out subtasks first.
+    private func sortedTodosList(for listId: String?) -> [TodoItem] {
+        let topLevel = todos.filter { $0.parentId == nil }
+        return viewModel.sortedTodos(from: topLevel, listId: listId)
     }
 
     /// A todo's subtasks (active + completed), excluding soft-deleted.
@@ -57,25 +71,38 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
             GradientBackground()
 
-            // Task list or empty state. Fills the screen and scrolls *behind*
-            // the floating header and input bar (liquid glass), so nothing sits
-            // in an opaque box. Ignores the keyboard so the list doesn't jump
-            // when the input bar rises to meet it.
-            Group {
-                if sortedTodosList.isEmpty {
-                    ScrollView {
-                        EmptyStateView()
-                            .transition(.opacity)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 96)
-                            .padding(.bottom, 100)
+            // Paged-swipe across lists — Today, This Week, Sometime, then
+            // custom lists in order. Each page fills the screen and scrolls
+            // *behind* the floating header and input bar (liquid glass), so
+            // nothing sits in an opaque box. No grid view in v1.
+            TabView(selection: Bindable(viewModel).selectedListId) {
+                ForEach(orderedLists) { list in
+                    Group {
+                        let pageTodos = sortedTodosList(for: list.id)
+                        if pageTodos.isEmpty {
+                            ScrollView {
+                                EmptyStateView()
+                                    .transition(.opacity)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.top, 96)
+                                    .padding(.bottom, 100)
+                            }
+                        } else {
+                            taskListView(for: pageTodos)
+                        }
                     }
-                } else {
-                    taskListView
+                    .tag(Optional(list.id))
                 }
             }
+            .tabViewStyle(.page(indexDisplayMode: .never))
             .padding(.horizontal, 16)
             .ignoresSafeArea(.keyboard, edges: .bottom)
+            .onAppear {
+                viewModel.selectDefaultListIfNeeded(from: orderedLists)
+            }
+            .onChange(of: orderedLists.map(\.id)) {
+                viewModel.selectDefaultListIfNeeded(from: orderedLists)
+            }
 
             // Floating header — pinned to the top, overlapping the scrolling
             // list beneath it. Its glass pill is the only opaque element; the
@@ -112,7 +139,8 @@ struct ContentView: View {
                     text: text,
                     userId: authService.userId,
                     context: modelContext,
-                    allTodos: todos
+                    allTodos: todos,
+                    listId: viewModel.selectedListId.flatMap { UUID(uuidString: $0) }
                 ) else { return }
 
                 if preferencesService.aiEnabled {
@@ -140,7 +168,7 @@ struct ContentView: View {
             .padding(.top, 10)
             .padding(.bottom, 6)
         }
-        .animation(.easeInOut(duration: 0.3), value: sortedTodosList.count)
+        .animation(.easeInOut(duration: 0.3), value: todos.count)
         .refreshable {
             await syncService.sync()
         }
@@ -162,9 +190,9 @@ struct ContentView: View {
         }
     }
 
-    private var taskListView: some View {
-        let incomplete = sortedTodosList.filter { !$0.isEffectivelyCompleted }
-        let completed = sortedTodosList.filter { $0.isEffectivelyCompleted }
+    private func taskListView(for pageTodos: [TodoItem]) -> some View {
+        let incomplete = pageTodos.filter { !$0.isEffectivelyCompleted }
+        let completed = pageTodos.filter { $0.isEffectivelyCompleted }
 
         return List {
             Section {
@@ -282,8 +310,9 @@ struct ContentView: View {
             apiService: syncService.apiService,
             urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
             subtasks: subtasks(of: todo),
+            availableLists: orderedLists,
             onToggle: {
-                viewModel.toggleTodo(todo, allTodos: todos)
+                viewModel.toggleTodo(todo, allTodos: todos, lists: orderedLists)
                 syncService.syncAfterAction()
             },
             onToggleSticky: {
@@ -326,6 +355,11 @@ struct ContentView: View {
                     parent: todo,
                     allTodos: todos
                 )
+                syncService.syncAfterAction()
+            },
+            onMoveToList: { listId in
+                guard let uuid = UUID(uuidString: listId) else { return }
+                viewModel.moveTodoToList(todo, to: uuid, allTodos: todos)
                 syncService.syncAfterAction()
             }
         )
@@ -411,7 +445,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [TodoItem.self, TodoUrl.self, TodoMessage.self], inMemory: true)
+        .modelContainer(for: [TodoItem.self, TodoUrl.self, TodoMessage.self, TodoListModel.self], inMemory: true)
         .environment(AuthService())
         .environment(SyncService(authService: AuthService()))
 }

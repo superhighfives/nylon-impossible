@@ -163,7 +163,7 @@ describe("Google Tasks import", () => {
 
   it("imports more tasks than fit in one D1 insert chunk", async () => {
     // D1 caps bound parameters at 100 per statement, so todos insert in chunks
-    // of 9. Importing 25 crosses multiple chunk boundaries — a regression to a
+    // of 6. Importing 25 crosses multiple chunk boundaries — a regression to a
     // chunk size that binds >100 params would throw a D1_ERROR mid-import.
     mockGoogleToken("google-token");
     mockGoogleTasksApi(

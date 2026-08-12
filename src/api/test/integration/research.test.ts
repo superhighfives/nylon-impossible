@@ -11,7 +11,7 @@ import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, todoResearch, todos, todoUrls, users } from "../../src/lib/db";
-import { cleanDb, seedUser } from "../helpers";
+import { cleanDb, getTodayListId, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -54,6 +54,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_test_123",
+        listId: await getTodayListId("user_test_123"),
         title: "How does OAuth work",
         position: "a0",
         createdAt: now,
@@ -129,6 +130,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_test_123",
+        listId: await getTodayListId("user_test_123"),
         title: "Buy milk",
         position: "a0",
         createdAt: now,
@@ -151,6 +153,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_test_123",
+        listId: await getTodayListId("user_test_123"),
         title: "Best practices for React",
         position: "a0",
         createdAt: now,
@@ -187,6 +190,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_test_123",
+        listId: await getTodayListId("user_test_123"),
         title: "How does OAuth work",
         position: "a0",
         createdAt: now,
@@ -223,6 +227,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_noai",
+        listId: await getTodayListId("user_noai"),
         title: "How does OAuth work",
         position: "a0",
         createdAt: now,
@@ -255,6 +260,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_free",
+        listId: await getTodayListId("user_free"),
         title: "How does OAuth work",
         position: "a0",
         createdAt: now,
@@ -274,6 +280,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_test_123",
+        listId: await getTodayListId("user_test_123"),
         title: "How does OAuth work",
         position: "a0",
         createdAt: now,
@@ -342,6 +349,7 @@ describe("Research functionality", () => {
       await db.insert(todos).values({
         id: todoId,
         userId: "user_test_123",
+        listId: await getTodayListId("user_test_123"),
         title: "Book dinner at San Jalisco",
         position: "a0",
         createdAt: now,
@@ -376,13 +384,11 @@ describe("Research functionality", () => {
       const now = new Date();
 
       // Create a todo owned by another user
-      await db.insert(users).values({
-        id: "other_user",
-        email: "other@example.com",
-      });
+      await seedUser("other_user", "other@example.com");
       await db.insert(todos).values({
         id: "550e8400-e29b-41d4-a716-446655440080",
         userId: "other_user",
+        listId: await getTodayListId("other_user"),
         title: "Other user todo",
         position: "a0",
         createdAt: now,

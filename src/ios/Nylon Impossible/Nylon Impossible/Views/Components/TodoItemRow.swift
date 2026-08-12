@@ -12,6 +12,10 @@ struct TodoItemRow: View {
     let apiService: APIService?
     let urls: [APITodoUrl]
     var subtasks: [TodoItem] = []
+    // Every list the user can move this todo into. Empty (the default) is
+    // fine for a static context like the drag preview, which never opens a
+    // real edit sheet.
+    var availableLists: [TodoListModel] = []
     var onToggle: () -> Void
     var onToggleSticky: () -> Void = {}
     var onSave: (String, String?, Date?, Recurrence?, Bool) -> Void
@@ -19,6 +23,7 @@ struct TodoItemRow: View {
     var onToggleSubtask: (TodoItem) -> Void = { _ in }
     var onDeleteSubtask: (TodoItem) -> Void = { _ in }
     var onMoveSubtask: (IndexSet, Int) -> Void = { _, _ in }
+    var onMoveToList: (String) -> Void = { _ in }
 
     private var completedSubtaskCount: Int {
         subtasks.filter { $0.isCompleted }.count
@@ -399,6 +404,7 @@ struct TodoItemRow: View {
                 apiService: apiService,
                 initialUrls: urls,
                 subtasks: subtasks,
+                availableLists: availableLists,
                 onSave: { title, notes, dueDate, recurrence, sticky in
                     onSave(title, notes, dueDate, recurrence, sticky)
                     showingEditSheet = false
@@ -409,7 +415,8 @@ struct TodoItemRow: View {
                 onAddSubtask: onAddSubtask,
                 onToggleSubtask: onToggleSubtask,
                 onDeleteSubtask: onDeleteSubtask,
-                onMoveSubtask: onMoveSubtask
+                onMoveSubtask: onMoveSubtask,
+                onMoveToList: onMoveToList
             )
         }
     }

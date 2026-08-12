@@ -2,6 +2,7 @@ import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
 import { Context, Effect, Layer } from "effect";
 import type { DbClient } from "./db";
 import { UnauthorizedError, UserNotFoundError } from "./errors";
+import { ensureSystemLists } from "./lists";
 import { users } from "./schema";
 
 /**
@@ -25,6 +26,10 @@ export async function ensureUserExists(
     .insert(users)
     .values({ id: userId, email: email || "" })
     .onConflictDoNothing();
+  // Matches the system-list provisioning sync.ts does when the API worker
+  // creates a user — a web-only signup goes through this path instead, and
+  // still needs somewhere for todos.listId to point.
+  await ensureSystemLists(db, userId);
 }
 
 /**

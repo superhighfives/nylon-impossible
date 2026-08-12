@@ -22,6 +22,39 @@ export function nextDueDate(
   return next;
 }
 
+/** Which built-in time-bucket list a due date's distance from `now` maps to. */
+export type ListPlacement = "today" | "thisWeek" | "sometime";
+
+/**
+ * Placement heuristic for a recurring todo's new occurrence: due today or
+ * tomorrow → Today; due within the next 7 days → This Week; further out →
+ * Sometime. Applied once when a new occurrence is created (initial creation
+ * of any recurring todo, or a repeat's dueDate advancing on completion) — the
+ * occurrence ages normally afterward like any manually-placed todo. Never
+ * used to move a todo based on an *existing*, unchanged due date reaching
+ * that point in time (reaching a due date never auto-promotes a todo).
+ *
+ * Mirrored in the Swift port at
+ * src/ios/Nylon Impossible/Nylon Impossible/Utils/Recurrence.swift.
+ */
+export function placementForDueDate(dueDate: Date, now: Date): ListPlacement {
+  const startOfToday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
+  const daysUntilDue = Math.floor(
+    (Date.UTC(
+      dueDate.getUTCFullYear(),
+      dueDate.getUTCMonth(),
+      dueDate.getUTCDate(),
+    ) -
+      startOfToday.getTime()) /
+      (24 * 60 * 60 * 1000),
+  );
+  if (daysUntilDue <= 1) return "today";
+  if (daysUntilDue <= 7) return "thisWeek";
+  return "sometime";
+}
+
 /**
  * Step a recurrence one occurrence backward from `from`. Used to undo a repeat
  * that was completed today: completing advances the dueDate, so un-checking it

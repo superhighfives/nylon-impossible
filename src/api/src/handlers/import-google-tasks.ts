@@ -4,6 +4,8 @@ import type { Context } from "hono";
 import { enrichOrAskWithAI } from "../lib/ai-enrich";
 import { clerkClient } from "../lib/clerk";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
+import { apiError } from "../lib/errors";
+import { getSystemListId } from "../lib/lists";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
@@ -21,15 +23,15 @@ interface GoogleTask {
 }
 
 // D1 caps bound parameters at 100 per statement. Each inserted todo row binds
-// 13 params: the 11 fields set below (id, userId, title, notes, completed,
-// position, dueDate, googleTaskId, aiStatus, createdAt, updatedAt) PLUS
-// `needsInput` and `sticky` — NOT NULL columns with defaults that Drizzle
-// still binds even though we don't set them. Chunk at 7 rows (91 params) to
-// stay under the cap; a larger chunk throws a D1_ERROR mid-import. Count the
-// generated SQL params, not the fields set here — NOT NULL defaulted columns
-// are easy to miss.
-const TODO_INSERT_COLUMNS = 13;
-const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 7
+// 15 params: the 13 fields set below (id, userId, listId, listEnteredAt,
+// title, notes, completed, position, dueDate, googleTaskId, aiStatus,
+// createdAt, updatedAt) PLUS `needsInput` and `sticky` — NOT NULL columns
+// with defaults that Drizzle still binds even though we don't set them.
+// Chunk at 6 rows (90 params) to stay under the cap; a larger chunk throws a
+// D1_ERROR mid-import. Count the generated SQL params, not the fields set
+// here — NOT NULL defaulted columns are easy to miss.
+const TODO_INSERT_COLUMNS = 15;
+const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 6
 
 // todoUrls rows bind 7 params (all NOT NULL columns are set explicitly, so
 // there's no hidden defaulted column like todos' needsInput). Chunk the same
@@ -172,10 +174,19 @@ export async function importGoogleTasks(c: Context<Env>) {
     toImport.length,
   );
 
+  // Imported tasks default to the Sometime list — they arrive without the
+  // "I want to work this today" intent that a manually-placed Today todo has.
+  const sometimeListId = await getSystemListId(db, userId, "sometime");
+  if (!sometimeListId) {
+    return apiError(c, "list_not_found");
+  }
+
   const now = new Date();
   const rows = toImport.map((task, index) => ({
     id: crypto.randomUUID(),
     userId,
+    listId: sometimeListId,
+    listEnteredAt: now,
     title: truncateTitle(task.title?.trim() || "Untitled"),
     notes: task.notes ? task.notes.slice(0, 10000) : null,
     completed: false,

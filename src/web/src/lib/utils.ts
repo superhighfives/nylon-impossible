@@ -131,10 +131,19 @@ export const errorToResponse = (
         );
 
       case "TodoNotFoundError":
+      case "ListNotFoundError":
         return Effect.fail(
           new Response("Not Found", {
             status: 404,
             statusText: "Not Found",
+          }),
+        );
+
+      case "SystemListImmutableError":
+        return Effect.fail(
+          new Response("System lists can't be renamed, deleted, or reordered", {
+            status: 403,
+            statusText: "Forbidden",
           }),
         );
 

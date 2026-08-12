@@ -1,6 +1,9 @@
 import { createClerkClient } from "@clerk/backend";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
-import { nextDueDate } from "@nylon-impossible/shared/recurrence";
+import {
+  nextDueDate,
+  placementForDueDate,
+} from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -26,11 +29,19 @@ import {
   users,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
+import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
 
-const DEFAULT_LISTS = ["TODO", "Shopping", "Bills", "Work"];
+// The three system lists provisioned for every new user, fixed first-three
+// order (position a0 < a1 < a2). Custom lists never interleave before/between
+// these.
+const SYSTEM_LISTS = [
+  { name: "Today", systemKind: "today" as const },
+  { name: "This Week", systemKind: "thisWeek" as const },
+  { name: "Sometime", systemKind: "sometime" as const },
+];
 
 const recurrenceSchema = z.object({
   frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
@@ -58,6 +69,7 @@ const syncRequestSchema = z.object({
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
       sticky: z.boolean().optional(),
+      listId: z.string().uuid().optional(),
       urls: z
         .array(z.object({ url: z.string().url().max(2048) }))
         .max(10)
@@ -161,6 +173,7 @@ function serializeTodo(
     id: todo.id.toLowerCase(),
     userId: todo.userId,
     parentId: todo.parentId?.toLowerCase() ?? null,
+    listId: todo.listId,
     title: todo.title,
     notes: todo.notes,
     completed: todo.completed,
@@ -257,14 +270,18 @@ export async function syncTodos(c: Context<Env>) {
       .returning({ id: users.id });
 
     if (inserted) {
-      // We created the user — seed default lists exactly once.
-      const positions = generateNKeysBetween(null, null, DEFAULT_LISTS.length);
+      // We created the user — seed the three system lists exactly once. This
+      // is the only place a user row is ever created, so it's the natural
+      // single place list provisioning happens.
+      const positions = generateNKeysBetween(null, null, SYSTEM_LISTS.length);
       const now = new Date();
       await db.insert(lists).values(
-        DEFAULT_LISTS.map((name, i) => ({
+        SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
           id: crypto.randomUUID(),
           userId,
           name,
+          kind: "system" as const,
+          systemKind,
           position: positions[i],
           createdAt: now,
           updatedAt: now,
@@ -361,19 +378,42 @@ export async function syncTodos(c: Context<Env>) {
         // Recurring todo being marked complete: advance the anchor, keep the
         // completion flag clear, and stamp completedAt. Mirrors the optimistic
         // client advance.
+        let recurrencePlacementListId: string | null = null;
         if (completing && nextRecurrence && nextDueDateValue) {
-          dueDateToWrite = nextDueDate(
-            nextRecurrence,
-            nextDueDateValue,
-            new Date(),
-          );
+          const now = new Date();
+          dueDateToWrite = nextDueDate(nextRecurrence, nextDueDateValue, now);
           completedToWrite = false;
-          completedAtToWrite = new Date();
+          completedAtToWrite = now;
+          // The new occurrence is placed by its due date's distance, per the
+          // settled recurrence heuristic — unless the client also explicitly
+          // moved it in this same change, which wins.
+          if (change.listId === undefined) {
+            recurrencePlacementListId = await getSystemListId(
+              db,
+              userId,
+              placementForDueDate(dueDateToWrite, now),
+            );
+          }
         }
         // Completing a sticky todo unsticks it, same as the REST update path.
         let stickyToWrite =
           change.sticky !== undefined ? change.sticky : existing.sticky;
         if (completing && stickyToWrite) stickyToWrite = false;
+        // A client-supplied listId only ever passes a UUID-format check at
+        // the request boundary — verify it actually belongs to this user
+        // before writing it, or a leaked/guessed list id from another
+        // account could be pointed at by this todo (see InvalidListError's
+        // doc in todos-core.ts for the cascade-delete consequence).
+        const ownedListId =
+          change.listId !== undefined
+            ? await verifyListOwnership(db, userId, change.listId)
+            : undefined;
+        if (change.listId !== undefined && !ownedListId) {
+          return apiError(c, "list_not_found");
+        }
+        const listIdToWrite =
+          ownedListId ?? recurrencePlacementListId ?? existing.listId;
+        const listChanged = listIdToWrite !== existing.listId;
         await db
           .update(todos)
           .set({
@@ -385,6 +425,10 @@ export async function syncTodos(c: Context<Env>) {
             dueDate: dueDateToWrite,
             recurrence: nextRecurrence,
             sticky: stickyToWrite,
+            listId: listIdToWrite,
+            listEnteredAt: listChanged
+              ? change.updatedAt
+              : existing.listEnteredAt,
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
@@ -431,9 +475,14 @@ export async function syncTodos(c: Context<Env>) {
       // Create new
       if (change.title) {
         const parentId = change.parentId?.toLowerCase() ?? null;
+        let parentListId: string | null = null;
         if (parentId) {
           const [parentTodo] = await db
-            .select({ id: todos.id, parentId: todos.parentId })
+            .select({
+              id: todos.id,
+              parentId: todos.parentId,
+              listId: todos.listId,
+            })
             .from(todos)
             .where(and(eq(todos.id, parentId), eq(todos.userId, userId)))
             .limit(1);
@@ -450,11 +499,41 @@ export async function syncTodos(c: Context<Env>) {
               ],
             });
           }
+          parentListId = parentTodo.listId;
+        }
+        // Subtasks are implicitly scoped to their parent's list — no
+        // independent list membership. A new recurring todo (which always
+        // has a due date) is placed by that due date's distance instead of
+        // defaulting to Today. Other top-level todos default to Today.
+        const isRecurring = !parentId && change.recurrence && change.dueDate;
+        // A client-supplied listId only ever passes a UUID-format check at
+        // the request boundary — verify ownership before writing it.
+        const ownedCreateListId = change.listId
+          ? await verifyListOwnership(db, userId, change.listId)
+          : null;
+        if (change.listId && !ownedCreateListId) {
+          return apiError(c, "list_not_found");
+        }
+        const listId =
+          parentListId ??
+          ownedCreateListId ??
+          (isRecurring && change.dueDate
+            ? await getSystemListId(
+                db,
+                userId,
+                placementForDueDate(change.dueDate, new Date()),
+              )
+            : null) ??
+          (await getSystemListId(db, userId, "today"));
+        if (!listId) {
+          return apiError(c, "list_not_found");
         }
         await db.insert(todos).values({
           id: normalizedId,
           userId,
           parentId,
+          listId,
+          listEnteredAt: change.updatedAt,
           title: truncateTitle(change.title),
           notes: change.notes ?? null,
           completed: change.completed ?? false,

@@ -1,8 +1,8 @@
 import { Show } from "@clerk/tanstack-react-start";
 import { createFileRoute } from "@tanstack/react-router";
 import { LandingPage } from "@/components/LandingPage";
+import { TodoGrid } from "@/components/TodoGrid";
 import { TodoInput } from "@/components/TodoInput";
-import { TodoList } from "@/components/TodoList";
 import {
   useWebSocketConnection,
   WebSocketSyncContext,
@@ -15,10 +15,12 @@ function SignedInContent() {
 
   return (
     <WebSocketSyncContext.Provider value={wsSync}>
-      <div className="container max-w-xl mx-auto py-8 px-4 todo-list-ios-offset">
-        <div className="space-y-4">
+      <div className="container max-w-4xl mx-auto py-8 px-4 todo-list-ios-offset">
+        <div className="max-w-xl mx-auto">
           <TodoInput />
-          <TodoList />
+        </div>
+        <div className="mt-4">
+          <TodoGrid />
         </div>
       </div>
     </WebSocketSyncContext.Provider>

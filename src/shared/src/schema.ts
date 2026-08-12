@@ -3,7 +3,6 @@ import {
   type AnySQLiteColumn,
   index,
   integer,
-  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
@@ -50,6 +49,9 @@ export const users = sqliteTable(
     hideCompleted: integer("hide_completed", { mode: "boolean" })
       .notNull()
       .default(false),
+    // IANA identifier (e.g. "America/New_York"). Drives the aging sweep's
+    // per-account "local midnight" calculation.
+    timezone: text("timezone").notNull().default("UTC"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -81,6 +83,18 @@ export const todos = sqliteTable(
       (): AnySQLiteColumn => todos.id,
       { onDelete: "cascade" },
     ),
+    // Which list this todo belongs to (Today/This Week/Sometime, or a custom
+    // list). A todo belongs to exactly one list. Independent of dueDate —
+    // list membership never implies or derives a due date, and vice versa.
+    listId: text("list_id")
+      .notNull()
+      .references(() => lists.id, { onDelete: "cascade" }),
+    // When listId last changed (manual drag, creation, or the aging sweep).
+    // Drives the "how long has this been in This Week" demotion rule, since
+    // listId alone carries no entry timestamp.
+    listEnteredAt: integer("list_entered_at", { mode: "timestamp" })
+      .notNull()
+      .default(sql`(unixepoch())`),
     title: text("title").notNull(),
     completed: integer("completed", { mode: "boolean" })
       .notNull()
@@ -125,6 +139,13 @@ export const todos = sqliteTable(
     index("idx_todos_user_parent_position").on(
       table.userId,
       table.parentId,
+      table.position,
+    ),
+    // List-scoped ordering — the index the drag reorder and per-list fetch
+    // actually use.
+    index("idx_todos_user_list_position").on(
+      table.userId,
+      table.listId,
       table.position,
     ),
     // Multiple NULLs are distinct in SQLite, so in-app todos never collide;
@@ -183,7 +204,10 @@ export const todoMessages = sqliteTable(
   ],
 );
 
-// Lists table (hardcoded defaults: TODO, Shopping, Bills, Work)
+// Lists table. Three system lists per user (Today/This Week/Sometime,
+// kind = "system", fixed first-three order) plus unlimited user-named
+// custom lists (kind = "custom"). A todo belongs to exactly one list via
+// todos.listId.
 export const lists = sqliteTable(
   "lists",
   {
@@ -194,6 +218,15 @@ export const lists = sqliteTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    kind: text("kind", { enum: ["system", "custom"] })
+      .notNull()
+      .default("custom"),
+    // Which built-in bucket this is, for system lists only. Null for custom
+    // lists — never collides under idx_lists_user_system_kind since SQLite
+    // treats multiple NULLs as distinct.
+    systemKind: text("system_kind", {
+      enum: ["today", "thisWeek", "sometime"],
+    }),
     position: text("position").notNull().default("a0"),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
@@ -203,27 +236,12 @@ export const lists = sqliteTable(
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("idx_lists_user_id").on(table.userId)],
-);
-
-// Todo-Lists join table
-export const todoLists = sqliteTable(
-  "todo_lists",
-  {
-    todoId: text("todo_id")
-      .notNull()
-      .references(() => todos.id, { onDelete: "cascade" }),
-    listId: text("list_id")
-      .notNull()
-      .references(() => lists.id, { onDelete: "cascade" }),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(sql`(unixepoch())`),
-  },
   (table) => [
-    primaryKey({ columns: [table.todoId, table.listId] }),
-    index("idx_todo_lists_todo").on(table.todoId),
-    index("idx_todo_lists_list").on(table.listId),
+    index("idx_lists_user_id").on(table.userId),
+    uniqueIndex("idx_lists_user_system_kind").on(
+      table.userId,
+      table.systemKind,
+    ),
   ],
 );
 
@@ -373,7 +391,10 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
     relationName: "subtasks",
   }),
   subtasks: many(todos, { relationName: "subtasks" }),
-  todoLists: many(todoLists),
+  list: one(lists, {
+    fields: [todos.listId],
+    references: [lists.id],
+  }),
   todoUrls: many(todoUrls),
   research: one(todoResearch),
   messages: many(todoMessages),
@@ -402,18 +423,7 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
     fields: [lists.userId],
     references: [users.id],
   }),
-  todoLists: many(todoLists),
-}));
-
-export const todoListsRelations = relations(todoLists, ({ one }) => ({
-  todo: one(todos, {
-    fields: [todoLists.todoId],
-    references: [todos.id],
-  }),
-  list: one(lists, {
-    fields: [todoLists.listId],
-    references: [lists.id],
-  }),
+  todos: many(todos),
 }));
 
 export const todoResearchRelations = relations(
@@ -445,8 +455,6 @@ export type Todo = typeof todos.$inferSelect;
 export type NewTodo = typeof todos.$inferInsert;
 export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
-export type TodoList = typeof todoLists.$inferSelect;
-export type NewTodoList = typeof todoLists.$inferInsert;
 export type TodoResearch = typeof todoResearch.$inferSelect;
 export type NewTodoResearch = typeof todoResearch.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;

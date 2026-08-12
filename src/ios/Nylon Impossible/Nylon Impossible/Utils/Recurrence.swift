@@ -9,7 +9,33 @@
 
 import Foundation
 
+/// Which built-in time-bucket list a due date's distance from `now` maps to.
+enum ListPlacement: String {
+    case today
+    case thisWeek
+    case sometime
+}
+
 enum RecurrenceHelper {
+    /// Placement heuristic for a recurring todo's new occurrence: due today or
+    /// tomorrow → Today; due within the next 7 days → This Week; further out →
+    /// Sometime. Applied once when a new occurrence is created (initial
+    /// creation of any recurring todo, or a repeat's dueDate advancing on
+    /// completion) — the occurrence ages normally afterward. Mirrors
+    /// `placementForDueDate` in src/shared/src/recurrence.ts.
+    static func placement(forDueDate dueDate: Date, now: Date) -> ListPlacement {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
+        let startOfToday = calendar.startOfDay(for: now)
+        let startOfDue = calendar.startOfDay(for: dueDate)
+        let daysUntilDue = calendar.dateComponents([.day], from: startOfToday, to: startOfDue).day ?? 0
+
+        if daysUntilDue <= 1 { return .today }
+        if daysUntilDue <= 7 { return .thisWeek }
+        return .sometime
+    }
+
     /// Compute the next due date for a repeating todo. Advances `from` by the
     /// recurrence frequency repeatedly until the result is strictly greater
     /// than `now`.

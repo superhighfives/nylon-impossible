@@ -8,6 +8,7 @@ function makeSubtask(overrides: Partial<TodoWithUrls> = {}): TodoWithUrls {
     id: "sub-1",
     userId: "user-1",
     parentId: "parent-1",
+    listId: "list-today",
     title: "A subtask",
     notes: null,
     completed: false,

@@ -112,6 +112,7 @@ struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
     let parentId: String?  // Parent todo id for subtasks; nil for top-level
+    let listId: String?    // Which list (Today/This Week/Sometime/custom) this todo belongs to
     let title: String
     let notes: String?
     let completed: Bool
@@ -130,7 +131,7 @@ struct APITodo: Codable, Sendable {
     let suggestions: [APITodoSuggestion]?  // Enrichment proposals included in sync response
 
     init(
-        id: String, userId: String, parentId: String? = nil, title: String,
+        id: String, userId: String, parentId: String? = nil, listId: String? = nil, title: String,
         notes: String? = nil,
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
@@ -144,6 +145,7 @@ struct APITodo: Codable, Sendable {
         self.id = id
         self.userId = userId
         self.parentId = parentId
+        self.listId = listId
         self.title = title
         self.notes = notes
         self.completed = completed
@@ -279,6 +281,7 @@ struct TodoUrlChange: Codable, Sendable, Equatable {
 struct TodoChange: Codable, Sendable {
     let id: String
     let parentId: String?  // Set on create for subtasks; server ignores on update
+    let listId: String?    // Set on create (defaults to Today server-side) or a manual list move
     let title: String?
     let notes: String?
     let completed: Bool?
@@ -292,7 +295,7 @@ struct TodoChange: Codable, Sendable {
     let urls: [TodoUrlChange]?
 
     enum CodingKeys: String, CodingKey {
-        case id, parentId, title, notes, completed, position, dueDate,
+        case id, parentId, listId, title, notes, completed, position, dueDate,
              recurrence, completedAt, updatedAt, deleted, sticky, urls
     }
 
@@ -304,6 +307,7 @@ struct TodoChange: Codable, Sendable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encodeIfPresent(parentId, forKey: .parentId)
+        try c.encodeIfPresent(listId, forKey: .listId)
         try c.encodeIfPresent(title, forKey: .title)
         try c.encodeIfPresent(notes, forKey: .notes)
         try c.encodeIfPresent(completed, forKey: .completed)
@@ -438,6 +442,12 @@ protocol APIProviding: Sendable {
     func dismissQuestion(todoId: String) async throws
     func acceptSuggestion(todoId: String, suggestionId: String) async throws
     func dismissSuggestion(todoId: String, suggestionId: String) async throws
+
+    // MARK: - Lists
+    func listLists() async throws -> [APIList]
+    func createList(name: String, position: String?) async throws -> APIList
+    func updateList(id: String, name: String?, position: String?) async throws -> APIList
+    func deleteList(id: String) async throws -> Int
 }
 
 // MARK: - API Service
@@ -625,6 +635,30 @@ final class APIService: APIProviding {
     /// already-imported tasks are skipped server-side.
     func importGoogleTasks() async throws -> GoogleTasksImportResponse {
         return try await post(path: "/todos/import/google-tasks", body: EmptyBody())
+    }
+
+    // MARK: - Lists
+
+    func listLists() async throws -> [APIList] {
+        return try await get(path: "/lists")
+    }
+
+    func createList(name: String, position: String? = nil) async throws -> APIList {
+        struct CreateListRequest: Encodable { let name: String; let position: String? }
+        return try await post(path: "/lists", body: CreateListRequest(name: name, position: position))
+    }
+
+    func updateList(id: String, name: String? = nil, position: String? = nil) async throws -> APIList {
+        struct UpdateListRequest: Encodable { let name: String?; let position: String? }
+        return try await patch(path: "/lists/\(id)", body: UpdateListRequest(name: name, position: position))
+    }
+
+    /// Delete a custom list. Cascade-deletes its todos server-side; returns
+    /// the number deleted so the caller can confirm/inform after the fact.
+    func deleteList(id: String) async throws -> Int {
+        struct DeleteListResponse: Decodable { let success: Bool; let deletedTodoCount: Int }
+        let response: DeleteListResponse = try await delete(path: "/lists/\(id)")
+        return response.deletedTodoCount
     }
 
     // MARK: - HTTP Methods

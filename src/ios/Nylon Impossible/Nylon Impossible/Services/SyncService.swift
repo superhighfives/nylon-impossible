@@ -21,7 +21,9 @@ enum SyncState: Equatable {
 final class SyncService {
     private let authService: any AuthProviding
     private var _apiService: (any APIProviding)?
-    private var modelContext: ModelContext?
+    // Not `private` — the SyncService+Lists.swift extension (split out to
+    // keep this type's body under SwiftLint's length limit) needs to read it.
+    var modelContext: ModelContext?
     
     /// Expose API service for direct API calls (e.g. fetching URLs)
     var apiService: APIService? {
@@ -115,6 +117,11 @@ final class SyncService {
                 userId: userId,
                 justPushedMessageIds: pushedMessageIds
             )
+
+            // Lists (Today/This Week/Sometime + custom) are server-authoritative
+            // and rarely change — a lightweight fetch-and-upsert alongside the
+            // main todo sync, not folded into the sync request/response body.
+            await syncLists(apiService: apiService, userId: userId)
 
             // Recompute app icon badge after every sync (due-today / overdue).
             if let modelContext {
@@ -215,6 +222,7 @@ final class SyncService {
                 id: todo.id.uuidString.lowercased(),
                 // Immutable; honoured only on create, but harmless to resend.
                 parentId: todo.isDeleted ? nil : todo.parentId?.uuidString.lowercased(),
+                listId: todo.isDeleted ? nil : todo.listId?.uuidString.lowercased(),
                 title: todo.isDeleted ? nil : todo.title,
                 notes: todo.isDeleted ? nil : todo.itemNotes,
                 completed: todo.isDeleted ? nil : todo.isCompleted,
@@ -264,6 +272,10 @@ final class SyncService {
                 if remote.updatedAt > local.updatedAt {
                     local.title = remote.title
                     local.parentId = remote.parentId.flatMap { UUID(uuidString: $0) }
+                    if let remoteListId = remote.listId, remoteListId != local.listId?.uuidString.lowercased() {
+                        local.listId = UUID(uuidString: remoteListId)
+                        local.listEnteredAt = Date()
+                    }
                     local.itemNotes = remote.notes
                     local.isCompleted = remote.completed
                     local.completedAt = remote.completedAt
@@ -293,6 +305,8 @@ final class SyncService {
                 let todo = TodoItem(title: remote.title, userId: userId, position: remote.position ?? "a0")
                 todo.id = remoteId
                 todo.parentId = remote.parentId.flatMap { UUID(uuidString: $0) }
+                todo.listId = remote.listId.flatMap { UUID(uuidString: $0) }
+                todo.listEnteredAt = Date()
                 todo.itemNotes = remote.notes
                 todo.isCompleted = remote.completed
                 todo.completedAt = remote.completedAt

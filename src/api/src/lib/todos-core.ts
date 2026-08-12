@@ -1,4 +1,7 @@
-import { nextDueDate } from "@nylon-impossible/shared/recurrence";
+import {
+  nextDueDate,
+  placementForDueDate,
+} from "@nylon-impossible/shared/recurrence";
 import type { Env, ResearchJobMessage } from "../types";
 import {
   and,
@@ -13,11 +16,23 @@ import {
   todoUrls,
   users,
 } from "./db";
+import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
 type Todo = typeof todos.$inferSelect;
+
+/**
+ * Thrown when a patch's `listId` doesn't resolve to a list owned by the
+ * caller — either it doesn't exist, or it belongs to someone else.
+ */
+export class InvalidListError extends Error {
+  constructor() {
+    super("listId must reference one of the user's own lists");
+    this.name = "InvalidListError";
+  }
+}
 
 /**
  * Fields `updateTodoCore` accepts. Mirrors the REST `PUT /todos/:id` body,
@@ -37,15 +52,21 @@ export interface UpdateTodoPatch {
   completedAt?: Date | null;
   updatedAt?: Date;
   sticky?: boolean;
+  listId?: string;
 }
 
 /**
- * The user's open, top-level todos in list order. Shared by the Gmail add-on
- * homepage card and any REST surface that needs the same "what's on my plate"
- * view, so the two can't drift. Excludes completed todos and subtasks
- * (parentId IS NULL), matching the top-level list shown on web/iOS.
+ * The user's open, top-level todos in the Today list, in list order. Shared
+ * by the Gmail add-on homepage card and any REST surface that needs the same
+ * "what's on my plate" view, so the two can't drift. Excludes completed
+ * todos and subtasks (parentId IS NULL), matching the top-level list shown
+ * on web/iOS. Scoped to Today only — the Gmail add-on doesn't yet surface
+ * This Week/Sometime/custom lists.
  */
-export function listOpenTodos(db: Db, userId: string) {
+export async function listOpenTodos(db: Db, userId: string) {
+  const todayListId = await getSystemListId(db, userId, "today");
+  if (!todayListId) return [];
+
   return db
     .select({
       id: todos.id,
@@ -57,6 +78,7 @@ export function listOpenTodos(db: Db, userId: string) {
     .where(
       and(
         eq(todos.userId, userId),
+        eq(todos.listId, todayListId),
         isNull(todos.parentId),
         eq(todos.completed, false),
       ),
@@ -112,9 +134,21 @@ export async function setTodoCompleted(
     if (isSubtask || hasChildren) recurrence = null;
   }
   if (completingRow && recurrence && existing.dueDate) {
+    const nextDue = nextDueDate(recurrence, existing.dueDate, now);
     updates.completed = false;
     updates.completedAt = now;
-    updates.dueDate = nextDueDate(recurrence, existing.dueDate, now);
+    updates.dueDate = nextDue;
+    // The new occurrence is placed by its due date's distance, per the
+    // settled recurrence heuristic — then ages normally afterward.
+    const placementListId = await getSystemListId(
+      db,
+      userId,
+      placementForDueDate(nextDue, now),
+    );
+    if (placementListId && placementListId !== existing.listId) {
+      updates.listId = placementListId;
+      updates.listEnteredAt = now;
+    }
   }
 
   // Completing a todo with an open question clears the question automatically.
@@ -200,6 +234,12 @@ export async function updateTodoCore(
   // completion stamps it server-side just below.
   if (patch.completedAt !== undefined) updates.completedAt = patch.completedAt;
   if (patch.sticky !== undefined) updates.sticky = patch.sticky;
+  if (patch.listId !== undefined && patch.listId !== existing.listId) {
+    const ownedListId = await verifyListOwnership(db, userId, patch.listId);
+    if (!ownedListId) throw new InvalidListError();
+    updates.listId = ownedListId;
+    updates.listEnteredAt = updatedAt;
+  }
 
   // Server-canonical advance: when a recurring todo is being marked complete
   // for the first time, advance dueDate to the next future occurrence and keep
@@ -227,9 +267,25 @@ export async function updateTodoCore(
   if (patch.recurrence !== undefined) updates.recurrence = recurrence;
   const anchor = patch.dueDate !== undefined ? patch.dueDate : existing.dueDate;
   if (completingRow && recurrence && anchor) {
+    const now = new Date();
+    const nextDue = nextDueDate(recurrence, anchor, now);
     updates.completed = false;
-    updates.completedAt = new Date();
-    updates.dueDate = nextDueDate(recurrence, anchor, new Date());
+    updates.completedAt = now;
+    updates.dueDate = nextDue;
+    // The new occurrence is placed by its due date's distance, per the
+    // settled recurrence heuristic — unless the caller also explicitly
+    // moved it in this same patch, which wins.
+    if (patch.listId === undefined) {
+      const placementListId = await getSystemListId(
+        db,
+        userId,
+        placementForDueDate(nextDue, now),
+      );
+      if (placementListId && placementListId !== existing.listId) {
+        updates.listId = placementListId;
+        updates.listEnteredAt = now;
+      }
+    }
   }
 
   // Completing a todo with an open question clears the question automatically.

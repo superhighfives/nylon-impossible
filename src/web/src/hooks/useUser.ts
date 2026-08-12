@@ -12,6 +12,7 @@ export interface User {
   location: string | null;
   theme: Theme;
   hideCompleted: boolean;
+  timezone: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -21,6 +22,7 @@ type UserUpdate = {
   location?: string | null;
   theme?: Theme;
   hideCompleted?: boolean;
+  timezone?: string;
 };
 
 const USER_QUERY_KEY = ["user", "me"] as const;
@@ -125,6 +127,9 @@ export function useUpdateUser() {
         }
         if (newData.hideCompleted !== undefined) {
           updates.hideCompleted = newData.hideCompleted;
+        }
+        if (newData.timezone !== undefined) {
+          updates.timezone = newData.timezone;
         }
         queryClient.setQueryData<User>(USER_QUERY_KEY, {
           ...previousUser,

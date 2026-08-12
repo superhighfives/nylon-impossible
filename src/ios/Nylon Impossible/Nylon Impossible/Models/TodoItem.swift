@@ -40,6 +40,15 @@ final class TodoItem {
     // handled explicitly, which avoids self-referential relationship pitfalls
     // and keeps the wire mapping trivial.
     var parentId: UUID?
+    // Which list (Today/This Week/Sometime, or a custom list) this todo
+    // belongs to. Stored as a plain id (not a SwiftData relationship) for the
+    // same reasons as `parentId` — explicit grouping, trivial wire mapping.
+    // Optional only for migration safety on existing local stores predating
+    // this field; every todo the server returns carries one.
+    var listId: UUID?
+    // When `listId` last changed (creation, manual move, or the server's
+    // aging sweep) — mirrors the server's `listEnteredAt` column.
+    var listEnteredAt: Date?
     var title: String
     var itemNotes: String?  // Optional notes
     var isCompleted: Bool
@@ -86,6 +95,8 @@ final class TodoItem {
         self.id = UUID()
         self.userId = userId
         self.parentId = nil
+        self.listId = nil
+        self.listEnteredAt = nil
         self.title = title
         self.itemNotes = nil
         self.isCompleted = false
