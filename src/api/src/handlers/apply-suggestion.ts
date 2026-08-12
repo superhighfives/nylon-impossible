@@ -176,14 +176,27 @@ export async function acceptSuggestion(c: Context<Env>) {
         updatedAt: now,
       });
 
-      await c.env.RESEARCH_QUEUE.send({
-        todoId,
-        userId,
-        query: payload.searchQuery ?? todo.title,
-        researchType: payload.researchType,
-        researchId,
-        userLocation: user?.location ?? null,
-      } satisfies ResearchJobMessage);
+      // A send failure (e.g. queue backpressure/quota) must not 500 this
+      // request; mark the just-created record failed instead.
+      try {
+        await c.env.RESEARCH_QUEUE.send({
+          todoId,
+          userId,
+          query: payload.searchQuery ?? todo.title,
+          researchType: payload.researchType,
+          researchId,
+          userLocation: user?.location ?? null,
+        } satisfies ResearchJobMessage);
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { area: "research-queue" },
+          extra: { todoId, researchId },
+        });
+        await db
+          .update(todoResearch)
+          .set({ status: "failed", updatedAt: new Date() })
+          .where(eq(todoResearch.id, researchId));
+      }
       break;
     }
   }

@@ -338,14 +338,28 @@ export async function createSmartTodo(
       .where(eq(users.id, userId))
       .then((rows) => rows[0]);
 
-    await env.RESEARCH_QUEUE.send({
-      todoId,
-      userId,
-      query: initial.title,
-      researchType: "general",
-      researchId,
-      userLocation: user?.location ?? null,
-    } satisfies ResearchJobMessage);
+    // A send failure (e.g. queue backpressure/quota) must not 500 the whole
+    // create request — the todo itself was already inserted. Mark the
+    // just-created research record failed instead.
+    try {
+      await env.RESEARCH_QUEUE.send({
+        todoId,
+        userId,
+        query: initial.title,
+        researchType: "general",
+        researchId,
+        userLocation: user?.location ?? null,
+      } satisfies ResearchJobMessage);
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { area: "research-queue" },
+        extra: { todoId, researchId },
+      });
+      await db
+        .update(todoResearch)
+        .set({ status: "failed", updatedAt: new Date() })
+        .where(eq(todoResearch.id, researchId));
+    }
   }
 
   // Fetch the created todo to return

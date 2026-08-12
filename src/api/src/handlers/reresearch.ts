@@ -97,15 +97,33 @@ export async function reresearchTodo(c: Context<Env>) {
     .from(users)
     .where(eq(users.id, userId));
 
-  // Enqueue research job — runs in a separate Worker invocation
-  await c.env.RESEARCH_QUEUE.send({
-    todoId,
-    userId,
-    query: searchQuery ?? todo.title,
-    researchType,
-    researchId: newResearchId,
-    userLocation: user?.location ?? null,
-  } satisfies ResearchJobMessage);
+  // Enqueue research job — runs in a separate Worker invocation. A send
+  // failure (e.g. queue backpressure/quota) must not 500 the request; mark
+  // the just-created record failed so the UI reflects it instead.
+  try {
+    await c.env.RESEARCH_QUEUE.send({
+      todoId,
+      userId,
+      query: searchQuery ?? todo.title,
+      researchType,
+      researchId: newResearchId,
+      userLocation: user?.location ?? null,
+    } satisfies ResearchJobMessage);
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { area: "research-queue" },
+      extra: { todoId, researchId: newResearchId },
+    });
+    await db
+      .update(todoResearch)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(eq(todoResearch.id, newResearchId));
+    return c.json({
+      id: newResearchId,
+      status: "failed",
+      researchType,
+    });
+  }
 
   Sentry.addBreadcrumb({
     category: "research",
