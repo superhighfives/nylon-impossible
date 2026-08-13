@@ -400,6 +400,12 @@ struct ContentView: View {
         pendingDeleteTodo = nil
     }
 
+}
+
+// MARK: - Drag reorder
+// Split out of the struct body to stay under SwiftLint's type_body_length
+// limit (same precedent as SyncService+Lists.swift).
+extension ContentView {
     /// The lifted row while it's being dragged: the row content floated onto a
     /// Liquid Glass card with a hairline ring. This is what makes the drag read
     /// as glass — SwiftUI's default `.onMove` lift is an opaque platter we can't
