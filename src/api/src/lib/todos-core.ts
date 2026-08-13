@@ -2,8 +2,7 @@ import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
-import * as Sentry from "@sentry/cloudflare";
-import type { Env, ResearchJobMessage } from "../types";
+import type { Env } from "../types";
 import {
   and,
   asc,
@@ -19,6 +18,7 @@ import {
 } from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
+import { sendResearchJob } from "./research";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -365,25 +365,14 @@ export async function updateTodoCore(
 
       // A send failure (e.g. queue backpressure/quota) must not 500 the
       // title edit — mark the just-created research record failed instead.
-      try {
-        await env.RESEARCH_QUEUE.send({
-          todoId,
-          userId,
-          query,
-          researchType: research.researchType,
-          researchId: newResearchId,
-          userLocation: user?.location ?? null,
-        } satisfies ResearchJobMessage);
-      } catch (error) {
-        Sentry.captureException(error, {
-          tags: { area: "research-queue" },
-          extra: { todoId, researchId: newResearchId },
-        });
-        await db
-          .update(todoResearch)
-          .set({ status: "failed", updatedAt: new Date() })
-          .where(eq(todoResearch.id, newResearchId));
-      }
+      await sendResearchJob(db, env.RESEARCH_QUEUE, {
+        todoId,
+        userId,
+        query,
+        researchType: research.researchType,
+        researchId: newResearchId,
+        userLocation: user?.location ?? null,
+      });
     }
   }
 

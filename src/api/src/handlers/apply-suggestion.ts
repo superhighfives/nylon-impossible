@@ -12,8 +12,9 @@ import {
   users,
 } from "../lib/db";
 import { apiError } from "../lib/errors";
+import { sendResearchJob } from "../lib/research";
 import { truncateTitle } from "../lib/url-helpers";
-import type { Env, ResearchJobMessage } from "../types";
+import type { Env } from "../types";
 
 // Notify all connected WebSocket clients for this user to sync. Inlined
 // (rather than imported from lib/ai-enrich) so this handler isn't coupled to
@@ -176,27 +177,14 @@ export async function acceptSuggestion(c: Context<Env>) {
         updatedAt: now,
       });
 
-      // A send failure (e.g. queue backpressure/quota) must not 500 this
-      // request; mark the just-created record failed instead.
-      try {
-        await c.env.RESEARCH_QUEUE.send({
-          todoId,
-          userId,
-          query: payload.searchQuery ?? todo.title,
-          researchType: payload.researchType,
-          researchId,
-          userLocation: user?.location ?? null,
-        } satisfies ResearchJobMessage);
-      } catch (error) {
-        Sentry.captureException(error, {
-          tags: { area: "research-queue" },
-          extra: { todoId, researchId },
-        });
-        await db
-          .update(todoResearch)
-          .set({ status: "failed", updatedAt: new Date() })
-          .where(eq(todoResearch.id, researchId));
-      }
+      await sendResearchJob(db, c.env.RESEARCH_QUEUE, {
+        todoId,
+        userId,
+        query: payload.searchQuery ?? todo.title,
+        researchType: payload.researchType,
+        researchId,
+        userLocation: user?.location ?? null,
+      });
       break;
     }
   }

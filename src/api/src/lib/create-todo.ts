@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
-import type { Env, ResearchJobMessage } from "../types";
+import type { Env } from "../types";
 import { enrichOrAskWithAI } from "./ai-enrich";
 import {
   and,
@@ -14,6 +14,7 @@ import {
 } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
+import { sendResearchJob } from "./research";
 import {
   cleanUrlString,
   createFallbackFromUrl,
@@ -341,25 +342,14 @@ export async function createSmartTodo(
     // A send failure (e.g. queue backpressure/quota) must not 500 the whole
     // create request — the todo itself was already inserted. Mark the
     // just-created research record failed instead.
-    try {
-      await env.RESEARCH_QUEUE.send({
-        todoId,
-        userId,
-        query: initial.title,
-        researchType: "general",
-        researchId,
-        userLocation: user?.location ?? null,
-      } satisfies ResearchJobMessage);
-    } catch (error) {
-      Sentry.captureException(error, {
-        tags: { area: "research-queue" },
-        extra: { todoId, researchId },
-      });
-      await db
-        .update(todoResearch)
-        .set({ status: "failed", updatedAt: new Date() })
-        .where(eq(todoResearch.id, researchId));
-    }
+    await sendResearchJob(db, env.RESEARCH_QUEUE, {
+      todoId,
+      userId,
+      query: initial.title,
+      researchType: "general",
+      researchId,
+      userLocation: user?.location ?? null,
+    });
   }
 
   // Fetch the created todo to return

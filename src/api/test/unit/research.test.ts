@@ -1,5 +1,89 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { isPlausibleUrl, isUrlReachable } from "../../src/lib/research";
+import { env } from "cloudflare:test";
+import { eq } from "drizzle-orm";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getDb, todoResearch, todos } from "../../src/lib/db";
+import { isPlausibleUrl, isUrlReachable, sendResearchJob } from "../../src/lib/research";
+import { cleanDb, getTodayListId, seedUser } from "../helpers";
+
+const TODO_ID = "22222222-2222-2222-2222-222222222222";
+const RESEARCH_ID = "33333333-3333-3333-3333-333333333333";
+
+async function seedPendingResearch() {
+  const db = getDb(env.DB);
+  const now = new Date();
+  await seedUser();
+  await db.insert(todos).values({
+    id: TODO_ID,
+    userId: "user_test_123",
+    listId: await getTodayListId("user_test_123"),
+    title: "How does OAuth work",
+    position: "a0",
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.insert(todoResearch).values({
+    id: RESEARCH_ID,
+    todoId: TODO_ID,
+    status: "pending",
+    researchType: "general",
+    createdAt: now,
+    updatedAt: now,
+  });
+  return db;
+}
+
+describe("sendResearchJob", () => {
+  beforeEach(async () => {
+    await cleanDb();
+  });
+
+  it("returns true and leaves the record pending when the send succeeds", async () => {
+    const db = await seedPendingResearch();
+    const queue = { send: vi.fn().mockResolvedValue(undefined) } as any;
+
+    const sent = await sendResearchJob(db, queue, {
+      todoId: TODO_ID,
+      userId: "user_test_123",
+      query: "How does OAuth work",
+      researchType: "general",
+      researchId: RESEARCH_ID,
+      userLocation: null,
+    });
+
+    expect(sent).toBe(true);
+    expect(queue.send).toHaveBeenCalledTimes(1);
+
+    const [research] = await db
+      .select()
+      .from(todoResearch)
+      .where(eq(todoResearch.id, RESEARCH_ID));
+    expect(research.status).toBe("pending");
+  });
+
+  it("returns false and marks the record failed when the send throws", async () => {
+    const db = await seedPendingResearch();
+    const queue = {
+      send: vi.fn().mockRejectedValue(new Error("queue backpressure")),
+    } as any;
+
+    const sent = await sendResearchJob(db, queue, {
+      todoId: TODO_ID,
+      userId: "user_test_123",
+      query: "How does OAuth work",
+      researchType: "general",
+      researchId: RESEARCH_ID,
+      userLocation: null,
+    });
+
+    expect(sent).toBe(false);
+
+    const [research] = await db
+      .select()
+      .from(todoResearch)
+      .where(eq(todoResearch.id, RESEARCH_ID));
+    expect(research.status).toBe("failed");
+  });
+});
 
 describe("isPlausibleUrl", () => {
   describe("accepts plausible URLs", () => {
