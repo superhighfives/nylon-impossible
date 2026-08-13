@@ -19,6 +19,7 @@ struct SyncErrorBanner: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(Color.appDanger)
+                    .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Couldn't sync")
@@ -30,6 +31,10 @@ struct SyncErrorBanner: View {
                         .lineLimit(3)
                 }
             }
+            // Only the text merges into one VoiceOver element; the Retry button
+            // stays its own element so its action is never swallowed by a
+            // container-level .combine.
+            .accessibilityElement(children: .combine)
 
             Spacer(minLength: 8)
 
@@ -55,7 +60,6 @@ struct SyncErrorBanner: View {
             RoundedRectangle(cornerRadius: 16)
                 .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
         )
-        .accessibilityElement(children: .combine)
     }
 }
 
