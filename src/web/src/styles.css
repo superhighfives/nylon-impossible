@@ -1,10 +1,11 @@
 /* biome-ignore-all lint/complexity/noImportantStyles: the reduced-motion reset below must override utility animations/transitions */
 @import "tailwindcss";
 @import "tailwindcss-radix-colors/dist/gray-colors-only.css";
-@import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
+@import "tailwindcss-radix-colors/dist/orange-colors-only.css";
 @import "tailwindcss-radix-colors/dist/red-colors-only.css";
 @import "./styles/radix-utilities.css";
 @import "tw-animate-css";
+@import "@fontsource-variable/archivo";
 
 /* Drive the `dark` variant off the `.dark` class on <html> instead of Tailwind's
    default `@media (prefers-color-scheme: dark)`. The whole theming system is
@@ -19,10 +20,14 @@
   /* top-4 (1rem) + pill height (~40px / 2.5rem) + breathing room (1.5rem) = 5rem */
   --spacing-header-offset: 5rem;
 
+  /* Editorial display face — logotype, list titles, board affordances. Body
+     copy stays on the system stack. */
+  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-base: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-yellow: 0 2px 12px rgba(255, 214, 10, 0.25);
+  --shadow-accent: 0 2px 12px rgba(247, 107, 21, 0.25);
 }
 
 html,
@@ -53,10 +58,18 @@ html.dark {
   color-scheme: dark;
 }
 
+/* The board is editorial paper-white in light mode (the radix gray-1 tint
+   reads slightly dingy next to the hairline rules); dark keeps the gray
+   scale's app background. */
 body {
-  @apply m-0 bg-gray-app text-gray;
+  @apply m-0 text-gray;
+  background-color: #fff;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html.dark body {
+  background-color: var(--color-graydark-1);
 }
 
 code {

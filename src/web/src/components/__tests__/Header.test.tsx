@@ -22,6 +22,14 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  // Header suppresses the pill on the signed-in board at "/"; the mocked
+  // Clerk <Show> renders children unconditionally, so the signed-out pill
+  // still renders here.
+  useLocation: ({
+    select,
+  }: {
+    select: (location: { pathname: string }) => string;
+  }) => select({ pathname: "/" }),
 }));
 
 describe("Header", () => {

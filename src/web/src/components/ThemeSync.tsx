@@ -8,7 +8,7 @@ export const THEME_STORAGE_KEY = "theme-preference";
 
 // Address-bar colors per resolved scheme. Rendered into <meta name="theme-color">
 // at SSR and kept live here on runtime theme changes.
-export const THEME_COLOR = { light: "#fdfdf9", dark: "#14120b" } as const;
+export const THEME_COLOR = { light: "#ffffff", dark: "#111110" } as const;
 
 /**
  * Applies the user's synced appearance preference at runtime and mirrors it to a

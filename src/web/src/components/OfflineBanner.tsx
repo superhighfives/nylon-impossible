@@ -13,7 +13,7 @@ export default function OfflineBanner() {
   return (
     <output
       aria-live="polite"
-      className="fixed top-0 left-0 right-0 z-[60] bg-yellow-base px-4 py-2 text-center text-sm font-medium text-yellow"
+      className="fixed top-0 left-0 right-0 z-[60] bg-accent-base px-4 py-2 text-center text-sm font-medium text-accent"
     >
       You're offline — changes will sync when you reconnect.
     </output>

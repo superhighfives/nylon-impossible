@@ -28,7 +28,7 @@ export function Checkbox({
   const checkedStyle =
     variant === "subtle"
       ? "data-checked:bg-gray-solid data-checked:border-gray-strong data-checked:text-gray-muted data-indeterminate:bg-gray-solid data-indeterminate:border-gray-strong data-indeterminate:text-gray-muted"
-      : "data-checked:bg-yellow-solid data-checked:border-yellow-solid data-checked:text-gray data-indeterminate:bg-yellow-solid data-indeterminate:border-yellow-solid data-indeterminate:text-gray";
+      : "data-checked:bg-accent-solid data-checked:border-accent-solid data-checked:text-white data-indeterminate:bg-accent-solid data-indeterminate:border-accent-solid data-indeterminate:text-white";
 
   return (
     <div className="inline-flex items-center gap-2">
@@ -37,8 +37,8 @@ export function Checkbox({
         checked={checked}
         indeterminate={indeterminate}
         className={`
-          h-4 w-4 shrink-0 rounded-md border border-gray bg-gray-surface cursor-pointer
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app
+          h-5 w-5 shrink-0 rounded-md border-2 border-gray-12 dark:border-graydark-12 bg-transparent cursor-pointer
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app
           disabled:cursor-not-allowed disabled:opacity-50
           ${checkedStyle}
           transition-colors

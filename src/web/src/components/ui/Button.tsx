@@ -3,11 +3,11 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,color,transform] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-1 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary: "bg-yellow-solid hover:bg-yellow-solid-hover text-gray-12",
+        primary: "bg-accent-solid hover:bg-accent-solid-hover text-white",
         secondary:
           "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray ring-1 ring-gray-subtle",
         ghost:
@@ -15,6 +15,10 @@ const buttonVariants = cva(
         destructive: "bg-red-solid hover:bg-red-solid-hover text-white",
         outline:
           "bg-gray-ghost hover:bg-gray-ghost-hover active:bg-gray-ghost-active text-gray ring-1 ring-gray",
+        // The Figma design's brand-outline treatment: orange text and hairline
+        // on the page background (Settings, board-level affordances).
+        accentOutline:
+          "bg-transparent text-accent-solid ring-1 ring-accent-solid hover:bg-accent-base active:bg-accent-hover",
       },
       size: {
         xs: "h-7 px-2 text-xs",

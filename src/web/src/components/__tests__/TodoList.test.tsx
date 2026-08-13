@@ -10,6 +10,8 @@ vi.mock("@/hooks/useTodos", () => ({
   useUpdateTodo: vi.fn(),
   useDeleteTodo: vi.fn(),
   useCreateTodo: vi.fn(),
+  // TodoGrid renders the floating composer (TodoInput), which smart-creates.
+  useSmartCreate: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock("@/hooks/useLists", () => ({
@@ -169,7 +171,7 @@ describe("TodoGrid", () => {
     expect(screen.getByText("Second thing")).toBeInTheDocument();
   });
 
-  it("shows a yellow dot only when a todo has a pending suggestion", () => {
+  it("shows a accent dot only when a todo has a pending suggestion", () => {
     stubTodos([
       makeTodo({
         id: "a",

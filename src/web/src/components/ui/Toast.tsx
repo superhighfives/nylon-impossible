@@ -7,9 +7,9 @@ const TYPE_STYLES: Record<
   { accent: string; icon: typeof CheckCircle2; iconClass: string }
 > = {
   success: {
-    accent: "bg-yellow-base ring-yellow-subtle",
+    accent: "bg-accent-base ring-accent-subtle",
     icon: CheckCircle2,
-    iconClass: "text-yellow-11 dark:text-yellowdark-11",
+    iconClass: "text-accent-muted",
   },
   error: {
     accent: "bg-red-base ring-red-subtle",
@@ -53,7 +53,7 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
         </div>
         <Toast.Close
           aria-label="Dismiss"
-          className="shrink-0 rounded-md p-1 text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong"
+          className="shrink-0 rounded-md p-1 text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
         >
           <X size={14} />
         </Toast.Close>

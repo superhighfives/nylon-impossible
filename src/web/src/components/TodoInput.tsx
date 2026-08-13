@@ -1,6 +1,6 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
 import { ChevronDown, Plus, Search, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { type Ref, useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
@@ -9,7 +9,12 @@ import { Button, Loader, Textarea } from "./ui";
 const menuItemBase =
   "flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-gray-hover focus:bg-gray-hover data-disabled:pointer-events-none data-disabled:opacity-50";
 
-export function TodoInput() {
+export function TodoInput({
+  textareaRef,
+}: {
+  /** Lets the board's global `n` shortcut focus the composer. */
+  textareaRef?: Ref<HTMLTextAreaElement>;
+}) {
   const [text, setText] = useState("");
 
   const smartCreate = useSmartCreate();
@@ -84,7 +89,7 @@ export function TodoInput() {
                   // Its own tap-target pseudo-element, flush on the left
                   // (before:left-0) so it meets — but never overlaps — the
                   // submit button at the seam.
-                  className="relative rounded-l-none border-l border-yellow-solid-hover before:absolute before:content-[''] before:-top-[6px] before:-bottom-[6px] before:-right-[6px] before:left-0"
+                  className="relative rounded-l-none border-l border-orange-10 dark:border-orangedark-10 before:absolute before:content-[''] before:-top-[6px] before:-bottom-[6px] before:-right-[6px] before:left-0"
                   aria-label="Add with AI"
                 >
                   <ChevronDown size={12} />
@@ -120,11 +125,12 @@ export function TodoInput() {
   return (
     <div className="space-y-2 todo-input-wrapper">
       <form onSubmit={handleSubmit}>
-        <div className="todo-input-container relative bg-gray-surface shadow-base rounded-2xl">
+        <div className="todo-input-container relative bg-gray-surface shadow-lg ring-1 ring-gray-subtle rounded-2xl">
           <Textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="What needs to be done?"
+            placeholder="Add to Today…"
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}

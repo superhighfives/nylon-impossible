@@ -1,8 +1,8 @@
 import { Show } from "@clerk/tanstack-react-start";
 import { createFileRoute } from "@tanstack/react-router";
+import { BoardChrome } from "@/components/BoardChrome";
 import { LandingPage } from "@/components/LandingPage";
 import { TodoGrid } from "@/components/TodoGrid";
-import { TodoInput } from "@/components/TodoInput";
 import {
   useWebSocketConnection,
   WebSocketSyncContext,
@@ -13,16 +13,13 @@ export const Route = createFileRoute("/")({ component: App });
 function SignedInContent() {
   const wsSync = useWebSocketConnection();
 
+  // The board is a fixed full-viewport surface (TodoGrid owns the column
+  // grid, the composer, and all board-level overlays); BoardChrome floats the
+  // logotype and Settings/account controls above it.
   return (
     <WebSocketSyncContext.Provider value={wsSync}>
-      <div className="container max-w-4xl mx-auto py-8 px-4 todo-list-ios-offset">
-        <div className="max-w-xl mx-auto">
-          <TodoInput />
-        </div>
-        <div className="mt-4">
-          <TodoGrid />
-        </div>
-      </div>
+      <BoardChrome />
+      <TodoGrid />
     </WebSocketSyncContext.Provider>
   );
 }

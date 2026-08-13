@@ -44,7 +44,7 @@ function formatSummaryWithCitations(
           href={url.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-yellow-11 dark:text-yellowdark-11 hover:underline font-medium"
+          className="text-accent-muted hover:underline font-medium"
         >
           [{citationNum}]
         </a>,
@@ -83,7 +83,7 @@ function SourceCard({
       rel="noopener noreferrer"
       className="flex items-start gap-3 p-3 rounded-lg bg-gray-base hover:bg-gray-hover transition-colors group/link"
     >
-      <span className="text-xs font-semibold text-yellow-11 dark:text-yellowdark-11 bg-yellow-base px-1.5 py-0.5 rounded shrink-0">
+      <span className="text-xs font-semibold text-accent-muted bg-accent-base px-1.5 py-0.5 rounded shrink-0">
         [{citationNumber}]
       </span>
       {isPending ? (

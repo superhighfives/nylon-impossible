@@ -9,7 +9,7 @@ export interface SelectItem {
 }
 
 const selectTriggerVariants = cva(
-  "flex w-full items-center justify-between rounded-lg bg-gray-surface text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base",
+  "flex w-full items-center justify-between rounded-lg bg-gray-surface text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base",
   {
     variants: {
       size: {
