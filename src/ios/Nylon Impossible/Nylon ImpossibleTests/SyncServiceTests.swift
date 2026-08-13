@@ -491,7 +491,7 @@ struct SyncServiceTests {
     func setsErrorStateOnAPIFailure() async throws {
         let auth = MockAuthService()
         let api = MockAPIService()
-        api.syncError = APIError.networkError(URLError(.notConnectedToInternet), url: "https://api.example.com/todos/sync")
+        api.syncError = APIError.serverError(500, "Internal error", url: "https://api.example.com/todos/sync")
 
         let container = try makeContainer()
         let context = container.mainContext
@@ -506,6 +506,26 @@ struct SyncServiceTests {
         } else {
             Issue.record("Expected .error state, got \(service.state)")
         }
+    }
+
+    @Test("Transient network failures don't surface as error state")
+    @MainActor
+    func transientFailureDoesNotSetErrorState() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        // Cancelled mid-flight (e.g. app backgrounded during a sync) — expected
+        // on mobile and retried on the next trigger, so no error banner.
+        api.syncError = APIError.networkError(URLError(.cancelled), url: "https://api.example.com/todos/sync")
+
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        #expect(service.state == .idle)
     }
 
     @Test("Removes local synced items that no longer exist on server")

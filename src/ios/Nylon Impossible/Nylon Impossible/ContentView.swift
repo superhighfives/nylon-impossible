@@ -114,8 +114,21 @@ struct ContentView: View {
                     },
                     syncState: syncService.state
                 )
+
+                // Sync failures surface here in the main view (with retry)
+                // rather than tucked behind the avatar menu. Transient
+                // connectivity blips never reach `.error` — see SyncService.
+                if case .error(let message) = syncService.state {
+                    SyncErrorBanner(message: message) {
+                        Task { await syncService.sync() }
+                    }
+                    .padding(.top, 12)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+
                 Spacer(minLength: 0)
             }
+            .animation(.easeInOut(duration: 0.25), value: syncService.state)
             .padding(.horizontal, 16)
             .ignoresSafeArea(.keyboard, edges: .bottom)
 

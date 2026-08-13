@@ -15,7 +15,6 @@ struct HeaderView: View {
     var onSignOut: (() -> Void)?
     var syncState: SyncState = .idle
 
-    @State private var showErrorPopover = false
     @State private var showSettings = false
 
     var body: some View {
@@ -49,26 +48,6 @@ struct HeaderView: View {
                 .environment(preferencesService)
                 .environment(syncService)
                 .environment(authService)
-        }
-        .popover(isPresented: $showErrorPopover) {
-            if case .error(let message) = syncState {
-                ScrollView {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(Color.appDanger)
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(minWidth: 280, minHeight: 100, maxHeight: 300)
-                .presentationCompactAdaptation(.popover)
-            }
-        }
-        // A successful retry can clear the error while the popover is still up;
-        // dismiss it so it doesn't linger showing empty content.
-        .onChange(of: syncState) { _, newValue in
-            if case .error = newValue {} else {
-                showErrorPopover = false
-            }
         }
     }
 
@@ -129,16 +108,6 @@ struct HeaderView: View {
         .frame(width: 32, height: 32)
         .clipShape(Circle())
         .overlay(Circle().stroke(Color.appBase, lineWidth: 2))
-        // Surface a sync failure without a separate top-bar control: tint a
-        // small dot on the avatar and let the menu carry the detail.
-        .overlay(alignment: .bottomTrailing) {
-            if case .error = syncState {
-                Circle()
-                    .fill(Color.appDanger)
-                    .frame(width: 9, height: 9)
-                    .overlay(Circle().stroke(Color.appBase, lineWidth: 1.5))
-            }
-        }
     }
 
     @ViewBuilder
@@ -151,11 +120,9 @@ struct HeaderView: View {
         case .success(let date):
             Text("Synced \(date.formatted(.relative(presentation: .named)))")
         case .error:
-            Button {
-                showErrorPopover = true
-            } label: {
-                Label("Sync failed — view details", systemImage: "exclamationmark.circle")
-            }
+            // The failure itself (message + retry) lives in the main view as
+            // SyncErrorBanner; the menu just acknowledges the state.
+            Label("Sync failed", systemImage: "exclamationmark.circle")
         }
     }
 }
