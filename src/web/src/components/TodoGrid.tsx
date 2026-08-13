@@ -748,68 +748,65 @@ export function TodoGrid() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden md:snap-none">
-            <div className="flex h-full min-w-max">
-              <div aria-hidden className={GUTTER_CLASS} />
-              {sortedLists.map((list) => {
-                const listTodos = todosByList.get(list.id) ?? [];
-                const incompleteOrder =
-                  localOrderByList[list.id] ??
-                  getIncompleteOrder(listTodos, timeZone, hiddenIds);
-                return (
-                  <section
-                    key={list.id}
-                    className={`${COLUMN_CLASS} group/column`}
-                  >
-                    <div className={TITLE_BAND_CLASS}>
-                      <ListHeader
-                        list={list}
-                        isDraggable={list.kind === "custom"}
-                        todoCount={todoCountByList.get(list.id) ?? 0}
-                      />
-                    </div>
-                    <NewTodoInline
-                      listId={list.id}
-                      firstPosition={incompleteOrder[0]?.position ?? null}
+          <BoardScaffold>
+            {sortedLists.map((list) => {
+              const listTodos = todosByList.get(list.id) ?? [];
+              const incompleteOrder =
+                localOrderByList[list.id] ??
+                getIncompleteOrder(listTodos, timeZone, hiddenIds);
+              return (
+                <section
+                  key={list.id}
+                  className={`${COLUMN_CLASS} group/column`}
+                >
+                  <div className={TITLE_BAND_CLASS}>
+                    <ListHeader
+                      list={list}
+                      isDraggable={list.kind === "custom"}
+                      todoCount={todoCountByList.get(list.id) ?? 0}
                     />
-                    {/* The rows scroll independently per column; the fade at
+                  </div>
+                  <NewTodoInline
+                    listId={list.id}
+                    firstPosition={
+                      incompleteOrder.find((t) => !t.sticky)?.position ?? null
+                    }
+                  />
+                  {/* The rows scroll independently per column; the fade at
                         the bottom keeps long lists from ending in a hard cut
                         behind the floating composer. */}
-                    <div className="relative min-h-0 flex-1">
-                      <div className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        <TodoListColumn
-                          listId={list.id}
-                          todos={listTodos}
-                          expandedId={expandedId}
-                          onToggleExpand={handleToggleExpand}
-                          onRequestDelete={handleRequestDelete}
-                          updateTodo={updateTodo}
-                          deleteTodo={deleteTodo}
-                          createTodo={createTodo}
-                          highlightIds={highlightIds}
-                          hiddenIds={hiddenIds}
-                          timeZone={timeZone}
-                          completedCollapsed={user?.hideCompleted ?? false}
-                          hideCompletedKnown={!!user}
-                          onToggleCompleted={handleToggleCompleted}
-                          updateUserPending={updateUser.isPending}
-                          isKeyboardDragging={isKeyboardDragging}
-                          localIncompleteTodos={
-                            localOrderByList[list.id] ?? null
-                          }
-                        />
-                      </div>
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                  <div className="relative min-h-0 flex-1">
+                    <div className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <TodoListColumn
+                        listId={list.id}
+                        todos={listTodos}
+                        expandedId={expandedId}
+                        onToggleExpand={handleToggleExpand}
+                        onRequestDelete={handleRequestDelete}
+                        updateTodo={updateTodo}
+                        deleteTodo={deleteTodo}
+                        createTodo={createTodo}
+                        highlightIds={highlightIds}
+                        hiddenIds={hiddenIds}
+                        timeZone={timeZone}
+                        completedCollapsed={user?.hideCompleted ?? false}
+                        hideCompletedKnown={!!user}
+                        onToggleCompleted={handleToggleCompleted}
+                        updateUserPending={updateUser.isPending}
+                        isKeyboardDragging={isKeyboardDragging}
+                        localIncompleteTodos={localOrderByList[list.id] ?? null}
                       />
                     </div>
-                  </section>
-                );
-              })}
-              <NewListColumn />
-            </div>
-          </div>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                    />
+                  </div>
+                </section>
+              );
+            })}
+            <NewListColumn />
+          </BoardScaffold>
           {/* Floating composer: the quick-add-to-Today surface. Focused by
               the global `n` shortcut; smart-create defaults into Today. */}
           <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 sm:pb-6">
