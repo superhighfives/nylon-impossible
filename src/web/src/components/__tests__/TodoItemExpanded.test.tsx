@@ -218,6 +218,24 @@ describe("TodoItemExpanded", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("shows 'Enrichment failed.' when aiStatus is failed", () => {
+    vi.mocked(useUser).mockReturnValue({
+      data: { plan: "pro", aiEnabled: true },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUser>);
+    renderExpanded({ aiStatus: "failed" });
+    expect(screen.getByText("Enrichment failed.")).toBeInTheDocument();
+  });
+
+  it("does not show 'Enrichment failed.' when aiStatus is pending", () => {
+    vi.mocked(useUser).mockReturnValue({
+      data: { plan: "pro", aiEnabled: true },
+      isLoading: false,
+    } as unknown as ReturnType<typeof useUser>);
+    renderExpanded({ aiStatus: "pending" });
+    expect(screen.queryByText("Enrichment failed.")).not.toBeInTheDocument();
+  });
+
   function urlFixture(overrides: Partial<TodoWithUrls["urls"][number]> = {}) {
     return {
       id: "url-1",

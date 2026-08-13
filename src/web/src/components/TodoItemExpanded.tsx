@@ -175,6 +175,7 @@ export function TodoItemExpanded({
   const aiAvailable = user?.aiEnabled === true;
   const aiProcessing =
     todo.aiStatus === "pending" || todo.aiStatus === "processing";
+  const aiFailed = todo.aiStatus === "failed";
 
   // Local state for form fields. We track which fields the user has touched
   // so that background updates to the todo (e.g. AI re-enrichment after a
@@ -500,6 +501,9 @@ export function TodoItemExpanded({
               Research
             </Button>
           </div>
+          {aiFailed && (
+            <p className="text-sm text-red-muted">Enrichment failed.</p>
+          )}
         </div>
       )}
 

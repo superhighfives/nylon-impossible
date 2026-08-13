@@ -12,6 +12,7 @@
 
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
+import type { ResearchJobMessage } from "../types";
 import { eq, type getDb, todoResearch, todoUrls } from "./db";
 import { fetchUrlMetadata } from "./url-metadata";
 
@@ -67,6 +68,33 @@ Instructions:
     max_completion_tokens: 1500,
     chat_template_kwargs: { enable_thinking: false },
   };
+}
+
+/**
+ * Enqueue a research job. A send failure (e.g. queue backpressure/quota)
+ * must not surface as a 500 to the caller — this marks the already-inserted
+ * `todoResearch` record failed instead and reports success/failure so the
+ * caller can decide what (if anything) to do next.
+ */
+export async function sendResearchJob(
+  db: ReturnType<typeof getDb>,
+  queue: Queue<ResearchJobMessage>,
+  message: ResearchJobMessage,
+): Promise<boolean> {
+  try {
+    await queue.send(message);
+    return true;
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: { area: "research-queue" },
+      extra: { todoId: message.todoId, researchId: message.researchId },
+    });
+    await db
+      .update(todoResearch)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(eq(todoResearch.id, message.researchId));
+    return false;
+  }
 }
 
 /**

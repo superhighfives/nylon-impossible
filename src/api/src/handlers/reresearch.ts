@@ -10,7 +10,8 @@ import {
   users,
 } from "../lib/db";
 import { apiError } from "../lib/errors";
-import type { Env, ResearchJobMessage } from "../types";
+import { sendResearchJob } from "../lib/research";
+import type { Env } from "../types";
 
 /**
  * POST /todos/:id/research
@@ -97,15 +98,25 @@ export async function reresearchTodo(c: Context<Env>) {
     .from(users)
     .where(eq(users.id, userId));
 
-  // Enqueue research job — runs in a separate Worker invocation
-  await c.env.RESEARCH_QUEUE.send({
+  // Enqueue research job — runs in a separate Worker invocation. A send
+  // failure (e.g. queue backpressure/quota) must not 500 the request; mark
+  // the just-created record failed so the UI reflects it instead.
+  const sent = await sendResearchJob(db, c.env.RESEARCH_QUEUE, {
     todoId,
     userId,
     query: searchQuery ?? todo.title,
     researchType,
     researchId: newResearchId,
     userLocation: user?.location ?? null,
-  } satisfies ResearchJobMessage);
+  });
+
+  if (!sent) {
+    return c.json({
+      id: newResearchId,
+      status: "failed",
+      researchType,
+    });
+  }
 
   Sentry.addBreadcrumb({
     category: "research",
