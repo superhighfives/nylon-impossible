@@ -158,7 +158,15 @@ final class SyncService {
                 }
             }
             print("[Sync] Error: \(error)")
-            state = .error(error.localizedDescription)
+            // Transient connectivity blips (request cancelled by backgrounding,
+            // offline, timed out) are expected on mobile and retried on the next
+            // sync trigger, so they don't earn the error banner — fall back to
+            // the last known-good state instead of alarming the user.
+            if APIError.isTransientNetworkError(error) {
+                state = lastSyncedAt.map { .success($0) } ?? .idle
+            } else {
+                state = .error(error.localizedDescription)
+            }
         }
     }
 
