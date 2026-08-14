@@ -153,7 +153,9 @@ function RootDocument() {
           }
         />
       </head>
-      <body className="min-h-full bg-gray-app text-gray antialiased">
+      {/* Background comes from styles.css (paper-white light / graydark-1
+          dark) so the editorial board and static pages share one canvas. */}
+      <body className="min-h-full text-gray antialiased">
         <HintsProvider hints={hints}>
           <ClerkProvider>
             <SentryUserSync />

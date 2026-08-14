@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { z } from "zod/v4";
 import { and, count, eq, getDb, lists, todos } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
+import { listIdSchema } from "../lib/list-id";
 import { notifySync } from "../lib/notify-sync";
 import type { Env } from "../types";
 
@@ -60,7 +61,7 @@ export async function getList(c: Context<Env>) {
 }
 
 const createListSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: listIdSchema.optional(),
   name: z.string().min(1).max(200),
   position: z.string().optional(),
 });

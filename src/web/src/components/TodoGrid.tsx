@@ -21,7 +21,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
+import { TodoInput } from "@/components/TodoInput";
 import {
   ErrorState,
   ExpandedSection,
@@ -94,6 +95,41 @@ const SYSTEM_ORDER: Record<string, number> = {
   sometime: 2,
 };
 
+/*
+ * Editorial board geometry, shared by every column (list columns, the New
+ * List column, and the loading/error scaffold) so the full-height hairline
+ * rules and the list-title baseline stay aligned across all of them.
+ *
+ * - Columns are fixed-width and snap-scroll horizontally; on phones a column
+ *   fills most of the viewport so the board pages list-by-list.
+ * - The title band is a fixed-height spacer with titles set on its bottom
+ *   edge — the deep whitespace above them is the design's header zone.
+ */
+const COLUMN_CLASS =
+  "relative flex h-full w-[min(85vw,21rem)] xl:w-[23rem] shrink-0 snap-start scroll-ml-4 flex-col border-l border-gray-subtle px-4 sm:px-6";
+const TITLE_BAND_CLASS =
+  "flex h-[clamp(6.5rem,24vh,13rem)] shrink-0 items-end pb-5";
+const LIST_TITLE_CLASS =
+  "font-display text-[1.35rem] font-bold leading-tight tracking-tight";
+/** Leading gutter before the first hairline; the logotype floats above it. */
+const GUTTER_CLASS = "w-4 shrink-0 sm:w-6 lg:w-10";
+
+/**
+ * The board frame minus the columns: full-viewport, horizontally scrollable,
+ * snap-paging on narrow screens. Loading/error states reuse it so the shell
+ * doesn't jump when data arrives.
+ */
+function BoardScaffold({ children }: { children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden md:snap-none">
+      <div className="flex h-full min-w-max">
+        <div aria-hidden className={GUTTER_CLASS} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function sortLists(lists: SerializedList[]): SerializedList[] {
   return [...lists].sort((a, b) => {
     const aSystem = a.kind === "system";
@@ -111,21 +147,20 @@ function sortLists(lists: SerializedList[]): SerializedList[] {
 
 function NewTodoInline({
   listId,
-  autoFocus,
-  onDone,
+  firstPosition,
 }: {
   listId: string;
-  autoFocus?: boolean;
-  onDone?: () => void;
+  /**
+   * Position of the list's current top incomplete todo. Quick-adds insert
+   * above it (top of the non-sticky tier), right where this affordance sits —
+   * so new rows appear next to the control that created them.
+   */
+  firstPosition: string | null;
 }) {
-  const [open, setOpen] = useState(!!autoFocus);
+  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const createTodo = useCreateTodo();
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (autoFocus) setOpen(true);
-  }, [autoFocus]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -134,7 +169,6 @@ function NewTodoInline({
   const close = () => {
     setOpen(false);
     setTitle("");
-    onDone?.();
   };
 
   const submit = () => {
@@ -144,7 +178,11 @@ function NewTodoInline({
       return;
     }
     createTodo.mutate(
-      { title: trimmed, listId },
+      {
+        title: trimmed,
+        listId,
+        position: generateKeyBetween(null, firstPosition),
+      },
       {
         onError: (err) =>
           toast.error(messageFromError(err, "Couldn't add todo")),
@@ -159,9 +197,14 @@ function NewTodoInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-gray-muted opacity-0 transition-opacity hover:text-gray group-hover:opacity-100 focus:opacity-100 max-sm:opacity-100"
+        className="mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder opacity-0 transition-[opacity,color] hover:text-gray-muted focus-visible:opacity-100 group-hover/column:opacity-100 group-focus-within/column:opacity-100 max-sm:opacity-100"
       >
-        <Plus size={12} />
+        <span
+          aria-hidden="true"
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-gray-strong"
+        >
+          <Plus size={12} />
+        </span>
         New todo
       </button>
     );
@@ -173,7 +216,7 @@ function NewTodoInline({
         e.preventDefault();
         submit();
       }}
-      className="flex items-center gap-1"
+      className="mb-1 flex min-h-9 items-center gap-1 py-1"
     >
       <Input
         ref={inputRef}
@@ -226,17 +269,17 @@ function ListHeader({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group flex items-center gap-1.5 pb-2 ${isDragging ? "z-10 opacity-70" : ""}`}
+      className={`group/header flex w-full items-center gap-2 ${isDragging ? "z-10 opacity-70" : ""}`}
     >
       {isDraggable && (
         <button
           type="button"
           aria-label={`Reorder "${list.name}"`}
-          className="cursor-grab touch-none select-none text-gray-muted opacity-0 transition-opacity active:cursor-grabbing group-hover:opacity-100"
+          className="cursor-grab touch-none select-none text-gray-muted opacity-0 transition-opacity active:cursor-grabbing group-hover/header:opacity-100"
           {...attributes}
           {...listeners}
         >
-          <GripVertical size={14} />
+          <GripVertical size={16} />
         </button>
       )}
       {renaming ? (
@@ -253,15 +296,15 @@ function ListHeader({
             }
           }}
           inputSize="sm"
-          className="flex-1"
+          className="flex-1 font-display font-bold"
         />
       ) : (
-        <h2 className="flex-1 text-sm font-semibold text-gray truncate">
+        <h2 className={`${LIST_TITLE_CLASS} min-w-0 flex-1 truncate text-gray`}>
           {list.name}
         </h2>
       )}
       {list.kind === "custom" && !renaming && (
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100">
+        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100">
           <Button
             variant="ghost"
             size="xs"
@@ -325,53 +368,54 @@ function NewListColumn() {
     setOpen(false);
   };
 
-  if (!open) {
-    return (
-      <div className="w-64 shrink-0">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs text-gray-muted hover:text-gray"
-        >
-          <Plus size={12} />
-          New list
-        </button>
-      </div>
-    );
-  }
-
+  // A full board column: "+ New List" sits on the same title baseline as the
+  // real list titles, styled as an orange wordmark per the design. Opening it
+  // swaps the wordmark for the name input in place.
   return (
-    <div className="w-64 shrink-0">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          submit();
-        }}
-        className="flex items-center gap-1"
-      >
-        <Input
-          autoFocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => (name.trim() ? submit() : setOpen(false))}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") setOpen(false);
-          }}
-          placeholder="List name"
-          inputSize="sm"
-        />
-        <Button
-          variant="ghost"
-          size="xs"
-          shape="square"
-          type="button"
-          aria-label="Cancel"
-          onClick={() => setOpen(false)}
-        >
-          <X size={14} />
-        </Button>
-      </form>
-    </div>
+    <section className={COLUMN_CLASS}>
+      <div className={TITLE_BAND_CLASS}>
+        {open ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit();
+            }}
+            className="flex w-full items-center gap-1"
+          >
+            <Input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onBlur={() => (name.trim() ? submit() : setOpen(false))}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setOpen(false);
+              }}
+              placeholder="List name"
+              inputSize="sm"
+              className="flex-1 font-display font-bold"
+            />
+            <Button
+              variant="ghost"
+              size="xs"
+              shape="square"
+              type="button"
+              aria-label="Cancel"
+              onClick={() => setOpen(false)}
+            >
+              <X size={14} />
+            </Button>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className={`${LIST_TITLE_CLASS} rounded-lg text-left text-accent-solid transition-[color,transform] active:scale-[0.98] hover:text-accent-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-4 focus-visible:ring-offset-gray-app`}
+          >
+            + New List
+          </button>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -408,7 +452,7 @@ export function TodoGrid() {
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
-  const [newTodoListId, setNewTodoListId] = useState<string | null>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -438,8 +482,8 @@ export function TodoGrid() {
     setLocalOrderByList({});
   }, [todos]);
 
-  // Global `n` shortcut: opens the Today column's inline new-todo input,
-  // unless focus is already inside a text field.
+  // Global `n` shortcut: focuses the bottom composer (which creates into
+  // Today), unless focus is already inside a text field.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "n" && e.key !== "N") return;
@@ -448,21 +492,35 @@ export function TodoGrid() {
       if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) {
         return;
       }
-      const todayList = (lists ?? []).find((l) => l.systemKind === "today");
-      if (!todayList) return;
       e.preventDefault();
-      setNewTodoListId(todayList.id);
+      composerRef.current?.focus();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [lists]);
+  }, []);
 
   if (listsLoading || todosLoading) {
-    return <TodoSkeleton />;
+    return (
+      <BoardScaffold>
+        <div className={COLUMN_CLASS}>
+          <div className={TITLE_BAND_CLASS}>
+            <div className="h-6 w-24 animate-pulse rounded-md bg-gray-base" />
+          </div>
+          <TodoSkeleton />
+        </div>
+      </BoardScaffold>
+    );
   }
 
   if (error) {
-    return <ErrorState onRetry={() => refetch()} isRetrying={isFetching} />;
+    return (
+      <BoardScaffold>
+        <div className={COLUMN_CLASS}>
+          <div className={TITLE_BAND_CLASS} />
+          <ErrorState onRetry={() => refetch()} isRetrying={isFetching} />
+        </div>
+      </BoardScaffold>
+    );
   }
 
   const sortedLists = sortLists(lists ?? []);
@@ -690,41 +748,71 @@ export function TodoGrid() {
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <div className="flex items-start gap-6 overflow-x-auto pb-4">
-            {sortedLists.map((list) => (
-              <div key={list.id} className="w-64 shrink-0 group">
-                <ListHeader
-                  list={list}
-                  isDraggable={list.kind === "custom"}
-                  todoCount={todoCountByList.get(list.id) ?? 0}
-                />
-                <TodoListColumn
-                  listId={list.id}
-                  todos={todosByList.get(list.id) ?? []}
-                  expandedId={expandedId}
-                  onToggleExpand={handleToggleExpand}
-                  onRequestDelete={handleRequestDelete}
-                  updateTodo={updateTodo}
-                  deleteTodo={deleteTodo}
-                  createTodo={createTodo}
-                  highlightIds={highlightIds}
-                  hiddenIds={hiddenIds}
-                  timeZone={timeZone}
-                  completedCollapsed={user?.hideCompleted ?? false}
-                  hideCompletedKnown={!!user}
-                  onToggleCompleted={handleToggleCompleted}
-                  updateUserPending={updateUser.isPending}
-                  isKeyboardDragging={isKeyboardDragging}
-                  localIncompleteTodos={localOrderByList[list.id] ?? null}
-                />
-                <NewTodoInline
-                  listId={list.id}
-                  autoFocus={newTodoListId === list.id}
-                  onDone={() => setNewTodoListId(null)}
-                />
-              </div>
-            ))}
+          <BoardScaffold>
+            {sortedLists.map((list) => {
+              const listTodos = todosByList.get(list.id) ?? [];
+              const incompleteOrder =
+                localOrderByList[list.id] ??
+                getIncompleteOrder(listTodos, timeZone, hiddenIds);
+              return (
+                <section
+                  key={list.id}
+                  className={`${COLUMN_CLASS} group/column`}
+                >
+                  <div className={TITLE_BAND_CLASS}>
+                    <ListHeader
+                      list={list}
+                      isDraggable={list.kind === "custom"}
+                      todoCount={todoCountByList.get(list.id) ?? 0}
+                    />
+                  </div>
+                  <NewTodoInline
+                    listId={list.id}
+                    firstPosition={
+                      incompleteOrder.find((t) => !t.sticky)?.position ?? null
+                    }
+                  />
+                  {/* The rows scroll independently per column; the fade at
+                        the bottom keeps long lists from ending in a hard cut
+                        behind the floating composer. */}
+                  <div className="relative min-h-0 flex-1">
+                    <div className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                      <TodoListColumn
+                        listId={list.id}
+                        todos={listTodos}
+                        expandedId={expandedId}
+                        onToggleExpand={handleToggleExpand}
+                        onRequestDelete={handleRequestDelete}
+                        updateTodo={updateTodo}
+                        deleteTodo={deleteTodo}
+                        createTodo={createTodo}
+                        highlightIds={highlightIds}
+                        hiddenIds={hiddenIds}
+                        timeZone={timeZone}
+                        completedCollapsed={user?.hideCompleted ?? false}
+                        hideCompletedKnown={!!user}
+                        onToggleCompleted={handleToggleCompleted}
+                        updateUserPending={updateUser.isPending}
+                        isKeyboardDragging={isKeyboardDragging}
+                        localIncompleteTodos={localOrderByList[list.id] ?? null}
+                      />
+                    </div>
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                    />
+                  </div>
+                </section>
+              );
+            })}
             <NewListColumn />
+          </BoardScaffold>
+          {/* Floating composer: the quick-add-to-Today surface. Focused by
+              the global `n` shortcut; smart-create defaults into Today. */}
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 sm:pb-6">
+            <div className="pointer-events-auto w-full max-w-md">
+              <TodoInput textareaRef={composerRef} />
+            </div>
           </div>
           <ConfirmDialog
             open={confirmDeleteId !== null}

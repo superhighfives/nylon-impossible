@@ -94,7 +94,7 @@ export function TodoAgentChat({ todo }: TodoAgentChatProps) {
                   <Bot
                     size={14}
                     aria-hidden
-                    className="mt-0.5 shrink-0 text-yellow"
+                    className="mt-0.5 shrink-0 text-accent"
                   />
                 ) : (
                   <User

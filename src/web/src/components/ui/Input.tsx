@@ -7,7 +7,7 @@ const inputVariants = cva(
   {
     variants: {
       variant: {
-        default: "ring-1 ring-gray-subtle focus-visible:ring-yellow-strong",
+        default: "ring-1 ring-gray-subtle focus-visible:ring-accent-strong",
         error: "ring-1 ring-red focus-visible:ring-red-strong",
       },
       inputSize: {

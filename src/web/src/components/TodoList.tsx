@@ -230,6 +230,9 @@ function InlineIndicators({
           {recurrenceLabel}
         </span>
       )}
+      {/* A pinned todo keeps its pin visible (it's state, not just an
+          action); the pin affordance on unpinned rows is hover-revealed like
+          the rest of the row's quiet controls. */}
       <Button
         variant="ghost"
         size="xs"
@@ -242,7 +245,7 @@ function InlineIndicators({
         className={
           sticky
             ? "text-gray hover:bg-gray-base"
-            : "text-gray-muted hover:bg-gray-base"
+            : "text-gray-muted hover:bg-gray-base sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
         }
       >
         {sticky ? <Pin size={14} /> : <PinOff size={14} />}
@@ -354,8 +357,8 @@ function TodoItemContent({
                 <p
                   className={`min-w-0 leading-snug wrap-anywhere ${
                     isCompleted
-                      ? "text-xs line-through text-gray-muted"
-                      : "text-sm text-gray"
+                      ? "text-sm line-through text-gray-placeholder"
+                      : "text-[15px] font-semibold text-gray"
                   }`}
                 >
                   {urlOnly ? (
@@ -398,10 +401,7 @@ function TodoItemContent({
                   className="flex items-center gap-1 text-gray-muted text-xs"
                   aria-label="Researching"
                 >
-                  <Loader
-                    size="sm"
-                    className="text-yellow-8 dark:text-yellowdark-8"
-                  />
+                  <Loader size="sm" className="text-accent-solid" />
                 </output>
               )}
               {todo.needsInput && (
@@ -412,7 +412,7 @@ function TodoItemContent({
                   type="button"
                   onClick={() => onToggleExpand(todo.id)}
                   aria-label="The assistant has a question — open to reply"
-                  className="bg-yellow-base hover:bg-yellow-hover text-yellow"
+                  className="bg-accent-base hover:bg-accent-hover text-accent"
                 >
                   <MessageCircle size={12} />
                 </Button>
@@ -425,7 +425,7 @@ function TodoItemContent({
                   className="flex shrink-0 items-center justify-center p-1"
                 >
                   <span
-                    className="block size-2 rounded-full bg-yellow-8 dark:bg-yellowdark-8"
+                    className="block size-2 rounded-full bg-accent-solid"
                     aria-hidden="true"
                   />
                 </button>
@@ -451,7 +451,7 @@ function TodoItemContent({
             {!isExpanded &&
               todo.research?.status === "completed" &&
               todo.research.summary && (
-                <p className="text-xs text-gray-muted mt-1.5 line-clamp-2 leading-relaxed">
+                <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-pretty text-gray-muted">
                   {todo.research.summary.replace(/\[\d+\]/g, "")}
                 </p>
               )}
@@ -518,11 +518,28 @@ function TodoItemContent({
               onClick={() => onDelete(todo.id)}
               disabled={deletePending}
               aria-label={`Delete "${todo.title}"`}
-              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex"
+              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
             >
               <Trash2 size={14} />
             </Button>
           )}
+          {/* Desktop expand affordance, hover-revealed with the other quiet
+              controls. Mobile expands through TodoActionsMenu below. */}
+          <Button
+            variant="ghost"
+            size="xs"
+            shape="square"
+            type="button"
+            onClick={() => onToggleExpand(todo.id)}
+            aria-label={isExpanded ? "Collapse details" : "Expand details"}
+            className="hidden text-gray-muted hover:text-gray sm:inline-flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+          >
+            {isExpanded ? (
+              <ChevronRight size={14} />
+            ) : (
+              <ChevronDown size={14} />
+            )}
+          </Button>
           {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
               control on the title line so it doesn't stretch the row height on
               todos without a description. */}
@@ -619,63 +636,45 @@ function SortableTodoItem(
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative rounded-lg py-2 transition-colors duration-1000 ease-out ${
+      className={`group relative rounded-lg py-3 transition-colors duration-1000 ease-out ${
         // Freshly imported rows glow briefly, then the tint transitions out
         // once the highlight clears — a gentle "these are new" cue.
-        !isDragging && props.highlighted ? "bg-yellow-base" : ""
+        !isDragging && props.highlighted ? "bg-accent-base" : ""
       } ${
         // Stays visually selected while its side panel is open, for context.
         !isDragging && props.isExpanded ? "bg-gray-base" : ""
       } ${
         isDragging
           ? `z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl backdrop-blur-sm ${
-              // Yellow border only for keyboard drags — it flags the selected
+              // Accent border only for keyboard drags — it flags the selected
               // row when there's no cursor on it. Pointer drags keep the gray
               // ring since the cursor already shows what's being moved.
               props.isKeyboardDragging
-                ? "ring-2 ring-yellow-strong"
+                ? "ring-2 ring-accent-strong"
                 : "ring-1 ring-gray-subtle"
             }`
           : ""
       }`}
     >
       {/* Drop line is for pointer drags; keyboard drags use the dragged row's
-          own yellow border to show the destination, so the line is redundant. */}
+          own accent border to show the destination, so the line is redundant. */}
       {(lineAbove || lineBelow) && !props.isKeyboardDragging && (
         <span
           aria-hidden="true"
           style={{ transform: `translateY(${lineShift}px)` }}
-          className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-yellow-solid ${
+          className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent-solid ${
             lineAbove ? "top-0" : "bottom-0"
           }`}
         />
       )}
-      {/* Desktop: expand toggle hangs off the left edge, revealed when the row
-          is hovered or any control in it is focused. Styled as a bare icon
-          button to match the grip and checkbox rather than a filled box. */}
-      {!isDragging && (
-        <div className="pointer-events-none absolute left-0 top-2 hidden -translate-x-full sm:block">
-          <button
-            type="button"
-            onClick={() => props.onToggleExpand(props.todo.id)}
-            aria-label={
-              props.isExpanded ? "Collapse details" : "Expand details"
-            }
-            className={`pointer-events-auto flex rounded-md p-0.5 text-gray-muted transition-[opacity,color] hover:text-gray sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing}`}
-          >
-            {props.isExpanded ? (
-              <ChevronRight size={16} className="block" />
-            ) : (
-              <ChevronDown size={16} className="block" />
-            )}
-          </button>
-        </div>
-      )}
       <div className="flex items-start">
+        {/* Reorder grip: inline on mobile; on desktop it hangs off the left
+            edge (out of the row's flow) so checkboxes sit flush with the
+            column title, per the design. Hover-revealed either way. */}
         <button
           type="button"
           disabled={props.isExpanded}
-          className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+          className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
           aria-label={`Reorder "${props.todo.title}"`}
           {...attributes}
           {...listeners}
@@ -829,7 +828,9 @@ export function TodoListColumn({
   });
 
   if (todos.length === 0) {
-    return <div ref={setColumnDropRef} className="min-h-8" />;
+    // Fills the column so a cross-list drag can drop anywhere in the empty
+    // space, not just a sliver under the title.
+    return <div ref={setColumnDropRef} className="h-full min-h-24" />;
   }
 
   const handleToggle = (id: string, completed: boolean) => {
@@ -957,7 +958,7 @@ export function TodoListColumn({
             onClick={onToggleCompleted}
             disabled={updateUserPending}
             aria-expanded={!completedCollapsed}
-            className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-medium text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-yellow-strong disabled:opacity-50"
+            className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50"
           >
             <ChevronRight
               size={14}
@@ -980,7 +981,10 @@ export function TodoListColumn({
                 }`}
               >
                 <div className="flex items-start gap-2">
-                  <div className="w-4 shrink-0" aria-hidden="true" />
+                  {/* Mobile-only spacer matching the active rows' inline grip
+                      width; on desktop the grip hangs in the margin, so
+                      completed rows are already flush. */}
+                  <div className="w-4 shrink-0 sm:hidden" aria-hidden="true" />
                   <div className="flex-1 min-w-0">
                     <TodoItemContent {...sharedProps(todo)} />
                   </div>

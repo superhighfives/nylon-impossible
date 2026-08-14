@@ -75,72 +75,72 @@
 }
 
 /* --------------------------------------------
-   Yellow Backgrounds
+   Accent Backgrounds
    -------------------------------------------- */
-@utility bg-yellow-app {
-  background-color: var(--color-yellow-1);
+@utility bg-accent-app {
+  background-color: var(--color-orange-1);
   @variant dark {
-    background-color: var(--color-yellowdark-1);
+    background-color: var(--color-orangedark-1);
   }
 }
 
-@utility bg-yellow-surface {
-  background-color: var(--color-yellow-2);
+@utility bg-accent-surface {
+  background-color: var(--color-orange-2);
   @variant dark {
-    background-color: var(--color-yellowdark-2);
+    background-color: var(--color-orangedark-2);
   }
 }
 
-@utility bg-yellow-base {
-  background-color: var(--color-yellow-3);
+@utility bg-accent-base {
+  background-color: var(--color-orange-3);
   @variant dark {
-    background-color: var(--color-yellowdark-3);
+    background-color: var(--color-orangedark-3);
   }
 }
 
-@utility bg-yellow-hover {
-  background-color: var(--color-yellow-4);
+@utility bg-accent-hover {
+  background-color: var(--color-orange-4);
   @variant dark {
-    background-color: var(--color-yellowdark-4);
+    background-color: var(--color-orangedark-4);
   }
 }
 
-@utility bg-yellow-active {
-  background-color: var(--color-yellow-5);
+@utility bg-accent-active {
+  background-color: var(--color-orange-5);
   @variant dark {
-    background-color: var(--color-yellowdark-5);
+    background-color: var(--color-orangedark-5);
   }
 }
 
-@utility bg-yellow-ghost {
+@utility bg-accent-ghost {
   background-color: transparent;
 }
 
-@utility bg-yellow-ghost-hover {
-  background-color: var(--color-yellow-3);
+@utility bg-accent-ghost-hover {
+  background-color: var(--color-orange-3);
   @variant dark {
-    background-color: var(--color-yellowdark-3);
+    background-color: var(--color-orangedark-3);
   }
 }
 
-@utility bg-yellow-ghost-active {
-  background-color: var(--color-yellow-4);
+@utility bg-accent-ghost-active {
+  background-color: var(--color-orange-4);
   @variant dark {
-    background-color: var(--color-yellowdark-4);
+    background-color: var(--color-orangedark-4);
   }
 }
 
-@utility bg-yellow-solid {
-  background-color: var(--color-yellow-9);
+@utility bg-accent-solid {
+  background-color: var(--color-orange-9);
   @variant dark {
-    background-color: var(--color-yellowdark-9);
+    background-color: var(--color-orangedark-9);
   }
 }
 
-@utility bg-yellow-solid-hover {
-  background-color: var(--color-yellow-10);
+@utility bg-accent-solid-hover {
+  background-color: var(--color-orange-10);
   @variant dark {
-    background-color: var(--color-yellowdark-10);
+    background-color: var(--color-orangedark-10);
   }
 }
 
@@ -239,33 +239,33 @@
 }
 
 /* --------------------------------------------
-   Yellow Borders
+   Accent Borders
    -------------------------------------------- */
-@utility border-yellow-subtle {
-  border-color: var(--color-yellow-6);
+@utility border-accent-subtle {
+  border-color: var(--color-orange-6);
   @variant dark {
-    border-color: var(--color-yellowdark-6);
+    border-color: var(--color-orangedark-6);
   }
 }
 
-@utility border-yellow {
-  border-color: var(--color-yellow-7);
+@utility border-accent {
+  border-color: var(--color-orange-7);
   @variant dark {
-    border-color: var(--color-yellowdark-7);
+    border-color: var(--color-orangedark-7);
   }
 }
 
-@utility border-yellow-strong {
-  border-color: var(--color-yellow-8);
+@utility border-accent-strong {
+  border-color: var(--color-orange-8);
   @variant dark {
-    border-color: var(--color-yellowdark-8);
+    border-color: var(--color-orangedark-8);
   }
 }
 
-@utility border-yellow-solid {
-  border-color: var(--color-yellow-9);
+@utility border-accent-solid {
+  border-color: var(--color-orange-9);
   @variant dark {
-    border-color: var(--color-yellowdark-9);
+    border-color: var(--color-orangedark-9);
   }
 }
 
@@ -330,37 +330,37 @@
 }
 
 /* --------------------------------------------
-   Yellow Dividers
+   Accent Dividers
    -------------------------------------------- */
-@utility divide-yellow-subtle {
+@utility divide-accent-subtle {
   & > :not(:last-child) {
-    border-color: var(--color-yellow-6);
+    border-color: var(--color-orange-6);
   }
   @variant dark {
     & > :not(:last-child) {
-      border-color: var(--color-yellowdark-6);
+      border-color: var(--color-orangedark-6);
     }
   }
 }
 
-@utility divide-yellow {
+@utility divide-accent {
   & > :not(:last-child) {
-    border-color: var(--color-yellow-7);
+    border-color: var(--color-orange-7);
   }
   @variant dark {
     & > :not(:last-child) {
-      border-color: var(--color-yellowdark-7);
+      border-color: var(--color-orangedark-7);
     }
   }
 }
 
-@utility divide-yellow-strong {
+@utility divide-accent-strong {
   & > :not(:last-child) {
-    border-color: var(--color-yellow-8);
+    border-color: var(--color-orange-8);
   }
   @variant dark {
     & > :not(:last-child) {
-      border-color: var(--color-yellowdark-8);
+      border-color: var(--color-orangedark-8);
     }
   }
 }
@@ -426,26 +426,33 @@
 }
 
 /* --------------------------------------------
-   Yellow Rings
+   Accent Rings
    -------------------------------------------- */
-@utility ring-yellow-subtle {
-  --tw-ring-color: var(--color-yellow-6);
+@utility ring-accent-subtle {
+  --tw-ring-color: var(--color-orange-6);
   @variant dark {
-    --tw-ring-color: var(--color-yellowdark-6);
+    --tw-ring-color: var(--color-orangedark-6);
   }
 }
 
-@utility ring-yellow {
-  --tw-ring-color: var(--color-yellow-7);
+@utility ring-accent {
+  --tw-ring-color: var(--color-orange-7);
   @variant dark {
-    --tw-ring-color: var(--color-yellowdark-7);
+    --tw-ring-color: var(--color-orangedark-7);
   }
 }
 
-@utility ring-yellow-strong {
-  --tw-ring-color: var(--color-yellow-8);
+@utility ring-accent-strong {
+  --tw-ring-color: var(--color-orange-8);
   @variant dark {
-    --tw-ring-color: var(--color-yellowdark-8);
+    --tw-ring-color: var(--color-orangedark-8);
+  }
+}
+
+@utility ring-accent-solid {
+  --tw-ring-color: var(--color-orange-9);
+  @variant dark {
+    --tw-ring-color: var(--color-orangedark-9);
   }
 }
 
@@ -498,26 +505,26 @@
 }
 
 /* --------------------------------------------
-   Yellow Underlines
+   Accent Underlines
    -------------------------------------------- */
-@utility underline-yellow-subtle {
-  text-decoration-color: var(--color-yellow-6);
+@utility underline-accent-subtle {
+  text-decoration-color: var(--color-orange-6);
   @variant dark {
-    text-decoration-color: var(--color-yellowdark-6);
+    text-decoration-color: var(--color-orangedark-6);
   }
 }
 
-@utility underline-yellow {
-  text-decoration-color: var(--color-yellow-7);
+@utility underline-accent {
+  text-decoration-color: var(--color-orange-7);
   @variant dark {
-    text-decoration-color: var(--color-yellowdark-7);
+    text-decoration-color: var(--color-orangedark-7);
   }
 }
 
-@utility underline-yellow-strong {
-  text-decoration-color: var(--color-yellow-8);
+@utility underline-accent-strong {
+  text-decoration-color: var(--color-orange-8);
   @variant dark {
-    text-decoration-color: var(--color-yellowdark-8);
+    text-decoration-color: var(--color-orangedark-8);
   }
 }
 
@@ -570,26 +577,35 @@
 }
 
 /* --------------------------------------------
-   Yellow Text
+   Accent Text
    -------------------------------------------- */
-@utility text-yellow-placeholder {
-  color: var(--color-yellow-10);
+@utility text-accent-placeholder {
+  color: var(--color-orange-10);
   @variant dark {
-    color: var(--color-yellowdark-10);
+    color: var(--color-orangedark-10);
   }
 }
 
-@utility text-yellow-muted {
-  color: var(--color-yellow-11);
+@utility text-accent-muted {
+  color: var(--color-orange-11);
   @variant dark {
-    color: var(--color-yellowdark-11);
+    color: var(--color-orangedark-11);
   }
 }
 
-@utility text-yellow {
-  color: var(--color-yellow-12);
+@utility text-accent {
+  color: var(--color-orange-12);
   @variant dark {
-    color: var(--color-yellowdark-12);
+    color: var(--color-orangedark-12);
+  }
+}
+
+/* Step 9 as a text color — the vivid brand orange itself, for the logotype,
+   board affordances, and small solid indicators rendered as text/icons. */
+@utility text-accent-solid {
+  color: var(--color-orange-9);
+  @variant dark {
+    color: var(--color-orangedark-9);
   }
 }
 

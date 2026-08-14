@@ -15,10 +15,11 @@ interface UrlPreviewCardProps {
 }
 
 /**
- * The canonical link card for the main todo list: one big hoverable card
- * (favicon + title + description + URL) that opens the link. Used both for
- * URL-only todos and for links nested under a titled todo, so the two read the
- * same. Mirrors the URL card in the expanded editor.
+ * The canonical link chip for the main todo list: a compact bordered
+ * favicon + title row that opens the link, per the design's "Name of
+ * Resource" chips. Used both for URL-only todos and for links nested under a
+ * titled todo, so the two read the same. The expanded editor keeps its own
+ * fuller card.
  */
 export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
   // Preview turned off — collapse back to just the raw URL.
@@ -29,7 +30,7 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
         href={url.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 rounded-lg bg-gray-surface p-3 shadow-sm transition-shadow hover:shadow-base group/link"
+        className="group/link flex items-center gap-2.5 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface"
       >
         {favicon ? (
           <img
@@ -42,10 +43,13 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
         ) : (
           <Link2 size={16} className="w-4 h-4 shrink-0 text-gray-muted" />
         )}
-        <span className="min-w-0 flex-1 truncate text-sm text-gray group-hover/link:underline">
+        <span className="min-w-0 flex-1 truncate text-sm text-gray">
           {url.url}
         </span>
-        <ExternalLink size={14} className="shrink-0 text-gray-muted" />
+        <ExternalLink
+          size={14}
+          className="shrink-0 text-gray-muted opacity-0 transition-opacity group-hover/link:opacity-100"
+        />
       </a>
     );
   }
@@ -72,38 +76,34 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 rounded-lg bg-gray-surface p-3 shadow-sm transition-shadow hover:shadow-base group/link"
+      title={url.url}
+      className="group/link flex items-center gap-2.5 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface"
     >
       {isPending ? (
-        <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
+        <Loader size="sm" className="w-4 h-4 shrink-0 text-gray-muted" />
       ) : favicon ? (
         <img
           src={favicon}
           alt=""
           loading="lazy"
-          className="w-4 h-4 mt-0.5 shrink-0"
+          className="w-4 h-4 shrink-0"
           onError={buildFaviconErrorHandler(url, googleFaviconUrl)}
         />
       ) : (
-        <Link2 size={16} className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
+        <Link2 size={16} className="w-4 h-4 shrink-0 text-gray-muted" />
       )}
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray wrap-anywhere group-hover/link:underline">
-          {displayTitle}
-          {isPending && (
-            <span className="ml-2 text-xs font-normal text-gray-muted">
-              Fetching…
-            </span>
-          )}
-        </p>
-        {!isPending && url.description && (
-          <p className="mt-0.5 text-xs text-gray-muted line-clamp-2 leading-relaxed">
-            {url.description}
-          </p>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray">
+        {displayTitle}
+        {isPending && (
+          <span className="ml-2 text-xs font-normal text-gray-muted">
+            Fetching…
+          </span>
         )}
-        <p className="mt-1 truncate text-xs text-gray-muted">{url.url}</p>
-      </div>
-      <ExternalLink size={14} className="mt-0.5 shrink-0 text-gray-muted" />
+      </span>
+      <ExternalLink
+        size={14}
+        className="shrink-0 text-gray-muted opacity-0 transition-opacity group-hover/link:opacity-100"
+      />
     </a>
   );
 }

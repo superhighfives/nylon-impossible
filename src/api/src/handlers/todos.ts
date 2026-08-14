@@ -13,6 +13,7 @@ import {
   todoUrls,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
+import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { InvalidListError, updateTodoCore } from "../lib/todos-core";
 import type { Env } from "../types";
@@ -25,7 +26,7 @@ const recurrenceSchema = z.object({
 const createTodoSchema = z.object({
   id: z.string().uuid().optional(),
   title: z.string().min(1).max(500),
-  listId: z.string().uuid().optional(),
+  listId: listIdSchema.optional(),
 });
 
 const updateTodoSchema = z.object({
@@ -40,7 +41,7 @@ const updateTodoSchema = z.object({
   completedAt: z.coerce.date().nullable().optional(),
   updatedAt: z.coerce.date().optional(),
   sticky: z.boolean().optional(),
-  listId: z.string().uuid().optional(),
+  listId: listIdSchema.optional(),
 });
 
 // Serialize a todo with ISO dates

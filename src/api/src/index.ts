@@ -64,7 +64,7 @@ const app = new Hono<Env>();
 // CORS
 const ALLOWED_ORIGINS =
   /^https:\/\/(www\.|admin\.)?nylonimpossible\.com$|^https:\/\/(?:api-)?pr-\d+\.nylonimpossible\.com$/;
-const LOCALHOST_ORIGIN = /^http:\/\/localhost(:\d+)?$/;
+const LOCALHOST_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use("*", (c, next) => {
   const isDev = c.env.ENVIRONMENT !== "production";

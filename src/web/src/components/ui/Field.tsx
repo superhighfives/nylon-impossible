@@ -1,5 +1,5 @@
 import { Field as BaseField } from "@base-ui/react/field";
-import type { ComponentProps, ReactNode, TextareaHTMLAttributes } from "react";
+import type { ComponentProps, ReactNode } from "react";
 
 export interface FieldProps extends ComponentProps<typeof BaseField.Root> {
   label?: string;
@@ -40,8 +40,7 @@ export function Field({
   );
 }
 
-export interface TextareaProps
-  extends TextareaHTMLAttributes<HTMLTextAreaElement> {
+export interface TextareaProps extends ComponentProps<"textarea"> {
   variant?: "default" | "error";
 }
 
@@ -51,7 +50,7 @@ export function Textarea({
   ...props
 }: TextareaProps) {
   const variantClasses = {
-    default: "ring-1 ring-gray-subtle focus-visible:ring-yellow-strong",
+    default: "ring-1 ring-gray-subtle focus-visible:ring-accent-strong",
     error: "ring-1 ring-red focus-visible:ring-red-strong",
   };
 

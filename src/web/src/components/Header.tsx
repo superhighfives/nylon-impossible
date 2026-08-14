@@ -1,5 +1,5 @@
 import { Show, UserButton } from "@clerk/tanstack-react-start";
-import { Link } from "@tanstack/react-router";
+import { Link, useLocation } from "@tanstack/react-router";
 import { Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/useIsMobile";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
@@ -11,9 +11,43 @@ export default function Header() {
   // On mobile, Settings opens from this dropdown instead of the floating
   // button, which would otherwise cover the composer input.
   const isMobile = useIsMobile();
+  const pathname = useLocation({ select: (location) => location.pathname });
   // When offline, push header down to make room for the offline banner (~40px)
   const topClass = isOnline === false ? "top-12" : "top-4";
 
+  // The signed-in board ("/") draws its own chrome — logotype top-left,
+  // Settings/account top-right (see BoardChrome). The floating pill only
+  // serves the signed-out landing page there.
+  if (pathname === "/") {
+    return (
+      <Show when="signed-out">
+        <PillHeader
+          topClass={topClass}
+          isMobile={isMobile}
+          openSettings={openSettings}
+        />
+      </Show>
+    );
+  }
+
+  return (
+    <PillHeader
+      topClass={topClass}
+      isMobile={isMobile}
+      openSettings={openSettings}
+    />
+  );
+}
+
+function PillHeader({
+  topClass,
+  isMobile,
+  openSettings,
+}: {
+  topClass: string;
+  isMobile: boolean;
+  openSettings: () => void;
+}) {
   return (
     <div
       className={`fixed ${topClass} left-0 right-0 z-50 flex justify-center px-4 pointer-events-none transition-[top] duration-200`}

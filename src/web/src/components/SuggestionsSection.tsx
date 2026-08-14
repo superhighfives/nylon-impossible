@@ -58,7 +58,7 @@ export function SuggestionsSection({ todo }: SuggestionsSectionProps) {
                   accept.mutate({ todoId: todo.id, suggestionId: s.id })
                 }
                 disabled={accept.isPending || dismiss.isPending}
-                className="bg-yellow-base text-yellow-8 hover:bg-yellow-base dark:text-yellowdark-8"
+                className="bg-accent-base text-accent-solid hover:bg-accent-base"
               >
                 Accept
               </Button>

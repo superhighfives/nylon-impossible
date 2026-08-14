@@ -29,6 +29,7 @@ import {
   users,
 } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
+import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
@@ -69,7 +70,7 @@ const syncRequestSchema = z.object({
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
       sticky: z.boolean().optional(),
-      listId: z.string().uuid().optional(),
+      listId: listIdSchema.optional(),
       urls: z
         .array(z.object({ url: z.string().url().max(2048) }))
         .max(10)
