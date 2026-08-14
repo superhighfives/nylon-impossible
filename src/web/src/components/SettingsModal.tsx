@@ -1,9 +1,11 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useClerk, useUser as useClerkUser } from "@clerk/tanstack-react-start";
+import { useLocation } from "@tanstack/react-router";
 import { MapPin, Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { useImportReview } from "@/hooks/useImportReview";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSettings } from "@/hooks/useSettings";
 import { useImportGoogleTasks } from "@/hooks/useTodos";
 import {
@@ -59,6 +61,8 @@ export function SettingsModal({ origin }: { origin: string }) {
   // Open state is shared so the nav dropdown (mobile) and the floating button
   // (desktop) can both drive the same modal.
   const { isOpen: open, setOpen } = useSettings();
+  const { isOnline } = useOnlineStatus();
+  const pathname = useLocation({ select: (loc) => loc.pathname });
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
   const [timezone, setTimezone] = useState("UTC");
@@ -185,17 +189,23 @@ export function SettingsModal({ origin }: { origin: string }) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       {/* Desktop opens from this floating button; on mobile it's opened from
-          the nav dropdown instead, so the button is hidden there. */}
-      <div className="fixed top-4 right-4 z-50 hidden sm:block">
-        <Dialog.Trigger
-          render={
-            <Button variant="outline" size="sm" aria-label="Settings">
-              <Settings size={16} />
-              Settings
-            </Button>
-          }
-        />
-      </div>
+          the nav dropdown instead, so the button is hidden there. The signed-in
+          board ("/") draws its own Settings button in BoardChrome's top-right
+          corner, so the trigger hides there too. */}
+      {pathname !== "/" && (
+        <div
+          className={`fixed ${isOnline === false ? "top-12" : "top-4"} right-4 z-50 hidden sm:block transition-[top] duration-200`}
+        >
+          <Dialog.Trigger
+            render={
+              <Button variant="outline" size="sm" aria-label="Settings">
+                <Settings size={16} />
+                Settings
+              </Button>
+            }
+          />
+        </div>
+      )}
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-70" />
         <Dialog.Popup className="fixed inset-0 z-80 flex items-center justify-center p-4">
