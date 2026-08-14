@@ -14,7 +14,7 @@ import {
 } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import { DevEnvironmentDetails } from "./DevEnvironmentIndicator";
-import { Button, Field, Input, Loader, Select } from "./ui";
+import { Button, Field, Input, LayerCard, Loader, Select } from "./ui";
 
 // Full IANA timezone list from the runtime — avoids hand-maintaining a
 // curated subset, and every value round-trips through Intl.DateTimeFormat
@@ -186,7 +186,7 @@ export function SettingsModal({ origin }: { origin: string }) {
     <Dialog.Root open={open} onOpenChange={setOpen}>
       {/* Desktop opens from this floating button; on mobile it's opened from
           the nav dropdown instead, so the button is hidden there. */}
-      <div className="fixed bottom-4 right-4 z-50 hidden sm:block">
+      <div className="fixed top-4 right-4 z-50 hidden sm:block">
         <Dialog.Trigger
           render={
             <Button variant="outline" size="sm" aria-label="Settings">
@@ -199,7 +199,7 @@ export function SettingsModal({ origin }: { origin: string }) {
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-70" />
         <Dialog.Popup className="fixed inset-0 z-80 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-gray-surface rounded-xl shadow-lg p-6 space-y-4">
+          <div className="w-full max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-gray-surface rounded-xl shadow-lg p-6 space-y-4">
             <Dialog.Title className="text-lg font-semibold text-gray">
               Settings
             </Dialog.Title>
@@ -212,210 +212,222 @@ export function SettingsModal({ origin }: { origin: string }) {
                 <span>Loading settings…</span>
               </div>
             ) : (
-              <>
-                {/* Location only feeds AI location research, so it shows
-                    alongside the AI toggle below once AI is enabled. */}
-                {aiEnabled && (
-                  <Field
-                    label="Your location"
-                    description="Used to find local venues when researching location todos."
-                  >
-                    <Input
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g. Los Angeles, CA"
-                      disabled={updateUser.isPending || isLocating}
-                    />
-                    <button
-                      type="button"
-                      onClick={handleUseCurrentLocation}
-                      disabled={updateUser.isPending || isLocating}
-                      className="flex items-center gap-1.5 text-xs text-gray-muted hover:text-gray transition-colors disabled:opacity-50 disabled:pointer-events-none"
-                    >
-                      <MapPin size={12} />
-                      {isLocating ? "Locating…" : "Use current location"}
-                    </button>
-                  </Field>
-                )}
-                <Field
-                  label="Appearance"
-                  description="System follows your device's light or dark setting."
-                >
-                  <div className="inline-flex rounded-lg bg-gray-base p-0.5">
-                    {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
-                      const selected = (user?.theme ?? "system") === value;
-                      return (
-                        <button
-                          key={value}
-                          type="button"
-                          aria-pressed={selected}
-                          disabled={updateUser.isPending}
-                          onClick={() => {
-                            if (selected) return;
-                            // Applies live via the optimistic cache update, which
-                            // ThemeSync watches — no Save needed.
-                            updateUser.mutate(
-                              { theme: value },
-                              {
-                                onError: (err) =>
-                                  toast.error(
-                                    messageFromError(
-                                      err,
-                                      "Couldn't change theme",
+              <div className="grid gap-3 sm:grid-cols-2">
+                <LayerCard>
+                  <LayerCard.Secondary>Appearance</LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    <div className="inline-flex self-start rounded-lg bg-gray-base p-0.5">
+                      {THEME_OPTIONS.map(({ value, label, icon: Icon }) => {
+                        const selected = (user?.theme ?? "system") === value;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            aria-pressed={selected}
+                            disabled={updateUser.isPending}
+                            onClick={() => {
+                              if (selected) return;
+                              // Applies live via the optimistic cache update, which
+                              // ThemeSync watches — no Save needed.
+                              updateUser.mutate(
+                                { theme: value },
+                                {
+                                  onError: (err) =>
+                                    toast.error(
+                                      messageFromError(
+                                        err,
+                                        "Couldn't change theme",
+                                      ),
                                     ),
-                                  ),
-                              },
-                            );
-                          }}
-                          className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50 ${
-                            selected
-                              ? "bg-gray-surface text-gray shadow-sm"
-                              : "text-gray-muted hover:text-gray"
-                          }`}
-                        >
-                          <Icon size={13} />
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Field>
-                <Field
-                  label="Timezone"
-                  description="Drives when Today's todos age into This Week, and This Week into Sometime — always at your local midnight."
-                >
-                  <Select
-                    items={TIMEZONE_ITEMS}
-                    value={timezone}
-                    onValueChange={(value) => setTimezone(value as string)}
-                    disabled={updateUser.isPending}
-                    size="sm"
-                  />
-                </Field>
+                                },
+                              );
+                            }}
+                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50 ${
+                              selected
+                                ? "bg-gray-surface text-gray shadow-sm"
+                                : "text-gray-muted hover:text-gray"
+                            }`}
+                          >
+                            <Icon size={13} />
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-gray-muted">
+                      System follows your device's light or dark setting.
+                    </p>
+                  </LayerCard.Primary>
+                </LayerCard>
+                <LayerCard>
+                  <LayerCard.Secondary>Timezone</LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    <Select
+                      items={TIMEZONE_ITEMS}
+                      value={timezone}
+                      onValueChange={(value) => setTimezone(value as string)}
+                      disabled={updateUser.isPending}
+                      size="sm"
+                    />
+                    <p className="text-xs text-gray-muted">
+                      Drives when Today's todos age into This Week, and This
+                      Week into Sometime — always at your local midnight.
+                    </p>
+                  </LayerCard.Primary>
+                </LayerCard>
                 {/* AI features are gated on this toggle (not the plan), so it's
                     available to every user to turn on or off. */}
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-1">
-                    <span className="text-sm font-medium text-gray">
-                      AI features
-                    </span>
+                <LayerCard className="sm:col-span-2">
+                  <LayerCard.Secondary className="justify-between">
+                    <span>AI features</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={aiEnabled}
+                      aria-label={
+                        aiEnabled ? "Disable AI features" : "Enable AI features"
+                      }
+                      onClick={() => setAiEnabled(!aiEnabled)}
+                      disabled={updateUser.isPending}
+                      // The visual track stays 16×28px; a -inset-3 pseudo-element
+                      // extends the clickable area to ~40×52px for an accessible
+                      // touch target without changing the design.
+                      className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50 ${aiEnabled ? "bg-accent-solid" : "bg-gray-active"}`}
+                    >
+                      <span
+                        className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
+                      />
+                    </button>
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary>
                     <p className="text-xs text-gray-muted">
                       When enabled, AI helps enrich todos by doing research
                       tasks, pulling out metadata, and finding locations.
                     </p>
-                  </div>
-                  <button
-                    type="button"
-                    role="switch"
-                    aria-checked={aiEnabled}
-                    aria-label={
-                      aiEnabled ? "Disable AI features" : "Enable AI features"
-                    }
-                    onClick={() => setAiEnabled(!aiEnabled)}
-                    disabled={updateUser.isPending}
-                    // The visual track stays 16×28px; a -inset-3 pseudo-element
-                    // extends the clickable area to ~40×52px for an accessible
-                    // touch target without changing the design.
-                    className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50 ${aiEnabled ? "bg-accent-solid" : "bg-gray-base"}`}
-                  >
-                    <span
-                      className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
-                    />
-                  </button>
-                </div>
-                <div className="border-t border-gray-base pt-4 mt-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-muted mb-2">
-                    Import
-                  </h3>
-                  {!isClerkLoaded ? (
-                    <div
-                      className="flex items-center gap-2 text-xs text-gray-muted py-1"
-                      aria-live="polite"
-                    >
-                      <Loader size="sm" />
-                      <span>Checking Google connection…</span>
-                    </div>
-                  ) : googleTasksReady ? (
-                    <>
-                      <p className="text-xs text-gray-muted mb-3">
-                        Bring across open tasks from your Google Tasks “My
-                        Tasks” list, with due dates and link research. Google
-                        doesn't share repeat schedules, so we'll help you set
-                        those afterwards. We only import open tasks, so a
-                        repeating to-do you've already completed in Google today
-                        won't come across — re-import once its next occurrence
-                        is due. Already-imported tasks are skipped, so it's safe
-                        to run again.
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          importGoogleTasks.mutate(undefined, {
-                            onSuccess: ({
-                              imported,
-                              importedIds,
-                              datedTodos,
-                            }) => {
-                              if (!importedIds?.length) return;
-                              // Step out of Settings and into the focused
-                              // repeat-schedule review for the new dated tasks.
-                              setOpen(false);
-                              startReview({
+                    {/* Location only feeds AI location research, so it shows
+                        once AI is enabled. */}
+                    {aiEnabled && (
+                      <Field
+                        label="Your location"
+                        description="Used to find local venues when researching location todos."
+                        className="pt-1"
+                      >
+                        <Input
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          placeholder="e.g. Los Angeles, CA"
+                          disabled={updateUser.isPending || isLocating}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleUseCurrentLocation}
+                          disabled={updateUser.isPending || isLocating}
+                          className="flex items-center gap-1.5 text-xs text-gray-muted hover:text-gray transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          <MapPin size={12} />
+                          {isLocating ? "Locating…" : "Use current location"}
+                        </button>
+                      </Field>
+                    )}
+                  </LayerCard.Primary>
+                </LayerCard>
+                <LayerCard>
+                  <LayerCard.Secondary>Import</LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    {!isClerkLoaded ? (
+                      <div
+                        className="flex items-center gap-2 text-xs text-gray-muted py-1"
+                        aria-live="polite"
+                      >
+                        <Loader size="sm" />
+                        <span>Checking Google connection…</span>
+                      </div>
+                    ) : googleTasksReady ? (
+                      <>
+                        <p className="text-xs text-gray-muted">
+                          Bring across open tasks from your Google Tasks “My
+                          Tasks” list, with due dates and link research. Google
+                          doesn't share repeat schedules, so we'll help you set
+                          those afterwards. We only import open tasks, so a
+                          repeating to-do you've already completed in Google
+                          today won't come across — re-import once its next
+                          occurrence is due. Already-imported tasks are skipped,
+                          so it's safe to run again.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            importGoogleTasks.mutate(undefined, {
+                              onSuccess: ({
+                                imported,
                                 importedIds,
                                 datedTodos,
-                                imported,
-                              });
-                            },
-                          })
-                        }
-                        disabled={importGoogleTasks.isPending}
-                        loading={importGoogleTasks.isPending}
-                      >
-                        Import from Google Tasks
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-xs text-gray-muted mb-3">
-                        Connect your Google account to import open tasks from
-                        Google Tasks. We only request read-only access to your
-                        tasks.
-                      </p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleConnectGoogle}
-                        disabled={isConnectingGoogle}
-                        loading={isConnectingGoogle}
-                      >
-                        {googleAccount
-                          ? "Reconnect Google for Tasks"
-                          : "Connect Google"}
-                      </Button>
-                    </>
-                  )}
-                </div>
-                <div className="border-t border-gray-base pt-4 mt-2">
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-red mb-2">
+                              }) => {
+                                if (!importedIds?.length) return;
+                                // Step out of Settings and into the focused
+                                // repeat-schedule review for the new dated tasks.
+                                setOpen(false);
+                                startReview({
+                                  importedIds,
+                                  datedTodos,
+                                  imported,
+                                });
+                              },
+                            })
+                          }
+                          disabled={importGoogleTasks.isPending}
+                          loading={importGoogleTasks.isPending}
+                          className="self-start"
+                        >
+                          Import from Google Tasks
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-muted">
+                          Connect your Google account to import open tasks from
+                          Google Tasks. We only request read-only access to your
+                          tasks.
+                        </p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleConnectGoogle}
+                          disabled={isConnectingGoogle}
+                          loading={isConnectingGoogle}
+                          className="self-start"
+                        >
+                          {googleAccount
+                            ? "Reconnect Google for Tasks"
+                            : "Connect Google"}
+                        </Button>
+                      </>
+                    )}
+                  </LayerCard.Primary>
+                </LayerCard>
+                <LayerCard>
+                  <LayerCard.Secondary className="text-red">
                     Danger zone
-                  </h3>
-                  <p className="text-xs text-gray-muted mb-3">
-                    Permanently delete your account and all of your data. This
-                    cannot be undone.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleDeleteAccount}
-                    disabled={deleteUser.isPending || updateUser.isPending}
-                    loading={deleteUser.isPending}
-                    className="text-red border-red-base hover:bg-red-base"
-                  >
-                    Delete my account
-                  </Button>
-                </div>
-              </>
+                  </LayerCard.Secondary>
+                  <LayerCard.Primary>
+                    <p className="text-xs text-gray-muted">
+                      Permanently delete your account and all of your data. This
+                      cannot be undone.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDeleteAccount}
+                      disabled={deleteUser.isPending || updateUser.isPending}
+                      loading={deleteUser.isPending}
+                      className="self-start text-red border-red-base hover:bg-red-base"
+                    >
+                      Delete my account
+                    </Button>
+                  </LayerCard.Primary>
+                </LayerCard>
+              </div>
             )}
             {/* Mobile only: the URL/API details that live in the floating
                 indicator on desktop. Renders nothing in production. */}
