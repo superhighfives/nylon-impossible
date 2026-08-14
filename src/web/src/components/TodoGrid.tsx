@@ -371,7 +371,7 @@ function NewListColumn() {
   };
 
   // A full board column: "+ New List" sits on the same title baseline as the
-  // real list titles, styled as an orange wordmark per the design. Opening it
+  // real list titles, styled as a yellow wordmark per the design. Opening it
   // swaps the wordmark for the name input in place.
   return (
     <section className={COLUMN_CLASS}>
@@ -411,7 +411,7 @@ function NewListColumn() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className={`${LIST_TITLE_CLASS} rounded-lg text-left text-accent-solid transition-[color,transform] active:scale-[0.98] hover:text-accent-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-4 focus-visible:ring-offset-gray-app`}
+            className={`${LIST_TITLE_CLASS} rounded-lg text-left text-accent-muted transition-[color,transform] active:scale-[0.98] hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-4 focus-visible:ring-offset-gray-app`}
           >
             + New List
           </button>

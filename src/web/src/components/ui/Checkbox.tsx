@@ -28,7 +28,7 @@ export function Checkbox({
   const checkedStyle =
     variant === "subtle"
       ? "data-checked:bg-gray-solid data-checked:border-gray-strong data-checked:text-gray-muted data-indeterminate:bg-gray-solid data-indeterminate:border-gray-strong data-indeterminate:text-gray-muted"
-      : "data-checked:bg-accent-solid data-checked:border-accent-solid data-checked:text-white data-indeterminate:bg-accent-solid data-indeterminate:border-accent-solid data-indeterminate:text-white";
+      : "data-checked:bg-accent-solid data-checked:border-accent-solid data-checked:text-accent-contrast data-indeterminate:bg-accent-solid data-indeterminate:border-accent-solid data-indeterminate:text-accent-contrast";
 
   return (
     <div className="inline-flex items-center gap-2">

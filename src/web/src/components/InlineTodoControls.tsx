@@ -128,7 +128,7 @@ function DueDateCalendar({
               aria-pressed={isSelected}
               className={`flex size-7 items-center justify-center rounded-md text-xs tabular-nums transition-colors ${
                 isSelected
-                  ? "bg-accent-solid text-white hover:bg-accent-solid-hover"
+                  ? "bg-accent-solid text-accent-contrast hover:bg-accent-solid-hover"
                   : isToday
                     ? "text-gray ring-1 ring-accent-strong ring-inset hover:bg-gray-hover"
                     : "text-gray-muted hover:bg-gray-hover hover:text-gray"

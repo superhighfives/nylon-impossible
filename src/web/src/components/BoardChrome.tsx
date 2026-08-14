@@ -6,7 +6,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { Button } from "./ui";
 
 /**
- * Fixed chrome for the signed-in board: the editorial logotype top-left and
+ * Fixed chrome for the signed-in board: the brand logo mark top-left and
  * Settings/account top-right, floating above the full-bleed column grid.
  * Replaces the floating pill header (which Header.tsx suppresses on "/").
  */
@@ -22,8 +22,18 @@ export function BoardChrome() {
     <div
       className={`pointer-events-none fixed inset-x-0 z-40 flex items-center justify-between px-4 transition-[top] duration-200 sm:px-6 lg:px-8 ${topClass}`}
     >
-      <h1 className="pointer-events-auto select-none font-display text-lg font-extrabold tracking-tight text-accent-solid sm:text-xl">
-        Nylon Impossible
+      <h1 className="pointer-events-auto select-none">
+        <picture>
+          <source
+            media="(prefers-color-scheme: dark)"
+            srcSet="/favicon-dark.svg"
+          />
+          <img
+            src="/favicon.svg"
+            alt="Nylon Impossible"
+            className="size-8 sm:size-9"
+          />
+        </picture>
       </h1>
       <div className="pointer-events-auto flex items-center gap-3">
         {!isMobile && (

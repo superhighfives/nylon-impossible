@@ -7,7 +7,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-accent-solid hover:bg-accent-solid-hover text-white",
+        primary:
+          "bg-accent-solid hover:bg-accent-solid-hover text-accent-contrast",
         secondary:
           "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray ring-1 ring-gray-subtle",
         ghost:
@@ -15,10 +16,11 @@ const buttonVariants = cva(
         destructive: "bg-red-solid hover:bg-red-solid-hover text-white",
         outline:
           "bg-gray-ghost hover:bg-gray-ghost-hover active:bg-gray-ghost-active text-gray ring-1 ring-gray",
-        // The Figma design's brand-outline treatment: orange text and hairline
-        // on the page background (Settings, board-level affordances).
+        // The Figma design's brand-outline treatment: accent text and hairline
+        // on the page background (Settings, board-level affordances). Text uses
+        // step 11 — step 9 yellow is unreadable on the light page background.
         accentOutline:
-          "bg-transparent text-accent-solid ring-1 ring-accent-solid hover:bg-accent-base active:bg-accent-hover",
+          "bg-transparent text-accent-muted ring-1 ring-accent-solid hover:bg-accent-base active:bg-accent-hover",
       },
       size: {
         xs: "h-7 px-2 text-xs",
