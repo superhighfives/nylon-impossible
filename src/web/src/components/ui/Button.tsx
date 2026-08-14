@@ -15,7 +15,7 @@ const buttonVariants = cva(
         destructive: "bg-red-solid hover:bg-red-solid-hover text-white",
         outline:
           "bg-gray-ghost hover:bg-gray-ghost-hover active:bg-gray-ghost-active text-gray ring-1 ring-gray",
-        // The Figma design's brand-outline treatment: orange text and hairline
+        // The Figma design's brand-outline treatment: yellow text and hairline
         // on the page background (Settings, board-level affordances).
         accentOutline:
           "bg-transparent text-accent-solid ring-1 ring-accent-solid hover:bg-accent-base active:bg-accent-hover",

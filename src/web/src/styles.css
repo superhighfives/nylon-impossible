@@ -1,7 +1,7 @@
 /* biome-ignore-all lint/complexity/noImportantStyles: the reduced-motion reset below must override utility animations/transitions */
 @import "tailwindcss";
 @import "tailwindcss-radix-colors/dist/gray-colors-only.css";
-@import "tailwindcss-radix-colors/dist/orange-colors-only.css";
+@import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
 @import "tailwindcss-radix-colors/dist/red-colors-only.css";
 @import "./styles/radix-utilities.css";
 @import "tw-animate-css";
@@ -27,7 +27,7 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-base: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-accent: 0 2px 12px rgba(247, 107, 21, 0.25);
+  --shadow-accent: 0 2px 12px rgba(255, 230, 41, 0.25);
 }
 
 html,

@@ -89,7 +89,7 @@ export function TodoInput({
                   // Its own tap-target pseudo-element, flush on the left
                   // (before:left-0) so it meets — but never overlaps — the
                   // submit button at the seam.
-                  className="relative rounded-l-none border-l border-orange-10 dark:border-orangedark-10 before:absolute before:content-[''] before:-top-[6px] before:-bottom-[6px] before:-right-[6px] before:left-0"
+                  className="relative rounded-l-none border-l border-yellow-10 dark:border-yellowdark-10 before:absolute before:content-[''] before:-top-[6px] before:-bottom-[6px] before:-right-[6px] before:left-0"
                   aria-label="Add with AI"
                 >
                   <ChevronDown size={12} />

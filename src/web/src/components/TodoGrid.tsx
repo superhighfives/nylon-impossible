@@ -371,7 +371,7 @@ function NewListColumn() {
   };
 
   // A full board column: "+ New List" sits on the same title baseline as the
-  // real list titles, styled as an orange wordmark per the design. Opening it
+  // real list titles, styled as a yellow wordmark per the design. Opening it
   // swaps the wordmark for the name input in place.
   return (
     <section className={COLUMN_CLASS}>
