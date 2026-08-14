@@ -41,7 +41,20 @@ export class TodoNotFoundError extends Data.TaggedError("TodoNotFoundError")<{
  */
 export class ValidationError extends Data.TaggedError("ValidationError")<{
   readonly errors: Array<{ path: string; message: string }>;
-}> {}
+}> {
+  // Server-fn `.validator()`s throw this synchronously, before the handler's
+  // `causeToClientError` mapping runs — so the raw error is what TanStack
+  // serializes to the client. Without this, `.message` is "" and the client
+  // shows `Error: No error message`.
+  override get message(): string {
+    return (
+      this.errors
+        .map((e) => e.message)
+        .filter(Boolean)
+        .join(", ") || "Validation failed"
+    );
+  }
+}
 
 /**
  * Thrown when user is not authorized to access a resource

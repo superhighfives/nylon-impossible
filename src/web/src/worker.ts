@@ -3,8 +3,8 @@
 // SSR render throws and anything that bubbles out of a server function — are
 // captured and flushed via waitUntil. Handled-but-swallowed server-function
 // errors are reported separately from our own funnel in lib/utils.ts
-// (errorToResponse), which runs inside this same request scope so
-// captureException finds the active client.
+// (runEffect's causeToClientError), which runs inside this same request scope
+// so captureException finds the active client.
 //
 // This mirrors the API worker's `export default Sentry.withSentry(...)` setup.
 // The plain `@tanstack/react-start/server-entry` (the framework default handler)
