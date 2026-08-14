@@ -120,9 +120,9 @@ const GUTTER_CLASS = "w-4 shrink-0 sm:w-6 lg:w-10";
  * doesn't jump when data arrives.
  */
 function BoardScaffold({ children }: { children: ReactNode }) {
+  // overscroll-x-contain stops edge swipes chaining into the page's
+  // rubber-band / browser back gesture.
   return (
-    {/* overscroll-x-contain stops edge swipes chaining into the page's
-        rubber-band / browser back gesture. */}
     <div className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain md:snap-none">
       <div className="flex h-full min-w-max">
         <div aria-hidden className={GUTTER_CLASS} />
