@@ -75,6 +75,66 @@
       "service": "nylon-impossible-todo-agent",
     },
   ],
+  // Worker Previews (private beta): per-branch preview deployments created by
+  // `wrangler preview`. Bindings and vars are NOT inherited from the top level,
+  // so everything a preview needs is repeated here.
+  //   - DB reuses the production `database_id`, so previews share prod D1 data.
+  //     This is deliberate (shared-backend decision) — preview code can read and
+  //     write real todo data. Use with care.
+  //   - USER_SYNC Durable Object state is auto-isolated per preview by the
+  //     platform; the binding still has to be declared so the class resolves.
+  //   - The RESEARCH_QUEUE producer points at the prod queue (shared by name).
+  //     No consumer and no cron are configured: queue consumers and cron
+  //     triggers only ever fire on the production deployment, never on previews
+  //     (`triggers` isn't even a valid key in this block). So the research
+  //     consumer and the hourly list-sweep cron do NOT run against prod D1 from
+  //     a preview — they're only exercised after merge.
+  //   - The TODO_AGENT service binding from a preview always resolves to the
+  //     bound Worker's PRODUCTION deployment (platform constraint), so this
+  //     necessarily calls prod todo-agent.
+  // Secrets (CLERK_SECRET_KEY, CLOUDFLARE_API_TOKEN, etc.) are not inherited
+  // either — set them out of band with `wrangler preview secret put <KEY>` (see
+  // the migration plan for the base-config vs per-preview decision).
+  "previews": {
+    "vars": {
+      "ENVIRONMENT": "preview",
+      "CF_AI_GATEWAY_ID": "nylon-impossible",
+      "WEB_BASE_URL": "https://www.nylonimpossible.com",
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "nylon-impossible-db",
+        "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+        "migrations_dir": "./migrations",
+      },
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "USER_SYNC",
+          "class_name": "UserSync",
+        },
+      ],
+    },
+    "ai": {
+      "binding": "AI",
+    },
+    "services": [
+      {
+        "binding": "TODO_AGENT",
+        "service": "nylon-impossible-todo-agent",
+      },
+    ],
+    "queues": {
+      "producers": [
+        { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },
+      ],
+    },
+    "observability": {
+      "enabled": true,
+    },
+  },
   // Note: SENTRY_DSN should be configured as a secret via `wrangler secret put SENTRY_DSN`
   // Note: INTERNAL_AGENT_SECRET (checked on /internal/agent/*, called by
   // src/todo-agent) should be configured as a secret via `wrangler secret

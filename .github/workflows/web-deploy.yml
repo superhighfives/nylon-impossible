@@ -9,7 +9,7 @@ on:
       - "src/todo-agent/**"
       - "package.json"
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
 
 permissions:
@@ -136,6 +136,16 @@ jobs:
     uses: ./.github/workflows/marketing.yml
     secrets: inherit
 
+  # Per-branch preview via Cloudflare Worker Previews (private beta). Replaces
+  # the old fully-isolated per-PR stack: no config rewriting, no per-PR queue,
+  # no custom domains, and no close-triggered cleanup — stale previews are
+  # auto-evicted by the platform. Previews share prod D1 and call prod
+  # todo-agent; the research queue consumer and hourly cron only ever run on
+  # production, never on a preview. See
+  # plans/in-progress/2026-08-13-migrate-pr-previews-to-worker-previews.md.
+  #
+  # Preview secrets are NOT set here — they live on each Worker's Previews
+  # settings, set once out of band with `wrangler preview secret put <KEY>`.
   deploy-preview:
     needs: [test]
     if: >-
@@ -150,7 +160,8 @@ jobs:
       pull-requests: write
       issues: write
     env:
-      INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
     steps:
       - name: Checkout
@@ -167,99 +178,21 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Ensure preview research queue exists
-        working-directory: src/api
+      # Preview name defaults to the git branch, but the Actions checkout is a
+      # detached merge ref, so pass it explicitly. Pushing more commits to the
+      # same PR reuses this name and keeps the preview URLs stable. Sanitised to
+      # the lowercase-alphanumeric-hyphen charset preview names allow.
+      - name: Derive preview name
         run: |
-          set +e
-          output=$(pnpm exec wrangler queues create "nylon-impossible-research-pr-$PR" 2>&1)
-          status=$?
-          echo "$output"
-          # "already taken" means a prior deploy of this same PR already created
-          # it — expected on re-push, not a real failure. Anything else (auth,
-          # rate limit, quota) should fail the job instead of deploying a
-          # preview silently missing its queue.
-          if [ $status -ne 0 ] && ! echo "$output" | grep -qi "already taken"; then
-            echo "::error::Failed to create the preview research queue for an unexpected reason (see output above)."
-            exit 1
-          fi
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PR: ${{ github.event.pull_request.number }}
+          name=$(printf '%s' "${{ github.head_ref }}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed 's/[^a-z0-9-]/-/g; s/^-*//; s/-*$//' \
+            | cut -c1-54)
+          echo "PREVIEW_NAME=$name" >> "$GITHUB_ENV"
+          echo "Preview name: $name"
 
-      - name: Rewrite API wrangler config for preview
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const pr = context.payload.pull_request.number;
-            const dir = 'src/api';
-            const name = `nylon-impossible-api-pr-${pr}`;
-            const domain = `api-pr-${pr}.nylonimpossible.com`;
-            const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
-            // Strip only whole-line // comments so URLs (https://...) inside
-            // string values survive; then drop trailing commas.
-            const stripped = raw.replace(/^\s*\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
-            const config = JSON.parse(stripped);
-            config.name = name;
-            config.routes = [{ pattern: domain, custom_domain: true }];
-            // Use a per-PR queue so each PR worker can register its own consumer
-            // (Cloudflare allows one consumer per queue).
-            // The DLQ is omitted from preview to avoid needing a second queue.
-            const previewQueue = `nylon-impossible-research-pr-${pr}`;
-            if (config.queues) {
-              if (config.queues.producers) {
-                config.queues.producers = config.queues.producers.map(p => ({ ...p, queue: previewQueue }));
-              }
-              if (config.queues.consumers) {
-                config.queues.consumers = config.queues.consumers.map(({ dead_letter_queue, ...c }) => ({ ...c, queue: previewQueue }));
-              }
-            }
-            // Point the TODO_AGENT service binding at this PR's todo-agent
-            // worker instead of the shared production one.
-            if (config.services) {
-              config.services = config.services.map(s =>
-                s.binding === 'TODO_AGENT'
-                  ? { ...s, service: `nylon-impossible-todo-agent-pr-${pr}` }
-                  : s
-              );
-            }
-            fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
-
-      - name: Rewrite todo-agent wrangler config for preview
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const pr = context.payload.pull_request.number;
-            const dir = 'src/todo-agent';
-            const name = `nylon-impossible-todo-agent-pr-${pr}`;
-            const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
-            // Strip only whole-line // comments so URLs (https://...) inside
-            // string values survive; then drop trailing commas.
-            const stripped = raw.replace(/^\s*\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
-            const config = JSON.parse(stripped);
-            config.name = name;
-            fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
-
-      - name: Rewrite Web wrangler config for preview
-        uses: actions/github-script@v9
-        with:
-          script: |
-            const fs = require('fs');
-            const pr = context.payload.pull_request.number;
-            const dir = 'src/web';
-            const name = `nylon-impossible-pr-${pr}`;
-            const domain = `pr-${pr}.nylonimpossible.com`;
-            const raw = fs.readFileSync(`${dir}/wrangler.jsonc`, 'utf8');
-            // Strip only whole-line // comments so URLs (https://...) inside
-            // string values survive; then drop trailing commas.
-            const stripped = raw.replace(/^\s*\/\/.*$/gm, '').replace(/,\s*([}\]])/g, '$1');
-            const config = JSON.parse(stripped);
-            config.name = name;
-            config.routes = [{ pattern: domain, custom_domain: true }];
-            fs.writeFileSync(`${dir}/wrangler.jsonc`, JSON.stringify(config, null, 2));
-
+      # Previews share prod D1, so migrations are applied to the same database as
+      # production (unchanged from the old flow).
       - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v4
         with:
@@ -268,63 +201,33 @@ jobs:
           workingDirectory: src/api
           command: d1 migrations apply nylon-impossible-db --remote
 
-      - name: Deploy preview todo-agent
-        working-directory: src/todo-agent
-        run: pnpm run deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Set preview todo-agent secrets
-        if: ${{ env.INTERNAL_AGENT_SECRET != '' }}
-        working-directory: src/todo-agent
-        run: printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler secret put INTERNAL_AGENT_SECRET
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
+      # Deploy the API preview first and capture its URL — the web build bakes it
+      # in at compile time (VITE_API_BASE_URL), so it must exist before the build.
       - name: Deploy preview API
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Set preview API secrets
         working-directory: src/api
         run: |
-          printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler secret put CLERK_SECRET_KEY
-          printf '%s' "$CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler secret put CLERK_PUBLISHABLE_KEY
-          printf '%s' "$CLOUDFLARE_API_TOKEN" | pnpm exec wrangler secret put CLOUDFLARE_API_TOKEN
-          if [ -n "$TAVILY_API_KEY" ]; then
-            printf '%s' "$TAVILY_API_KEY" | pnpm exec wrangler secret put TAVILY_API_KEY
+          set -euo pipefail
+          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json)
+          url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty')
+          if [ -z "$url" ]; then
+            # Fallback if the private-beta JSON shape shifts: grab the first
+            # workers.dev URL from the output.
+            url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
           fi
-          if [ -n "$INTERNAL_AGENT_SECRET" ]; then
-            printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler secret put INTERNAL_AGENT_SECRET
+          if [ -z "$url" ]; then
+            echo "::error::Could not determine the API preview URL from wrangler output."
+            printf '%s\n' "$out"
+            exit 1
           fi
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
-
-      - name: Upload preview Web secrets
-        working-directory: src/web
-        run: node -e "console.log(JSON.stringify({CLERK_SECRET_KEY:process.env.CLERK_SECRET_KEY,VITE_CLERK_PUBLISHABLE_KEY:process.env.VITE_CLERK_PUBLISHABLE_KEY}))" | pnpm exec wrangler secret bulk
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          echo "API_PREVIEW_URL=$url" >> "$GITHUB_ENV"
+          echo "API preview: $url"
 
       - name: Build preview Web
         run: pnpm --filter @nylon-impossible/web run build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
-          VITE_API_BASE_URL: https://api-pr-${{ github.event.pull_request.number }}.nylonimpossible.com
+          VITE_API_BASE_URL: ${{ env.API_PREVIEW_URL }}
           VITE_IS_PREVIEW: true
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
@@ -332,18 +235,31 @@ jobs:
 
       - name: Deploy preview Web
         working-directory: src/web
-        run: pnpm exec wrangler deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json)
+          url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty')
+          if [ -z "$url" ]; then
+            url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
+          fi
+          if [ -z "$url" ]; then
+            echo "::error::Could not determine the Web preview URL from wrangler output."
+            printf '%s\n' "$out"
+            exit 1
+          fi
+          echo "WEB_PREVIEW_URL=$url" >> "$GITHUB_ENV"
+          echo "Web preview: $url"
 
       - name: Comment preview URLs on PR
         uses: actions/github-script@v9
+        env:
+          WEB_PREVIEW_URL: ${{ env.WEB_PREVIEW_URL }}
+          API_PREVIEW_URL: ${{ env.API_PREVIEW_URL }}
         with:
           script: |
             const prNumber = context.payload.pull_request.number;
-            const webUrl = `https://pr-${prNumber}.nylonimpossible.com`;
-            const apiUrl = `https://api-pr-${prNumber}.nylonimpossible.com`;
+            const webUrl = process.env.WEB_PREVIEW_URL;
+            const apiUrl = process.env.API_PREVIEW_URL;
 
             const body = [
               `### Preview Deployment`,
@@ -381,86 +297,3 @@ jobs:
                 body,
               });
             }
-
-  cleanup-preview:
-    if: >-
-      github.event_name == 'pull_request'
-      && github.event.action == 'closed'
-      && github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 22
-
-      - name: Install dependencies
-        working-directory: src/api
-        run: pnpm install
-
-      # A Worker can't be deleted while it's a registered consumer of a Queue,
-      # and a Queue can't be deleted while any Worker still has a binding
-      # (producer or consumer) referencing it — so this has to happen in this
-      # exact order: unregister the consumer, delete the workers (which also
-      # clears their producer bindings, since those live in the worker's own
-      # config), then delete the queue.
-      #
-      # "does not exist" from any of these steps is expected and benign — the
-      # PR may have closed before deploy-preview ever ran, or a prior run of
-      # this same job may have already cleaned it up. Anything else is a real
-      # failure and should fail the job so it's visible, instead of silently
-      # leaking a Worker or Queue the way the old continue-on-error version did
-      # for months (see plans/done/2026-08-07-clean-up-orphaned-preview-resources.md).
-      - name: Clean up preview resources
-        working-directory: src/api
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          set +e
-          failed=0
-
-          run_step() {
-            local desc="$1"; shift
-            echo "::group::$desc"
-            output=$("$@" 2>&1)
-            status=$?
-            echo "$output"
-            echo "::endgroup::"
-            if [ $status -ne 0 ]; then
-              if echo "$output" | grep -qi "does not exist"; then
-                echo "$desc: already gone, ok"
-              else
-                echo "::error::$desc failed unexpectedly"
-                failed=1
-              fi
-            fi
-          }
-
-          run_step "Remove queue consumer" \
-            pnpm exec wrangler queues consumer remove "nylon-impossible-research-pr-$PR" "nylon-impossible-api-pr-$PR"
-
-          run_step "Delete API worker" \
-            pnpm exec wrangler delete --name "nylon-impossible-api-pr-$PR" --force
-
-          run_step "Delete Web worker" \
-            pnpm exec wrangler delete --name "nylon-impossible-pr-$PR" --force
-
-          run_step "Delete todo-agent worker" \
-            pnpm exec wrangler delete --name "nylon-impossible-todo-agent-pr-$PR" --force
-
-          run_step "Delete research queue" \
-            pnpm exec wrangler queues delete "nylon-impossible-research-pr-$PR"
-
-          exit $failed

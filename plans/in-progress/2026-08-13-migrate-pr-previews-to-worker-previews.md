@@ -1,7 +1,85 @@
 # Migrate PR previews to Worker Previews
 
 **Date**: 2026-08-13
-**Status**: Ready
+**Status**: In Progress
+**Updated**: 2026-08-14
+
+## Implementation notes (2026-08-14)
+
+Code changes landed on branch `migrate-worker-previews` (off `main`). What
+actually shipped, and how it deviated from the spec below:
+
+- **Step 0 result.** Installed Wrangler is **4.119.0**; `wrangler preview` and
+  its `secret` / `settings` subcommands exist but are flagged **`[private
+  beta]`**. This means the feature depends on account-level beta enablement and
+  paid-plan preview limits that **cannot be verified from the repo** — confirm
+  in the Cloudflare dashboard before merging.
+- **Docs are on a preview host, and ahead of the shipped CLI.** The stable
+  `developers.cloudflare.com/workers/previews/*` links 404; the real docs live at
+  `worker-previews-docs-2.preview.developers.cloudflare.com/workers/previews/`.
+  They confirm the resource model used below (see next bullet). Config choices
+  were cross-checked against the bundled `wrangler/config-schema.json`
+  (`PreviewsConfig`) and `wrangler preview --help`.
+- **Secret command — version skew, not a plan error.** The docs show BOTH
+  `wrangler preview base-config secret put <KEY>` (shared "base configuration"
+  that every *new* preview inherits) and `wrangler preview secret put <KEY>
+  --name <preview>` (one preview). BUT the pinned Wrangler (checked 4.119.0 and
+  4.120.0) has **no `base-config` subcommand** — only `wrangler preview secret
+  put <KEY> [--name <preview>]`, which targets a single preview (defaulting to
+  the current git branch). So until a Wrangler with `base-config` is pinned,
+  there is **no "set once, all previews inherit" path**: preview secrets must be
+  set per-preview (per branch), or Wrangler must be bumped to a build that ships
+  `base-config`. Resolve this as part of the out-of-band secret step.
+- **Resource model confirmed by the docs** (`/workers/previews/resources/`):
+  Durable Objects are "automatically isolated" per preview (own namespace +
+  state); D1/KV/R2 are "shared by resource ID"; queue *producers* work when
+  bound to the same resource, but "queue consumers … target production, not
+  Previews"; "cron triggers … target production. They do not target Previews";
+  and "service bindings from a Preview always call the bound Worker's production
+  deployment." This matches the config exactly: API previews declare the queue
+  *producer* only, no consumer and no cron, so the hourly list-sweep and the
+  research consumer never run against shared prod D1 from a preview; TODO_AGENT
+  necessarily hits prod. Active-preview limit is 100/worker on paid plans
+  (10 on free); older previews auto-evict at the limit.
+- **`previews` block, not a named env.** Bindings and `vars` are **not**
+  inherited into the block (the docs' examples repeat them; `vars`/`define`
+  schema descriptions say so explicitly), so each Worker's `previews` block
+  repeats exactly what its previews need. `triggers` is not even a valid key in
+  the block.
+- **CORS.** `src/api/src/index.ts` now accepts `*.workers.dev` origins, but
+  **only when `ENVIRONMENT !== "production"`** (same gating as localhost). The
+  preview API runs with `ENVIRONMENT: "preview"`, so prod CORS stays pinned to
+  our own domains. The legacy `(api-)?pr-N.nylonimpossible.com` allow-list entry
+  was left in place (harmless during transition).
+- **CI URL capture.** `wrangler preview --json` emits
+  `{ "preview": { "name", "urls": [...] }, "deployment": {...} }`; the workflow
+  reads `.preview.urls[0]` (with a `grep` fallback for a workers.dev URL if the
+  beta JSON shape shifts). Preview name is the sanitised PR head branch, passed
+  explicitly via `--name` because the Actions checkout is a detached merge ref.
+
+### Still out of band (not doable from the repo — owner action required)
+
+- [ ] Confirm the Worker Previews private beta is enabled on the account and the
+      active-preview limit is acceptable.
+- [ ] Set preview secrets (API: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`,
+      `CLOUDFLARE_API_TOKEN`, and if present `TAVILY_API_KEY`,
+      `INTERNAL_AGENT_SECRET`; Web: `CLERK_SECRET_KEY`). **Decide the mechanism
+      first** given the version skew above: either (a) bump Wrangler to a build
+      with `wrangler preview base-config secret put` and set them once on the
+      base config, or (b) with the pinned CLI, set them per-preview via
+      `wrangler preview secret put <KEY> --name <preview>` (needs a per-branch
+      step — note this partially reintroduces per-preview secret management the
+      migration aimed to drop).
+- [ ] Add `https://*.workers.dev` (or the specific preview subdomains) to
+      Clerk's allowed origins / authorized parties for the preview keys.
+- [ ] Run one real `wrangler preview` (API + web) to verify the beta actually
+      deploys, the `--json` shape matches `.preview.urls[0]`, and DO isolation /
+      D1 sharing / no-cron-no-consumer behaviours hold as assumed above.
+- [ ] One-time legacy cleanup of leftover `nylon-impossible-*-pr-*` workers and
+      `nylon-impossible-research-pr-*` queues (the old sweep script's delete
+      logic, run manually once).
+- [ ] Optional: write the reusable `WORKER-PREVIEWS-MIGRATION.md` at repo root
+      (listed under Dependencies) — not created yet.
 
 ## Problem
 
