@@ -99,10 +99,18 @@ interface UpdateListParams {
 
 /** Rename/reposition a custom list. Rejects system lists. */
 export const updateList = createServerFn({ method: "POST" })
-  .validator((data: UpdateListParams) => ({
-    id: data.id,
-    input: updateListSchema.parse(data.input),
-  }))
+  .validator((data: UpdateListParams) => {
+    const result = updateListSchema.safeParse(data.input);
+    if (!result.success) {
+      throw new ValidationError({
+        errors: result.error.issues.map((e) => ({
+          path: e.path.join("."),
+          message: e.message,
+        })),
+      });
+    }
+    return { id: data.id, input: result.data };
+  })
   .handler(async (ctx) => {
     const { id, input: validated } = ctx.data;
     const program = withAuthenticatedUser((user, db) =>

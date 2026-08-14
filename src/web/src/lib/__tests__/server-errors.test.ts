@@ -25,6 +25,27 @@ beforeEach(() => {
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
+describe("ValidationError", () => {
+  // Server-fn `.validator()`s throw ValidationError synchronously, before any
+  // Effect runs — the raw error is what gets serialized to the client, so its
+  // own `.message` must be non-empty (not just the causeToClientError mapping).
+  it("exposes its issue messages via .message for synchronous validator throws", () => {
+    const err = new ValidationError({
+      errors: [
+        { path: "listId", message: "No list found" },
+        { path: "title", message: "Title is required" },
+      ],
+    });
+    expect(err.message).toBe("No list found, Title is required");
+  });
+
+  it("falls back to a generic message when it has no issues", () => {
+    expect(new ValidationError({ errors: [] }).message).toBe(
+      "Validation failed",
+    );
+  });
+});
+
 describe("causeToClientError", () => {
   it("carries validation messages through to a non-empty client message", () => {
     const err = causeToClientError(
