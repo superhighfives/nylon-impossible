@@ -401,7 +401,7 @@ function TodoItemContent({
                   className="flex items-center gap-1 text-gray-muted text-xs"
                   aria-label="Researching"
                 >
-                  <Loader size="sm" className="text-accent-solid" />
+                  <Loader size="sm" className="text-accent-muted" />
                 </output>
               )}
               {todo.needsInput && (

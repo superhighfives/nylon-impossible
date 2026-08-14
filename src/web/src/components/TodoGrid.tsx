@@ -411,7 +411,7 @@ function NewListColumn() {
           <button
             type="button"
             onClick={() => setOpen(true)}
-            className={`${LIST_TITLE_CLASS} rounded-lg text-left text-accent-solid transition-[color,transform] active:scale-[0.98] hover:text-accent-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-4 focus-visible:ring-offset-gray-app`}
+            className={`${LIST_TITLE_CLASS} rounded-lg text-left text-accent-muted transition-[color,transform] active:scale-[0.98] hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-4 focus-visible:ring-offset-gray-app`}
           >
             + New List
           </button>
