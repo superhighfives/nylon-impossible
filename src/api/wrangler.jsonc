@@ -99,6 +99,7 @@
     "vars": {
       "ENVIRONMENT": "preview",
       "CF_AI_GATEWAY_ID": "nylon-impossible",
+      "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
       "WEB_BASE_URL": "https://www.nylonimpossible.com",
     },
     "d1_databases": [

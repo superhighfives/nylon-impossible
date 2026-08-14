@@ -21,7 +21,6 @@ concurrency:
 
 jobs:
   test:
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -150,7 +149,6 @@ jobs:
     needs: [test]
     if: >-
       github.event_name == 'pull_request'
-      && github.event.action != 'closed'
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
@@ -186,8 +184,9 @@ jobs:
         run: |
           name=$(printf '%s' "${{ github.head_ref }}" \
             | tr '[:upper:]' '[:lower:]' \
-            | sed 's/[^a-z0-9-]/-/g; s/^-*//; s/-*$//' \
-            | cut -c1-54)
+            | sed 's/[^a-z0-9-]/-/g' \
+            | cut -c1-54 \
+            | sed 's/^-*//; s/-*$//')
           echo "PREVIEW_NAME=$name" >> "$GITHUB_ENV"
           echo "Preview name: $name"
 
