@@ -609,6 +609,13 @@
   }
 }
 
+/* Text sitting ON the solid accent (bg-accent-solid). Yellow is one of
+   Radix's bright scales whose step 9 stays light in both themes, so the
+   accessible pairing is dark text — never white. */
+@utility text-accent-contrast {
+  color: var(--color-yellow-12);
+}
+
 /* --------------------------------------------
    Red Text
    -------------------------------------------- */

@@ -6,7 +6,7 @@ import { useSettings } from "@/hooks/useSettings";
 import { Button } from "./ui";
 
 /**
- * Fixed chrome for the signed-in board: the editorial logotype top-left and
+ * Fixed chrome for the signed-in board: the brand logo mark top-left and
  * Settings/account top-right, floating above the full-bleed column grid.
  * Replaces the floating pill header (which Header.tsx suppresses on "/").
  */
