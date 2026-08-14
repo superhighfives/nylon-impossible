@@ -52,3 +52,33 @@ so they deliberately don't appear in `wrangler.jsonc`.
 Handlers return errors through `apiError(c, code)` with a code from
 `API_ERRORS` in `src/api/src/lib/errors.ts` — don't hand-write status codes or
 message strings at the call site.
+
+## Migrations: expand/contract
+
+Deploy (`.github/workflows/web-deploy.yml`) **applies D1 migrations to the
+shared `nylon-impossible-db` before rolling out the workers** — migrate → deploy
+todo-agent → deploy API → deploy web. Both the `web` and `api` workers bind the
+same database, so during that window the schema is already new while the old
+worker code is still serving.
+
+A migration that **tightens** a constraint in one step therefore causes a brief
+outage for live writes until rollout finishes. Concretely: `0023` made
+`todos.list_id` NOT NULL with no default, and every write that omitted the
+column 500'd (`NOT NULL constraint failed: todos.list_id`) for the length of the
+deploy — surfacing on the client as `Error: No error message`.
+
+For any constraint-tightening change, use **expand/contract**:
+
+1. Migration A adds the column **nullable** (or with a safe default).
+2. Deploy the workers that populate it.
+3. Migration B (a later deploy) makes it `NOT NULL` / adds the strict
+   constraint.
+
+A single add-nullable-then-rebuild-NOT-NULL migration applied before the new
+code deploys is what bites. Reordering CI to deploy-before-migrate just breaks
+it the other way (new code expects a column the migration hasn't added yet), so
+this is a migration-authoring discipline, not a CI tweak.
+
+Note: a red `web-deploy` run is usually the cosmetic marketing `screenshots`
+job, not the deploy — check the `deploy-production` job specifically before
+concluding a deploy failed.

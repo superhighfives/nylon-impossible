@@ -1,5 +1,4 @@
-import * as Sentry from "@sentry/cloudflare";
-import { Effect, Layer } from "effect";
+import { Effect, Exit, Layer } from "effect";
 import type { User } from "./auth";
 import { AuthService, AuthServiceLive, ensureUserExists } from "./auth";
 import { DatabaseService, DatabaseServiceLive } from "./db";
@@ -8,6 +7,7 @@ import {
   type UnauthorizedError,
   type UserNotFoundError,
 } from "./errors";
+import { causeToClientError } from "./server-errors";
 
 /**
  * Combined layer that provides both Auth and Database services
@@ -71,12 +71,14 @@ export const withAuthenticatedUser = <A, E>(
   });
 
 /**
- * Convert an Effect program to a Promise for use in server functions
+ * Convert an Effect program to a Promise for use in server functions.
  *
- * This handles the common pattern of running an Effect with AppLayer
- * and converting it to a Promise that TanStack Start expects.
- *
- * Errors are converted to Response objects that TanStack Start can handle.
+ * Runs the effect with AppLayer and, on failure, throws a `ServerFnError`
+ * (see ./server-errors) carrying a real message. Throwing the Error directly
+ * (rather than letting
+ * `Effect.runPromise` reject with a FiberFailure wrapping a messageless
+ * `Response`) is what lets TanStack Start serialize a useful message to the
+ * client instead of `Error: No error message`.
  *
  * @example
  * ```ts
@@ -87,113 +89,12 @@ export const withAuthenticatedUser = <A, E>(
  * });
  * ```
  */
-export const runEffect = <A, E>(
+export const runEffect = async <A, E>(
   effect: Effect.Effect<A, E, AuthService | DatabaseService>,
-): Promise<A> =>
-  Effect.runPromise(
-    effect.pipe(Effect.catchAll(errorToResponse), Effect.provide(AppLayer)),
+): Promise<A> => {
+  const exit = await Effect.runPromiseExit(
+    effect.pipe(Effect.provide(AppLayer)),
   );
-
-/**
- * Convert Effect errors to HTTP responses
- *
- * This provides a standard way to handle errors in server functions.
- * All tagged errors are mapped to appropriate HTTP status codes.
- *
- * @example
- * ```ts
- * return runEffect(
- *   program.pipe(Effect.catchAll(errorToResponse))
- * );
- * ```
- */
-export const errorToResponse = (
-  error: unknown,
-): Effect.Effect<never, Response> => {
-  // Handle tagged errors
-  if (typeof error === "object" && error !== null && "_tag" in error) {
-    switch (error._tag) {
-      case "UnauthorizedError":
-      case "UserNotFoundError":
-        return Effect.fail(
-          new Response("Unauthorized", {
-            status: 401,
-            statusText: "Unauthorized",
-          }),
-        );
-
-      case "ForbiddenError":
-        return Effect.fail(
-          new Response("Forbidden", {
-            status: 403,
-            statusText: "Forbidden",
-          }),
-        );
-
-      case "TodoNotFoundError":
-      case "ListNotFoundError":
-        return Effect.fail(
-          new Response("Not Found", {
-            status: 404,
-            statusText: "Not Found",
-          }),
-        );
-
-      case "SystemListImmutableError":
-        return Effect.fail(
-          new Response("System lists can't be renamed, deleted, or reordered", {
-            status: 403,
-            statusText: "Forbidden",
-          }),
-        );
-
-      case "ValidationError":
-        return Effect.fail(
-          new Response(
-            JSON.stringify({
-              errors:
-                "errors" in error
-                  ? error.errors
-                  : [{ message: "Validation failed" }],
-            }),
-            {
-              status: 400,
-              statusText: "Bad Request",
-              headers: { "Content-Type": "application/json" },
-            },
-          ),
-        );
-
-      case "DatabaseError":
-        console.error("Database error:", error);
-        // Server fault (5xx) — report it. Auth/validation/not-found above are
-        // expected client errors and deliberately aren't sent to Sentry. This
-        // is the funnel that previously swallowed the D1 bound-param overflow.
-        Sentry.captureException(error, {
-          tags: {
-            area: "web-server-fn",
-            operation:
-              "operation" in error && typeof error.operation === "string"
-                ? error.operation
-                : "unknown",
-          },
-        });
-        return Effect.fail(
-          new Response("Internal Server Error", {
-            status: 500,
-            statusText: "Internal Server Error",
-          }),
-        );
-    }
-  }
-
-  // Handle unknown errors
-  console.error("Unknown error:", error);
-  Sentry.captureException(error, { tags: { area: "web-server-fn" } });
-  return Effect.fail(
-    new Response("Internal Server Error", {
-      status: 500,
-      statusText: "Internal Server Error",
-    }),
-  );
+  if (Exit.isSuccess(exit)) return exit.value;
+  throw causeToClientError(exit.cause);
 };
