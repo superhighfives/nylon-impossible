@@ -207,10 +207,11 @@ jobs:
         run: |
           set -euo pipefail
           out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json)
-          url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty')
+          url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty' 2>/dev/null || true)
           if [ -z "$url" ]; then
-            # Fallback if the private-beta JSON shape shifts: grab the first
-            # workers.dev URL from the output.
+            # Fallback if the private-beta JSON shape shifts (or the output
+            # isn't valid JSON at all, e.g. a banner line before it): grab
+            # the first workers.dev URL from the output.
             url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
           fi
           if [ -z "$url" ]; then
@@ -237,7 +238,7 @@ jobs:
         run: |
           set -euo pipefail
           out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json)
-          url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty')
+          url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty' 2>/dev/null || true)
           if [ -z "$url" ]; then
             url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
           fi
