@@ -16,6 +16,12 @@
       "database_name": "nylon-impossible-db",
       "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
       "migrations_dir": "./migrations",
+      // Previews get their OWN D1 (not prod's) so preview code can't touch real
+      // data and preview/dev-instance user rows stay isolated. `preview_database_id`
+      // is ignored by `wrangler deploy` (prod uses `database_id`); it exists so CI
+      // can run `wrangler d1 migrations apply DB --preview --remote` against this DB, and it
+      // matches the `previews` block's binding below.
+      "preview_database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
     },
   ],
   "durable_objects": {
@@ -78,9 +84,13 @@
   // Worker Previews (private beta): per-branch preview deployments created by
   // `wrangler preview`. Bindings and vars are NOT inherited from the top level,
   // so everything a preview needs is repeated here.
-  //   - DB reuses the production `database_id`, so previews share prod D1 data.
-  //     This is deliberate (shared-backend decision) — preview code can read and
-  //     write real todo data. Use with care.
+  //   - DB is a SEPARATE preview database (not prod's `database_id`), so preview
+  //     code can't read or write real todo data and dev-instance user rows stay
+  //     out of the production users table. CI migrates it via
+  //     `wrangler d1 migrations apply DB --preview --remote` (see `preview_database_id`
+  //     on the top-level binding). The API provisions a user row on demand from
+  //     Clerk (ensureUser, shared by /users/me and /todos/sync), since the Clerk
+  //     signup webhook only fires in prod.
   //   - USER_SYNC Durable Object state is auto-isolated per preview by the
   //     platform; the binding still has to be declared so the class resolves.
   //   - The RESEARCH_QUEUE producer points at the prod queue (shared by name).
@@ -106,8 +116,8 @@
     "d1_databases": [
       {
         "binding": "DB",
-        "database_name": "nylon-impossible-db",
-        "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+        "database_name": "nylon-impossible-preview-db",
+        "database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
         "migrations_dir": "./migrations",
       },
     ],

@@ -1,0 +1,82 @@
+import { createClerkClient } from "@clerk/backend";
+import { generateNKeysBetween } from "fractional-indexing";
+import type { Env } from "../types";
+import { eq, type getDb, lists, users } from "./db";
+
+// The three system lists provisioned for every new user, in fixed first-three
+// order. Kept here because this is the single place a user row is ever created.
+const SYSTEM_LISTS = [
+  { name: "Today", systemKind: "today" as const },
+  { name: "This Week", systemKind: "thisWeek" as const },
+  { name: "Sometime", systemKind: "sometime" as const },
+];
+
+/**
+ * Ensure a `users` row exists for a verified Clerk identity, creating it — and
+ * seeding the three system lists — from Clerk on first sight.
+ *
+ * This is the app's on-demand provisioning fallback for the Clerk signup
+ * webhook. The webhook only fires in production, so previews and local dev never
+ * receive it; previews additionally authenticate against the Clerk *development*
+ * instance, whose user IDs never exist in a webhook-provisioned table. Running
+ * this from any authed entry point that needs a row (sync, /users/me) keeps
+ * those environments working. Previews use their own isolated D1, so this never
+ * writes into the production users table.
+ *
+ * Returns "email_conflict" when the Clerk email is already held by a *different*
+ * account id (so this id legitimately still has no row); callers surface that as
+ * a clean error rather than a downstream foreign-key crash.
+ */
+export async function ensureUser(
+  env: Env["Bindings"],
+  db: ReturnType<typeof getDb>,
+  userId: string,
+): Promise<"ok" | "email_conflict"> {
+  const [existingUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (existingUser) return "ok";
+
+  const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+  const clerkUser = await clerk.users.getUser(userId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+
+  // RETURNING tells us whether THIS call actually inserted the row. The
+  // users.email unique index means the insert no-ops when the email already
+  // belongs to a different auth id (or when Clerk gave us no email and a prior
+  // emailless user already holds the ""). Knowing we inserted lets us seed the
+  // default lists exactly once — never again on a concurrent-provision race.
+  const [inserted] = await db
+    .insert(users)
+    .values({ id: userId, email })
+    .onConflictDoNothing()
+    .returning({ id: users.id });
+
+  if (inserted) {
+    const positions = generateNKeysBetween(null, null, SYSTEM_LISTS.length);
+    const now = new Date();
+    await db.insert(lists).values(
+      SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
+        id: crypto.randomUUID(),
+        userId,
+        name,
+        kind: "system" as const,
+        systemKind,
+        position: positions[i],
+        createdAt: now,
+        updatedAt: now,
+      })),
+    );
+    return "ok";
+  }
+
+  // Insert no-op. Either a concurrent provision already created this exact user
+  // (fine — proceed), or the email is owned by a *different* account id, in which
+  // case this userId has no row.
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId));
+  return existing ? "ok" : "email_conflict";
+}

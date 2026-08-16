@@ -34,6 +34,21 @@ actually shipped, and how it deviated from the spec below:
   4.119.0/4.120.0 → **4.123.0** (within the existing `^` ranges) because 4.123's
   `preview secret put` explicitly "create[s] a new deployment" with the secret
   applied, making the deploy-then-seed order correct on the *first* PR push.
+- **Separate preview D1 — reverses the "share prod D1" decision.** Previews run
+  on `*.workers.dev`, a different registrable domain than `nylonimpossible.com`,
+  so production Clerk cookies (scoped to `.nylonimpossible.com`) aren't readable
+  and interactive sign-in can't use the prod instance — previews must use the
+  Clerk **development** instance (see the Clerk section). Dev-instance user IDs
+  never match prod-provisioned `users` rows, so sharing prod D1 would 404 every
+  `/users/me` (and pollute the prod users table on any auto-provision). The fix:
+  a dedicated `nylon-impossible-preview-db`. Both the API and web `previews`
+  blocks bind it by `database_id`; the API's top-level `DB` binding carries a
+  matching `preview_database_id` so CI migrates it with `wrangler d1 migrations
+  apply DB --preview --remote` (the `--preview` flag *requires* `--remote`). The
+  app already provisions user rows on demand from Clerk in the sync handler (a
+  fallback for the prod-only signup webhook); that was extracted into a shared
+  `ensureUser` helper (`src/api/src/lib/ensure-user.ts`) and is now also called
+  from `/users/me`, so a fresh dev-instance login provisions instead of 404ing.
 - **Resource model confirmed by the docs** (`/workers/previews/resources/`):
   Durable Objects are "automatically isolated" per preview (own namespace +
   state); D1/KV/R2 are "shared by resource ID"; queue *producers* work when
@@ -125,7 +140,7 @@ These are real changes from today's fully-isolated stack. They're acceptable giv
 
 1. **Preview API `UserSync` Durable Object is auto-isolated per preview.** Each branch gets fresh sync state. Arguably better; just different.
 2. **Preview API does not consume the research queue.** Queue consumers are triggers that only ever target production ([Resources and isolation](https://developers.cloudflare.com/workers/previews/resources/)). Research-worker behaviour is exercised end-to-end only after merge (or against prod). This matches the accepted tradeoff of keeping todo-agent/backend prod-shared.
-3. **Previews share production D1 data.** D1 is shared by resource ID. Preview code can read/write prod todo data. This is the main "use with care" item — call it out in the PR that lands this.
+3. **Previews use a SEPARATE, isolated D1 (`nylon-impossible-preview-db`), not prod's.** This reverses the plan's original "share prod D1" decision — see the Implementation-notes deviation below. Preview code can't read or write real todo data, and preview logins (Clerk dev instance) don't pollute the prod users table. The API provisions a user row on demand from Clerk (shared `ensureUser`, used by `/users/me` and `/todos/sync`), since the Clerk signup webhook only fires in prod.
 4. **Clerk runs against the development instance on previews**, not production. Dev instances accept any request origin, so `*.workers.dev` previews need no Clerk allow-listing; production keys are domain-locked to `nylonimpossible.com` and can't serve workers.dev. Sign-in routes through Clerk's `*.accounts.dev` Account Portal and shows a dev-mode badge — both expected for previews. (The API's own CORS still gates `*.workers.dev` on `ENVIRONMENT !== "production"`; see below.)
 
 ## Implementation

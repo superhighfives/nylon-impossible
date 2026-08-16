@@ -191,15 +191,17 @@ jobs:
           echo "PREVIEW_NAME=$name" >> "$GITHUB_ENV"
           echo "Preview name: $name"
 
-      # Previews share prod D1, so migrations are applied to the same database as
-      # production (unchanged from the old flow).
-      - name: Apply D1 migrations
+      # Previews use their OWN isolated D1 (not prod's), so migrations target the
+      # preview database via `--preview` — which resolves the `DB` binding's
+      # `preview_database_id` from src/api/wrangler.jsonc. This keeps preview data
+      # separate from production; the web preview binds the same DB by id.
+      - name: Apply D1 migrations (preview DB)
         uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: d1 migrations apply nylon-impossible-db --remote
+          command: d1 migrations apply DB --preview --remote
 
       # Deploy the API preview first and capture its URL — the web build bakes it
       # in at compile time (VITE_API_BASE_URL), so it must exist before the build.
