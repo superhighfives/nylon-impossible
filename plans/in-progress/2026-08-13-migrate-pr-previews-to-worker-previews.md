@@ -20,16 +20,20 @@ actually shipped, and how it deviated from the spec below:
   They confirm the resource model used below (see next bullet). Config choices
   were cross-checked against the bundled `wrangler/config-schema.json`
   (`PreviewsConfig`) and `wrangler preview --help`.
-- **Secret command — version skew, not a plan error.** The docs show BOTH
-  `wrangler preview base-config secret put <KEY>` (shared "base configuration"
-  that every *new* preview inherits) and `wrangler preview secret put <KEY>
-  --name <preview>` (one preview). BUT the pinned Wrangler (checked 4.119.0 and
-  4.120.0) has **no `base-config` subcommand** — only `wrangler preview secret
-  put <KEY> [--name <preview>]`, which targets a single preview (defaulting to
-  the current git branch). So until a Wrangler with `base-config` is pinned,
-  there is **no "set once, all previews inherit" path**: preview secrets must be
-  set per-preview (per branch), or Wrangler must be bumped to a build that ships
-  `base-config`. Resolve this as part of the out-of-band secret step.
+- **Secret command — `base-config` does not exist; secrets are CI-seeded per
+  preview.** The docs mention `wrangler preview base-config secret put <KEY>`
+  (shared "base configuration" every *new* preview inherits), but **no shipped
+  Wrangler has a `base-config` subcommand** — verified on the pinned 4.119.0 *and*
+  the latest 4.123.0, both of which expose only `wrangler preview secret
+  put/delete/list/bulk [--name <preview>]`. There is no CLI "set once, all
+  previews inherit" path (the only such mechanism is the Preview base config in
+  the Cloudflare dashboard — a manual GUI action, invisible to the repo). So the
+  workflow seeds secrets **per preview** with `wrangler preview secret put <KEY>
+  --name <PREVIEW_NAME>` right after each deploy — automated in CI, so it is *not*
+  the manual per-preview toil the migration aimed to drop. Wrangler was bumped
+  4.119.0/4.120.0 → **4.123.0** (within the existing `^` ranges) because 4.123's
+  `preview secret put` explicitly "create[s] a new deployment" with the secret
+  applied, making the deploy-then-seed order correct on the *first* PR push.
 - **Resource model confirmed by the docs** (`/workers/previews/resources/`):
   Durable Objects are "automatically isolated" per preview (own namespace +
   state); D1/KV/R2 are "shared by resource ID"; queue *producers* work when
@@ -61,17 +65,19 @@ actually shipped, and how it deviated from the spec below:
 
 - [ ] Confirm the Worker Previews private beta is enabled on the account and the
       active-preview limit is acceptable.
-- [ ] Set preview secrets (API: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`,
-      `CLOUDFLARE_API_TOKEN`, and if present `TAVILY_API_KEY`,
-      `INTERNAL_AGENT_SECRET`; Web: `CLERK_SECRET_KEY`). **Decide the mechanism
-      first** given the version skew above: either (a) bump Wrangler to a build
-      with `wrangler preview base-config secret put` and set them once on the
-      base config, or (b) with the pinned CLI, set them per-preview via
-      `wrangler preview secret put <KEY> --name <preview>` (needs a per-branch
-      step — note this partially reintroduces per-preview secret management the
-      migration aimed to drop).
-- [ ] Add `https://*.workers.dev` (or the specific preview subdomains) to
-      Clerk's allowed origins / authorized parties for the preview keys.
+- [x] ~~Set preview secrets~~ — **now automated in CI**, not out of band. The
+      `deploy-preview` job seeds them per preview with `wrangler preview secret
+      put --name <PREVIEW_NAME>` after each deploy (API: `CLERK_SECRET_KEY`,
+      `CLERK_PUBLISHABLE_KEY`, `CLOUDFLARE_API_TOKEN`, optional `TAVILY_API_KEY` /
+      `INTERNAL_AGENT_SECRET`; Web: `CLERK_SECRET_KEY`, `VITE_CLERK_PUBLISHABLE_KEY`).
+      No base-config command exists (see the secret-command note above), so
+      per-preview seeding is the mechanism.
+- [x] ~~Add `*.workers.dev` to Clerk allowed origins~~ — **moot**. Previews now
+      run against the Clerk **development** instance (`CLERK_DEVELOPMENT_*`
+      secrets, the same pair the marketing workflow uses), which accepts any
+      request origin — so no Clerk dashboard config is needed for workers.dev. A
+      `pk_live_`/`sk_live_` pair is domain-locked to `nylonimpossible.com` and
+      can't serve a workers.dev origin anyway (cookie domain + FAPI origin).
 - [ ] Run one real `wrangler preview` (API + web) to verify the beta actually
       deploys, the `--json` shape matches `.preview.urls[0]`, and DO isolation /
       D1 sharing / no-cron-no-consumer behaviours hold as assumed above.
@@ -120,7 +126,7 @@ These are real changes from today's fully-isolated stack. They're acceptable giv
 1. **Preview API `UserSync` Durable Object is auto-isolated per preview.** Each branch gets fresh sync state. Arguably better; just different.
 2. **Preview API does not consume the research queue.** Queue consumers are triggers that only ever target production ([Resources and isolation](https://developers.cloudflare.com/workers/previews/resources/)). Research-worker behaviour is exercised end-to-end only after merge (or against prod). This matches the accepted tradeoff of keeping todo-agent/backend prod-shared.
 3. **Previews share production D1 data.** D1 is shared by resource ID. Preview code can read/write prod todo data. This is the main "use with care" item — call it out in the PR that lands this.
-4. **Clerk runs against production keys** via the preview base config. `*.workers.dev` preview origins likely need allow-listing in Clerk (and in any API CORS/origin check). Verification step below.
+4. **Clerk runs against the development instance on previews**, not production. Dev instances accept any request origin, so `*.workers.dev` previews need no Clerk allow-listing; production keys are domain-locked to `nylonimpossible.com` and can't serve workers.dev. Sign-in routes through Clerk's `*.accounts.dev` Account Portal and shows a dev-mode badge — both expected for previews. (The API's own CORS still gates `*.workers.dev` on `ENVIRONMENT !== "production"`; see below.)
 
 ## Implementation
 
@@ -150,29 +156,23 @@ These are real changes from today's fully-isolated stack. They're acceptable giv
   - Keep `test`, `deploy-production`, and `screenshots` jobs unchanged.
 - `.github/workflows/preview-cleanup-sweep.yml` — **delete the file.** Auto-eviction replaces it. (Optionally keep a one-shot manual `workflow_dispatch` sweep for a transition period to mop up legacy `*-pr-N` workers/queues from the old system, then delete it once the account is clean.)
 
-### Preview secrets (one-time, out of band)
+### Preview secrets (CI-automated, per preview)
 
-Preview workers do not inherit production secrets. Set them once on the preview **base configuration** so every new preview starts with them:
+Preview workers inherit no secrets from the top-level config or from production. Because no shipped Wrangler has a `base-config secret` command (see the secret-command note in Implementation notes), the `deploy-preview` job seeds each preview per name, right after its deploy:
 
 ```sh
-# From src/api
-printf '%s' "$CLERK_SECRET_KEY"      | pnpm exec wrangler preview base-config secret put CLERK_SECRET_KEY
-printf '%s' "$CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler preview base-config secret put CLERK_PUBLISHABLE_KEY
-printf '%s' "$CLOUDFLARE_API_TOKEN"  | pnpm exec wrangler preview base-config secret put CLOUDFLARE_API_TOKEN
-# Optional, if present:
-printf '%s' "$TAVILY_API_KEY"        | pnpm exec wrangler preview base-config secret put TAVILY_API_KEY
-printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler preview base-config secret put INTERNAL_AGENT_SECRET
-
-# From src/web (only what the web worker needs at runtime)
-printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview base-config secret put CLERK_SECRET_KEY
+# In the job, after `wrangler preview --name "$PREVIEW_NAME"`:
+printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
+# …CLERK_PUBLISHABLE_KEY, CLOUDFLARE_API_TOKEN, optional TAVILY_API_KEY /
+#   INTERNAL_AGENT_SECRET for the API; CLERK_SECRET_KEY + VITE_CLERK_PUBLISHABLE_KEY
+#   for the web worker.
 ```
 
-This replaces the per-push `wrangler secret put` / `wrangler secret bulk` steps in the old job. If a team prefers CI-managed secrets, these commands can live in a manual `workflow_dispatch` job instead — but not on every PR push.
+On Wrangler 4.123 `preview secret put` creates a new deployment with the secret applied, so the running preview picks it up on the first push. The GitHub secret **values** are the Clerk **development** instance keys (`CLERK_DEVELOPMENT_SECRET_KEY` / `CLERK_DEVELOPMENT_PUBLISHABLE_KEY`), not production — the worker-side secret *names* are unchanged. This is CI-managed, so it does not reintroduce the manual per-push secret toil the old job had.
 
-### Clerk / origin allow-listing
+### Clerk / origin allow-listing — not needed
 
-- Add the preview URL shape (`https://*.<subdomain>.workers.dev`, or the specific `<worker>` subdomains) to Clerk's allowed origins / authorized parties for the environment the preview keys belong to.
-- Check the API for any explicit origin/CORS allow-list that currently only knows about `nylonimpossible.com` and `*-pr-*.nylonimpossible.com`; extend it to accept the workers.dev preview origins. `src/api/src/lib/auth.ts` uses `verifyToken` with a shared secret (no origin coupling there), but grep for CORS middleware before assuming there's nothing to change.
+Previews use the Clerk **development** instance, which accepts any request origin, so there is nothing to add to Clerk for `*.workers.dev`. On the API side, `src/api/src/index.ts` CORS already accepts `*.workers.dev` origins when `ENVIRONMENT !== "production"` (the preview API runs as `ENVIRONMENT: "preview"`), so no further origin/CORS change is required.
 
 ### Key considerations
 
@@ -189,8 +189,8 @@ This replaces the per-push `wrangler secret put` / `wrangler secret bulk` steps 
 - [ ] `deploy-preview` job replaced with a `wrangler preview`-based job (API → capture URL → web build → web preview → comment).
 - [ ] `cleanup-preview` job and all config-rewriting / queue-creation steps removed.
 - [ ] `preview-cleanup-sweep.yml` deleted (after a final legacy cleanup run).
-- [ ] Preview base-config secrets set for API and web.
-- [ ] Clerk allowed origins + any API CORS allow-list updated for `*.workers.dev`.
+- [x] Preview secrets seeded per preview in CI (dev-instance Clerk keys) for API and web.
+- [x] Clerk allow-listing not required (dev instance); API CORS already accepts `*.workers.dev` off `ENVIRONMENT`.
 - [ ] Opening a PR produces working web + API preview URLs, commented on the PR, with the web preview talking to the matching API preview.
 - [ ] Pushing a second commit keeps the same preview URLs.
 - [ ] Closing a PR leaves no manual cleanup required (auto-eviction handles it); no orphaned `*-pr-*` resources remain from the old system.

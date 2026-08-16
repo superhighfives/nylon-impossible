@@ -222,10 +222,46 @@ jobs:
           echo "API_PREVIEW_URL=$url" >> "$GITHUB_ENV"
           echo "API preview: $url"
 
+      # Worker Previews inherit neither the top-level config's secrets nor
+      # production's — and the old per-PR flow's secret-seeding steps were
+      # removed in this migration. Without CLERK_SECRET_KEY the web preview's
+      # clerkMiddleware() throws on every SSR request (500), and auth'd API
+      # routes reject every call. Re-seed on each run so a fresh PR preview
+      # boots working; `preview secret put` targets this preview by name and
+      # redeploys it with the secret applied. Idempotent, so re-pushing is fine.
+      - name: Set preview API secrets
+        working-directory: src/api
+        run: |
+          set -euo pipefail
+          printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler preview secret put CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$CLOUDFLARE_API_TOKEN" | pnpm exec wrangler preview secret put CLOUDFLARE_API_TOKEN --name "$PREVIEW_NAME"
+          if [ -n "$TAVILY_API_KEY" ]; then
+            printf '%s' "$TAVILY_API_KEY" | pnpm exec wrangler preview secret put TAVILY_API_KEY --name "$PREVIEW_NAME"
+          fi
+          if [ -n "$INTERNAL_AGENT_SECRET" ]; then
+            printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler preview secret put INTERNAL_AGENT_SECRET --name "$PREVIEW_NAME"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Previews use the Clerk *development* instance, not production: dev
+          # instances accept any request origin, so the *.workers.dev preview
+          # URLs work with zero Clerk dashboard config. A pk_live_/sk_live_ pair
+          # is domain-locked to nylonimpossible.com and can't serve workers.dev.
+          # The worker still reads CLERK_SECRET_KEY/CLERK_PUBLISHABLE_KEY — only
+          # the values differ. Same dev keys the marketing workflow already uses.
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
+
       - name: Build preview Web
         run: pnpm --filter @nylon-impossible/web run build
         env:
-          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
+          # Dev-instance publishable key (baked into the bundle) — see the note
+          # on the "Set preview API secrets" step for why previews avoid prod.
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_API_BASE_URL: ${{ env.API_PREVIEW_URL }}
           VITE_IS_PREVIEW: true
@@ -249,6 +285,26 @@ jobs:
           fi
           echo "WEB_PREVIEW_URL=$url" >> "$GITHUB_ENV"
           echo "Web preview: $url"
+
+      # The web preview's server-side clerkMiddleware() runs on every SSR request
+      # and needs CLERK_SECRET_KEY at runtime (VITE_CLERK_PUBLISHABLE_KEY is baked
+      # in at build, but the secret key is not). Seed it so SSR stops 500ing.
+      # VITE_CLERK_PUBLISHABLE_KEY is also set as a runtime secret to match the
+      # publishable key the bundle was built with. The preview URL is stable by
+      # name, so the redeploy this triggers keeps the URL commented below valid.
+      - name: Set preview Web secrets
+        working-directory: src/web
+        run: |
+          set -euo pipefail
+          printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$VITE_CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler preview secret put VITE_CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Dev-instance keys — must match the publishable key the bundle was
+          # built with above. See the "Set preview API secrets" note.
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
 
       - name: Comment preview URLs on PR
         uses: actions/github-script@v9
