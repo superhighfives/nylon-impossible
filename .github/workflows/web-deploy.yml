@@ -143,8 +143,9 @@ jobs:
   # production, never on a preview. See
   # plans/in-progress/2026-08-13-migrate-pr-previews-to-worker-previews.md.
   #
-  # Preview secrets are NOT set here — they live on each Worker's Previews
-  # settings, set once out of band with `wrangler preview secret put <KEY>`.
+  # Preview secrets are seeded by this job (see the "Set preview API/Web
+  # secrets" steps below), against the Clerk *development* instance —
+  # they are not inherited from production.
   deploy-preview:
     needs: [test]
     if: >-
