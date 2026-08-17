@@ -176,6 +176,13 @@
       "when": 1786998403757,
       "tag": "0024_normalize_dashless_list_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1786999322379,
+      "tag": "0025_bump_todos_updated_at_for_list_id_resync",
+      "breakpoints": true
     }
   ]
 }

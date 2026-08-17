@@ -1,0 +1,16 @@
+-- Force clients to re-pull todos so migration 0024's normalized list ids
+-- actually reach them.
+--
+-- 0024 rewrote `todos.list_id` (dashless -> dashed UUID) but left `updated_at`
+-- untouched. The iOS client reconciles todos last-write-wins on `updatedAt`
+-- (SyncService: `if remote.updatedAt > local.updatedAt`), so with an unchanged
+-- timestamp it treats each todo as already current and never applies the new
+-- listId — leaving every list empty on devices that had already synced the old
+-- (unparseable) id. Web is unaffected (it has no such local cache).
+--
+-- Bump `updated_at` to now so every todo reads as newer than any client's
+-- cached copy and gets re-pulled once, carrying the corrected list_id. This is
+-- a one-time data nudge (the migration runs once); it does not change any
+-- todo's content. Lists don't need this — they reconcile by id, and 0024
+-- changed their ids, so clients rebuild them regardless.
+UPDATE `todos` SET `updated_at` = unixepoch();

@@ -127,6 +127,30 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      # Fail the deploy loudly if the freshly-rolled-out worker doesn't actually
+      # serve the app. A green build with a broken SSR bundle (e.g. the
+      # @tanstack/react-start 1.168.44 regression that 500'd every request with
+      # `{"unhandled":true,"message":"HTTPError"}`) would otherwise ship silently
+      # — the deploy job succeeds, only real traffic reveals the outage. Assert a
+      # 200 with an actual HTML document, retrying briefly for rollout to settle.
+      - name: Smoke test production
+        run: |
+          set -euo pipefail
+          URL="https://nylonimpossible.com/"
+          for attempt in 1 2 3 4 5; do
+            code=$(curl -sS -o /tmp/home.html -w '%{http_code}' "$URL" || echo 000)
+            if [ "$code" = "200" ] && grep -aqi '<!doctype html' /tmp/home.html; then
+              echo "✓ $URL served 200 with an HTML document (attempt $attempt)"
+              exit 0
+            fi
+            echo "attempt $attempt: HTTP $code (not a healthy HTML response yet); first bytes:"
+            head -c 200 /tmp/home.html || true
+            echo
+            sleep 10
+          done
+          echo "✘ $URL never returned a healthy HTML 200 after deploy" >&2
+          exit 1
+
   # Regenerate marketing screenshots after a production deploy. Skipped on PRs
   # because deploy-production only runs on push/workflow_dispatch, and a job
   # that `needs` a skipped job is skipped too. Runs on its own macos-26 runner.
