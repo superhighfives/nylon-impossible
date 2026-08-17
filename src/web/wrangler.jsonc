@@ -21,5 +21,25 @@
 	],
 	"observability": {
 		"enabled": true
+	},
+	// Worker Previews (private beta): per-branch preview deployments created by
+	// `wrangler preview`. Bindings are NOT inherited from the top level, so the
+	// DB binding is repeated here, pointed at the SEPARATE preview database (not
+	// prod's) — the same DB the API preview binds to, kept isolated from prod
+	// data. Its schema is migrated by the API's deploy-preview CI step. The API
+	// base URL the web app talks to is a build-time Vite var (VITE_API_BASE_URL),
+	// wired to the matching API preview URL in CI — not a wrangler binding, so it
+	// does not appear here.
+	"previews": {
+		"d1_databases": [
+			{
+				"binding": "DB",
+				"database_name": "nylon-impossible-preview-db",
+				"database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d"
+			}
+		],
+		"observability": {
+			"enabled": true
+		}
 	}
 }

@@ -16,6 +16,12 @@
       "database_name": "nylon-impossible-db",
       "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
       "migrations_dir": "./migrations",
+      // Previews get their OWN D1 (not prod's) so preview code can't touch real
+      // data and preview/dev-instance user rows stay isolated. `preview_database_id`
+      // is ignored by `wrangler deploy` (prod uses `database_id`); it exists so CI
+      // can run `wrangler d1 migrations apply DB --preview --remote` against this DB, and it
+      // matches the `previews` block's binding below.
+      "preview_database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
     },
   ],
   "durable_objects": {
@@ -75,6 +81,72 @@
       "service": "nylon-impossible-todo-agent",
     },
   ],
+  // Worker Previews (private beta): per-branch preview deployments created by
+  // `wrangler preview`. Bindings and vars are NOT inherited from the top level,
+  // so everything a preview needs is repeated here.
+  //   - DB is a SEPARATE preview database (not prod's `database_id`), so preview
+  //     code can't read or write real todo data and dev-instance user rows stay
+  //     out of the production users table. CI migrates it via
+  //     `wrangler d1 migrations apply DB --preview --remote` (see `preview_database_id`
+  //     on the top-level binding). The API provisions a user row on demand from
+  //     Clerk (ensureUser, shared by /users/me and /todos/sync), since the Clerk
+  //     signup webhook only fires in prod.
+  //   - USER_SYNC Durable Object state is auto-isolated per preview by the
+  //     platform; the binding still has to be declared so the class resolves.
+  //   - The RESEARCH_QUEUE producer points at the prod queue (shared by name).
+  //     No consumer and no cron are configured: queue consumers and cron
+  //     triggers only ever fire on the production deployment, never on previews
+  //     (`triggers` isn't even a valid key in this block). So the research
+  //     consumer and the hourly list-sweep cron do NOT run against prod D1 from
+  //     a preview — they're only exercised after merge.
+  //   - The TODO_AGENT service binding from a preview always resolves to the
+  //     bound Worker's PRODUCTION deployment (platform constraint), so this
+  //     necessarily calls prod todo-agent.
+  // Secrets are not inherited either — CI seeds them per-preview against the
+  // Clerk *development* instance (see the "Set preview API secrets" step in
+  // web-deploy.yml and the migration plan for the base-config vs per-preview
+  // decision).
+  "previews": {
+    "vars": {
+      "ENVIRONMENT": "preview",
+      "CF_AI_GATEWAY_ID": "nylon-impossible",
+      "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
+      "WEB_BASE_URL": "https://www.nylonimpossible.com",
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "nylon-impossible-preview-db",
+        "database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
+        "migrations_dir": "./migrations",
+      },
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "USER_SYNC",
+          "class_name": "UserSync",
+        },
+      ],
+    },
+    "ai": {
+      "binding": "AI",
+    },
+    "services": [
+      {
+        "binding": "TODO_AGENT",
+        "service": "nylon-impossible-todo-agent",
+      },
+    ],
+    "queues": {
+      "producers": [
+        { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },
+      ],
+    },
+    "observability": {
+      "enabled": true,
+    },
+  },
   // Note: SENTRY_DSN should be configured as a secret via `wrangler secret put SENTRY_DSN`
   // Note: INTERNAL_AGENT_SECRET (checked on /internal/agent/*, called by
   // src/todo-agent) should be configured as a secret via `wrangler secret

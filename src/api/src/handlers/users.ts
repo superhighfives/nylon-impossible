@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { z } from "zod/v4";
 import { eq, getDb, users } from "../lib/db";
 import { deleteUserCascade } from "../lib/delete-user";
+import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
@@ -17,6 +18,12 @@ const updatePreferencesSchema = z.object({
 export async function getMe(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
+
+  // Provision the row on first sight. The Clerk signup webhook only fires in
+  // production; previews (which authenticate against the Clerk dev instance) and
+  // local dev rely on this fallback so /users/me doesn't 404 on a fresh login.
+  // Shared with /todos/sync — see ensureUser.
+  await ensureUser(c.env, db, userId);
 
   const user = await db
     .select({

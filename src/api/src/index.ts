@@ -65,12 +65,19 @@ const app = new Hono<Env>();
 const ALLOWED_ORIGINS =
   /^https:\/\/(www\.|admin\.)?nylonimpossible\.com$|^https:\/\/(?:api-)?pr-\d+\.nylonimpossible\.com$/;
 const LOCALHOST_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+// Worker Previews serve the web app from a
+// <preview>-<worker>.<subdomain>.workers.dev origin. Only trusted outside
+// production (the preview API runs with ENVIRONMENT: "preview"), so prod CORS
+// stays pinned to our own domains and never opens up to arbitrary *.workers.dev.
+const WORKERS_DEV_ORIGIN =
+  /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.workers\.dev$/;
 
 app.use("*", (c, next) => {
   const isDev = c.env.ENVIRONMENT !== "production";
   return cors({
     origin: (origin) => {
       if (isDev && LOCALHOST_ORIGIN.test(origin)) return origin;
+      if (isDev && WORKERS_DEV_ORIGIN.test(origin)) return origin;
       return ALLOWED_ORIGINS.test(origin) ? origin : null;
     },
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

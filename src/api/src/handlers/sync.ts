@@ -1,4 +1,3 @@
-import { createClerkClient } from "@clerk/backend";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
   nextDueDate,
@@ -15,7 +14,6 @@ import {
   gt,
   inArray,
   isNotNull,
-  lists,
   type Todo,
   type TodoMessage,
   type TodoResearch,
@@ -26,23 +24,14 @@ import {
   todoSuggestions,
   todos,
   todoUrls,
-  users,
 } from "../lib/db";
+import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
-
-// The three system lists provisioned for every new user, fixed first-three
-// order (position a0 < a1 < a2). Custom lists never interleave before/between
-// these.
-const SYSTEM_LISTS = [
-  { name: "Today", systemKind: "today" as const },
-  { name: "This Week", systemKind: "thisWeek" as const },
-  { name: "Sometime", systemKind: "sometime" as const },
-];
 
 const recurrenceSchema = z.object({
   frequency: z.enum(["daily", "weekly", "monthly", "yearly"]),
@@ -248,59 +237,10 @@ export async function syncTodos(c: Context<Env>) {
   const conflicts: SyncConflict[] = [];
   const syncedAt = new Date();
 
-  // Ensure user exists before inserting todos (FK constraint)
-  const [existingUser] = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, userId));
-
-  if (!existingUser) {
-    const clerk = createClerkClient({ secretKey: c.env.CLERK_SECRET_KEY });
-    const clerkUser = await clerk.users.getUser(userId);
-    const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-
-    // RETURNING tells us whether THIS call actually inserted the row. The
-    // users.email unique index means the insert no-ops when the email already
-    // belongs to a different auth id (or when Clerk gave us no email and a
-    // prior emailless user already holds the ""). Knowing we inserted lets us
-    // seed default lists exactly once — never again on a concurrent-sync race.
-    const [inserted] = await db
-      .insert(users)
-      .values({ id: userId, email })
-      .onConflictDoNothing()
-      .returning({ id: users.id });
-
-    if (inserted) {
-      // We created the user — seed the three system lists exactly once. This
-      // is the only place a user row is ever created, so it's the natural
-      // single place list provisioning happens.
-      const positions = generateNKeysBetween(null, null, SYSTEM_LISTS.length);
-      const now = new Date();
-      await db.insert(lists).values(
-        SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
-          id: crypto.randomUUID(),
-          userId,
-          name,
-          kind: "system" as const,
-          systemKind,
-          position: positions[i],
-          createdAt: now,
-          updatedAt: now,
-        })),
-      );
-    } else {
-      // Insert no-op. Either a concurrent sync already created this exact user
-      // (fine — proceed), or the email is owned by a *different* account id, in
-      // which case this userId has no row and inserting todos would fail the FK.
-      // Surface that as a clean 409 instead of a downstream FK crash.
-      const [existing] = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.id, userId));
-      if (!existing) {
-        return apiError(c, "email_already_registered");
-      }
-    }
+  // Ensure user exists before inserting todos (FK constraint). Shared with
+  // /users/me so both entry points provision identically.
+  if ((await ensureUser(c.env, db, userId)) === "email_conflict") {
+    return apiError(c, "email_already_registered");
   }
 
   // Track todos that need URLs stored. explicitUrls takes priority over regex extraction.
