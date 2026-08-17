@@ -29,7 +29,7 @@ enum TaskCreationService {
         allTodos: [TodoItem],
         // Which list to create into; nil defaults to Today server-side once
         // this syncs (mirrors the web/API default for an omitted listId).
-        listId: UUID? = nil
+        listId: String? = nil
     ) -> TodoItem {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -120,7 +120,7 @@ enum TaskCreationService {
         userId: String?,
         context: ModelContext,
         allTodos: [TodoItem],
-        listId: UUID? = nil
+        listId: String? = nil
     ) -> TodoItem? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }

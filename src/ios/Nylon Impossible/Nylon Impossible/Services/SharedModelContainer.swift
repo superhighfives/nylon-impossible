@@ -26,9 +26,35 @@ enum SharedModelContainer {
         )
         
         do {
-            return try ModelContainer(for: schema, configurations: config)
+            let container = try ModelContainer(for: schema, configurations: config)
+            backfillLegacyListIds(in: container)
+            return container
         } catch {
             fatalError("Failed to create shared model container: \(error)")
         }
     }()
+
+    /// One-time bridge for `TodoItem.listId`'s UUID? -> String? change. The old
+    /// value survives the store migration under the renamed `listIdLegacy`
+    /// column (see `TodoItem`); copy it into the new String `listId` so list
+    /// membership is correct immediately, without waiting for the next full
+    /// sync. Runs once per process, before any sync touches the store (this is
+    /// called inside `shared`'s initializer). Idempotent: a row is only touched
+    /// while it still has a legacy value and no new one, and `listIdLegacy` is
+    /// cleared as it's copied, so subsequent launches find nothing to do.
+    ///
+    /// Filtered in memory rather than with a #Predicate — predicates over
+    /// optional UUIDs are unreliable (see TaskCreationService.fetchAllTodos) and
+    /// the local store is small.
+    private static func backfillLegacyListIds(in container: ModelContainer) {
+        let context = ModelContext(container)
+        let all = (try? context.fetch(FetchDescriptor<TodoItem>())) ?? []
+        let stale = all.filter { $0.listId == nil && $0.listIdLegacy != nil }
+        guard !stale.isEmpty else { return }
+        for todo in stale {
+            todo.listId = todo.listIdLegacy?.uuidString.lowercased()
+            todo.listIdLegacy = nil
+        }
+        try? context.save()
+    }
 }
