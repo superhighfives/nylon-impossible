@@ -169,6 +169,13 @@
       "when": 1786300000000,
       "tag": "0023_time_bucket_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1786998403757,
+      "tag": "0024_normalize_dashless_list_ids",
+      "breakpoints": true
     }
   ]
 }
