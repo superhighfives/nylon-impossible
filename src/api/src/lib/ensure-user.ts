@@ -1,7 +1,7 @@
 import { createClerkClient } from "@clerk/backend";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
-import { eq, type getDb, lists, users } from "./db";
+import { eq, type getDb, lists, todos, users } from "./db";
 
 // The three system lists provisioned for every new user, in fixed first-three
 // order. Kept here because this is the single place a user row is ever created.
@@ -9,6 +9,38 @@ const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
   { name: "This Week", systemKind: "thisWeek" as const },
   { name: "Sometime", systemKind: "sometime" as const },
+];
+
+// Preview-only demo data. When one of these accounts first logs into a preview,
+// its freshly-provisioned app is seeded with a realistic set of todos so the
+// preview isn't an empty shell. Matched by Clerk email so we don't need each
+// account's dev-instance Clerk id, and gated to ENVIRONMENT === "preview" (see
+// seedPreviewTodos) so production and local dev are never touched.
+const PREVIEW_SEED_EMAILS = new Set([
+  "marketing@nylonimpossible.com",
+  "hi@charliegleason.com",
+]);
+
+type SeedTodo = {
+  list: (typeof SYSTEM_LISTS)[number]["systemKind"];
+  title: string;
+  notes?: string;
+  completed?: boolean;
+  dueInDays?: number;
+};
+
+const PREVIEW_SEED_TODOS: SeedTodo[] = [
+  {
+    list: "today",
+    title: "Finish quarterly report",
+    notes: "Needs sign-off from the finance team before end of month",
+    dueInDays: 0,
+  },
+  { list: "today", title: "Buy groceries for the week", completed: true },
+  { list: "thisWeek", title: "Book dentist appointment", dueInDays: 3 },
+  { list: "thisWeek", title: "Reply to the design feedback thread" },
+  { list: "sometime", title: "Read 'Atomic Habits'" },
+  { list: "sometime", title: "Plan the autumn hiking trip" },
 ];
 
 /**
@@ -56,18 +88,24 @@ export async function ensureUser(
   if (inserted) {
     const positions = generateNKeysBetween(null, null, SYSTEM_LISTS.length);
     const now = new Date();
-    await db.insert(lists).values(
-      SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
-        id: crypto.randomUUID(),
-        userId,
-        name,
-        kind: "system" as const,
-        systemKind,
-        position: positions[i],
-        createdAt: now,
-        updatedAt: now,
-      })),
-    );
+    const systemLists = SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
+      id: crypto.randomUUID(),
+      userId,
+      name,
+      kind: "system" as const,
+      systemKind,
+      position: positions[i],
+      createdAt: now,
+      updatedAt: now,
+    }));
+    await db.insert(lists).values(systemLists);
+
+    if (
+      env.ENVIRONMENT === "preview" &&
+      PREVIEW_SEED_EMAILS.has(email.toLowerCase())
+    ) {
+      await seedPreviewTodos(db, userId, systemLists);
+    }
     return "ok";
   }
 
@@ -79,4 +117,36 @@ export async function ensureUser(
     .from(users)
     .where(eq(users.id, userId));
   return existing ? "ok" : "email_conflict";
+}
+
+// Insert the demo todos for a just-provisioned preview account, distributing
+// PREVIEW_SEED_TODOS across the user's system lists with fractional positions in
+// declared order. Due dates are relative to now so the seed never goes stale.
+async function seedPreviewTodos(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  systemLists: { id: string; systemKind: string }[],
+): Promise<void> {
+  const now = new Date();
+  const rows = systemLists.flatMap((list) => {
+    const seeds = PREVIEW_SEED_TODOS.filter((t) => t.list === list.systemKind);
+    const positions = generateNKeysBetween(null, null, seeds.length);
+    return seeds.map((t, i) => ({
+      id: crypto.randomUUID(),
+      userId,
+      listId: list.id,
+      title: t.title,
+      notes: t.notes ?? null,
+      completed: t.completed ?? false,
+      position: positions[i],
+      dueDate:
+        t.dueInDays === undefined
+          ? null
+          : new Date(now.getTime() + t.dueInDays * 86_400_000),
+      createdAt: now,
+      updatedAt: now,
+    }));
+  });
+
+  if (rows.length > 0) await db.insert(todos).values(rows);
 }

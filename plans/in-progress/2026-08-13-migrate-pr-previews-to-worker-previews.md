@@ -49,6 +49,11 @@ actually shipped, and how it deviated from the spec below:
   fallback for the prod-only signup webhook); that was extracted into a shared
   `ensureUser` helper (`src/api/src/lib/ensure-user.ts`) and is now also called
   from `/users/me`, so a fresh dev-instance login provisions instead of 404ing.
+  `ensureUser` additionally seeds a set of demo todos when a preview-allowlisted
+  account (`marketing@nylonimpossible.com`, `hi@charliegleason.com`, matched by
+  Clerk email) first provisions on a preview (`ENVIRONMENT === "preview"`), so
+  logging into a preview as one of those accounts lands on a populated app
+  instead of an empty one. Other accounts get a clean empty account.
 - **Resource model confirmed by the docs** (`/workers/previews/resources/`):
   Durable Objects are "automatically isolated" per preview (own namespace +
   state); D1/KV/R2 are "shared by resource ID"; queue *producers* work when
