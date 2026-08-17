@@ -82,7 +82,7 @@
     }
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.6",
+    "@biomejs/biome": "2.5.8",
     "drizzle-kit": "^0.31.8",
     "husky": "^9.1.7",
     "wrangler": "^4.123.0"
