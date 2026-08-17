@@ -232,17 +232,29 @@ jobs:
       - name: Deploy preview API
         working-directory: src/api
         run: |
-          set -euo pipefail
-          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json)
+          set -uo pipefail
+          # `wrangler preview` (private beta) can exit 0 yet return an empty
+          # `urls` array: the preview deploys, but no Preview URL is minted
+          # because the worker has Preview URLs disabled (preview_urls / no
+          # workers.dev subdomain). Capture stdout+stderr and treat "no URL" as
+          # a distinct, explained failure rather than an opaque exit 1 — that
+          # empty-urls case (not any wrangler error) is what broke #305.
+          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json 2>&1)
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "wrangler preview (API) exited $rc:"
+            printf '%s\n' "$out"
+            exit 1
+          fi
           url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty' 2>/dev/null || true)
           if [ -z "$url" ]; then
-            # Fallback if the private-beta JSON shape shifts (or the output
-            # isn't valid JSON at all, e.g. a banner line before it): grab
-            # the first workers.dev URL from the output.
+            # Fallback if the private-beta JSON shape shifts (or a banner line
+            # precedes it): grab the first workers.dev URL from the output.
             url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
           fi
           if [ -z "$url" ]; then
-            echo "::error::Could not determine the API preview URL from wrangler output."
+            echo "wrangler preview (API) succeeded but returned no Preview URL."
+            echo "The worker likely has Preview URLs disabled (preview_urls / workers.dev subdomain)."
             printf '%s\n' "$out"
             exit 1
           fi
@@ -299,14 +311,23 @@ jobs:
       - name: Deploy preview Web
         working-directory: src/web
         run: |
-          set -euo pipefail
-          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json)
+          set -uo pipefail
+          # See the API deploy step: distinguish a wrangler failure from a
+          # successful preview that returns no Preview URL (empty `urls`).
+          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json 2>&1)
+          rc=$?
+          if [ "$rc" -ne 0 ]; then
+            echo "wrangler preview (Web) exited $rc:"
+            printf '%s\n' "$out"
+            exit 1
+          fi
           url=$(printf '%s' "$out" | jq -r '.preview.urls[0] // empty' 2>/dev/null || true)
           if [ -z "$url" ]; then
             url=$(printf '%s' "$out" | grep -oE 'https://[a-z0-9.-]+\.workers\.dev' | head -1)
           fi
           if [ -z "$url" ]; then
-            echo "::error::Could not determine the Web preview URL from wrangler output."
+            echo "wrangler preview (Web) succeeded but returned no Preview URL."
+            echo "The worker likely has Preview URLs disabled (preview_urls / workers.dev subdomain)."
             printf '%s\n' "$out"
             exit 1
           fi
