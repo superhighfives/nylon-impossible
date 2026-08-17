@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Sentry
 import SwiftData
 
 enum SharedModelContainer {
@@ -48,13 +49,27 @@ enum SharedModelContainer {
     /// the local store is small.
     private static func backfillLegacyListIds(in container: ModelContainer) {
         let context = ModelContext(container)
-        let all = (try? context.fetch(FetchDescriptor<TodoItem>())) ?? []
+        let all: [TodoItem]
+        do {
+            all = try context.fetch(FetchDescriptor<TodoItem>())
+        } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "backfillLegacyListIds.fetch", key: "area")
+            }
+            return
+        }
         let stale = all.filter { $0.listId == nil && $0.listIdLegacy != nil }
         guard !stale.isEmpty else { return }
         for todo in stale {
             todo.listId = todo.listIdLegacy?.uuidString.lowercased()
             todo.listIdLegacy = nil
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "backfillLegacyListIds.save", key: "area")
+            }
+        }
     }
 }
