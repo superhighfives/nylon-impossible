@@ -6,6 +6,10 @@
 		"nodejs_compat"
 	],
 	"main": "src/worker.ts",
+	// Keep Preview URLs enabled across deploys — see src/api/wrangler.jsonc for
+	// the full rationale. wrangler deploy otherwise resets them to match
+	// workers_dev (off) on every deploy, breaking preview URL minting.
+	"preview_urls": true,
 	"routes": [
 		{
 			"pattern": "nylonimpossible.com",

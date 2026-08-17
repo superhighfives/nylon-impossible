@@ -4,6 +4,13 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-09-02",
   "compatibility_flags": ["nodejs_compat"],
+  // Keep Preview URLs enabled across deploys. Preview URLs default to matching
+  // `workers_dev` (off here — we serve production on a custom route), so every
+  // `wrangler deploy` silently resets them off, wiping any dashboard enable and
+  // leaving `wrangler preview` with no URL to mint (breaks the deploy-preview CI
+  // job). Declaring it here makes it stick. Independent of `workers_dev`, so
+  // production stays off workers.dev.
+  "preview_urls": true,
   "routes": [
     {
       "pattern": "api.nylonimpossible.com",
