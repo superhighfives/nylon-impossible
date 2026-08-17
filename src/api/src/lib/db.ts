@@ -47,4 +47,4 @@ export function getDb(d1: D1Database) {
   return drizzle(d1);
 }
 
-export { eq, and, gt, lt, sql, inArray, isNull, isNotNull, asc, count, desc };
+export { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, sql };
