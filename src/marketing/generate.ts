@@ -26,7 +26,16 @@
  */
 
 import { execSync, spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -220,6 +229,48 @@ function makeBrowserChromeSvg(
 }
 
 // ---------------------------------------------------------------------------
+// Local D1 storage sync
+// ---------------------------------------------------------------------------
+
+/**
+ * `wrangler d1 migrations apply` / `d1 execute` (used to seed the local D1
+ * before capture) and @cloudflare/vite-plugin's bundled Miniflare resolve
+ * the same `database_id` to two different local sqlite files under
+ * .wrangler/state/v3/d1/miniflare-D1DatabaseObject/ — version skew between
+ * wrangler's standalone D1 CLI and the vite-plugin's embedded Miniflare.
+ * The plugin's file is created lazily on the dev server's first D1 access
+ * (not at boot), so it doesn't exist yet when migrations run, and every
+ * server-function DB query 500s with "no such table" until something
+ * populates it. Copy the migrated (larger) file onto any smaller sibling so
+ * whichever one the dev server actually resolves to has the right schema
+ * and seed data.
+ */
+function syncLocalD1Storage(): void {
+  const d1Dir = join(
+    WORKSPACE_ROOT,
+    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject"
+  );
+  if (!existsSync(d1Dir)) return;
+  const files = readdirSync(d1Dir).filter(
+    (f) => f.endsWith(".sqlite") && f !== "metadata.sqlite"
+  );
+  if (files.length < 2) return;
+
+  const bySize = files
+    .map((f) => ({ f, size: statSync(join(d1Dir, f)).size }))
+    .sort((a, b) => b.size - a.size);
+  const [source, ...rest] = bySize;
+
+  for (const { f } of rest) {
+    copyFileSync(join(d1Dir, source.f), join(d1Dir, f));
+    for (const ext of ["-wal", "-shm"]) {
+      const sidecar = join(d1Dir, f + ext);
+      if (existsSync(sidecar)) unlinkSync(sidecar);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Capture — web
 // ---------------------------------------------------------------------------
 
@@ -290,18 +341,6 @@ async function captureWebScreenshots(): Promise<void> {
       });
       const page = await context.newPage();
 
-      // TEMPORARY: diagnosing the "New todo" wait timing out in CI
-      // (dev server + Clerk sign-in succeed, composer never appears).
-      // Remove once root-caused.
-      page.on("console", (msg) => console.log(`  [${mode} console.${msg.type()}] ${msg.text()}`));
-      page.on("pageerror", (err) => console.log(`  [${mode} pageerror] ${err.message}`));
-      page.on("requestfailed", (req) =>
-        console.log(`  [${mode} requestfailed] ${req.method()} ${req.url()} — ${req.failure()?.errorText}`)
-      );
-      page.on("response", (res) => {
-        if (res.status() >= 400) console.log(`  [${mode} response ${res.status()}] ${res.url()}`);
-      });
-
       // Navigate first (required before clerk.signIn), then sign in.
       // clerk.signIn with emailAddress uses CLERK_SECRET_KEY to create a
       // ticket internally — no manual token fetch needed.
@@ -310,16 +349,26 @@ async function captureWebScreenshots(): Promise<void> {
 
       try {
         await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
-      } catch (err) {
-        const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
-        const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
-        writeFileSync(debugHtml, await page.content());
-        await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
-        console.log(`  Dumped ${debugHtml} and ${debugPng}`);
-        const tail = serverLog.join("").trimEnd();
-        console.log("  Dev server output at time of failure:");
-        console.log(tail ? tail : "  (server produced no output)");
-        throw err;
+      } catch {
+        // The dev server's first authenticated D1 access may have just
+        // lazily created a sibling sqlite file the migrate/seed step never
+        // touched (see syncLocalD1Storage) — sync onto it and retry once
+        // before giving up.
+        syncLocalD1Storage();
+        await page.reload();
+        try {
+          await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+        } catch (err) {
+          const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
+          const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
+          writeFileSync(debugHtml, await page.content());
+          await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
+          console.log(`  Dumped ${debugHtml} and ${debugPng}`);
+          const tail = serverLog.join("").trimEnd();
+          console.log("  Dev server output at time of failure:");
+          console.log(tail ? tail : "  (server produced no output)");
+          throw err;
+        }
       }
       await sleep(500);
 

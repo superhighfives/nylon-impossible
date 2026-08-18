@@ -88,8 +88,10 @@ jobs:
         run: npx tsx generate.ts --all
         working-directory: src/marketing
 
-      # TEMPORARY: diagnosing the "New todo" wait timing out in this job.
-      # Remove once root-caused.
+      # Surfaces the composer-not-found state (HTML + screenshot) if capture
+      # ever fails again — generate.ts's own D1-sync-and-retry (see
+      # syncLocalD1Storage) handles the known local-D1-file-divergence case
+      # inline, so a failure reaching here is something new.
       - name: Upload debug artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v4
