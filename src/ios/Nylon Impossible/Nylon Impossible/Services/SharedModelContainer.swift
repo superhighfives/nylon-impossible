@@ -31,9 +31,39 @@ enum SharedModelContainer {
             backfillLegacyListIds(in: container)
             return container
         } catch {
-            fatalError("Failed to create shared model container: \(error)")
+            // SwiftData can fail to open a store it can't lightweight-migrate
+            // (e.g. NYLON-IMPOSSIBLE-IOS-8: the listId UUID->String rename+add
+            // in build 155 hit SwiftDataError.loadIssueModelContainer on some
+            // existing stores). This used to be a fatalError, which permanently
+            // bricked the app and its extensions/intents (all share this
+            // container) for anyone who hit it - there's no user-facing
+            // recovery, just a crash loop. The local store is a sync cache, not
+            // the source of truth (see SyncService), so it's safe to drop and
+            // recreate it: any local-only unsynced todos are lost, but the app
+            // becomes usable again instead of crash-looping forever.
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "SharedModelContainer.open", key: "area")
+            }
+            destroyStore(at: storeURL)
+            do {
+                let container = try ModelContainer(for: schema, configurations: config)
+                backfillLegacyListIds(in: container)
+                return container
+            } catch {
+                fatalError("Failed to create shared model container after store reset: \(error)")
+            }
         }
     }()
+
+    /// Best-effort delete of the SQLite store (plus its WAL/SHM sidecar files)
+    /// so a fresh `ModelContainer` can be created in its place. Only called
+    /// after opening the existing store has already failed.
+    private static func destroyStore(at storeURL: URL) {
+        let fileManager = FileManager.default
+        for suffix in ["", "-wal", "-shm"] {
+            try? fileManager.removeItem(atPath: storeURL.path + suffix)
+        }
+    }
 
     /// One-time bridge for `TodoItem.listId`'s UUID? -> String? change. The old
     /// value survives the store migration under the renamed `listIdLegacy`
