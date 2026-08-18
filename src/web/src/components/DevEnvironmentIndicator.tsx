@@ -10,8 +10,8 @@ interface Props {
 
 /**
  * The current page URL and API base, but only in local dev and preview
- * deploys — returns null in production so callers render nothing. Shared by the
- * floating desktop indicator and the Settings modal's mobile section.
+ * deploys — returns null in production so callers render nothing. Used by the
+ * Settings modal's dev-environment section.
  */
 export function useDevEnvironment(
   origin: string,

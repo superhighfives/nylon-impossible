@@ -26,8 +26,9 @@ struct ListHeaderView: View {
     @State private var renameText = ""
     @State private var showDeleteConfirm = false
     @State private var showReorderSheet = false
+    @State private var errorMessage: String?
 
-    private var isCustom: Bool { list.kind == "custom" }
+    private var isCustom: Bool { !list.isSystem }
 
     /// Custom lists in display order — the reorder sheet's contents, and the
     /// gate for showing "Reorder Lists" (nothing to reorder below two).
@@ -76,6 +77,14 @@ struct ListHeaderView: View {
                 apiService: apiService,
                 onMutate: onMutate
             )
+        }
+        .alert(
+            "Error",
+            isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
         }
     }
 
@@ -145,16 +154,19 @@ struct ListHeaderView: View {
         let trimmed = newListName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         Task {
-            if let created = try? await viewModel.createList(
-                name: trimmed,
-                apiService: apiService,
-                context: modelContext,
-                existingLists: existingLists
-            ) {
+            do {
+                let created = try await viewModel.createList(
+                    name: trimmed,
+                    apiService: apiService,
+                    context: modelContext,
+                    existingLists: existingLists
+                )
                 // Page straight to the freshly-created list, like web scrolls
                 // its new column into view.
                 viewModel.selectList(created.id)
                 onMutate()
+            } catch {
+                errorMessage = "Couldn't create list. Try again."
             }
         }
     }
@@ -163,15 +175,23 @@ struct ListHeaderView: View {
         let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed != list.name else { return }
         Task {
-            try? await viewModel.renameList(list, name: trimmed, apiService: apiService)
-            onMutate()
+            do {
+                try await viewModel.renameList(list, name: trimmed, apiService: apiService)
+                onMutate()
+            } catch {
+                errorMessage = "Couldn't rename list. Try again."
+            }
         }
     }
 
     private func deleteList() {
         Task {
-            try? await viewModel.deleteList(list, apiService: apiService, context: modelContext)
-            onMutate()
+            do {
+                try await viewModel.deleteList(list, apiService: apiService, context: modelContext)
+                onMutate()
+            } catch {
+                errorMessage = "Couldn't delete list. Try again."
+            }
         }
     }
 }

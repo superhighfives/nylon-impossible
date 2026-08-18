@@ -22,6 +22,7 @@ struct ReorderListsView: View {
     // reorder call reconciles `position` behind it and the parent @Query
     // re-sorts on return.
     @State private var ordered: [TodoListModel]
+    @State private var errorMessage: String?
 
     init(
         customLists: [TodoListModel],
@@ -57,11 +58,21 @@ struct ReorderListsView: View {
                 }
             }
         }
+        .alert(
+            "Error",
+            isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 
     private func move(from source: IndexSet, to destination: Int) {
-        // Capture the dragged list before mutating, then apply the move to the
-        // local copy and reposition it between its resulting neighbors.
+        // Capture the dragged list (and its pre-move order, for rollback) before
+        // mutating, then apply the move to the local copy and reposition it
+        // between its resulting neighbors.
+        let previousOrder = ordered
         let moved = source.map { ordered[$0] }
         ordered.move(fromOffsets: source, toOffset: destination)
         guard let movedList = moved.first,
@@ -72,13 +83,20 @@ struct ReorderListsView: View {
         let next = newIndex < ordered.count - 1 ? ordered[newIndex + 1] : nil
 
         Task {
-            try? await viewModel.reorderList(
-                movedList,
-                prev: prev,
-                next: next,
-                apiService: apiService
-            )
-            onMutate()
+            do {
+                try await viewModel.reorderList(
+                    movedList,
+                    prev: prev,
+                    next: next,
+                    apiService: apiService
+                )
+                onMutate()
+            } catch {
+                // The optimistic move never persisted — snap back so the sheet
+                // doesn't show an order the server never agreed to.
+                ordered = previousOrder
+                errorMessage = "Couldn't save the new order. Try again."
+            }
         }
     }
 }
