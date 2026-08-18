@@ -15,7 +15,10 @@ import {
   useUser,
 } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
-import { DevEnvironmentDetails } from "./DevEnvironmentIndicator";
+import {
+  DevEnvironmentDetails,
+  useDevEnvironment,
+} from "./DevEnvironmentIndicator";
 import { Button, Field, Input, LayerCard, Loader, Select } from "./ui";
 
 // Full IANA timezone list from the runtime — avoids hand-maintaining a
@@ -62,6 +65,9 @@ export function SettingsModal({ origin }: { origin: string }) {
   // (desktop) can both drive the same modal.
   const { isOpen: open, setOpen } = useSettings();
   const { isOnline } = useOnlineStatus();
+  // Non-null only in local dev and preview deploys; gates the Environment card
+  // so production renders nothing (and no empty heading).
+  const devEnv = useDevEnvironment(origin);
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const [location, setLocation] = useState("");
   const [aiEnabled, setAiEnabled] = useState(false);
@@ -437,13 +443,21 @@ export function SettingsModal({ origin }: { origin: string }) {
                     </Button>
                   </LayerCard.Primary>
                 </LayerCard>
+                {/* Local dev and preview deploys only — gated by devEnv so
+                    production renders nothing (no empty card). Replaces the
+                    floating desktop indicator that used to sit bottom-left. */}
+                {devEnv && (
+                  <LayerCard className="sm:col-span-2">
+                    <LayerCard.Secondary>Environment</LayerCard.Secondary>
+                    <LayerCard.Primary>
+                      <div className="flex flex-col gap-1 text-xs font-mono text-gray-muted">
+                        <DevEnvironmentDetails origin={origin} />
+                      </div>
+                    </LayerCard.Primary>
+                  </LayerCard>
+                )}
               </div>
             )}
-            {/* Mobile only: the URL/API details that live in the floating
-                indicator on desktop. Renders nothing in production. */}
-            <div className="sm:hidden empty:hidden border-t border-gray-base pt-4 mt-2 flex flex-col gap-1 text-xs font-mono text-gray-muted">
-              <DevEnvironmentDetails origin={origin} />
-            </div>
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close
                 render={

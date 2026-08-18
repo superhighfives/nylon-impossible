@@ -22,25 +22,19 @@ struct HeaderView: View {
         // user avatar overlapping. Settings, sign out, and sync state live
         // inside the avatar menu (the web app tucks these behind the Clerk
         // UserButton) rather than as separate top-bar controls.
-        VStack(spacing: 12) {
-            // Spacing accounts for the avatar's 44pt tap target (6pt of
-            // transparent inset around its 32pt visual) so the logo/avatar
-            // still visually overlap by ~8pt like the web header.
-            HStack(spacing: -14) {
-                logo
-                avatarMenu
-            }
-            .padding(4)
-            .glassEffect(.regular, in: .capsule)
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
-            )
-
-            #if DEBUG
-            DebugBannerView()
-            #endif
+        // Spacing accounts for the avatar's 44pt tap target (6pt of
+        // transparent inset around its 32pt visual) so the logo/avatar
+        // still visually overlap by ~8pt like the web header.
+        HStack(spacing: -14) {
+            logo
+            avatarMenu
         }
+        .padding(4)
+        .glassEffect(.regular, in: .capsule)
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
+        )
         .frame(maxWidth: .infinity)
         .padding(.top, 16)
         .sheet(isPresented: $showSettings) {

@@ -1,8 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import DevEnvironmentIndicator, {
-  DevEnvironmentDetails,
-} from "../DevEnvironmentIndicator";
+import { DevEnvironmentDetails } from "../DevEnvironmentIndicator";
 
 vi.mock("@tanstack/react-router", () => ({
   useLocation: () => ({ href: "/tasks" }),
@@ -74,26 +72,5 @@ describe("DevEnvironmentDetails", () => {
       expect(screen.queryByText("api")).not.toBeInTheDocument();
       unmount();
     }
-  });
-});
-
-describe("DevEnvironmentIndicator", () => {
-  afterEach(() => {
-    import.meta.env.PROD = false;
-  });
-
-  it("renders a trigger button in development", () => {
-    render(<DevEnvironmentIndicator origin="http://localhost:3000" />);
-    expect(
-      screen.getByRole("button", { name: "Environment details" }),
-    ).toBeInTheDocument();
-  });
-
-  it("renders nothing on production non-preview origins", () => {
-    import.meta.env.PROD = true;
-    render(<DevEnvironmentIndicator origin="https://nylonimpossible.com" />);
-    expect(
-      screen.queryByRole("button", { name: "Environment details" }),
-    ).not.toBeInTheDocument();
   });
 });
