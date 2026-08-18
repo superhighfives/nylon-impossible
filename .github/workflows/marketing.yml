@@ -79,17 +79,6 @@ jobs:
             --file=../../src/marketing/seed.sql
         working-directory: src/api
 
-      - name: Debug D1 local state after migrate/seed
-        run: |
-          echo "cwd: $(pwd)"
-          echo "resolved persist dir: $(cd ../../.wrangler/state 2>/dev/null && pwd || echo MISSING)"
-          find ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject -type f -exec ls -la {} \; 2>&1 || echo "no d1 dir"
-          for f in ../../.wrangler/state/v3/d1/miniflare-D1DatabaseObject/*.sqlite; do
-            echo "=== $f ==="
-            sqlite3 "$f" ".tables" 2>&1
-          done
-        working-directory: src/api
-
       - name: Generate and publish marketing screenshots
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
