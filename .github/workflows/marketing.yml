@@ -87,3 +87,17 @@ jobs:
           SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
         run: npx tsx generate.ts --all
         working-directory: src/marketing
+
+      # Surfaces the composer-not-found state (HTML + screenshot) if capture
+      # ever fails again — generate.ts's own D1-sync-and-retry (see
+      # syncLocalD1Storage) handles the known local-D1-file-divergence case
+      # inline, so a failure reaching here is something new.
+      - name: Upload debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-debug
+          path: |
+            src/marketing/source/debug-*.html
+            src/marketing/source/debug-*.png
+          if-no-files-found: ignore

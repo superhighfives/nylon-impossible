@@ -26,7 +26,16 @@
  */
 
 import { execSync, spawn, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import dotenv from "dotenv";
@@ -220,6 +229,52 @@ function makeBrowserChromeSvg(
 }
 
 // ---------------------------------------------------------------------------
+// Local D1 storage sync
+// ---------------------------------------------------------------------------
+
+/**
+ * `wrangler d1 migrations apply` / `d1 execute` (used to seed the local D1
+ * before capture) and @cloudflare/vite-plugin's bundled Miniflare resolve
+ * the same `database_id` to two different local sqlite files under
+ * .wrangler/state/v3/d1/miniflare-D1DatabaseObject/ — version skew between
+ * wrangler's standalone D1 CLI and the vite-plugin's embedded Miniflare.
+ * The plugin's file is created lazily on the dev server's first D1 access
+ * (not at boot), so it doesn't exist yet when migrations run, and every
+ * server-function DB query 500s with "no such table" until something
+ * populates it. Copy the migrated (larger) file onto any smaller sibling so
+ * whichever one the dev server actually resolves to has the right schema
+ * and seed data.
+ */
+function syncLocalD1Storage(): void {
+  const d1Dir = join(
+    WORKSPACE_ROOT,
+    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject"
+  );
+  if (!existsSync(d1Dir)) {
+    console.log(`  [d1-sync] ${d1Dir} does not exist, skipping`);
+    return;
+  }
+  const files = readdirSync(d1Dir).filter(
+    (f) => f.endsWith(".sqlite") && f !== "metadata.sqlite"
+  );
+  const bySize = files
+    .map((f) => ({ f, size: statSync(join(d1Dir, f)).size }))
+    .sort((a, b) => b.size - a.size);
+  console.log(`  [d1-sync] found ${bySize.length} db file(s): ${JSON.stringify(bySize)}`);
+  if (bySize.length < 2) return;
+
+  const [source, ...rest] = bySize;
+  for (const { f } of rest) {
+    console.log(`  [d1-sync] copying ${source.f} (${source.size}b) → ${f} (${statSync(join(d1Dir, f)).size}b)`);
+    copyFileSync(join(d1Dir, source.f), join(d1Dir, f));
+    for (const ext of ["-wal", "-shm"]) {
+      const sidecar = join(d1Dir, f + ext);
+      if (existsSync(sidecar)) unlinkSync(sidecar);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Capture — web
 // ---------------------------------------------------------------------------
 
@@ -296,7 +351,42 @@ async function captureWebScreenshots(): Promise<void> {
       await page.goto(manifest.web.url);
       await clerk.signIn({ page, emailAddress });
 
-      await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+      // The dev server's first authenticated D1 access may lazily create a
+      // sibling sqlite file the migrate/seed step never touched (see
+      // syncLocalD1Storage) — sync onto it and reload if the composer
+      // doesn't show up, a few times in case that file takes a beat to
+      // settle, before giving up.
+      let composerFound = false;
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+          composerFound = true;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.log(`  [${mode}] composer not found on attempt ${attempt}/4`);
+          syncLocalD1Storage();
+          await sleep(1000);
+          await page.reload();
+        }
+      }
+      if (!composerFound) {
+        const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
+        const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
+        writeFileSync(debugHtml, await page.content());
+        // Best-effort: don't let a screenshot failure mask the lastErr thrown below.
+        await page
+          .screenshot({ path: debugPng, fullPage: true })
+          .catch((err) =>
+            console.log(`  Failed to capture ${debugPng}: ${err}`)
+          );
+        console.log(`  Dumped ${debugHtml} and ${debugPng}`);
+        const tail = serverLog.join("").trimEnd();
+        console.log("  Dev server output at time of failure:");
+        console.log(tail ? tail : "  (server produced no output)");
+        throw lastErr;
+      }
       await sleep(500);
 
       const dest = join(SOURCE_DIR, `web-${mode}.png`);
