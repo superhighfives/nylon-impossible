@@ -33,7 +33,7 @@ final class TodoViewModel {
         let activeTodos = todos.filter { !$0.isDeleted }
         let scoped: [TodoItem]
         if let listId {
-            scoped = activeTodos.filter { $0.listId?.uuidString.lowercased() == listId }
+            scoped = activeTodos.filter { $0.listId?.lowercased() == listId }
         } else {
             scoped = activeTodos
         }
@@ -61,7 +61,7 @@ final class TodoViewModel {
         }
     }
 
-    func addTodo(context: ModelContext, userId: String?, allTodos: [TodoItem], listId: UUID? = nil) {
+    func addTodo(context: ModelContext, userId: String?, allTodos: [TodoItem], listId: String? = nil) {
         guard !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
         _ = TaskCreationService.createTask(
@@ -125,7 +125,7 @@ final class TodoViewModel {
         dueDate: Date?,
         recurrence: Recurrence?,
         sticky: Bool,
-        listId: UUID? = nil
+        listId: String? = nil
     ) {
         todo.title = title
         todo.itemNotes = notes
@@ -144,7 +144,7 @@ final class TodoViewModel {
     /// incomplete todos, mirroring web's cross-list drag-drop-at-end
     /// behavior (`TodoGrid.handleDragEnd`'s `insertIndex === targetOrder.length`
     /// case), since there's no drop-index equivalent from a picker.
-    func moveTodoToList(_ todo: TodoItem, to listId: UUID, allTodos: [TodoItem]) {
+    func moveTodoToList(_ todo: TodoItem, to listId: String, allTodos: [TodoItem]) {
         guard todo.listId != listId else { return }
         let targetIncomplete = allTodos
             .filter {
@@ -196,7 +196,7 @@ final class TodoViewModel {
             let placement = RecurrenceHelper.placement(forDueDate: nextDue, now: now)
             let targetKind = SystemListKind(rawValue: placement.rawValue)
             if let placedList = lists.first(where: { $0.systemKind == targetKind }) {
-                todo.listId = UUID(uuidString: placedList.id)
+                todo.listId = placedList.id
                 todo.listEnteredAt = now
             }
             todo.markModified()

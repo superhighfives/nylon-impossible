@@ -73,7 +73,7 @@ struct TodoEditSheet: View {
         _dueDate = State(initialValue: todo.dueDate ?? Date())
         _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
         _sticky = State(initialValue: todo.sticky)
-        _selectedListId = State(initialValue: todo.listId?.uuidString.lowercased())
+        _selectedListId = State(initialValue: todo.listId?.lowercased())
         _urls = State(initialValue: initialUrls)
         let initialResearch: APIResearch?
         if let researchId = todo.researchId {

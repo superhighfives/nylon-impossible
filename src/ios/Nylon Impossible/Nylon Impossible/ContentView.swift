@@ -153,7 +153,7 @@ struct ContentView: View {
                     userId: authService.userId,
                     context: modelContext,
                     allTodos: todos,
-                    listId: viewModel.selectedListId.flatMap { UUID(uuidString: $0) }
+                    listId: viewModel.selectedListId
                 ) else { return }
 
                 if preferencesService.aiEnabled {
@@ -371,8 +371,7 @@ struct ContentView: View {
                 syncService.syncAfterAction()
             },
             onMoveToList: { listId in
-                guard let uuid = UUID(uuidString: listId) else { return }
-                viewModel.moveTodoToList(todo, to: uuid, allTodos: todos)
+                viewModel.moveTodoToList(todo, to: listId, allTodos: todos)
                 syncService.syncAfterAction()
             }
         )

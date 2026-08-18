@@ -45,7 +45,18 @@ final class TodoItem {
     // same reasons as `parentId` — explicit grouping, trivial wire mapping.
     // Optional only for migration safety on existing local stores predating
     // this field; every todo the server returns carries one.
-    var listId: UUID?
+    //
+    // An opaque server id String, not a UUID: the server's migrated system-list
+    // ids are dashless 32-hex (`fb56f07a...`, see API migration 0024) which
+    // `UUID(uuidString:)` rejects — a UUID type silently dropped them to nil and
+    // left every list empty. A String holds any id shape the server sends.
+    var listId: String?
+    // The pre-String value of `listId`, kept under a renamed column so SwiftData
+    // can migrate the store without a UUID->String type change on `listId` in
+    // place (which lightweight migration can't infer). Backfilled into `listId`
+    // once on launch by `SharedModelContainer.backfillLegacyListIds`, then left
+    // nil. Safe to delete in a future release once all stores have migrated.
+    @Attribute(originalName: "listId") var listIdLegacy: UUID?
     // When `listId` last changed (creation, manual move, or the server's
     // aging sweep) — mirrors the server's `listEnteredAt` column.
     var listEnteredAt: Date?
@@ -96,6 +107,7 @@ final class TodoItem {
         self.userId = userId
         self.parentId = nil
         self.listId = nil
+        self.listIdLegacy = nil
         self.listEnteredAt = nil
         self.title = title
         self.itemNotes = nil
