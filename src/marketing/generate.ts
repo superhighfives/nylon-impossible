@@ -250,18 +250,22 @@ function syncLocalD1Storage(): void {
     WORKSPACE_ROOT,
     ".wrangler/state/v3/d1/miniflare-D1DatabaseObject"
   );
-  if (!existsSync(d1Dir)) return;
+  if (!existsSync(d1Dir)) {
+    console.log(`  [d1-sync] ${d1Dir} does not exist, skipping`);
+    return;
+  }
   const files = readdirSync(d1Dir).filter(
     (f) => f.endsWith(".sqlite") && f !== "metadata.sqlite"
   );
-  if (files.length < 2) return;
-
   const bySize = files
     .map((f) => ({ f, size: statSync(join(d1Dir, f)).size }))
     .sort((a, b) => b.size - a.size);
-  const [source, ...rest] = bySize;
+  console.log(`  [d1-sync] found ${bySize.length} db file(s): ${JSON.stringify(bySize)}`);
+  if (bySize.length < 2) return;
 
+  const [source, ...rest] = bySize;
   for (const { f } of rest) {
+    console.log(`  [d1-sync] copying ${source.f} (${source.size}b) → ${f} (${statSync(join(d1Dir, f)).size}b)`);
     copyFileSync(join(d1Dir, source.f), join(d1Dir, f));
     for (const ext of ["-wal", "-shm"]) {
       const sidecar = join(d1Dir, f + ext);
@@ -347,28 +351,36 @@ async function captureWebScreenshots(): Promise<void> {
       await page.goto(manifest.web.url);
       await clerk.signIn({ page, emailAddress });
 
-      try {
-        await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
-      } catch {
-        // The dev server's first authenticated D1 access may have just
-        // lazily created a sibling sqlite file the migrate/seed step never
-        // touched (see syncLocalD1Storage) — sync onto it and retry once
-        // before giving up.
-        syncLocalD1Storage();
-        await page.reload();
+      // The dev server's first authenticated D1 access may lazily create a
+      // sibling sqlite file the migrate/seed step never touched (see
+      // syncLocalD1Storage) — sync onto it and reload if the composer
+      // doesn't show up, a few times in case that file takes a beat to
+      // settle, before giving up.
+      let composerFound = false;
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= 4; attempt++) {
         try {
           await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+          composerFound = true;
+          break;
         } catch (err) {
-          const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
-          const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
-          writeFileSync(debugHtml, await page.content());
-          await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
-          console.log(`  Dumped ${debugHtml} and ${debugPng}`);
-          const tail = serverLog.join("").trimEnd();
-          console.log("  Dev server output at time of failure:");
-          console.log(tail ? tail : "  (server produced no output)");
-          throw err;
+          lastErr = err;
+          console.log(`  [${mode}] composer not found on attempt ${attempt}/4`);
+          syncLocalD1Storage();
+          await sleep(1000);
+          await page.reload();
         }
+      }
+      if (!composerFound) {
+        const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
+        const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
+        writeFileSync(debugHtml, await page.content());
+        await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
+        console.log(`  Dumped ${debugHtml} and ${debugPng}`);
+        const tail = serverLog.join("").trimEnd();
+        console.log("  Dev server output at time of failure:");
+        console.log(tail ? tail : "  (server produced no output)");
+        throw lastErr;
       }
       await sleep(500);
 
