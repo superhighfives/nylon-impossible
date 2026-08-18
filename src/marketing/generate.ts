@@ -290,13 +290,34 @@ async function captureWebScreenshots(): Promise<void> {
       });
       const page = await context.newPage();
 
+      // TEMPORARY: diagnosing the "New todo" wait timing out in CI
+      // (dev server + Clerk sign-in succeed, composer never appears).
+      // Remove once root-caused.
+      page.on("console", (msg) => console.log(`  [${mode} console.${msg.type()}] ${msg.text()}`));
+      page.on("pageerror", (err) => console.log(`  [${mode} pageerror] ${err.message}`));
+      page.on("requestfailed", (req) =>
+        console.log(`  [${mode} requestfailed] ${req.method()} ${req.url()} — ${req.failure()?.errorText}`)
+      );
+      page.on("response", (res) => {
+        if (res.status() >= 400) console.log(`  [${mode} response ${res.status()}] ${res.url()}`);
+      });
+
       // Navigate first (required before clerk.signIn), then sign in.
       // clerk.signIn with emailAddress uses CLERK_SECRET_KEY to create a
       // ticket internally — no manual token fetch needed.
       await page.goto(manifest.web.url);
       await clerk.signIn({ page, emailAddress });
 
-      await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+      try {
+        await page.waitForSelector('[aria-label="New todo"]', { timeout: 30_000 });
+      } catch (err) {
+        const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
+        const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
+        writeFileSync(debugHtml, await page.content());
+        await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
+        console.log(`  Dumped ${debugHtml} and ${debugPng}`);
+        throw err;
+      }
       await sleep(500);
 
       const dest = join(SOURCE_DIR, `web-${mode}.png`);

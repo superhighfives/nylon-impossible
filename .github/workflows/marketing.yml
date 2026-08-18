@@ -87,3 +87,15 @@ jobs:
           SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
         run: npx tsx generate.ts --all
         working-directory: src/marketing
+
+      # TEMPORARY: diagnosing the "New todo" wait timing out in this job.
+      # Remove once root-caused.
+      - name: Upload debug artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-debug
+          path: |
+            src/marketing/source/debug-*.html
+            src/marketing/source/debug-*.png
+          if-no-files-found: ignore
