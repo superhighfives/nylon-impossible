@@ -316,6 +316,9 @@ async function captureWebScreenshots(): Promise<void> {
         writeFileSync(debugHtml, await page.content());
         await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
         console.log(`  Dumped ${debugHtml} and ${debugPng}`);
+        const tail = serverLog.join("").trimEnd();
+        console.log("  Dev server output at time of failure:");
+        console.log(tail ? tail : "  (server produced no output)");
         throw err;
       }
       await sleep(500);
