@@ -375,7 +375,12 @@ async function captureWebScreenshots(): Promise<void> {
         const debugHtml = join(SOURCE_DIR, `debug-${mode}.html`);
         const debugPng = join(SOURCE_DIR, `debug-${mode}.png`);
         writeFileSync(debugHtml, await page.content());
-        await page.screenshot({ path: debugPng, fullPage: true }).catch(() => {});
+        // Best-effort: don't let a screenshot failure mask the lastErr thrown below.
+        await page
+          .screenshot({ path: debugPng, fullPage: true })
+          .catch((err) =>
+            console.log(`  Failed to capture ${debugPng}: ${err}`)
+          );
         console.log(`  Dumped ${debugHtml} and ${debugPng}`);
         const tail = serverLog.join("").trimEnd();
         console.log("  Dev server output at time of failure:");
