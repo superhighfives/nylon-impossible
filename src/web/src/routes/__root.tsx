@@ -16,7 +16,6 @@ import {
 } from "@tanstack/react-start/server";
 import { useEffect } from "react";
 import { ClientHintCheck } from "../components/ClientHintCheck";
-import DevEnvironmentIndicator from "../components/DevEnvironmentIndicator";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
 import { ImportReviewModal } from "../components/ImportReviewModal";
@@ -171,7 +170,6 @@ function RootDocument() {
                     <div className="pt-header-offset">
                       <Outlet />
                     </div>
-                    <DevEnvironmentIndicator origin={origin} />
                     <Show when="signed-in">
                       <SettingsModal origin={origin} />
                       <ImportReviewModal />
