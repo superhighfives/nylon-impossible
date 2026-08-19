@@ -11,6 +11,11 @@ const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
  * Renders free text (e.g. a todo title) with any URLs turned into clickable
  * links. `stopPropagation` keeps a click on the link from bubbling to row-level
  * handlers, and links open in a new tab. Non-URL text renders verbatim.
+ *
+ * `pointer-events-auto` on the anchor lets it stay clickable even when a
+ * caller wraps this in a `pointer-events-none` container — the pattern used
+ * to make a todo's title clickable-to-expand without nesting this `<a>`
+ * inside a `<button>` (see TodoList.tsx's stretched-button title).
  */
 export function LinkifiedText({ text }: { text: string }): ReactNode {
   return text.split(URL_REGEX).map((segment, i) => {
@@ -26,7 +31,7 @@ export function LinkifiedText({ text }: { text: string }): ReactNode {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="underline decoration-gray-line underline-offset-2 hover:decoration-gray break-all"
+          className="pointer-events-auto underline decoration-gray-line underline-offset-2 hover:decoration-gray break-all"
         >
           {href}
         </a>
