@@ -9,7 +9,6 @@ import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import {
   AlertCircle,
-  ChevronDown,
   ChevronRight,
   Clock,
   FileText,
@@ -335,157 +334,162 @@ function TodoItemContent({
   };
 
   return (
-    <div className="flex items-start gap-3">
-      <div className="relative -top-px">
-        <Checkbox
-          checked={isCompleted}
-          onCheckedChange={() => onToggle(todo.id, isCompleted)}
-          disabled={updatePending}
-          variant={isCompleted ? "subtle" : "default"}
-          aria-label={
-            isCompleted
-              ? `Mark "${todo.title}" as not completed`
-              : `Mark "${todo.title}" as completed`
-          }
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="space-y-1">
-          {showTitleLine && (
-            <div className="flex items-center gap-2">
-              {!showUrlOnlyCard && (
-                <p
-                  className={`min-w-0 leading-snug wrap-anywhere ${
-                    isCompleted
-                      ? "text-sm line-through text-gray-placeholder"
-                      : "text-[15px] font-semibold text-gray"
-                  }`}
-                >
-                  {urlOnly ? (
-                    previewTitle ? (
-                      previewTitle
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-start gap-3">
+        <div className="relative -top-px">
+          <Checkbox
+            checked={isCompleted}
+            onCheckedChange={() => onToggle(todo.id, isCompleted)}
+            disabled={updatePending}
+            variant={isCompleted ? "subtle" : "default"}
+            aria-label={
+              isCompleted
+                ? `Mark "${todo.title}" as not completed`
+                : `Mark "${todo.title}" as completed`
+            }
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="space-y-1">
+            {showTitleLine && (
+              <div className="flex items-center gap-2">
+                {!showUrlOnlyCard && (
+                  <button
+                    type="button"
+                    aria-expanded={isExpanded}
+                    onClick={() => onToggleExpand(todo.id)}
+                    className={`min-w-0 border-0 bg-transparent p-0 text-left leading-snug wrap-anywhere ${
+                      isCompleted
+                        ? "text-sm line-through text-gray-placeholder"
+                        : "text-[15px] font-semibold text-gray"
+                    }`}
+                  >
+                    {urlOnly ? (
+                      previewTitle ? (
+                        previewTitle
+                      ) : (
+                        <LinkifiedText text={urlOnly.url} />
+                      )
                     ) : (
-                      <LinkifiedText text={urlOnly.url} />
-                    )
-                  ) : (
-                    <LinkifiedText text={todo.title} />
-                  )}
-                </p>
-              )}
-              {subtasks.length > 0 &&
-                (() => {
-                  const doneSubtasks = subtasks.filter(
-                    (s) => s.completed,
-                  ).length;
-                  return (
+                      <LinkifiedText text={todo.title} />
+                    )}
+                  </button>
+                )}
+                {subtasks.length > 0 &&
+                  (() => {
+                    const doneSubtasks = subtasks.filter(
+                      (s) => s.completed,
+                    ).length;
+                    return (
+                      <span
+                        role="img"
+                        className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
+                        aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
+                      >
+                        <ListTree size={10} aria-hidden="true" />
+                        {doneSubtasks}/{subtasks.length}
+                      </span>
+                    );
+                  })()}
+                {aiProcessing && (
+                  <output
+                    className="flex items-center gap-1 text-gray-muted text-xs"
+                    aria-label="AI is processing"
+                  >
+                    <Loader size="sm" className="text-gray-muted" />
+                  </output>
+                )}
+                {researchPending && (
+                  <output
+                    className="flex items-center gap-1 text-gray-muted text-xs"
+                    aria-label="Researching"
+                  >
+                    <Loader size="sm" className="text-accent-muted" />
+                  </output>
+                )}
+                {todo.needsInput && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    shape="circle"
+                    type="button"
+                    onClick={() => onToggleExpand(todo.id)}
+                    aria-label="The assistant has a question — open to reply"
+                    className="bg-accent-base hover:bg-accent-hover text-accent"
+                  >
+                    <MessageCircle size={12} />
+                  </Button>
+                )}
+                {hasPendingSuggestions && (
+                  <button
+                    type="button"
+                    onClick={() => onToggleExpand(todo.id)}
+                    aria-label="AI has suggestions — open to review"
+                    className="flex shrink-0 items-center justify-center p-1"
+                  >
                     <span
-                      role="img"
-                      className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
-                      aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
-                    >
-                      <ListTree size={10} aria-hidden="true" />
-                      {doneSubtasks}/{subtasks.length}
-                    </span>
+                      className="block size-2 rounded-full bg-accent-solid"
+                      aria-hidden="true"
+                    />
+                  </button>
+                )}
+              </div>
+            )}
+            {showUrlOnlyCard && urlOnly && <UrlPreviewCard url={urlOnly} />}
+          </div>
+          {isCompleted && (
+            <p className="text-xs text-gray-muted mt-0.5">
+              Completed:{" "}
+              {formatDate(todo.completedAt ?? todo.updatedAt, timeZone, {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+              })}
+            </p>
+          )}
+          {isCompleted ? (
+            <CompletedContentBadges todo={todo} />
+          ) : (
+            <>
+              {!isExpanded &&
+                todo.research?.status === "completed" &&
+                todo.research.summary && (
+                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-pretty text-gray-muted">
+                    {todo.research.summary.replace(/\[\d+\]/g, "")}
+                  </p>
+                )}
+              {!urlOnly &&
+                todo.urls &&
+                (() => {
+                  const nonResearchUrls = todo.urls.filter(
+                    (url) => !url.researchId,
+                  );
+                  if (nonResearchUrls.length === 0) return null;
+                  const overflow = nonResearchUrls.length - 2;
+                  return (
+                    <div className="flex flex-col gap-1 mt-1.5">
+                      {nonResearchUrls.slice(0, 2).map((url) => (
+                        <UrlPreviewCard key={url.id} url={url} />
+                      ))}
+                      {overflow > 0 && (
+                        <span className="text-xs text-gray-muted">
+                          +{overflow} {overflow === 1 ? "link" : "links"}
+                        </span>
+                      )}
+                    </div>
                   );
                 })()}
-              {aiProcessing && (
-                <output
-                  className="flex items-center gap-1 text-gray-muted text-xs"
-                  aria-label="AI is processing"
-                >
-                  <Loader size="sm" className="text-gray-muted" />
-                </output>
-              )}
-              {researchPending && (
-                <output
-                  className="flex items-center gap-1 text-gray-muted text-xs"
-                  aria-label="Researching"
-                >
-                  <Loader size="sm" className="text-accent-muted" />
-                </output>
-              )}
-              {todo.needsInput && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  shape="circle"
-                  type="button"
-                  onClick={() => onToggleExpand(todo.id)}
-                  aria-label="The assistant has a question — open to reply"
-                  className="bg-accent-base hover:bg-accent-hover text-accent"
-                >
-                  <MessageCircle size={12} />
-                </Button>
-              )}
-              {hasPendingSuggestions && (
-                <button
-                  type="button"
-                  onClick={() => onToggleExpand(todo.id)}
-                  aria-label="AI has suggestions — open to review"
-                  className="flex shrink-0 items-center justify-center p-1"
-                >
-                  <span
-                    className="block size-2 rounded-full bg-accent-solid"
-                    aria-hidden="true"
-                  />
-                </button>
-              )}
-            </div>
+            </>
           )}
-          {showUrlOnlyCard && urlOnly && <UrlPreviewCard url={urlOnly} />}
+          {/* Active rows edit due date inline in the right-hand cluster; only
+              completed rows keep the read-only indicators below the title. */}
+          {!showInlineEditing && <TodoIndicators todo={todo} />}
         </div>
-        {isCompleted && (
-          <p className="text-xs text-gray-muted mt-0.5">
-            Completed:{" "}
-            {formatDate(todo.completedAt ?? todo.updatedAt, timeZone, {
-              weekday: "short",
-              day: "numeric",
-              month: "short",
-            })}
-          </p>
-        )}
-        {isCompleted ? (
-          <CompletedContentBadges todo={todo} />
-        ) : (
-          <>
-            {!isExpanded &&
-              todo.research?.status === "completed" &&
-              todo.research.summary && (
-                <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-pretty text-gray-muted">
-                  {todo.research.summary.replace(/\[\d+\]/g, "")}
-                </p>
-              )}
-            {!urlOnly &&
-              todo.urls &&
-              (() => {
-                const nonResearchUrls = todo.urls.filter(
-                  (url) => !url.researchId,
-                );
-                if (nonResearchUrls.length === 0) return null;
-                const overflow = nonResearchUrls.length - 2;
-                return (
-                  <div className="flex flex-col gap-1 mt-1.5">
-                    {nonResearchUrls.slice(0, 2).map((url) => (
-                      <UrlPreviewCard key={url.id} url={url} />
-                    ))}
-                    {overflow > 0 && (
-                      <span className="text-xs text-gray-muted">
-                        +{overflow} {overflow === 1 ? "link" : "links"}
-                      </span>
-                    )}
-                  </div>
-                );
-              })()}
-          </>
-        )}
-        {/* Active rows edit due date inline in the right-hand cluster; only
-            completed rows keep the read-only indicators below the title. */}
-        {!showInlineEditing && <TodoIndicators todo={todo} />}
       </div>
-      {/* Actions are hidden in the drag overlay clone so the lifted card
-          hugs the title instead of stretching to the taller control. */}
+      {/* Actions get their own row instead of squeezing the title into a
+          narrower column — a long title can wrap freely at full width. */}
       {showActions && (
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
           {/* Inline due-date control sits on one line with the expand
               control. Hidden when expanded — the expanded form has its own
               full editors. */}
@@ -523,23 +527,6 @@ function TodoItemContent({
               <Trash2 size={14} />
             </Button>
           )}
-          {/* Desktop expand affordance, hover-revealed with the other quiet
-              controls. Mobile expands through TodoActionsMenu below. */}
-          <Button
-            variant="ghost"
-            size="xs"
-            shape="square"
-            type="button"
-            onClick={() => onToggleExpand(todo.id)}
-            aria-label={isExpanded ? "Collapse details" : "Expand details"}
-            className="hidden text-gray-muted hover:text-gray sm:inline-flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
-          >
-            {isExpanded ? (
-              <ChevronRight size={14} />
-            ) : (
-              <ChevronDown size={14} />
-            )}
-          </Button>
           {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
               control on the title line so it doesn't stretch the row height on
               todos without a description. */}
@@ -785,7 +772,6 @@ export interface TodoListColumnProps {
   /** True once the synced `hideCompleted` preference has loaded (gates the Completed section so it doesn't flash open). */
   hideCompletedKnown: boolean;
   onToggleCompleted: () => void;
-  updateUserPending: boolean;
   /** True while a keyboard-initiated drag is in progress anywhere on the board. */
   isKeyboardDragging: boolean;
   /** Mid-drag optimistic order override for this list, or null to use the derived order. */
@@ -816,7 +802,6 @@ export function TodoListColumn({
   completedCollapsed,
   hideCompletedKnown,
   onToggleCompleted,
-  updateUserPending,
   isKeyboardDragging,
   localIncompleteTodos,
 }: TodoListColumnProps) {
@@ -956,9 +941,8 @@ export function TodoListColumn({
           <button
             type="button"
             onClick={onToggleCompleted}
-            disabled={updateUserPending}
             aria-expanded={!completedCollapsed}
-            className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50"
+            className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
           >
             <ChevronRight
               size={14}

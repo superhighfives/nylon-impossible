@@ -22,7 +22,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { TodoInput } from "@/components/TodoInput";
 import {
   ErrorState,
   ExpandedSection,
@@ -45,7 +44,7 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
-import { useUpdateUser, useUser } from "@/hooks/useUser";
+import { useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { Button, ConfirmDialog, Input, SidePanel } from "./ui";
@@ -443,7 +442,6 @@ export function TodoGrid() {
   const createTodo = useCreateTodo();
   const updateList = useUpdateList();
   const { data: user } = useUser();
-  const updateUser = useUpdateUser();
   const { highlightIds, hiddenIds } = useImportReview();
   const { timeZone } = useHints();
   useLocalMidnightTick();
@@ -454,8 +452,13 @@ export function TodoGrid() {
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
-  const composerRef = useRef<HTMLTextAreaElement>(null);
-
+  // Per-list override of the synced `hideCompleted` default: each list's
+  // Completed accordion opens/closes independently, seeded from (but not
+  // synced back to) the shared preference — otherwise toggling one list's
+  // accordion flips every list's accordion at once.
+  const [completedOverrideByList, setCompletedOverrideByList] = useState<
+    Record<string, boolean>
+  >({});
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
@@ -483,23 +486,6 @@ export function TodoGrid() {
   useEffect(() => {
     setLocalOrderByList({});
   }, [todos]);
-
-  // Global `n` shortcut: focuses the bottom composer (which creates into
-  // Today), unless focus is already inside a text field.
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "n" && e.key !== "N") return;
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) {
-        return;
-      }
-      e.preventDefault();
-      composerRef.current?.focus();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, []);
 
   if (listsLoading || todosLoading) {
     return (
@@ -569,14 +555,11 @@ export function TodoGrid() {
       updateTodo.mutate({ id, input: updates });
     };
 
-  const handleToggleCompleted = () => {
-    updateUser.mutate(
-      { hideCompleted: !(user?.hideCompleted ?? false) },
-      {
-        onError: (err) =>
-          toast.error(messageFromError(err, "Couldn't change setting")),
-      },
-    );
+  const handleToggleCompleted = (listId: string) => {
+    setCompletedOverrideByList((prev) => ({
+      ...prev,
+      [listId]: !(prev[listId] ?? user?.hideCompleted ?? false),
+    }));
   };
 
   const handleDragStart = ({ activatorEvent }: DragStartEvent) => {
@@ -775,8 +758,7 @@ export function TodoGrid() {
                     }
                   />
                   {/* The rows scroll independently per column; the fade at
-                        the bottom keeps long lists from ending in a hard cut
-                        behind the floating composer. */}
+                        the bottom keeps long lists from ending in a hard cut. */}
                   <div className="relative min-h-0 flex-1">
                     <div className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                       <TodoListColumn
@@ -791,10 +773,13 @@ export function TodoGrid() {
                         highlightIds={highlightIds}
                         hiddenIds={hiddenIds}
                         timeZone={timeZone}
-                        completedCollapsed={user?.hideCompleted ?? false}
+                        completedCollapsed={
+                          completedOverrideByList[list.id] ??
+                          user?.hideCompleted ??
+                          false
+                        }
                         hideCompletedKnown={!!user}
-                        onToggleCompleted={handleToggleCompleted}
-                        updateUserPending={updateUser.isPending}
+                        onToggleCompleted={() => handleToggleCompleted(list.id)}
                         isKeyboardDragging={isKeyboardDragging}
                         localIncompleteTodos={localOrderByList[list.id] ?? null}
                       />
@@ -809,13 +794,6 @@ export function TodoGrid() {
             })}
             <NewListColumn />
           </BoardScaffold>
-          {/* Floating composer: the quick-add-to-Today surface. Focused by
-              the global `n` shortcut; smart-create defaults into Today. */}
-          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4 sm:pb-6">
-            <div className="pointer-events-auto w-full max-w-md">
-              <TodoInput textareaRef={composerRef} />
-            </div>
-          </div>
           <ConfirmDialog
             open={confirmDeleteId !== null}
             onOpenChange={(open) => {

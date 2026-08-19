@@ -239,21 +239,62 @@ describe("TodoGrid", () => {
     expect(screen.queryByText("Done one")).not.toBeInTheDocument();
   });
 
-  it("toggles the hideCompleted preference when the accordion is clicked", () => {
+  it("expands the completed accordion locally when clicked, without syncing the preference", () => {
     const mutate = vi.fn();
     vi.mocked(useUpdateUser).mockReturnValue({
       mutate,
       isPending: false,
     } as unknown as ReturnType<typeof useUpdateUser>);
-    stubUser(false);
+    stubUser(true);
     stubTodos([makeTodo({ id: "b", title: "Done thing", completed: true })]);
 
     render(<TodoGrid />);
-    fireEvent.click(screen.getByRole("button", { name: /completed/i }));
-    expect(mutate).toHaveBeenCalledWith(
-      { hideCompleted: true },
-      expect.anything(),
-    );
+    const accordion = screen.getByRole("button", { name: /completed/i });
+    expect(accordion).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(accordion);
+
+    expect(accordion).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Done thing")).toBeInTheDocument();
+    expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("toggles each list's completed accordion independently", () => {
+    const workList: SerializedList = {
+      ...TODAY_LIST,
+      id: "list-work",
+      name: "Work",
+      kind: "custom",
+      systemKind: null,
+      position: "a1",
+    };
+    stubLists([TODAY_LIST, workList]);
+    stubUser(true);
+    stubTodos([
+      makeTodo({
+        id: "a",
+        listId: "list-today",
+        title: "Today done",
+        completed: true,
+      }),
+      makeTodo({
+        id: "b",
+        listId: "list-work",
+        title: "Work done",
+        completed: true,
+      }),
+    ]);
+
+    render(<TodoGrid />);
+    const accordions = screen.getAllByRole("button", { name: /completed/i });
+    expect(accordions).toHaveLength(2);
+    expect(accordions[0]).toHaveAttribute("aria-expanded", "false");
+    expect(accordions[1]).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(accordions[0]);
+
+    expect(accordions[0]).toHaveAttribute("aria-expanded", "true");
+    expect(accordions[1]).toHaveAttribute("aria-expanded", "false");
   });
 
   it("does not flash completed todos while the hideCompleted preference is loading", () => {

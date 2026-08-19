@@ -51,7 +51,7 @@ export function TodoInput({
   function renderTrailing() {
     if (smartCreate.isPending) {
       return (
-        <div className="absolute right-3 bottom-3">
+        <div className="flex shrink-0 items-center pr-1.5">
           <Loader size="sm" className="text-gray-muted" />
         </div>
       );
@@ -59,7 +59,7 @@ export function TodoInput({
     if (!trimmed) return null;
 
     return (
-      <div className="absolute right-2 bottom-2 flex items-center">
+      <div className="flex shrink-0 items-center pr-1">
         <Button
           type="submit"
           variant="primary"
@@ -123,9 +123,9 @@ export function TodoInput({
   }
 
   return (
-    <div className="space-y-2 todo-input-wrapper">
+    <div className="todo-input-wrapper">
       <form onSubmit={handleSubmit}>
-        <div className="todo-input-container relative bg-gray-surface shadow-lg ring-1 ring-gray-subtle rounded-2xl">
+        <div className="todo-input-container flex items-center gap-1 rounded-full bg-gray-surface shadow-lg ring-1 ring-gray-subtle">
           <Textarea
             ref={textareaRef}
             value={text}
@@ -134,7 +134,7 @@ export function TodoInput({
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}
-            className={`w-full resize-none min-h-0 rounded-2xl transition-[padding] ${trimmed ? "pb-12" : ""}`}
+            className="min-h-0 w-full resize-none overflow-hidden rounded-full border-0 py-1.5 pl-3 shadow-none ring-0 focus-visible:ring-0"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
