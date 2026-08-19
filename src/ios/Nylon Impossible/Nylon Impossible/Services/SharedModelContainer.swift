@@ -13,11 +13,20 @@ enum SharedModelContainer {
     static let shared: ModelContainer = {
         let schema = Schema([TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self, TodoListModel.self])
         
-        // Use App Group container for shared access
-        let appGroupURL = FileManager.default.containerURL(
+        // Every target — app, share extension, intents — opens this one store in
+        // the App Group container. Without that container there's no agreed
+        // location to write to; run from memory rather than trap on a `!`, the
+        // same trade as the fallbacks below.
+        guard let appGroupURL = FileManager.default.containerURL(
             forSecurityApplicationGroupIdentifier: "group.com.superhighfives.Nylon-Impossible"
-        )!
-        
+        ) else {
+            SentrySDK.capture(message: "App Group container unavailable") { scope in
+                scope.setTag(value: "SharedModelContainer.appGroup", key: "area")
+                scope.setLevel(.error)
+            }
+            return inMemoryContainer(for: schema)
+        }
+
         let storeURL = appGroupURL.appendingPathComponent("nylon.store")
         
         let config = ModelConfiguration(
@@ -49,21 +58,33 @@ enum SharedModelContainer {
             do {
                 return try ModelContainer(for: schema, configurations: config)
             } catch {
-                // Can't even create a store at a path we just cleared (disk
-                // full, App Group revoked). Run from memory rather than
-                // crash-loop: the app is degraded — this session's writes are
-                // lost on quit — but usable, and sync repopulates it from the
-                // server, which is where the todos actually live.
+                // Can't create a store even at a path we just cleared — the
+                // filesystem is against us (disk full, sandbox trouble).
                 capture(error, stage: "recreate")
-                let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-                do {
-                    return try ModelContainer(for: schema, configurations: memoryConfig)
-                } catch {
-                    fatalError("Failed to create in-memory model container: \(error)")
-                }
+                return inMemoryContainer(for: schema)
             }
         }
     }()
+
+    /// Last resort when no store can be opened: a container with nothing behind
+    /// it. Degraded — this session's writes are lost on quit, and nothing is
+    /// shared with the extensions — but the app runs, and sync repopulates it
+    /// from the server, which is where the todos actually live.
+    private static func inMemoryContainer(for schema: Schema) -> ModelContainer {
+        do {
+            return try ModelContainer(
+                for: schema,
+                configurations: ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+            )
+        } catch {
+            // Still fatal, unlike everything above it: with no disk, no App
+            // Group and no migration in play, a schema that won't construct in
+            // memory is a bug in the models themselves rather than a condition
+            // the device got itself into — and there's nothing left to fall back
+            // to. Every caller of this container is unusable without it.
+            fatalError("Failed to create in-memory model container: \(error)")
+        }
+    }
 
     private static func capture(_ error: Error, stage: String) {
         SentrySDK.capture(error: error) { scope in
