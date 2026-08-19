@@ -92,9 +92,14 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
         href: appCss,
       },
       {
+        // Browser chrome renders this directly — it can only ever follow the
+        // OS's prefers-color-scheme, unlike the in-app logo (BoardChrome.tsx),
+        // which swaps files based on the app's own explicit theme. Keep the
+        // OS-driven dark-mode CSS isolated to this dedicated file so it can't
+        // leak into the app-theme-driven favicon.svg/favicon-dark.svg pair.
         rel: "icon",
         type: "image/svg+xml",
-        href: "/favicon.svg",
+        href: "/favicon-tab.svg",
         sizes: "any",
       },
       {
