@@ -27,33 +27,49 @@ enum SharedModelContainer {
         )
         
         do {
-            let container = try ModelContainer(for: schema, configurations: config)
-            backfillLegacyListIds(in: container)
-            return container
+            return try ModelContainer(for: schema, configurations: config)
         } catch {
             // SwiftData can fail to open a store it can't lightweight-migrate
-            // (e.g. NYLON-IMPOSSIBLE-IOS-8: the listId UUID->String rename+add
-            // in build 155 hit SwiftDataError.loadIssueModelContainer on some
-            // existing stores). This used to be a fatalError, which permanently
+            // (NYLON-IMPOSSIBLE-IOS-8: the listId UUID->String rename+re-add in
+            // build 155 hit SwiftDataError.loadIssueModelContainer on existing
+            // stores — see `TodoItem.listKey` for why that shape was
+            // un-inferable). This used to be a fatalError, which permanently
             // bricked the app and its extensions/intents (all share this
             // container) for anyone who hit it - there's no user-facing
             // recovery, just a crash loop. The local store is a sync cache, not
             // the source of truth (see SyncService), so it's safe to drop and
             // recreate it: any local-only unsynced todos are lost, but the app
             // becomes usable again instead of crash-looping forever.
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "SharedModelContainer.open", key: "area")
-            }
+            //
+            // Reaching here at all is a bug in a schema change, not a routine
+            // fallback — hence still error level, tagged so a reset is
+            // distinguishable in Sentry from a hard failure below.
+            capture(error, stage: "open")
             destroyStore(at: storeURL)
             do {
-                let container = try ModelContainer(for: schema, configurations: config)
-                backfillLegacyListIds(in: container)
-                return container
+                return try ModelContainer(for: schema, configurations: config)
             } catch {
-                fatalError("Failed to create shared model container after store reset: \(error)")
+                // Can't even create a store at a path we just cleared (disk
+                // full, App Group revoked). Run from memory rather than
+                // crash-loop: the app is degraded — this session's writes are
+                // lost on quit — but usable, and sync repopulates it from the
+                // server, which is where the todos actually live.
+                capture(error, stage: "recreate")
+                let memoryConfig = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+                do {
+                    return try ModelContainer(for: schema, configurations: memoryConfig)
+                } catch {
+                    fatalError("Failed to create in-memory model container: \(error)")
+                }
             }
         }
     }()
+
+    private static func capture(_ error: Error, stage: String) {
+        SentrySDK.capture(error: error) { scope in
+            scope.setTag(value: "SharedModelContainer.\(stage)", key: "area")
+        }
+    }
 
     /// Best-effort delete of the SQLite store (plus its WAL/SHM sidecar files)
     /// so a fresh `ModelContainer` can be created in its place. Only called
@@ -62,44 +78,6 @@ enum SharedModelContainer {
         let fileManager = FileManager.default
         for suffix in ["", "-wal", "-shm"] {
             try? fileManager.removeItem(atPath: storeURL.path + suffix)
-        }
-    }
-
-    /// One-time bridge for `TodoItem.listId`'s UUID? -> String? change. The old
-    /// value survives the store migration under the renamed `listIdLegacy`
-    /// column (see `TodoItem`); copy it into the new String `listId` so list
-    /// membership is correct immediately, without waiting for the next full
-    /// sync. Runs once per process, before any sync touches the store (this is
-    /// called inside `shared`'s initializer). Idempotent: a row is only touched
-    /// while it still has a legacy value and no new one, and `listIdLegacy` is
-    /// cleared as it's copied, so subsequent launches find nothing to do.
-    ///
-    /// Filtered in memory rather than with a #Predicate — predicates over
-    /// optional UUIDs are unreliable (see TaskCreationService.fetchAllTodos) and
-    /// the local store is small.
-    private static func backfillLegacyListIds(in container: ModelContainer) {
-        let context = ModelContext(container)
-        let all: [TodoItem]
-        do {
-            all = try context.fetch(FetchDescriptor<TodoItem>())
-        } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "backfillLegacyListIds.fetch", key: "area")
-            }
-            return
-        }
-        let stale = all.filter { $0.listId == nil && $0.listIdLegacy != nil }
-        guard !stale.isEmpty else { return }
-        for todo in stale {
-            todo.listId = todo.listIdLegacy?.uuidString.lowercased()
-            todo.listIdLegacy = nil
-        }
-        do {
-            try context.save()
-        } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "backfillLegacyListIds.save", key: "area")
-            }
         }
     }
 }

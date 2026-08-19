@@ -50,14 +50,17 @@ final class TodoItem {
     // ids are dashless 32-hex (`fb56f07a...`, see API migration 0024) which
     // `UUID(uuidString:)` rejects — a UUID type silently dropped them to nil and
     // left every list empty. A String holds any id shape the server sends.
-    var listId: String?
-    // The pre-String value of `listId`, kept under a renamed column so SwiftData
-    // can migrate the store without a UUID->String type change on `listId` in
-    // place (which lightweight migration can't infer). Backfilled into `listId`
-    // once on launch by `SharedModelContainer.backfillLegacyListIds`, then left
-    // nil. Safe to delete in a future release once all stores have migrated.
-    @Attribute(originalName: "listId") var listIdLegacy: UUID?
-    // When `listId` last changed (creation, manual move, or the server's
+    //
+    // Deliberately NOT called `listId` — don't "tidy" it back. Two incompatible
+    // `listId` columns exist in stores out in the wild: UUID (pre-#307) and
+    // String (build 155, from #307's rename-and-re-add). A model attribute named
+    // `listId` has to pick one type, and lightweight migration can't infer the
+    // same-name type change for whichever store disagrees — that's the
+    // `SwiftDataError.loadIssueModelContainer` in NYLON-IMPOSSIBLE-IOS-8. Under a
+    // fresh name, both stores migrate by the two operations SwiftData always
+    // infers: drop the old columns, add an optional new one.
+    var listKey: String?
+    // When `listKey` last changed (creation, manual move, or the server's
     // aging sweep) — mirrors the server's `listEnteredAt` column.
     var listEnteredAt: Date?
     var title: String
@@ -106,8 +109,7 @@ final class TodoItem {
         self.id = UUID()
         self.userId = userId
         self.parentId = nil
-        self.listId = nil
-        self.listIdLegacy = nil
+        self.listKey = nil
         self.listEnteredAt = nil
         self.title = title
         self.itemNotes = nil

@@ -33,7 +33,7 @@ final class TodoViewModel {
         let activeTodos = todos.filter { !$0.isDeleted }
         let scoped: [TodoItem]
         if let listId {
-            scoped = activeTodos.filter { $0.listId?.lowercased() == listId }
+            scoped = activeTodos.filter { $0.listKey?.lowercased() == listId }
         } else {
             scoped = activeTodos
         }
@@ -132,8 +132,8 @@ final class TodoViewModel {
         todo.dueDate = dueDate
         todo.recurrence = recurrence
         todo.sticky = sticky
-        if let listId, listId != todo.listId {
-            todo.listId = listId
+        if let listId, listId != todo.listKey {
+            todo.listKey = listId
             todo.listEnteredAt = Date()
         }
         todo.markModified()
@@ -145,16 +145,16 @@ final class TodoViewModel {
     /// behavior (`TodoGrid.handleDragEnd`'s `insertIndex === targetOrder.length`
     /// case), since there's no drop-index equivalent from a picker.
     func moveTodoToList(_ todo: TodoItem, to listId: String, allTodos: [TodoItem]) {
-        guard todo.listId != listId else { return }
+        guard todo.listKey != listId else { return }
         let targetIncomplete = allTodos
             .filter {
-                $0.listId == listId && !$0.isDeleted && !$0.isEffectivelyCompleted
+                $0.listKey == listId && !$0.isDeleted && !$0.isEffectivelyCompleted
                     && $0.parentId == nil
             }
             .sorted { $0.position < $1.position }
 
         todo.position = generateKeyBetween(targetIncomplete.last?.position, nil)
-        todo.listId = listId
+        todo.listKey = listId
         todo.listEnteredAt = Date()
         todo.markModified()
     }
@@ -196,7 +196,7 @@ final class TodoViewModel {
             let placement = RecurrenceHelper.placement(forDueDate: nextDue, now: now)
             let targetKind = SystemListKind(rawValue: placement.rawValue)
             if let placedList = lists.first(where: { $0.systemKind == targetKind }) {
-                todo.listId = placedList.id
+                todo.listKey = placedList.id
                 todo.listEnteredAt = now
             }
             todo.markModified()
@@ -212,7 +212,7 @@ final class TodoViewModel {
             let incompleteTodos = allTodos
                 .filter {
                     !$0.isDeleted && !$0.isEffectivelyCompleted && $0.parentId == nil
-                        && $0.id != todo.id && $0.listId == todo.listId
+                        && $0.id != todo.id && $0.listKey == todo.listKey
                 }
                 .sorted { $0.position < $1.position }
             todo.position = generateKeyBetween(incompleteTodos.last?.position, nil)

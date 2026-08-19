@@ -40,7 +40,7 @@ enum TaskCreationService {
         // against another list's items here could land it anywhere once
         // that list is sorted.
         let firstPosition = allTodos
-            .filter { !$0.isDeleted && !$0.isCompleted && $0.parentId == nil && $0.listId == listId }
+            .filter { !$0.isDeleted && !$0.isCompleted && $0.parentId == nil && $0.listKey == listId }
             .min { $0.position < $1.position }?
             .position
 
@@ -51,7 +51,7 @@ enum TaskCreationService {
             userId: userId,
             position: position
         )
-        todo.listId = listId
+        todo.listKey = listId
         todo.listEnteredAt = Date()
 
         context.insert(todo)
@@ -91,7 +91,7 @@ enum TaskCreationService {
         todo.parentId = parent.id
         // Subtasks are implicitly scoped to their parent's list — no
         // independent list membership.
-        todo.listId = parent.listId
+        todo.listKey = parent.listKey
         todo.listEnteredAt = Date()
         context.insert(todo)
 
