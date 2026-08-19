@@ -354,26 +354,40 @@ function TodoItemContent({
             {showTitleLine && (
               <div className="flex items-center gap-2">
                 {!showUrlOnlyCard && (
-                  <button
-                    type="button"
-                    aria-expanded={isExpanded}
-                    onClick={() => onToggleExpand(todo.id)}
-                    className={`min-w-0 border-0 bg-transparent p-0 text-left leading-snug wrap-anywhere ${
-                      isCompleted
-                        ? "text-sm line-through text-gray-placeholder"
-                        : "text-[15px] font-semibold text-gray"
-                    }`}
-                  >
-                    {urlOnly ? (
-                      previewTitle ? (
-                        previewTitle
+                  // The title is clickable-to-expand via a `<button>` stretched
+                  // over this wrapper (absolute + inset-0), not wrapping the
+                  // text itself — LinkifiedText can render a real `<a>` for a
+                  // URL in the title, and nesting that inside a `<button>` is
+                  // invalid HTML. The visible text sits above it
+                  // (pointer-events-none) so clicks fall through to the button
+                  // everywhere except the link itself, which opts back in to
+                  // pointer events and keeps its own click behavior.
+                  <div className="relative min-w-0">
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}"`}
+                      onClick={() => onToggleExpand(todo.id)}
+                      className="absolute inset-0 rounded-md border-0 bg-transparent p-0"
+                    />
+                    <p
+                      className={`relative min-w-0 pointer-events-none leading-snug wrap-anywhere ${
+                        isCompleted
+                          ? "text-sm line-through text-gray-placeholder"
+                          : "text-[15px] font-semibold text-gray"
+                      }`}
+                    >
+                      {urlOnly ? (
+                        previewTitle ? (
+                          previewTitle
+                        ) : (
+                          <LinkifiedText text={urlOnly.url} />
+                        )
                       ) : (
-                        <LinkifiedText text={urlOnly.url} />
-                      )
-                    ) : (
-                      <LinkifiedText text={todo.title} />
-                    )}
-                  </button>
+                        <LinkifiedText text={todo.title} />
+                      )}
+                    </p>
+                  </div>
                 )}
                 {subtasks.length > 0 &&
                   (() => {
