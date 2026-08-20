@@ -1,6 +1,19 @@
 #!/bin/bash
 set -e
 
+# CI workflows (marketing.yml, marketing-test.yml, ...) already migrate and
+# seed their own local D1 explicitly, with workflow-specific seed data, before
+# spawning `pnpm --filter web dev` directly. That spawn bypasses this predev
+# hook's intended target (a developer's local `pnpm web:dev`) but still
+# triggers it, so left unguarded this hook races — and used to crash —
+# generate.ts's own syncLocalD1Storage() retry, which already handles the
+# same underlying per-worker local-D1-file divergence more safely (it copies
+# the already-seeded file across instead of independently reseeding).
+if [ -n "${CI:-}" ]; then
+  echo "CI detected — skipping local D1 auto-migrate/seed (the workflow manages its own D1 state)."
+  exit 0
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
