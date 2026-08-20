@@ -92,8 +92,10 @@ const restrictToVerticalAxisForKeyboard =
 // actually over this rect? — gets that right for pointer/touch drags;
 // `closestCenter` is the fallback for keyboard drags, which have no pointer
 // position to test against.
-const itemCollisionDetection: CollisionDetection = (args) =>
-  pointerWithin(args).length > 0 ? pointerWithin(args) : closestCenter(args);
+const itemCollisionDetection: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : closestCenter(args);
+};
 
 const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
   event,
@@ -513,7 +515,6 @@ export function TodoGrid() {
   // horizontal than vertical, redirect it to the board's own scroller.
   const handleColumnWheel = (e: WheelEvent<HTMLDivElement>) => {
     if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
-      e.preventDefault();
       boardScrollRef.current?.scrollBy({ left: e.deltaX });
     }
   };

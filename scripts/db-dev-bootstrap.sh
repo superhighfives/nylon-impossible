@@ -17,8 +17,13 @@ USER_COUNT=$(npx wrangler d1 execute nylon-impossible-db --local --persist-to ..
         try {
           const parsed = JSON.parse(data);
           console.log(parsed[0]?.results?.[0]?.count ?? 0);
-        } catch {
-          console.log(0);
+        } catch (err) {
+          // Fail loud rather than reporting "0 users": a false 0 here
+          // triggers a reseed, and seed.sql opens with DELETE FROM on every
+          // table, so silently swallowing a parse failure would wipe the
+          // local dev DB instead of surfacing the real error.
+          console.error("Failed to parse wrangler d1 execute output:", err.message);
+          process.exit(1);
         }
       });
     ')
