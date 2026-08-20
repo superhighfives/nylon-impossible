@@ -317,6 +317,11 @@ function TodoItemContent({
   const isOverdue = !!dueDateObj && dueDateObj < new Date() && !isCompleted;
   const hasRecurrence = !!todo.recurrence;
   const showInlineEditing = !isCompleted;
+  // The actions pill floats over the row instead of reserving its own line —
+  // it stays visible when it's carrying real state (a due date, recurrence,
+  // or pin), and is otherwise a hover/focus affordance on desktop (always
+  // visible on touch, where hover doesn't exist).
+  const hasVisiblePillState = !!dueValueStr || hasRecurrence || !!todo.sticky;
 
   const handleInlineDueDate = (date: Date | null) => {
     // Clearing a due date also clears any recurrence — a repeat has no anchor
@@ -354,40 +359,23 @@ function TodoItemContent({
             {showTitleLine && (
               <div className="flex items-center gap-2">
                 {!showUrlOnlyCard && (
-                  // The title is clickable-to-expand via a `<button>` stretched
-                  // over this wrapper (absolute + inset-0), not wrapping the
-                  // text itself — LinkifiedText can render a real `<a>` for a
-                  // URL in the title, and nesting that inside a `<button>` is
-                  // invalid HTML. The visible text sits above it
-                  // (pointer-events-none) so clicks fall through to the button
-                  // everywhere except the link itself, which opts back in to
-                  // pointer events and keeps its own click behavior.
-                  <div className="relative min-w-0">
-                    <button
-                      type="button"
-                      aria-expanded={isExpanded}
-                      aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}"`}
-                      onClick={() => onToggleExpand(todo.id)}
-                      className="absolute inset-0 rounded-md border-0 bg-transparent p-0"
-                    />
-                    <p
-                      className={`relative min-w-0 pointer-events-none leading-snug wrap-anywhere ${
-                        isCompleted
-                          ? "text-sm line-through text-gray-placeholder"
-                          : "text-[15px] font-semibold text-gray"
-                      }`}
-                    >
-                      {urlOnly ? (
-                        previewTitle ? (
-                          previewTitle
-                        ) : (
-                          <LinkifiedText text={urlOnly.url} />
-                        )
+                  <p
+                    className={`min-w-0 leading-snug wrap-anywhere ${
+                      isCompleted
+                        ? "text-sm line-through text-gray-placeholder"
+                        : "text-[15px] font-semibold text-gray"
+                    }`}
+                  >
+                    {urlOnly ? (
+                      previewTitle ? (
+                        previewTitle
                       ) : (
-                        <LinkifiedText text={todo.title} />
-                      )}
-                    </p>
-                  </div>
+                        <LinkifiedText text={urlOnly.url} />
+                      )
+                    ) : (
+                      <LinkifiedText text={todo.title} />
+                    )}
+                  </p>
                 )}
                 {subtasks.length > 0 &&
                   (() => {
@@ -500,13 +488,34 @@ function TodoItemContent({
           {!showInlineEditing && <TodoIndicators todo={todo} />}
         </div>
       </div>
-      {/* Actions get their own row instead of squeezing the title into a
-          narrower column — a long title can wrap freely at full width. */}
+      {/* Actions float as a pill over the row instead of reserving their own
+          line — it stays put when it's carrying real state (due date,
+          recurrence, pin) and is otherwise a hover/focus affordance on
+          desktop (always visible on touch, where there's no hover). */}
       {showActions && (
-        <div className="flex items-center justify-end gap-1.5">
-          {/* Inline due-date control sits on one line with the expand
-              control. Hidden when expanded — the expanded form has its own
-              full editors. */}
+        <div
+          className={`absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity ${
+            hasVisiblePillState
+              ? "opacity-100"
+              : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+          }`}
+        >
+          {/* Opens the details panel — the title itself is now a plain,
+              linkified text line so URLs inside it stay clickable. */}
+          <Button
+            variant="ghost"
+            size="xs"
+            shape="square"
+            type="button"
+            onClick={() => onToggleExpand(todo.id)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}" details`}
+            className="text-gray-muted hover:text-gray"
+          >
+            <ChevronRight size={14} />
+          </Button>
+          {/* Hidden once expanded — the expanded form has its own full
+              editors. */}
           {showInlineEditing && !isExpanded && (
             <InlineIndicators
               dueValue={dueValueStr}
@@ -536,14 +545,12 @@ function TodoItemContent({
               onClick={() => onDelete(todo.id)}
               disabled={deletePending}
               aria-label={`Delete "${todo.title}"`}
-              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex"
             >
               <Trash2 size={14} />
             </Button>
           )}
-          {/* Mobile: popover actions menu. The h-5 wrapper centers the taller
-              control on the title line so it doesn't stretch the row height on
-              todos without a description. */}
+          {/* Mobile: popover actions menu. */}
           <div className="flex h-5 items-center sm:hidden">
             <TodoActionsMenu
               todoId={todo.id}
@@ -782,10 +789,6 @@ export interface TodoListColumnProps {
   highlightIds: ReadonlySet<string>;
   hiddenIds: ReadonlySet<string>;
   timeZone: string;
-  completedCollapsed: boolean;
-  /** True once the synced `hideCompleted` preference has loaded (gates the Completed section so it doesn't flash open). */
-  hideCompletedKnown: boolean;
-  onToggleCompleted: () => void;
   /** True while a keyboard-initiated drag is in progress anywhere on the board. */
   isKeyboardDragging: boolean;
   /** Mid-drag optimistic order override for this list, or null to use the derived order. */
@@ -794,8 +797,9 @@ export interface TodoListColumnProps {
 
 /**
  * One list's rows: sticky-tier sort, subtasks, URL previews, AI status
- * badges, and the collapsible Completed section. Drag-and-drop *within* this
- * list is driven by dnd-kit hooks here (`useSortable` on each row); the
+ * badges. Completed todos across every list render in their own aggregate
+ * `CompletedColumn` instead of an inline accordion here. Drag-and-drop
+ * *within* this list is driven by dnd-kit hooks here (`useSortable` on each row); the
  * shared `DndContext` those hooks attach to — along with cross-list drop
  * handling, the delete-confirm dialog, and the expanded side panel — lives
  * one level up in `TodoGrid`, since a drag (and only one open panel/dialog)
@@ -813,9 +817,6 @@ export function TodoListColumn({
   highlightIds,
   hiddenIds,
   timeZone,
-  completedCollapsed,
-  hideCompletedKnown,
-  onToggleCompleted,
   isKeyboardDragging,
   localIncompleteTodos,
 }: TodoListColumnProps) {
@@ -912,9 +913,6 @@ export function TodoListColumn({
 
   const displayIncompleteTodos =
     localIncompleteTodos ?? getIncompleteOrder(todos, timeZone, hiddenIds);
-  const completedTodos = sortTopLevelTodos(todos, timeZone).completed.filter(
-    (t) => !hiddenIds.has(t.id),
-  );
 
   const sharedProps = (todo: TodoWithUrls) => ({
     todo,
@@ -946,51 +944,119 @@ export function TodoListColumn({
           />
         ))}
       </SortableContext>
-      {/* Hold the completed section until the synced `hideCompleted`
-          preference is known. Rendering before then would default to expanded
-          and flash the completed items open, then collapse them once the
-          preference arrives. */}
-      {hideCompletedKnown && completedTodos.length > 0 && (
-        <div className="mt-2 border-t border-gray-base pt-1">
-          <button
-            type="button"
-            onClick={onToggleCompleted}
-            aria-expanded={!completedCollapsed}
-            className="flex min-h-10 w-full items-center gap-1.5 rounded-lg py-2 text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+    </div>
+  );
+}
+
+export interface CompletedColumnProps {
+  /** Every completed, top-level todo across every list — already
+   * hidden-filtered and sorted (most recently completed first) by the
+   * caller (TodoGrid, via `sortTopLevelTodos`). */
+  completedTodos: TodoWithUrls[];
+  /** All todos (any list, any completion state) — used to look up subtasks
+   * for a completed row's expanded badges. */
+  allTodos: TodoWithUrls[];
+  expandedId: string | null;
+  onToggleExpand: (id: string) => void;
+  onRequestDelete: (id: string) => void;
+  updateTodo: ReturnType<typeof useUpdateTodo>;
+  deleteTodo: ReturnType<typeof useDeleteTodo>;
+  /** Un-completes a todo, restoring it to the end of its own list's
+   * incomplete order (or rolling back a stamped recurrence) — the same
+   * logic the old per-list accordion used, now computed once at the grid
+   * level since this column spans every list. */
+  onUncomplete: (todo: TodoWithUrls) => void;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  /** True once the synced `hideCompleted` preference has loaded (gates this
+   * column so it doesn't flash open before the collapsed default is known). */
+  known: boolean;
+}
+
+/**
+ * Aggregate "Completed" column: every completed todo across every list, in
+ * one place, instead of a collapsible section duplicated inside each list's
+ * own column. Collapsed by default when the synced `hideCompleted`
+ * preference says so; toggling it is local to this session, matching the
+ * old per-list accordion's behavior (never synced back to the preference).
+ */
+export function CompletedColumn({
+  completedTodos,
+  allTodos,
+  expandedId,
+  onToggleExpand,
+  onRequestDelete,
+  updateTodo,
+  deleteTodo,
+  onUncomplete,
+  collapsed,
+  onToggleCollapsed,
+  known,
+}: CompletedColumnProps) {
+  const subtasksByParent = new Map<string, TodoWithUrls[]>();
+  for (const t of allTodos) {
+    if (t.parentId) {
+      const siblings = subtasksByParent.get(t.parentId) ?? [];
+      siblings.push(t);
+      subtasksByParent.set(t.parentId, siblings);
+    }
+  }
+
+  // Hold the whole column until the synced `hideCompleted` preference is
+  // known — rendering before then would default to expanded and flash the
+  // completed items open, then collapse once the preference arrives.
+  if (!known || completedTodos.length === 0) return null;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-expanded={!collapsed}
+        aria-label={`${collapsed ? "Show" : "Hide"} completed items`}
+        className="flex min-h-10 w-full items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+      >
+        <ChevronRight
+          size={14}
+          aria-hidden="true"
+          className={`shrink-0 transition-transform ${
+            collapsed ? "" : "rotate-90"
+          }`}
+        />
+        <span>
+          {completedTodos.length}{" "}
+          {completedTodos.length === 1 ? "item" : "items"}
+        </span>
+      </button>
+      {!collapsed &&
+        completedTodos.map((todo) => (
+          <div
+            key={todo.id}
+            className={`group rounded-lg py-2 ${
+              expandedId === todo.id ? "bg-gray-base" : ""
+            }`}
           >
-            <ChevronRight
-              size={14}
-              aria-hidden="true"
-              className={`shrink-0 transition-transform ${
-                completedCollapsed ? "" : "rotate-90"
-              }`}
-            />
-            <span>Completed</span>
-            <span className="rounded-md bg-gray-base px-1.5 py-0.5 tabular-nums text-gray-muted">
-              {completedTodos.length}
-            </span>
-          </button>
-          {!completedCollapsed &&
-            completedTodos.map((todo) => (
-              <div
-                key={todo.id}
-                className={`group rounded-lg py-2 ${
-                  expandedId === todo.id ? "bg-gray-base" : ""
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  {/* Mobile-only spacer matching the active rows' inline grip
-                      width; on desktop the grip hangs in the margin, so
-                      completed rows are already flush. */}
-                  <div className="w-4 shrink-0 sm:hidden" aria-hidden="true" />
-                  <div className="flex-1 min-w-0">
-                    <TodoItemContent {...sharedProps(todo)} />
-                  </div>
-                </div>
+            <div className="flex items-start gap-2">
+              {/* Mobile-only spacer matching the active rows' inline grip
+                  width; on desktop the grip hangs in the margin, so
+                  completed rows are already flush. */}
+              <div className="w-4 shrink-0 sm:hidden" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <TodoItemContent
+                  todo={todo}
+                  subtasks={subtasksByParent.get(todo.id) ?? []}
+                  isExpanded={expandedId === todo.id}
+                  onToggle={() => onUncomplete(todo)}
+                  onDelete={onRequestDelete}
+                  onToggleExpand={onToggleExpand}
+                  onInlineUpdate={() => {}}
+                  updatePending={updateTodo.isPending}
+                  deletePending={deleteTodo.isPending}
+                />
               </div>
-            ))}
-        </div>
-      )}
+            </div>
+          </div>
+        ))}
     </div>
   );
 }

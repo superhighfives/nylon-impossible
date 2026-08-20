@@ -259,7 +259,7 @@ describe("TodoGrid", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("toggles each list's completed accordion independently", () => {
+  it("aggregates completed todos from every list into a single Completed column", () => {
     const workList: SerializedList = {
       ...TODAY_LIST,
       id: "list-work",
@@ -286,15 +286,16 @@ describe("TodoGrid", () => {
     ]);
 
     render(<TodoGrid />);
+    // One aggregate accordion, not one per list.
     const accordions = screen.getAllByRole("button", { name: /completed/i });
-    expect(accordions).toHaveLength(2);
+    expect(accordions).toHaveLength(1);
     expect(accordions[0]).toHaveAttribute("aria-expanded", "false");
-    expect(accordions[1]).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(accordions[0]);
 
     expect(accordions[0]).toHaveAttribute("aria-expanded", "true");
-    expect(accordions[1]).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Today done")).toBeInTheDocument();
+    expect(screen.getByText("Work done")).toBeInTheDocument();
   });
 
   it("does not flash completed todos while the hideCompleted preference is loading", () => {
