@@ -19,7 +19,15 @@ import {
   DevEnvironmentDetails,
   useDevEnvironment,
 } from "./DevEnvironmentIndicator";
-import { Button, Field, Input, LayerCard, Loader, Select } from "./ui";
+import {
+  Button,
+  Field,
+  InfoTooltip,
+  Input,
+  LayerCard,
+  Loader,
+  Select,
+} from "./ui";
 
 // Full IANA timezone list from the runtime — avoids hand-maintaining a
 // curated subset, and every value round-trips through Intl.DateTimeFormat
@@ -348,7 +356,23 @@ export function SettingsModal({ origin }: { origin: string }) {
                   </LayerCard.Primary>
                 </LayerCard>
                 <LayerCard>
-                  <LayerCard.Secondary>Import</LayerCard.Secondary>
+                  <LayerCard.Secondary>
+                    Import
+                    {isClerkLoaded && googleTasksReady && (
+                      <InfoTooltip
+                        render={
+                          <>
+                            Google doesn't share repeat schedules, so we'll help
+                            you set those afterwards. We only import open tasks,
+                            so a repeating to-do you've already completed in
+                            Google today won't come across — re-import once its
+                            next occurrence is due. Already-imported tasks are
+                            skipped, so it's safe to run again.
+                          </>
+                        }
+                      />
+                    )}
+                  </LayerCard.Secondary>
                   <LayerCard.Primary>
                     {!isClerkLoaded ? (
                       <div
@@ -362,13 +386,7 @@ export function SettingsModal({ origin }: { origin: string }) {
                       <>
                         <p className="text-xs text-gray-muted">
                           Bring across open tasks from your Google Tasks “My
-                          Tasks” list, with due dates and link research. Google
-                          doesn't share repeat schedules, so we'll help you set
-                          those afterwards. We only import open tasks, so a
-                          repeating to-do you've already completed in Google
-                          today won't come across — re-import once its next
-                          occurrence is due. Already-imported tasks are skipped,
-                          so it's safe to run again.
+                          Tasks” list, with due dates and link research.
                         </p>
                         <Button
                           variant="outline"

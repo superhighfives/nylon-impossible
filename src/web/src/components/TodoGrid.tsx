@@ -1,4 +1,5 @@
 import {
+  type CollisionDetection,
   closestCenter,
   DndContext,
   type DragEndEvent,
@@ -7,6 +8,7 @@ import {
   KeyboardSensor,
   type Modifier,
   PointerSensor,
+  pointerWithin,
   TouchSensor,
   useSensor,
   useSensors,
@@ -19,10 +21,19 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+  type WheelEvent,
+} from "react";
+import {
+  CompletedColumn,
   ErrorState,
   ExpandedSection,
   getIncompleteOrder,
@@ -46,15 +57,45 @@ import {
 } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
-import type { SerializedList, TodoWithUrls } from "@/types/database";
+import { sortTopLevelTodos } from "@/lib/todoOrder";
+import type {
+  SerializedList,
+  TodoWithUrls,
+  UpdateTodoInput,
+} from "@/types/database";
 import { Button, ConfirmDialog, Input, SidePanel } from "./ui";
 
-// The grid's own vertical-drag lock (matches the single-list behavior) —
-// rows only move up/down within a column, never sideways mid-drag.
-const restrictToVerticalAxis: Modifier = ({ transform }) => ({
-  ...transform,
-  x: 0,
-});
+// Keyboard reorder only ever moves up/down (see `verticalKeyboardCoordinates`
+// below), so it's always locked to vertical. Pointer/touch drags used to be
+// locked unconditionally too, which silently broke cross-list drag: the
+// collision rect never left the source column's x position, so `over` could
+// never resolve to a todo or column in a different list. A small dead zone
+// (a few px of incidental horizontal jitter from an imperfectly-vertical
+// mouse/finger movement) keeps ordinary in-column reordering feeling
+// vertical-only; past that, the transform follows the pointer's real x so
+// the item can visibly travel into — and register a drop against — another
+// column.
+const HORIZONTAL_DRAG_DEAD_ZONE = 12;
+
+const restrictToVerticalAxisForKeyboard =
+  (isKeyboardDragging: boolean): Modifier =>
+  ({ transform }) => {
+    if (isKeyboardDragging) return { ...transform, x: 0 };
+    if (Math.abs(transform.x) < HORIZONTAL_DRAG_DEAD_ZONE) {
+      return { ...transform, x: 0 };
+    }
+    return transform;
+  };
+
+// Multi-container drag needs a collision strategy that can tell a column
+// drop zone from a row drop zone reliably. `pointerWithin` — is the pointer
+// actually over this rect? — gets that right for pointer/touch drags;
+// `closestCenter` is the fallback for keyboard drags, which have no pointer
+// position to test against.
+const itemCollisionDetection: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : closestCenter(args);
+};
 
 const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
   event,
@@ -118,11 +159,20 @@ const GUTTER_CLASS = "w-4 shrink-0 sm:w-6 lg:w-10";
  * snap-paging on narrow screens. Loading/error states reuse it so the shell
  * doesn't jump when data arrives.
  */
-function BoardScaffold({ children }: { children: ReactNode }) {
+function BoardScaffold({
+  children,
+  scrollRef,
+}: {
+  children: ReactNode;
+  scrollRef?: RefObject<HTMLDivElement | null>;
+}) {
   // overscroll-x-contain stops edge swipes chaining into the page's
   // rubber-band / browser back gesture.
   return (
-    <div className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain md:snap-none">
+    <div
+      ref={scrollRef}
+      className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain md:snap-none"
+    >
       <div className="flex h-full min-w-max">
         <div aria-hidden className={GUTTER_CLASS} />
         {children}
@@ -452,13 +502,22 @@ export function TodoGrid() {
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
-  // Per-list override of the synced `hideCompleted` default: each list's
-  // Completed accordion opens/closes independently, seeded from (but not
-  // synced back to) the shared preference — otherwise toggling one list's
-  // accordion flips every list's accordion at once.
-  const [completedOverrideByList, setCompletedOverrideByList] = useState<
-    Record<string, boolean>
-  >({});
+  // The aggregate Completed column's collapse state — seeded from (but not
+  // synced back to) the shared `hideCompleted` preference, same as the old
+  // per-list accordion's behavior.
+  const [completedColumnCollapsed, setCompletedColumnCollapsed] = useState<
+    boolean | null
+  >(null);
+  const boardScrollRef = useRef<HTMLDivElement>(null);
+  // Columns scroll vertically in their own container, so a horizontal
+  // trackpad/wheel gesture over a column would otherwise be swallowed by
+  // that container instead of paging the board. When a wheel event is more
+  // horizontal than vertical, redirect it to the board's own scroller.
+  const handleColumnWheel = (e: WheelEvent<HTMLDivElement>) => {
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+      boardScrollRef.current?.scrollBy({ left: e.deltaX });
+    }
+  };
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
@@ -555,11 +614,41 @@ export function TodoGrid() {
       updateTodo.mutate({ id, input: updates });
     };
 
-  const handleToggleCompleted = (listId: string) => {
-    setCompletedOverrideByList((prev) => ({
-      ...prev,
-      [listId]: !(prev[listId] ?? user?.hideCompleted ?? false),
-    }));
+  const handleToggleCompletedColumn = () => {
+    setCompletedColumnCollapsed(
+      !(completedColumnCollapsed ?? user?.hideCompleted ?? false),
+    );
+  };
+
+  // Un-completes a todo from the aggregate Completed column, restoring it to
+  // the end of its own list's incomplete order — mirrors the per-list logic
+  // the old inline accordion used (see git history), now computed here since
+  // this column spans every list rather than belonging to one.
+  const handleUncomplete = (todo: TodoWithUrls) => {
+    if (!todo.completed && todo.completedAt) {
+      const input: UpdateTodoInput = { completedAt: null };
+      if (todo.recurrence && todo.dueDate) {
+        input.dueDate = previousDueDate(
+          todo.recurrence,
+          new Date(todo.dueDate),
+        );
+      }
+      updateTodo.mutate({ id: todo.id, input });
+      return;
+    }
+    const sourceListTodos = todosByList.get(todo.listId) ?? [];
+    const sourceOrder =
+      localOrderByList[todo.listId] ??
+      getIncompleteOrder(sourceListTodos, timeZone, hiddenIds);
+    const lastPosition =
+      sourceOrder.length > 0
+        ? sourceOrder[sourceOrder.length - 1].position
+        : null;
+    const newPosition = generateKeyBetween(lastPosition ?? null, null);
+    updateTodo.mutate({
+      id: todo.id,
+      input: { completed: false, position: newPosition },
+    });
   };
 
   const handleDragStart = ({ activatorEvent }: DragStartEvent) => {
@@ -710,6 +799,10 @@ export function TodoGrid() {
     ? allTodos.filter((t) => t.parentId === expandedTodo.id)
     : [];
 
+  const completedTodos = sortTopLevelTodos(allTodos, timeZone).completed.filter(
+    (t) => !hiddenIds.has(t.id),
+  );
+
   return (
     // Two independent DndContexts: this outer one reorders custom-list
     // headers (horizontal); the inner one (below) reorders/cross-list-moves
@@ -727,13 +820,13 @@ export function TodoGrid() {
       >
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
-          modifiers={[restrictToVerticalAxis]}
+          collisionDetection={itemCollisionDetection}
+          modifiers={[restrictToVerticalAxisForKeyboard(isKeyboardDragging)]}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
-          <BoardScaffold>
+          <BoardScaffold scrollRef={boardScrollRef}>
             {sortedLists.map((list) => {
               const listTodos = todosByList.get(list.id) ?? [];
               const incompleteOrder =
@@ -760,7 +853,10 @@ export function TodoGrid() {
                   {/* The rows scroll independently per column; the fade at
                         the bottom keeps long lists from ending in a hard cut. */}
                   <div className="relative min-h-0 flex-1">
-                    <div className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <div
+                      className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      onWheel={handleColumnWheel}
+                    >
                       <TodoListColumn
                         listId={list.id}
                         todos={listTodos}
@@ -773,13 +869,6 @@ export function TodoGrid() {
                         highlightIds={highlightIds}
                         hiddenIds={hiddenIds}
                         timeZone={timeZone}
-                        completedCollapsed={
-                          completedOverrideByList[list.id] ??
-                          user?.hideCompleted ??
-                          false
-                        }
-                        hideCompletedKnown={!!user}
-                        onToggleCompleted={() => handleToggleCompleted(list.id)}
                         isKeyboardDragging={isKeyboardDragging}
                         localIncompleteTodos={localOrderByList[list.id] ?? null}
                       />
@@ -792,6 +881,40 @@ export function TodoGrid() {
                 </section>
               );
             })}
+            {/* Every completed todo across every list, in one place, instead
+                of a collapsible section duplicated inside each list's own
+                column. */}
+            <section className={`${COLUMN_CLASS} group/column`}>
+              <div className={TITLE_BAND_CLASS}>
+                <h2 className={LIST_TITLE_CLASS}>Completed</h2>
+              </div>
+              <div className="relative min-h-0 flex-1">
+                <div
+                  className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  onWheel={handleColumnWheel}
+                >
+                  <CompletedColumn
+                    completedTodos={completedTodos}
+                    allTodos={allTodos}
+                    expandedId={expandedId}
+                    onToggleExpand={handleToggleExpand}
+                    onRequestDelete={handleRequestDelete}
+                    updateTodo={updateTodo}
+                    deleteTodo={deleteTodo}
+                    onUncomplete={handleUncomplete}
+                    collapsed={
+                      completedColumnCollapsed ?? user?.hideCompleted ?? false
+                    }
+                    onToggleCollapsed={handleToggleCompletedColumn}
+                    known={!!user}
+                  />
+                </div>
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                />
+              </div>
+            </section>
             <NewListColumn />
           </BoardScaffold>
           <ConfirmDialog

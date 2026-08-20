@@ -9,4 +9,5 @@ export { Loader, type LoaderProps } from "./Loader";
 export { Select, type SelectProps } from "./Select";
 export { SidePanel, type SidePanelProps } from "./SidePanel";
 export { Toaster } from "./Toast";
+export { InfoTooltip, Tooltip, type TooltipProps } from "./Tooltip";
 export { UrlPreviewCard } from "./UrlPreviewCard";

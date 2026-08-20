@@ -134,7 +134,8 @@ export function TodoInput({
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}
-            className="min-h-0 w-full resize-none overflow-hidden rounded-full border-0 py-1.5 pl-3 shadow-none ring-0 focus-visible:ring-0"
+            minHeightClassName="min-h-0"
+            className="w-full resize-none overflow-hidden rounded-full border-0 py-1.5 pl-3 shadow-none ring-0 focus-visible:ring-0"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();

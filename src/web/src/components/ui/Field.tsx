@@ -42,11 +42,14 @@ export function Field({
 
 export interface TextareaProps extends ComponentProps<"textarea"> {
   variant?: "default" | "error";
+  /** Tailwind min-h-* utility to use instead of the default 80px. */
+  minHeightClassName?: string;
 }
 
 export function Textarea({
   className,
   variant = "default",
+  minHeightClassName = "min-h-[80px]",
   ...props
 }: TextareaProps) {
   const variantClasses = {
@@ -56,7 +59,7 @@ export function Textarea({
 
   return (
     <textarea
-      className={`flex min-h-[80px] w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base ${variantClasses[variant]} ${className ?? ""}`}
+      className={`flex ${minHeightClassName} w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base ${variantClasses[variant]} ${className ?? ""}`}
       {...props}
     />
   );

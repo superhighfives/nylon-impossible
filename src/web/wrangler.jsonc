@@ -20,7 +20,14 @@
 		{
 			"binding": "DB",
 			"database_name": "nylon-impossible-db",
-			"database_id": "effd712c-bc6e-4536-bddd-735b56502080"
+			"database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+			// Miniflare's local D1 persistence is keyed per-worker (this config's
+			// top-level "name"), not just database_id — so even though this is the
+			// SAME database as src/api/wrangler.jsonc, `wrangler dev`/`vite dev` here
+			// reads a SEPARATE local sqlite file from the API's. migrations_dir lets
+			// `wrangler d1 migrations apply -c src/web/wrangler.jsonc` populate it
+			// directly instead of only the API's copy (see root db:migrate script).
+			"migrations_dir": "../api/migrations"
 		}
 	],
 	"observability": {
