@@ -296,36 +296,69 @@ async function captureWebScreenshots(): Promise<void> {
     );
   }
 
-  console.log("  Starting web dev server…");
-  const server = spawn(
-    "pnpm",
-    ["--filter", "@nylon-impossible/web", "dev"],
-    {
-      cwd: WORKSPACE_ROOT,
-      env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"],
-    }
-  );
+  // Spawn the dev server and wait for it to accept connections. Vite's cold
+  // dependency-optimizer scan occasionally races on a fresh CI install and
+  // the server never finishes booting (observed: a "Failed to resolve
+  // dependency" optimizer warning followed by every request hanging) — a
+  // known one-off flake, not a code issue, so retry with a fresh process
+  // once before giving up, the same "don't trust the first attempt" pattern
+  // used below for the composer-not-found retry.
+  function startDevServer() {
+    console.log("  Starting web dev server…");
+    const proc = spawn(
+      "pnpm",
+      ["--filter", "@nylon-impossible/web", "dev"],
+      {
+        cwd: WORKSPACE_ROOT,
+        env: { ...process.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      }
+    );
+    // Buffer the server's output (capped) so we can surface it if the server
+    // never comes up — otherwise a boot failure is invisible in CI logs.
+    const log: string[] = [];
+    const captureLine = (chunk: Buffer) => {
+      log.push(chunk.toString());
+      if (log.length > 200) log.splice(0, log.length - 200);
+    };
+    proc.stderr?.on("data", captureLine);
+    proc.stdout?.on("data", captureLine);
+    return { proc, log };
+  }
 
-  // Buffer the server's output (capped) so we can surface it if the server
-  // never comes up — otherwise a boot failure is invisible in CI logs.
-  const serverLog: string[] = [];
-  const captureLine = (chunk: Buffer) => {
-    serverLog.push(chunk.toString());
-    if (serverLog.length > 200) serverLog.splice(0, serverLog.length - 200);
-  };
-  server.stderr?.on("data", captureLine);
-  server.stdout?.on("data", captureLine);
+  async function killDevServer(proc: ReturnType<typeof spawn>) {
+    proc.kill("SIGTERM");
+    await sleep(500);
+    try {
+      proc.kill("SIGKILL");
+    } catch {
+      /* already dead */
+    }
+  }
+
+  let server = startDevServer();
 
   try {
-    try {
-      await waitForUrl(manifest.web.url, 120_000);
-    } catch (err) {
-      const tail = serverLog.join("").trimEnd();
-      console.error("  Dev server never became ready. Recent output:");
-      console.error(tail ? tail : "  (server produced no output)");
-      throw err;
+    let ready = false;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await waitForUrl(manifest.web.url, 120_000);
+        ready = true;
+        break;
+      } catch (err) {
+        const tail = server.log.join("").trimEnd();
+        console.error(
+          `  Dev server never became ready (attempt ${attempt}/2). Recent output:`
+        );
+        console.error(tail ? tail : "  (server produced no output)");
+        await killDevServer(server.proc);
+        if (attempt === 2) throw err;
+        console.log("  Retrying with a fresh dev server process…");
+        server = startDevServer();
+      }
     }
+    if (!ready) throw new Error("Dev server never became ready after retry");
+    const serverLog = server.log;
     console.log(`  Dev server ready at ${manifest.web.url}`);
 
     const { chromium } = await import("playwright");
@@ -397,9 +430,7 @@ async function captureWebScreenshots(): Promise<void> {
 
     await browser.close();
   } finally {
-    server.kill("SIGTERM");
-    await sleep(500);
-    try { server.kill("SIGKILL"); } catch { /* already dead */ }
+    await killDevServer(server.proc);
     if (!devVarsExisted) unlinkSync(devVarsPath);
   }
 }
