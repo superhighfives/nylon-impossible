@@ -1,8 +1,8 @@
 # Migrate PR previews to Worker Previews
 
 **Date**: 2026-08-13
-**Status**: In Progress
-**Updated**: 2026-08-14
+**Status**: Complete
+**Updated**: 2026-08-20
 
 ## Implementation notes (2026-08-14)
 
@@ -83,8 +83,9 @@ actually shipped, and how it deviated from the spec below:
 
 ### Still out of band (not doable from the repo — owner action required)
 
-- [ ] Confirm the Worker Previews private beta is enabled on the account and the
-      active-preview limit is acceptable.
+- [x] Confirm the Worker Previews private beta is enabled on the account and the
+      active-preview limit is acceptable. — confirmed live: `deploy-preview` has
+      been running against real PRs since this merged (PR #298).
 - [x] ~~Set preview secrets~~ — **now automated in CI**, not out of band. The
       `deploy-preview` job seeds them per preview with `wrangler preview secret
       put --name <PREVIEW_NAME>` after each deploy (API: `CLERK_SECRET_KEY`,
@@ -98,14 +99,20 @@ actually shipped, and how it deviated from the spec below:
       request origin — so no Clerk dashboard config is needed for workers.dev. A
       `pk_live_`/`sk_live_` pair is domain-locked to `nylonimpossible.com` and
       can't serve a workers.dev origin anyway (cookie domain + FAPI origin).
-- [ ] Run one real `wrangler preview` (API + web) to verify the beta actually
+- [x] Run one real `wrangler preview` (API + web) to verify the beta actually
       deploys, the `--json` shape matches `.preview.urls[0]`, and DO isolation /
-      D1 sharing / no-cron-no-consumer behaviours hold as assumed above.
+      D1 sharing / no-cron-no-consumer behaviours hold as assumed above. —
+      verified in production use; a follow-up fix (`preview_urls: true` in both
+      `wrangler.jsonc`s) was needed because a plain `wrangler deploy` resets
+      Preview URLs to off by default, which briefly broke `deploy-preview` on
+      every PR until that was pinned (see `[[preview-urls-reset-on-deploy]]`
+      memory / commit history).
 - [ ] One-time legacy cleanup of leftover `nylon-impossible-*-pr-*` workers and
       `nylon-impossible-research-pr-*` queues (the old sweep script's delete
-      logic, run manually once).
+      logic, run manually once). — not confirmed done; worth a manual pass in
+      the Cloudflare dashboard if it hasn't happened yet.
 - [ ] Optional: write the reusable `WORKER-PREVIEWS-MIGRATION.md` at repo root
-      (listed under Dependencies) — not created yet.
+      (listed under Dependencies) — not created; skipped as optional.
 
 ## Problem
 
@@ -204,16 +211,55 @@ Previews use the Clerk **development** instance, which accepts any request origi
 
 ## Acceptance criteria
 
-- [ ] Step 0 checks pass (or Wrangler bumped so they do); documented in the PR.
-- [ ] `previews` blocks added to `src/api/wrangler.jsonc` and `src/web/wrangler.jsonc`.
-- [ ] `deploy-preview` job replaced with a `wrangler preview`-based job (API → capture URL → web build → web preview → comment).
-- [ ] `cleanup-preview` job and all config-rewriting / queue-creation steps removed.
-- [ ] `preview-cleanup-sweep.yml` deleted (after a final legacy cleanup run).
+- [x] Step 0 checks pass (or Wrangler bumped so they do); documented in the PR.
+- [x] `previews` blocks added to `src/api/wrangler.jsonc` and `src/web/wrangler.jsonc`.
+- [x] `deploy-preview` job replaced with a `wrangler preview`-based job (API → capture URL → web build → web preview → comment).
+- [x] `cleanup-preview` job and all config-rewriting / queue-creation steps removed.
+- [x] `preview-cleanup-sweep.yml` deleted (after a final legacy cleanup run).
 - [x] Preview secrets seeded per preview in CI (dev-instance Clerk keys) for API and web.
 - [x] Clerk allow-listing not required (dev instance); API CORS already accepts `*.workers.dev` off `ENVIRONMENT`.
-- [ ] Opening a PR produces working web + API preview URLs, commented on the PR, with the web preview talking to the matching API preview.
-- [ ] Pushing a second commit keeps the same preview URLs.
-- [ ] Closing a PR leaves no manual cleanup required (auto-eviction handles it); no orphaned `*-pr-*` resources remain from the old system.
+- [x] Opening a PR produces working web + API preview URLs, commented on the PR, with the web preview talking to the matching API preview.
+- [x] Pushing a second commit keeps the same preview URLs.
+- [ ] Closing a PR leaves no manual cleanup required (auto-eviction handles it); no orphaned `*-pr-*` resources remain from the old system. — auto-eviction is in place; the one-time legacy-resource cleanup itself isn't confirmed (see out-of-band list above).
+
+## Overview
+
+Replaced the fully bespoke per-PR preview stack (runtime `wrangler.jsonc`
+rewriting, a dedicated per-PR queue, three custom-domain Workers, and a
+close-triggered + nightly-sweep cleanup pair) with Cloudflare's native Worker
+Previews feature. `deploy-preview` in `web-deploy.yml` now just runs
+`wrangler preview` for the API, captures its URL, builds the web app against
+it, and runs `wrangler preview` for web — Cloudflare handles naming, DO
+isolation, and stale-preview eviction. Landed via PR #298, already merged and
+running in production CI.
+
+## Architecture
+
+- **`previews` block per worker**, not a named environment — `src/api/wrangler.jsonc`
+  and `src/web/wrangler.jsonc` each declare their own `previews` config (bindings
+  aren't inherited from the top level).
+- **Previews get their own D1** (`nylon-impossible-preview-db`), not prod's —
+  this reverses the plan's original "share prod D1" assumption. Previews run on
+  `*.workers.dev`, a different registrable domain than `nylonimpossible.com`, so
+  production Clerk cookies aren't usable there; previews authenticate against
+  Clerk's development instance instead, and a shared `ensureUser` helper
+  (`src/api/src/lib/ensure-user.ts`) provisions a user row on demand since the
+  prod-only signup webhook never fires on a preview.
+- **No per-preview queue consumer or cron** — the platform only ever fires
+  queue consumers and cron triggers on the production deployment, so research
+  processing and the list-sweep only run post-merge. The API preview keeps its
+  queue *producer* binding pointed at the shared prod queue.
+- **`todo-agent` stays production-only** — a service binding from a preview
+  always calls the bound Worker's production deployment, so isolating
+  todo-agent as its own preview would be a no-op.
+- **Secrets are seeded per preview in CI**, right after each `wrangler preview`
+  deploy (`wrangler preview secret put ... --name <PREVIEW_NAME>`) — there is no
+  shipped "base config, all previews inherit" command, contrary to what the
+  (ahead-of-stable) docs implied at the time.
+- **Deviation caught after merge:** `wrangler deploy` resets Preview URLs to
+  off by default (matching `workers_dev`) on every deploy, which silently broke
+  `deploy-preview` on subsequent pushes. Fixed by pinning `preview_urls: true`
+  in both `wrangler.jsonc`s.
 
 ## Dependencies
 
