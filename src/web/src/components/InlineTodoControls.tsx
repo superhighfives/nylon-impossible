@@ -167,6 +167,7 @@ interface InlineDueDateProps {
   isOverdue: boolean;
   onChange: (date: Date | null) => void;
   disabled?: boolean;
+  className?: string;
 }
 
 /**
@@ -182,6 +183,7 @@ export function InlineDueDate({
   isOverdue,
   onChange,
   disabled = false,
+  className = "",
 }: InlineDueDateProps) {
   const { timeZone } = useHints();
   const [open, setOpen] = useState(false);
@@ -203,7 +205,7 @@ export function InlineDueDate({
             isOverdue
               ? "bg-red-base text-red-muted"
               : "bg-gray-base text-gray-muted"
-          }`}
+          } ${className}`}
         >
           <Popover.Trigger
             render={
@@ -235,7 +237,7 @@ export function InlineDueDate({
               type="button"
               disabled={disabled}
               aria-label="Set due date"
-              className={`flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing}`}
+              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing} ${className}`}
             >
               <Calendar size={11} aria-hidden="true" />
             </button>

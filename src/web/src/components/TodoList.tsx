@@ -194,20 +194,12 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
  * next to the expand control.
  */
 function InlineIndicators({
-  dueValue,
-  dueLabel,
-  isOverdue,
-  onDueChange,
   recurrence,
   recurrenceLabel,
   sticky,
   onStickyToggle,
   disabled,
 }: {
-  dueValue: string | null;
-  dueLabel: string | null;
-  isOverdue: boolean;
-  onDueChange: (date: Date | null) => void;
   recurrence: TodoWithUrls["recurrence"];
   recurrenceLabel: string | null;
   sticky: boolean;
@@ -216,13 +208,6 @@ function InlineIndicators({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <InlineDueDate
-        value={dueValue}
-        label={dueLabel}
-        isOverdue={isOverdue}
-        onChange={onDueChange}
-        disabled={disabled}
-      />
       {recurrence && (
         <span className="flex items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs text-gray-muted">
           <Repeat size={10} aria-hidden="true" />
@@ -318,10 +303,11 @@ function TodoItemContent({
   const hasRecurrence = !!todo.recurrence;
   const showInlineEditing = !isCompleted;
   // The actions pill floats over the row instead of reserving its own line —
-  // it stays visible when it's carrying real state (a due date, recurrence,
-  // or pin), and is otherwise a hover/focus affordance on desktop (always
-  // visible on touch, where hover doesn't exist).
-  const hasVisiblePillState = !!dueValueStr || hasRecurrence || !!todo.sticky;
+  // it stays visible when it's carrying real state (recurrence or pin), and
+  // is otherwise a hover/focus affordance on desktop (always visible on
+  // touch, where hover doesn't exist). Due date lives inline with the title
+  // instead, so it doesn't force the pill open.
+  const hasVisiblePillState = hasRecurrence || !!todo.sticky;
 
   const handleInlineDueDate = (date: Date | null) => {
     // Clearing a due date also clears any recurrence — a repeat has no anchor
@@ -354,13 +340,13 @@ function TodoItemContent({
             }
           />
         </div>
-        <div className="flex-1 min-w-0">
+        <div className={`flex-1 min-w-0 ${showActions ? "pr-20" : ""}`}>
           <div className="space-y-1">
             {showTitleLine && (
-              <div className="flex items-center gap-2">
+              <div>
                 {!showUrlOnlyCard && (
                   <p
-                    className={`min-w-0 leading-snug wrap-anywhere ${
+                    className={`inline leading-snug wrap-anywhere ${
                       isCompleted
                         ? "text-sm line-through text-gray-placeholder"
                         : "text-[15px] font-semibold text-gray"
@@ -377,6 +363,16 @@ function TodoItemContent({
                     )}
                   </p>
                 )}
+                {showInlineEditing && (
+                  <InlineDueDate
+                    value={dueValueStr}
+                    label={dueLabel}
+                    isOverdue={isOverdue}
+                    onChange={handleInlineDueDate}
+                    disabled={updatePending}
+                    className="ml-2 align-middle"
+                  />
+                )}
                 {subtasks.length > 0 &&
                   (() => {
                     const doneSubtasks = subtasks.filter(
@@ -385,7 +381,7 @@ function TodoItemContent({
                     return (
                       <span
                         role="img"
-                        className="flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 text-xs tabular-nums text-gray-muted"
+                        className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs tabular-nums text-gray-muted"
                         aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
                       >
                         <ListTree size={10} aria-hidden="true" />
@@ -395,7 +391,7 @@ function TodoItemContent({
                   })()}
                 {aiProcessing && (
                   <output
-                    className="flex items-center gap-1 text-gray-muted text-xs"
+                    className="ml-2 inline-flex items-center gap-1 align-middle text-gray-muted text-xs"
                     aria-label="AI is processing"
                   >
                     <Loader size="sm" className="text-gray-muted" />
@@ -403,7 +399,7 @@ function TodoItemContent({
                 )}
                 {researchPending && (
                   <output
-                    className="flex items-center gap-1 text-gray-muted text-xs"
+                    className="ml-2 inline-flex items-center gap-1 align-middle text-gray-muted text-xs"
                     aria-label="Researching"
                   >
                     <Loader size="sm" className="text-accent-muted" />
@@ -417,7 +413,7 @@ function TodoItemContent({
                     type="button"
                     onClick={() => onToggleExpand(todo.id)}
                     aria-label="The assistant has a question — open to reply"
-                    className="bg-accent-base hover:bg-accent-hover text-accent"
+                    className="ml-2 inline-flex align-middle bg-accent-base hover:bg-accent-hover text-accent"
                   >
                     <MessageCircle size={12} />
                   </Button>
@@ -427,7 +423,7 @@ function TodoItemContent({
                     type="button"
                     onClick={() => onToggleExpand(todo.id)}
                     aria-label="AI has suggestions — open to review"
-                    className="flex shrink-0 items-center justify-center p-1"
+                    className="ml-2 inline-flex shrink-0 items-center justify-center p-1 align-middle"
                   >
                     <span
                       className="block size-2 rounded-full bg-accent-solid"
@@ -518,10 +514,6 @@ function TodoItemContent({
               editors. */}
           {showInlineEditing && !isExpanded && (
             <InlineIndicators
-              dueValue={dueValueStr}
-              dueLabel={dueLabel}
-              isOverdue={isOverdue}
-              onDueChange={handleInlineDueDate}
               recurrence={todo.recurrence}
               recurrenceLabel={
                 todo.recurrence
@@ -1024,8 +1016,11 @@ export function CompletedColumn({
           }`}
         />
         <span>
-          {completedTodos.length}{" "}
-          {completedTodos.length === 1 ? "item" : "items"}
+          {collapsed
+            ? `View completed (${completedTodos.length} ${
+                completedTodos.length === 1 ? "item" : "items"
+              })`
+            : "Hide completed"}
         </span>
       </button>
       {!collapsed &&

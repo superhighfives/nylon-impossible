@@ -881,6 +881,7 @@ export function TodoGrid() {
                 </section>
               );
             })}
+            <NewListColumn />
             {/* Every completed todo across every list, in one place, instead
                 of a collapsible section duplicated inside each list's own
                 column. */}
@@ -915,7 +916,6 @@ export function TodoGrid() {
                 />
               </div>
             </section>
-            <NewListColumn />
           </BoardScaffold>
           <ConfirmDialog
             open={confirmDeleteId !== null}
