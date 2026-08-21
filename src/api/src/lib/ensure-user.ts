@@ -11,12 +11,13 @@ const SYSTEM_LISTS = [
   { name: "Sometime", systemKind: "sometime" as const },
 ];
 
-// Preview-only demo data. When one of these accounts first logs into a preview,
-// its freshly-provisioned app is seeded with a realistic set of todos so the
-// preview isn't an empty shell. Matched by Clerk email so we don't need each
-// account's dev-instance Clerk id, and gated to ENVIRONMENT === "preview" (see
-// seedPreviewTodos) so production and local dev are never touched.
-const PREVIEW_SEED_EMAILS = new Set([
+// Non-production demo data. When one of these accounts first logs into a
+// preview or local dev, its freshly-provisioned app is seeded with a
+// realistic set of todos so it isn't an empty shell. Matched by Clerk email
+// so we don't need each account's dev-instance Clerk id, and gated to
+// ENVIRONMENT !== "production" (see seedDemoTodos) so production is never
+// touched.
+const DEMO_SEED_EMAILS = new Set([
   "marketing@nylonimpossible.com",
   "hi@charliegleason.com",
 ]);
@@ -29,7 +30,7 @@ type SeedTodo = {
   dueInDays?: number;
 };
 
-const PREVIEW_SEED_TODOS: SeedTodo[] = [
+const DEMO_SEED_TODOS: SeedTodo[] = [
   {
     list: "today",
     title: "Finish quarterly report",
@@ -101,10 +102,10 @@ export async function ensureUser(
     await db.insert(lists).values(systemLists);
 
     if (
-      env.ENVIRONMENT === "preview" &&
-      PREVIEW_SEED_EMAILS.has(email.toLowerCase())
+      env.ENVIRONMENT !== "production" &&
+      DEMO_SEED_EMAILS.has(email.toLowerCase())
     ) {
-      await seedPreviewTodos(db, userId, systemLists);
+      await seedDemoTodos(db, userId, systemLists);
     }
     return "ok";
   }
@@ -119,17 +120,18 @@ export async function ensureUser(
   return existing ? "ok" : "email_conflict";
 }
 
-// Insert the demo todos for a just-provisioned preview account, distributing
-// PREVIEW_SEED_TODOS across the user's system lists with fractional positions in
-// declared order. Due dates are relative to now so the seed never goes stale.
-async function seedPreviewTodos(
+// Insert the demo todos for a just-provisioned non-production account,
+// distributing DEMO_SEED_TODOS across the user's system lists with
+// fractional positions in declared order. Due dates are relative to now so
+// the seed never goes stale.
+async function seedDemoTodos(
   db: ReturnType<typeof getDb>,
   userId: string,
   systemLists: { id: string; systemKind: string }[],
 ): Promise<void> {
   const now = new Date();
   const rows = systemLists.flatMap((list) => {
-    const seeds = PREVIEW_SEED_TODOS.filter((t) => t.list === list.systemKind);
+    const seeds = DEMO_SEED_TODOS.filter((t) => t.list === list.systemKind);
     const positions = generateNKeysBetween(null, null, seeds.length);
     return seeds.map((t, i) => ({
       id: crypto.randomUUID(),
