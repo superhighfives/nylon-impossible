@@ -1,10 +1,10 @@
 import { and, eq, type getDb, lists } from "./db";
 
 type Db = ReturnType<typeof getDb>;
-export type SystemListKind = "today" | "thisWeek" | "sometime";
+export type SystemListKind = "today" | "thisWeek" | "sometime" | "completed";
 
 /**
- * Look up one of a user's three system list ids (Today/This Week/Sometime).
+ * Look up one of a user's system list ids (Today/This Week/Sometime/Completed).
  * These are seeded for every user at account creation (`sync.ts`), so this
  * should always resolve — callers can treat a null result as a bug, not a
  * normal case to handle gracefully.
