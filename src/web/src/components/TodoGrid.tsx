@@ -181,8 +181,15 @@ function BoardScaffold({
   );
 }
 
+// The Completed list is a real `lists` row (so it has a stable id/position
+// like the other system lists), but it's always rendered last regardless of
+// that position — never interleaved by the position-based sort below — and
+// is rendered separately from this array's map (see TodoGrid), since its
+// contents are a synthesized aggregate, not real todos pointing at its id.
 function sortLists(lists: SerializedList[]): SerializedList[] {
-  return [...lists].sort((a, b) => {
+  const completed = lists.find((l) => l.systemKind === "completed");
+  const rest = lists.filter((l) => l.systemKind !== "completed");
+  const sorted = [...rest].sort((a, b) => {
     const aSystem = a.kind === "system";
     const bSystem = b.kind === "system";
     if (aSystem !== bSystem) return aSystem ? -1 : 1;
@@ -194,6 +201,7 @@ function sortLists(lists: SerializedList[]): SerializedList[] {
     }
     return a.position.localeCompare(b.position);
   });
+  return completed ? [...sorted, completed] : sorted;
 }
 
 function NewTodoInline({
@@ -835,64 +843,69 @@ export function TodoGrid() {
           onDragCancel={handleDragCancel}
         >
           <BoardScaffold scrollRef={boardScrollRef}>
-            {sortedLists.map((list) => {
-              const listTodos = todosByList.get(list.id) ?? [];
-              const incompleteOrder =
-                localOrderByList[list.id] ??
-                getIncompleteOrder(listTodos, timeZone, hiddenIds);
-              return (
-                <section
-                  key={list.id}
-                  className={`${COLUMN_CLASS} group/column`}
-                >
-                  <div className={TITLE_BAND_CLASS}>
-                    <ListHeader
-                      list={list}
-                      isDraggable={list.kind === "custom"}
-                      todoCount={todoCountByList.get(list.id) ?? 0}
-                    />
-                  </div>
-                  <NewTodoInline
-                    listId={list.id}
-                    firstPosition={
-                      incompleteOrder.find((t) => !t.sticky)?.position ?? null
-                    }
-                  />
-                  {/* The rows scroll independently per column; the fade at
-                        the bottom keeps long lists from ending in a hard cut. */}
-                  <div className="relative min-h-0 flex-1">
-                    <div
-                      className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                      onWheel={handleColumnWheel}
-                    >
-                      <TodoListColumn
-                        listId={list.id}
-                        todos={listTodos}
-                        expandedId={expandedId}
-                        onToggleExpand={handleToggleExpand}
-                        onRequestDelete={handleRequestDelete}
-                        updateTodo={updateTodo}
-                        deleteTodo={deleteTodo}
-                        createTodo={createTodo}
-                        highlightIds={highlightIds}
-                        hiddenIds={hiddenIds}
-                        timeZone={timeZone}
-                        isKeyboardDragging={isKeyboardDragging}
-                        localIncompleteTodos={localOrderByList[list.id] ?? null}
+            {sortedLists
+              .filter((list) => list.systemKind !== "completed")
+              .map((list) => {
+                const listTodos = todosByList.get(list.id) ?? [];
+                const incompleteOrder =
+                  localOrderByList[list.id] ??
+                  getIncompleteOrder(listTodos, timeZone, hiddenIds);
+                return (
+                  <section
+                    key={list.id}
+                    className={`${COLUMN_CLASS} group/column`}
+                  >
+                    <div className={TITLE_BAND_CLASS}>
+                      <ListHeader
+                        list={list}
+                        isDraggable={list.kind === "custom"}
+                        todoCount={todoCountByList.get(list.id) ?? 0}
                       />
                     </div>
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                    <NewTodoInline
+                      listId={list.id}
+                      firstPosition={
+                        incompleteOrder.find((t) => !t.sticky)?.position ?? null
+                      }
                     />
-                  </div>
-                </section>
-              );
-            })}
+                    {/* The rows scroll independently per column; the fade at
+                        the bottom keeps long lists from ending in a hard cut. */}
+                    <div className="relative min-h-0 flex-1">
+                      <div
+                        className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        onWheel={handleColumnWheel}
+                      >
+                        <TodoListColumn
+                          listId={list.id}
+                          todos={listTodos}
+                          expandedId={expandedId}
+                          onToggleExpand={handleToggleExpand}
+                          onRequestDelete={handleRequestDelete}
+                          updateTodo={updateTodo}
+                          deleteTodo={deleteTodo}
+                          createTodo={createTodo}
+                          highlightIds={highlightIds}
+                          hiddenIds={hiddenIds}
+                          timeZone={timeZone}
+                          isKeyboardDragging={isKeyboardDragging}
+                          localIncompleteTodos={
+                            localOrderByList[list.id] ?? null
+                          }
+                        />
+                      </div>
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                      />
+                    </div>
+                  </section>
+                );
+              })}
             <NewListColumn />
-            {/* Every completed todo across every list, in one place, instead
-                of a collapsible section duplicated inside each list's own
-                column. */}
+            {/* Backed by the real `completed` system list (always sorted
+                last, excluded from the map above and from drag/reorder), but
+                its contents are still every completed todo across every
+                list, synthesized here rather than filtered by listId. */}
             <section className={`${COLUMN_CLASS} group/column`}>
               <div className={TITLE_BAND_CLASS}>
                 <h2 className={`${LIST_TITLE_CLASS} text-gray-muted`}>

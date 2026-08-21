@@ -43,7 +43,7 @@ export interface UpdateTodoInput {
 }
 
 /** Which built-in bucket a system list represents. */
-export type SystemListKind = "today" | "thisWeek" | "sometime";
+export type SystemListKind = "today" | "thisWeek" | "sometime" | "completed";
 
 export interface CreateListInput {
   name: string;
