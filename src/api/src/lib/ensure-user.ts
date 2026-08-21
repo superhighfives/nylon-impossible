@@ -1,4 +1,8 @@
 import { createClerkClient } from "@clerk/backend";
+import {
+  DEMO_SEED_EMAILS,
+  DEMO_SEED_TODOS,
+} from "@nylon-impossible/shared/demo-seed";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { eq, type getDb, lists, todos, users } from "./db";
@@ -9,39 +13,6 @@ const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
   { name: "This Week", systemKind: "thisWeek" as const },
   { name: "Sometime", systemKind: "sometime" as const },
-];
-
-// Non-production demo data. When one of these accounts first logs into a
-// preview or local dev, its freshly-provisioned app is seeded with a
-// realistic set of todos so it isn't an empty shell. Matched by Clerk email
-// so we don't need each account's dev-instance Clerk id, and gated to
-// ENVIRONMENT !== "production" (see seedDemoTodos) so production is never
-// touched.
-const DEMO_SEED_EMAILS = new Set([
-  "marketing@nylonimpossible.com",
-  "hi@charliegleason.com",
-]);
-
-type SeedTodo = {
-  list: (typeof SYSTEM_LISTS)[number]["systemKind"];
-  title: string;
-  notes?: string;
-  completed?: boolean;
-  dueInDays?: number;
-};
-
-const DEMO_SEED_TODOS: SeedTodo[] = [
-  {
-    list: "today",
-    title: "Finish quarterly report",
-    notes: "Needs sign-off from the finance team before end of month",
-    dueInDays: 0,
-  },
-  { list: "today", title: "Buy groceries for the week", completed: true },
-  { list: "thisWeek", title: "Book dentist appointment", dueInDays: 3 },
-  { list: "thisWeek", title: "Reply to the design feedback thread" },
-  { list: "sometime", title: "Read 'Atomic Habits'" },
-  { list: "sometime", title: "Plan the autumn hiking trip" },
 ];
 
 /**

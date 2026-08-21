@@ -1,8 +1,10 @@
+import { env } from "cloudflare:workers";
 import { auth, clerkClient } from "@clerk/tanstack-react-start/server";
+import { DEMO_SEED_EMAILS } from "@nylon-impossible/shared/demo-seed";
 import { Context, Effect, Layer } from "effect";
 import type { DbClient } from "./db";
 import { UnauthorizedError, UserNotFoundError } from "./errors";
-import { ensureSystemLists } from "./lists";
+import { ensureSystemLists, seedDemoTodos } from "./lists";
 import { users } from "./schema";
 
 /**
@@ -22,14 +24,34 @@ export async function ensureUserExists(
   userId: string,
   email: string,
 ): Promise<void> {
-  await db
+  const [inserted] = await db
     .insert(users)
     .values({ id: userId, email: email || "" })
-    .onConflictDoNothing();
+    .onConflictDoNothing()
+    .returning({ id: users.id });
+
   // Matches the system-list provisioning sync.ts does when the API worker
   // creates a user — a web-only signup goes through this path instead, and
   // still needs somewhere for todos.listId to point.
-  await ensureSystemLists(db, userId);
+  const newLists = await ensureSystemLists(db, userId);
+
+  // Demo-account seeding, matching the API worker's ensureUser. Web-only
+  // signups (this path) never touch the API, so this is a separate insertion
+  // — gated on `inserted` (this call actually created the row, not a
+  // concurrent-provision race) so it only ever runs once.
+  // Widen away the generated ENVIRONMENT literal ("development" — inferred
+  // from wrangler.jsonc's single top-level `vars` value): the deploy-time
+  // `--var ENVIRONMENT:production` override and the previews block's
+  // "preview" are both real runtime values `wrangler types` can't see.
+  const runtimeEnvironment = env.ENVIRONMENT as string;
+  if (
+    inserted &&
+    newLists &&
+    runtimeEnvironment !== "production" &&
+    DEMO_SEED_EMAILS.has((email || "").toLowerCase())
+  ) {
+    await seedDemoTodos(db, userId, newLists);
+  }
 }
 
 /**

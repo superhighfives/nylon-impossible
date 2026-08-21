@@ -1,8 +1,9 @@
+import { DEMO_SEED_TODOS } from "@nylon-impossible/shared/demo-seed";
 import { and, eq } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { SystemListKind } from "@/types/database";
 import type { DbClient } from "./db";
-import { lists } from "./schema";
+import { lists, todos } from "./schema";
 
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
@@ -16,27 +17,77 @@ const SYSTEM_LISTS = [
  * `ensureUserExists` rather than the API worker's `sync.ts` — this is the
  * matching provisioning step for that path, so a web-only user always has
  * somewhere for `todos.listId` to point.
+ *
+ * Returns the newly-created lists, or `null` if they already existed — lets
+ * the caller seed demo todos exactly once, the same "did this call actually
+ * insert" signal the API worker's `ensureUser` uses.
  */
 export async function ensureSystemLists(
   db: DbClient,
   userId: string,
-): Promise<void> {
+): Promise<{ id: string; systemKind: string }[] | null> {
   const [existing] = await db
     .select({ id: lists.id })
     .from(lists)
     .where(and(eq(lists.userId, userId), eq(lists.systemKind, "today")));
-  if (existing) return;
+  if (existing) return null;
 
   const positions = generateNKeysBetween(null, null, SYSTEM_LISTS.length);
-  await db.insert(lists).values(
-    SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
+  const inserted = await db
+    .insert(lists)
+    .values(
+      SYSTEM_LISTS.map(({ name, systemKind }, i) => ({
+        userId,
+        name,
+        kind: "system" as const,
+        systemKind,
+        position: positions[i],
+      })),
+    )
+    .returning({ id: lists.id, systemKind: lists.systemKind });
+  // systemKind is nullable on the column (custom lists have none), but every
+  // row inserted above is one of SYSTEM_LISTS, which always sets it.
+  return inserted.map((l) => ({
+    id: l.id,
+    systemKind: l.systemKind as string,
+  }));
+}
+
+/**
+ * Insert the demo todos for a just-provisioned non-production account,
+ * distributing DEMO_SEED_TODOS across the user's system lists with
+ * fractional positions in declared order. Due dates are relative to now so
+ * the seed never goes stale. Mirrors the API worker's
+ * `seedDemoTodos` (src/api/src/lib/ensure-user.ts) — kept separate since each
+ * provisions users independently, but sourced from the same shared data.
+ */
+export async function seedDemoTodos(
+  db: DbClient,
+  userId: string,
+  systemLists: { id: string; systemKind: string }[],
+): Promise<void> {
+  const now = new Date();
+  const rows = systemLists.flatMap((list) => {
+    const seeds = DEMO_SEED_TODOS.filter((t) => t.list === list.systemKind);
+    const positions = generateNKeysBetween(null, null, seeds.length);
+    return seeds.map((t, i) => ({
+      id: crypto.randomUUID(),
       userId,
-      name,
-      kind: "system" as const,
-      systemKind,
+      listId: list.id,
+      title: t.title,
+      notes: t.notes ?? null,
+      completed: t.completed ?? false,
       position: positions[i],
-    })),
-  );
+      dueDate:
+        t.dueInDays === undefined
+          ? null
+          : new Date(now.getTime() + t.dueInDays * 86_400_000),
+      createdAt: now,
+      updatedAt: now,
+    }));
+  });
+
+  if (rows.length > 0) await db.insert(todos).values(rows);
 }
 
 /** Look up one of a user's three system list ids. */

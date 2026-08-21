@@ -30,6 +30,15 @@
 			"migrations_dir": "../api/migrations"
 		}
 	],
+	// ENVIRONMENT was never set for this worker before (unlike src/api/wrangler.jsonc,
+	// which has always had it) — added so web-only user provisioning
+	// (ensureUserExists in src/web/src/lib/auth.ts) can gate its demo-account
+	// seeding the same way the API worker's ensureUser does. "production" is
+	// passed at deploy time via --var (see .github/workflows/web-deploy.yml),
+	// not set here, matching the API's pattern.
+	"vars": {
+		"ENVIRONMENT": "development"
+	},
 	"observability": {
 		"enabled": true
 	},
@@ -49,6 +58,9 @@
 				"database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d"
 			}
 		],
+		"vars": {
+			"ENVIRONMENT": "preview"
+		},
 		"observability": {
 			"enabled": true
 		}
