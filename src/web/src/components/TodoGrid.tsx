@@ -511,10 +511,18 @@ export function TodoGrid() {
   const boardScrollRef = useRef<HTMLDivElement>(null);
   // Columns scroll vertically in their own container, so a horizontal
   // trackpad/wheel gesture over a column would otherwise be swallowed by
-  // that container instead of paging the board. When a wheel event is more
-  // horizontal than vertical, redirect it to the board's own scroller.
+  // that container instead of paging the board. When a wheel event is
+  // clearly more horizontal than vertical, redirect it to the board's own
+  // scroller. A mostly-vertical trackpad scroll is rarely axis-locked — it
+  // regularly emits ticks where a few px of deltaX jitter edges out an even
+  // smaller deltaY, so a plain deltaX > deltaY check hijacks the board mid-
+  // scroll and reads as the whole board jittering left/right. Requiring
+  // deltaX to clearly dominate (not just edge out) filters that jitter while
+  // still catching genuine horizontal gestures.
   const handleColumnWheel = (e: WheelEvent<HTMLDivElement>) => {
-    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) {
+    const absX = Math.abs(e.deltaX);
+    const absY = Math.abs(e.deltaY);
+    if (absX > 2 && absX > absY * 2) {
       boardScrollRef.current?.scrollBy({ left: e.deltaX });
     }
   };
@@ -887,7 +895,9 @@ export function TodoGrid() {
                 column. */}
             <section className={`${COLUMN_CLASS} group/column`}>
               <div className={TITLE_BAND_CLASS}>
-                <h2 className={LIST_TITLE_CLASS}>Completed</h2>
+                <h2 className={`${LIST_TITLE_CLASS} text-gray-muted`}>
+                  Completed
+                </h2>
               </div>
               <div className="relative min-h-0 flex-1">
                 <div
