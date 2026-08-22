@@ -275,9 +275,15 @@ function NewTodoInline({
         e.preventDefault();
         submit();
       }}
-      className="mb-1 flex min-h-9 items-center gap-1 py-1"
+      className="mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2"
     >
-      <Input
+      <span
+        aria-hidden="true"
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-gray-strong"
+      >
+        <Plus size={12} />
+      </span>
+      <input
         ref={inputRef}
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -286,8 +292,7 @@ function NewTodoInline({
           if (e.key === "Escape") close();
         }}
         placeholder="New todo"
-        inputSize="sm"
-        className="flex-1"
+        className="flex-1 border-none bg-transparent p-0 text-sm text-gray outline-none placeholder:text-gray-muted"
       />
     </form>
   );

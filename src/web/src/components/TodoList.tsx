@@ -327,7 +327,7 @@ function TodoItemContent({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-start gap-3">
-        <div className="relative -top-px">
+        <div className="mt-[3px]">
           <Checkbox
             checked={isCompleted}
             onCheckedChange={() => onToggle(todo.id, isCompleted)}
