@@ -667,14 +667,30 @@ function SortableTodoItem(
         // TodoGrid) so it isn't clipped by this column's overflow-y-auto
         // scroller. This row just holds its own space as a ghost — fixed to
         // its pre-drag height so nothing jumps when the drag starts/ends.
+        // The grip button stays mounted (just visually hidden) rather than
+        // unmounted: it's the node that holds keyboard focus when a
+        // keyboard drag starts, and dnd-kit's KeyboardSensor keeps driving
+        // the drag from it via document-level listeners — unmounting it
+        // would drop focus to <body> for the rest of the drag.
         <div
           style={{ height: draggedHeight || undefined }}
-          className={`rounded-lg border border-dashed bg-gray-base/40 ${
+          className={`relative rounded-lg border border-dashed bg-gray-base/40 ${
             props.isKeyboardDragging
               ? "border-accent-strong ring-2 ring-accent-strong"
               : "border-gray-strong"
           }`}
-        />
+        >
+          <button
+            type="button"
+            disabled={props.isExpanded}
+            className="absolute h-px w-px overflow-hidden opacity-0"
+            aria-label={`Reorder "${props.todo.title}"`}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={16} />
+          </button>
+        </div>
       ) : (
         <div className="flex items-start">
           {/* Reorder grip: inline on mobile; on desktop it hangs off the left
