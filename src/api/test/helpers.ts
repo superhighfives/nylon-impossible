@@ -12,9 +12,9 @@ import {
 } from "../src/lib/db";
 
 /**
- * Seed the three system lists (Today/This Week/Sometime) for a user, mirroring
- * the provisioning `sync.ts` does at real account creation. Idempotent — safe
- * to call even if the lists already exist.
+ * Seed the system lists (Today/This Week/Sometime/Completed) for a user,
+ * mirroring the provisioning `ensure-user.ts` does at real account creation.
+ * Idempotent — safe to call even if the lists already exist.
  */
 export async function seedSystemLists(userId = "user_test_123") {
   const db = getDb(env.DB);
@@ -22,6 +22,7 @@ export async function seedSystemLists(userId = "user_test_123") {
     { name: "Today", systemKind: "today" as const },
     { name: "This Week", systemKind: "thisWeek" as const },
     { name: "Sometime", systemKind: "sometime" as const },
+    { name: "Completed", systemKind: "completed" as const },
   ];
   const [existing] = await db
     .select({ id: lists.id })
@@ -58,6 +59,23 @@ export async function getTodayListId(userId = "user_test_123") {
   return list.id;
 }
 
+/** The id of a user's Completed list, seeded by `seedSystemLists`. */
+export async function getCompletedListId(userId = "user_test_123") {
+  const db = getDb(env.DB);
+  const [list] = await db
+    .select({ id: lists.id })
+    .from(lists)
+    .where(
+      and(
+        eq(lists.userId, userId),
+        eq(lists.kind, "system"),
+        eq(lists.systemKind, "completed"),
+      ),
+    );
+  if (!list) throw new Error(`No Completed list seeded for user ${userId}`);
+  return list.id;
+}
+
 export async function seedUser(
   userId = "user_test_123",
   email = "test@example.com",
@@ -71,7 +89,7 @@ export async function seedUser(
     .insert(users)
     .values({ id: userId, email, plan: "pro", ...overrides })
     .onConflictDoNothing();
-  // Real account creation always seeds the three system lists (sync.ts) —
+  // Real account creation always seeds the system lists (ensure-user.ts) —
   // match that here so todos.listId's NOT NULL FK has somewhere to point.
   await seedSystemLists(userId);
   return userId;

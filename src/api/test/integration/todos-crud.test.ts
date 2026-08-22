@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, todoMessages, todos } from "../../src/lib/db";
 import {
   cleanDb,
+  getCompletedListId,
   getTodayListId,
   seedMessage,
   seedTodo,
@@ -141,6 +142,30 @@ describe("Todos CRUD", () => {
         body: JSON.stringify({
           title: "Sneaky todo",
           listId: otherUsersListId,
+        }),
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json<{ code: string }>()).code).toBe(
+        "list_not_found",
+      );
+
+      const db = getDb(env.DB);
+      const stored = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(stored).toHaveLength(0);
+    });
+
+    it("rejects the completed system list as a listId target", async () => {
+      const completedListId = await getCompletedListId();
+
+      const res = await SELF.fetch("http://localhost/todos", {
+        method: "POST",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Sneaky todo",
+          listId: completedListId,
         }),
       });
       expect(res.status).toBe(404);
@@ -397,6 +422,31 @@ describe("Todos CRUD", () => {
         method: "PUT",
         headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
         body: JSON.stringify({ listId: otherUsersListId }),
+      });
+      expect(res.status).toBe(404);
+      expect((await res.json<{ code: string }>()).code).toBe(
+        "list_not_found",
+      );
+
+      // The todo's listId is untouched.
+      const db = getDb(env.DB);
+      const [stored] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.id, created.id));
+      expect(stored.listId).toBe(created.listId);
+    });
+
+    it("PUT /todos/:id rejects moving a todo into the completed system list", async () => {
+      const createRes = await createTodoViaAPI("My todo");
+      const created = await createRes.json<{ id: string; listId: string }>();
+
+      const completedListId = await getCompletedListId();
+
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ listId: completedListId }),
       });
       expect(res.status).toBe(404);
       expect((await res.json<{ code: string }>()).code).toBe(
