@@ -1,5 +1,5 @@
 import { DEMO_SEED_TODOS } from "@nylon-impossible/shared/demo-seed";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { SystemListKind } from "@/types/database";
 import type { DbClient } from "./db";
@@ -91,7 +91,7 @@ export async function seedDemoTodos(
   if (rows.length > 0) await db.insert(todos).values(rows);
 }
 
-/** Look up one of a user's three system list ids. */
+/** Look up one of a user's system list ids (Today/This Week/Sometime/Completed). */
 export async function getSystemListId(
   db: DbClient,
   userId: string,
@@ -119,6 +119,12 @@ export async function getSystemListId(
  * the moment the *other* user deletes that list. Returns the id back for a
  * convenient `??`/ternary at the call site, or null if it isn't owned by
  * `userId`.
+ *
+ * Also excludes the `completed` system list: no todo's `listId` is ever
+ * meant to point there (its contents are a synthesized aggregate, not a real
+ * scope — see the migration that created it), so a todo pointed at it would
+ * silently vanish from every UI. Custom lists have a null `systemKind`, so
+ * that case must stay eligible.
  */
 export async function verifyListOwnership(
   db: DbClient,
@@ -128,6 +134,12 @@ export async function verifyListOwnership(
   const [list] = await db
     .select({ id: lists.id })
     .from(lists)
-    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
+    .where(
+      and(
+        eq(lists.id, listId),
+        eq(lists.userId, userId),
+        or(isNull(lists.systemKind), ne(lists.systemKind, "completed")),
+      ),
+    );
   return list?.id ?? null;
 }

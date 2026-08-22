@@ -9,6 +9,8 @@ import {
   isNotNull,
   isNull,
   lt,
+  ne,
+  or,
   sql,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
@@ -47,4 +49,18 @@ export function getDb(d1: D1Database) {
   return drizzle(d1);
 }
 
-export { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, sql };
+export {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  or,
+  sql,
+};
