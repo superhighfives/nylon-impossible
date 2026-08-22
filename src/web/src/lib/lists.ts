@@ -91,7 +91,7 @@ export async function seedDemoTodos(
   if (rows.length > 0) await db.insert(todos).values(rows);
 }
 
-/** Look up one of a user's three system list ids. */
+/** Look up one of a user's system list ids (Today/This Week/Sometime/Completed). */
 export async function getSystemListId(
   db: DbClient,
   userId: string,
