@@ -70,7 +70,7 @@ export function TodoAgentChat({ todo }: TodoAgentChatProps) {
   return (
     <div className="space-y-1.5">
       <p className="text-xs font-medium text-gray-muted">Chat</p>
-      <div className="flex flex-col gap-2 rounded-lg bg-gray-surface p-3">
+      <div className="flex flex-col gap-2 rounded-lg bg-gray-surface p-3 ring-1 ring-gray-subtle">
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-gray-muted">
             <Loader size="sm" />

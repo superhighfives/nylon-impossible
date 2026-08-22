@@ -197,7 +197,7 @@ export function SubtaskSection({
     <div className="space-y-1.5">
       <div className="flex items-center gap-1.5">
         <span className="flex items-center gap-1 text-xs font-medium text-gray-muted">
-          <ListTree size={12} />
+          <ListTree size={12} className="mt-px" />
           Subtasks
         </span>
         {total > 0 && (

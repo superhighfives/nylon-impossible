@@ -107,15 +107,7 @@ struct TodoEditSheet: View {
                     TextField("Add a note...", text: $notes, axis: .vertical)
                         .lineLimit(3...6)
                 } header: {
-                    HStack {
-                        Text("Notes")
-                        Spacer()
-                        if preferencesService.aiEnabled {
-                            Text("Not used by AI")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
+                    Text("Notes")
                 }
                 
                 // Due Date

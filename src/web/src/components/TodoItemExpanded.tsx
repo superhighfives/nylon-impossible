@@ -352,17 +352,12 @@ export function TodoItemExpanded({
 
       {/* Notes */}
       <div className="space-y-1.5">
-        <div className="flex items-center justify-between">
-          <label
-            htmlFor={`notes-${todo.id}`}
-            className="text-xs font-medium text-gray-muted"
-          >
-            Notes
-          </label>
-          {aiAvailable && (
-            <span className="text-xs text-gray-muted">Not used by AI</span>
-          )}
-        </div>
+        <label
+          htmlFor={`notes-${todo.id}`}
+          className="text-xs font-medium text-gray-muted"
+        >
+          Notes
+        </label>
         <Textarea
           id={`notes-${todo.id}`}
           value={notes}
@@ -409,30 +404,6 @@ export function TodoItemExpanded({
         </div>
       </div>
 
-      {/* Sticky — pins the todo above non-sticky ones. Instantly reversible,
-          so this commits on click with no debounce, matching how the Repeat
-          select commits immediately. */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor={`sticky-${todo.id}`}
-          className="text-xs font-medium text-gray-muted"
-        >
-          Sticky
-        </label>
-        <Button
-          id={`sticky-${todo.id}`}
-          variant="secondary"
-          size="sm"
-          type="button"
-          onClick={() => onUpdate({ sticky: !todo.sticky })}
-          aria-pressed={todo.sticky}
-          className="w-fit"
-        >
-          {todo.sticky ? <Pin size={14} /> : <PinOff size={14} />}
-          {todo.sticky ? "Pinned to top" : "Pin to top"}
-        </Button>
-      </div>
-
       {/* Repeat — disabled until a due date is set, since the rule has no
           anchor without one. Hidden when the todo has subtasks: recurrence and
           subtasks are mutually exclusive. */}
@@ -472,40 +443,56 @@ export function TodoItemExpanded({
         />
       )}
 
-      {/* AI actions — explicit, opt-in enrich / research (nothing runs
-          automatically). Pro + aiEnabled only. */}
-      {aiAvailable && (
-        <div className="space-y-1.5">
+      {/* Actions — opt-in AI enrich/research (Pro + aiEnabled only) sit
+          alongside the always-available Sticky toggle, since they're all
+          one-click actions on the todo as a whole. Sticky commits on click
+          with no debounce — instantly reversible, like the Repeat select. */}
+      <div className="space-y-1.5">
+        {aiAvailable && (
           <p className="text-xs font-medium text-gray-muted">AI</p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              type="button"
-              onClick={() => enrichTodo.mutate(todo.id)}
-              disabled={enrichTodo.isPending || aiProcessing}
-              loading={enrichTodo.isPending}
-            >
-              {!enrichTodo.isPending && <Sparkles size={14} />}
-              Enrich
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              type="button"
-              onClick={() => reresearch.mutate(todo.id)}
-              disabled={reresearch.isPending}
-              loading={reresearch.isPending}
-            >
-              {!reresearch.isPending && <Search size={14} />}
-              Research
-            </Button>
-          </div>
-          {aiFailed && (
-            <p className="text-sm text-red-muted">Enrichment failed.</p>
+        )}
+        <div className="flex items-center gap-2">
+          {aiAvailable && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={() => enrichTodo.mutate(todo.id)}
+                disabled={enrichTodo.isPending || aiProcessing}
+                loading={enrichTodo.isPending}
+              >
+                {!enrichTodo.isPending && <Sparkles size={14} />}
+                Enrich
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={() => reresearch.mutate(todo.id)}
+                disabled={reresearch.isPending}
+                loading={reresearch.isPending}
+              >
+                {!reresearch.isPending && <Search size={14} />}
+                Research
+              </Button>
+            </>
           )}
+          <Button
+            variant="secondary"
+            size="sm"
+            type="button"
+            onClick={() => onUpdate({ sticky: !todo.sticky })}
+            aria-pressed={todo.sticky}
+          >
+            {todo.sticky ? <Pin size={14} /> : <PinOff size={14} />}
+            {todo.sticky ? "Pinned to top" : "Pin to top"}
+          </Button>
         </div>
-      )}
+        {aiAvailable && aiFailed && (
+          <p className="text-sm text-red-muted">Enrichment failed.</p>
+        )}
+      </div>
 
       {/* Delete row. Edits auto-save (no Save button); the toast in
           useUpdateTodo surfaces any failure. */}
