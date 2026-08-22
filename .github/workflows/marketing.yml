@@ -94,7 +94,7 @@ jobs:
       # inline, so a failure reaching here is something new.
       - name: Upload debug artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: screenshots-debug
           path: |
