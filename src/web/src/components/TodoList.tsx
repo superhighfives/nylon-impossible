@@ -612,8 +612,14 @@ function SortableTodoItem(
   // Rows reflow to open a gap at the target so it's clear where the item lands.
   // No transition — rows (and the drop line) snap into place instead of sliding,
   // which is what kept the line from feeling static. Translate only, no scaleY,
-  // so variable-height rows never squish or stretch.
-  const style = { transform: CSS.Translate.toString(transform) };
+  // so variable-height rows never squish or stretch. The dragged row itself
+  // never moves via transform — a DragOverlay (rendered in TodoGrid) tracks
+  // the pointer instead, so it isn't clipped by this row's column's
+  // overflow-y-auto scroller. Applying transform here too would just repeat
+  // that motion on a node still confined to the source column's box.
+  const style = {
+    transform: isDragging ? undefined : CSS.Translate.toString(transform),
+  };
 
   // Drop indicator: a guide line at the insertion point. It sits on the leading
   // edge of the hovered row, on the side the dragged item will land — above when
@@ -643,21 +649,10 @@ function SortableTodoItem(
       } ${
         // Stays visually selected while its side panel is open, for context.
         !isDragging && props.isExpanded ? "bg-gray-base" : ""
-      } ${
-        isDragging
-          ? `z-10 -mx-3 cursor-grabbing rounded-xl bg-gray-surface/80 px-3 shadow-xl backdrop-blur-sm ${
-              // Accent border only for keyboard drags — it flags the selected
-              // row when there's no cursor on it. Pointer drags keep the gray
-              // ring since the cursor already shows what's being moved.
-              props.isKeyboardDragging
-                ? "ring-2 ring-accent-strong"
-                : "ring-1 ring-gray-subtle"
-            }`
-          : ""
       }`}
     >
-      {/* Drop line is for pointer drags; keyboard drags use the dragged row's
-          own accent border to show the destination, so the line is redundant. */}
+      {/* Drop line is for pointer drags; keyboard drags use the ghost's own
+          accent border to show the destination, so the line is redundant. */}
       {(lineAbove || lineBelow) && !props.isKeyboardDragging && (
         <span
           aria-hidden="true"
@@ -667,22 +662,62 @@ function SortableTodoItem(
           }`}
         />
       )}
+      {isDragging ? (
+        // The real content moves to the DragOverlay (see TodoRowPreview in
+        // TodoGrid) so it isn't clipped by this column's overflow-y-auto
+        // scroller. This row just holds its own space as a ghost — fixed to
+        // its pre-drag height so nothing jumps when the drag starts/ends.
+        <div
+          style={{ height: draggedHeight || undefined }}
+          className={`rounded-lg border border-dashed bg-gray-base/40 ${
+            props.isKeyboardDragging
+              ? "border-accent-strong ring-2 ring-accent-strong"
+              : "border-gray-strong"
+          }`}
+        />
+      ) : (
+        <div className="flex items-start">
+          {/* Reorder grip: inline on mobile; on desktop it hangs off the left
+              edge (out of the row's flow) so checkboxes sit flush with the
+              column title, per the design. Hover-revealed either way. */}
+          <button
+            type="button"
+            disabled={props.isExpanded}
+            className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+            aria-label={`Reorder "${props.todo.title}"`}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={16} className="block" />
+          </button>
+          <div className="flex-1 min-w-0">
+            <TodoItemContent {...props} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The floating preview rendered inside dnd-kit's `DragOverlay` (in TodoGrid)
+ * while a row is being dragged — the moving visual the user actually tracks
+ * with their pointer. Portaled to `document.body` by `DragOverlay`, so
+ * (unlike the origin row) it's never clipped by a column's overflow-y-auto
+ * scroller. `width` is pinned to the origin row's own width since the
+ * overlay isn't constrained by a column once portaled.
+ */
+export function TodoRowPreview(
+  props: TodoItemProps & { width: number | undefined },
+) {
+  return (
+    <div
+      style={{ width: props.width }}
+      className="pointer-events-none cursor-grabbing rounded-xl bg-gray-surface/80 px-3 py-3 shadow-xl ring-1 ring-gray-subtle backdrop-blur-sm"
+    >
       <div className="flex items-start">
-        {/* Reorder grip: inline on mobile; on desktop it hangs off the left
-            edge (out of the row's flow) so checkboxes sit flush with the
-            column title, per the design. Hover-revealed either way. */}
-        <button
-          type="button"
-          disabled={props.isExpanded}
-          className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
-          aria-label={`Reorder "${props.todo.title}"`}
-          {...attributes}
-          {...listeners}
-        >
-          <GripVertical size={16} className="block" />
-        </button>
         <div className="flex-1 min-w-0">
-          <TodoItemContent {...props} showActions={!isDragging} />
+          <TodoItemContent {...props} showActions={false} />
         </div>
       </div>
     </div>

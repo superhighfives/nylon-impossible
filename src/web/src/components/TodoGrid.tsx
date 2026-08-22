@@ -3,6 +3,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  DragOverlay,
   type DragStartEvent,
   type KeyboardCoordinateGetter,
   KeyboardSensor,
@@ -38,6 +39,7 @@ import {
   ExpandedSection,
   getIncompleteOrder,
   TodoListColumn,
+  TodoRowPreview,
   TodoSkeleton,
 } from "@/components/TodoList";
 import { useHints } from "@/hooks/useHints";
@@ -92,9 +94,31 @@ const restrictToVerticalAxisForKeyboard =
 // actually over this rect? — gets that right for pointer/touch drags;
 // `closestCenter` is the fallback for keyboard drags, which have no pointer
 // position to test against.
-const itemCollisionDetection: CollisionDetection = (args) => {
-  const hits = pointerWithin(args);
-  return hits.length > 0 ? hits : closestCenter(args);
+//
+// Row-level precision only applies within the dragged item's own list —
+// crossing into a different list is a coarse, whole-column drop (it always
+// lands at the top of its tier there; see handleDragEnd). So hits against
+// individual rows belonging to a *different* list are filtered out here,
+// leaving only same-list rows (fine-grained reorder) and column droppables
+// (`column-*`, coarse cross-list move) as valid targets.
+const makeItemCollisionDetection = (
+  listIdByTodoId: Map<string, string>,
+): CollisionDetection => {
+  const isValidHit = (id: string, sourceListId: string | undefined) =>
+    id.startsWith("column-") ||
+    !listIdByTodoId.has(id) ||
+    listIdByTodoId.get(id) === sourceListId;
+
+  return (args) => {
+    const sourceListId = listIdByTodoId.get(args.active.id as string);
+    const hits = pointerWithin(args).filter((hit) =>
+      isValidHit(hit.id as string, sourceListId),
+    );
+    if (hits.length > 0) return hits;
+    return closestCenter(args).filter((hit) =>
+      isValidHit(hit.id as string, sourceListId),
+    );
+  };
 };
 
 const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
@@ -512,6 +536,8 @@ export function TodoGrid() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeWidth, setActiveWidth] = useState<number | undefined>(undefined);
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
@@ -613,6 +639,8 @@ export function TodoGrid() {
   }
 
   const allTodos = todos ?? [];
+  const listIdByTodoId = new Map(allTodos.map((t) => [t.id, t.listId]));
+  const itemCollisionDetection = makeItemCollisionDetection(listIdByTodoId);
 
   const handleRequestDelete = (id: string) => setConfirmDeleteId(id);
   const handleToggleExpand = (id: string) =>
@@ -672,11 +700,16 @@ export function TodoGrid() {
     });
   };
 
-  const handleDragStart = ({ activatorEvent }: DragStartEvent) => {
+  const handleDragStart = ({ active, activatorEvent }: DragStartEvent) => {
     setIsKeyboardDragging(activatorEvent instanceof KeyboardEvent);
+    setActiveId(active.id as string);
+    setActiveWidth(active.rect.current.initial?.width);
   };
 
-  const handleDragCancel = () => setIsKeyboardDragging(false);
+  const handleDragCancel = () => {
+    setIsKeyboardDragging(false);
+    setActiveId(null);
+  };
 
   // Column-header reorder — custom lists only, drag the header to move a
   // list among the other custom lists. Separate DndContext/sensors from the
@@ -718,6 +751,7 @@ export function TodoGrid() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     setIsKeyboardDragging(false);
+    setActiveId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -774,25 +808,29 @@ export function TodoGrid() {
       return;
     }
 
-    // Cross-list: insert at the drop index in the target list's own order,
-    // then compute a fresh position against that list's neighbors. Sticky
-    // tier is preserved but not re-scoped on the destination — good enough
-    // for "moved to a new list", which is a coarser action than reordering.
+    // Cross-list: the whole column is the dropzone (collision detection
+    // above never resolves `over` to an individual row in a different list),
+    // so there's no drop-index to honor — the item always lands at the top
+    // of its own tier in the target list, preserving the "pinned always
+    // first" invariant instead of trying to land at an arbitrary row.
     const targetListTodos = todosByList.get(targetListId) ?? [];
     const targetOrder =
       localOrderByList[targetListId] ??
       getIncompleteOrder(targetListTodos, timeZone, hiddenIds);
 
-    const overIndex = targetOrder.findIndex((t) => t.id === over.id);
-    const insertIndex = overIndex === -1 ? targetOrder.length : overIndex;
-
-    const prevItem = insertIndex > 0 ? targetOrder[insertIndex - 1] : null;
-    const nextItem =
-      insertIndex < targetOrder.length ? targetOrder[insertIndex] : null;
+    const prevItem = draggedItem.sticky
+      ? null
+      : (targetOrder.filter((t) => t.sticky).at(-1) ?? null);
+    const firstOfTier = targetOrder.find(
+      (t) => t.sticky === draggedItem.sticky,
+    );
     const newPosition = generateKeyBetween(
       prevItem?.position ?? null,
-      nextItem?.position ?? null,
+      firstOfTier?.position ?? null,
     );
+    const insertIndex = draggedItem.sticky
+      ? 0
+      : targetOrder.filter((t) => t.sticky).length;
 
     setLocalOrderByList((prev) => ({
       ...prev,
@@ -823,6 +861,10 @@ export function TodoGrid() {
   const completedTodos = sortTopLevelTodos(allTodos, timeZone).completed.filter(
     (t) => !hiddenIds.has(t.id),
   );
+
+  const activeTodo = activeId
+    ? (allTodos.find((t) => t.id === activeId) ?? null)
+    : null;
 
   return (
     // Two independent DndContexts: this outer one reorders custom-list
@@ -877,7 +919,13 @@ export function TodoGrid() {
                         the bottom keeps long lists from ending in a hard cut. */}
                     <div className="relative min-h-0 flex-1">
                       <div
-                        className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                        // -mx/px cancel out to the same content position as the
+                        // column's own padding, but move that padding onto this
+                        // scroller's box. overflow-y-auto forces overflow-x to
+                        // auto too (browsers won't mix scroll with visible), so
+                        // without its own padding this clips the reorder grip,
+                        // which hangs left of each row via -translate-x-full.
+                        className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 pb-28 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                         onWheel={handleColumnWheel}
                       >
                         <TodoListColumn
@@ -919,7 +967,7 @@ export function TodoGrid() {
               </div>
               <div className="relative min-h-0 flex-1">
                 <div
-                  className="h-full overflow-y-auto overscroll-contain pb-28 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 pb-28 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   onWheel={handleColumnWheel}
                 >
                   <CompletedColumn
@@ -945,6 +993,24 @@ export function TodoGrid() {
               </div>
             </section>
           </BoardScaffold>
+          <DragOverlay
+            modifiers={[restrictToVerticalAxisForKeyboard(isKeyboardDragging)]}
+          >
+            {activeTodo && (
+              <TodoRowPreview
+                todo={activeTodo}
+                subtasks={allTodos.filter((t) => t.parentId === activeTodo.id)}
+                isExpanded={false}
+                onToggle={() => {}}
+                onDelete={() => {}}
+                onToggleExpand={() => {}}
+                onInlineUpdate={() => {}}
+                updatePending={false}
+                deletePending={false}
+                width={activeWidth}
+              />
+            )}
+          </DragOverlay>
           <ConfirmDialog
             open={confirmDeleteId !== null}
             onOpenChange={(open) => {
