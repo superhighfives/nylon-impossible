@@ -7,12 +7,13 @@ import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { eq, type getDb, lists, todos, users } from "./db";
 
-// The three system lists provisioned for every new user, in fixed first-three
-// order. Kept here because this is the single place a user row is ever created.
+// The system lists provisioned for every new user, in fixed order. Kept here
+// because this is the single place a user row is ever created.
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
   { name: "This Week", systemKind: "thisWeek" as const },
   { name: "Sometime", systemKind: "sometime" as const },
+  { name: "Completed", systemKind: "completed" as const },
 ];
 
 /**

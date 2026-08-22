@@ -28,12 +28,19 @@ struct ContentView: View {
 
     /// Lists in the fixed order: Today, This Week, Sometime, then custom
     /// lists by position. Mirrors web's `TodoGrid` ordering.
+    ///
+    /// Excludes the `completed` system list: unlike the other system lists,
+    /// no todo's `listId` ever points at it (its web counterpart is a
+    /// synthesized aggregate across every list, not a real scope) — a
+    /// per-list page for it would just be permanently empty.
     private var orderedLists: [TodoListModel] {
-        lists.sorted { a, b in
-            if a.isSystem != b.isSystem { return a.isSystem }
-            if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
-            return a.position < b.position
-        }
+        lists
+            .filter { $0.systemKind != .completed }
+            .sorted { a, b in
+                if a.isSystem != b.isSystem { return a.isSystem }
+                if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
+                return a.position < b.position
+            }
     }
 
     /// The list currently paged into view, driving the floating list header.

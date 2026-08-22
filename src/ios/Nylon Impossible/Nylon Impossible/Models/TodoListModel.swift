@@ -16,6 +16,7 @@ enum SystemListKind: String, Codable, CaseIterable {
     case today
     case thisWeek
     case sometime
+    case completed
 }
 
 @Model
@@ -65,6 +66,7 @@ final class TodoListModel {
         case .today: return 0
         case .thisWeek: return 1
         case .sometime: return 2
+        case .completed: return 3
         case nil: return Int.max
         }
     }

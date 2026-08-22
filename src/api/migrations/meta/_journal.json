@@ -183,6 +183,13 @@
       "when": 1786999322379,
       "tag": "0025_bump_todos_updated_at_for_list_id_resync",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1787000000000,
+      "tag": "0026_add_completed_system_list",
+      "breakpoints": true
     }
   ]
 }

@@ -225,7 +225,7 @@ export const lists = sqliteTable(
     // lists — never collides under idx_lists_user_system_kind since SQLite
     // treats multiple NULLs as distinct.
     systemKind: text("system_kind", {
-      enum: ["today", "thisWeek", "sometime"],
+      enum: ["today", "thisWeek", "sometime", "completed"],
     }),
     position: text("position").notNull().default("a0"),
     createdAt: integer("created_at", { mode: "timestamp" })

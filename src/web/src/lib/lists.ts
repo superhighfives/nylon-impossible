@@ -9,11 +9,12 @@ const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
   { name: "This Week", systemKind: "thisWeek" as const },
   { name: "Sometime", systemKind: "sometime" as const },
+  { name: "Completed", systemKind: "completed" as const },
 ];
 
 /**
- * Seed the three system lists (Today/This Week/Sometime) for a user, if they
- * don't already exist. Web-only signups create their user row via
+ * Seed the system lists (Today/This Week/Sometime/Completed) for a user, if
+ * they don't already exist. Web-only signups create their user row via
  * `ensureUserExists` rather than the API worker's `sync.ts` — this is the
  * matching provisioning step for that path, so a web-only user always has
  * somewhere for `todos.listId` to point.
