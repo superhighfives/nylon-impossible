@@ -479,7 +479,6 @@ export function TodoItemExpanded({
             </>
           )}
           <Button
-            id={`sticky-${todo.id}`}
             variant="secondary"
             size="sm"
             type="button"
