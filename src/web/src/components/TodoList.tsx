@@ -340,10 +340,10 @@ function TodoItemContent({
             }
           />
         </div>
-        <div className={`flex-1 min-w-0 ${showActions ? "pr-20" : ""}`}>
+        <div className="flex-1 min-w-0">
           <div className="space-y-1">
             {showTitleLine && (
-              <div>
+              <div className={showActions ? "pr-20" : ""}>
                 {!showUrlOnlyCard && (
                   <p
                     className={`inline leading-snug wrap-anywhere ${

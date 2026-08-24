@@ -175,18 +175,16 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group/link max-w-full"
+      className="inline-flex items-start gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group/link max-w-full"
     >
-      <PlatformBadge platform={social.platform} />
-      <span className="text-sm text-gray truncate group-hover/link:underline min-w-0">
+      <span className="mt-0.5">
+        <PlatformBadge platform={social.platform} />
+      </span>
+      <span className="text-sm text-gray group-hover/link:underline">
         {displayTitle}
       </span>
       {url.description && (
-        // Tweet text / caption alongside the author. High shrink factor keeps
-        // the author name visible, collapsing the body text first.
-        <span className="text-[11px] text-gray-muted truncate min-w-0 shrink-[1000]">
-          {url.description}
-        </span>
+        <span className="text-[11px] text-gray-muted">{url.description}</span>
       )}
     </a>
   );
