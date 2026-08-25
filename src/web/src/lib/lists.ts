@@ -3,7 +3,18 @@ import { and, eq, isNull, ne, or } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { SystemListKind } from "@/types/database";
 import type { DbClient } from "./db";
-import { lists, todos } from "./schema";
+import { lists, todos, todoUrls } from "./schema";
+
+// D1 caps bound parameters at 100 per statement. The demo-todo row here sets
+// 10 fields explicitly; NOT NULL columns left unset (listEnteredAt,
+// needsInput, sticky) may still bind hidden default params, so budget for up
+// to 13 and chunk conservatively — matches the pattern in the API worker's
+// import-google-tasks.ts, which hit this same cap.
+const TODO_INSERT_CHUNK_SIZE = 6;
+// The demo-url row sets all 14 non-null-default-only columns explicitly, no
+// hidden extras (researchId is the only omitted column, and it's nullable
+// with no default).
+const TODO_URL_INSERT_CHUNK_SIZE = 7;
 
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
@@ -55,10 +66,11 @@ export async function ensureSystemLists(
 }
 
 /**
- * Insert the demo todos for a just-provisioned non-production account,
- * distributing DEMO_SEED_TODOS across the user's system lists with
- * fractional positions in declared order. Due dates are relative to now so
- * the seed never goes stale. Mirrors the API worker's
+ * Insert the demo todos (and any attached link previews) for a
+ * just-provisioned non-production account, distributing DEMO_SEED_TODOS
+ * across the user's system lists with fractional positions in declared
+ * order. Due dates are relative to now so the seed never goes stale.
+ * Mirrors the API worker's
  * `seedDemoTodos` (src/api/src/lib/ensure-user.ts) — kept separate since each
  * provisions users independently, but sourced from the same shared data.
  */
@@ -68,27 +80,65 @@ export async function seedDemoTodos(
   systemLists: { id: string; systemKind: string }[],
 ): Promise<void> {
   const now = new Date();
-  const rows = systemLists.flatMap((list) => {
+  const seeded = systemLists.flatMap((list) => {
     const seeds = DEMO_SEED_TODOS.filter((t) => t.list === list.systemKind);
     const positions = generateNKeysBetween(null, null, seeds.length);
     return seeds.map((t, i) => ({
-      id: crypto.randomUUID(),
-      userId,
-      listId: list.id,
-      title: t.title,
-      notes: t.notes ?? null,
-      completed: t.completed ?? false,
-      position: positions[i],
-      dueDate:
-        t.dueInDays === undefined
-          ? null
-          : new Date(now.getTime() + t.dueInDays * 86_400_000),
-      createdAt: now,
-      updatedAt: now,
+      seed: t,
+      row: {
+        id: crypto.randomUUID(),
+        userId,
+        listId: list.id,
+        title: t.title,
+        notes: t.notes ?? null,
+        completed: t.completed ?? false,
+        position: positions[i],
+        dueDate:
+          t.dueInDays === undefined
+            ? null
+            : new Date(now.getTime() + t.dueInDays * 86_400_000),
+        createdAt: now,
+        updatedAt: now,
+      },
     }));
   });
 
-  if (rows.length > 0) await db.insert(todos).values(rows);
+  const todoRows = seeded.map(({ row }) => row);
+  for (let i = 0; i < todoRows.length; i += TODO_INSERT_CHUNK_SIZE) {
+    await db
+      .insert(todos)
+      .values(todoRows.slice(i, i + TODO_INSERT_CHUNK_SIZE));
+  }
+
+  const urlRows = seeded.flatMap(({ seed, row }) => {
+    const urls = seed.urls ?? [];
+    const positions = generateNKeysBetween(null, null, urls.length);
+    return urls.map((u, j) => {
+      const fetchStatus = u.fetchStatus ?? (u.title ? "fetched" : "pending");
+      return {
+        id: crypto.randomUUID(),
+        todoId: row.id,
+        url: u.url,
+        title: u.title ?? null,
+        description: u.description ?? null,
+        siteName: u.siteName ?? null,
+        favicon: u.favicon ?? null,
+        image: u.image ?? null,
+        showPreview: u.showPreview ?? true,
+        position: positions[j],
+        fetchStatus,
+        fetchedAt: fetchStatus === "fetched" ? now : null,
+        createdAt: now,
+        updatedAt: now,
+      };
+    });
+  });
+
+  for (let i = 0; i < urlRows.length; i += TODO_URL_INSERT_CHUNK_SIZE) {
+    await db
+      .insert(todoUrls)
+      .values(urlRows.slice(i, i + TODO_URL_INSERT_CHUNK_SIZE));
+  }
 }
 
 /** Look up one of a user's system list ids (Today/This Week/Sometime/Completed). */

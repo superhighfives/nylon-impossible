@@ -1,11 +1,5 @@
 import { Popover } from "@base-ui/react/popover";
-import {
-  AlertCircle,
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  X,
-} from "lucide-react";
+import { AlertCircle, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useState } from "react";
 import { focusRing } from "@/components/ui";
 import { useHints } from "@/hooks/useHints";
@@ -173,9 +167,11 @@ interface InlineDueDateProps {
 /**
  * Quick due-date editor for a todo row. Opens a custom calendar popover (styled
  * after kumo-ui's date picker) rather than the native control, so the picker
- * matches the app on every platform. When set it shows the formatted date badge
- * (red when overdue) with a clear affordance; when unset a faint calendar button
- * appears on row hover.
+ * matches the app on every platform. Only renders once a due date is already
+ * set, showing the formatted date badge (red when overdue) with a clear
+ * affordance and a way to change the date — adding one in the first place
+ * happens in the expanded detail panel, so the row itself doesn't need a
+ * standing "set due date" affordance.
  */
 export function InlineDueDate({
   value,
@@ -188,6 +184,8 @@ export function InlineDueDate({
   const { timeZone } = useHints();
   const [open, setOpen] = useState(false);
 
+  if (!value) return null;
+
   const handleSelect = (ymd: string) => {
     onChange(ymdToDate(ymd));
     setOpen(false);
@@ -199,51 +197,36 @@ export function InlineDueDate({
 
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
-      {value ? (
-        <span
-          className={`inline-flex items-center gap-1 rounded-md text-xs tabular-nums transition-colors ${
-            isOverdue
-              ? "bg-red-base text-red-muted"
-              : "bg-gray-base text-gray-muted"
-          } ${className}`}
-        >
-          <Popover.Trigger
-            render={
-              <button
-                type="button"
-                disabled={disabled}
-                aria-label={`Due ${label}. Change due date`}
-                className={`inline-flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-1 transition-colors disabled:opacity-50 ${focusRing}`}
-              >
-                {isOverdue && <AlertCircle size={10} aria-hidden="true" />}
-                {label}
-              </button>
-            }
-          />
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={handleClear}
-            aria-label="Clear due date"
-            className={`rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50 ${focusRing}`}
-          >
-            <X size={11} aria-hidden="true" />
-          </button>
-        </span>
-      ) : (
+      <span
+        className={`inline-flex items-center gap-1 rounded-md text-xs tabular-nums transition-colors ${
+          isOverdue
+            ? "bg-red-base text-red-muted"
+            : "bg-gray-base text-gray-muted"
+        } ${className}`}
+      >
         <Popover.Trigger
           render={
             <button
               type="button"
               disabled={disabled}
-              aria-label="Set due date"
-              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-gray-muted/60 transition-[color,opacity] hover:text-gray-muted disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 ${focusRing} ${className}`}
+              aria-label={`Due ${label}. Change due date`}
+              className={`inline-flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-1 transition-colors disabled:opacity-50 ${focusRing}`}
             >
-              <Calendar size={11} aria-hidden="true" />
+              {isOverdue && <AlertCircle size={10} aria-hidden="true" />}
+              {label}
             </button>
           }
         />
-      )}
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={handleClear}
+          aria-label="Clear due date"
+          className={`rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50 ${focusRing}`}
+        >
+          <X size={11} aria-hidden="true" />
+        </button>
+      </span>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="start">
           <Popover.Popup className="z-50 rounded-lg border border-gray-subtle bg-gray-surface p-3 shadow-lg outline-none">

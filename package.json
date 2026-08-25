@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
+    "dev": "pnpm db:reset && pnpm --parallel --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
     "test": "pnpm web:test && pnpm api:test",
     "lint": "pnpm web:lint && pnpm api:lint && pnpm admin:lint && pnpm todo-agent:lint",
     "lint:fix": "pnpm web:lint:fix && pnpm api:lint:fix && pnpm admin:lint:fix && pnpm todo-agent:lint:fix",

@@ -264,11 +264,12 @@ function TodoItemContent({
   const previewTitle = urlOnly?.showPreview
     ? getFetchedPreviewTitle(urlOnly)
     : null;
-  // Active URL-only rows with a fetched title render as a single hoverable card
-  // (favicon + title + description + URL) instead of an inline title line, for
-  // consistency with the URL card in the expanded editor. Completed rows stay
-  // terse, so they keep the inline title treatment below.
-  const showUrlOnlyCard = !isCompleted && !!urlOnly && !!previewTitle;
+  // Active URL-only rows always render as a single hoverable card (favicon +
+  // title + description + URL), for consistency with the URL card in the
+  // expanded editor — UrlPreviewCard has its own loading/failed/raw-URL
+  // states, so there's no need to gate this on a title having fetched yet.
+  // Completed rows stay terse, so they keep the inline title treatment below.
+  const showUrlOnlyCard = !isCompleted && !!urlOnly;
   const now = Date.now();
   const aiProcessing =
     (todo.aiStatus === "pending" || todo.aiStatus === "processing") &&

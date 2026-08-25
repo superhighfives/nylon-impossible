@@ -175,16 +175,18 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-start gap-2 px-2 py-1 rounded-lg bg-gray-surface shadow-sm hover:shadow-base transition-shadow group/link max-w-full"
+      className="group/link flex flex-col gap-1 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface max-w-full"
     >
-      <span className="mt-0.5">
+      <span className="flex items-center gap-2">
         <PlatformBadge platform={social.platform} />
-      </span>
-      <span className="text-sm text-gray group-hover/link:underline">
-        {displayTitle}
+        <span className="text-sm font-medium text-gray group-hover/link:underline">
+          {displayTitle}
+        </span>
       </span>
       {url.description && (
-        <span className="text-[11px] text-gray-muted">{url.description}</span>
+        <span className="text-xs text-gray-muted leading-relaxed">
+          {url.description}
+        </span>
       )}
     </a>
   );
