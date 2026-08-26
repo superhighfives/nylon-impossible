@@ -437,6 +437,7 @@ protocol APIProviding: Sendable {
     func deleteMe() async throws
     func reresearch(todoId: String) async throws
     func enrich(todoId: String) async throws
+    func processTodo(todoId: String) async throws -> Int
     func cancelResearch(todoId: String) async throws
     func replyToTodo(todoId: String, content: String) async throws -> String
     func dismissQuestion(todoId: String) async throws
@@ -568,6 +569,24 @@ final class APIService: APIProviding {
 
     func cancelResearch(todoId: String) async throws {
         let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/research")
+    }
+
+    // MARK: - Process
+
+    /// Re-run link processing for a todo: attach any URLs in its text, fetch
+    /// what's behind them, and replace a "Check {domain}" placeholder title with
+    /// what actually turned up.
+    ///
+    /// Deliberately not an AI action — no model runs and it works with AI turned
+    /// off. Returns how many links were queued, so the caller can say "nothing
+    /// to process" rather than leave the button looking inert.
+    func processTodo(todoId: String) async throws -> Int {
+        struct ProcessResponse: Decodable { let status: String; let links: Int }
+        let response: ProcessResponse = try await post(
+            path: "/todos/\(todoId)/process",
+            body: EmptyBody()
+        )
+        return response.links
     }
 
     // MARK: - Conversation

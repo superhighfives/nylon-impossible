@@ -26,6 +26,7 @@ import {
   todos,
   todoUrls,
 } from "./db";
+import { finishTodoLinks } from "./process-todo";
 import {
   dueDateSuggestionLabel,
   recurrenceSuggestionLabel,
@@ -34,7 +35,6 @@ import {
   titleSuggestionLabel,
 } from "./suggestion-labels";
 import { truncateTitle } from "./url-helpers";
-import { fetchUrlMetadata } from "./url-metadata";
 
 /**
  * Enrich a todo with AI-extracted metadata in the background. Writes pending
@@ -258,8 +258,7 @@ export async function enrichOrAskWithAI(
     // this is additive preview data, not a field overwrite, so it stays
     // outside the consent flow (unlike title/dueDate/recurrence/subtasks).
     if (enrichment.urls && enrichment.urls.length > 0) {
-      await insertAndFetchUrls(db, todoId, enrichment.urls);
-      await notifySync(env, userId);
+      await insertAndFetchUrls(db, env, userId, todoId, enrichment.urls);
     }
 
     // Handle a clarifying question if the agent decided to ask one. This
@@ -315,10 +314,15 @@ export async function enrichOrAskWithAI(
 }
 
 /**
- * Insert URL records and fetch metadata in background
+ * Insert URL records the model extracted and fetch their metadata.
+ *
+ * The fetching itself is the same deterministic pass as everywhere else
+ * (`process-todo.ts`) — only the decision to attach these URLs came from AI.
  */
 async function insertAndFetchUrls(
   db: ReturnType<typeof getDb>,
+  env: { USER_SYNC: DurableObjectNamespace },
+  userId: string,
   todoId: string,
   urls: string[],
 ): Promise<void> {
@@ -355,34 +359,11 @@ async function insertAndFetchUrls(
 
   await db.insert(todoUrls).values(urlRecords);
 
-  // Fetch metadata for each URL
-  await Promise.allSettled(
-    urlRecords.map(async (record) => {
-      try {
-        const metadata = await fetchUrlMetadata(record.url);
-        await db
-          .update(todoUrls)
-          .set({
-            title: metadata.title,
-            description: metadata.description,
-            siteName: metadata.siteName,
-            favicon: metadata.favicon,
-            fetchStatus: "fetched" as const,
-            fetchedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(todoUrls.id, record.id));
-      } catch (error) {
-        console.error(`Failed to fetch metadata for ${record.url}:`, error);
-        await db
-          .update(todoUrls)
-          .set({
-            fetchStatus: "failed" as const,
-            updatedAt: new Date(),
-          })
-          .where(eq(todoUrls.id, record.id));
-      }
-    }),
+  await finishTodoLinks(
+    db,
+    env,
+    userId,
+    urlRecords.map(({ id, url }) => ({ id, todoId, url })),
   );
 }
 

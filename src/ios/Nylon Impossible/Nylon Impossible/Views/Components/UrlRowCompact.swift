@@ -12,13 +12,16 @@ import SwiftUI
 struct UrlRowCompact: View {
     let url: APITodoUrl
     
-    /// Pending URLs older than this threshold are treated as failed (worker likely restarted)
+    /// Pending URLs untouched for this long are treated as failed (worker likely restarted)
     private static let stalePendingThreshold: TimeInterval = 30
-    
-    /// Check if a pending URL is stale (fetch likely lost due to worker restart)
+
+    /// Check if a pending URL is stale (fetch likely lost due to worker restart).
+    /// Measured from `updatedAt`, not `createdAt`: re-processing an old link
+    /// flips it back to pending, and that fresh spinner shouldn't read as stale
+    /// just because the row was created weeks ago.
     private var isStale: Bool {
         url.fetchStatus == .pending &&
-        Date().timeIntervalSince(url.createdAt) > Self.stalePendingThreshold
+        Date().timeIntervalSince(url.updatedAt) > Self.stalePendingThreshold
     }
     
     private var isPending: Bool {
@@ -76,11 +79,16 @@ struct UrlRowCompact: View {
         } else {
             Link(destination: URL(string: url.url)!) {
                 HStack(spacing: 6) {
-                    // Icon: spinner for pending, favicon otherwise (no error icon for compact)
+                    // Icon: spinner while fetching, warning when the fetch didn't
+                    // land, favicon otherwise.
                     Group {
                         if isPending {
                             ProgressView()
                                 .scaleEffect(0.6)
+                        } else if isFailed {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.appDanger)
                         } else {
                             FaviconImage(primaryURL: storedFaviconURL, fallbackURL: googleFaviconURL)
                         }
@@ -97,6 +105,15 @@ struct UrlRowCompact: View {
                         Text("Fetching...")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                    }
+
+                    // A fetch that never landed used to look the same as a page
+                    // with no title. Say so, so "Process links" in the edit
+                    // sheet reads as the obvious next move.
+                    if isFailed {
+                        Text("Couldn't fetch")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.appDanger)
                     }
                 }
                 .padding(.horizontal, 8)

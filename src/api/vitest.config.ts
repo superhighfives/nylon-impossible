@@ -30,12 +30,16 @@ export default defineConfig(async () => {
   // (The AI side is mocked via test/setup-mocks.ts using vi.mock — aliases
   // here only fire on literal import-string matches, so they couldn't reach
   // ai-enrich.ts's `./ai` import or the handlers' background enrichment.)
-  aliases["../lib/url-metadata"] = path.join(
+  const urlMetadataMock = path.join(
     __dirname,
     "test",
     "__mocks__",
     "url-metadata.ts",
   );
+  // Both spellings: handlers import "../lib/url-metadata", lib modules
+  // (create-todo, process-todo, url-helpers) import "./url-metadata".
+  aliases["../lib/url-metadata"] = urlMetadataMock;
+  aliases["./url-metadata"] = urlMetadataMock;
 
   // AI Gateway + Tavily bindings for real AI tests (injected from environment)
   const aiBindings = useAI

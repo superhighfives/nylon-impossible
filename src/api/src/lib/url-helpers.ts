@@ -2,6 +2,8 @@
  * URL handling utilities for smart todo creation
  */
 
+import { isSocialPostUrl, type UrlMetadata } from "./url-metadata";
+
 /** Common trailing punctuation that shouldn't be part of URLs */
 const TRAILING_PUNCT = /[.,;:!?)]+$/;
 
@@ -141,4 +143,85 @@ export function truncateTitle(title: string, maxLength = 500): string {
   }
 
   return `${truncated}...`;
+}
+
+/**
+ * Longest a title derived from link metadata gets. Comfortably longer than a
+ * glance needs, short enough that a tweet or a verbose page title doesn't take
+ * over the row.
+ */
+const DERIVED_TITLE_MAX = 140;
+
+/** Collapse whitespace/newlines into single spaces; null for nothing usable. */
+function collapseWhitespace(text: string | null | undefined): string | null {
+  const collapsed = text?.replace(/\s+/g, " ").trim();
+  return collapsed ? collapsed : null;
+}
+
+/** Trim a derived title to `DERIVED_TITLE_MAX`, preferring a word boundary. */
+function shortenDerivedTitle(text: string): string {
+  if (text.length <= DERIVED_TITLE_MAX) return text;
+  const cut = text.slice(0, DERIVED_TITLE_MAX - 1);
+  const lastSpace = cut.lastIndexOf(" ");
+  const kept = lastSpace > cut.length * 0.6 ? cut.slice(0, lastSpace) : cut;
+  return `${kept.replace(TRAILING_PUNCT, "")}…`;
+}
+
+/** `https://example.com/` and `https://example.com` are the same link here. */
+function withoutTrailingSlash(url: string): string {
+  return url.endsWith("/") ? url.slice(0, -1) : url;
+}
+
+/**
+ * Whether `title` is one of the placeholders we generate for a captured link —
+ * the raw URL, or `createFallbackFromUrl`'s "Check {domain}".
+ *
+ * This is the guard on rewriting a title from fetched metadata: a placeholder
+ * is ours to replace, anything the user typed is not.
+ */
+export function isPlaceholderTitle(title: string, url: string): boolean {
+  const trimmed = title.trim();
+  if (!trimmed) return true;
+  if (
+    withoutTrailingSlash(trimmed) ===
+    withoutTrailingSlash(cleanUrlString(url).trim())
+  ) {
+    return true;
+  }
+  const domain = extractDomain(url);
+  return domain !== null && trimmed === `Check ${domain}`;
+}
+
+/**
+ * A human title for a captured link, from the metadata we fetched for it.
+ *
+ * For a post (a tweet), the post's own text is what says what the link is —
+ * the author is already shown on the preview card, so repeating it in the title
+ * would just spend the row twice. Everywhere else the page title is the answer.
+ * Returns null when the metadata has nothing better than the placeholder,
+ * leaving "Check {domain}" in place rather than replacing it with noise.
+ */
+export function titleFromUrlMetadata(
+  url: string,
+  metadata: Pick<UrlMetadata, "title" | "description" | "siteName">,
+): string | null {
+  if (isSocialPostUrl(url)) {
+    // A media-only post has no text; its author line ("Name (@handle)") is the
+    // next best thing.
+    const text =
+      collapseWhitespace(metadata.description) ??
+      collapseWhitespace(metadata.title);
+    return text ? shortenDerivedTitle(text) : null;
+  }
+
+  const pageTitle = collapseWhitespace(metadata.title);
+  if (pageTitle) return shortenDerivedTitle(pageTitle);
+
+  // A site that names itself something other than its own domain still beats
+  // "Check example.com"; one that doesn't adds nothing.
+  const siteName = collapseWhitespace(metadata.siteName);
+  if (siteName && siteName !== extractDomain(url)) {
+    return shortenDerivedTitle(siteName);
+  }
+  return null;
 }

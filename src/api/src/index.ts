@@ -35,6 +35,7 @@ import {
   getLists,
   updateList,
 } from "./handlers/lists";
+import { processTodo } from "./handlers/process";
 import { replyToTodo } from "./handlers/reply";
 import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
@@ -148,6 +149,9 @@ app.delete("/todos/:id", deleteTodo);
 app.post("/todos/:id/research", reresearchTodo);
 app.delete("/todos/:id/research", cancelResearch);
 app.post("/todos/:id/enrich", enrichTodo);
+// Link processing — deterministic, no AI, so it sits outside the aiEnabled gate
+// the enrich/research routes above honour.
+app.post("/todos/:id/process", processTodo);
 app.post("/todos/:id/reply", replyToTodo);
 app.delete("/todos/:id/question", dismissQuestion);
 app.post("/todos/:id/suggestions/:sid/accept", acceptSuggestion);

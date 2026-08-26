@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   createFallbackFromUrl,
   extractDomain,
+  isPlaceholderTitle,
+  titleFromUrlMetadata,
   truncateTitle,
 } from "../../src/lib/url-helpers";
 
@@ -208,5 +210,126 @@ describe("truncateTitle", () => {
     // Should truncate to ~7 code points + "..."
     expect(result.length).toBeLessThanOrEqual(20); // Allow for surrogate pairs
     expect(result.endsWith("...")).toBe(true);
+  });
+});
+
+describe("isPlaceholderTitle", () => {
+  it("recognises the generated 'Check {domain}' title", () => {
+    expect(isPlaceholderTitle("Check x.com", "https://x.com/a/status/1")).toBe(
+      true,
+    );
+  });
+
+  it("recognises the raw URL as its own title", () => {
+    const url = "https://x.com/mitchellh/status/2089111740395270615?s=46";
+    expect(isPlaceholderTitle(url, url)).toBe(true);
+  });
+
+  it("ignores a trailing slash the URL constructor added", () => {
+    expect(isPlaceholderTitle("https://example.com", "https://example.com/")).toBe(
+      true,
+    );
+  });
+
+  it("treats an empty title as a placeholder", () => {
+    expect(isPlaceholderTitle("   ", "https://example.com")).toBe(true);
+  });
+
+  it("leaves a title the user wrote alone", () => {
+    expect(isPlaceholderTitle("Read this later", "https://example.com")).toBe(
+      false,
+    );
+  });
+
+  it("leaves a 'Check' title for a different domain alone", () => {
+    expect(isPlaceholderTitle("Check other.com", "https://example.com")).toBe(
+      false,
+    );
+  });
+});
+
+describe("titleFromUrlMetadata", () => {
+  const TWEET = "https://x.com/markphelps/status/2089111740395270615";
+
+  it("titles a tweet with its own text, not its author", () => {
+    expect(
+      titleFromUrlMetadata(TWEET, {
+        title: "Mark Phelps (@markphelps)",
+        description: "Shipping a thing I've wanted for years",
+        siteName: "X",
+      }),
+    ).toBe("Shipping a thing I've wanted for years");
+  });
+
+  it("falls back to the author line for a media-only tweet", () => {
+    expect(
+      titleFromUrlMetadata(TWEET, {
+        title: "Mark Phelps (@markphelps)",
+        description: null,
+        siteName: "X",
+      }),
+    ).toBe("Mark Phelps (@markphelps)");
+  });
+
+  it("collapses newlines in a multi-line tweet", () => {
+    expect(
+      titleFromUrlMetadata(TWEET, {
+        title: null,
+        description: "First line\n\nSecond line",
+        siteName: "X",
+      }),
+    ).toBe("First line Second line");
+  });
+
+  it("shortens a long tweet at a word boundary", () => {
+    const long = `${"word ".repeat(60)}end`;
+    const result = titleFromUrlMetadata(TWEET, {
+      title: null,
+      description: long,
+      siteName: "X",
+    });
+    expect(result?.length).toBeLessThanOrEqual(140);
+    expect(result?.endsWith("…")).toBe(true);
+    expect(result).not.toContain("  ");
+  });
+
+  it("uses the page title for an ordinary link", () => {
+    expect(
+      titleFromUrlMetadata("https://github.com/devenjarvis/lathe", {
+        title: "GitHub - devenjarvis/lathe: A testing library",
+        description: "Some blurb",
+        siteName: "GitHub",
+      }),
+    ).toBe("GitHub - devenjarvis/lathe: A testing library");
+  });
+
+  it("falls back to a site name that isn't just the domain", () => {
+    expect(
+      titleFromUrlMetadata("https://news.ycombinator.com/item?id=1", {
+        title: null,
+        description: null,
+        siteName: "Hacker News",
+      }),
+    ).toBe("Hacker News");
+  });
+
+  it("returns null when the site name only repeats the domain", () => {
+    expect(
+      titleFromUrlMetadata("https://example.com/page", {
+        title: null,
+        description: null,
+        siteName: "example.com",
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null when there's nothing better than the placeholder", () => {
+    expect(
+      titleFromUrlMetadata("https://example.com/page", {
+        title: null,
+        description: null,
+        siteName: null,
+      }),
+    ).toBeNull();
   });
 });

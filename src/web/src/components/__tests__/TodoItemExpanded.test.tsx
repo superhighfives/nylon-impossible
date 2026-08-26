@@ -9,10 +9,12 @@ vi.mock("@/hooks/useUser", () => ({
 
 const updateUrlPreviewMutate = vi.fn();
 const enrichMutate = vi.fn();
+const processMutate = vi.fn();
 const reresearchMutate = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
   useUpdateUrlPreview: () => ({ mutate: updateUrlPreviewMutate }),
   useEnrichTodo: () => ({ mutate: enrichMutate, isPending: false }),
+  useProcessTodo: () => ({ mutate: processMutate, isPending: false }),
   useReresearch: () => ({ mutate: reresearchMutate, isPending: false }),
 }));
 
@@ -238,6 +240,39 @@ describe("TodoItemExpanded", () => {
       ...overrides,
     };
   }
+
+  it("processes links without AI, and offers it with AI turned off", () => {
+    // beforeEach sets aiEnabled:false — Process is not an AI action, so it's
+    // there regardless.
+    renderExpanded();
+    fireEvent.click(screen.getByRole("button", { name: /process links/i }));
+    expect(processMutate).toHaveBeenCalledWith("todo-1");
+  });
+
+  it("names the failed link and offers a retry that re-processes", () => {
+    renderExpanded({
+      urls: [urlFixture({ fetchStatus: "failed", title: null })],
+    });
+    expect(screen.getByText(/couldn't reach this link/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(processMutate).toHaveBeenCalledWith("todo-1");
+  });
+
+  it("counts multiple failed links in the retry prompt", () => {
+    renderExpanded({
+      urls: [
+        urlFixture({ fetchStatus: "failed", title: null }),
+        urlFixture({ id: "url-2", fetchStatus: "failed", title: null }),
+      ],
+    });
+    expect(screen.getByText(/couldn't reach 2 links/i)).toBeInTheDocument();
+  });
+
+  it("says nothing about failures when every link fetched", () => {
+    renderExpanded({ urls: [urlFixture()] });
+    expect(screen.queryByText(/couldn't reach/i)).not.toBeInTheDocument();
+  });
 
   it("toggles a link's preview off, persisting showPreview=false", () => {
     renderExpanded({ urls: [urlFixture()] });

@@ -1,4 +1,4 @@
-import { ExternalLink, Link2 } from "lucide-react";
+import { AlertCircle, ExternalLink, Link2 } from "lucide-react";
 import { getEmailUrlInfo } from "@/lib/email-urls";
 import { getSocialUrlInfo } from "@/lib/social-urls";
 import { buildFaviconErrorHandler, getUrlDisplay } from "@/lib/url-display";
@@ -7,7 +7,7 @@ import { EmailPreviewCardCompact } from "./EmailPreviewCard";
 import { Loader } from "./Loader";
 import { SocialPreviewCardCompact } from "./SocialPreviewCard";
 
-/** Pending URLs older than this are treated as failed (worker likely restarted) */
+/** Pending URLs untouched for this long are treated as failed (worker likely restarted) */
 const STALE_PENDING_THRESHOLD_MS = 30_000;
 
 interface UrlPreviewCardProps {
@@ -64,11 +64,15 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
     return <SocialPreviewCardCompact url={url} />;
   }
 
+  // Staleness is measured from `updatedAt`, not `createdAt`: re-processing an
+  // old link flips it back to pending, and that fresh spinner shouldn't read as
+  // stale just because the row was created weeks ago.
   const isStale =
     url.fetchStatus === "pending" &&
-    Date.now() - new Date(url.createdAt).getTime() > STALE_PENDING_THRESHOLD_MS;
+    Date.now() - new Date(url.updatedAt).getTime() > STALE_PENDING_THRESHOLD_MS;
   // Treat stale pending URLs as settled (fetch likely lost to a worker restart).
   const isPending = url.fetchStatus === "pending" && !isStale;
+  const isFailed = url.fetchStatus === "failed" || isStale;
   const { favicon, googleFaviconUrl, displayTitle } = getUrlDisplay(url);
 
   return (
@@ -81,6 +85,8 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 shrink-0 text-gray-muted" />
+      ) : isFailed ? (
+        <AlertCircle size={16} className="w-4 h-4 shrink-0 text-red-muted" />
       ) : favicon ? (
         <img
           src={favicon}
@@ -97,6 +103,14 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
         {isPending && (
           <span className="ml-2 text-xs font-normal text-gray-muted">
             Fetching…
+          </span>
+        )}
+        {/* A fetch that never landed used to be indistinguishable from a page
+            with no title — say so instead, so "Process links" reads as the
+            obvious next move rather than a mystery. */}
+        {isFailed && (
+          <span className="ml-2 text-xs font-normal text-red-muted">
+            Couldn't fetch
           </span>
         )}
       </span>

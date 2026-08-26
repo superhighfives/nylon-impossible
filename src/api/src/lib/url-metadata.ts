@@ -157,6 +157,15 @@ function extractTweetId(url: string): string | null {
   return url.match(TWEET_URL_RE)?.[1] ?? null;
 }
 
+/**
+ * Whether a URL points at a single post rather than a profile or listing page.
+ * Callers use it to know that `description` holds the post's own text — the
+ * thing worth reading — instead of a page blurb.
+ */
+export function isSocialPostUrl(url: string): boolean {
+  return extractTweetId(url) !== null;
+}
+
 // X blocks the tweet text from the page HTML for bots, but its public
 // syndication endpoint (the one embeds/react-tweet use) returns the tweet as
 // JSON without auth. The token is a deterministic value derived from the id.
@@ -228,6 +237,19 @@ async function fetchTweetMetadata(id: string): Promise<UrlMetadata | null> {
 }
 
 /**
+ * A metadata fetch and whether the page was reachable at all.
+ *
+ * `ok: false` means we never got a response to read — a network error, a
+ * timeout, or a non-2xx status — as opposed to a page that loaded but carried
+ * no usable tags. Only the former is worth showing the user as a failure (and
+ * worth offering a retry for), so the distinction has to survive the call.
+ */
+export interface UrlMetadataResult {
+  ok: boolean;
+  metadata: UrlMetadata;
+}
+
+/**
  * Fetch and extract metadata from a URL.
  *
  * Extracts Open Graph tags, Twitter Card tags, and standard meta tags.
@@ -235,12 +257,23 @@ async function fetchTweetMetadata(id: string): Promise<UrlMetadata | null> {
  * Times out after 10 seconds to prevent hanging on slow/unresponsive servers.
  */
 export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
+  return (await fetchUrlMetadataResult(url)).metadata;
+}
+
+/**
+ * As `fetchUrlMetadata`, but reporting whether the page was reachable. Prefer
+ * this wherever the outcome is stored or shown — a URL row marked `fetched`
+ * with nothing in it is indistinguishable from one that genuinely 404'd.
+ */
+export async function fetchUrlMetadataResult(
+  url: string,
+): Promise<UrlMetadataResult> {
   // Tweets don't expose their text to bots via HTML — pull it from X's
   // syndication endpoint first, falling back to the scrape below if that fails.
   const tweetId = extractTweetId(url);
   if (tweetId) {
     const tweet = await fetchTweetMetadata(tweetId);
-    if (tweet) return tweet;
+    if (tweet) return { ok: true, metadata: tweet };
   }
 
   let response: Response;
@@ -251,16 +284,16 @@ export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
   } catch {
-    return NULL_METADATA;
+    return { ok: false, metadata: NULL_METADATA };
   }
 
-  if (!response.ok) return NULL_METADATA;
+  if (!response.ok) return { ok: false, metadata: NULL_METADATA };
 
   let html: string;
   try {
     html = await response.text();
   } catch {
-    return NULL_METADATA;
+    return { ok: false, metadata: NULL_METADATA };
   }
 
   // Prefer Open Graph, then Twitter Card, then standard meta/title
@@ -285,10 +318,13 @@ export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
   const image = rawImage ? (resolveUrl(rawImage, url) ?? rawImage) : null;
 
   return {
-    title: decodeHtmlEntities(title),
-    description: decodeHtmlEntities(description),
-    siteName: decodeHtmlEntities(siteName),
-    favicon,
-    image,
+    ok: true,
+    metadata: {
+      title: decodeHtmlEntities(title),
+      description: decodeHtmlEntities(description),
+      siteName: decodeHtmlEntities(siteName),
+      favicon,
+      image,
+    },
   };
 }

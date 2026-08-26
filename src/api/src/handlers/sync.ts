@@ -29,8 +29,8 @@ import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
+import { finishTodoLinks } from "../lib/process-todo";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
-import { fetchUrlMetadata } from "../lib/url-metadata";
 import type { Env } from "../types";
 
 const recurrenceSchema = z.object({
@@ -181,44 +181,6 @@ function serializeTodo(
     urls,
     suggestions,
   };
-}
-
-/** Fetch metadata for URLs in background and update records */
-async function fetchAndUpdateUrlMetadata(
-  db: ReturnType<typeof getDb>,
-  urls: Array<{ id: string; todoId: string; url: string }>,
-) {
-  await Promise.allSettled(
-    urls.map(async ({ id, todoId, url }) => {
-      const now = new Date();
-      try {
-        const metadata = await fetchUrlMetadata(url);
-        await db
-          .update(todoUrls)
-          .set({
-            title: metadata.title,
-            description: metadata.description,
-            siteName: metadata.siteName,
-            favicon: metadata.favicon,
-            image: metadata.image ?? null,
-            fetchStatus: "fetched" as const,
-            fetchedAt: now,
-            updatedAt: now,
-          })
-          .where(eq(todoUrls.id, id));
-      } catch {
-        await db
-          .update(todoUrls)
-          .set({ fetchStatus: "failed" as const, updatedAt: now })
-          .where(eq(todoUrls.id, id));
-      }
-      // Bump parent todo so clients receive updated URL metadata on next sync
-      await db
-        .update(todos)
-        .set({ updatedAt: now })
-        .where(eq(todos.id, todoId));
-    }),
-  );
 }
 
 // POST /todos/sync - Bidirectional sync
@@ -618,7 +580,11 @@ export async function syncTodos(c: Context<Env>) {
     }
 
     if (urlsToFetch.length > 0) {
-      c.executionCtx.waitUntil(fetchAndUpdateUrlMetadata(db, urlsToFetch));
+      // Fetching bumps each parent todo so the new metadata lands on the next
+      // pull, and renames any todo still carrying a "Check {domain}"
+      // placeholder — which is how a link shared in from the iOS share sheet
+      // ends up titled after the page rather than its domain.
+      c.executionCtx.waitUntil(finishTodoLinks(db, c.env, userId, urlsToFetch));
     }
   }
 

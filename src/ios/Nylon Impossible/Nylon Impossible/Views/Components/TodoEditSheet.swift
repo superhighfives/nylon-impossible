@@ -39,7 +39,8 @@ struct TodoEditSheet: View {
     @State private var isLoadingUrls: Bool = false
     @State private var isReresearching: Bool = false
     @State private var isEnriching: Bool = false
-    @State private var newSubtaskTitle: String = ""
+    @State private var isProcessing: Bool = false
+    @State private var processMessage: String?
 
     init(
         todo: TodoItem,
@@ -175,8 +176,30 @@ struct TodoEditSheet: View {
                 // Subtasks — hidden on a recurring todo (mutually exclusive with
                 // recurrence). Once a subtask is added, the Repeat section hides.
                 if recurrenceFrequency == nil {
-                    subtasksSection
+                    SubtasksSection(
+                        subtasks: subtasks,
+                        onToggle: onToggleSubtask,
+                        onDelete: onDeleteSubtask,
+                        onMove: onMoveSubtask,
+                        // Recurrence and subtasks are mutually exclusive, so
+                        // adding one clears the rule — same invariant the API
+                        // enforces on the write.
+                        onAdd: { title in
+                            recurrenceFrequency = nil
+                            onAddSubtask(title)
+                        }
+                    )
                 }
+
+                // Link processing — deterministic, no model involved, so it
+                // sits in its own section above the AI one and shows up whether
+                // or not AI is on. Which button spends a model call should
+                // never be ambiguous.
+                TaskActionsSection(
+                    isProcessing: isProcessing || hasPendingLinks,
+                    message: processMessage,
+                    onProcess: { Task { await processLinks() } }
+                )
 
                 // AI actions — explicit, opt-in enrich / research (nothing runs
                 // automatically). Gated on the aiEnabled master switch.
@@ -208,7 +231,10 @@ struct TodoEditSheet: View {
                 // Links (non-research URLs only)
                 LinksSection(
                     regularUrls: urls.filter { $0.researchId == nil },
-                    isLoading: isLoadingUrls && urls.isEmpty
+                    isLoading: isLoadingUrls && urls.isEmpty,
+                    failedCount: failedLinkCount,
+                    isRetrying: isProcessing || hasPendingLinks,
+                    onRetry: { Task { await processLinks() } }
                 )
             }
             .task {
@@ -237,85 +263,6 @@ struct TodoEditSheet: View {
         }
     }
     
-    // Active subtasks order by position; completed sink to the bottom.
-    private var activeSubtasks: [TodoItem] {
-        subtasks.filter { !$0.isCompleted }.sorted { $0.position < $1.position }
-    }
-
-    private var completedSubtasks: [TodoItem] {
-        subtasks.filter { $0.isCompleted }.sorted { $0.position < $1.position }
-    }
-
-    @ViewBuilder
-    private var subtasksSection: some View {
-        Section {
-            ForEach(activeSubtasks) { subtask in
-                subtaskRow(subtask)
-            }
-            .onMove(perform: onMoveSubtask)
-            .onDelete { offsets in
-                for index in offsets { onDeleteSubtask(activeSubtasks[index]) }
-            }
-
-            // Completed subtasks pinned to the bottom, not reorderable.
-            ForEach(completedSubtasks) { subtask in
-                subtaskRow(subtask)
-                    .moveDisabled(true)
-            }
-            .onDelete { offsets in
-                for index in offsets { onDeleteSubtask(completedSubtasks[index]) }
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Color.appSubtle)
-                TextField("Add a subtask...", text: $newSubtaskTitle)
-                    .onSubmit(addSubtask)
-                if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button("Add", action: addSubtask)
-                        .font(.caption)
-                }
-            }
-        } header: {
-            HStack {
-                Text("Subtasks")
-                if !subtasks.isEmpty {
-                    Spacer()
-                    Text("\(completedSubtasks.count)/\(subtasks.count)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func subtaskRow(_ subtask: TodoItem) -> some View {
-        Button {
-            onToggleSubtask(subtask)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appLine)
-                Text(subtask.title)
-                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appDefault)
-                    .strikethrough(subtask.isCompleted, color: Color.appSubtle)
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func addSubtask() {
-        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        recurrenceFrequency = nil
-        onAddSubtask(trimmed)
-        newSubtaskTitle = ""
-    }
-
     private func saveChanges() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
@@ -384,6 +331,50 @@ struct TodoEditSheet: View {
         }
     }
 
+    /// The todo's own links — research sources belong to the research section.
+    private var regularLinks: [APITodoUrl] {
+        urls.filter { $0.researchId == nil }
+    }
+
+    private var hasPendingLinks: Bool {
+        regularLinks.contains { $0.fetchStatus == .pending }
+    }
+
+    private var failedLinkCount: Int {
+        regularLinks.filter { $0.fetchStatus == .failed }.count
+    }
+
+    /// Re-run link processing: attach any URLs in the todo's text, fetch what's
+    /// behind them, and replace a "Check {domain}" placeholder title with what
+    /// turned up. Not an AI action — no model runs — and it doubles as the retry
+    /// for a link whose fetch failed.
+    private func processLinks() async {
+        guard let apiService else { return }
+        isProcessing = true
+        processMessage = nil
+        defer { isProcessing = false }
+        do {
+            let links = try await apiService.processTodo(todoId: todo.id.uuidString.lowercased())
+            // Say so rather than leaving the button looking inert when there was
+            // nothing to work with.
+            guard links > 0 else {
+                processMessage = "No links to process."
+                return
+            }
+            // The links come back `pending`, so this first reload is what puts
+            // the spinner on them.
+            await loadUrls()
+            // Fetching itself runs in the background server-side. Come back once
+            // for the result so the sheet settles on its own; anything slower
+            // than that lands via the next sync.
+            try? await Task.sleep(for: .seconds(3))
+            await loadUrls()
+        } catch {
+            print("[Process] Link processing error: \(error)")
+            processMessage = "Couldn't process links."
+        }
+    }
+
     private func cancelResearch() async {
         guard let apiService else { return }
         do {
@@ -405,7 +396,8 @@ struct TodoEditSheet: View {
             guard let researchId = research?.id else { return false }
             return !urls.contains(where: { $0.researchId == researchId })
         }()
-        guard needsInitialLoad || hasPendingUrls || hasPendingResearch || isReresearching else { return }
+        guard needsInitialLoad || hasPendingUrls || hasPendingResearch
+            || isReresearching || isProcessing else { return }
 
         isLoadingUrls = true
         defer { isLoadingUrls = false }
@@ -426,13 +418,16 @@ struct TodoEditSheet: View {
 struct UrlRow: View {
     let url: APITodoUrl
     
-    /// Pending URLs older than this threshold are treated as failed (worker likely restarted)
+    /// Pending URLs untouched for this long are treated as failed (worker likely restarted)
     private static let stalePendingThreshold: TimeInterval = 30
-    
-    /// Check if a pending URL is stale (fetch likely lost due to worker restart)
+
+    /// Check if a pending URL is stale (fetch likely lost due to worker restart).
+    /// Measured from `updatedAt`, not `createdAt`: re-processing an old link
+    /// flips it back to pending, and that fresh spinner shouldn't read as stale
+    /// just because the row was created weeks ago.
     private var isStale: Bool {
         url.fetchStatus == .pending &&
-        Date().timeIntervalSince(url.createdAt) > Self.stalePendingThreshold
+        Date().timeIntervalSince(url.updatedAt) > Self.stalePendingThreshold
     }
     
     private var isPending: Bool {
@@ -555,6 +550,127 @@ struct UrlRow: View {
     .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))
 }
 
+/// A todo's subtasks: reorderable active ones, completed pinned below, and an
+/// inline add field.
+private struct SubtasksSection: View {
+    let subtasks: [TodoItem]
+    let onToggle: (TodoItem) -> Void
+    let onDelete: (TodoItem) -> Void
+    let onMove: (IndexSet, Int) -> Void
+    let onAdd: (String) -> Void
+
+    @State private var newSubtaskTitle: String = ""
+
+    // Active subtasks order by position; completed sink to the bottom.
+    private var activeSubtasks: [TodoItem] {
+        subtasks.filter { !$0.isCompleted }.sorted { $0.position < $1.position }
+    }
+
+    private var completedSubtasks: [TodoItem] {
+        subtasks.filter { $0.isCompleted }.sorted { $0.position < $1.position }
+    }
+
+    var body: some View {
+        Section {
+            ForEach(activeSubtasks) { subtask in
+                subtaskRow(subtask)
+            }
+            .onMove(perform: onMove)
+            .onDelete { offsets in
+                for index in offsets { onDelete(activeSubtasks[index]) }
+            }
+
+            // Completed subtasks pinned to the bottom, not reorderable.
+            ForEach(completedSubtasks) { subtask in
+                subtaskRow(subtask)
+                    .moveDisabled(true)
+            }
+            .onDelete { offsets in
+                for index in offsets { onDelete(completedSubtasks[index]) }
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Color.appSubtle)
+                TextField("Add a subtask...", text: $newSubtaskTitle)
+                    .onSubmit(addSubtask)
+                if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button("Add", action: addSubtask)
+                        .font(.caption)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Subtasks")
+                if !subtasks.isEmpty {
+                    Spacer()
+                    Text("\(completedSubtasks.count)/\(subtasks.count)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func subtaskRow(_ subtask: TodoItem) -> some View {
+        Button {
+            onToggle(subtask)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appLine)
+                Text(subtask.title)
+                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appDefault)
+                    .strikethrough(subtask.isCompleted, color: Color.appSubtle)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addSubtask() {
+        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onAdd(trimmed)
+        newSubtaskTitle = ""
+    }
+}
+
+/// Deterministic, always-available actions for a todo. Right now that's link
+/// processing: attach the URLs in the task's text, fetch what's behind them,
+/// and name the task after what turned up.
+///
+/// Deliberately its own section, sitting above the AI one and appearing whether
+/// or not AI is switched on — no model runs here, and it shouldn't have to be
+/// guessed at which of these buttons does.
+private struct TaskActionsSection: View {
+    let isProcessing: Bool
+    let message: String?
+    let onProcess: () -> Void
+
+    var body: some View {
+        Section {
+            Button(action: onProcess) {
+                HStack {
+                    Label("Process links", systemImage: "arrow.clockwise")
+                    if isProcessing {
+                        Spacer()
+                        ProgressView().scaleEffect(0.7)
+                    }
+                }
+            }
+            .disabled(isProcessing)
+        } header: {
+            Text("Task")
+        } footer: {
+            Text(message ?? "Fetches each link and titles the task after it. No AI involved.")
+        }
+    }
+}
+
 /// Explicit, opt-in AI actions for a todo — enrich and research. AI never runs
 /// automatically; this is the deliberate per-todo affordance (Pro + aiEnabled,
 /// gated by the caller).
@@ -585,6 +701,12 @@ private struct AIActionsSection: View {
 private struct LinksSection: View {
     let regularUrls: [APITodoUrl]
     let isLoading: Bool
+    /// How many links couldn't be reached — the recoverable case (rate limits,
+    /// timeouts, a site briefly down) that's worth naming and offering a retry
+    /// for, rather than leaving the row looking merely empty.
+    var failedCount: Int = 0
+    var isRetrying: Bool = false
+    var onRetry: () -> Void = {}
 
     var body: some View {
         if isLoading {
@@ -603,8 +725,21 @@ private struct LinksSection: View {
                 ForEach(regularUrls) { url in
                     UrlRow(url: url)
                 }
+                if failedCount > 0 {
+                    Button(action: onRetry) {
+                        Label("Try again", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(isRetrying)
+                }
             } header: {
                 Text("Links (\(regularUrls.count))")
+            } footer: {
+                if failedCount > 0 {
+                    Text(failedCount == 1
+                         ? "Couldn't reach this link."
+                         : "Couldn't reach \(failedCount) links.")
+                        .foregroundStyle(Color.appDanger)
+                }
             }
         }
     }

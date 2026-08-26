@@ -14,7 +14,20 @@ struct ShareSheetView: View {
     let onCancel: () -> Void
 
     @State private var taskTitle: String = ""
+    /// The "Check {domain}" title we generated ourselves, when we generated one
+    /// — nil if the sharing app supplied a real title, or this isn't a URL.
+    private let generatedTitle: String?
     @FocusState private var isFocused: Bool
+
+    /// Whether the field still holds the placeholder we generated. Compared
+    /// against the live `taskTitle` rather than settled at init: the moment the
+    /// user types their own title the server stops rewriting it (per
+    /// `isPlaceholderTitle` on the API side), so the promise below has to stop
+    /// with it — and come back if they undo the edit.
+    private var titleIsPlaceholder: Bool {
+        guard let generatedTitle else { return false }
+        return taskTitle.trimmingCharacters(in: .whitespacesAndNewlines) == generatedTitle
+    }
 
     init(content: String, isURL: Bool, prefilledTitle: String? = nil, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.content = content
@@ -23,9 +36,14 @@ struct ShareSheetView: View {
         self.onCancel = onCancel
         // Use the app-provided title (e.g. article title from Reeder) when available;
         // otherwise fall back to generating a title from the URL or using the text directly.
+        // A share extension has no network of its own, so the URL-derived title
+        // is a placeholder: the server replaces it with the page's real title
+        // (or a tweet's opening line) once it fetches the link on the next sync.
         let defaultTitle = isURL ? TaskCreationService.titleFromURL(content) : content
         let trimmed = prefilledTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
-        _taskTitle = State(initialValue: (trimmed?.isEmpty == false ? trimmed! : nil) ?? defaultTitle)
+        let supplied = trimmed?.isEmpty == false ? trimmed : nil
+        generatedTitle = (isURL && supplied == nil) ? defaultTitle : nil
+        _taskTitle = State(initialValue: supplied ?? defaultTitle)
     }
     
     var body: some View {
@@ -43,6 +61,14 @@ struct ShareSheetView: View {
                 }
                 .padding(.horizontal)
                 
+                if titleIsPlaceholder {
+                    Text("Leave this as-is and Nylon will title the task from the link once it fetches it.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                }
+
                 if isURL {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("URL")
