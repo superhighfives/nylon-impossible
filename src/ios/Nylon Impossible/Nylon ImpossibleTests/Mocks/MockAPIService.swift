@@ -114,6 +114,18 @@ final class MockAPIService: APIProviding {
         }
     }
 
+    var processTodoError: Error?
+    var processTodoLinkCount: Int = 1
+    var lastProcessTodoId: String?
+
+    func processTodo(todoId: String) async throws -> Int {
+        lastProcessTodoId = todoId
+        if let error = processTodoError {
+            throw error
+        }
+        return processTodoLinkCount
+    }
+
     var cancelResearchError: Error?
     var lastCancelResearchTodoId: String?
 
