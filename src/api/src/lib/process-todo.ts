@@ -240,18 +240,23 @@ export async function finishTodoLinks(
 
   await fetchTodoLinks(db, links);
 
+  // One sync can carry links for many todos, and they don't depend on each
+  // other. `allSettled` so a todo that fails to retitle doesn't cost the rest
+  // their bump — or everyone the notify below.
   const now = new Date();
-  for (const todoId of new Set(links.map((link) => link.todoId))) {
-    const retitled = await applyLinkTitle(db, todoId);
-    // applyLinkTitle already bumped the todo when it renamed it. Otherwise the
-    // bump is what carries the new link metadata into the next sync pull.
-    if (!retitled) {
-      await db
-        .update(todos)
-        .set({ updatedAt: now })
-        .where(eq(todos.id, todoId));
-    }
-  }
+  await Promise.allSettled(
+    [...new Set(links.map((link) => link.todoId))].map(async (todoId) => {
+      const retitled = await applyLinkTitle(db, todoId);
+      // applyLinkTitle already bumped the todo when it renamed it. Otherwise the
+      // bump is what carries the new link metadata into the next sync pull.
+      if (!retitled) {
+        await db
+          .update(todos)
+          .set({ updatedAt: now })
+          .where(eq(todos.id, todoId));
+      }
+    }),
+  );
 
   await notifySync(env, userId);
 }

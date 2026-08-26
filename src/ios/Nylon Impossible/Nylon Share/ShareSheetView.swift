@@ -14,12 +14,20 @@ struct ShareSheetView: View {
     let onCancel: () -> Void
 
     @State private var taskTitle: String = ""
-    /// Whether the title is still the "Check {domain}" placeholder we generated
-    /// rather than one the sharing app supplied or the user typed. Only a
-    /// placeholder gets replaced server-side once the link is fetched, so this
-    /// is what decides whether to promise that.
-    private let titleIsPlaceholder: Bool
+    /// The "Check {domain}" title we generated ourselves, when we generated one
+    /// — nil if the sharing app supplied a real title, or this isn't a URL.
+    private let generatedTitle: String?
     @FocusState private var isFocused: Bool
+
+    /// Whether the field still holds the placeholder we generated. Compared
+    /// against the live `taskTitle` rather than settled at init: the moment the
+    /// user types their own title the server stops rewriting it (per
+    /// `isPlaceholderTitle` on the API side), so the promise below has to stop
+    /// with it — and come back if they undo the edit.
+    private var titleIsPlaceholder: Bool {
+        guard let generatedTitle else { return false }
+        return taskTitle.trimmingCharacters(in: .whitespacesAndNewlines) == generatedTitle
+    }
 
     init(content: String, isURL: Bool, prefilledTitle: String? = nil, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
         self.content = content
@@ -34,7 +42,7 @@ struct ShareSheetView: View {
         let defaultTitle = isURL ? TaskCreationService.titleFromURL(content) : content
         let trimmed = prefilledTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
         let supplied = trimmed?.isEmpty == false ? trimmed : nil
-        titleIsPlaceholder = isURL && supplied == nil
+        generatedTitle = (isURL && supplied == nil) ? defaultTitle : nil
         _taskTitle = State(initialValue: supplied ?? defaultTitle)
     }
     

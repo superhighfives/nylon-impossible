@@ -57,12 +57,18 @@ struct TodoItemRow: View {
             .strikethrough(todo.isEffectivelyCompleted, color: Color.appSubtle)
     }
 
-    /// The title — a real link when that's all it is, plain text otherwise
-    /// (the row's own tap gesture opens the edit sheet either way).
+    /// The title — a real link when that's all it is, a button onto the edit
+    /// sheet otherwise.
     ///
     /// A row that reads as nothing but a link should behave as one. That's all
     /// it can do until link processing gives the task a proper title and a
     /// preview card to sit under it.
+    ///
+    /// Both branches are real controls rather than bare text, so each carries
+    /// its own role — VoiceOver announces a link as a link and a title as a
+    /// button, and both are reachable and activatable without sight of the
+    /// row's tap area. The container's gesture only widens the target for the
+    /// space around them; it is never the sole way in.
     @ViewBuilder
     private var titleView: some View {
         if let url = titleOnlyUrl {
@@ -74,9 +80,13 @@ struct TodoItemRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel("Open \(todo.title)")
         } else {
-            titleText
-                .foregroundStyle(todo.isEffectivelyCompleted ? Color.appSubtle : Color.appDefault)
-                .animation(.easeInOut(duration: 0.2), value: todo.isEffectivelyCompleted)
+            Button(action: { showingEditSheet = true }) {
+                titleText
+                    .foregroundStyle(todo.isEffectivelyCompleted ? Color.appSubtle : Color.appDefault)
+                    .animation(.easeInOut(duration: 0.2), value: todo.isEffectivelyCompleted)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens the task for editing")
         }
     }
 
@@ -271,6 +281,11 @@ struct TodoItemRow: View {
             // inside a `.plain` Button's label never receives the tap. As a
             // sibling gesture the links win within their own bounds and the
             // container catches everything else.
+            //
+            // It's extra hit area, not the only way in: the title is itself a
+            // Button, so the edit sheet stays reachable with the role and
+            // activation VoiceOver expects. A gesture on a container carries no
+            // such semantics on its own.
             VStack(alignment: .leading, spacing: 4) {
                 // Title row with AI status.
                 HStack(spacing: 6) {
