@@ -14,13 +14,13 @@ import {
 } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
+import { finishTodoLinks } from "./process-todo";
 import { sendResearchJob } from "./research";
 import {
   cleanUrlString,
   createFallbackFromUrl,
   truncateTitle,
 } from "./url-helpers";
-import { fetchUrlMetadata } from "./url-metadata";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -371,7 +371,10 @@ export async function createSmartTodo(
   return { todo: serializeCreatedTodo(created), ai: useAI };
 }
 
-/** Fetch metadata for URLs in background */
+/**
+ * Fetch metadata for a new todo's URLs in the background, then name the todo
+ * after what came back if its title is still the "Check {domain}" placeholder.
+ */
 async function fetchUrlMetadataBackground(
   db: Db,
   todoId: string,
@@ -381,44 +384,16 @@ async function fetchUrlMetadataBackground(
   // Get the pending URL records we just created — attachments (e.g. a Gmail
   // permalink) are inserted already `fetched` and must not be fetched over.
   const urlRecords = await db
-    .select()
+    .select({ id: todoUrls.id, url: todoUrls.url })
     .from(todoUrls)
     .where(
       and(eq(todoUrls.todoId, todoId), eq(todoUrls.fetchStatus, "pending")),
     );
 
-  await Promise.allSettled(
-    urlRecords.map(async (record) => {
-      try {
-        const metadata = await fetchUrlMetadata(record.url);
-        await db
-          .update(todoUrls)
-          .set({
-            title: metadata.title,
-            description: metadata.description,
-            siteName: metadata.siteName,
-            favicon: metadata.favicon,
-            image: metadata.image,
-            fetchStatus: "fetched" as const,
-            fetchedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(todoUrls.id, record.id));
-      } catch (error) {
-        Sentry.captureException(error, {
-          tags: { area: "url-metadata" },
-        });
-        await db
-          .update(todoUrls)
-          .set({
-            fetchStatus: "failed" as const,
-            updatedAt: new Date(),
-          })
-          .where(eq(todoUrls.id, record.id));
-      }
-    }),
+  await finishTodoLinks(
+    db,
+    env,
+    userId,
+    urlRecords.map((record) => ({ ...record, todoId })),
   );
-
-  // Notify clients that metadata is ready
-  await notifySync(env, userId);
 }

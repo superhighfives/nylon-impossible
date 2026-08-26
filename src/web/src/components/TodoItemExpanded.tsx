@@ -5,6 +5,7 @@ import {
   Link2,
   Pin,
   PinOff,
+  RefreshCw,
   Search,
   Sparkles,
   Trash2,
@@ -14,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import { useHints } from "@/hooks/useHints";
 import {
   useEnrichTodo,
+  useProcessTodo,
   useReresearch,
   useUpdateUrlPreview,
 } from "@/hooks/useTodos";
@@ -168,6 +170,7 @@ export function TodoItemExpanded({
   const { timeZone } = useHints();
   const updateUrlPreview = useUpdateUrlPreview();
   const enrichTodo = useEnrichTodo();
+  const processTodo = useProcessTodo();
   const reresearch = useReresearch();
 
   // AI is intentional and gated on the aiEnabled master switch; the
@@ -176,6 +179,15 @@ export function TodoItemExpanded({
   const aiProcessing =
     todo.aiStatus === "pending" || todo.aiStatus === "processing";
   const aiFailed = todo.aiStatus === "failed";
+
+  // The todo's own links (research sources belong to a research run and are
+  // shown in its section instead). A pending one means a fetch is in flight;
+  // a failed one is what the Process action retries.
+  const links = todo.urls.filter((url) => !url.researchId);
+  const linksProcessing = links.some((url) => url.fetchStatus === "pending");
+  const failedLinkCount = links.filter(
+    (url) => url.fetchStatus === "failed",
+  ).length;
 
   // Local state for form fields. We track which fields the user has touched
   // so that background updates to the todo (e.g. AI re-enrichment after a
@@ -443,17 +455,48 @@ export function TodoItemExpanded({
         />
       )}
 
-      {/* Actions — opt-in AI enrich/research (Pro + aiEnabled only) sit
-          alongside the always-available Sticky toggle, since they're all
-          one-click actions on the todo as a whole. Sticky commits on click
-          with no debounce — instantly reversible, like the Repeat select. */}
-      <div className="space-y-1.5">
+      {/* Actions, split by what actually runs. "Task" is deterministic work
+          that's always available — pinning, and fetching what's behind the
+          todo's links. "AI" is the opt-in half (aiEnabled only), where a model
+          proposes changes for you to accept. Keeping them in separate labelled
+          groups is the point: it should never be ambiguous which button spends
+          a model call. Sticky commits on click with no debounce — instantly
+          reversible, like the Repeat select. */}
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <p className="text-xs font-medium text-gray-muted">Task</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => onUpdate({ sticky: !todo.sticky })}
+              aria-pressed={todo.sticky}
+            >
+              {todo.sticky ? <Pin size={14} /> : <PinOff size={14} />}
+              {todo.sticky ? "Pinned to top" : "Pin to top"}
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              type="button"
+              onClick={() => processTodo.mutate(todo.id)}
+              disabled={processTodo.isPending || linksProcessing}
+              loading={processTodo.isPending}
+              title="Fetch titles and previews for this task's links"
+            >
+              {!processTodo.isPending && <RefreshCw size={14} />}
+              Process links
+            </Button>
+          </div>
+          <p className="text-xs text-gray-muted">
+            Fetches each link and titles the task after it. No AI involved.
+          </p>
+        </div>
         {aiAvailable && (
-          <p className="text-xs font-medium text-gray-muted">AI</p>
-        )}
-        <div className="flex items-center gap-2">
-          {aiAvailable && (
-            <>
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-gray-muted">AI</p>
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="secondary"
                 size="sm"
@@ -476,21 +519,11 @@ export function TodoItemExpanded({
                 {!reresearch.isPending && <Search size={14} />}
                 Research
               </Button>
-            </>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            type="button"
-            onClick={() => onUpdate({ sticky: !todo.sticky })}
-            aria-pressed={todo.sticky}
-          >
-            {todo.sticky ? <Pin size={14} /> : <PinOff size={14} />}
-            {todo.sticky ? "Pinned to top" : "Pin to top"}
-          </Button>
-        </div>
-        {aiAvailable && aiFailed && (
-          <p className="text-sm text-red-muted">Enrichment failed.</p>
+            </div>
+            {aiFailed && (
+              <p className="text-sm text-red-muted">Enrichment failed.</p>
+            )}
+          </div>
         )}
       </div>
 
@@ -536,39 +569,60 @@ export function TodoItemExpanded({
       {aiAvailable && <TodoAgentChat todo={todo} />}
 
       {/* URLs (user-provided, not research sources) */}
-      {todo.urls && todo.urls.filter((url) => !url.researchId).length > 0 && (
+      {links.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-gray-muted flex items-center gap-1">
             <Link2 size={12} />
-            Links ({todo.urls.filter((url) => !url.researchId).length})
+            Links ({links.length})
           </p>
           <div className="space-y-2">
-            {todo.urls
-              .filter((url) => !url.researchId)
-              .map((url) => (
-                <div key={url.id} className="space-y-1">
-                  <UrlCard url={url} />
-                  {url.fetchStatus === "fetched" &&
-                    (url.title || url.description) && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateUrlPreview.mutate({
-                            id: url.id,
-                            showPreview: !url.showPreview,
-                          })
-                        }
-                        disabled={updateUrlPreview.isPending}
-                        // aria-pressed reflects "URL-only mode" being active.
-                        aria-pressed={!url.showPreview}
-                        className="-mx-1.5 inline-flex min-h-8 items-center px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
-                      >
-                        {url.showPreview ? "Show just the URL" : "Show preview"}
-                      </button>
-                    )}
-                </div>
-              ))}
+            {links.map((url) => (
+              <div key={url.id} className="space-y-1">
+                <UrlCard url={url} />
+                {url.fetchStatus === "fetched" &&
+                  (url.title || url.description) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateUrlPreview.mutate({
+                          id: url.id,
+                          showPreview: !url.showPreview,
+                        })
+                      }
+                      disabled={updateUrlPreview.isPending}
+                      // aria-pressed reflects "URL-only mode" being active.
+                      aria-pressed={!url.showPreview}
+                      className="-mx-1.5 inline-flex min-h-8 items-center px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
+                    >
+                      {url.showPreview ? "Show just the URL" : "Show preview"}
+                    </button>
+                  )}
+              </div>
+            ))}
           </div>
+          {/* A fetch that didn't land is recoverable — sites rate-limit, time
+              out, or were briefly down — so say so and offer the retry right
+              here rather than leaving the card looking merely empty. */}
+          {failedLinkCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+              <p className="text-xs text-red-muted">
+                Couldn't reach{" "}
+                {failedLinkCount === 1
+                  ? "this link"
+                  : `${failedLinkCount} links`}
+                .
+              </p>
+              <button
+                type="button"
+                onClick={() => processTodo.mutate(todo.id)}
+                disabled={processTodo.isPending || linksProcessing}
+                className="-mx-1.5 inline-flex min-h-8 items-center gap-1 px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
+              >
+                <RefreshCw size={12} />
+                Try again
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

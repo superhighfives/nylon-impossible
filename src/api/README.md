@@ -30,6 +30,9 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 | `POST` | `/todos/sync` | Sync todos (bulk create/update/delete) | Yes |
 | `PUT` | `/todos/:id` | Update todo | Yes |
 | `DELETE` | `/todos/:id` | Delete todo | Yes |
+| `POST` | `/todos/:id/process` | Re-run link processing (fetch links, title the todo from them) — no AI | Yes |
+| `POST` | `/todos/:id/enrich` | Run AI enrichment (requires `aiEnabled`) | Yes |
+| `POST` | `/todos/:id/research` | Run AI research (requires `aiEnabled`) | Yes |
 | `POST` | `/gmail-addon/homepage` | Gmail add-on homepage card | Google ID token |
 | `POST` | `/gmail-addon/contextual` | Gmail add-on message card | Google ID token |
 | `POST` | `/gmail-addon/actions/*` | Gmail add-on card actions | Google ID token |
@@ -136,6 +139,7 @@ src/api/
 │   │   ├── sync.ts               # Sync endpoint with conflict resolution
 │   │   ├── users.ts              # Current-user endpoints
 │   │   ├── smart-create.ts       # Thin wrapper over createSmartTodo (background AI enrichment)
+│   │   ├── process.ts            # Re-run link processing for a todo (no AI)
 │   │   ├── reresearch.ts         # Manually re-run research for a todo
 │   │   ├── cancel-research.ts    # Cancel an in-flight research job
 │   │   └── gmail-addon/          # Gmail add-on card handlers (homepage, contextual, actions)
@@ -151,6 +155,7 @@ src/api/
 │   │   ├── db.ts                 # Drizzle schema and database client
 │   │   ├── errors.ts             # Shared error types
 │   │   ├── notify-sync.ts        # Poke the sync Durable Object after writes
+│   │   ├── process-todo.ts       # Non-AI link processing: attach, fetch, title from metadata
 │   │   ├── url-helpers.ts        # URL parsing / title-truncation utilities
 │   │   └── url-metadata.ts       # OG metadata fetching for extracted URLs
 │   └── durable-objects/

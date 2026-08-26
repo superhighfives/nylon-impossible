@@ -610,6 +610,52 @@ export function useImportGoogleTasks() {
 }
 
 /**
+ * Hook to re-run link processing on a todo: attach any URLs in its text, fetch
+ * what's behind them, and name the todo after what turned up if it's still
+ * carrying a "Check {domain}" placeholder.
+ *
+ * Deliberately not an AI action — no model runs and it works with AI turned
+ * off. It's the retry for a link whose fetch failed, and the way a todo
+ * captured as a bare URL gets a real title. Results arrive via sync; the links
+ * flip to pending server-side so the row shows a spinner meanwhile.
+ */
+export function useProcessTodo() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (todoId: string) => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/process`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+
+      return response.json() as Promise<{ status: string; links: number }>;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+      if (result.links === 0) {
+        toast.info("No links to process on this task");
+      }
+    },
+    onError: (err) => {
+      Sentry.captureException(err, { tags: { mutation: "processTodo" } });
+      toast.error(messageFromError(err, "Couldn't process todo"));
+    },
+  });
+}
+
+/**
  * Hook to run AI enrichment on an existing todo on demand. AI is intentional —
  * nothing enriches automatically — so this backs the explicit per-todo "Enrich"
  * action. Marks the todo pending server-side; the result arrives via sync.

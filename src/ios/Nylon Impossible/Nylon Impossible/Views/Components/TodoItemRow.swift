@@ -36,6 +36,50 @@ struct TodoItemRow: View {
         urls.filter { $0.researchId == nil }
     }
 
+    /// The URL a title consists entirely of — a task captured as nothing but a
+    /// link, whether shared in from elsewhere or typed straight into the add
+    /// bar. Nil for a title that's prose, even prose containing a link.
+    private var titleOnlyUrl: URL? {
+        let trimmed = todo.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.contains(" "),
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
+    /// The title, as the row renders it.
+    private var titleText: Text {
+        Text(todo.title)
+            .font(.system(size: todo.isEffectivelyCompleted ? 13 : 16))
+            .strikethrough(todo.isEffectivelyCompleted, color: Color.appSubtle)
+    }
+
+    /// The title — a real link when that's all it is, plain text otherwise
+    /// (the row's own tap gesture opens the edit sheet either way).
+    ///
+    /// A row that reads as nothing but a link should behave as one. That's all
+    /// it can do until link processing gives the task a proper title and a
+    /// preview card to sit under it.
+    @ViewBuilder
+    private var titleView: some View {
+        if let url = titleOnlyUrl {
+            Link(destination: url) {
+                titleText
+                    .foregroundStyle(todo.isEffectivelyCompleted ? Color.appSubtle : Color.appAccent)
+                    .underline()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Open \(todo.title)")
+        } else {
+            titleText
+                .foregroundStyle(todo.isEffectivelyCompleted ? Color.appSubtle : Color.appDefault)
+                .animation(.easeInOut(duration: 0.2), value: todo.isEffectivelyCompleted)
+        }
+    }
+
     /// Due-date + recurrence pills shown under the title, mirroring
     /// the web `TodoIndicators` row.
     @ViewBuilder
@@ -269,111 +313,112 @@ struct TodoItemRow: View {
             }
             .buttonStyle(.plain)
 
-            // Task content — tappable to edit
-            Button(action: {
-                showingEditSheet = true
-            }) {
-                VStack(alignment: .leading, spacing: 4) {
-                    // Title row with AI status.
-                    HStack(spacing: 6) {
-                        Text(todo.title)
-                            .font(.system(size: todo.isEffectivelyCompleted ? 13 : 16))
-                            .foregroundStyle(todo.isEffectivelyCompleted ? Color.appSubtle : Color.appDefault)
-                            .strikethrough(todo.isEffectivelyCompleted, color: Color.appSubtle)
-                            .animation(.easeInOut(duration: 0.2), value: todo.isEffectivelyCompleted)
-                        
-                        // AI processing indicator
-                        if todo.isAIProcessing {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                                .tint(Color.appSubtle)
-                                .accessibilityLabel("AI is processing")
-                        }
+            // Task content — tappable to edit.
+            //
+            // The tap is an `onTapGesture` on the container rather than a
+            // Button wrapping it: the links inside (the title when it's a bare
+            // URL, and the preview cards) are real `Link`s, and a `Link` nested
+            // inside a `.plain` Button's label never receives the tap. As a
+            // sibling gesture the links win within their own bounds and the
+            // container catches everything else.
+            VStack(alignment: .leading, spacing: 4) {
+                // Title row with AI status.
+                HStack(spacing: 6) {
+                    titleView
 
-                        // Research pending indicator
-                        if !todo.isAIProcessing && todo.isResearchPending {
-                            ProgressView()
-                                .scaleEffect(0.7)
-                                .tint(Color.appAccent)
-                                .accessibilityLabel("Researching")
-                        }
+                    // AI processing indicator
+                    if todo.isAIProcessing {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .tint(Color.appSubtle)
+                            .accessibilityLabel("AI is processing")
+                    }
 
-                        // Agent has a question awaiting the user's reply
-                        if todo.needsInput {
-                            Image(systemName: "bubble.left.fill")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.appAccent)
-                                .accessibilityLabel("The assistant has a question")
-                        }
+                    // Research pending indicator
+                    if !todo.isAIProcessing && todo.isResearchPending {
+                        ProgressView()
+                            .scaleEffect(0.7)
+                            .tint(Color.appAccent)
+                            .accessibilityLabel("Researching")
+                    }
 
-                        // Agent has proposed changes awaiting review
-                        if todo.hasPendingSuggestions {
-                            Circle()
-                                .fill(Color.appAccent)
-                                .frame(width: 8, height: 8)
-                                .accessibilityLabel("AI has suggestions")
-                        }
+                    // Agent has a question awaiting the user's reply
+                    if todo.needsInput {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.appAccent)
+                            .accessibilityLabel("The assistant has a question")
+                    }
 
-                        // Subtask progress (n/m), mirroring the web badge.
-                        if !subtasks.isEmpty {
-                            HStack(spacing: 3) {
-                                Image(systemName: "list.bullet.indent")
-                                    .font(.system(size: 10))
-                                Text("\(completedSubtaskCount)/\(subtasks.count)")
-                                    .font(.system(size: 12))
-                                    .monospacedDigit()
-                            }
-                            .foregroundStyle(Color.appSubtle)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.appTint, in: RoundedRectangle(cornerRadius: 6))
-                            .accessibilityLabel("\(completedSubtaskCount) of \(subtasks.count) subtasks complete")
-                        }
+                    // Agent has proposed changes awaiting review
+                    if todo.hasPendingSuggestions {
+                        Circle()
+                            .fill(Color.appAccent)
+                            .frame(width: 8, height: 8)
+                            .accessibilityLabel("AI has suggestions")
+                    }
 
-                        Spacer()
-                        if !todo.isSynced {
-                            Circle()
-                                .fill(Color.appSubtle)
-                                .frame(width: 6, height: 6)
+                    // Subtask progress (n/m), mirroring the web badge.
+                    if !subtasks.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "list.bullet.indent")
+                                .font(.system(size: 10))
+                            Text("\(completedSubtaskCount)/\(subtasks.count)")
+                                .font(.system(size: 12))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(Color.appSubtle)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.appTint, in: RoundedRectangle(cornerRadius: 6))
+                        .accessibilityLabel("\(completedSubtaskCount) of \(subtasks.count) subtasks complete")
+                    }
+
+                    Spacer()
+
+                    if !todo.isSynced {
+                        Circle()
+                            .fill(Color.appSubtle)
+                            .frame(width: 6, height: 6)
+                    }
+                }
+
+                if todo.isEffectivelyCompleted {
+                    // Completion date for any completed todo. Repeats stamp
+                    // completedAt; normal/legacy todos fall back to updatedAt
+                    // (≈ completion time). Matches web.
+                    Text("Completed: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.appSubtle)
+
+                    // Full note/research/link previews collapse to compact
+                    // outline badges once done. Matches web.
+                    completedContentBadges
+                } else if !nonResearchUrls.isEmpty {
+                    // URL cards (compact) — hide research URLs, limit to 2 visible
+                    FlowLayout(spacing: 6) {
+                        ForEach(Array(nonResearchUrls.prefix(2))) { url in
+                            UrlRowCompact(url: url)
                         }
                     }
-                    
-                    if todo.isEffectivelyCompleted {
-                        // Completion date for any completed todo. Repeats stamp
-                        // completedAt; normal/legacy todos fall back to updatedAt
-                        // (≈ completion time). Matches web.
-                        Text("Completed: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    if nonResearchUrls.count > 2 {
+                        Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.appSubtle)
-
-                        // Full note/research/link previews collapse to compact
-                        // outline badges once done. Matches web.
-                        completedContentBadges
-                    } else if !nonResearchUrls.isEmpty {
-                        // URL cards (compact) — hide research URLs, limit to 2 visible
-                        FlowLayout(spacing: 6) {
-                            ForEach(Array(nonResearchUrls.prefix(2))) { url in
-                                UrlRowCompact(url: url)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if nonResearchUrls.count > 2 {
-                            Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.appSubtle)
-                        }
                     }
-
-                    // Due-date badges — labeled pills, matching
-                    // web's indicator row.
-                    indicatorBadges
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .buttonStyle(.plain)
 
-            // Sticky pin toggle — a sibling of the title/edit Button rather
-            // than nested inside it, so tapping the pin doesn't also open the
+                // Due-date badges — labeled pills, matching
+                // web's indicator row.
+                indicatorBadges
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .onTapGesture { showingEditSheet = true }
+
+            // Sticky pin toggle — a sibling of the tappable content rather
+            // than inside it, so tapping the pin doesn't also open the
             // edit sheet. Subtasks never get this (no toggle passed in from
             // the subtask row builder). Hidden once completed — completing
             // clears sticky server-side, so it wouldn't do anything.
