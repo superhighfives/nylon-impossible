@@ -9,6 +9,11 @@ name: Generate Marketing Screenshots
 # `continue-on-error`, so the fix is to stop coupling the two — regenerating
 # images for a different repo's landing page is downstream of the deploy, not
 # part of it, and it now has a run (and a status) of its own.
+#
+# ios-release.yml still calls this as a reusable workflow, so it keeps the
+# workflow_call trigger. A screenshot flake can therefore still redden an App
+# Store release; capture degrading to the last good screenshots (see
+# capturePhase in generate.ts) is what keeps that rare.
 on:
   workflow_dispatch:
     inputs:
@@ -24,6 +29,29 @@ on:
     workflows: ["Deploy to Cloudflare"]
     types: [completed]
     branches: [main]
+  # ios-release.yml still calls this directly after an App Store release, so the
+  # iOS shots reflect the released build. `uses:` only resolves against a
+  # workflow that declares workflow_call, and workflow_run above can't stand in
+  # for it — it's scoped to "Deploy to Cloudflare", which a release never runs.
+  workflow_call:
+    inputs:
+      force_ios:
+        type: boolean
+        default: false
+      # Callers get the lenient default: a flaky capture degrades to the last
+      # good screenshots rather than reddening whatever pipeline invoked this.
+      strict:
+        type: boolean
+        default: false
+    secrets:
+      CLERK_DEVELOPMENT_PUBLISHABLE_KEY:
+        required: true
+      CLERK_DEVELOPMENT_SECRET_KEY:
+        required: true
+      CLERK_DEVELOPMENT_USER_EMAIL:
+        required: true
+      SUPERHIGHFIVES_DEPLOY_TOKEN:
+        required: true
 
 permissions:
   contents: read
@@ -37,10 +65,11 @@ concurrency:
 
 jobs:
   screenshots:
-    # web-deploy also runs on pull_request, where deploy-production is skipped
-    # and there is nothing newly in production to screenshot.
+    # Dispatched and called invocations always run. Only the workflow_run path
+    # needs filtering: web-deploy also runs on pull_request, where
+    # deploy-production is skipped and nothing new reached production.
     if: >-
-      github.event_name == 'workflow_dispatch'
+      github.event_name != 'workflow_run'
       || (github.event.workflow_run.conclusion == 'success'
           && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event))
     runs-on: macos-26
