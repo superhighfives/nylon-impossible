@@ -561,7 +561,7 @@ function ColumnScroller({
         // auto too (browsers won't mix scroll with visible), so
         // without its own padding this clips the reorder grip,
         // which hangs left of each row via -translate-x-full.
-        className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 pb-28 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         onWheel={onWheel}
       >
         <div ref={topSentinelRef} aria-hidden />
