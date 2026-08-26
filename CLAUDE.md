@@ -79,32 +79,6 @@ code deploys is what bites. Reordering CI to deploy-before-migrate just breaks
 it the other way (new code expects a column the migration hasn't added yet), so
 this is a migration-authoring discipline, not a CI tweak.
 
-## Marketing screenshots
-
-`marketing.yml` regenerates the landing-page screenshots on
-superhighfives.com. It used to be a job inside `web-deploy.yml`, which meant
-its flakes (Vite optimizer races, Clerk sign-in timeouts, `simctl launch` on a
-wedged simulator) reported the *deploy* as failed — for a stretch, every red
-`web-deploy` run was this job and `deploy-production` was green in all of them.
-It now runs on `workflow_run` after a successful deploy, with its own status.
-
-Two rules keep it that way, and both are easy to undo by accident:
-
-- **Capture is best-effort.** `capturePhase` in `generate.ts` catches a failed
-  capture and reuses the screenshot the workflow restored from cache, so the
-  composite matches what's published and the publish step no-ops. Don't
-  "fix" a flake by adding another retry — that's been tried four times and a
-  new failure mode showed up each time. A run only fails when there's nothing
-  to fall back to. `capture-status.json` records `fresh`/`cached`/`skipped`
-  per asset; anything reused gets a `::warning::`.
-- **Don't put it back in the deploy pipeline.** A job that calls a reusable
-  workflow can't be given `continue-on-error`, so coupling them is all-or-
-  nothing.
-
-The iOS screenshots are cached against `hashFiles('src/ios/**', …)`, so a
-web-only deploy skips the Xcode build and simulator entirely — that's most of
-the runtime and nearly all of the flakiness. Only a freshly captured pair is
-written back to that cache; caching a reused one would pin stale screenshots to
-a revision they don't belong to. To regenerate by hand, dispatch the workflow
-with `force_ios` (it also runs `strict` by default, so a fallback fails rather
-than passing quietly).
+Note: a red `web-deploy` run is usually the cosmetic marketing `screenshots`
+job, not the deploy — check the `deploy-production` job specifically before
+concluding a deploy failed.

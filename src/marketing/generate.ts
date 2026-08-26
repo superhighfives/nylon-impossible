@@ -11,8 +11,6 @@
  *   --web          Composite source PNGs into website JPGs (@2x + @1x).
  *   --publish      Copy web JPGs to superhighfives.com, commit, and push.
  *   --all          Run capture, web, and publish in sequence.
- *   --skip-ios     Reuse the iOS screenshots already in source/ (no simulator).
- *   --strict       Fail if any asset had to fall back to a previous capture.
  *
  * Environment:
  *   VITE_CLERK_PUBLISHABLE_KEY  Required for web capture (Clerk dev instance publishable key).
@@ -21,8 +19,6 @@
  *   SUPERHIGHFIVES_DIR          Path to superhighfives.com repo root.
  *                               Default: ../../pika-workspace/superhighfives.com
  *                               (relative to nylon-impossible workspace root)
- *   MARKETING_SKIP_IOS=1        Same as --skip-ios.
- *   MARKETING_STRICT=1          Same as --strict.
  *
  * Output:
  *   source/   — captured raw PNGs (gitignored)
@@ -104,15 +100,6 @@ const runCapture = flag("--capture") || flag("--all");
 const runCaptureWeb = flag("--capture-web");
 const runWeb = flag("--web") || flag("--all");
 const runPublish = flag("--publish") || flag("--all");
-
-// Capture is best-effort by default (see capturePhase): a flake degrades to the
-// screenshots already in source/ instead of failing the run. --strict turns
-// that back into a hard failure, so a manual run still tells you the truth.
-const strictCapture = flag("--strict") || process.env.MARKETING_STRICT === "1";
-// Skip the simulator when source/ already holds iOS screenshots for this
-// revision of the app — see the iOS cache in .github/workflows/marketing.yml.
-const skipIOSCapture =
-  flag("--skip-ios") || process.env.MARKETING_SKIP_IOS === "1";
 
 if (!runCapture && !runCaptureWeb && !runWeb && !runPublish) {
   console.error(
@@ -452,33 +439,17 @@ async function captureWebScreenshots(): Promise<void> {
 // Capture — iOS simulator
 // ---------------------------------------------------------------------------
 
-/**
- * Current CoreSimulator state ("Booted", "Shutdown", …) for a device.
- *
- * Timed out deliberately: when CoreSimulator is wedged — exactly when we're
- * asking — `simctl list` hangs rather than erroring, and an untimed execSync
- * here once burned ~110s inside a boot retry that was itself on a 120s budget.
- * A hung lookup is not worth waiting on; report it as unknown and let the
- * caller retry.
- */
+/** Current CoreSimulator state ("Booted", "Shutdown", …) for a device. */
 function simulatorState(udid: string): string {
-  try {
-    const raw = execSync("xcrun simctl list devices -j", {
-      encoding: "utf8",
-      timeout: 30_000,
-    });
-    const allDevices = Object.values(
-      (
-        JSON.parse(raw) as {
-          devices: Record<string, Array<{ udid: string; state: string }>>;
-        }
-      ).devices,
-    ).flat();
-    return allDevices.find((d) => d.udid === udid)?.state ?? "unknown";
-  } catch (err) {
-    console.log(`  Could not read simulator state: ${describeError(err)}`);
-    return "unknown";
-  }
+  const raw = execSync("xcrun simctl list devices -j", { encoding: "utf8" });
+  const allDevices = Object.values(
+    (
+      JSON.parse(raw) as {
+        devices: Record<string, Array<{ udid: string; state: string }>>;
+      }
+    ).devices,
+  ).flat();
+  return allDevices.find((d) => d.udid === udid)?.state ?? "unknown";
 }
 
 /**
@@ -609,9 +580,7 @@ async function captureIOSScreenshots(): Promise<void> {
       break;
     } catch (err) {
       installErr = err;
-      console.log(
-        `  install attempt ${attempt} failed: ${describeError(err)}`
-      );
+      console.log(`  install attempt ${attempt} failed, retrying…`);
       await sleep(5000);
       // Install fails with SimError 405 when the device has slipped back to
       // Shutdown, so make sure it's booted again before the next attempt.
@@ -624,25 +593,13 @@ async function captureIOSScreenshots(): Promise<void> {
   let launchErr: unknown;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      // --terminate-running-process: a half-launched app from a previous
-      // attempt otherwise makes the next one fail outright.
-      execSync(
-        `xcrun simctl launch --terminate-running-process "${udid}" ${bundleId}`,
-        // 30s was too tight: on a loaded runner the launch itself is what
-        // times out, and spawnSync's ETIMEDOUT then escapes as the final
-        // error even though the device was merely slow. Match install's budget.
-        { stdio: "pipe", timeout: 120_000 }
-      );
+      execSync(`xcrun simctl launch "${udid}" ${bundleId}`, { stdio: "pipe", timeout: 30_000 });
       launchErr = undefined;
       break;
     } catch (err) {
       launchErr = err;
-      console.log(`  launch attempt ${attempt} failed: ${describeError(err)}`);
+      console.log(`  launch attempt ${attempt} failed, retrying…`);
       await sleep(5000);
-      // Launch fails the same way install does when the device has slipped
-      // back to Shutdown under CI load — install already re-checked, launch
-      // didn't, so three attempts could all fail against a dead device.
-      await ensureBooted(udid);
     }
   }
   if (launchErr) throw launchErr;
@@ -665,9 +622,7 @@ async function captureIOSScreenshots(): Promise<void> {
         break;
       } catch (err) {
         lastErr = err;
-        console.log(
-          `  screenshot attempt ${attempt} failed: ${describeError(err)}`
-        );
+        console.log(`  screenshot attempt ${attempt} failed, retrying…`);
         await sleep(5000);
       }
     }
@@ -679,143 +634,11 @@ async function captureIOSScreenshots(): Promise<void> {
   spawnSync("xcrun", ["simctl", "shutdown", udid], { stdio: "pipe" });
 }
 
-// ---------------------------------------------------------------------------
-// Capture orchestration
-// ---------------------------------------------------------------------------
-
-const WEB_ASSETS = ["web-light", "web-dark"] as const;
-const IOS_ASSETS = ["ios-light", "ios-dark"] as const;
-
-/**
- * How each source PNG got here.
- *
- *   fresh    captured by this run
- *   cached   capture failed, but a previous run's PNG was restored into
- *            source/ and is being reused
- *   skipped  capture deliberately not attempted (--skip-ios)
- *   missing  no PNG at all — the composite can't be built
- */
-type AssetStatus = "fresh" | "cached" | "skipped" | "missing";
-
-const captureStatus = new Map<string, AssetStatus>();
-
-function sourcePath(asset: string): string {
-  return join(SOURCE_DIR, `${asset}.png`);
-}
-
-/** mtime in ms, or undefined when the file isn't there. */
-function sourceStamp(asset: string): number | undefined {
-  const path = sourcePath(asset);
-  return existsSync(path) ? statSync(path).mtimeMs : undefined;
-}
-
-/**
- * Run one capture phase, tolerating failure when a previous run's screenshots
- * are still on disk.
- *
- * Every red "Deploy to Cloudflare" run in the weeks before this was written was
- * this job, and never the deploy itself: a Vite optimizer race, a Clerk sign-in
- * timeout, the composer selector not appearing, `simctl launch` timing out. Each
- * one got a retry bolted on afterwards, and a new one showed up next. They are
- * all transient failures of a *cosmetic* step, so stop treating them as fatal.
- *
- * The workflow restores the last successful capture into source/ before this
- * runs, so falling back to it makes the composite byte-identical to what's
- * already published — the publish step then no-ops on "nothing to commit" and
- * the flake costs a warning annotation instead of a red run. A genuinely
- * broken capture still fails loudly, because there'd be no PNG to fall back to
- * (and --strict turns any fallback into a failure).
- */
-async function capturePhase(
-  label: string,
-  assets: readonly string[],
-  capture: () => Promise<void>
-): Promise<void> {
-  const before = new Map(assets.map((a) => [a, sourceStamp(a)]));
-  try {
-    await capture();
-  } catch (err) {
-    console.error(`  ✘ ${label} capture failed: ${describeError(err)}`);
-  }
-  for (const asset of assets) {
-    const after = sourceStamp(asset);
-    captureStatus.set(
-      asset,
-      after === undefined
-        ? "missing"
-        : after === before.get(asset)
-          ? "cached"
-          : "fresh"
-    );
-  }
-}
-
-/**
- * Report what we ended up with, and decide whether that's good enough.
- *
- * Writes source/capture-status.json so the workflow can tell a fresh iOS
- * capture (safe to cache under the current app revision) from a reused one
- * (caching it would pin stale screenshots to a revision they don't belong to).
- */
-function finishCapture(): void {
-  const statuses = Object.fromEntries(captureStatus);
-  writeFileSync(
-    join(SOURCE_DIR, "capture-status.json"),
-    `${JSON.stringify(statuses, null, 2)}\n`
-  );
-
-  const missing = [...captureStatus].filter(([, v]) => v === "missing");
-  const reused = [...captureStatus].filter(([, v]) => v === "cached");
-
-  for (const [asset] of reused) {
-    // ::warning:: surfaces on the run summary even though the job stays green.
-    console.log(
-      `::warning title=Marketing screenshot reused::${asset}.png could not be captured; reusing the previous one`
-    );
-  }
-
-  console.log("\n  Capture summary:");
-  for (const [asset, status] of captureStatus) {
-    console.log(`    ${asset.padEnd(10)} ${status}`);
-  }
-
-  if (missing.length > 0) {
-    throw new Error(
-      `No screenshot available for: ${missing.map(([a]) => a).join(", ")}. ` +
-        "Capture failed and there was nothing cached to fall back to."
-    );
-  }
-  if (strictCapture && reused.length > 0) {
-    throw new Error(
-      `--strict: reused previous screenshots for ${reused
-        .map(([a]) => a)
-        .join(", ")}`
-    );
-  }
-}
-
 async function runCaptureStep(): Promise<void> {
   console.log("\n── Capture ──────────────────────────────────────");
   mkdirSync(SOURCE_DIR, { recursive: true });
-
-  await capturePhase("web", WEB_ASSETS, captureWebScreenshots);
-
-  // The iOS screenshots only change when the app does, but building the app and
-  // booting a simulator is the slowest and least reliable part of this job — so
-  // don't do it on a web-only deploy. The cache lookup upstream decides; here we
-  // just double-check the PNGs it claimed to restore are actually present.
-  const iosCached = IOS_ASSETS.every((a) => existsSync(sourcePath(a)));
-  if (skipIOSCapture && iosCached) {
-    console.log("  Reusing cached iOS screenshots (app unchanged).");
-    for (const asset of IOS_ASSETS) captureStatus.set(asset, "skipped");
-  } else {
-    if (skipIOSCapture) {
-      console.log("  iOS capture was skippable, but no cached PNGs found.");
-    }
-    await capturePhase("ios", IOS_ASSETS, captureIOSScreenshots);
-  }
-
-  finishCapture();
+  await captureWebScreenshots();
+  await captureIOSScreenshots();
 }
 
 // ---------------------------------------------------------------------------
@@ -1013,25 +836,6 @@ function runPublishStep(): void {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-/**
- * execSync/spawnSync bury the actual reason in the captured stderr, so a bare
- * `err.message` reads "Command failed" and every retry log line in CI has been
- * useless. Pull the streams out too.
- */
-function describeError(err: unknown): string {
-  const e = err as {
-    message?: string;
-    stderr?: Buffer | string;
-    stdout?: Buffer | string;
-  };
-  const parts = [e?.message ?? String(err)];
-  for (const stream of [e?.stderr, e?.stdout]) {
-    const text = stream?.toString().trim();
-    if (text) parts.push(text);
-  }
-  return parts.join(" — ");
 }
 
 async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
