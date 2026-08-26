@@ -151,14 +151,6 @@ jobs:
           echo "✘ $URL never returned a healthy HTML 200 after deploy" >&2
           exit 1
 
-  # Regenerate marketing screenshots after a production deploy. Skipped on PRs
-  # because deploy-production only runs on push/workflow_dispatch, and a job
-  # that `needs` a skipped job is skipped too. Runs on its own macos-26 runner.
-  screenshots:
-    needs: [deploy-production]
-    uses: ./.github/workflows/marketing.yml
-    secrets: inherit
-
   # Per-branch preview via Cloudflare Worker Previews (private beta). Replaces
   # the old fully-isolated per-PR stack: no config rewriting, no per-PR queue,
   # no custom domains, and no close-triggered cleanup — stale previews are
