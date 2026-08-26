@@ -116,36 +116,6 @@ struct TodoItemRow: View {
         }
     }
 
-    /// Outline badges summarizing a completed todo's content — notes, research,
-    /// links — in place of the full previews shown while it's active. Mirrors
-    /// web's `CompletedContentBadges`.
-    @ViewBuilder
-    private var completedContentBadges: some View {
-        let hasNotes = !(todo.itemNotes?
-            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
-            .isEmpty ?? true)
-        let hasResearch = todo.researchStatus == "completed"
-            && !(todo.researchSummary?.isEmpty ?? true)
-        let linkCount = nonResearchUrls.count
-        if hasNotes || hasResearch || linkCount > 0 {
-            FlowLayout(spacing: 6) {
-                if hasNotes {
-                    outlineBadge("Notes", systemImage: "doc.text")
-                }
-                if hasResearch {
-                    outlineBadge("Research", systemImage: "sparkles")
-                }
-                if linkCount > 0 {
-                    outlineBadge(
-                        "\(linkCount) \(linkCount == 1 ? "link" : "links")",
-                        systemImage: "link"
-                    )
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
     /// "Next: Tomorrow" pill — clock on the left, repeat glyph on the right,
     /// outlined rather than filled — for a completed repeat's next occurrence.
     @ViewBuilder
@@ -158,26 +128,6 @@ struct TodoItemRow: View {
                 .monospacedDigit()
             Image(systemName: "arrow.triangle.2.circlepath")
                 .font(.system(size: 10))
-        }
-        .foregroundStyle(Color.appSubtle)
-        .padding(.horizontal, 6)
-        .padding(.vertical, 2)
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .stroke(Color.appLine, lineWidth: 1)
-        )
-    }
-
-    /// Single icon + label outline badge — the shared shape behind the completed
-    /// content badges.
-    @ViewBuilder
-    private func outlineBadge(_ text: String, systemImage: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: systemImage)
-                .font(.system(size: 10))
-            Text(text)
-                .font(.system(size: 12))
-                .monospacedDigit()
         }
         .foregroundStyle(Color.appSubtle)
         .padding(.horizontal, 6)
@@ -393,7 +343,7 @@ struct TodoItemRow: View {
 
                     // Full note/research/link previews collapse to compact
                     // outline badges once done. Matches web.
-                    completedContentBadges
+                    CompletedContentBadges(todo: todo, linkCount: nonResearchUrls.count)
                 } else if !nonResearchUrls.isEmpty {
                     // URL cards (compact) — hide research URLs, limit to 2 visible
                     FlowLayout(spacing: 6) {
@@ -466,6 +416,59 @@ struct TodoItemRow: View {
         }
     }
 
+}
+
+/// Outline badges summarizing a completed todo's content — notes, research,
+/// links — in place of the full previews shown while it's active. Mirrors
+/// web's `CompletedContentBadges`.
+private struct CompletedContentBadges: View {
+    let todo: TodoItem
+    let linkCount: Int
+
+    var body: some View {
+        let hasNotes = !(todo.itemNotes?
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
+            .isEmpty ?? true)
+        let hasResearch = todo.researchStatus == "completed"
+            && !(todo.researchSummary?.isEmpty ?? true)
+        if hasNotes || hasResearch || linkCount > 0 {
+            FlowLayout(spacing: 6) {
+                if hasNotes {
+                    badge("Notes", systemImage: "doc.text")
+                }
+                if hasResearch {
+                    badge("Research", systemImage: "sparkles")
+                }
+                if linkCount > 0 {
+                    badge(
+                        "\(linkCount) \(linkCount == 1 ? "link" : "links")",
+                        systemImage: "link"
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    /// Single icon + label outline badge — the shared shape behind the completed
+    /// content badges.
+    @ViewBuilder
+    private func badge(_ text: String, systemImage: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: systemImage)
+                .font(.system(size: 10))
+            Text(text)
+                .font(.system(size: 12))
+                .monospacedDigit()
+        }
+        .foregroundStyle(Color.appSubtle)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .stroke(Color.appLine, lineWidth: 1)
+        )
+    }
 }
 
 #Preview {

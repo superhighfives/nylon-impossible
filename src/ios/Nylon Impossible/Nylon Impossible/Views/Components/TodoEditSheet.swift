@@ -41,7 +41,6 @@ struct TodoEditSheet: View {
     @State private var isEnriching: Bool = false
     @State private var isProcessing: Bool = false
     @State private var processMessage: String?
-    @State private var newSubtaskTitle: String = ""
 
     init(
         todo: TodoItem,
@@ -177,7 +176,19 @@ struct TodoEditSheet: View {
                 // Subtasks — hidden on a recurring todo (mutually exclusive with
                 // recurrence). Once a subtask is added, the Repeat section hides.
                 if recurrenceFrequency == nil {
-                    subtasksSection
+                    SubtasksSection(
+                        subtasks: subtasks,
+                        onToggle: onToggleSubtask,
+                        onDelete: onDeleteSubtask,
+                        onMove: onMoveSubtask,
+                        // Recurrence and subtasks are mutually exclusive, so
+                        // adding one clears the rule — same invariant the API
+                        // enforces on the write.
+                        onAdd: { title in
+                            recurrenceFrequency = nil
+                            onAddSubtask(title)
+                        }
+                    )
                 }
 
                 // Link processing — deterministic, no model involved, so it
@@ -252,85 +263,6 @@ struct TodoEditSheet: View {
         }
     }
     
-    // Active subtasks order by position; completed sink to the bottom.
-    private var activeSubtasks: [TodoItem] {
-        subtasks.filter { !$0.isCompleted }.sorted { $0.position < $1.position }
-    }
-
-    private var completedSubtasks: [TodoItem] {
-        subtasks.filter { $0.isCompleted }.sorted { $0.position < $1.position }
-    }
-
-    @ViewBuilder
-    private var subtasksSection: some View {
-        Section {
-            ForEach(activeSubtasks) { subtask in
-                subtaskRow(subtask)
-            }
-            .onMove(perform: onMoveSubtask)
-            .onDelete { offsets in
-                for index in offsets { onDeleteSubtask(activeSubtasks[index]) }
-            }
-
-            // Completed subtasks pinned to the bottom, not reorderable.
-            ForEach(completedSubtasks) { subtask in
-                subtaskRow(subtask)
-                    .moveDisabled(true)
-            }
-            .onDelete { offsets in
-                for index in offsets { onDeleteSubtask(completedSubtasks[index]) }
-            }
-
-            HStack(spacing: 8) {
-                Image(systemName: "plus.circle.fill")
-                    .foregroundStyle(Color.appSubtle)
-                TextField("Add a subtask...", text: $newSubtaskTitle)
-                    .onSubmit(addSubtask)
-                if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Button("Add", action: addSubtask)
-                        .font(.caption)
-                }
-            }
-        } header: {
-            HStack {
-                Text("Subtasks")
-                if !subtasks.isEmpty {
-                    Spacer()
-                    Text("\(completedSubtasks.count)/\(subtasks.count)")
-                        .font(.caption)
-                        .monospacedDigit()
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func subtaskRow(_ subtask: TodoItem) -> some View {
-        Button {
-            onToggleSubtask(subtask)
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appLine)
-                Text(subtask.title)
-                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appDefault)
-                    .strikethrough(subtask.isCompleted, color: Color.appSubtle)
-                Spacer()
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func addSubtask() {
-        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        recurrenceFrequency = nil
-        onAddSubtask(trimmed)
-        newSubtaskTitle = ""
-    }
-
     private func saveChanges() {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else { return }
@@ -616,6 +548,95 @@ struct UrlRow: View {
         onCancel: {}
     )
     .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))
+}
+
+/// A todo's subtasks: reorderable active ones, completed pinned below, and an
+/// inline add field.
+private struct SubtasksSection: View {
+    let subtasks: [TodoItem]
+    let onToggle: (TodoItem) -> Void
+    let onDelete: (TodoItem) -> Void
+    let onMove: (IndexSet, Int) -> Void
+    let onAdd: (String) -> Void
+
+    @State private var newSubtaskTitle: String = ""
+
+    // Active subtasks order by position; completed sink to the bottom.
+    private var activeSubtasks: [TodoItem] {
+        subtasks.filter { !$0.isCompleted }.sorted { $0.position < $1.position }
+    }
+
+    private var completedSubtasks: [TodoItem] {
+        subtasks.filter { $0.isCompleted }.sorted { $0.position < $1.position }
+    }
+
+    var body: some View {
+        Section {
+            ForEach(activeSubtasks) { subtask in
+                subtaskRow(subtask)
+            }
+            .onMove(perform: onMove)
+            .onDelete { offsets in
+                for index in offsets { onDelete(activeSubtasks[index]) }
+            }
+
+            // Completed subtasks pinned to the bottom, not reorderable.
+            ForEach(completedSubtasks) { subtask in
+                subtaskRow(subtask)
+                    .moveDisabled(true)
+            }
+            .onDelete { offsets in
+                for index in offsets { onDelete(completedSubtasks[index]) }
+            }
+
+            HStack(spacing: 8) {
+                Image(systemName: "plus.circle.fill")
+                    .foregroundStyle(Color.appSubtle)
+                TextField("Add a subtask...", text: $newSubtaskTitle)
+                    .onSubmit(addSubtask)
+                if !newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Button("Add", action: addSubtask)
+                        .font(.caption)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Subtasks")
+                if !subtasks.isEmpty {
+                    Spacer()
+                    Text("\(completedSubtasks.count)/\(subtasks.count)")
+                        .font(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func subtaskRow(_ subtask: TodoItem) -> some View {
+        Button {
+            onToggle(subtask)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appLine)
+                Text(subtask.title)
+                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appDefault)
+                    .strikethrough(subtask.isCompleted, color: Color.appSubtle)
+                Spacer()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func addSubtask() {
+        let trimmed = newSubtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        onAdd(trimmed)
+        newSubtaskTitle = ""
+    }
 }
 
 /// Deterministic, always-available actions for a todo. Right now that's link
