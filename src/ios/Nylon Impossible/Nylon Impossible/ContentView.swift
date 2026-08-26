@@ -25,6 +25,10 @@ struct ContentView: View {
     @State private var dropTargetId: UUID?
     // Staged by swipe-to-delete; the row only actually deletes once confirmed.
     @State private var pendingDeleteTodo: TodoItem?
+    // Raised to open the keyboard on the add-task field without a tap — the
+    // Home Screen "New Task" quick action. AddTaskInputView lowers it again
+    // once it has focus.
+    @State private var focusAddTask = false
 
     /// Lists in the fixed order: Today, This Week, Sometime, then custom
     /// lists by position. Mirrors web's `TodoGrid` ordering.
@@ -167,7 +171,8 @@ struct ContentView: View {
             AddTaskInputView(
                 text: $viewModel.newTaskText,
                 canAdd: viewModel.canAddTask,
-                aiAvailable: preferencesService.aiEnabled
+                aiAvailable: preferencesService.aiEnabled,
+                focusRequested: $focusAddTask
             ) { option in
                 let text = viewModel.newTaskText
                 viewModel.newTaskText = ""
@@ -217,6 +222,13 @@ struct ContentView: View {
         .task {
             await scheduleMidnightTicks()
         }
+        // Quick actions are parked on QuickActionService by the scene delegate
+        // because they can land before this view exists. On appear for one
+        // that was already waiting (launched from the icon, or held while
+        // signed out); on change for one that arrives while the app is on
+        // screen.
+        .onAppear { performPendingQuickAction() }
+        .onChange(of: QuickActionService.shared.pending) { performPendingQuickAction() }
         .confirmationDialog(
             "Delete this todo?",
             isPresented: Binding(
@@ -229,6 +241,17 @@ struct ContentView: View {
             Button("Cancel", role: .cancel) { pendingDeleteTodo = nil }
         } message: {
             Text("This can't be undone.")
+        }
+    }
+
+    /// Perform whatever quick action is waiting, if any. The action stays on
+    /// whichever list is showing rather than paging to a fixed one — the list
+    /// header names it, and the task lands where the user is already looking.
+    private func performPendingQuickAction() {
+        guard let action = QuickActionService.shared.take() else { return }
+        switch action {
+        case .newTask:
+            focusAddTask = true
         }
     }
 

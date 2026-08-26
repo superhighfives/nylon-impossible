@@ -22,6 +22,7 @@ Native iOS client for the Nylon Impossible todo app. Built with SwiftUI and Swif
 - Background sync with the API via `POST /todos/sync`
 - Real-time sync via WebSocket (broadcasts between web and iOS)
 - Clerk authentication (sign in with social providers or email)
+- Home Screen quick action — long-press the app icon for "New Task"
 - Custom gradient-based design system
 
 ## Getting Started
