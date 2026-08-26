@@ -508,6 +508,83 @@ function NewListColumn() {
 }
 
 /**
+ * Wraps a column's scrollable row list. The top/bottom fades only show while
+ * there's a real row still hidden past that edge — a pair of 1px sentinels
+ * bracket the actual rows (inside the scroll container's own padding, not
+ * past it), so scrolling into the trailing `pb-28` reserved for the floating
+ * composer correctly clears the bottom fade instead of leaving it "stuck on"
+ * once every row is already visible.
+ */
+function ColumnScroller({
+  onWheel,
+  children,
+}: {
+  onWheel: (e: WheelEvent<HTMLDivElement>) => void;
+  children: ReactNode;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement>(null);
+  const [topRowVisible, setTopRowVisible] = useState(true);
+  const [bottomRowVisible, setBottomRowVisible] = useState(true);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const top = topSentinelRef.current;
+    const bottom = bottomSentinelRef.current;
+    if (!root || !top || !bottom) return;
+
+    const topObserver = new IntersectionObserver(
+      ([entry]) => setTopRowVisible(entry.isIntersecting),
+      { root },
+    );
+    const bottomObserver = new IntersectionObserver(
+      ([entry]) => setBottomRowVisible(entry.isIntersecting),
+      { root },
+    );
+    topObserver.observe(top);
+    bottomObserver.observe(bottom);
+
+    return () => {
+      topObserver.disconnect();
+      bottomObserver.disconnect();
+    };
+  }, []);
+
+  return (
+    <div className="relative min-h-0 flex-1">
+      <div
+        ref={scrollRef}
+        // -mx/px cancel out to the same content position as the
+        // column's own padding, but move that padding onto this
+        // scroller's box. overflow-y-auto forces overflow-x to
+        // auto too (browsers won't mix scroll with visible), so
+        // without its own padding this clips the reorder grip,
+        // which hangs left of each row via -translate-x-full.
+        className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 pb-28 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onWheel={onWheel}
+      >
+        <div ref={topSentinelRef} aria-hidden />
+        {children}
+        <div ref={bottomSentinelRef} aria-hidden />
+      </div>
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white to-transparent transition-opacity duration-200 dark:from-graydark-1 ${
+          topRowVisible ? "opacity-0" : "opacity-100"
+        }`}
+      />
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent transition-opacity duration-200 dark:from-graydark-1 ${
+          bottomRowVisible ? "opacity-0" : "opacity-100"
+        }`}
+      />
+    </div>
+  );
+}
+
+/**
  * Fetches every list + todo once, groups todos by listId, and renders one
  * `TodoListColumn` per list side by side (Today, This Week, Sometime, then
  * custom lists in position order). Owns the single `DndContext` that spans
@@ -915,42 +992,23 @@ export function TodoGrid() {
                         incompleteOrder.find((t) => !t.sticky)?.position ?? null
                       }
                     />
-                    {/* The rows scroll independently per column; the fade at
-                        the bottom keeps long lists from ending in a hard cut. */}
-                    <div className="relative min-h-0 flex-1">
-                      <div
-                        // -mx/px cancel out to the same content position as the
-                        // column's own padding, but move that padding onto this
-                        // scroller's box. overflow-y-auto forces overflow-x to
-                        // auto too (browsers won't mix scroll with visible), so
-                        // without its own padding this clips the reorder grip,
-                        // which hangs left of each row via -translate-x-full.
-                        className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 pb-28 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                        onWheel={handleColumnWheel}
-                      >
-                        <TodoListColumn
-                          listId={list.id}
-                          todos={listTodos}
-                          expandedId={expandedId}
-                          onToggleExpand={handleToggleExpand}
-                          onRequestDelete={handleRequestDelete}
-                          updateTodo={updateTodo}
-                          deleteTodo={deleteTodo}
-                          createTodo={createTodo}
-                          highlightIds={highlightIds}
-                          hiddenIds={hiddenIds}
-                          timeZone={timeZone}
-                          isKeyboardDragging={isKeyboardDragging}
-                          localIncompleteTodos={
-                            localOrderByList[list.id] ?? null
-                          }
-                        />
-                      </div>
-                      <div
-                        aria-hidden
-                        className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+                    <ColumnScroller onWheel={handleColumnWheel}>
+                      <TodoListColumn
+                        listId={list.id}
+                        todos={listTodos}
+                        expandedId={expandedId}
+                        onToggleExpand={handleToggleExpand}
+                        onRequestDelete={handleRequestDelete}
+                        updateTodo={updateTodo}
+                        deleteTodo={deleteTodo}
+                        createTodo={createTodo}
+                        highlightIds={highlightIds}
+                        hiddenIds={hiddenIds}
+                        timeZone={timeZone}
+                        isKeyboardDragging={isKeyboardDragging}
+                        localIncompleteTodos={localOrderByList[list.id] ?? null}
                       />
-                    </div>
+                    </ColumnScroller>
                   </section>
                 );
               })}
@@ -965,32 +1023,23 @@ export function TodoGrid() {
                   Completed
                 </h2>
               </div>
-              <div className="relative min-h-0 flex-1">
-                <div
-                  className="-mx-4 h-full overflow-y-auto overscroll-contain px-4 pb-28 sm:-mx-6 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                  onWheel={handleColumnWheel}
-                >
-                  <CompletedColumn
-                    completedTodos={completedTodos}
-                    allTodos={allTodos}
-                    expandedId={expandedId}
-                    onToggleExpand={handleToggleExpand}
-                    onRequestDelete={handleRequestDelete}
-                    updateTodo={updateTodo}
-                    deleteTodo={deleteTodo}
-                    onUncomplete={handleUncomplete}
-                    collapsed={
-                      completedColumnCollapsed ?? user?.hideCompleted ?? false
-                    }
-                    onToggleCollapsed={handleToggleCompletedColumn}
-                    known={!!user}
-                  />
-                </div>
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-white to-transparent dark:from-graydark-1"
+              <ColumnScroller onWheel={handleColumnWheel}>
+                <CompletedColumn
+                  completedTodos={completedTodos}
+                  allTodos={allTodos}
+                  expandedId={expandedId}
+                  onToggleExpand={handleToggleExpand}
+                  onRequestDelete={handleRequestDelete}
+                  updateTodo={updateTodo}
+                  deleteTodo={deleteTodo}
+                  onUncomplete={handleUncomplete}
+                  collapsed={
+                    completedColumnCollapsed ?? user?.hideCompleted ?? false
+                  }
+                  onToggleCollapsed={handleToggleCompletedColumn}
+                  known={!!user}
                 />
-              </div>
+              </ColumnScroller>
             </section>
           </BoardScaffold>
           <DragOverlay
