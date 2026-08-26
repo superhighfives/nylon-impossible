@@ -40,7 +40,6 @@ import { recurrenceLabel } from "@/lib/recurrence";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
 import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
-import { TodoActionsMenu } from "./TodoActionsMenu";
 import { Button, Checkbox, focusRing, Loader, UrlPreviewCard } from "./ui";
 
 /**
@@ -325,6 +324,56 @@ function TodoItemContent({
     onInlineUpdate(todo.id, { sticky: !todo.sticky });
   };
 
+  // Shared between the desktop hover pill and the always-visible mobile row
+  // below — same controls, just different containers.
+  const rowActions = (
+    <>
+      {/* Opens the details panel — the title itself is now a plain,
+          linkified text line so URLs inside it stay clickable. */}
+      <Button
+        variant="ghost"
+        size="xs"
+        shape="square"
+        type="button"
+        onClick={() => onToggleExpand(todo.id)}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}" details`}
+        className="text-gray-muted hover:text-gray"
+      >
+        <ChevronRight size={14} />
+      </Button>
+      {/* Hidden once expanded — the expanded form has its own full
+          editors. */}
+      {showInlineEditing && !isExpanded && (
+        <InlineIndicators
+          recurrence={todo.recurrence}
+          recurrenceLabel={
+            todo.recurrence
+              ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
+              : null
+          }
+          sticky={todo.sticky}
+          onStickyToggle={handleStickyToggle}
+          disabled={updatePending}
+        />
+      )}
+      {showInlineEditing && !isExpanded && (
+        <Button
+          variant="ghost"
+          size="xs"
+          shape="square"
+          type="button"
+          onClick={() => onDelete(todo.id)}
+          disabled={deletePending}
+          aria-label={`Delete "${todo.title}"`}
+          className="text-gray-muted hover:text-red-muted hover:bg-red-base"
+        >
+          <Trash2 size={14} />
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-start gap-3">
@@ -344,7 +393,7 @@ function TodoItemContent({
         <div className="flex-1 min-w-0">
           <div className="space-y-1">
             {showTitleLine && (
-              <div className={showActions ? "pr-20" : ""}>
+              <div className={showActions ? "sm:pr-20" : ""}>
                 {!showUrlOnlyCard && (
                   <p
                     className={`inline leading-snug wrap-anywhere ${
@@ -485,76 +534,26 @@ function TodoItemContent({
           {!showInlineEditing && <TodoIndicators todo={todo} />}
         </div>
       </div>
-      {/* Actions float as a pill over the row instead of reserving their own
-          line — it stays put when it's carrying real state (due date,
-          recurrence, pin) and is otherwise a hover/focus affordance on
-          desktop (always visible on touch, where there's no hover). */}
+      {/* Desktop: actions float as a pill over the row instead of reserving
+          their own line — it stays put when it's carrying real state (due
+          date, recurrence, pin) and is otherwise a hover/focus affordance.
+          Touch has no hover, so mobile gets its own always-visible row
+          below instead of this floating pill. */}
       {showActions && (
         <div
-          className={`absolute right-1 top-1 z-10 flex items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity ${
+          className={`absolute right-1 top-1 z-10 hidden items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity sm:flex ${
             hasVisiblePillState
               ? "opacity-100"
-              : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+              : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
           }`}
         >
-          {/* Opens the details panel — the title itself is now a plain,
-              linkified text line so URLs inside it stay clickable. */}
-          <Button
-            variant="ghost"
-            size="xs"
-            shape="square"
-            type="button"
-            onClick={() => onToggleExpand(todo.id)}
-            aria-expanded={isExpanded}
-            aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}" details`}
-            className="text-gray-muted hover:text-gray"
-          >
-            <ChevronRight size={14} />
-          </Button>
-          {/* Hidden once expanded — the expanded form has its own full
-              editors. */}
-          {showInlineEditing && !isExpanded && (
-            <InlineIndicators
-              recurrence={todo.recurrence}
-              recurrenceLabel={
-                todo.recurrence
-                  ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
-                  : null
-              }
-              sticky={todo.sticky}
-              onStickyToggle={handleStickyToggle}
-              disabled={updatePending}
-            />
-          )}
-          {/* Desktop: row-level delete, next to the priority/date icons.
-              Mobile keeps delete inside TodoActionsMenu instead of
-              duplicating the affordance here. */}
-          {showInlineEditing && !isExpanded && (
-            <Button
-              variant="ghost"
-              size="xs"
-              shape="square"
-              type="button"
-              onClick={() => onDelete(todo.id)}
-              disabled={deletePending}
-              aria-label={`Delete "${todo.title}"`}
-              className="hidden text-gray-muted hover:text-red-muted hover:bg-red-base sm:inline-flex"
-            >
-              <Trash2 size={14} />
-            </Button>
-          )}
-          {/* Mobile: popover actions menu. */}
-          <div className="flex h-5 items-center sm:hidden">
-            <TodoActionsMenu
-              todoId={todo.id}
-              todoTitle={todo.title}
-              isExpanded={isExpanded}
-              onToggleExpand={onToggleExpand}
-              onDelete={onDelete}
-              deletePending={deletePending}
-            />
-          </div>
+          {rowActions}
         </div>
+      )}
+      {/* Touch: same actions as the desktop pill, always visible as a row
+          below the content instead of a hover-revealed overlay. */}
+      {showActions && (
+        <div className="flex items-center gap-0.5 sm:hidden">{rowActions}</div>
       )}
     </div>
   );
