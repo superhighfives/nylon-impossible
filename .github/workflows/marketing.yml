@@ -1,8 +1,48 @@
 name: Generate Marketing Screenshots
 
+# Runs *after* a successful production deploy rather than as part of it.
+#
+# This used to be a `screenshots` job inside web-deploy.yml, which meant a flake
+# in here reported "Deploy to Cloudflare" as failed: every red run of that
+# workflow in the six weeks before this was written was this job, with
+# deploy-production green in all of them. A reusable-workflow job can't be given
+# `continue-on-error`, so the fix is to stop coupling the two — regenerating
+# images for a different repo's landing page is downstream of the deploy, not
+# part of it, and it now has a run (and a status) of its own.
+#
+# ios-release.yml still calls this as a reusable workflow, so it keeps the
+# workflow_call trigger. A screenshot flake can therefore still redden an App
+# Store release; capture degrading to the last good screenshots (see
+# capturePhase in generate.ts) is what keeps that rare.
 on:
   workflow_dispatch:
+    inputs:
+      force_ios:
+        description: "Rebuild the iOS screenshots even if cached ones match this revision"
+        type: boolean
+        default: false
+      strict:
+        description: "Fail if any screenshot had to fall back to a cached one"
+        type: boolean
+        default: true
+  workflow_run:
+    workflows: ["Deploy to Cloudflare"]
+    types: [completed]
+    branches: [main]
+  # ios-release.yml still calls this directly after an App Store release, so the
+  # iOS shots reflect the released build. `uses:` only resolves against a
+  # workflow that declares workflow_call, and workflow_run above can't stand in
+  # for it — it's scoped to "Deploy to Cloudflare", which a release never runs.
   workflow_call:
+    inputs:
+      force_ios:
+        type: boolean
+        default: false
+      # Callers get the lenient default: a flaky capture degrades to the last
+      # good screenshots rather than reddening whatever pipeline invoked this.
+      strict:
+        type: boolean
+        default: false
     secrets:
       CLERK_DEVELOPMENT_PUBLISHABLE_KEY:
         required: true
@@ -16,14 +56,33 @@ on:
 permissions:
   contents: read
 
+# The publish step commits and pushes to superhighfives.com, so two overlapping
+# deploys must not race each other there. Queue rather than cancel: a cancelled
+# run could be halfway through that push.
+concurrency:
+  group: marketing-screenshots
+  cancel-in-progress: false
+
 jobs:
   screenshots:
+    # Dispatched and called invocations always run. Only the workflow_run path
+    # needs filtering: web-deploy also runs on pull_request, where
+    # deploy-production is skipped and nothing new reached production.
+    if: >-
+      github.event_name != 'workflow_run'
+      || (github.event.workflow_run.conclusion == 'success'
+          && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event))
     runs-on: macos-26
     timeout-minutes: 45
 
     steps:
+      # Screenshot the commit that was actually deployed. A workflow_run event
+      # otherwise checks out the default branch's head, which may already have
+      # moved on.
       - name: Checkout nylon-impossible
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Checkout superhighfives.com
         uses: actions/checkout@v7
@@ -49,14 +108,63 @@ jobs:
       - name: Install workspace dependencies
         run: pnpm install
 
+      # Every capture below is best-effort: generate.ts falls back to whatever
+      # is already in src/marketing/source rather than failing the job (see
+      # capturePhase). These two restores are what puts something there. A
+      # degraded run then composites the previous screenshots, the publish step
+      # finds nothing changed, and the flake costs a warning annotation instead
+      # of a red run. Nothing is restored on the very first run, so a total
+      # capture failure there still fails loudly — as it should.
+      - name: Restore last good web screenshots
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src/marketing/source/web-light.png
+            src/marketing/source/web-dark.png
+          key: marketing-web-v1-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: marketing-web-v1-${{ runner.os }}-
+
+      # The iOS screenshots only change when the app does, but building the app
+      # and booting a simulator is ~12 of this job's minutes and its least
+      # reliable stretch. Key the cache on the iOS sources (plus the seed data
+      # and layout manifest that decide what's on screen) so a web-only deploy
+      # skips the simulator entirely. An exact hit means "these screenshots are
+      # already current" → skip; a prefix-only hit still restores older PNGs, so
+      # if the simulator then flakes there's something to fall back to.
+      - name: Restore iOS screenshots for this app revision
+        id: ios-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            src/marketing/source/ios-light.png
+            src/marketing/source/ios-dark.png
+          key: marketing-ios-v1-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json', 'src/marketing/seed.sql') }}
+          restore-keys: marketing-ios-v1-${{ runner.os }}-
+
+      - name: Decide whether to rebuild iOS screenshots
+        id: ios
+        env:
+          CACHE_HIT: ${{ steps.ios-cache.outputs.cache-hit }}
+          FORCE_IOS: ${{ inputs.force_ios }}
+        run: |
+          if [ "$CACHE_HIT" = "true" ] && [ "$FORCE_IOS" != "true" ]; then
+            echo "iOS app unchanged — reusing cached screenshots."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "Rebuilding iOS screenshots (cache-hit=$CACHE_HIT force=$FORCE_IOS)."
+            echo "skip=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
         working-directory: src/marketing
 
       - name: Select Xcode
+        if: steps.ios.outputs.skip != '1'
         run: xcodebuild -version
 
       - name: Ensure iOS simulator platform is available
+        if: steps.ios.outputs.skip != '1'
         run: |
           DEVICE=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
@@ -85,13 +193,68 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
           CLERK_MARKETING_USER_EMAIL: ${{ secrets.CLERK_DEVELOPMENT_USER_EMAIL }}
           SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
+          MARKETING_SKIP_IOS: ${{ steps.ios.outputs.skip }}
+          # A hand-triggered run is asking "does this still work?", so it
+          # defaults to the old all-or-nothing standard: any fallback to a
+          # cached screenshot fails the run rather than passing quietly.
+          MARKETING_STRICT: ${{ inputs.strict && '1' || '' }}
         run: npx tsx generate.ts --all
         working-directory: src/marketing
 
-      # Surfaces the composer-not-found state (HTML + screenshot) if capture
-      # ever fails again — generate.ts's own D1-sync-and-retry (see
-      # syncLocalD1Storage) handles the known local-D1-file-divergence case
-      # inline, so a failure reaching here is something new.
+      - name: Summarise capture
+        if: always()
+        run: |
+          status=src/marketing/source/capture-status.json
+          [ -f "$status" ] || exit 0
+          {
+            echo "### Marketing screenshots"
+            echo
+            echo "| Asset | Source |"
+            echo "| --- | --- |"
+            jq -r 'to_entries[] | "| \(.key) | \(.value) |"' "$status"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Only cache iOS screenshots this run actually captured. Storing a reused
+      # (stale) pair under the current revision's key would pin it there, and
+      # every later run would skip the simulator and keep publishing the wrong
+      # app screenshot.
+      - name: Inspect capture results
+        id: captured
+        if: always()
+        run: |
+          status=src/marketing/source/capture-status.json
+          if [ -f "$status" ] \
+            && [ "$(jq -r '."ios-light" // ""' "$status")" = "fresh" ] \
+            && [ "$(jq -r '."ios-dark" // ""' "$status")" = "fresh" ]; then
+            echo "ios_fresh=1" >> "$GITHUB_OUTPUT"
+          fi
+          # actions/cache/save errors outright when nothing matches its path, so
+          # don't call it at all if the job died before capture wrote anything.
+          if [ -f src/marketing/source/web-light.png ] \
+            && [ -f src/marketing/source/web-dark.png ]; then
+            echo "web_present=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save iOS screenshots for this app revision
+        if: always() && steps.captured.outputs.ios_fresh == '1'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            src/marketing/source/ios-light.png
+            src/marketing/source/ios-dark.png
+          key: marketing-ios-v1-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json', 'src/marketing/seed.sql') }}
+
+      - name: Save last good web screenshots
+        if: always() && steps.captured.outputs.web_present == '1'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            src/marketing/source/web-light.png
+            src/marketing/source/web-dark.png
+          key: marketing-web-v1-${{ runner.os }}-${{ github.run_id }}
+
+      # Reaching here means capture failed *and* there was nothing cached to
+      # fall back to — the composer-not-found dump is the usual culprit.
       - name: Upload debug artifacts on failure
         if: failure()
         uses: actions/upload-artifact@v7
@@ -100,4 +263,5 @@ jobs:
           path: |
             src/marketing/source/debug-*.html
             src/marketing/source/debug-*.png
+            src/marketing/source/capture-status.json
           if-no-files-found: ignore
