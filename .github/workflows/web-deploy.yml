@@ -224,6 +224,12 @@ jobs:
       - name: Deploy preview API
         working-directory: src/api
         run: |
+          # GitHub runs this with `bash -e`, and `set -uo pipefail` does not
+          # undo that — so the `out=$(…)` assignment below aborted the step the
+          # instant wrangler failed, before a single line of the diagnostics
+          # could print. Run 32932292738 failed here with no output whatsoever.
+          # `+e` is what the `rc` checks below have always assumed.
+          set +e
           set -uo pipefail
           # `wrangler preview` (private beta) can exit 0 yet return an empty
           # `urls` array: the preview deploys, but no Preview URL is minted
@@ -303,6 +309,12 @@ jobs:
       - name: Deploy preview Web
         working-directory: src/web
         run: |
+          # GitHub runs this with `bash -e`, and `set -uo pipefail` does not
+          # undo that — so the `out=$(…)` assignment below aborted the step the
+          # instant wrangler failed, before a single line of the diagnostics
+          # could print. Run 32932292738 failed here with no output whatsoever.
+          # `+e` is what the `rc` checks below have always assumed.
+          set +e
           set -uo pipefail
           # See the API deploy step: distinguish a wrangler failure from a
           # successful preview that returns no Preview URL (empty `urls`).
