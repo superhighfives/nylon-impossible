@@ -75,8 +75,27 @@ jobs:
       # `-quiet` keeps a passing run readable, but it also swallows the reason a
       # test host dies: a crash shows up as every pending test "failing" in
       # 0.000 seconds with nothing else logged, which is undiagnosable from the
-      # log alone. The result bundle has the crash report and the per-test
-      # failure messages, so keep it when a run goes red.
+      # log alone. The result bundle holds the real failure messages, so read it
+      # back into the log — an artifact alone is no use to anyone without a Mac.
+      - name: Summarise test failures
+        if: failure()
+        run: |
+          if [ ! -d TestResults.xcresult ]; then
+            echo "No result bundle — the failure was before or outside the test run."
+            exit 0
+          fi
+          # Raw output rather than anything that picks fields out of it: the
+          # point is to see what actually happened, and a parser guessing at
+          # xcresulttool's schema can hide the one line that matters.
+          echo "::group::Test failure summary"
+          xcrun xcresulttool get test-results summary --path TestResults.xcresult || true
+          echo "::endgroup::"
+          echo "::group::Test results tree (truncated)"
+          xcrun xcresulttool get test-results tests --path TestResults.xcresult 2>&1 \
+            | head -c 40000 || true
+          echo "::endgroup::"
+
+      # Kept as well, for anyone with a Mac who wants to open the bundle.
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
