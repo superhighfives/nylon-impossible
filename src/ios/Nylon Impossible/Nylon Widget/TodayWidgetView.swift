@@ -5,6 +5,11 @@
 //  Created by Claude on 8/27/26.
 //
 
+// `Button(intent:label:)` is defined in the AppIntents/SwiftUI cross-import
+// overlay, and the project builds with MemberImportVisibility — so the module
+// that defines a member has to be imported where the member is used, even
+// though the type comes from SwiftUI.
+import AppIntents
 import SwiftUI
 import WidgetKit
 
