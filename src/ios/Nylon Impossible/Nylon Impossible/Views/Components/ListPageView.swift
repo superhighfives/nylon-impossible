@@ -24,6 +24,10 @@ struct ListPageView: View {
     let allTodos: [TodoItem]
     let orderedLists: [TodoListModel]
     let viewModel: TodoViewModel
+    /// Space the floating header needs above this page's content — smaller on
+    /// the system lists, which show no title band. See `ContentView.headerInset`.
+    /// Both branches take it, so the empty state sits where the first row would.
+    let topInset: CGFloat
     @Binding var dropTargetId: UUID?
     @Binding var pendingDeleteTodo: TodoItem?
 
@@ -60,7 +64,7 @@ struct ListPageView: View {
                     EmptyStateView()
                         .transition(.opacity)
                         .frame(maxWidth: .infinity)
-                        .padding(.top, 118)
+                        .padding(.top, topInset)
                         .padding(.bottom, 100)
                 }
             } else {
@@ -69,6 +73,7 @@ struct ListPageView: View {
                     allTodos: allTodos,
                     orderedLists: orderedLists,
                     viewModel: viewModel,
+                    topInset: topInset,
                     departures: moves.departures,
                     arrivals: moves.arrivals,
                     dropTargetId: $dropTargetId,

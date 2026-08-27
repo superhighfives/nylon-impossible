@@ -200,6 +200,17 @@ describe("TodoGrid", () => {
     ).toBeInTheDocument();
   });
 
+  it("marks only the active todos that have notes", () => {
+    stubTodos([
+      makeTodo({ id: "a", title: "Has a note", notes: "Ask about pricing" }),
+      makeTodo({ id: "b", title: "Blank note", notes: "   ", position: "a1" }),
+      makeTodo({ id: "c", title: "No note", notes: null, position: "a2" }),
+    ]);
+
+    render(<TodoGrid />);
+    expect(screen.getAllByLabelText("Has notes")).toHaveLength(1);
+  });
+
   it("shows completed todos when hideCompleted is false", () => {
     stubUser(false);
     stubTodos([
