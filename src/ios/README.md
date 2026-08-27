@@ -142,8 +142,15 @@ Two things are easy to get wrong here:
 - **Nothing polls.** A widget re-renders when its timeline expires (midnight,
   here) or when something calls `WidgetCenter.reloadTimelines`. Every write
   path ends in `WidgetRefresh.reload()` — the app on backgrounding and on
-  sign-in/out, a sync that pulled remote changes, the share extension, the Siri
-  intent, and the toggle itself. A new write path needs one too.
+  sign-in/out, the share extension, the Siri intent, and the completion itself.
+  A new write path needs one too.
+
+  The app refreshes on backgrounding rather than per-mutation or per-sync,
+  which is both sufficient (leaving the app is the only moment the widget
+  becomes visible) and deliberate: `WidgetCenter` is a system-daemon client,
+  and calling it from `SyncService.sync()` put an XPC round trip inside the
+  hottest path in the test suite. `WidgetRefresh.reload()` also no-ops under
+  `XCTestConfigurationFilePath` for the same reason.
 - **Completion is not a flag flip.** `CompleteTodoIntent` calls
   `TodoCompletionService`, the same code the app's checkbox runs, so repeats
   roll forward and re-place themselves and subtasks follow their parent. Don't

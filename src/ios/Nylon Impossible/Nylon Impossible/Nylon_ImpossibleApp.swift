@@ -219,10 +219,14 @@ struct RootView: View {
                 BadgeService.refresh(modelContext: modelContext)
             case .background, .inactive:
                 syncService.disconnectWebSocket()
-                // Catch-all for edits made in the app this session: rather than
-                // reload on every individual mutation, refresh the widget on
-                // the way out, which is when the Home Screen is about to be
-                // looked at anyway.
+                // The app's single widget refresh, covering everything that
+                // happened while it was open: edits made here, and anything a
+                // sync pulled in from the web or another device. Leaving is
+                // also the only moment any of it becomes visible — nobody sees
+                // the Home Screen from inside the app — so refreshing per
+                // mutation or per sync would buy nothing, and it kept WidgetKit
+                // out of `SyncService.sync()`, which the test suite drives
+                // dozens of times per run.
                 WidgetRefresh.reload()
             @unknown default:
                 break

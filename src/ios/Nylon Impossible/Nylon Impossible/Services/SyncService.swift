@@ -128,10 +128,6 @@ final class SyncService {
                 BadgeService.refresh(modelContext: modelContext)
             }
 
-            // A sync is the only way a change made on the web or another device
-            // reaches the widget, so re-ask for a timeline off the back of it.
-            WidgetRefresh.reload()
-
             // Fire any AI actions requested at creation now that their todos
             // exist server-side. Deferred to here so an enrich/research chosen
             // offline runs as soon as the todo reaches the server.
