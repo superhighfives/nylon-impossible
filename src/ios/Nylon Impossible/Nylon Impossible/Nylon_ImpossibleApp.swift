@@ -14,6 +14,9 @@ import Sentry
 
 @main
 struct Nylon_ImpossibleApp: App {
+    // Only here to receive Home Screen quick actions — SwiftUI's App has no
+    // hook for them. See AppDelegate.swift.
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var authService = AuthService()
     @State private var syncService: SyncService?
     @State private var preferencesService: UserPreferencesService?
