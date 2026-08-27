@@ -71,107 +71,116 @@ export function TodoAgentChat({ todo }: TodoAgentChatProps) {
     <div className="space-y-1.5">
       {/* Breaks out of the panel's own px-4 so the divider runs edge to
           edge, unlike the inset dividers elsewhere in the panel. */}
-      <div className="-mx-4 mb-3 border-t border-gray-subtle" />
-      <p className="text-xs font-medium text-gray-muted">Chat</p>
-      {/* gray-app instead of the panel's own gray-surface — one step
-          further from the panel, so it reads as recessed rather than
-          matching the surface it sits on. */}
-      <div className="flex flex-col gap-2 rounded-lg bg-gray-app p-3">
-        {isLoading ? (
-          <div className="flex items-center gap-2 text-sm text-gray-muted">
-            <Loader size="sm" />
-            Loading…
-          </div>
-        ) : messages.length === 0 ? (
-          <p className="text-sm text-gray-muted">
-            Ask this todo's assistant to help you work it — research, update its
-            details, add subtasks, or mark it done.
-          </p>
-        ) : (
-          messages.map((m) => {
-            const isAssistant = m.role === "assistant";
-            const settlement = (conversation?.settlements ?? []).find(
-              (s) => s.submissionId === m.submissionId,
-            );
-            const text = messageText(m);
-            return (
-              <div key={m.id} className="flex items-start gap-2 text-sm">
-                {isAssistant ? (
-                  <Bot
-                    size={14}
-                    aria-hidden
-                    className="mt-0.5 shrink-0 text-accent"
-                  />
-                ) : (
-                  <User
-                    size={14}
-                    aria-hidden
-                    className="mt-0.5 shrink-0 text-gray-muted"
-                  />
-                )}
-                <span className="sr-only">
-                  {isAssistant ? "Assistant: " : "You: "}
-                </span>
-                {text ? (
-                  <p className={isAssistant ? "text-gray" : "text-gray-muted"}>
-                    {text}
-                  </p>
-                ) : settlement?.error ? (
-                  <p className="flex items-start gap-1.5 text-red-muted">
-                    <AlertCircle
+      <div className="-mx-4 border-t border-gray-subtle" />
+      {/* The whole section — label included — gets the recessed
+          background, not just the message/input cluster, so it reads as
+          one distinct area of the panel rather than a floating card.
+          gray-app instead of the panel's own gray-surface is one step
+          further from the panel: darker in dark mode, lighter in light. */}
+      <div className="-mx-4 space-y-1.5 bg-gray-app px-4 py-3">
+        <p className="text-xs font-medium text-gray-muted">Chat</p>
+        <div className="flex flex-col gap-2">
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-muted">
+              <Loader size="sm" />
+              Loading…
+            </div>
+          ) : messages.length === 0 ? (
+            <p className="text-sm text-gray-muted">
+              Ask this todo's assistant to help you work it — research, update
+              its details, add subtasks, or mark it done.
+            </p>
+          ) : (
+            messages.map((m) => {
+              const isAssistant = m.role === "assistant";
+              const settlement = (conversation?.settlements ?? []).find(
+                (s) => s.submissionId === m.submissionId,
+              );
+              const text = messageText(m);
+              return (
+                <div key={m.id} className="flex items-start gap-2 text-sm">
+                  {isAssistant ? (
+                    <Bot
                       size={14}
                       aria-hidden
-                      className="mt-0.5 shrink-0"
+                      className="mt-0.5 shrink-0 text-accent"
                     />
-                    Something went wrong answering that.
-                  </p>
-                ) : null}
-              </div>
-            );
-          })
-        )}
+                  ) : (
+                    <User
+                      size={14}
+                      aria-hidden
+                      className="mt-0.5 shrink-0 text-gray-muted"
+                    />
+                  )}
+                  <span className="sr-only">
+                    {isAssistant ? "Assistant: " : "You: "}
+                  </span>
+                  {text ? (
+                    <p
+                      className={isAssistant ? "text-gray" : "text-gray-muted"}
+                    >
+                      {text}
+                    </p>
+                  ) : settlement?.error ? (
+                    <p className="flex items-start gap-1.5 text-red-muted">
+                      <AlertCircle
+                        size={14}
+                        aria-hidden
+                        className="mt-0.5 shrink-0"
+                      />
+                      Something went wrong answering that.
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })
+          )}
 
-        {pending && (
-          <div className="flex items-center gap-2 text-sm text-gray-muted">
-            <Loader size="sm" />
-            Thinking…
-          </div>
-        )}
+          {pending && (
+            <div className="flex items-center gap-2 text-sm text-gray-muted">
+              <Loader size="sm" />
+              Thinking…
+            </div>
+          )}
 
-        {pendingDelete && (
-          <div className="flex items-center justify-between gap-2 rounded-md bg-red-base p-2 text-sm text-red-muted">
-            <span>Delete this todo?</span>
-            <Button
-              variant="destructive"
-              size="xs"
-              type="button"
-              onClick={() => setConfirmingDelete(true)}
-            >
-              Confirm
-            </Button>
-          </div>
-        )}
+          {pendingDelete && (
+            <div className="flex items-center justify-between gap-2 rounded-md bg-red-base p-2 text-sm text-red-muted">
+              <span>Delete this todo?</span>
+              <Button
+                variant="destructive"
+                size="xs"
+                type="button"
+                onClick={() => setConfirmingDelete(true)}
+              >
+                Confirm
+              </Button>
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="mt-1 flex items-center gap-2">
-          <Input
-            inputSize="sm"
-            placeholder="Message this todo's assistant…"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            disabled={pending}
-            aria-label="Message this todo's assistant"
-          />
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            loading={send.isPending}
-            disabled={!draft.trim() || pending}
+          <form
+            onSubmit={handleSubmit}
+            className="mt-1 flex items-center gap-2"
           >
-            {!send.isPending && <Send size={14} />}
-            Send
-          </Button>
-        </form>
+            <Input
+              inputSize="sm"
+              placeholder="Message this todo's assistant…"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              disabled={pending}
+              aria-label="Message this todo's assistant"
+            />
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              loading={send.isPending}
+              disabled={!draft.trim() || pending}
+            >
+              {!send.isPending && <Send size={14} />}
+              Send
+            </Button>
+          </form>
+        </div>
       </div>
 
       <ConfirmDialog
