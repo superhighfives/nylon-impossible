@@ -5,13 +5,16 @@ import SwiftData
 
 @Suite("TodayDigest")
 struct TodayDigestTests {
-    /// The same model set `SyncServiceTests` and `ConversationSyncTests` use.
-    /// Deliberately matching them rather than listing what this suite happens
-    /// to touch: these tests run in parallel in one process, and registering
-    /// the same `@Model` types under a *different* schema shape is a way to
-    /// upset SwiftData that shows up as a process-wide trap rather than a
-    /// failure here. `TodoListModel` was in this list and had no business
-    /// being — nothing in these tests reads or writes a list.
+    /// The same model set `SyncServiceTests` and `ConversationSyncTests` use —
+    /// nothing here reads or writes a list, so `TodoListModel` has no business
+    /// in it.
+    ///
+    /// **Bind the result to a local and take `mainContext` from that**, as
+    /// every other suite here does. `try makeContainer().mainContext` releases
+    /// the container as the expression ends and leaves the context holding a
+    /// deallocated one; SwiftData traps the next time it touches it, which
+    /// takes the whole test process down — every pending test in it, across
+    /// every suite — rather than failing anything here.
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
@@ -50,13 +53,8 @@ struct TodayDigestTests {
         recurrence: Recurrence? = nil
     ) -> TodoItem {
         let todo = TodoItem(title: title, userId: userId, position: position)
-        // Insert before mutating, which is the order the app itself uses
-        // (`TaskCreationService.createTask`, then edits) and the order this
-        // helper originally had backwards. Setting these on a model that
-        // belongs to no context yet traps inside SwiftData on the subsequent
-        // `insert` — `TodoItem.isDeleted` shadows `PersistentModel.isDeleted`,
-        // which SwiftData reads as part of inserting, and nothing else in this
-        // target writes that property before the model is in a context.
+        // Insert before mutating, matching the order the app uses
+        // (`TaskCreationService.createTask` inserts, then edits).
         context.insert(todo)
         todo.dueDate = dueDate
         todo.isCompleted = completed
@@ -88,7 +86,8 @@ struct TodayDigestTests {
     @MainActor
     func includesTodayAndOverdue() throws {
         let now = Self.now
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
 
         insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-86_400))
         insert(context, title: "Later today", dueDate: now.addingTimeInterval(3600))
@@ -104,7 +103,8 @@ struct TodayDigestTests {
     @MainActor
     func excludesNonEligible() throws {
         let now = Self.now
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
         let dueToday = now.addingTimeInterval(-60)
 
         insert(context, title: "Open", dueDate: dueToday)
@@ -121,7 +121,8 @@ struct TodayDigestTests {
     @MainActor
     func excludesRepeatCompletedToday() throws {
         let now = Self.now
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
 
         // Completing a repeat rolls its dueDate forward and stamps completedAt
         // rather than setting isCompleted — it reads as done until local
@@ -141,7 +142,8 @@ struct TodayDigestTests {
     @MainActor
     func scopesToUser() throws {
         let now = Self.now
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
         let dueToday = now.addingTimeInterval(-60)
 
         insert(context, title: "Mine", dueDate: dueToday)
@@ -159,7 +161,8 @@ struct TodayDigestTests {
     @MainActor
     func ordersStickyThenDueThenPosition() throws {
         let now = Self.now
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
 
         insert(context, title: "Same day, later position", dueDate: now, position: "a2")
         insert(context, title: "Same day, earlier position", dueDate: now, position: "a1")
@@ -180,7 +183,8 @@ struct TodayDigestTests {
     @MainActor
     func limitTruncates() throws {
         let now = Self.now
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
 
         insert(context, title: "First", dueDate: now, position: "a1")
         insert(context, title: "Second", dueDate: now, position: "a2")
@@ -194,7 +198,8 @@ struct TodayDigestTests {
     @Test("An empty store is empty, not an error")
     @MainActor
     func emptyStore() throws {
-        let context = try makeContainer().mainContext
+        let container = try makeContainer()
+        let context = container.mainContext
         #expect(TodayDigest.fetch(userId: Self.userId, context: context, now: Self.now).isEmpty)
     }
 }
