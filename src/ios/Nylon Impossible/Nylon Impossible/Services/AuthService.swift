@@ -68,7 +68,7 @@ final class AuthService: AuthProviding {
     
     /// Sign out the current user
     func signOut() async {
-        clearUserIdFromSharedDefaults()
+        clearSharedSessionState()
         do {
             try await clerk.auth.signOut()
         } catch {
@@ -79,7 +79,7 @@ final class AuthService: AuthProviding {
     /// Persist userId to shared UserDefaults for Siri and Share Extension access
     func persistUserIdToSharedDefaults() {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
-        sharedDefaults?.set(userId, forKey: "currentUserId")
+        sharedDefaults?.set(userId, forKey: BackgroundSyncService.userIdKey)
     }
 
     /// Persist a fresh Clerk JWT (with ~50-minute expiry) to the Keychain so
@@ -127,11 +127,16 @@ final class AuthService: AuthProviding {
         }
     }
 
-    /// Clear userId from shared UserDefaults and auth token from Keychain on sign out.
+    /// Clear userId from shared UserDefaults and auth token from Keychain.
     /// Also removes legacy UserDefaults token entries for users who haven't migrated yet.
-    private func clearUserIdFromSharedDefaults() {
+    ///
+    /// Called on sign out, and again whenever Clerk finishes loading without a
+    /// session — a stored session that expired or was revoked never runs
+    /// `signOut()`, so without that second call the shared defaults keep naming
+    /// the last account for every target that can't ask Clerk directly.
+    func clearSharedSessionState() {
         let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
-        sharedDefaults?.removeObject(forKey: "currentUserId")
+        sharedDefaults?.removeObject(forKey: BackgroundSyncService.userIdKey)
         // Clear legacy UserDefaults token entries (pre-Keychain migration)
         sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenKey)
         sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenExpiryKey)

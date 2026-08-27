@@ -191,6 +191,10 @@ struct RootView: View {
                 Task { await authService.persistAuthTokenToKeychain() }
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
+                // The widget reads sign-in state from shared defaults, which
+                // only just changed — without this it keeps showing the
+                // signed-out card until something else reloads it.
+                WidgetRefresh.reload()
             } else {
                 // Clear Sentry user on sign out
                 SentrySDK.setUser(nil)
@@ -200,6 +204,22 @@ struct RootView: View {
                 preferencesService?.resetLocalState()
                 hasTriggeredInitialSync = false
             }
+        }
+        // Clerk has loaded and there's no session — the same condition that
+        // puts `SignInView` on screen above. Reached two ways: an explicit sign
+        // out, and a launch where the stored session had expired or been
+        // revoked. Only the first runs `signOut()`, so without this the shared
+        // defaults keep naming the last account, and every Clerk-less target
+        // reads that as signed in — the widget included, which would leave that
+        // account's todos on the Home Screen while the app sits on the sign-in
+        // wall. Fires on appear too, because `isSignedIn` starting false is not
+        // a change `onChange` can see.
+        .onChange(of: clerk.client != nil && !isSignedIn, initial: true) { _, isSignedOut in
+            guard isSignedOut else { return }
+            authService.clearSharedSessionState()
+            // Take the signed-out user's todos off the Home Screen now, rather
+            // than leaving them there until the next reload.
+            WidgetRefresh.reload()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard isSignedIn, let syncService else { return }
@@ -215,6 +235,15 @@ struct RootView: View {
                 BadgeService.refresh(modelContext: modelContext)
             case .background, .inactive:
                 syncService.disconnectWebSocket()
+                // The app's single widget refresh, covering everything that
+                // happened while it was open: edits made here, and anything a
+                // sync pulled in from the web or another device. Leaving is
+                // also the only moment any of it becomes visible — nobody sees
+                // the Home Screen from inside the app — so refreshing per
+                // mutation or per sync would buy nothing, and it kept WidgetKit
+                // out of `SyncService.sync()`, which the test suite drives
+                // dozens of times per run.
+                WidgetRefresh.reload()
             @unknown default:
                 break
             }

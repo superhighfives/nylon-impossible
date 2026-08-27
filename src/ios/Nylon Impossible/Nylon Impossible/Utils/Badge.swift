@@ -25,7 +25,7 @@ enum BadgeService {
     }
 
     static func computeCount(modelContext: ModelContext) -> Int {
-        let cutoff = startOfTomorrowLocal()
+        let cutoff = TodayDigest.startOfTomorrow()
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate { todo in
                 !todo.isCompleted &&
@@ -35,13 +35,5 @@ enum BadgeService {
             }
         )
         return (try? modelContext.fetchCount(descriptor)) ?? 0
-    }
-
-    /// Midnight at the start of the next calendar day in the user's local
-    /// timezone — matches the shared definition in plans/ready/2026-03-21-repeating-todos.md.
-    private static func startOfTomorrowLocal() -> Date {
-        let calendar = Calendar.current
-        let startOfToday = calendar.startOfDay(for: Date())
-        return calendar.date(byAdding: .day, value: 1, to: startOfToday) ?? startOfToday
     }
 }
