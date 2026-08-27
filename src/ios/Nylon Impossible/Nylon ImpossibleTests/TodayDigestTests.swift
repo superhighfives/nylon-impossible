@@ -5,10 +5,17 @@ import SwiftData
 
 @Suite("TodayDigest")
 struct TodayDigestTests {
+    /// The same model set `SyncServiceTests` and `ConversationSyncTests` use.
+    /// Deliberately matching them rather than listing what this suite happens
+    /// to touch: these tests run in parallel in one process, and registering
+    /// the same `@Model` types under a *different* schema shape is a way to
+    /// upset SwiftData that shows up as a process-wide trap rather than a
+    /// failure here. `TodoListModel` was in this list and had no business
+    /// being — nothing in these tests reads or writes a list.
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
-            for: TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self, TodoListModel.self,
+            for: TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self,
             configurations: config
         )
     }
