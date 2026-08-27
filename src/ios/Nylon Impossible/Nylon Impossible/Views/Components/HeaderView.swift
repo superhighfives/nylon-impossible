@@ -7,13 +7,16 @@
 
 import SwiftUI
 
-struct HeaderView: View {
+struct HeaderView<Accessory: View>: View {
     @Environment(UserPreferencesService.self) private var preferencesService
     @Environment(SyncService.self) private var syncService
     @Environment(AuthService.self) private var authService
 
     var onSignOut: (() -> Void)?
     var syncState: SyncState = .idle
+    /// Trailing control pinned to the top-right, level with the pill — the
+    /// new-list "+" in the app; nothing in previews.
+    @ViewBuilder var accessory: () -> Accessory
 
     @State private var showSettings = false
 
@@ -36,6 +39,9 @@ struct HeaderView: View {
                 .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
         )
         .frame(maxWidth: .infinity)
+        // The pill stays centred; the accessory floats at the trailing edge,
+        // vertically centred on it.
+        .overlay(alignment: .trailing) { accessory() }
         .padding(.top, 16)
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -118,6 +124,12 @@ struct HeaderView: View {
             // SyncErrorBanner; the menu just acknowledges the state.
             Label("Sync failed", systemImage: "exclamationmark.circle")
         }
+    }
+}
+
+extension HeaderView where Accessory == EmptyView {
+    init(onSignOut: (() -> Void)? = nil, syncState: SyncState = .idle) {
+        self.init(onSignOut: onSignOut, syncState: syncState) { EmptyView() }
     }
 }
 

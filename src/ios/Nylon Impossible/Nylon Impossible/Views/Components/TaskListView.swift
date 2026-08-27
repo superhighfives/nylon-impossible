@@ -19,6 +19,9 @@ struct TaskListView: View {
     let allTodos: [TodoItem]
     let orderedLists: [TodoListModel]
     let viewModel: TodoViewModel
+    /// Space the floating header needs above the first row — smaller on the
+    /// system lists, which show no title band. See `ContentView.headerInset`.
+    let topInset: CGFloat
     /// The incomplete row a drag is hovering over — owned by the parent because
     /// its "drop here" line is shared board state.
     @Binding var dropTargetId: UUID?
@@ -100,7 +103,7 @@ struct TaskListView: View {
         // Top inset so the first row starts below the floating header (rows
         // still scroll up behind it), bottom inset so content clears the
         // floating input bar.
-        .contentMargins(.top, 118, for: .scrollContent)
+        .contentMargins(.top, topInset, for: .scrollContent)
         .contentMargins(.bottom, 100, for: .scrollContent)
     }
 

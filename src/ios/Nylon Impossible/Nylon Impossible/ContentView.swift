@@ -52,6 +52,13 @@ struct ContentView: View {
         orderedLists.first { $0.id == viewModel.selectedListId }
     }
 
+    /// How much room the floating header needs above a page's content. Custom
+    /// lists carry a title band under the header pill; the system lists don't,
+    /// so their content starts that much higher.
+    private func headerInset(for list: TodoListModel) -> CGFloat {
+        list.isSystem ? 77 : 118
+    }
+
     /// Subtasks live inside their parent's edit sheet, not as their own rows,
     /// so a list's page is top-level todos only, scoped to that list. List
     /// scoping itself lives in `TodoViewModel.sortedTodos` — this only needs
@@ -95,7 +102,7 @@ struct ContentView: View {
                                 EmptyStateView()
                                     .transition(.opacity)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.top, 118)
+                                    .padding(.top, headerInset(for: list))
                                     .padding(.bottom, 100)
                             }
                         } else {
@@ -104,6 +111,7 @@ struct ContentView: View {
                                 allTodos: todos,
                                 orderedLists: orderedLists,
                                 viewModel: viewModel,
+                                topInset: headerInset(for: list),
                                 dropTargetId: $dropTargetId,
                                 pendingDeleteTodo: $pendingDeleteTodo
                             )
@@ -126,17 +134,33 @@ struct ContentView: View {
             // list beneath it. Its glass pill is the only opaque element; the
             // list shows through around it so it reads as floating, not boxed.
             VStack(spacing: 0) {
+                // The "+" for a new list sits top-right, level with the pill —
+                // a global action next to the account menu, not something
+                // scoped to the list you happen to be paged onto.
                 HeaderView(
                     onSignOut: {
                         Task { await authService.signOut() }
                     },
                     syncState: syncService.state
-                )
+                ) {
+                    if let apiService = syncService.apiService {
+                        NewListButton(
+                            viewModel: viewModel,
+                            apiService: apiService,
+                            existingLists: orderedLists,
+                            modelContext: modelContext,
+                            onMutate: { syncService.syncAfterAction() }
+                        )
+                    }
+                }
 
-                // The selected list's title + a "+" to add a list, mirroring
-                // web's per-column header. Also the only cue for which list
-                // you're on, since the paged TabView hides its page dots.
-                if let selectedList, let apiService = syncService.apiService {
+                // Only custom lists get a title band, and it's there for the
+                // rename/delete/reorder menu. The three system lists name
+                // themselves in the add-todo field's copy instead — the paged
+                // TabView hides its page dots, so that copy is the cue for
+                // which list you're on.
+                if let selectedList, !selectedList.isSystem,
+                    let apiService = syncService.apiService {
                     ListHeaderView(
                         list: selectedList,
                         viewModel: viewModel,
@@ -172,6 +196,7 @@ struct ContentView: View {
                 text: $viewModel.newTaskText,
                 canAdd: viewModel.canAddTask,
                 aiAvailable: preferencesService.aiEnabled,
+                listPhrase: selectedList?.promptPhrase,
                 focusRequested: $focusAddTask
             ) { option in
                 let text = viewModel.newTaskText
