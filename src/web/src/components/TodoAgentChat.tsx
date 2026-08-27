@@ -69,8 +69,11 @@ export function TodoAgentChat({ todo }: TodoAgentChatProps) {
 
   return (
     <div className="space-y-1.5">
+      {/* Breaks out of the panel's own px-4 so the divider runs edge to
+          edge, unlike the inset dividers elsewhere in the panel. */}
+      <div className="-mx-4 mb-3 border-t border-gray-subtle" />
       <p className="text-xs font-medium text-gray-muted">Chat</p>
-      <div className="flex flex-col gap-2 rounded-lg bg-gray-surface p-3 ring-1 ring-gray-subtle">
+      <div className="flex flex-col gap-2">
         {isLoading ? (
           <div className="flex items-center gap-2 text-sm text-gray-muted">
             <Loader size="sm" />
