@@ -143,6 +143,34 @@ struct ListMoveTrackerTests {
         #expect(tracker.arrivals.isEmpty)
     }
 
+    @Test("the baseline is seeded once, not again after the page empties")
+    func baselineIsSeededOnce() {
+        let tracker = ListMoveTracker()
+        let first = settledTodo(title: "First", in: thisWeek)
+        tracker.establishBaseline(ids: [first.id])
+
+        // Everything on the page goes away.
+        tracker.reconcile(
+            previousIds: [first.id], currentIds: [],
+            allTodos: [], lists: lists, listId: thisWeek
+        )
+        #expect(tracker.retained.isEmpty)
+
+        // A second `onAppear` must not re-seed the tracker off whatever is
+        // showing by then — `reconcile` owns this state from here on.
+        let later = settledTodo(title: "Later", in: thisWeek)
+        later.listEnteredAt = Date()
+        tracker.establishBaseline(ids: [later.id])
+        #expect(tracker.retained.isEmpty)
+
+        // And the arrival still registers, since the baseline is long since set.
+        tracker.reconcile(
+            previousIds: [], currentIds: [later.id],
+            allTodos: [later], lists: lists, listId: thisWeek
+        )
+        #expect(tracker.arrivals == [later.id])
+    }
+
     @Test("a todo swept in from another list is flagged as having arrived")
     func sweptInTodoArrives() {
         let tracker = ListMoveTracker()

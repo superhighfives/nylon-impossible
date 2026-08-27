@@ -66,16 +66,24 @@ final class ListMoveTracker {
     /// than todos moving in, and washing the whole list brand-yellow on first
     /// launch is exactly the noise this is meant to avoid.
     private var hasBaseline = false
+    private var hasSeeded = false
 
     /// Record the page's starting state, so its *first* change is diffable too.
     /// A page that renders with todos already in it is also its own baseline;
     /// an empty one has to wait for its first change (the initial load) to know
     /// what "already here" means.
+    ///
+    /// One-shot per tracker, rather than "whenever `retained` happens to be
+    /// empty": the caller drives this from `onAppear`, and a tracker whose page
+    /// has legitimately emptied must not re-seed itself from whatever shows up
+    /// next if that fires again. After the first call, `reconcile` is the only
+    /// thing that moves this state.
     @MainActor
     func establishBaseline(ids: [UUID]) {
-        guard retained.isEmpty else { return }
+        guard !hasSeeded else { return }
+        hasSeeded = true
         retained = Set(ids)
-        hasBaseline = hasBaseline || !ids.isEmpty
+        hasBaseline = !ids.isEmpty
     }
 
     /// Reconcile a change in this page's todos.
@@ -145,6 +153,9 @@ final class ListMoveTracker {
         // drops out here rather than lingering.
         retained = current.union(departures.keys)
         hasBaseline = true
+        // Whichever of this and `establishBaseline` runs first owns the
+        // seeding; the other becomes a no-op.
+        hasSeeded = true
     }
 
     /// Start (or restart) the accent countdown once this page is on screen.
