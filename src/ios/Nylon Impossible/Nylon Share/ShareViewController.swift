@@ -144,9 +144,14 @@ class ShareViewController: UIViewController {
         let container = SharedModelContainer.shared
         let context = ModelContext(container)
         
-        // Get userId from shared UserDefaults
+        // Get userId from shared UserDefaults. Spelled out rather than via
+        // `BackgroundSyncService.userIdKey`: this target doesn't compile that
+        // service (it doesn't sync — the app picks the todo up on its next
+        // foreground sync), and pulling it in for one string constant would
+        // drag Config, KeychainHelper, APIError and the sync wire types along
+        // with it.
         let userId = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")?
-            .string(forKey: BackgroundSyncService.userIdKey)
+            .string(forKey: "currentUserId")
         
         let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
         
