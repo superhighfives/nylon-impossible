@@ -342,9 +342,7 @@ function TodoItemContent({
       >
         <ChevronRight size={14} />
       </Button>
-      {/* Hidden once expanded — the expanded form has its own full
-          editors. */}
-      {showInlineEditing && !isExpanded && (
+      {showInlineEditing && (
         <InlineIndicators
           recurrence={todo.recurrence}
           recurrenceLabel={
@@ -357,7 +355,7 @@ function TodoItemContent({
           disabled={updatePending}
         />
       )}
-      {showInlineEditing && !isExpanded && (
+      {showInlineEditing && (
         <Button
           variant="ghost"
           size="xs"
