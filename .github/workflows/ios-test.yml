@@ -84,15 +84,29 @@ jobs:
             echo "No result bundle — the failure was before or outside the test run."
             exit 0
           fi
-          # Raw output rather than anything that picks fields out of it: the
-          # point is to see what actually happened, and a parser guessing at
-          # xcresulttool's schema can hide the one line that matters.
           echo "::group::Test failure summary"
           xcrun xcresulttool get test-results summary --path TestResults.xcresult || true
           echo "::endgroup::"
-          echo "::group::Test results tree (truncated)"
+          # Every failure line from the whole tree, not the first N bytes of it:
+          # truncating by offset can bury the one failure that matters just as
+          # effectively as a parser guessing at the schema would.
+          echo "::group::Failure messages from the full results tree"
           xcrun xcresulttool get test-results tests --path TestResults.xcresult 2>&1 \
-            | head -c 40000 || true
+            | grep -B 4 -i 'failure\|crash' | head -n 400 || true
+          echo "::endgroup::"
+          # "Test crashed with signal trap" names no frame. The simulator's
+          # crash report does, and it is the only thing that says *where* the
+          # trap is — without it a process-wide trap is guesswork.
+          echo "::group::Crash reports"
+          for dir in ~/Library/Logs/DiagnosticReports \
+                     ~/Library/Developer/CoreSimulator/Devices/*/data/Library/Logs/DiagnosticReports; do
+            [ -d "$dir" ] || continue
+            find "$dir" \( -name '*.ips' -o -name '*.crash' \) -mmin -60 2>/dev/null | head -n 5 | while read -r f; do
+              echo "----- $f"
+              head -c 8000 "$f"
+              echo
+            done
+          done
           echo "::endgroup::"
 
       # Kept as well, for anyone with a Mac who wants to open the bundle.
