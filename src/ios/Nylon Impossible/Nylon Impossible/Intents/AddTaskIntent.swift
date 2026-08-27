@@ -32,7 +32,7 @@ struct AddTaskIntent: AppIntent {
 
         // Get current userId from Keychain/UserDefaults if available
         // For Siri, we may not have auth context, so userId can be nil
-        let userId: String? = sharedDefaults?.string(forKey: "currentUserId")
+        let userId: String? = sharedDefaults?.string(forKey: BackgroundSyncService.userIdKey)
 
         let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
 
@@ -42,6 +42,8 @@ struct AddTaskIntent: AppIntent {
             context: context,
             allTodos: allTodos
         )
+
+        WidgetRefresh.reload()
 
         // Attempt an immediate sync to the server so the task is visible on other devices
         // without requiring the user to open the app. Fall back to a BGAppRefreshTask if

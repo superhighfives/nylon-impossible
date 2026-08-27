@@ -188,6 +188,10 @@ struct RootView: View {
                 Task { await authService.persistAuthTokenToKeychain() }
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
+                // The widget reads sign-in state from shared defaults, which
+                // only just changed — without this it keeps showing the
+                // signed-out card until something else reloads it.
+                WidgetRefresh.reload()
             } else {
                 // Clear Sentry user on sign out
                 SentrySDK.setUser(nil)
@@ -196,6 +200,9 @@ struct RootView: View {
                 // Drop cached preference state so the next account doesn't inherit it
                 preferencesService?.resetLocalState()
                 hasTriggeredInitialSync = false
+                // Take the signed-out user's todos off the Home Screen now,
+                // rather than leaving them there until the next reload.
+                WidgetRefresh.reload()
             }
         }
         .onChange(of: scenePhase) { _, newPhase in
@@ -212,6 +219,11 @@ struct RootView: View {
                 BadgeService.refresh(modelContext: modelContext)
             case .background, .inactive:
                 syncService.disconnectWebSocket()
+                // Catch-all for edits made in the app this session: rather than
+                // reload on every individual mutation, refresh the widget on
+                // the way out, which is when the Home Screen is about to be
+                // looked at anyway.
+                WidgetRefresh.reload()
             @unknown default:
                 break
             }

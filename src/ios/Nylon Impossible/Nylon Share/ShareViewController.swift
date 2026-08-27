@@ -146,7 +146,7 @@ class ShareViewController: UIViewController {
         
         // Get userId from shared UserDefaults
         let userId = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")?
-            .string(forKey: "currentUserId")
+            .string(forKey: BackgroundSyncService.userIdKey)
         
         let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
         
@@ -166,7 +166,11 @@ class ShareViewController: UIViewController {
                 allTodos: allTodos
             )
         }
-        
+
+        // A task shared in with a due date can belong on the widget straight
+        // away, and nothing else will prompt a reload until the app is opened.
+        WidgetRefresh.reload()
+
         completeWithSuccess()
     }
     

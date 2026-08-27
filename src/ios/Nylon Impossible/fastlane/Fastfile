@@ -62,7 +62,11 @@ platform :ios do
     end
     sh(*archive_cmd)
 
-    # Step 2: Export WITHOUT -allowProvisioningUpdates (manual signing)
+    # Step 2: Export WITHOUT -allowProvisioningUpdates (manual signing).
+    # Every embedded extension needs its profile named here — one missing entry
+    # fails the export, not the archive. Each profile is created by hand in the
+    # developer portal and must carry the same App Group and Keychain Sharing
+    # capabilities as the app, since that's how the extensions reach the store.
     File.write(export_options_path, <<~PLIST)
       <?xml version="1.0" encoding="UTF-8"?>
       <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -82,6 +86,8 @@ platform :ios do
           <string>Nylon Impossible AppStore</string>
           <key>com.superhighfives.Nylon-Impossible.Nylon-Share</key>
           <string>Nylon Share AppStore</string>
+          <key>com.superhighfives.Nylon-Impossible.Nylon-Widget</key>
+          <string>Nylon Widget AppStore</string>
         </dict>
       </dict>
       </plist>

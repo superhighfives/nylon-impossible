@@ -54,6 +54,17 @@ enum SharedModelContainer {
             // fallback — hence still error level, tagged so a reset is
             // distinguishable in Sentry from a hard failure below.
             capture(error, stage: "open")
+
+            // Only the app gets to do the destroying. Extensions run without
+            // the user having asked for anything much — the widget's timeline
+            // is refreshed by the system, and after an update it can easily be
+            // the first process to open the store at all — so an extension
+            // that reset it would throw away unsynced todos before the app had
+            // a chance to try. Degrading to in-memory means the widget renders
+            // empty for now and the reset (with the sync that repopulates it)
+            // happens on next launch, where it belongs.
+            guard isMainApp else { return inMemoryContainer(for: schema) }
+
             destroyStore(at: storeURL)
             do {
                 return try ModelContainer(for: schema, configurations: config)
@@ -84,6 +95,12 @@ enum SharedModelContainer {
             // to. Every caller of this container is unusable without it.
             fatalError("Failed to create in-memory model container: \(error)")
         }
+    }
+
+    /// False in the share extension, the widget, and any other appex — all of
+    /// which are bundled inside the app, so their bundle URL ends in `.appex`.
+    private static var isMainApp: Bool {
+        Bundle.main.bundleURL.pathExtension != "appex"
     }
 
     private static func capture(_ error: Error, stage: String) {

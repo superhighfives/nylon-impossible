@@ -23,6 +23,7 @@ Native iOS client for the Nylon Impossible todo app. Built with SwiftUI and Swif
 - Real-time sync via WebSocket (broadcasts between web and iOS)
 - Clerk authentication (sign in with social providers or email)
 - Custom gradient-based design system
+- Home Screen widget showing what's due today, with a tap-to-complete toggle
 
 ## Getting Started
 
@@ -86,6 +87,27 @@ src/ios/Nylon Impossible/Nylon Impossible/
 └── Assets.xcassets/
 ```
 
+## Targets
+
+| Target | Product | What it is |
+|--------|---------|------------|
+| `Nylon Impossible` | `.app` | The app |
+| `Nylon Share` | `.appex` | Share sheet extension |
+| `Nylon Widget` | `.appex` | Home Screen widget |
+| `Nylon ImpossibleTests` | `.xctest` | Unit tests |
+
+All three code targets open the same SwiftData store in the
+`group.com.superhighfives.Nylon-Impossible` App Group (see
+`SharedModelContainer`) and read credentials from the shared Keychain access
+group. The extensions compile a subset of the app's own files rather than
+importing a framework — the file list per target lives in the project's
+`membershipExceptions`, so a new shared file has to be added there as well as
+written.
+
+Only the app performs the destructive store reset in `SharedModelContainer`:
+an extension can be the first process to open the store after an update, and
+resetting from there would discard unsynced todos before the app ever ran.
+
 ## Sync Architecture
 
 1. **Local-first**: All changes are saved to SwiftData immediately
@@ -108,6 +130,29 @@ SwiftLint is run from the project directory:
 cd "src/ios/Nylon Impossible" && swiftlint
 ```
 
+## Widget
+
+`Nylon Widget/` renders the todos due before local midnight — the same
+definition the app icon badge uses, shared as `TodayDigest`. Small and medium
+families, up to four rows, with each row's circle a `ToggleTodoIntent` button
+that completes the todo in place.
+
+Two things are easy to get wrong here:
+
+- **Nothing polls.** A widget re-renders when its timeline expires (midnight,
+  here) or when something calls `WidgetCenter.reloadTimelines`. Every write
+  path ends in `WidgetRefresh.reload()` — the app on backgrounding and on
+  sign-in/out, a sync that pulled remote changes, the share extension, the Siri
+  intent, and the toggle itself. A new write path needs one too.
+- **Completion is not a flag flip.** `ToggleTodoIntent` calls
+  `TodoCompletionService`, the same code the app's checkbox runs, so repeats
+  roll forward and re-place themselves and subtasks follow their parent. Don't
+  reimplement it against `isCompleted`.
+
+The toggle uploads immediately via `BackgroundSyncService` when there's a valid
+token, and otherwise leaves the todo unsynced for the app's next foreground
+sync — an extension can't schedule a `BGTask` to retry sooner.
+
 ## Deployment
 
 iOS builds are deployed to TestFlight via Fastlane:
@@ -118,6 +163,11 @@ bundle exec fastlane release
 ```
 
 This is also automated via the `testflight.yml` GitHub Actions workflow.
+
+Each embedded extension needs its own App Store provisioning profile, named in
+the Fastfile's `provisioningProfiles` dict, carrying the same App Group and
+Keychain Sharing capabilities as the app. A missing entry fails the export
+step, not the archive.
 
 ## License
 

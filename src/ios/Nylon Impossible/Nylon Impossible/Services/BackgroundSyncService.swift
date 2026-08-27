@@ -14,6 +14,10 @@ import SwiftData
 /// app is foregrounded and SyncService.sync() runs.
 struct BackgroundSyncService {
     static let appGroupSuiteName = "group.com.superhighfives.Nylon-Impossible"
+    /// Shared-defaults key for the signed-in Clerk user. Read by every target
+    /// that touches the store without Clerk: the share extension, the Siri
+    /// intent, the widget, and this service.
+    static let userIdKey = "currentUserId"
     static let authTokenKey = "currentAuthToken"
     static let authTokenExpiryKey = "currentAuthTokenExpiry"
     static let backgroundSyncTaskIdentifier = "com.nylonimpossible.backgroundsync"
@@ -27,7 +31,7 @@ struct BackgroundSyncService {
     init?(sharedDefaults: UserDefaults) {
         guard
             let token = KeychainHelper.loadString(forKey: BackgroundSyncService.authTokenKey),
-            let userId = sharedDefaults.string(forKey: "currentUserId"),
+            let userId = sharedDefaults.string(forKey: BackgroundSyncService.userIdKey),
             let expiry = KeychainHelper.loadDate(forKey: BackgroundSyncService.authTokenExpiryKey),
             expiry > Date()
         else { return nil }
