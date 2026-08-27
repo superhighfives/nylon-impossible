@@ -95,28 +95,16 @@ struct ContentView: View {
             // nothing sits in an opaque box. No grid view in v1.
             TabView(selection: Bindable(viewModel).selectedListId) {
                 ForEach(orderedLists) { list in
-                    Group {
-                        let pageTodos = sortedTodosList(for: list.id)
-                        if pageTodos.isEmpty {
-                            ScrollView {
-                                EmptyStateView()
-                                    .transition(.opacity)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.top, headerInset(for: list))
-                                    .padding(.bottom, 100)
-                            }
-                        } else {
-                            TaskListView(
-                                pageTodos: pageTodos,
-                                allTodos: todos,
-                                orderedLists: orderedLists,
-                                viewModel: viewModel,
-                                topInset: headerInset(for: list),
-                                dropTargetId: $dropTargetId,
-                                pendingDeleteTodo: $pendingDeleteTodo
-                            )
-                        }
-                    }
+                    ListPageView(
+                        list: list,
+                        pageTodos: sortedTodosList(for: list.id),
+                        allTodos: todos,
+                        orderedLists: orderedLists,
+                        viewModel: viewModel,
+                        topInset: headerInset(for: list),
+                        dropTargetId: $dropTargetId,
+                        pendingDeleteTodo: $pendingDeleteTodo
+                    )
                     .tag(Optional(list.id))
                 }
             }

@@ -22,6 +22,12 @@ struct TaskListView: View {
     /// Space the floating header needs above the first row — smaller on the
     /// system lists, which show no title band. See `ContentView.headerInset`.
     let topInset: CGFloat
+    /// Rows on their way off this page, mapped to the list they went to — see
+    /// `ListMoveTracker`. Each is still rendered (the parent keeps it in
+    /// `pageTodos`) but dimmed, inert, and wearing its destination chip.
+    var departures: [UUID: String] = [:]
+    /// Rows that landed here from another list and haven't been seen yet.
+    var arrivals: Set<UUID> = []
     /// The incomplete row a drag is hovering over — owned by the parent because
     /// its "drop here" line is shared board state.
     @Binding var dropTargetId: UUID?
@@ -153,6 +159,9 @@ struct TaskListView: View {
 
     @ViewBuilder
     private func todoRow(_ todo: TodoItem) -> some View {
+        let departingTo = departures[todo.id]
+        let arrived = arrivals.contains(todo.id)
+
         TodoItemRow(
             todo: todo,
             apiService: syncService.apiService,
@@ -210,9 +219,32 @@ struct TaskListView: View {
                 syncService.syncAfterAction()
             }
         )
+        // A row that just landed here from another list is washed in brand
+        // colour until it's been seen, so a refresh that silently gains todos
+        // says which ones are new to the page. Bled past the row's own bounds
+        // so it reads as a highlight behind the content, not a badge on it.
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color.appBrand.opacity(arrived ? 0.14 : 0))
+                .padding(.horizontal, -8)
+                .padding(.vertical, -4)
+        )
+        // A departing row is on its way out — dimmed, and inert so it can't be
+        // toggled or opened in the beat before it goes.
+        .opacity(departingTo == nil ? 1 : 0.55)
+        .allowsHitTesting(departingTo == nil)
+        .overlay(alignment: .trailing) {
+            if let departingTo {
+                MovingToListChip(listName: departingTo)
+                    .transition(.scale(scale: 0.85).combined(with: .opacity))
+            }
+        }
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
         .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+        // Removal slides toward the trailing edge — the direction the next
+        // list sits in the pager — so a swept row reads as moving on rather
+        // than being deleted.
         .transition(.asymmetric(
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
@@ -262,6 +294,12 @@ struct TaskListView: View {
         in incomplete: [TodoItem]
     ) -> Bool {
         dropTargetId = nil
+        // `incomplete` still holds rows that have already left this list (held
+        // on screen for their exit), and their positions are no longer
+        // comparable with this list's. Rather than compute a new index against
+        // them, sit the drop out — it's a sub-second window, and the drag
+        // simply springs back.
+        guard departures.isEmpty else { return false }
         guard let draggedId = items.first,
               let sourceIndex = incomplete.firstIndex(where: {
                   $0.id.uuidString == draggedId
