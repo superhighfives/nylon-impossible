@@ -200,10 +200,23 @@ struct RootView: View {
                 // Drop cached preference state so the next account doesn't inherit it
                 preferencesService?.resetLocalState()
                 hasTriggeredInitialSync = false
-                // Take the signed-out user's todos off the Home Screen now,
-                // rather than leaving them there until the next reload.
-                WidgetRefresh.reload()
             }
+        }
+        // Clerk has loaded and there's no session — the same condition that
+        // puts `SignInView` on screen above. Reached two ways: an explicit sign
+        // out, and a launch where the stored session had expired or been
+        // revoked. Only the first runs `signOut()`, so without this the shared
+        // defaults keep naming the last account, and every Clerk-less target
+        // reads that as signed in — the widget included, which would leave that
+        // account's todos on the Home Screen while the app sits on the sign-in
+        // wall. Fires on appear too, because `isSignedIn` starting false is not
+        // a change `onChange` can see.
+        .onChange(of: clerk.client != nil && !isSignedIn, initial: true) { _, isSignedOut in
+            guard isSignedOut else { return }
+            authService.clearSharedSessionState()
+            // Take the signed-out user's todos off the Home Screen now, rather
+            // than leaving them there until the next reload.
+            WidgetRefresh.reload()
         }
         .onChange(of: scenePhase) { _, newPhase in
             guard isSignedIn, let syncService else { return }
