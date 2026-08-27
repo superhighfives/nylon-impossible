@@ -25,6 +25,11 @@ struct AddTaskInputView: View {
     // folded into the placeholder so the field also says which list you're
     // adding to. nil for custom lists — see TodoListModel.promptPhrase.
     var listPhrase: String?
+    // Set by a caller that wants the field focused without the user tapping it
+    // — the Home Screen "New Task" quick action. Cleared here once focus has
+    // been taken, so it reads as a one-shot request rather than a state the
+    // caller has to keep in sync with the keyboard.
+    var focusRequested: Binding<Bool> = .constant(false)
     var onAdd: (AICreateOption) -> Void
 
     @FocusState private var isFocused: Bool
@@ -89,6 +94,21 @@ struct AddTaskInputView: View {
             }
         }
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: canAdd)
+        // Both hooks are needed: a request raised before this view exists (a
+        // cold launch straight into the quick action) is only seen on appear,
+        // while one raised afterwards (the app was already running) only
+        // arrives as a change.
+        .onAppear { takeFocusIfRequested() }
+        .onChange(of: focusRequested.wrappedValue) { takeFocusIfRequested() }
+    }
+
+    private func takeFocusIfRequested() {
+        guard focusRequested.wrappedValue else { return }
+        focusRequested.wrappedValue = false
+        // Deferred a turn rather than set inline: on a cold launch straight
+        // into the quick action, this runs while the field is still being
+        // installed, and focus taken then is dropped on the floor.
+        Task { isFocused = true }
     }
 
     /// The add affordance. With AI available it's a split button: a plain tap
