@@ -50,6 +50,14 @@ struct TodayDigestTests {
         recurrence: Recurrence? = nil
     ) -> TodoItem {
         let todo = TodoItem(title: title, userId: userId, position: position)
+        // Insert before mutating, which is the order the app itself uses
+        // (`TaskCreationService.createTask`, then edits) and the order this
+        // helper originally had backwards. Setting these on a model that
+        // belongs to no context yet traps inside SwiftData on the subsequent
+        // `insert` — `TodoItem.isDeleted` shadows `PersistentModel.isDeleted`,
+        // which SwiftData reads as part of inserting, and nothing else in this
+        // target writes that property before the model is in a context.
+        context.insert(todo)
         todo.dueDate = dueDate
         todo.isCompleted = completed
         todo.completedAt = completedAt
@@ -57,7 +65,6 @@ struct TodayDigestTests {
         todo.sticky = sticky
         todo.parentId = parentId
         todo.recurrence = recurrence
-        context.insert(todo)
         return todo
     }
 
