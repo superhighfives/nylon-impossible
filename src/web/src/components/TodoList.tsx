@@ -279,12 +279,17 @@ function TodoItemContent({
   const hasPendingSuggestions = todo.suggestions.some(
     (s) => s.status === "pending",
   );
+  // Notes are only visible once a row is expanded, so an active row carrying
+  // one gets a quiet inline mark to say there's something to open. Completed
+  // rows already spell it out in CompletedContentBadges.
+  const hasNotes = !!todo.notes?.trim();
   // Skip the inline title line entirely for a URL-only card with no status
   // badges, so the card sits flush at the top of the row. space-y-1 then only
   // adds a gap when the title line is actually present.
   const showTitleLine =
     !showUrlOnlyCard ||
     subtasks.length > 0 ||
+    (hasNotes && !isCompleted) ||
     aiProcessing ||
     researchPending ||
     !!todo.needsInput ||
@@ -437,6 +442,15 @@ function TodoItemContent({
                       </span>
                     );
                   })()}
+                {hasNotes && !isCompleted && (
+                  <span
+                    role="img"
+                    className="ml-2 inline-flex shrink-0 align-middle text-gray-muted"
+                    aria-label="Has notes"
+                  >
+                    <FileText size={12} aria-hidden="true" />
+                  </span>
+                )}
                 {aiProcessing && (
                   <output
                     className="ml-2 inline-flex items-center gap-1 align-middle text-gray-muted text-xs"
