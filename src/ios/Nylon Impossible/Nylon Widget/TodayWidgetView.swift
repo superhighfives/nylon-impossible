@@ -104,7 +104,7 @@ private struct TodayRow: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Button(intent: ToggleTodoIntent(todoId: todo.id.uuidString)) {
+            Button(intent: CompleteTodoIntent(todoId: todo.id.uuidString)) {
                 // The app's unchecked circle, scaled to a widget row. There's
                 // no checked state to draw — completing a todo takes it off
                 // the list this widget is showing.

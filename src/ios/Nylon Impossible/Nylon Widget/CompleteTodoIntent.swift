@@ -1,5 +1,5 @@
 //
-//  ToggleTodoIntent.swift
+//  CompleteTodoIntent.swift
 //  Nylon Widget
 //
 //  Created by Claude on 8/27/26.
@@ -10,13 +10,17 @@ import SwiftData
 
 /// Completes a todo from the widget.
 ///
-/// Named "toggle" because that's what it calls: `TodoCompletionService` is the
-/// same code path the app's checkbox runs, so a repeat rolls its due date
-/// forward and re-places itself, a sticky todo unsticks, and subtasks follow
-/// their parent — rather than the widget inventing a simpler rule and quietly
-/// disagreeing with the app. In practice it only ever completes, since a
-/// completed todo leaves the list the widget shows.
-struct ToggleTodoIntent: AppIntent {
+/// Completion runs through `TodoCompletionService` — the same code path the
+/// app's checkbox uses — so a repeat rolls its due date forward and re-places
+/// itself, a sticky todo unsticks, and subtasks follow their parent, rather
+/// than the widget inventing a simpler rule and quietly disagreeing with the
+/// app.
+///
+/// That service is a genuine toggle, but this is a one-way button: the widget
+/// draws no checked state, because a completed todo leaves the list it shows.
+/// So an already-completed todo is a no-op here rather than an un-complete —
+/// see `perform()`.
+struct CompleteTodoIntent: AppIntent {
     static var title: LocalizedStringResource = "Complete Task"
     static var description = IntentDescription("Complete a task from the Nylon widget")
 
@@ -54,6 +58,18 @@ struct ToggleTodoIntent: AppIntent {
             return .result()
         }
 
+        // Already done by the time the tap resolved: ticked off in the app just
+        // before the widget's reload caught up, synced down from another
+        // device, or a double-tap. The entry this button was drawn from is
+        // stale, not the store — and since the button only ever offers
+        // "complete", passing this to the toggle would un-complete instead,
+        // rolling a repeat's dueDate back an occurrence with nothing on screen
+        // to say so. Redraw and leave it alone.
+        guard !todo.isEffectivelyCompleted else {
+            WidgetRefresh.reload()
+            return .result()
+        }
+
         let userId = UserDefaults(suiteName: BackgroundSyncService.appGroupSuiteName)?
             .string(forKey: BackgroundSyncService.userIdKey)
         let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
@@ -67,7 +83,7 @@ struct ToggleTodoIntent: AppIntent {
             // The store rejected the write, so there is nothing to sync and
             // nothing to redraw — leave the row as it was rather than showing
             // a completion that didn't happen.
-            print("[ToggleTodoIntent] Failed to save: \(error)")
+            print("[CompleteTodoIntent] Failed to save: \(error)")
             return .result()
         }
 

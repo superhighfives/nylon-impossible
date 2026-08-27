@@ -115,7 +115,7 @@
 				Utils/KeychainHelper.swift,
 				Utils/Recurrence.swift,
 				Utils/WidgetRefresh.swift,
-				Views/Extensions/Color+Hex.swift,
+				"Views/Extensions/Color+Hex.swift",
 			);
 			target = DD0000082F5B000000000008 /* Nylon Widget */;
 		};

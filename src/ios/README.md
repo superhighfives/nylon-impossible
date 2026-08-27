@@ -134,7 +134,7 @@ cd "src/ios/Nylon Impossible" && swiftlint
 
 `Nylon Widget/` renders the todos due before local midnight — the same
 definition the app icon badge uses, shared as `TodayDigest`. Small and medium
-families, up to four rows, with each row's circle a `ToggleTodoIntent` button
+families, up to four rows, with each row's circle a `CompleteTodoIntent` button
 that completes the todo in place.
 
 Two things are easy to get wrong here:
@@ -144,10 +144,13 @@ Two things are easy to get wrong here:
   path ends in `WidgetRefresh.reload()` — the app on backgrounding and on
   sign-in/out, a sync that pulled remote changes, the share extension, the Siri
   intent, and the toggle itself. A new write path needs one too.
-- **Completion is not a flag flip.** `ToggleTodoIntent` calls
+- **Completion is not a flag flip.** `CompleteTodoIntent` calls
   `TodoCompletionService`, the same code the app's checkbox runs, so repeats
   roll forward and re-place themselves and subtasks follow their parent. Don't
-  reimplement it against `isCompleted`.
+  reimplement it against `isCompleted`. That service is a real toggle, though,
+  and the widget button is one-way — it has no checked state to draw — so the
+  intent no-ops on an already-completed todo rather than un-completing one from
+  a stale entry.
 
 The toggle uploads immediately via `BackgroundSyncService` when there's a valid
 token, and otherwise leaves the todo unsynced for the app's next foreground
