@@ -13,19 +13,27 @@ struct TodayDigestTests {
         )
     }
 
-    /// Midday, so "today" has room either side of it in the same local day.
-    private let now = Calendar.current.date(
-        bySettingHour: 12, minute: 0, second: 0, of: Date()
-    )!
+    /// Midday today, so the fixtures have room either side of them within the
+    /// same local day. A plain offset from `startOfDay` rather than
+    /// `date(bySettingHour:)`, which searches *forward* — after noon that hands
+    /// back midday tomorrow, and it returns an optional that has to be unwrapped.
+    ///
+    /// A `static` computed property, not a stored one: Swift Testing builds a
+    /// fresh suite instance for every test case, so anything stored on the
+    /// suite is re-evaluated per test. Every other suite in this target keeps
+    /// its fixtures in a `static let` or a local for the same reason.
+    private static var now: Date {
+        Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 60 * 60)
+    }
 
-    private let userId = "user_123"
+    private static let userId = "user_123"
 
     @discardableResult
     private func insert(
         _ context: ModelContext,
         title: String,
         dueDate: Date?,
-        userId: String? = "user_123",
+        userId: String? = TodayDigestTests.userId,
         position: String = "a0",
         completed: Bool = false,
         completedAt: Date? = nil,
@@ -50,6 +58,7 @@ struct TodayDigestTests {
 
     @Test("startOfTomorrow is local midnight after the given date")
     func startOfTomorrowIsNextLocalMidnight() {
+        let now = Self.now
         let cutoff = TodayDigest.startOfTomorrow(after: now)
         let calendar = Calendar.current
 
@@ -64,6 +73,7 @@ struct TodayDigestTests {
     @Test("Includes todos due today and overdue, excludes later ones")
     @MainActor
     func includesTodayAndOverdue() throws {
+        let now = Self.now
         let context = try makeContainer().mainContext
 
         insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-86_400))
@@ -71,7 +81,7 @@ struct TodayDigestTests {
         insert(context, title: "Tomorrow", dueDate: now.addingTimeInterval(86_400))
         insert(context, title: "No due date", dueDate: nil)
 
-        let due = TodayDigest.fetch(userId: userId, context: context, now: now)
+        let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
         #expect(due.map(\.title) == ["Overdue", "Later today"])
     }
@@ -79,6 +89,7 @@ struct TodayDigestTests {
     @Test("Excludes completed, deleted, and subtask todos")
     @MainActor
     func excludesNonEligible() throws {
+        let now = Self.now
         let context = try makeContainer().mainContext
         let dueToday = now.addingTimeInterval(-60)
 
@@ -87,7 +98,7 @@ struct TodayDigestTests {
         insert(context, title: "Deleted", dueDate: dueToday, deleted: true)
         insert(context, title: "Subtask", dueDate: dueToday, parentId: UUID())
 
-        let due = TodayDigest.fetch(userId: userId, context: context, now: now)
+        let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
         #expect(due.map(\.title) == ["Open"])
     }
@@ -95,6 +106,7 @@ struct TodayDigestTests {
     @Test("Excludes a repeat completed today, which the app still shows as done")
     @MainActor
     func excludesRepeatCompletedToday() throws {
+        let now = Self.now
         let context = try makeContainer().mainContext
 
         // Completing a repeat rolls its dueDate forward and stamps completedAt
@@ -108,12 +120,13 @@ struct TodayDigestTests {
             recurrence: Recurrence(frequency: .daily)
         )
 
-        #expect(TodayDigest.fetch(userId: userId, context: context, now: now).isEmpty)
+        #expect(TodayDigest.fetch(userId: Self.userId, context: context, now: now).isEmpty)
     }
 
     @Test("Excludes other users' todos and signed-out local ones")
     @MainActor
     func scopesToUser() throws {
+        let now = Self.now
         let context = try makeContainer().mainContext
         let dueToday = now.addingTimeInterval(-60)
 
@@ -121,7 +134,7 @@ struct TodayDigestTests {
         insert(context, title: "Theirs", dueDate: dueToday, userId: "user_456")
         insert(context, title: "Local only", dueDate: dueToday, userId: nil)
 
-        let due = TodayDigest.fetch(userId: userId, context: context, now: now)
+        let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
         #expect(due.map(\.title) == ["Mine"])
     }
@@ -131,6 +144,7 @@ struct TodayDigestTests {
     @Test("Sticky first, then soonest due, then position")
     @MainActor
     func ordersStickyThenDueThenPosition() throws {
+        let now = Self.now
         let context = try makeContainer().mainContext
 
         insert(context, title: "Same day, later position", dueDate: now, position: "a2")
@@ -138,7 +152,7 @@ struct TodayDigestTests {
         insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-86_400), position: "a9")
         insert(context, title: "Pinned", dueDate: now, position: "a9", sticky: true)
 
-        let due = TodayDigest.fetch(userId: userId, context: context, now: now)
+        let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
         #expect(due.map(\.title) == [
             "Pinned",
@@ -151,13 +165,14 @@ struct TodayDigestTests {
     @Test("Limit truncates the list without changing its order")
     @MainActor
     func limitTruncates() throws {
+        let now = Self.now
         let context = try makeContainer().mainContext
 
         insert(context, title: "First", dueDate: now, position: "a1")
         insert(context, title: "Second", dueDate: now, position: "a2")
         insert(context, title: "Third", dueDate: now, position: "a3")
 
-        let due = TodayDigest.fetch(userId: userId, limit: 2, context: context, now: now)
+        let due = TodayDigest.fetch(userId: Self.userId, limit: 2, context: context, now: now)
 
         #expect(due.map(\.title) == ["First", "Second"])
     }
@@ -166,6 +181,6 @@ struct TodayDigestTests {
     @MainActor
     func emptyStore() throws {
         let context = try makeContainer().mainContext
-        #expect(TodayDigest.fetch(userId: userId, context: context, now: now).isEmpty)
+        #expect(TodayDigest.fetch(userId: Self.userId, context: context, now: Self.now).isEmpty)
     }
 }

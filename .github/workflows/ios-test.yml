@@ -71,3 +71,17 @@ jobs:
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -resultBundlePath TestResults \
             -quiet
+
+      # `-quiet` keeps a passing run readable, but it also swallows the reason a
+      # test host dies: a crash shows up as every pending test "failing" in
+      # 0.000 seconds with nothing else logged, which is undiagnosable from the
+      # log alone. The result bundle has the crash report and the per-test
+      # failure messages, so keep it when a run goes red.
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: src/ios/Nylon Impossible/TestResults.xcresult
+          retention-days: 7
+          if-no-files-found: ignore
