@@ -102,21 +102,39 @@ jobs:
           echo "::group::Diagnostics exported from the result bundle"
           xcrun xcresulttool export diagnostics \
             --path TestResults.xcresult --output-path exported-diagnostics 2>&1 | head -n 20 || true
-          if [ -d exported-diagnostics ]; then
-            find exported-diagnostics \( -name '*.crash' -o -name '*.ips' -o -name '*.log' \) 2>/dev/null \
-              | head -n 10 | while read -r f; do
-                echo "----- $f"
-                head -c 6000 "$f"
-                echo
-              done
-          fi
           echo "::endgroup::"
-          echo "::group::Loose crash reports"
-          find ~/Library -name '*.ips' -mmin -60 2>/dev/null | head -n 10 | while read -r f; do
+          # The crash report is the only thing that names the trapping frame.
+          # Print the faulting thread's stack symbolically rather than the first
+          # N bytes of the file: the header is ~6KB of process metadata and the
+          # frames sit after it, so a byte cap shows everything except the part
+          # that matters.
+          echo "::group::Crash report stacks"
+          find ~/Library/Logs/DiagnosticReports exported-diagnostics \
+            -name '*.ips' -mmin -90 2>/dev/null | head -n 5 > /tmp/ips-list || true
+          while read -r f; do
             echo "----- $f"
-            head -c 6000 "$f"
-            echo
-          done
+            python3 - "$f" <<'PYEOF' || true
+          import json, sys
+          raw = open(sys.argv[1], errors="replace").read()
+          body = json.loads(raw.split("\n", 1)[1])
+          exc = body.get("exception", {})
+          print("exception:", exc.get("type"), exc.get("signal"), exc.get("codes"))
+          print("termination:", body.get("termination", {}).get("indicator"))
+          images = [i.get("name", "?") for i in body.get("usedImages", [])]
+          for thread in body.get("threads", []):
+              if not thread.get("triggered"):
+                  continue
+              print("faulting thread:", thread.get("name") or thread.get("queue") or "")
+              for n, fr in enumerate(thread.get("frames", [])[:40]):
+                  idx = fr.get("imageIndex", -1)
+                  image = images[idx] if 0 <= idx < len(images) else "?"
+                  sym = fr.get("symbol", "")
+                  src = ""
+                  if fr.get("sourceFile"):
+                      src = f'  ({fr["sourceFile"]}:{fr.get("sourceLine", "?")})'
+                  print(f'  {n:2} {image:32.32} {sym}{src}')
+          PYEOF
+          done < /tmp/ips-list
           echo "::endgroup::"
 
       # Kept as well, for anyone with a Mac who wants to open the bundle.
