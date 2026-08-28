@@ -1,4 +1,4 @@
-import { getSocialUrlInfo } from "@/lib/social-urls";
+import { getSocialUrlInfo, parseSocialAuthor } from "@/lib/social-urls";
 import type { SerializedTodoUrl } from "@/types/database";
 
 export interface UrlDisplay {
@@ -85,9 +85,9 @@ export function getUrlOnlyUrl(todo: {
  */
 export function getFetchedPreviewTitle(url: SerializedTodoUrl): string | null {
   if (url.fetchStatus !== "fetched") return null;
-  if (getSocialUrlInfo(url.url) && url.title) {
-    const match = url.title.match(/^(.+?)\s+\(@([^)]+)\)/);
-    return match ? match[1].trim() : url.title;
+  if (getSocialUrlInfo(url.url)) {
+    const author = parseSocialAuthor(url.title);
+    if (author) return author.name;
   }
   return url.title ?? url.siteName ?? null;
 }
