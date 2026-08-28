@@ -61,11 +61,25 @@ struct ListPageView: View {
         return Group {
             if displayed.isEmpty {
                 ScrollView {
-                    EmptyStateView()
+                    // Completed has no add-todo field (see ContentView), so
+                    // its empty copy drops the "add a todo below" cue.
+                    if list.systemKind == .completed {
+                        EmptyStateView(
+                            icon: "checkmark.circle",
+                            title: "Nothing completed yet",
+                            message: "Todos you finish anywhere show up here."
+                        )
                         .transition(.opacity)
                         .frame(maxWidth: .infinity)
                         .padding(.top, topInset)
                         .padding(.bottom, 100)
+                    } else {
+                        EmptyStateView()
+                            .transition(.opacity)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, topInset)
+                            .padding(.bottom, 100)
+                    }
                 }
             } else {
                 TaskListView(
@@ -73,6 +87,7 @@ struct ListPageView: View {
                     allTodos: allTodos,
                     orderedLists: orderedLists,
                     viewModel: viewModel,
+                    isCompletedList: list.systemKind == .completed,
                     topInset: topInset,
                     departures: moves.departures,
                     arrivals: moves.arrivals,

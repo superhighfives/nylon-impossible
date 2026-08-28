@@ -114,8 +114,10 @@ final class ListMoveTracker {
         for id in previous.subtracting(current) {
             // Only a move earns the treatment. A todo that was deleted is gone
             // from `allTodos` (hard delete on sync) or flagged `isDeleted`, and
-            // completing one keeps it on this page in the Completed section —
-            // neither should read as having gone somewhere.
+            // one that was completed still carries this page's `listKey`
+            // (`destination == page`) even though `ContentView.sortedTodosList`
+            // has filtered it out of `pageTodos` — neither should read as
+            // having gone somewhere.
             guard let todo = byId[id],
                   !todo.isDeleted,
                   let destination = todo.listKey?.lowercased(),

@@ -19,6 +19,13 @@ struct TaskListView: View {
     let allTodos: [TodoItem]
     let orderedLists: [TodoListModel]
     let viewModel: TodoViewModel
+    /// True on the synthesized Completed page. `pageTodos` there is already
+    /// 100% completed items (see `ContentView.sortedTodosList`), so this skips
+    /// the incomplete/completed split and the `hideCompleted`-gated accordion
+    /// below — otherwise the page would nest a "Completed" toggle inside a
+    /// page already titled "Completed", collapsed shut for anyone with
+    /// `hideCompleted` on.
+    let isCompletedList: Bool
     /// Space the floating header needs above the first row — smaller on the
     /// system lists, which show no title band. See `ContentView.headerInset`.
     let topInset: CGFloat
@@ -49,54 +56,68 @@ struct TaskListView: View {
         let completed = pageTodos.filter { $0.isEffectivelyCompleted }
 
         return List {
-            Section {
-                // Reordering is driven by `.draggable`/`.dropDestination` rather
-                // than `.onMove`. `.onMove`'s lift is a system-managed opaque
-                // platter that can't be restyled; owning the drag lets the
-                // lifted row render as Liquid Glass (see `dragPreview`), matching
-                // web's translucent, blurred, ringed drag card.
-                ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
-                    todoRow(todo)
-                        // Thin brand line on the hovered row's leading edge — the
-                        // "it'll land here" cue, mirroring web's drop line.
-                        .overlay(alignment: .top) {
-                            if dropTargetId == todo.id {
-                                Capsule()
-                                    .fill(Color.appBrand)
-                                    .frame(height: 2)
-                                    .padding(.horizontal, 4)
-                                    .transition(.opacity)
-                            }
-                        }
-                        .draggable(todo.id.uuidString) {
-                            dragPreview(for: todo)
-                        }
-                        .dropDestination(for: String.self) { items, _ in
-                            handleReorderDrop(items, ontoIndex: index, in: incomplete)
-                        } isTargeted: { targeted in
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if targeted {
-                                    dropTargetId = todo.id
-                                } else if dropTargetId == todo.id {
-                                    dropTargetId = nil
+            if isCompletedList {
+                // The Completed page's `pageTodos` is already all-completed —
+                // render it flat, with no nested accordion and no
+                // `hideCompleted` gate (the page's own title already says
+                // "Completed"; a collapsed toggle underneath it would just
+                // hide the page's entire reason for existing).
+                Section {
+                    ForEach(pageTodos) { todo in
+                        todoRow(todo)
+                            .moveDisabled(true)
+                    }
+                }
+            } else {
+                Section {
+                    // Reordering is driven by `.draggable`/`.dropDestination` rather
+                    // than `.onMove`. `.onMove`'s lift is a system-managed opaque
+                    // platter that can't be restyled; owning the drag lets the
+                    // lifted row render as Liquid Glass (see `dragPreview`), matching
+                    // web's translucent, blurred, ringed drag card.
+                    ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
+                        todoRow(todo)
+                            // Thin brand line on the hovered row's leading edge — the
+                            // "it'll land here" cue, mirroring web's drop line.
+                            .overlay(alignment: .top) {
+                                if dropTargetId == todo.id {
+                                    Capsule()
+                                        .fill(Color.appBrand)
+                                        .frame(height: 2)
+                                        .padding(.horizontal, 4)
+                                        .transition(.opacity)
                                 }
                             }
-                        }
+                            .draggable(todo.id.uuidString) {
+                                dragPreview(for: todo)
+                            }
+                            .dropDestination(for: String.self) { items, _ in
+                                handleReorderDrop(items, ontoIndex: index, in: incomplete)
+                            } isTargeted: { targeted in
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if targeted {
+                                        dropTargetId = todo.id
+                                    } else if dropTargetId == todo.id {
+                                        dropTargetId = nil
+                                    }
+                                }
+                            }
+                    }
                 }
-            }
 
-            // Completed items collapse into a bottom-of-list accordion, matching
-            // web: the toggle (with a count badge) always shows when there are
-            // completed items; `hideCompleted` controls collapsed vs expanded
-            // rather than hiding the section outright.
-            if !completed.isEmpty {
-                Section {
-                    completedAccordionHeader(count: completed.count)
+                // Completed items collapse into a bottom-of-list accordion, matching
+                // web: the toggle (with a count badge) always shows when there are
+                // completed items; `hideCompleted` controls collapsed vs expanded
+                // rather than hiding the section outright.
+                if !completed.isEmpty {
+                    Section {
+                        completedAccordionHeader(count: completed.count)
 
-                    if !preferencesService.hideCompleted {
-                        ForEach(completed) { todo in
-                            todoRow(todo)
-                                .moveDisabled(true)
+                        if !preferencesService.hideCompleted {
+                            ForEach(completed) { todo in
+                                todoRow(todo)
+                                    .moveDisabled(true)
+                            }
                         }
                     }
                 }
@@ -157,23 +178,46 @@ struct TaskListView: View {
         .moveDisabled(true)
     }
 
+    /// The next of the three time-based system lists ("Today" → "This Week"
+    /// → "Sometime") after the one `todo` is currently in — the trailing
+    /// swipe's "move on" shortcut. `nil` on Sometime (nothing further to
+    /// advance to), a custom list, Completed, or if the todo's current list
+    /// isn't one of `orderedLists` for some reason.
+    private func nextSystemList(after todo: TodoItem) -> TodoListModel? {
+        guard let currentKind = orderedLists.first(where: { $0.id == todo.listKey })?.systemKind else {
+            return nil
+        }
+        let nextKind: SystemListKind
+        switch currentKind {
+        case .today: nextKind = .thisWeek
+        case .thisWeek: nextKind = .sometime
+        case .sometime, .completed: return nil
+        }
+        return orderedLists.first { $0.systemKind == nextKind }
+    }
+
     @ViewBuilder
     private func todoRow(_ todo: TodoItem) -> some View {
         let departingTo = departures[todo.id]
         let arrived = arrivals.contains(todo.id)
+
+        let toggleSticky = {
+            viewModel.toggleSticky(todo)
+            syncService.syncAfterAction()
+        }
+        let moveToList: (String) -> Void = { listId in
+            viewModel.moveTodoToList(todo, to: listId, allTodos: allTodos)
+            syncService.syncAfterAction()
+        }
 
         TodoItemRow(
             todo: todo,
             apiService: syncService.apiService,
             urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
             subtasks: subtasks(of: todo),
-            availableLists: orderedLists,
+            availableLists: orderedLists.filter { $0.systemKind != .completed },
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: allTodos, lists: orderedLists)
-                syncService.syncAfterAction()
-            },
-            onToggleSticky: {
-                viewModel.toggleSticky(todo)
                 syncService.syncAfterAction()
             },
             onSave: { title, notes, dueDate, recurrence, sticky in
@@ -214,10 +258,7 @@ struct TaskListView: View {
                 )
                 syncService.syncAfterAction()
             },
-            onMoveToList: { listId in
-                viewModel.moveTodoToList(todo, to: listId, allTodos: allTodos)
-                syncService.syncAfterAction()
-            }
+            onMoveToList: moveToList
         )
         // A row that just landed here from another list is washed in brand
         // colour until it's been seen, so a refresh that silently gains todos
@@ -249,10 +290,37 @@ struct TaskListView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
-        // Stages the delete for confirmation instead of removing immediately.
+        // Pin/unpin — leading edge, like Mail/Reminders' flag: a light,
+        // reversible action opposite the trailing edge's heavier ones.
+        // Hidden once completed, matching the old persistent button (see
+        // TodoItemRow's pin indicator) — completing already clears sticky.
+        .swipeActions(edge: .leading) {
+            if !todo.isEffectivelyCompleted {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        toggleSticky()
+                    }
+                } label: {
+                    Label(todo.sticky ? "Unpin" : "Pin", systemImage: todo.sticky ? "pin.slash.fill" : "pin.fill")
+                }
+                .tint(Color.appAccent)
+            }
+        }
+        // Delete stays first (and so keeps triggering on a full swipe,
+        // SwiftUI's default for a trailing edge's first action) — "move on"
+        // is a second, partial-swipe-only action alongside it, only offered
+        // on the three time-based lists where "next" is well defined.
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { pendingDeleteTodo = todo } label: {
                 Label("Delete", systemImage: "trash")
+            }
+            if !todo.isEffectivelyCompleted, let nextList = nextSystemList(after: todo) {
+                Button {
+                    moveToList(nextList.id)
+                } label: {
+                    Label("Move to \(nextList.name)", systemImage: "arrow.right")
+                }
+                .tint(Color.appAccent)
             }
         }
     }

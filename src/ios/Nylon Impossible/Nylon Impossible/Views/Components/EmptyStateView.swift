@@ -8,24 +8,28 @@
 import SwiftUI
 
 struct EmptyStateView: View {
+    var icon: String = "tray"
+    var title: String = "Nothing to do yet"
+    var message: String = "Add a todo below to get started. Try “Buy groceries tomorrow” or paste a link to research."
+
     @State private var appeared = false
 
     var body: some View {
         VStack(spacing: 4) {
             Spacer()
 
-            Image(systemName: "tray")
+            Image(systemName: icon)
                 .font(.system(size: 20))
                 .foregroundStyle(Color.appSubtle)
                 .frame(width: 48, height: 48)
                 .background(Color.appTint, in: Circle())
                 .padding(.bottom, 12)
 
-            Text("Nothing to do yet")
+            Text(title)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(Color.appDefault)
 
-            Text("Add a todo below to get started. Try “Buy groceries tomorrow” or paste a link to research.")
+            Text(message)
                 .font(.system(size: 13))
                 .foregroundStyle(Color.appSubtle)
                 .multilineTextAlignment(.center)
