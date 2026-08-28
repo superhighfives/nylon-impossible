@@ -50,11 +50,13 @@ struct TodayProvider: TimelineProvider {
             let entry = Self.currentEntry()
 
             // A single entry, refetched at local midnight — which is both when
-            // "due today" starts meaning a different set of todos and when a
-            // date-only due date tips into overdue. Every other way the list
-            // changes (an edit in the app, a sync, the toggle below) ends in a
-            // `WidgetRefresh.reload()`, so there's nothing to poll for in
-            // between.
+            // "due before midnight" starts meaning a different set of todos
+            // and when a date-only due date tips into overdue. The overnight
+            // sweep that ages todos out of the Today list is the server's, so
+            // it lands here with a sync rather than on this schedule — and
+            // that, like every other way the list changes (an edit in the app,
+            // the toggle below), ends in a `WidgetRefresh.reload()`, so
+            // there's nothing to poll for in between.
             let midnight = TodayDigest.startOfTomorrow(after: entry.date)
             completion(Timeline(entries: [entry], policy: .after(midnight)))
         }
@@ -68,8 +70,8 @@ struct TodayProvider: TimelineProvider {
         }
 
         let context = ModelContext(SharedModelContainer.shared)
-        let due = TodayDigest.fetch(userId: userId, context: context, now: now)
-        let shown = due.prefix(maxRows).map { todo in
+        let forToday = TodayDigest.fetch(userId: userId, context: context, now: now)
+        let shown = forToday.prefix(maxRows).map { todo in
             WidgetTodo(
                 id: todo.id,
                 title: todo.title,
@@ -79,7 +81,7 @@ struct TodayProvider: TimelineProvider {
             )
         }
 
-        return TodayEntry(date: now, content: .todos(Array(shown), total: due.count))
+        return TodayEntry(date: now, content: .todos(Array(shown), total: forToday.count))
     }
 }
 
@@ -90,7 +92,7 @@ struct TodayWidget: Widget {
                 .containerBackground(Color.appBase, for: .widget)
         }
         .configurationDisplayName("Today")
-        .description("Tasks due today, and anything overdue.")
+        .description("Everything on your Today list, plus anything due or overdue.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
@@ -101,6 +103,10 @@ extension WidgetTodo {
     /// Stand-ins for the widget gallery and Xcode previews. Never persisted,
     /// and their ids belong to no real todo — a toggle tapped in the gallery
     /// finds nothing and does nothing, which is the right outcome there.
+    ///
+    /// One of them has no due date: a Today-list todo that isn't due at all is
+    /// the ordinary case, not an edge one, so the gallery shouldn't promise a
+    /// widget made entirely of deadlines.
     static let placeholders: [WidgetTodo] = [
         WidgetTodo(
             id: UUID(),
@@ -126,7 +132,7 @@ extension WidgetTodo {
         WidgetTodo(
             id: UUID(),
             title: "Reply to the venue about Thursday",
-            dueDate: Date().addingTimeInterval(21_600),
+            dueDate: nil,
             isSticky: false,
             isRepeating: false
         ),
