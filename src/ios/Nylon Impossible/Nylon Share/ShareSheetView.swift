@@ -14,19 +14,29 @@ struct ShareSheetView: View {
     let onCancel: () -> Void
 
     @State private var taskTitle: String = ""
-    /// The "Check {domain}" title we generated ourselves, when we generated one
-    /// — nil if the sharing app supplied a real title, or this isn't a URL.
-    private let generatedTitle: String?
+    /// The title saved when the field is left empty, shown greyed out inside it.
+    /// nil for shared text, which is the task itself and so starts *in* the
+    /// field rather than behind it — there's nothing else it could fall back to.
+    private let emptyFallback: String?
+    /// Whether `emptyFallback` is the "Check {domain}" title we generated
+    /// ourselves — nothing was supplied by the sharing app, so the server is
+    /// what will eventually name this todo properly.
+    private let fallbackIsGenerated: Bool
     @FocusState private var isFocused: Bool
 
-    /// Whether the field still holds the placeholder we generated. Compared
-    /// against the live `taskTitle` rather than settled at init: the moment the
-    /// user types their own title the server stops rewriting it (per
+    /// Whether saving right now would write the title we generated. Tracks the
+    /// live `taskTitle` rather than being settled at init: the moment the user
+    /// types their own title the server stops rewriting it (per
     /// `isPlaceholderTitle` on the API side), so the promise below has to stop
     /// with it — and come back if they undo the edit.
-    private var titleIsPlaceholder: Bool {
-        guard let generatedTitle else { return false }
-        return taskTitle.trimmingCharacters(in: .whitespacesAndNewlines) == generatedTitle
+    private var willUseGeneratedTitle: Bool {
+        fallbackIsGenerated
+            && taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// What Save writes — the typed title, or the fallback behind it.
+    private var savedTitle: String {
+        TaskCreationService.shareSheetTitle(typed: taskTitle, fallback: emptyFallback ?? "")
     }
 
     init(content: String, isURL: Bool, prefilledTitle: String? = nil, onSave: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
@@ -35,15 +45,18 @@ struct ShareSheetView: View {
         self.onSave = onSave
         self.onCancel = onCancel
         // Use the app-provided title (e.g. article title from Reeder) when available;
-        // otherwise fall back to generating a title from the URL or using the text directly.
+        // otherwise fall back to generating a title from the URL.
         // A share extension has no network of its own, so the URL-derived title
         // is a placeholder: the server replaces it with the page's real title
         // (or a tweet's opening line) once it fetches the link on the next sync.
-        let defaultTitle = isURL ? TaskCreationService.titleFromURL(content) : content
         let trimmed = prefilledTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
         let supplied = trimmed?.isEmpty == false ? trimmed : nil
-        generatedTitle = (isURL && supplied == nil) ? defaultTitle : nil
-        _taskTitle = State(initialValue: supplied ?? defaultTitle)
+        // A shared link starts with an empty field and its fallback greyed out
+        // behind it, so a title can be typed straight in instead of selecting
+        // and deleting one first. Shared text stays in the field to be edited.
+        emptyFallback = isURL ? (supplied ?? TaskCreationService.titleFromURL(content)) : nil
+        fallbackIsGenerated = isURL && supplied == nil
+        _taskTitle = State(initialValue: isURL ? "" : content)
     }
     
     var body: some View {
@@ -54,15 +67,15 @@ struct ShareSheetView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     
-                    TextField("Task title", text: $taskTitle, axis: .vertical)
+                    TextField(emptyFallback ?? "Task title", text: $taskTitle, axis: .vertical)
                         .textFieldStyle(.roundedBorder)
                         .focused($isFocused)
                         .lineLimit(3...6)
                 }
                 .padding(.horizontal)
-                
-                if titleIsPlaceholder {
-                    Text("Leave this as-is and Nylon will title the task from the link once it fetches it.")
+
+                if willUseGeneratedTitle {
+                    Text("Leave this empty and Nylon will title the task from the link once it fetches it.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,10 +111,10 @@ struct ShareSheetView: View {
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        onSave(taskTitle)
+                        onSave(savedTitle)
                     }
                     .fontWeight(.semibold)
-                    .disabled(taskTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(savedTitle.isEmpty)
                 }
             }
         }

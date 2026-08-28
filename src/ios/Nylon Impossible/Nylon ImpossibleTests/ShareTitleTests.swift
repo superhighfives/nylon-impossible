@@ -98,3 +98,49 @@ struct ShareTitleTests {
         #expect(title == "")
     }
 }
+
+/// The share sheet leaves a shared link's title field empty and shows the
+/// fallback greyed out behind it, so empty means "use what's shown".
+@Suite("TaskCreationService.shareSheetTitle")
+struct ShareSheetTitleTests {
+
+    @Test("uses the fallback when the field was left empty")
+    func emptyFieldUsesFallback() {
+        let title = TaskCreationService.shareSheetTitle(typed: "", fallback: "Check example.com")
+        #expect(title == "Check example.com")
+    }
+
+    @Test("uses the fallback when the field holds only whitespace")
+    func whitespaceFieldUsesFallback() {
+        let title = TaskCreationService.shareSheetTitle(typed: "   \n ", fallback: "Check example.com")
+        #expect(title == "Check example.com")
+    }
+
+    @Test("keeps a typed title over the fallback")
+    func typedTitleWins() {
+        let title = TaskCreationService.shareSheetTitle(typed: "Read on the train", fallback: "Check example.com")
+        #expect(title == "Read on the train")
+    }
+
+    @Test("trims what was typed")
+    func trimsTypedTitle() {
+        let title = TaskCreationService.shareSheetTitle(typed: "  Read later  ", fallback: "Check example.com")
+        #expect(title == "Read later")
+    }
+
+    @Test("stays empty when there's nothing typed and nothing to fall back to")
+    func nothingToSave() {
+        // Shared text with an emptied field — Save is disabled on this.
+        #expect(TaskCreationService.shareSheetTitle(typed: " ", fallback: "").isEmpty)
+    }
+
+    @Test("saving an untouched link writes the placeholder the server rewrites")
+    func untouchedLinkKeepsPlaceholder() {
+        // The round trip the share extension actually makes: generate, show as
+        // prompt text, save empty — the API's `isPlaceholderTitle` has to still
+        // recognise what comes out, or the fetched page title never lands.
+        let url = "https://x.com/mitchellh/status/2089111740395270615"
+        let fallback = TaskCreationService.titleFromURL(url)
+        #expect(TaskCreationService.shareSheetTitle(typed: "", fallback: fallback) == "Check x.com")
+    }
+}
