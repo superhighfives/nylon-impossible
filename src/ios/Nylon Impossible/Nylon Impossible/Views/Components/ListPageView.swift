@@ -87,6 +87,7 @@ struct ListPageView: View {
                     allTodos: allTodos,
                     orderedLists: orderedLists,
                     viewModel: viewModel,
+                    isCompletedList: list.systemKind == .completed,
                     topInset: topInset,
                     departures: moves.departures,
                     arrivals: moves.arrivals,

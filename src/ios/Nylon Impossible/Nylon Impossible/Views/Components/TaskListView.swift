@@ -19,6 +19,13 @@ struct TaskListView: View {
     let allTodos: [TodoItem]
     let orderedLists: [TodoListModel]
     let viewModel: TodoViewModel
+    /// True on the synthesized Completed page. `pageTodos` there is already
+    /// 100% completed items (see `ContentView.sortedTodosList`), so this skips
+    /// the incomplete/completed split and the `hideCompleted`-gated accordion
+    /// below — otherwise the page would nest a "Completed" toggle inside a
+    /// page already titled "Completed", collapsed shut for anyone with
+    /// `hideCompleted` on.
+    let isCompletedList: Bool
     /// Space the floating header needs above the first row — smaller on the
     /// system lists, which show no title band. See `ContentView.headerInset`.
     let topInset: CGFloat
@@ -49,54 +56,68 @@ struct TaskListView: View {
         let completed = pageTodos.filter { $0.isEffectivelyCompleted }
 
         return List {
-            Section {
-                // Reordering is driven by `.draggable`/`.dropDestination` rather
-                // than `.onMove`. `.onMove`'s lift is a system-managed opaque
-                // platter that can't be restyled; owning the drag lets the
-                // lifted row render as Liquid Glass (see `dragPreview`), matching
-                // web's translucent, blurred, ringed drag card.
-                ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
-                    todoRow(todo)
-                        // Thin brand line on the hovered row's leading edge — the
-                        // "it'll land here" cue, mirroring web's drop line.
-                        .overlay(alignment: .top) {
-                            if dropTargetId == todo.id {
-                                Capsule()
-                                    .fill(Color.appBrand)
-                                    .frame(height: 2)
-                                    .padding(.horizontal, 4)
-                                    .transition(.opacity)
-                            }
-                        }
-                        .draggable(todo.id.uuidString) {
-                            dragPreview(for: todo)
-                        }
-                        .dropDestination(for: String.self) { items, _ in
-                            handleReorderDrop(items, ontoIndex: index, in: incomplete)
-                        } isTargeted: { targeted in
-                            withAnimation(.easeInOut(duration: 0.15)) {
-                                if targeted {
-                                    dropTargetId = todo.id
-                                } else if dropTargetId == todo.id {
-                                    dropTargetId = nil
+            if isCompletedList {
+                // The Completed page's `pageTodos` is already all-completed —
+                // render it flat, with no nested accordion and no
+                // `hideCompleted` gate (the page's own title already says
+                // "Completed"; a collapsed toggle underneath it would just
+                // hide the page's entire reason for existing).
+                Section {
+                    ForEach(pageTodos) { todo in
+                        todoRow(todo)
+                            .moveDisabled(true)
+                    }
+                }
+            } else {
+                Section {
+                    // Reordering is driven by `.draggable`/`.dropDestination` rather
+                    // than `.onMove`. `.onMove`'s lift is a system-managed opaque
+                    // platter that can't be restyled; owning the drag lets the
+                    // lifted row render as Liquid Glass (see `dragPreview`), matching
+                    // web's translucent, blurred, ringed drag card.
+                    ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
+                        todoRow(todo)
+                            // Thin brand line on the hovered row's leading edge — the
+                            // "it'll land here" cue, mirroring web's drop line.
+                            .overlay(alignment: .top) {
+                                if dropTargetId == todo.id {
+                                    Capsule()
+                                        .fill(Color.appBrand)
+                                        .frame(height: 2)
+                                        .padding(.horizontal, 4)
+                                        .transition(.opacity)
                                 }
                             }
-                        }
+                            .draggable(todo.id.uuidString) {
+                                dragPreview(for: todo)
+                            }
+                            .dropDestination(for: String.self) { items, _ in
+                                handleReorderDrop(items, ontoIndex: index, in: incomplete)
+                            } isTargeted: { targeted in
+                                withAnimation(.easeInOut(duration: 0.15)) {
+                                    if targeted {
+                                        dropTargetId = todo.id
+                                    } else if dropTargetId == todo.id {
+                                        dropTargetId = nil
+                                    }
+                                }
+                            }
+                    }
                 }
-            }
 
-            // Completed items collapse into a bottom-of-list accordion, matching
-            // web: the toggle (with a count badge) always shows when there are
-            // completed items; `hideCompleted` controls collapsed vs expanded
-            // rather than hiding the section outright.
-            if !completed.isEmpty {
-                Section {
-                    completedAccordionHeader(count: completed.count)
+                // Completed items collapse into a bottom-of-list accordion, matching
+                // web: the toggle (with a count badge) always shows when there are
+                // completed items; `hideCompleted` controls collapsed vs expanded
+                // rather than hiding the section outright.
+                if !completed.isEmpty {
+                    Section {
+                        completedAccordionHeader(count: completed.count)
 
-                    if !preferencesService.hideCompleted {
-                        ForEach(completed) { todo in
-                            todoRow(todo)
-                                .moveDisabled(true)
+                        if !preferencesService.hideCompleted {
+                            ForEach(completed) { todo in
+                                todoRow(todo)
+                                    .moveDisabled(true)
+                            }
                         }
                     }
                 }
@@ -194,7 +215,7 @@ struct TaskListView: View {
             apiService: syncService.apiService,
             urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
             subtasks: subtasks(of: todo),
-            availableLists: orderedLists,
+            availableLists: orderedLists.filter { $0.systemKind != .completed },
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: allTodos, lists: orderedLists)
                 syncService.syncAfterAction()
