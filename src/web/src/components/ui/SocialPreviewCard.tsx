@@ -1,4 +1,4 @@
-import { getSocialUrlInfo } from "@/lib/social-urls";
+import { getSocialUrlInfo, parseSocialAuthor } from "@/lib/social-urls";
 import type { SerializedTodoUrl } from "@/types/database";
 
 interface SocialPreviewCardProps {
@@ -76,21 +76,11 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
 
   const { platform, isPost, hostname } = social;
 
-  // Parse author info out of the og:title, e.g. "Name (@handle) on X"
+  // Author info comes out of the og:title, e.g. "Name (@handle) on X"
   // or "Name (@handle)" for profiles.
-  let authorName: string | null = null;
-  let authorHandle: string | null = null;
-  if (url.title) {
-    const match = url.title.match(/^(.+?)\s+\(@([^)]+)\)/);
-    if (match) {
-      authorName = match[1].trim();
-      authorHandle = `@${match[2]}`;
-    } else {
-      authorName = url.title;
-    }
-  }
-
-  const displayTitle = authorName ?? url.siteName ?? hostname;
+  const author = parseSocialAuthor(url.title);
+  const displayTitle = author?.name ?? url.siteName ?? hostname;
+  const authorHandle = author?.handle;
   const bodyText = url.description;
 
   return (
@@ -102,18 +92,22 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
     >
       {/* Header row */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
-        {/* Profile picture / thumbnail */}
+        {/* Profile picture / thumbnail. The wrapper doubles as the placeholder:
+            an avatar that fails to load hides itself and leaves the neutral
+            circle behind, so the header doesn't reflow. Same as the iOS card. */}
         {url.image && !isPost ? (
-          <img
-            src={url.image}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-            className="w-8 h-8 rounded-full shrink-0 object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
+          <span className="w-8 h-8 rounded-full shrink-0 overflow-hidden bg-gray-hover">
+            <img
+              src={url.image}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          </span>
         ) : null}
 
         <div className="flex-1 min-w-0">
@@ -163,12 +157,8 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
   const social = getSocialUrlInfo(url.url);
   if (!social) return null;
 
-  let authorName: string | null = null;
-  if (url.title) {
-    const match = url.title.match(/^(.+?)\s+\(@([^)]+)\)/);
-    authorName = match ? match[1].trim() : url.title;
-  }
-  const displayTitle = authorName ?? url.siteName ?? social.hostname;
+  const displayTitle =
+    parseSocialAuthor(url.title)?.name ?? url.siteName ?? social.hostname;
 
   return (
     <a
@@ -183,8 +173,10 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
           {displayTitle}
         </span>
       </span>
+      {/* Two lines, same as the iOS chip — an unclamped tweet could otherwise
+          push a single list row taller than the rest of the list. */}
       {url.description && (
-        <span className="text-xs text-gray-muted leading-relaxed">
+        <span className="text-xs text-gray-muted leading-relaxed line-clamp-2">
           {url.description}
         </span>
       )}

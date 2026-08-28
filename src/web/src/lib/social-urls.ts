@@ -28,6 +28,30 @@ const YOUTUBE_HOSTS = new Set([
   "m.youtube.com",
 ]);
 
+export interface SocialAuthor {
+  /** Display name, with the "(@handle)" suffix stripped when there was one. */
+  name: string;
+  /** "@handle", or null when the title wasn't in the author shape. */
+  handle: string | null;
+}
+
+/**
+ * Split the "Name (@handle) on X" og:title shape the social platforms use into
+ * its parts. Titles that don't match keep their whole text as the name, so
+ * callers can always fall back to `name`.
+ *
+ * Mirrored in `parseSocialAuthor` in the iOS `SocialPreviewCard.swift` — keep
+ * the two in step so a tweet reads the same on both clients.
+ */
+export function parseSocialAuthor(
+  title: string | null | undefined,
+): SocialAuthor | null {
+  if (!title) return null;
+  const match = title.match(/^(.+?)\s+\(@([^)]+)\)/);
+  if (!match) return { name: title, handle: null };
+  return { name: match[1].trim(), handle: `@${match[2]}` };
+}
+
 /**
  * Detect whether a URL is from a known social platform.
  * Returns null if not a recognized social URL.
