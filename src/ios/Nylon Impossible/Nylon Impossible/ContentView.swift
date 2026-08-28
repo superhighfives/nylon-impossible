@@ -31,20 +31,25 @@ struct ContentView: View {
     @State private var focusAddTask = false
 
     /// Lists in the fixed order: Today, This Week, Sometime, then custom
-    /// lists by position. Mirrors web's `TodoGrid` ordering.
+    /// lists by position, then Completed last. Mirrors web's `TodoGrid`
+    /// ordering, where the synthesized Completed column always renders after
+    /// every real list (including "+ New List").
     ///
-    /// Excludes the `completed` system list: unlike the other system lists,
-    /// no todo's `listId` ever points at it (its web counterpart is a
-    /// synthesized aggregate across every list, not a real scope) — a
-    /// per-list page for it would just be permanently empty.
+    /// Completed sorts last unconditionally rather than by
+    /// `systemSortIndex` (which would otherwise place it right after
+    /// Sometime, ahead of custom lists) — it isn't a scope any todo's
+    /// `listId` ever points at, so where it falls among *lists* doesn't
+    /// matter the way it does for Today/This Week/Sometime; only that it
+    /// comes after everything else, like web's.
     private var orderedLists: [TodoListModel] {
-        lists
-            .filter { $0.systemKind != .completed }
-            .sorted { a, b in
-                if a.isSystem != b.isSystem { return a.isSystem }
-                if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
-                return a.position < b.position
+        lists.sorted { a, b in
+            if (a.systemKind == .completed) != (b.systemKind == .completed) {
+                return b.systemKind == .completed
             }
+            if a.isSystem != b.isSystem { return a.isSystem }
+            if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
+            return a.position < b.position
+        }
     }
 
     /// The list currently paged into view, driving the floating list header.
@@ -52,20 +57,25 @@ struct ContentView: View {
         orderedLists.first { $0.id == viewModel.selectedListId }
     }
 
-    /// How much room the floating header needs above a page's content. Custom
-    /// lists carry a title band under the header pill; the system lists don't,
-    /// so their content starts that much higher.
-    private func headerInset(for list: TodoListModel) -> CGFloat {
-        list.isSystem ? 77 : 118
-    }
+    /// How much room the floating header needs above a page's content — every
+    /// page now carries a title band under the header pill (see
+    /// `ListHeaderView`), so the inset is uniform.
+    private let headerInset: CGFloat = 118
 
     /// Subtasks live inside their parent's edit sheet, not as their own rows,
-    /// so a list's page is top-level todos only, scoped to that list. List
-    /// scoping itself lives in `TodoViewModel.sortedTodos` — this only needs
-    /// to strip out subtasks first.
-    private func sortedTodosList(for listId: String?) -> [TodoItem] {
+    /// so a list's page is top-level todos only. Every list scopes to its own
+    /// `listId` and drops completed items (`TodoViewModel.sortedTodos`
+    /// handles the scoping/sort, this just strips subtasks and completion).
+    /// Completed is the exception: no todo's `listId` ever points at it — it's
+    /// an aggregate of every completed, top-level todo across every list,
+    /// mirroring web's synthesized `CompletedColumn`.
+    private func sortedTodosList(for list: TodoListModel) -> [TodoItem] {
         let topLevel = todos.filter { $0.parentId == nil }
-        return viewModel.sortedTodos(from: topLevel, listId: listId)
+        if list.systemKind == .completed {
+            return viewModel.sortedTodos(from: topLevel).filter { $0.isEffectivelyCompleted }
+        }
+        return viewModel.sortedTodos(from: topLevel, listId: list.id)
+            .filter { !$0.isEffectivelyCompleted }
     }
 
     /// Sleeps until just past the next local midnight, bumps `midnightTick`, and
@@ -97,11 +107,11 @@ struct ContentView: View {
                 ForEach(orderedLists) { list in
                     ListPageView(
                         list: list,
-                        pageTodos: sortedTodosList(for: list.id),
+                        pageTodos: sortedTodosList(for: list),
                         allTodos: todos,
                         orderedLists: orderedLists,
                         viewModel: viewModel,
-                        topInset: headerInset(for: list),
+                        topInset: headerInset,
                         dropTargetId: $dropTargetId,
                         pendingDeleteTodo: $pendingDeleteTodo
                     )
@@ -142,12 +152,13 @@ struct ContentView: View {
                     }
                 }
 
-                // Only custom lists get a title band, and it's there for the
-                // rename/delete/reorder menu. The three system lists name
-                // themselves in the add-todo field's copy instead — the paged
-                // TabView hides its page dots, so that copy is the cue for
-                // which list you're on.
-                if let selectedList, !selectedList.isSystem,
+                // Every page gets a title band now — a plain label for the
+                // system lists (Today/This Week/Sometime/Completed), a menu
+                // for rename/delete/reorder on a custom one. The paged
+                // TabView hides its page dots, so this doubles as the cue for
+                // which list you're on (the time-based three also still fold
+                // their name into the add-todo field's copy).
+                if let selectedList,
                     let apiService = syncService.apiService {
                     ListHeaderView(
                         list: selectedList,
@@ -179,54 +190,58 @@ struct ContentView: View {
 
             // Floating input bar — liquid glass, anchored to the bottom and
             // rising with the keyboard (like Discord) since it does not ignore
-            // the keyboard safe area.
-            AddTaskInputView(
-                text: $viewModel.newTaskText,
-                canAdd: viewModel.canAddTask,
-                aiAvailable: preferencesService.aiEnabled,
-                listPhrase: selectedList?.promptPhrase,
-                focusRequested: $focusAddTask
-            ) { option in
-                let text = viewModel.newTaskText
-                viewModel.newTaskText = ""
+            // the keyboard safe area. Hidden on the Completed page: it isn't a
+            // real scope a todo can be created into (see `sortedTodosList`),
+            // and web has no "Add to Completed…" input either.
+            if selectedList?.systemKind != .completed {
+                AddTaskInputView(
+                    text: $viewModel.newTaskText,
+                    canAdd: viewModel.canAddTask,
+                    aiAvailable: preferencesService.aiEnabled,
+                    listPhrase: selectedList?.promptPhrase,
+                    focusRequested: $focusAddTask
+                ) { option in
+                    let text = viewModel.newTaskText
+                    viewModel.newTaskText = ""
 
-                // Create instantly and locally so the todo appears and persists
-                // even with no connection; sync (and any requested AI) run in
-                // the background. Enrich/research is recorded on the todo and
-                // fired once it has synced (SyncService.processPendingAI), so
-                // choosing it offline still takes effect on reconnect.
-                guard let todo = TaskCreationService.createSmart(
-                    text: text,
-                    userId: authService.userId,
-                    context: modelContext,
-                    allTodos: todos,
-                    listId: viewModel.selectedListId
-                ) else { return }
+                    // Create instantly and locally so the todo appears and persists
+                    // even with no connection; sync (and any requested AI) run in
+                    // the background. Enrich/research is recorded on the todo and
+                    // fired once it has synced (SyncService.processPendingAI), so
+                    // choosing it offline still takes effect on reconnect.
+                    guard let todo = TaskCreationService.createSmart(
+                        text: text,
+                        userId: authService.userId,
+                        context: modelContext,
+                        allTodos: todos,
+                        listId: viewModel.selectedListId
+                    ) else { return }
 
-                if preferencesService.aiEnabled {
-                    switch option {
-                    case .enrich:
-                        // Show the AI spinner immediately; the server flips this
-                        // through processing → complete once enrichment runs.
-                        // aiStartedAt is re-stamped when the enrich call actually
-                        // fires (processPendingAI), so the spinner stays honest
-                        // even if syncing is delayed while offline.
-                        todo.aiStatus = TodoAIStatus.pending.rawValue
-                        todo.aiStartedAt = Date()
-                        todo.pendingEnrich = true
-                    case .research:
-                        todo.pendingResearch = true
-                    case .plain:
-                        break
+                    if preferencesService.aiEnabled {
+                        switch option {
+                        case .enrich:
+                            // Show the AI spinner immediately; the server flips this
+                            // through processing → complete once enrichment runs.
+                            // aiStartedAt is re-stamped when the enrich call actually
+                            // fires (processPendingAI), so the spinner stays honest
+                            // even if syncing is delayed while offline.
+                            todo.aiStatus = TodoAIStatus.pending.rawValue
+                            todo.aiStartedAt = Date()
+                            todo.pendingEnrich = true
+                        case .research:
+                            todo.pendingResearch = true
+                        case .plain:
+                            break
+                        }
+                        try? modelContext.save()
                     }
-                    try? modelContext.save()
-                }
 
-                syncService.syncAfterAction()
+                    syncService.syncAfterAction()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 6)
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
         }
         .animation(.easeInOut(duration: 0.3), value: todos.count)
         .refreshable {

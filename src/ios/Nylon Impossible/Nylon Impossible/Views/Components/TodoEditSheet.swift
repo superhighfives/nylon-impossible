@@ -620,7 +620,7 @@ private struct SubtasksSection: View {
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: subtask.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appLine)
+                    .foregroundStyle(subtask.isCompleted ? Color.appBrand : Color.appDefault)
                 Text(subtask.title)
                     .foregroundStyle(subtask.isCompleted ? Color.appSubtle : Color.appDefault)
                     .strikethrough(subtask.isCompleted, color: Color.appSubtle)

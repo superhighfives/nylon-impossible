@@ -17,7 +17,6 @@ struct TodoItemRow: View {
     // real edit sheet.
     var availableLists: [TodoListModel] = []
     var onToggle: () -> Void
-    var onToggleSticky: () -> Void = {}
     var onSave: (String, String?, Date?, Recurrence?, Bool) -> Void
     var onAddSubtask: (String) -> Void = { _ in }
     var onToggleSubtask: (TodoItem) -> Void = { _ in }
@@ -234,7 +233,11 @@ struct TodoItemRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 16) {
+        // Top-aligned, not center — matches web's `items-start` row (the
+        // checkbox pins to the title's first line instead of floating at the
+        // vertical center of the whole row, which looks off once badges or a
+        // wrapped title make the row taller than the checkbox).
+        HStack(alignment: .top, spacing: 16) {
             // Checkbox
             Button(action: {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
@@ -251,27 +254,37 @@ struct TodoItemRow: View {
                     onToggle()
                 }
             }) {
+                // Rounded square, not a circle — matches web's Checkbox
+                // (rounded-md, border-2 border-gray-12), including the brand
+                // yellow fill on completion (web fills accent-solid with a
+                // dark checkmark instead of a muted gray).
                 ZStack {
-                    Circle()
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .stroke(
-                            todo.isEffectivelyCompleted ? Color.clear : Color.appLine,
+                            todo.isEffectivelyCompleted ? Color.clear : Color.appDefault,
                             lineWidth: 2.5
                         )
                         .frame(width: 28, height: 28)
 
                     if todo.isEffectivelyCompleted {
-                        Circle()
-                            .fill(Color.appSubtle.opacity(0.4))
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.appBrand)
                             .frame(width: 28, height: 28)
 
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(Color.appSubtle)
+                            .foregroundStyle(Color.appBrandForeground)
                             .scaleEffect(checkmarkScale)
                     }
                 }
             }
             .buttonStyle(.plain)
+            // The 28pt box is taller than one line of the 16pt title, so
+            // top-aligning them outright would sit the box a few points below
+            // the title's optical center; nudge it back up — the iOS analogue
+            // of web's `mt-[3px]` push (there the checkbox is the *smaller*
+            // one, so it nudges the other way to reach the same centering).
+            .offset(y: -4)
 
             // Task content — tappable to edit.
             //
@@ -382,19 +395,18 @@ struct TodoItemRow: View {
             .contentShape(Rectangle())
             .onTapGesture { showingEditSheet = true }
 
-            // Sticky pin toggle — a sibling of the tappable content rather
-            // than inside it, so tapping the pin doesn't also open the
-            // edit sheet. Subtasks never get this (no toggle passed in from
-            // the subtask row builder). Hidden once completed — completing
-            // clears sticky server-side, so it wouldn't do anything.
-            if !todo.isEffectivelyCompleted {
-                Button(action: onToggleSticky) {
-                    Image(systemName: todo.sticky ? "pin.fill" : "pin")
-                        .font(.system(size: 14))
-                        .foregroundStyle(todo.sticky ? Color.appAccent : Color.appSubtle)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(todo.sticky ? "Unpin todo" : "Pin todo to top")
+            // Pinned indicator — state, not an action. The toggle itself now
+            // lives in the row's leading swipe action (see `TaskListView`),
+            // mirroring web: "a pinned todo keeps its pin visible... the pin
+            // affordance on unpinned rows is hover-revealed" — an unpinned
+            // row carries no persistent pin control at all, only the
+            // swipe-revealed one. Non-interactive here since a tap would
+            // fight the container's own tap-to-edit gesture.
+            if todo.sticky {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 14))
+                    .foregroundStyle(Color.appAccent)
+                    .accessibilityLabel("Pinned")
             }
         }
         .padding(.vertical, 10)

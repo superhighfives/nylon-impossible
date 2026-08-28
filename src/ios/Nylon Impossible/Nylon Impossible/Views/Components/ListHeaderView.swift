@@ -6,15 +6,16 @@
 import SwiftData
 import SwiftUI
 
-/// Floating title bar for the currently-selected **custom** list — the iOS
-/// analogue of web's per-column title band. The name doubles as a menu for
-/// renaming, deleting, and reordering.
-///
-/// System lists (Today / This Week / Sometime) don't get one: they can't be
-/// renamed or removed, so the pill would carry an immutable name and nothing
-/// else. Their name is folded into the add-todo field's copy instead
-/// ("What needs to be done **this week**?"), which is also the cue for which
-/// page you're on — see `TodoListModel.promptPhrase`.
+/// Floating title bar for the currently-selected list — the iOS analogue of
+/// web's per-column title band. For a **custom** list the name doubles as a
+/// menu for renaming, deleting, and reordering; system lists (Today / This
+/// Week / Sometime / Completed) can't be renamed or removed, so they get the
+/// same capsule with a plain, non-interactive label instead — matching how
+/// web's `ListHeader` renders every column's title the same way regardless
+/// of `kind`. The three time-based lists still fold their name into the
+/// add-todo field's copy too ("What needs to be done **this week**?"), which
+/// doubles as the cue for which page you're on now that this title matches
+/// it — see `TodoListModel.promptPhrase`.
 struct ListHeaderView: View {
     let list: TodoListModel
     let viewModel: TodoViewModel
@@ -37,45 +38,64 @@ struct ListHeaderView: View {
     }
 
     var body: some View {
-        title
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .glassEffect(.regular, in: .capsule)
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
+        Group {
+            if list.isSystem {
+                systemTitle
+            } else {
+                title
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .glassEffect(.regular, in: .capsule)
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
+        )
+        .alert("Rename List", isPresented: $showRenameAlert) {
+            TextField("List name", text: $renameText)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") { commitRename() }
+        }
+        .confirmationDialog(
+            "Delete “\(list.name)”?",
+            isPresented: $showDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { deleteList() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Todos in this list will be deleted too. This can't be undone.")
+        }
+        .sheet(isPresented: $showReorderSheet) {
+            ReorderListsView(
+                customLists: customLists,
+                viewModel: viewModel,
+                apiService: apiService,
+                onMutate: onMutate
             )
-            .alert("Rename List", isPresented: $showRenameAlert) {
-                TextField("List name", text: $renameText)
-                Button("Cancel", role: .cancel) {}
-                Button("Save") { commitRename() }
-            }
-            .confirmationDialog(
-                "Delete “\(list.name)”?",
-                isPresented: $showDeleteConfirm,
-                titleVisibility: .visible
-            ) {
-                Button("Delete", role: .destructive) { deleteList() }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Todos in this list will be deleted too. This can't be undone.")
-            }
-            .sheet(isPresented: $showReorderSheet) {
-                ReorderListsView(
-                    customLists: customLists,
-                    viewModel: viewModel,
-                    apiService: apiService,
-                    onMutate: onMutate
-                )
-            }
-            .alert(
-                "Error",
-                isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
-            ) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(errorMessage ?? "")
-            }
+        }
+        .alert(
+            "Error",
+            isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    /// The plain, non-interactive label system lists get — same capsule,
+    /// same typography as a custom list's `title`, minus the menu (rename /
+    /// delete / reorder don't apply to Today, This Week, Sometime, or
+    /// Completed).
+    private var systemTitle: some View {
+        Text(list.name)
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(Color.appStrong)
+            .lineLimit(1)
+            .frame(maxWidth: 220)
+            .accessibilityLabel(list.name)
     }
 
     private var title: some View {

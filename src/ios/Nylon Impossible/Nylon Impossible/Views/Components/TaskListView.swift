@@ -157,10 +157,37 @@ struct TaskListView: View {
         .moveDisabled(true)
     }
 
+    /// The next of the three time-based system lists ("Today" → "This Week"
+    /// → "Sometime") after the one `todo` is currently in — the trailing
+    /// swipe's "move on" shortcut. `nil` on Sometime (nothing further to
+    /// advance to), a custom list, Completed, or if the todo's current list
+    /// isn't one of `orderedLists` for some reason.
+    private func nextSystemList(after todo: TodoItem) -> TodoListModel? {
+        guard let currentKind = orderedLists.first(where: { $0.id == todo.listKey })?.systemKind else {
+            return nil
+        }
+        let nextKind: SystemListKind
+        switch currentKind {
+        case .today: nextKind = .thisWeek
+        case .thisWeek: nextKind = .sometime
+        case .sometime, .completed: return nil
+        }
+        return orderedLists.first { $0.systemKind == nextKind }
+    }
+
     @ViewBuilder
     private func todoRow(_ todo: TodoItem) -> some View {
         let departingTo = departures[todo.id]
         let arrived = arrivals.contains(todo.id)
+
+        let toggleSticky = {
+            viewModel.toggleSticky(todo)
+            syncService.syncAfterAction()
+        }
+        let moveToList: (String) -> Void = { listId in
+            viewModel.moveTodoToList(todo, to: listId, allTodos: allTodos)
+            syncService.syncAfterAction()
+        }
 
         TodoItemRow(
             todo: todo,
@@ -170,10 +197,6 @@ struct TaskListView: View {
             availableLists: orderedLists,
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: allTodos, lists: orderedLists)
-                syncService.syncAfterAction()
-            },
-            onToggleSticky: {
-                viewModel.toggleSticky(todo)
                 syncService.syncAfterAction()
             },
             onSave: { title, notes, dueDate, recurrence, sticky in
@@ -214,10 +237,7 @@ struct TaskListView: View {
                 )
                 syncService.syncAfterAction()
             },
-            onMoveToList: { listId in
-                viewModel.moveTodoToList(todo, to: listId, allTodos: allTodos)
-                syncService.syncAfterAction()
-            }
+            onMoveToList: moveToList
         )
         // A row that just landed here from another list is washed in brand
         // colour until it's been seen, so a refresh that silently gains todos
@@ -249,10 +269,37 @@ struct TaskListView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
-        // Stages the delete for confirmation instead of removing immediately.
+        // Pin/unpin — leading edge, like Mail/Reminders' flag: a light,
+        // reversible action opposite the trailing edge's heavier ones.
+        // Hidden once completed, matching the old persistent button (see
+        // TodoItemRow's pin indicator) — completing already clears sticky.
+        .swipeActions(edge: .leading) {
+            if !todo.isEffectivelyCompleted {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        toggleSticky()
+                    }
+                } label: {
+                    Label(todo.sticky ? "Unpin" : "Pin", systemImage: todo.sticky ? "pin.slash.fill" : "pin.fill")
+                }
+                .tint(Color.appAccent)
+            }
+        }
+        // Delete stays first (and so keeps triggering on a full swipe,
+        // SwiftUI's default for a trailing edge's first action) — "move on"
+        // is a second, partial-swipe-only action alongside it, only offered
+        // on the three time-based lists where "next" is well defined.
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { pendingDeleteTodo = todo } label: {
                 Label("Delete", systemImage: "trash")
+            }
+            if !todo.isEffectivelyCompleted, let nextList = nextSystemList(after: todo) {
+                Button {
+                    moveToList(nextList.id)
+                } label: {
+                    Label("Move to \(nextList.name)", systemImage: "arrow.right")
+                }
+                .tint(Color.appAccent)
             }
         }
     }
