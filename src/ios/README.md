@@ -24,7 +24,7 @@ Native iOS client for the Nylon Impossible todo app. Built with SwiftUI and Swif
 - Clerk authentication (sign in with social providers or email)
 - Home Screen quick action — long-press the app icon for "New Task"
 - Custom gradient-based design system
-- Home Screen widget showing what's due today, with a tap-to-complete toggle
+- Home Screen widget showing everything for today, with a tap-to-complete toggle
 
 ## Getting Started
 
@@ -133,13 +133,21 @@ cd "src/ios/Nylon Impossible" && swiftlint
 
 ## Widget
 
-`Nylon Widget/` renders the todos due before local midnight — the same
-definition the app icon badge uses, shared as `TodayDigest`. Small and medium
+`Nylon Widget/` renders everything on the user's Today list plus anything due
+before local midnight, defined once as `TodayDigest`. Small and medium
 families, up to four rows, with each row's circle a `CompleteTodoIntent` button
 that completes the todo in place.
 
-Two things are easy to get wrong here:
+Three things are easy to get wrong here:
 
+- **"Today" is two things, not one.** A list and a due date are independent
+  (`plans/done/2026-08-06-time-bucket-lists.md`): a Today item can be undated
+  or due weeks out, and reaching a due date never moves a todo into Today. So
+  the widget takes the union — narrowing it to either half drops rows the user
+  expects to see. The app icon badge is deliberately *not* the same set: it
+  counts due-or-overdue only, because a badge is an attention count rather than
+  a plan for the day. It still takes its cutoff from `TodayDigest`, so the two
+  can't disagree about when the day ends.
 - **Nothing polls.** A widget re-renders when its timeline expires (midnight,
   here) or when something calls `WidgetCenter.reloadTimelines`. Every write
   path ends in `WidgetRefresh.reload()` — the app on backgrounding and on

@@ -5,9 +5,9 @@ import SwiftData
 
 @Suite("TodayDigest")
 struct TodayDigestTests {
-    /// The same model set `SyncServiceTests` and `ConversationSyncTests` use —
-    /// nothing here reads or writes a list, so `TodoListModel` has no business
-    /// in it.
+    /// The same model set `SyncServiceTests` and `ConversationSyncTests` use.
+    /// `TodoListModel` is in it because the digest resolves the Today list to
+    /// scope by — without it the fetch has no such entity to ask for.
     ///
     /// **Bind the result to a local and take `mainContext` from that**, as
     /// every other suite here does. `try makeContainer().mainContext` releases
@@ -19,6 +19,7 @@ struct TodayDigestTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
             for: TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self,
+            TodoListModel.self,
             configurations: config
         )
     }
@@ -38,12 +39,32 @@ struct TodayDigestTests {
 
     private static let userId = "user_123"
 
+    /// Server list ids are dashless lowercase hex, not UUIDs — see
+    /// `TodoItem.listKey`. Nothing here depends on the shape beyond it being
+    /// an opaque string, but matching it keeps the fixtures honest.
+    private static let todayListId = "fb56f07a1c4d4e0b9a2f7c8e5d3b1a09"
+    private static let sometimeListId = "0a1b3d5e8c7f2a9b0e4d4c1a70f65bf0"
+
+    /// The two system lists these tests place todos in. Sometime is here as
+    /// the "somewhere else" every list-scoped test needs to contrast against.
+    private func insertLists(_ context: ModelContext, userId: String = TodayDigestTests.userId) {
+        context.insert(TodoListModel(
+            id: Self.todayListId, userId: userId, name: "Today",
+            kind: "system", systemKind: .today, position: "a0"
+        ))
+        context.insert(TodoListModel(
+            id: Self.sometimeListId, userId: userId, name: "Sometime",
+            kind: "system", systemKind: .sometime, position: "a2"
+        ))
+    }
+
     @discardableResult
     private func insert(
         _ context: ModelContext,
         title: String,
         dueDate: Date?,
         userId: String? = TodayDigestTests.userId,
+        listKey: String? = nil,
         position: String = "a0",
         completed: Bool = false,
         completedAt: Date? = nil,
@@ -57,6 +78,7 @@ struct TodayDigestTests {
         // (`TaskCreationService.createTask` inserts, then edits).
         context.insert(todo)
         todo.dueDate = dueDate
+        todo.listKey = listKey
         todo.isCompleted = completed
         todo.completedAt = completedAt
         todo.isDeleted = deleted
@@ -80,7 +102,7 @@ struct TodayDigestTests {
         #expect(calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: cutoff).day == 1)
     }
 
-    // MARK: - What counts as due
+    // MARK: - What counts as today
 
     @Test("Includes todos due today and overdue, excludes later ones")
     @MainActor
@@ -97,6 +119,103 @@ struct TodayDigestTests {
         let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
         #expect(due.map(\.title) == ["Overdue", "Later today"])
+    }
+
+    @Test("Includes everything on the Today list, due date or not")
+    @MainActor
+    func includesTheTodayList() throws {
+        let now = Self.now
+        let container = try makeContainer()
+        let context = container.mainContext
+        insertLists(context)
+
+        // A Today item means "I want to work on this today" — its due date, if
+        // it has one at all, is unrelated to why it's there.
+        insert(context, title: "Undated", dueDate: nil, listKey: Self.todayListId, position: "a1")
+        insert(
+            context, title: "Due in three weeks",
+            dueDate: now.addingTimeInterval(21 * 86_400), listKey: Self.todayListId, position: "a2"
+        )
+        insert(context, title: "Parked", dueDate: nil, listKey: Self.sometimeListId, position: "a3")
+
+        let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
+
+        #expect(forToday.map(\.title) == ["Due in three weeks", "Undated"])
+    }
+
+    @Test("Still includes what's due or overdue in another list")
+    @MainActor
+    func includesDueFromOtherLists() throws {
+        let now = Self.now
+        let container = try makeContainer()
+        let context = container.mainContext
+        insertLists(context)
+
+        // Reaching a due date never promotes a todo into Today, so the widget
+        // has to reach across lists for these or they go unseen all day.
+        insert(
+            context, title: "Overdue in Sometime",
+            dueDate: now.addingTimeInterval(-86_400), listKey: Self.sometimeListId
+        )
+        insert(context, title: "On the list", dueDate: nil, listKey: Self.todayListId)
+
+        let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
+
+        #expect(forToday.map(\.title) == ["Overdue in Sometime", "On the list"])
+    }
+
+    @Test("Excludes another user's Today list")
+    @MainActor
+    func scopesTheTodayListToUser() throws {
+        let now = Self.now
+        let container = try makeContainer()
+        let context = container.mainContext
+        insertLists(context, userId: "user_456")
+
+        // Same list id, another account's list row: nothing here belongs to
+        // the signed-in user, so nothing but the due date can put it on the
+        // widget.
+        insert(context, title: "Theirs, undated", dueDate: nil, listKey: Self.todayListId)
+
+        #expect(TodayDigest.fetch(userId: Self.userId, context: context, now: now).isEmpty)
+    }
+
+    @Test("Falls back to due dates when the lists haven't synced yet")
+    @MainActor
+    func fallsBackWithoutLists() throws {
+        let now = Self.now
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // No `TodoListModel` rows at all — a fresh install where the widget
+        // reads the store before the first sync lands.
+        insert(context, title: "Due today", dueDate: now, listKey: Self.todayListId)
+        insert(context, title: "Undated", dueDate: nil, listKey: Self.todayListId)
+
+        let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
+
+        #expect(forToday.map(\.title) == ["Due today"])
+    }
+
+    @Test("A repeat completed today doesn't come back via its list")
+    @MainActor
+    func excludesCompletedRepeatOnTheTodayList() throws {
+        let now = Self.now
+        let container = try makeContainer()
+        let context = container.mainContext
+        insertLists(context)
+
+        // Completing a repeat rolls its dueDate past the cutoff, which is what
+        // used to keep it off the widget. Now that list membership can put a
+        // todo here on its own, `isEffectivelyCompleted` is the only thing
+        // still holding it back until midnight.
+        insert(
+            context, title: "Watered the plants",
+            dueDate: now.addingTimeInterval(86_400), listKey: Self.todayListId,
+            completedAt: now, recurrence: Recurrence(frequency: .daily)
+        )
+
+        #expect(TodayDigest.fetch(userId: Self.userId, context: context, now: now).isEmpty)
     }
 
     @Test("Excludes completed, deleted, and subtask todos")
@@ -176,6 +295,29 @@ struct TodayDigestTests {
             "Overdue",
             "Same day, earlier position",
             "Same day, later position",
+        ])
+    }
+
+    @Test("Undated Today items sort below everything with a date, by position")
+    @MainActor
+    func ordersUndatedLast() throws {
+        let now = Self.now
+        let container = try makeContainer()
+        let context = container.mainContext
+        insertLists(context)
+
+        insert(context, title: "Undated, later position", dueDate: nil, listKey: Self.todayListId, position: "a2")
+        insert(context, title: "Undated, earlier position", dueDate: nil, listKey: Self.todayListId, position: "a1")
+        insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-3600), position: "a9")
+        insert(context, title: "Pinned and undated", dueDate: nil, listKey: Self.todayListId, position: "a9", sticky: true)
+
+        let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
+
+        #expect(forToday.map(\.title) == [
+            "Pinned and undated",
+            "Overdue",
+            "Undated, earlier position",
+            "Undated, later position",
         ])
     }
 

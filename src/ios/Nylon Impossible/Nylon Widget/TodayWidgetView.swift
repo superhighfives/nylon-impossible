@@ -29,11 +29,11 @@ struct TodayWidgetView: View {
             switch entry.content {
             case .signedOut:
                 header(count: nil)
-                message("Sign in to see what's due", systemImage: "person.crop.circle")
+                message("Sign in to see your day", systemImage: "person.crop.circle")
             case .todos(let todos, let total):
                 header(count: total)
                 if todos.isEmpty {
-                    message("Nothing due today", systemImage: "checkmark.circle")
+                    message("Nothing for today", systemImage: "checkmark.circle")
                 } else {
                     rows(todos, total: total)
                 }
@@ -72,9 +72,10 @@ struct TodayWidgetView: View {
             ForEach(shown) { todo in
                 TodayRow(todo: todo, now: entry.date, isCompact: family == .systemSmall)
             }
-            // Honest remainder: the provider counts everything due and only
-            // caps what it carries, so this is the number of todos actually
-            // left rather than the number that didn't fit in the fetch.
+            // Honest remainder: the provider counts everything for today and
+            // only caps what it carries, so this is the number of todos
+            // actually left rather than the number that didn't fit in the
+            // fetch.
             if total > shown.count {
                 Text("+\(total - shown.count) more")
                     .font(.system(size: 11))
@@ -137,10 +138,12 @@ private struct TodayRow: View {
     }
 
     /// Overdue is the one thing worth the space, drawn the way the app's row
-    /// draws it. Everything here is due today by definition, so a date on each
-    /// row would say the same thing four times over — but a todo that's late
-    /// is a different fact, and `TodoItem.isOverdue`'s rule (any due date now
-    /// past) is the one the app already shows in red.
+    /// draws it. Rows are here for either of two reasons — on the Today list,
+    /// or due before midnight — and a due date on every row would crowd a
+    /// widget this size to spell out a distinction the user drew themselves
+    /// (most of them are undated anyway). Late is a different fact, and
+    /// `TodoItem.isOverdue`'s rule (any due date now past) is the one the app
+    /// already shows in red.
     @ViewBuilder
     private var trailing: some View {
         HStack(spacing: 4) {
