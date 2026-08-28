@@ -19,6 +19,20 @@ enum TaskCreationService {
         return "Check \(domain)"
     }
 
+    /// The title a share-sheet save writes: what was typed into the field, or —
+    /// when it was left empty — the fallback shown behind it as prompt text.
+    ///
+    /// The share sheet doesn't prefill a shared link's title; it shows the
+    /// fallback greyed out instead, so the field can be typed into rather than
+    /// selected and cleared first. Empty therefore means "use what's shown",
+    /// not "no title".
+    static func shareSheetTitle(typed: String, fallback: String) -> String {
+        let trimmed = typed.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty
+            ? fallback.trimmingCharacters(in: .whitespacesAndNewlines)
+            : trimmed
+    }
+
     /// Create a todo item with the given title
     /// This is the core creation logic used by both the main app and Siri
     @MainActor
