@@ -31,6 +31,13 @@ struct TodoItemRow: View {
     @State private var checkmarkScale: CGFloat = 1.0
     @State private var showingEditSheet = false
 
+    /// The checkbox's box size, and the nudge that lifts it onto the title's
+    /// first line. Named because the trailing sync dot pins to the same line
+    /// and derives its own position from them — change one and the dot follows.
+    private static let checkboxSize: CGFloat = 28
+    private static let checkboxNudge: CGFloat = 4
+    private static let syncDotSize: CGFloat = 6
+
     private var nonResearchUrls: [APITodoUrl] {
         urls.filter { $0.researchId == nil }
     }
@@ -264,12 +271,12 @@ struct TodoItemRow: View {
                             todo.isEffectivelyCompleted ? Color.clear : Color.appDefault,
                             lineWidth: 2.5
                         )
-                        .frame(width: 28, height: 28)
+                        .frame(width: Self.checkboxSize, height: Self.checkboxSize)
 
                     if todo.isEffectivelyCompleted {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .fill(Color.appBrand)
-                            .frame(width: 28, height: 28)
+                            .frame(width: Self.checkboxSize, height: Self.checkboxSize)
 
                         Image(systemName: "checkmark")
                             .font(.system(size: 12, weight: .medium))
@@ -284,7 +291,7 @@ struct TodoItemRow: View {
             // the title's optical center; nudge it back up — the iOS analogue
             // of web's `mt-[3px]` push (there the checkbox is the *smaller*
             // one, so it nudges the other way to reach the same centering).
-            .offset(y: -4)
+            .offset(y: -Self.checkboxNudge)
 
             // Task content — tappable to edit.
             //
@@ -355,9 +362,25 @@ struct TodoItemRow: View {
                     Spacer()
 
                     if !todo.isSynced {
+                        // Level with the checkbox, not with the title. This
+                        // row is center-aligned, so on a title that wraps the
+                        // dot would sit halfway down the block — level with
+                        // the second line of three, floating in the middle of
+                        // nothing. Pin it to the top of the row instead and
+                        // drop it onto the checkbox's center, which is
+                        // `checkboxSize / 2` down and `checkboxNudge` back up.
+                        // The offset is draw-only and the dot keeps its 6pt
+                        // footprint, so nothing here can change the row's
+                        // height.
                         Circle()
                             .fill(Color.appSubtle)
-                            .frame(width: 6, height: 6)
+                            .frame(width: Self.syncDotSize, height: Self.syncDotSize)
+                            .offset(
+                                y: Self.checkboxSize / 2
+                                    - Self.checkboxNudge
+                                    - Self.syncDotSize / 2
+                            )
+                            .frame(maxHeight: .infinity, alignment: .top)
                     }
                 }
 
@@ -546,6 +569,18 @@ private struct CompletedContentBadges: View {
                     item.dueDate = Date().addingTimeInterval(-86400)
                     return item
                 }(),
+                apiService: nil,
+                urls: [],
+                onToggle: {},
+                onSave: { _, _, _, _, _ in }
+            )
+            // Unsynced (a new TodoItem starts that way) with a title long
+            // enough to wrap — the sync dot should stay level with the
+            // checkbox rather than drift to the middle line.
+            TodoItemRow(
+                todo: TodoItem(
+                    title: "Add a way to show new models on the gateway overview, preferably as part of the rest api"
+                ),
                 apiService: nil,
                 urls: [],
                 onToggle: {},
