@@ -9,7 +9,7 @@
     "all": "tsx generate.ts --all"
   },
   "dependencies": {
-    "@clerk/testing": "^2.0.8",
+    "@clerk/testing": "^2.2.30",
     "dotenv": "^17.4.2",
     "playwright": "^1.62.1",
     "sharp": "^0.33.0"
