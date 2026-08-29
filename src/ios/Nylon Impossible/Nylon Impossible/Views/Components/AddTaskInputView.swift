@@ -154,8 +154,10 @@ struct AddTaskInputView: View {
             .font(.system(size: 16, weight: .semibold))
             .foregroundStyle(Color.appBrandForeground)
             .frame(width: 34, height: 34)
-            .background(Color.appBrand)
-            .glassEffect(.regular, in: .rect(cornerRadius: 10))
+            // Circular rather than a squircle: it sits inside the field's own
+            // pill, and it's the same shape as NewListButton's plus.
+            .background(Color.appBrand, in: .circle)
+            .glassEffect(.regular, in: .circle)
     }
 }
 
