@@ -28,7 +28,6 @@ struct ListPageView: View {
     /// the system lists, which show no title band. See `ContentView.headerInset`.
     /// Both branches take it, so the empty state sits where the first row would.
     let topInset: CGFloat
-    @Binding var dropTargetId: UUID?
     @Binding var pendingDeleteTodo: TodoItem?
 
     @State private var moves = ListMoveTracker()
@@ -91,7 +90,6 @@ struct ListPageView: View {
                     topInset: topInset,
                     departures: moves.departures,
                     arrivals: moves.arrivals,
-                    dropTargetId: $dropTargetId,
                     pendingDeleteTodo: $pendingDeleteTodo
                 )
             }

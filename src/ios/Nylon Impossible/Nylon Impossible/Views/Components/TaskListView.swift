@@ -5,9 +5,18 @@
 //  The scrollable todo list for a single list page — extracted from
 //  ContentView so each type stays within SwiftLint's length limits. Reads the
 //  same services from the environment and drives the view model directly, so
-//  the parent only hands it the page's todos plus the two pieces of drag/delete
-//  state it owns.
+//  the parent only hands it the page's todos plus the pending-delete state it
+//  owns.
 //
+//  Reordering uses `List`'s native `.onMove` rather than a custom
+//  `.draggable`/`.dropDestination` pair: the latter renders a nicer Liquid
+//  Glass lift, but `.dropDestination` inside a `List` never fires its drop
+//  callbacks on iOS when the drag source and drop target are rows in the same
+//  list (a longstanding, still-unresolved platform bug — confirmed on both
+//  Simulator and a physical device here) — see
+//  https://developer.apple.com/forums/thread/730367. `.onMove` uses a
+//  different, unaffected mechanism, at the cost of the system's plain opaque
+//  lift platter instead of a custom preview.
 
 import SwiftData
 import SwiftUI
@@ -35,9 +44,6 @@ struct TaskListView: View {
     var departures: [UUID: String] = [:]
     /// Rows that landed here from another list and haven't been seen yet.
     var arrivals: Set<UUID> = []
-    /// The incomplete row a drag is hovering over — owned by the parent because
-    /// its "drop here" line is shared board state.
-    @Binding var dropTargetId: UUID?
     /// Staged by swipe-to-delete; the parent owns the confirmation dialog.
     @Binding var pendingDeleteTodo: TodoItem?
 
@@ -70,39 +76,10 @@ struct TaskListView: View {
                 }
             } else {
                 Section {
-                    // Reordering is driven by `.draggable`/`.dropDestination` rather
-                    // than `.onMove`. `.onMove`'s lift is a system-managed opaque
-                    // platter that can't be restyled; owning the drag lets the
-                    // lifted row render as Liquid Glass (see `dragPreview`), matching
-                    // web's translucent, blurred, ringed drag card.
-                    ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
+                    ForEach(incomplete) { todo in
                         todoRow(todo)
-                            // Thin brand line on the hovered row's leading edge — the
-                            // "it'll land here" cue, mirroring web's drop line.
-                            .overlay(alignment: .top) {
-                                if dropTargetId == todo.id {
-                                    Capsule()
-                                        .fill(Color.appBrand)
-                                        .frame(height: 2)
-                                        .padding(.horizontal, 4)
-                                        .transition(.opacity)
-                                }
-                            }
-                            .draggable(todo.id.uuidString) {
-                                dragPreview(for: todo)
-                            }
-                            .dropDestination(for: String.self) { items, _ in
-                                handleReorderDrop(items, ontoIndex: index, in: incomplete)
-                            } isTargeted: { targeted in
-                                withAnimation(.easeInOut(duration: 0.15)) {
-                                    if targeted {
-                                        dropTargetId = todo.id
-                                    } else if dropTargetId == todo.id {
-                                        dropTargetId = nil
-                                    }
-                                }
-                            }
                     }
+                    .onMove(perform: handleMove)
                 }
 
                 // Completed items collapse into a bottom-of-list accordion, matching
@@ -290,11 +267,28 @@ struct TaskListView: View {
             insertion: .move(edge: .top).combined(with: .opacity),
             removal: .move(edge: .trailing).combined(with: .opacity)
         ))
-        // Pin/unpin — leading edge, like Mail/Reminders' flag: a light,
-        // reversible action opposite the trailing edge's heavier ones.
-        // Hidden once completed, matching the old persistent button (see
-        // TodoItemRow's pin indicator) — completing already clears sticky.
+        // "Move on" — leading edge, so swiping right advances a todo to the
+        // next time-based list. Only offered on Today/This Week, where
+        // "next" is well defined.
         .swipeActions(edge: .leading) {
+            if !todo.isEffectivelyCompleted, let nextList = nextSystemList(after: todo) {
+                Button {
+                    moveToList(nextList.id)
+                } label: {
+                    Label("Move to \(nextList.name)", systemImage: "arrow.right")
+                }
+                .tint(Color.appAccent)
+            }
+        }
+        // Delete stays first (and so keeps triggering on a full swipe,
+        // SwiftUI's default for a trailing edge's first action) — pin is a
+        // second, partial-swipe-only action alongside it. Pin hides once
+        // completed, matching the old persistent button (see TodoItemRow's
+        // pin indicator) — completing already clears sticky.
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive) { pendingDeleteTodo = todo } label: {
+                Label("Delete", systemImage: "trash")
+            }
             if !todo.isEffectivelyCompleted {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -306,83 +300,21 @@ struct TaskListView: View {
                 .tint(Color.appAccent)
             }
         }
-        // Delete stays first (and so keeps triggering on a full swipe,
-        // SwiftUI's default for a trailing edge's first action) — "move on"
-        // is a second, partial-swipe-only action alongside it, only offered
-        // on the three time-based lists where "next" is well defined.
-        .swipeActions(edge: .trailing) {
-            Button(role: .destructive) { pendingDeleteTodo = todo } label: {
-                Label("Delete", systemImage: "trash")
-            }
-            if !todo.isEffectivelyCompleted, let nextList = nextSystemList(after: todo) {
-                Button {
-                    moveToList(nextList.id)
-                } label: {
-                    Label("Move to \(nextList.name)", systemImage: "arrow.right")
-                }
-                .tint(Color.appAccent)
-            }
-        }
     }
 
-    /// The lifted row while it's being dragged: the row content floated onto a
-    /// Liquid Glass card with a hairline ring. This is what makes the drag read
-    /// as glass — SwiftUI's default `.onMove` lift is an opaque platter we can't
-    /// restyle, so we render our own preview. Interactivity is irrelevant here
-    /// (the system snapshots it into a static image), so the row's handlers are
-    /// no-ops.
-    @ViewBuilder
-    private func dragPreview(for todo: TodoItem) -> some View {
-        TodoItemRow(
-            todo: todo,
-            apiService: syncService.apiService,
-            urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
-            subtasks: subtasks(of: todo),
-            onToggle: {},
-            onSave: { _, _, _, _, _ in }
-        )
-        .padding(.horizontal, 12)
-        .padding(.vertical, 2)
-        .frame(maxWidth: 360, alignment: .leading)
-        .glassEffect(.regular, in: .rect(cornerRadius: 16))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(Color.appLine.opacity(0.5), lineWidth: 0.5)
-        )
-    }
-
-    /// Land a dragged incomplete row at the dropped-on row's slot. `targetIndex`
-    /// is the drop target's index within `incomplete`; a drag downward inserts
-    /// after it, upward inserts before it — matching `List.onMove`'s offset
-    /// semantics so `viewModel.moveTodo` behaves exactly as it did under
-    /// `.onMove`.
-    private func handleReorderDrop(
-        _ items: [String],
-        ontoIndex targetIndex: Int,
-        in incomplete: [TodoItem]
-    ) -> Bool {
-        dropTargetId = nil
-        // `incomplete` still holds rows that have already left this list (held
-        // on screen for their exit), and their positions are no longer
-        // comparable with this list's. Rather than compute a new index against
-        // them, sit the drop out — it's a sub-second window, and the drag
-        // simply springs back.
-        guard departures.isEmpty else { return false }
-        guard let draggedId = items.first,
-              let sourceIndex = incomplete.firstIndex(where: {
-                  $0.id.uuidString == draggedId
-              }),
-              sourceIndex != targetIndex else { return false }
-
-        let destination = sourceIndex < targetIndex ? targetIndex + 1 : targetIndex
-        withAnimation(.easeInOut(duration: 0.25)) {
-            viewModel.moveTodo(
-                from: IndexSet(integer: sourceIndex),
-                to: destination,
-                in: incomplete
-            )
-        }
+    /// `List.onMove`'s handler for the incomplete section. `incomplete` is
+    /// recomputed fresh each `body` evaluation, so this closure always closes
+    /// over the same position-ordered array the indices were computed
+    /// against.
+    private func handleMove(from source: IndexSet, to destination: Int) {
+        // Rows that have already left this list (held on screen for their
+        // exit) are still in `pageTodos`, but their positions are no longer
+        // comparable with this list's. Rather than compute a new index
+        // against them, sit the move out — it's a sub-second window, and the
+        // row simply stays put.
+        guard departures.isEmpty else { return }
+        let incomplete = pageTodos.filter { !$0.isEffectivelyCompleted }
+        viewModel.moveTodo(from: source, to: destination, in: incomplete)
         syncService.syncAfterAction()
-        return true
     }
 }
