@@ -436,13 +436,13 @@ struct TodoItemRow: View {
         .padding(.horizontal, 4)
         // No persistent box — rows sit directly on the background so they read
         // as floating (matching web, where the surface/ring only appears while
-        // a row is being dragged). The Liquid Glass drag lift is supplied by
-        // `ContentView.dragPreview`, not by a box on the resting row.
+        // a row is being dragged). The drag lift itself is the system's own
+        // `List.onMove` platter (see `TaskListView`), not anything drawn here.
         .opacity(todo.isEffectivelyCompleted ? 0.7 : 1.0)
         .contentShape(Rectangle())
         // No `.contextMenu` here: its long-press gesture collides with the
-        // row's `.draggable` lift (also long-press), so the share popover
-        // would hijack a drag. Sharing stays available from the edit sheet.
+        // row's reorder lift (also long-press), so the share popover would
+        // hijack a drag. Sharing stays available from the edit sheet.
         .sheet(isPresented: $showingEditSheet) {
             TodoEditSheet(
                 todo: todo,
