@@ -29,6 +29,7 @@ struct ListPageView: View {
     /// Both branches take it, so the empty state sits where the first row would.
     let topInset: CGFloat
     @Binding var dropTargetId: UUID?
+    @Binding var draggingTodoId: UUID?
     @Binding var pendingDeleteTodo: TodoItem?
 
     @State private var moves = ListMoveTracker()
@@ -92,6 +93,7 @@ struct ListPageView: View {
                     departures: moves.departures,
                     arrivals: moves.arrivals,
                     dropTargetId: $dropTargetId,
+                    draggingTodoId: $draggingTodoId,
                     pendingDeleteTodo: $pendingDeleteTodo
                 )
             }
