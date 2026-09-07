@@ -3,6 +3,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
   type KeyboardCoordinateGetter,
@@ -39,6 +40,7 @@ import {
   ExpandedSection,
   getIncompleteOrder,
   TodoListColumn,
+  TodoRowGhost,
   TodoRowPreview,
   TodoSkeleton,
 } from "@/components/TodoList";
@@ -517,9 +519,16 @@ function NewListColumn() {
  */
 function ColumnScroller({
   onWheel,
+  isDropZone = false,
   children,
 }: {
   onWheel: (e: WheelEvent<HTMLDivElement>) => void;
+  /**
+   * True while a cross-column drag is hovering this column. Frames the rows
+   * area as a drop zone — the coarse target a cross-list drop actually
+   * resolves against, rather than any one row inside it.
+   */
+  isDropZone?: boolean;
   children: ReactNode;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -552,7 +561,15 @@ function ColumnScroller({
   }, []);
 
   return (
-    <div className="relative min-h-0 flex-1">
+    // `isolate` so the drop-zone frame's negative z-index stays behind the rows
+    // without falling behind the column (and the page) entirely.
+    <div className="relative isolate min-h-0 flex-1">
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute -inset-x-2 inset-y-0 -z-10 rounded-2xl border-2 border-dashed border-accent-strong bg-accent-base/60 transition-opacity duration-150 ${
+          isDropZone ? "opacity-100" : "opacity-0"
+        }`}
+      />
       <div
         ref={scrollRef}
         // -mx/px cancel out to the same content position as the
@@ -615,6 +632,11 @@ export function TodoGrid() {
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeWidth, setActiveWidth] = useState<number | undefined>(undefined);
+  // The list a drag is currently over, tracked so a cross-column drag can show
+  // the target column's drop zone and the slot the row will land in. Same-list
+  // hovers are handled by dnd-kit's own reflow, so this is only *used* when it
+  // differs from the dragged row's own list.
+  const [overListId, setOverListId] = useState<string | null>(null);
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
@@ -781,11 +803,13 @@ export function TodoGrid() {
     setIsKeyboardDragging(activatorEvent instanceof KeyboardEvent);
     setActiveId(active.id as string);
     setActiveWidth(active.rect.current.initial?.width);
+    setOverListId(null);
   };
 
   const handleDragCancel = () => {
     setIsKeyboardDragging(false);
     setActiveId(null);
+    setOverListId(null);
   };
 
   // Column-header reorder — custom lists only, drag the header to move a
@@ -826,9 +850,14 @@ export function TodoGrid() {
     return todo?.listId ?? null;
   };
 
+  const handleDragOver = ({ over }: DragOverEvent) => {
+    setOverListId(over ? resolveListIdFromOverId(over.id as string) : null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setIsKeyboardDragging(false);
     setActiveId(null);
+    setOverListId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -943,6 +972,33 @@ export function TodoGrid() {
     ? (allTodos.find((t) => t.id === activeId) ?? null)
     : null;
 
+  // The list a cross-column drag would land in right now, or null while the
+  // drag is still over its own column (dnd-kit's reflow already shows that
+  // case) or over nothing at all.
+  const crossListTargetId =
+    activeTodo && overListId && overListId !== activeTodo.listId
+      ? overListId
+      : null;
+
+  // The stand-in the target column shows for a row that isn't in it yet.
+  // Built here because this is the only level that knows which row is being
+  // dragged; it renders the row's own content (hidden) so the slot it marks
+  // out is exactly the size the row will be.
+  const crossListGhost = activeTodo ? (
+    <TodoRowGhost
+      key="cross-list-drop"
+      todo={activeTodo}
+      subtasks={allTodos.filter((t) => t.parentId === activeTodo.id)}
+      isExpanded={false}
+      onToggle={() => {}}
+      onDelete={() => {}}
+      onToggleExpand={() => {}}
+      onInlineUpdate={() => {}}
+      updatePending={false}
+      deletePending={false}
+    />
+  ) : null;
+
   return (
     // Two independent DndContexts: this outer one reorders custom-list
     // headers (horizontal); the inner one (below) reorders/cross-list-moves
@@ -963,6 +1019,7 @@ export function TodoGrid() {
           collisionDetection={itemCollisionDetection}
           modifiers={[restrictToVerticalAxisForKeyboard(isKeyboardDragging)]}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
           onDragCancel={handleDragCancel}
         >
@@ -974,6 +1031,19 @@ export function TodoGrid() {
                 const incompleteOrder =
                   localOrderByList[list.id] ??
                   getIncompleteOrder(listTodos, timeZone, hiddenIds);
+                const isDropZone = crossListTargetId === list.id;
+                // Same slot handleDragEnd will use — top of the dragged row's
+                // own tier — so the stand-in shown here is where it lands, not
+                // wherever the pointer happens to be.
+                const crossListDrop =
+                  isDropZone && activeTodo && crossListGhost
+                    ? {
+                        index: activeTodo.sticky
+                          ? 0
+                          : incompleteOrder.filter((t) => t.sticky).length,
+                        ghost: crossListGhost,
+                      }
+                    : null;
                 return (
                   <section
                     key={list.id}
@@ -992,7 +1062,10 @@ export function TodoGrid() {
                         incompleteOrder.find((t) => !t.sticky)?.position ?? null
                       }
                     />
-                    <ColumnScroller onWheel={handleColumnWheel}>
+                    <ColumnScroller
+                      onWheel={handleColumnWheel}
+                      isDropZone={isDropZone}
+                    >
                       <TodoListColumn
                         listId={list.id}
                         todos={listTodos}
@@ -1007,6 +1080,11 @@ export function TodoGrid() {
                         timeZone={timeZone}
                         isKeyboardDragging={isKeyboardDragging}
                         localIncompleteTodos={localOrderByList[list.id] ?? null}
+                        crossListDrop={crossListDrop}
+                        isLeavingList={
+                          crossListTargetId !== null &&
+                          activeTodo?.listId === list.id
+                        }
                       />
                     </ColumnScroller>
                   </section>
