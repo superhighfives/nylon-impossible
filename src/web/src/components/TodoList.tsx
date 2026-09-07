@@ -598,6 +598,36 @@ export function ExpandedSection({
 }
 
 /**
+ * The reorder grip's box, as far as layout is concerned. Below `sm` the grip is
+ * in the row's flow and takes ~26px of width off the content; at `sm` it hangs
+ * out of the flow instead, off the row's left edge. A drag stand-in has to
+ * reserve the same box or its hidden sizing copy measures against a wider
+ * content box than the real row did — and a title near its wrap threshold then
+ * makes the outline a line taller than the row it stands in for. Shared so the
+ * two can't drift; the grip button adds its own non-layout classes on top.
+ */
+const GRIP_BOX_CLASS =
+  "mr-1.5 flex rounded-md p-0.5 sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full";
+
+/**
+ * A row's content in exactly the layout the real row gives it, grip box
+ * included. Only ever rendered hidden, as the thing a stand-in takes its size
+ * from — see `RowGhost`.
+ */
+function GhostRowContent(props: TodoItemProps) {
+  return (
+    <div className="flex items-start">
+      <span aria-hidden="true" className={GRIP_BOX_CLASS}>
+        <GripVertical size={16} className="block" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <TodoItemContent {...props} />
+      </div>
+    </div>
+  );
+}
+
+/**
  * The dashed outline drawn over a row that's mid-drag, plus the solid brand
  * line marking the insertion point along its leading edge.
  *
@@ -653,11 +683,7 @@ export function TodoRowGhost(props: TodoItemProps) {
   return (
     <div className="relative rounded-lg py-3">
       <RowGhost>
-        <div className="flex items-start">
-          <div className="flex-1 min-w-0">
-            <TodoItemContent {...props} />
-          </div>
-        </div>
+        <GhostRowContent {...props} />
       </RowGhost>
     </div>
   );
@@ -760,11 +786,7 @@ function SortableTodoItem(
             variant={props.isLeavingList ? "origin" : "target"}
             ring={props.isKeyboardDragging && !props.isLeavingList}
           >
-            <div className="flex items-start">
-              <div className="flex-1 min-w-0">
-                <TodoItemContent {...props} />
-              </div>
-            </div>
+            <GhostRowContent {...props} />
           </RowGhost>
           <button
             type="button"
@@ -785,7 +807,7 @@ function SortableTodoItem(
           <button
             type="button"
             disabled={props.isExpanded}
-            className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+            className={`${GRIP_BOX_CLASS} cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
             aria-label={`Reorder "${props.todo.title}"`}
             {...attributes}
             {...listeners}
