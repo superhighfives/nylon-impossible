@@ -38,6 +38,9 @@ struct TaskListView: View {
     /// The incomplete row a drag is hovering over — owned by the parent because
     /// its "drop here" line is shared board state.
     @Binding var dropTargetId: UUID?
+    /// The row a drag has lifted, so its slot can render as a ghost outline.
+    /// Only meaningful while `dropTargetId` is set — see `ContentView`.
+    @Binding var draggingTodoId: UUID?
     /// Staged by swipe-to-delete; the parent owns the confirmation dialog.
     @Binding var pendingDeleteTodo: TodoItem?
 
@@ -64,7 +67,7 @@ struct TaskListView: View {
                 // hide the page's entire reason for existing).
                 Section {
                     ForEach(pageTodos) { todo in
-                        todoRow(todo)
+                        todoRow(todo, isLifted: false)
                             .moveDisabled(true)
                     }
                 }
@@ -76,11 +79,14 @@ struct TaskListView: View {
                     // lifted row render as Liquid Glass (see `dragPreview`), matching
                     // web's translucent, blurred, ringed drag card.
                     ForEach(Array(incomplete.enumerated()), id: \.element.id) { index, todo in
-                        todoRow(todo)
-                            // Thin brand line on the hovered row's leading edge — the
-                            // "it'll land here" cue, mirroring web's drop line.
-                            .overlay(alignment: .top) {
-                                if dropTargetId == todo.id {
+                        todoRow(todo, isLifted: isRowLifted(todo))
+                            // Thin brand line at the edge the row will land
+                            // against — mirroring web's drop line. A drag
+                            // moving down inserts *after* the hovered row (see
+                            // `handleReorderDrop`), so the line goes under it;
+                            // moving up it goes above.
+                            .overlay(alignment: dropsBelow(index, in: incomplete) ? .bottom : .top) {
+                                if dropTargetId == todo.id, draggingTodoId != todo.id {
                                     Capsule()
                                         .fill(Color.appBrand)
                                         .frame(height: 2)
@@ -88,7 +94,7 @@ struct TaskListView: View {
                                         .transition(.opacity)
                                 }
                             }
-                            .draggable(todo.id.uuidString) {
+                            .draggable(dragPayload(for: todo)) {
                                 dragPreview(for: todo)
                             }
                             .dropDestination(for: String.self) { items, _ in
@@ -115,7 +121,7 @@ struct TaskListView: View {
 
                         if !preferencesService.hideCompleted {
                             ForEach(completed) { todo in
-                                todoRow(todo)
+                                todoRow(todo, isLifted: false)
                                     .moveDisabled(true)
                             }
                         }
@@ -196,8 +202,34 @@ struct TaskListView: View {
         return orderedLists.first { $0.systemKind == nextKind }
     }
 
+    /// True while this row is the one a drag has lifted. Gated on a live hover
+    /// so a cancelled drag — which SwiftUI gives no callback for before iOS 27
+    /// — can't leave a row ghosted for good.
+    private func isRowLifted(_ todo: TodoItem) -> Bool {
+        draggingTodoId == todo.id && dropTargetId != nil
+    }
+
+    /// Whether a drop on the row at `index` lands below it rather than above:
+    /// true when the lifted row is currently above it, matching the offset
+    /// `handleReorderDrop` computes.
+    private func dropsBelow(_ index: Int, in incomplete: [TodoItem]) -> Bool {
+        guard let liftedId = draggingTodoId,
+              let sourceIndex = incomplete.firstIndex(where: { $0.id == liftedId })
+        else { return false }
+        return sourceIndex < index
+    }
+
+    /// `draggable`'s payload is an `@autoclosure`, so this runs when the lift
+    /// actually begins rather than on every render — the one hook a drag source
+    /// gets before iOS 27's `onDragSessionUpdated`. The write is deferred so it
+    /// can never land inside a view update.
+    private func dragPayload(for todo: TodoItem) -> String {
+        Task { @MainActor in draggingTodoId = todo.id }
+        return todo.id.uuidString
+    }
+
     @ViewBuilder
-    private func todoRow(_ todo: TodoItem) -> some View {
+    private func todoRow(_ todo: TodoItem, isLifted: Bool) -> some View {
         let departingTo = departures[todo.id]
         let arrived = arrivals.contains(todo.id)
 
@@ -274,15 +306,30 @@ struct TaskListView: View {
         // toggled or opened in the beat before it goes.
         .opacity(departingTo == nil ? 1 : 0.55)
         .allowsHitTesting(departingTo == nil)
+        // A lifted row hands its content to the drag preview and leaves a ghost
+        // in its place. The outline is an overlay on the row itself rather than
+        // a fixed height, so it's exactly the size of the row that left — which
+        // matters most for the tall ones (notes, URL previews, subtasks).
+        .opacity(isLifted ? 0 : 1)
+        .overlay {
+            if isLifted {
+                LiftedRowGhost()
+            }
+        }
         .overlay(alignment: .trailing) {
             if let departingTo {
                 MovingToListChip(listName: departingTo)
                     .transition(.scale(scale: 0.85).combined(with: .opacity))
             }
         }
+        // The row's own padding rather than list row insets, so the drop
+        // destination attached to this view covers the full height of its slot.
+        // Left as insets, the 6pt gaps between rows are dead space, and a drag
+        // crossing one flickers the drop line and the ghost off and back on.
+        .padding(.vertical, 6)
         .listRowBackground(Color.clear)
         .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 6, leading: 0, bottom: 6, trailing: 0))
+        .listRowInsets(EdgeInsets())
         // Removal slides toward the trailing edge — the direction the next
         // list sits in the pager — so a swept row reads as moving on rather
         // than being deleted.
@@ -362,6 +409,7 @@ struct TaskListView: View {
         in incomplete: [TodoItem]
     ) -> Bool {
         dropTargetId = nil
+        draggingTodoId = nil
         // `incomplete` still holds rows that have already left this list (held
         // on screen for their exit), and their positions are no longer
         // comparable with this list's. Rather than compute a new index against
@@ -384,5 +432,24 @@ struct TaskListView: View {
         }
         syncService.syncAfterAction()
         return true
+    }
+}
+
+/// The dashed stand-in left in a lifted row's slot while it's being dragged.
+/// Drawn as an overlay on the row it replaces rather than at a fixed height,
+/// so it's exactly the size of the row that left — which is what makes it read
+/// as that row's space rather than a generic gap.
+private struct LiftedRowGhost: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 12)
+            .strokeBorder(
+                Color.appBrand.opacity(0.7),
+                style: StrokeStyle(lineWidth: 1.5, dash: [5, 4])
+            )
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.appBrand.opacity(0.1))
+            }
+            .transition(.opacity)
     }
 }

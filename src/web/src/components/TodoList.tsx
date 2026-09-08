@@ -24,6 +24,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { InlineDueDate } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
@@ -596,9 +597,105 @@ export function ExpandedSection({
   );
 }
 
+/**
+ * The reorder grip's box, as far as layout is concerned. Below `sm` the grip is
+ * in the row's flow and takes ~26px of width off the content; at `sm` it hangs
+ * out of the flow instead, off the row's left edge. A drag stand-in has to
+ * reserve the same box or its hidden sizing copy measures against a wider
+ * content box than the real row did — and a title near its wrap threshold then
+ * makes the outline a line taller than the row it stands in for. Shared so the
+ * two can't drift; the grip button adds its own non-layout classes on top.
+ */
+const GRIP_BOX_CLASS =
+  "mr-1.5 flex rounded-md p-0.5 sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full";
+
+/**
+ * A row's content in exactly the layout the real row gives it, grip box
+ * included. Only ever rendered hidden, as the thing a stand-in takes its size
+ * from — see `RowGhost`.
+ */
+function GhostRowContent(props: TodoItemProps) {
+  return (
+    <div className="flex items-start">
+      <span aria-hidden="true" className={GRIP_BOX_CLASS}>
+        <GripVertical size={16} className="block" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <TodoItemContent {...props} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The dashed outline drawn over a row that's mid-drag, plus the solid brand
+ * line marking the insertion point along its leading edge.
+ *
+ * The space it fills comes from `children` — a hidden copy of the row's own
+ * content — rather than a measured height. That's deliberate: with a
+ * `DragOverlay` mounted, dnd-kit's `active.rect` describes the floating
+ * overlay, not the row, and there's nothing to measure at all in a column the
+ * row hasn't reached yet. Laying the outline over the real content instead
+ * makes "exactly the size of the item" true by construction in both places.
+ */
+function RowGhost({
+  children,
+  variant = "target",
+  ring = false,
+}: {
+  children: ReactNode;
+  /**
+   * `target` is the slot the row will land in — brand-tinted, with the
+   * insertion line. `origin` is the space it vacated in a column it's on its
+   * way out of: neutral, and without a line, since nothing lands there.
+   */
+  variant?: "target" | "origin";
+  /** Keyboard drags get a stronger outline — there's no pointer to follow. */
+  ring?: boolean;
+}) {
+  return (
+    <>
+      <div aria-hidden="true" className="invisible">
+        {children}
+      </div>
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 rounded-lg border border-dashed ${
+          variant === "target"
+            ? "border-accent-strong bg-accent-base/60"
+            : "border-gray-strong bg-gray-base/40"
+        } ${ring ? "ring-2 ring-accent-strong" : ""}`}
+      >
+        {variant === "target" && (
+          <span className="absolute inset-x-0 -top-px h-0.5 rounded-full bg-accent-solid" />
+        )}
+      </span>
+    </>
+  );
+}
+
+/**
+ * A standalone stand-in for a row that isn't in this column yet: the slot a
+ * cross-column drag will land in. `SortableTodoItem` draws the same thing
+ * inside the row the drag lifted, so both columns show the same shape.
+ */
+export function TodoRowGhost(props: TodoItemProps) {
+  return (
+    <div className="relative rounded-lg py-3">
+      <RowGhost>
+        <GhostRowContent {...props} />
+      </RowGhost>
+    </div>
+  );
+}
+
 function SortableTodoItem(
   props: TodoItemProps & {
     isKeyboardDragging: boolean;
+    /** True while this row is being dragged toward a different list — its
+     * stand-in stays put and goes neutral, because the slot it's headed for is
+     * shown in that other column instead. */
+    isLeavingList: boolean;
     highlighted: boolean;
     onUpdateExpanded: (updates: {
       title?: string;
@@ -609,46 +706,55 @@ function SortableTodoItem(
   },
 ) {
   const {
-    active,
     attributes,
     listeners,
     setNodeRef,
     transform,
     isDragging,
-    isSorting,
     activeIndex,
+    over,
     overIndex,
-    index,
+    rect,
   } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
 
   // Rows reflow to open a gap at the target so it's clear where the item lands.
-  // No transition — rows (and the drop line) snap into place instead of sliding,
-  // which is what kept the line from feeling static. Translate only, no scaleY,
-  // so variable-height rows never squish or stretch. The dragged row itself
-  // never moves via transform — a DragOverlay (rendered in TodoGrid) tracks
-  // the pointer instead, so it isn't clipped by this row's column's
-  // overflow-y-auto scroller. Applying transform here too would just repeat
-  // that motion on a node still confined to the source column's box.
+  // No transition — rows (and the placeholder) snap into place instead of
+  // sliding, which is what kept the drop cue from feeling static. Translate
+  // only, no scaleY, so variable-height rows never squish or stretch.
+  //
+  // The dragged row never follows the pointer — a DragOverlay (rendered in
+  // TodoGrid) does that, so the moving card isn't clipped by the column's
+  // overflow-y-auto scroller. What's left here is the row's stand-in, and it
+  // *is* translated: by the offset that puts it in the gap the reflow just
+  // opened, so the dashed outline marks the destination rather than sitting
+  // back at the origin behind the rows that shifted over it.
+  //
+  // Every row between origin and target shifts by exactly the dragged row's
+  // height, so the gap lines up with the far edge of the row being hovered:
+  // its bottom when moving down, its top when moving up. `rect` and
+  // `over.rect` are both droppable rects, measured when the drag started and
+  // before any transform was applied, so their difference is the plain layout
+  // offset — which is what a transform needs. (`active.rect` is *not* the row:
+  // with a DragOverlay mounted it describes the floating overlay instead.)
+  const draggedRect = rect.current;
+  const gapShift = (() => {
+    if (!isDragging || props.isLeavingList) return 0;
+    if (!over || !draggedRect || overIndex === -1) return 0;
+    if (overIndex === activeIndex) return 0;
+    return overIndex > activeIndex
+      ? over.rect.top +
+          over.rect.height -
+          (draggedRect.top + draggedRect.height)
+      : over.rect.top - draggedRect.top;
+  })();
+
   const style = {
-    transform: isDragging ? undefined : CSS.Translate.toString(transform),
+    transform: isDragging
+      ? gapShift
+        ? `translate3d(0, ${gapShift}px, 0)`
+        : undefined
+      : CSS.Translate.toString(transform),
   };
-
-  // Drop indicator: a guide line at the insertion point. It sits on the leading
-  // edge of the hovered row, on the side the dragged item will land — above when
-  // moving up, below when moving down.
-  const isDropTarget =
-    isSorting &&
-    !isDragging &&
-    index === overIndex &&
-    activeIndex !== overIndex;
-  const lineAbove = isDropTarget && overIndex < activeIndex;
-  const lineBelow = isDropTarget && overIndex > activeIndex;
-
-  // Reflow opens a gap the height of the dragged row beyond the row edge, so
-  // nudge the line by half that height to sit centered in the gap. Since nothing
-  // animates, it snaps straight to the centered position.
-  const draggedHeight = active?.rect.current.initial?.height ?? 0;
-  const lineShift = lineAbove ? -draggedHeight / 2 : draggedHeight / 2;
 
   return (
     <div
@@ -663,35 +769,25 @@ function SortableTodoItem(
         !isDragging && props.isExpanded ? "bg-gray-base" : ""
       }`}
     >
-      {/* Drop line is for pointer drags; keyboard drags use the ghost's own
-          accent border to show the destination, so the line is redundant. */}
-      {(lineAbove || lineBelow) && !props.isKeyboardDragging && (
-        <span
-          aria-hidden="true"
-          style={{ transform: `translateY(${lineShift}px)` }}
-          className={`pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-accent-solid ${
-            lineAbove ? "top-0" : "bottom-0"
-          }`}
-        />
-      )}
       {isDragging ? (
-        // The real content moves to the DragOverlay (see TodoRowPreview in
-        // TodoGrid) so it isn't clipped by this column's overflow-y-auto
-        // scroller. This row just holds its own space as a ghost — fixed to
-        // its pre-drag height so nothing jumps when the drag starts/ends.
+        // The row's visible content moves to the DragOverlay (see
+        // TodoRowPreview in TodoGrid) so the card that follows the pointer
+        // isn't clipped by this column's overflow-y-auto scroller. What stays
+        // here is a hidden copy of that content — holding the row's exact
+        // space — under the dashed outline.
+        //
         // The grip button stays mounted (just visually hidden) rather than
         // unmounted: it's the node that holds keyboard focus when a
         // keyboard drag starts, and dnd-kit's KeyboardSensor keeps driving
         // the drag from it via document-level listeners — unmounting it
         // would drop focus to <body> for the rest of the drag.
-        <div
-          style={{ height: draggedHeight || undefined }}
-          className={`relative rounded-lg border border-dashed bg-gray-base/40 ${
-            props.isKeyboardDragging
-              ? "border-accent-strong ring-2 ring-accent-strong"
-              : "border-gray-strong"
-          }`}
-        >
+        <>
+          <RowGhost
+            variant={props.isLeavingList ? "origin" : "target"}
+            ring={props.isKeyboardDragging && !props.isLeavingList}
+          >
+            <GhostRowContent {...props} />
+          </RowGhost>
           <button
             type="button"
             disabled={props.isExpanded}
@@ -702,7 +798,7 @@ function SortableTodoItem(
           >
             <GripVertical size={16} />
           </button>
-        </div>
+        </>
       ) : (
         <div className="flex items-start">
           {/* Reorder grip: inline on mobile; on desktop it hangs off the left
@@ -711,7 +807,7 @@ function SortableTodoItem(
           <button
             type="button"
             disabled={props.isExpanded}
-            className={`mr-1.5 flex rounded-md p-0.5 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:absolute sm:left-0 sm:top-3.5 sm:mr-0 sm:-translate-x-full sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+            className={`${GRIP_BOX_CLASS} cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
             aria-label={`Reorder "${props.todo.title}"`}
             {...attributes}
             {...listeners}
@@ -848,6 +944,15 @@ export interface TodoListColumnProps {
   isKeyboardDragging: boolean;
   /** Mid-drag optimistic order override for this list, or null to use the derived order. */
   localIncompleteTodos: TodoWithUrls[] | null;
+  /**
+   * Set only on the column a cross-list drag is currently over: where the
+   * dragged row will land (an index into this column's displayed order) and
+   * the stand-in to show there — a `TodoRowGhost` built by TodoGrid, which is
+   * the only place that knows which row is being dragged.
+   */
+  crossListDrop: { index: number; ghost: ReactNode } | null;
+  /** True while one of *this* list's rows is being dragged toward another list. */
+  isLeavingList: boolean;
 }
 
 /**
@@ -874,6 +979,8 @@ export function TodoListColumn({
   timeZone,
   isKeyboardDragging,
   localIncompleteTodos,
+  crossListDrop,
+  isLeavingList,
 }: TodoListColumnProps) {
   // Registers the whole column as a drop target so a drag can land in empty
   // space (an empty list, or below the last row) and still resolve to this
@@ -885,7 +992,11 @@ export function TodoListColumn({
   if (todos.length === 0) {
     // Fills the column so a cross-list drag can drop anywhere in the empty
     // space, not just a sliver under the title.
-    return <div ref={setColumnDropRef} className="h-full min-h-24" />;
+    return (
+      <div ref={setColumnDropRef} className="h-full min-h-24">
+        {crossListDrop?.ghost}
+      </div>
+    );
   }
 
   const handleToggle = (id: string, completed: boolean) => {
@@ -981,6 +1092,25 @@ export function TodoListColumn({
     deletePending: deleteTodo.isPending,
   });
 
+  const rows: ReactNode[] = displayIncompleteTodos.map((todo) => (
+    <SortableTodoItem
+      key={todo.id}
+      {...sharedProps(todo)}
+      isKeyboardDragging={isKeyboardDragging}
+      isLeavingList={isLeavingList}
+      highlighted={highlightIds.has(todo.id)}
+      onUpdateExpanded={handleUpdateExpanded(todo.id)}
+      subtaskHandlers={subtaskHandlers}
+    />
+  ));
+
+  // A cross-list drag lands at the top of its own tier here (see
+  // TodoGrid.handleDragEnd), so the stand-in goes in at that index rather than
+  // under the pointer — it shows where the row will actually end up.
+  if (crossListDrop) {
+    rows.splice(crossListDrop.index, 0, crossListDrop.ghost);
+  }
+
   return (
     <div ref={setColumnDropRef}>
       <SortableContext
@@ -988,16 +1118,7 @@ export function TodoListColumn({
         items={displayIncompleteTodos.map((t) => t.id)}
         strategy={verticalListSortingStrategy}
       >
-        {displayIncompleteTodos.map((todo) => (
-          <SortableTodoItem
-            key={todo.id}
-            {...sharedProps(todo)}
-            isKeyboardDragging={isKeyboardDragging}
-            highlighted={highlightIds.has(todo.id)}
-            onUpdateExpanded={handleUpdateExpanded(todo.id)}
-            subtaskHandlers={subtaskHandlers}
-          />
-        ))}
+        {rows}
       </SortableContext>
     </div>
   );
