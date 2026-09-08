@@ -130,7 +130,7 @@ export function ImportReviewModal() {
               <Dialog.Description className="text-xs text-gray-muted">
                 Google doesn't share repeat schedules over its API, so your
                 imported tasks came across as one-offs. Set how these dated
-                tasks should repeat — AI fills in a best guess where it can.
+                tasks should repeat.
               </Dialog.Description>
             </div>
 
