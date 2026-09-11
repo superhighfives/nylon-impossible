@@ -138,8 +138,8 @@ struct TodoViewModelTests {
         let incomplete = [a, b, c]
 
         let vm = TodoViewModel()
-        // Drag A (index 0) to drop onto C (index 2): matches ContentView's
-        // handleReorderDrop for a downward drag (destination = targetIndex + 1).
+        // Drag A (index 0) to drop onto C (index 2): matches TaskListView's
+        // handleMove for a downward drag (destination = targetIndex + 1).
         vm.moveTodo(from: IndexSet(integer: 0), to: 3, in: incomplete)
 
         #expect(a.position > c.position)

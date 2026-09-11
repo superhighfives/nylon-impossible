@@ -20,16 +20,6 @@ struct ContentView: View {
     // active (isEffectivelyCompleted flips) without a refetch. Any @State write
     // re-runs body, which recomputes the sorted/filtered lists.
     @State private var midnightTick = 0
-    // The incomplete row a drag is currently hovering over. Drives the thin
-    // "drop here" line — the iOS analogue of web's yellow reorder line.
-    @State private var dropTargetId: UUID?
-    // The row currently lifted by a drag. Its slot renders as a ghost outline
-    // so the list shows where the row came out of, alongside the line showing
-    // where it's going. Only read while `dropTargetId` is set: SwiftUI has no
-    // drag-cancelled callback before iOS 27's `onDragSessionUpdated`, so a
-    // cancelled lift can leave this set — gating on the hover, which does
-    // clear itself, is what keeps a stale id from ghosting a row for good.
-    @State private var draggingTodoId: UUID?
     // Staged by swipe-to-delete; the row only actually deletes once confirmed.
     @State private var pendingDeleteTodo: TodoItem?
     // Raised to open the keyboard on the add-task field without a tap — the
@@ -119,8 +109,6 @@ struct ContentView: View {
                         orderedLists: orderedLists,
                         viewModel: viewModel,
                         topInset: headerInset,
-                        dropTargetId: $dropTargetId,
-                        draggingTodoId: $draggingTodoId,
                         pendingDeleteTodo: $pendingDeleteTodo
                     )
                     .tag(Optional(list.id))
