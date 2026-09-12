@@ -111,11 +111,17 @@ than passing quietly).
 
 ## Continuous improvement routines
 
-Three Claude cloud routines run against this repo outside of any local
-session — they're configured via claude.ai, not checked into
+Three Claude cloud routines are meant to run against this repo outside of any
+local session — they're configured via claude.ai, not checked into
 `.github/workflows/`, so this section is the source of truth for what they do
-and why. All three open or update PRs only; none of them have merge rights.
-A human merges everything they produce.
+and why. All three are to open or update PRs only; none of them get merge
+rights. A human merges everything they produce.
+
+**Status: not yet live.** The routines below are the agreed design, not a
+description of something already running — creating them needs an
+`environment_id` from the claude.ai routines API, which wasn't reachable when
+this was written. Treat this section as the spec to build against, and delete
+this paragraph once all three exist and have run once.
 
 - **Sentry sweep** — cron, nightly (~03:00 local). Runs the `review-sentry`
   skill against unresolved issues for this project and opens one PR per issue
