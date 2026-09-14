@@ -24,5 +24,4 @@ jobs:
       verify_commands: |
         pnpm typecheck
         pnpm lint
-    secrets:
-      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+    secrets: inherit
