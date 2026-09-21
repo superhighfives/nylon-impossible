@@ -6,7 +6,6 @@ on:
     paths:
       - "src/web/**"
       - "src/api/**"
-      - "src/todo-agent/**"
       - "package.json"
   pull_request:
     types: [opened, synchronize, reopened]
@@ -37,9 +36,6 @@ jobs:
       - name: Lint & typecheck Web
         run: pnpm web:check && pnpm web:typecheck
 
-      - name: Lint & typecheck todo-agent
-        run: pnpm todo-agent:check && pnpm todo-agent:typecheck
-
       - name: Test API
         run: pnpm --filter @nylon-impossible/api test
 
@@ -53,8 +49,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-    env:
-      INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
     steps:
       - name: Checkout
@@ -79,13 +73,6 @@ jobs:
           workingDirectory: src/api
           command: d1 migrations apply nylon-impossible-db --remote
 
-      - name: Deploy todo-agent
-        working-directory: src/todo-agent
-        run: pnpm run deploy
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
       - name: Deploy API
         uses: cloudflare/wrangler-action@v4
         with:
@@ -97,19 +84,6 @@ jobs:
             CLOUDFLARE_API_TOKEN
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-
-      # INTERNAL_AGENT_SECRET is optional here: it isn't set as a repo secret
-      # yet, and both workers boot fine without it (the /internal/agent/*
-      # routes just reject calls until a value is set on both sides via
-      # `wrangler secret put`, matching the note in src/api/wrangler.jsonc).
-      - name: Set INTERNAL_AGENT_SECRET on API and todo-agent
-        if: ${{ env.INTERNAL_AGENT_SECRET != '' }}
-        run: |
-          printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm --filter @nylon-impossible/api exec wrangler secret put INTERNAL_AGENT_SECRET
-          printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm --filter @nylon-impossible/todo-agent exec wrangler secret put INTERNAL_AGENT_SECRET
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Build Web
         run: pnpm --filter @nylon-impossible/web run build
@@ -154,9 +128,8 @@ jobs:
   # Per-branch preview via Cloudflare Worker Previews (private beta). Replaces
   # the old fully-isolated per-PR stack: no config rewriting, no per-PR queue,
   # no custom domains, and no close-triggered cleanup — stale previews are
-  # auto-evicted by the platform. Previews share prod D1 and call prod
-  # todo-agent; the research queue consumer and hourly cron only ever run on
-  # production, never on a preview. See
+  # auto-evicted by the platform. Previews share prod D1; the research queue
+  # consumer and hourly cron only ever run on production, never on a preview. See
   # plans/in-progress/2026-08-13-migrate-pr-previews-to-worker-previews.md.
   #
   # Preview secrets are seeded by this job (see the "Set preview API/Web
@@ -276,9 +249,6 @@ jobs:
           if [ -n "$TAVILY_API_KEY" ]; then
             printf '%s' "$TAVILY_API_KEY" | pnpm exec wrangler preview secret put TAVILY_API_KEY --name "$PREVIEW_NAME"
           fi
-          if [ -n "$INTERNAL_AGENT_SECRET" ]; then
-            printf '%s' "$INTERNAL_AGENT_SECRET" | pnpm exec wrangler preview secret put INTERNAL_AGENT_SECRET --name "$PREVIEW_NAME"
-          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -291,7 +261,6 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
           TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
-          INTERNAL_AGENT_SECRET: ${{ secrets.INTERNAL_AGENT_SECRET }}
 
       - name: Build preview Web
         run: pnpm --filter @nylon-impossible/web run build

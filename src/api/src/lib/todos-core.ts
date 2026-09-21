@@ -38,8 +38,7 @@ export class InvalidListError extends Error {
 /**
  * Fields `updateTodoCore` accepts. Mirrors the REST `PUT /todos/:id` body,
  * minus request-shape concerns (no zod here — validation/coercion is the
- * caller's job; REST validates via zod, the todo-agent's tools validate via
- * their own tool schema).
+ * caller's job; REST validates via zod).
  */
 export interface UpdateTodoPatch {
   title?: string;
