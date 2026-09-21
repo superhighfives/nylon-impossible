@@ -129,8 +129,8 @@ final class SyncService {
             }
 
             // Fire any AI actions requested at creation now that their todos
-            // exist server-side. Deferred to here so an enrich/research chosen
-            // offline runs as soon as the todo reaches the server.
+            // exist server-side. Deferred to here so an enrich chosen offline
+            // runs as soon as the todo reaches the server.
             await processPendingAI(apiService: apiService, userId: userId)
 
             // 4. Update sync timestamp
@@ -298,13 +298,6 @@ final class SyncService {
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
-                // Always update research fields — they change independently of updatedAt
-                local.researchId = remote.research?.id
-                local.researchStatus = remote.research?.status
-                local.researchType = remote.research?.researchType
-                local.researchSummary = remote.research?.summary
-                local.researchedAt = remote.research?.researchedAt
-                local.researchCreatedAt = remote.research?.createdAt
                 // Server is authoritative for the question flag.
                 local.needsInput = remote.needsInput ?? false
                 // If local is newer, it will be synced on next sync
@@ -322,12 +315,6 @@ final class SyncService {
                 todo.recurrence = remote.recurrence
                 todo.aiStatus = remote.aiStatus?.rawValue
                 todo.sticky = remote.sticky ?? false
-                todo.researchId = remote.research?.id
-                todo.researchStatus = remote.research?.status
-                todo.researchType = remote.research?.researchType
-                todo.researchSummary = remote.research?.summary
-                todo.researchedAt = remote.research?.researchedAt
-                todo.researchCreatedAt = remote.research?.createdAt
                 todo.needsInput = remote.needsInput ?? false
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
@@ -394,7 +381,6 @@ final class SyncService {
             var updatedUrls: [TodoUrl] = []
             for remoteUrl in remoteUrls {
                 if let existing = existingById[remoteUrl.id] {
-                    existing.researchId = remoteUrl.researchId
                     existing.title = remoteUrl.title
                     existing.itemDescription = remoteUrl.description
                     existing.siteName = remoteUrl.siteName
@@ -541,8 +527,8 @@ extension SyncService {
         return pushedIds
     }
 
-    /// Fire enrich/research actions recorded on todos at creation, once those
-    /// todos have synced (so the server knows them). Runs only for synced,
+    /// Fire enrich actions recorded on todos at creation, once those todos
+    /// have synced (so the server knows them). Runs only for synced,
     /// non-deleted todos owned by this user. Clears the flag on success and
     /// leaves it set to retry next sync on failure — a single failed call must
     /// not abort the whole sync.
@@ -554,7 +540,7 @@ extension SyncService {
                 $0.userId == userId
                     && $0.isSynced
                     && !$0.isDeleted
-                    && ($0.pendingEnrich || $0.pendingResearch)
+                    && $0.pendingEnrich
             }
         )
         guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else {
@@ -591,25 +577,6 @@ extension SyncService {
                         didChange = true
                         SentrySDK.capture(error: error) { scope in
                             scope.setTag(value: "pending-enrich", key: "area")
-                        }
-                    }
-                }
-            }
-
-            if todo.pendingResearch {
-                do {
-                    try await apiService.reresearch(todoId: todoId)
-                    todo.pendingResearch = false
-                    didChange = true
-                } catch {
-                    // Same policy as enrich: retry transient failures, give up on
-                    // permanent ones so a never-succeeding call doesn't retry and
-                    // re-report on every sync.
-                    if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
-                        todo.pendingResearch = false
-                        didChange = true
-                        SentrySDK.capture(error: error) { scope in
-                            scope.setTag(value: "pending-research", key: "area")
                         }
                     }
                 }

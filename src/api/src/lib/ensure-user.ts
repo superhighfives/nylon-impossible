@@ -14,9 +14,8 @@ import { eq, type getDb, lists, todos, todoUrls, users } from "./db";
 // to 13 and chunk conservatively — matches the pattern in
 // import-google-tasks.ts, which hit this same cap.
 const TODO_INSERT_CHUNK_SIZE = 6;
-// The demo-url row sets all 14 non-null-default-only columns explicitly, no
-// hidden extras (researchId is the only omitted column, and it's nullable
-// with no default).
+// The demo-url row sets all non-null-default-only columns explicitly, so
+// there are no hidden bound-param extras to budget for.
 const TODO_URL_INSERT_CHUNK_SIZE = 7;
 
 // The system lists provisioned for every new user, in fixed order. Kept here

@@ -105,7 +105,6 @@ export function ImportReviewModal() {
       sticky: false,
       createdAt: review.dueDate,
       updatedAt: review.dueDate,
-      research: null,
       messages: [],
       urls: [],
       suggestions: [],

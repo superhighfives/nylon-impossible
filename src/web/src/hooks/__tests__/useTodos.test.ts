@@ -12,7 +12,6 @@ import {
   useDismissSuggestion,
   useDismissTodoQuestion,
   useReplyToTodo,
-  useReresearch,
   useTodos,
   useUpdateTodo,
 } from "../useTodos";
@@ -69,7 +68,6 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     updatedAt: "2026-01-01T00:00:00.000Z",
     needsInput: false,
     sticky: false,
-    research: null,
     messages: [],
     urls: [],
     suggestions: [],
@@ -133,24 +131,9 @@ describe("useTodos", () => {
 // hasPendingNonStaleWork (refetchInterval helper)
 // ---------------------------------------------------------------------------
 
-function makeResearch(
-  status: "pending" | "completed" | "failed",
-  createdAt: string,
-): NonNullable<TodoWithUrls["research"]> {
-  return {
-    id: "research-1",
-    status,
-    researchType: "general",
-    summary: null,
-    researchedAt: null,
-    createdAt,
-  };
-}
-
 describe("hasPendingNonStaleWork", () => {
   const now = new Date("2026-01-01T00:10:00.000Z").getTime();
   const justNow = new Date("2026-01-01T00:09:50.000Z").toISOString(); // 10s ago (within STALE_AI_MS)
-  const recent = new Date("2026-01-01T00:09:00.000Z").toISOString(); // 1 min ago (within STALE_RESEARCH_MS)
   const stale = new Date("2026-01-01T00:03:00.000Z").toISOString(); // 7 min ago
 
   beforeEach(() => {
@@ -192,21 +175,6 @@ describe("hasPendingNonStaleWork", () => {
         makeTodo({ aiStatus: "processing", createdAt: stale }),
       ]),
     ).toBe(false);
-  });
-
-  it("returns true when a todo has pending research created less than 2 minutes ago", () => {
-    const todo = makeTodo({ research: makeResearch("pending", recent) });
-    expect(hasPendingNonStaleWork([todo])).toBe(true);
-  });
-
-  it("returns false when pending research is older than 2 minutes", () => {
-    const todo = makeTodo({ research: makeResearch("pending", stale) });
-    expect(hasPendingNonStaleWork([todo])).toBe(false);
-  });
-
-  it("returns false when research is completed regardless of age", () => {
-    const todo = makeTodo({ research: makeResearch("completed", recent) });
-    expect(hasPendingNonStaleWork([todo])).toBe(false);
   });
 
   it("returns true when at least one todo has active pending work", () => {
@@ -414,81 +382,6 @@ describe("useDeleteTodo", () => {
     const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
     expect(cached).toHaveLength(2);
     expect(cached?.[0]?.id).toBe("todo-1");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// useReresearch
-// ---------------------------------------------------------------------------
-
-describe("useReresearch", () => {
-  const originalFetch = global.fetch;
-
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  afterEach(() => {
-    global.fetch = originalFetch;
-  });
-
-  it("calls the research endpoint and invalidates queries on success", async () => {
-    const mockFetch = vi.mocked(global.fetch);
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          id: "research-1",
-          status: "pending",
-          researchType: "general",
-        }),
-    } as Response);
-
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useReresearch(), { wrapper: Wrapper });
-
-    result.current.mutate("todo-1");
-
-    await waitFor(() => expect(result.current.isSuccess).toBe(true));
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/todos/todo-1/research"),
-      expect.objectContaining({ method: "POST" }),
-    );
-  });
-
-  it("throws an error when response is not ok", async () => {
-    const mockFetch = vi.mocked(global.fetch);
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: () => Promise.resolve({ error: "Todo not found" }),
-    } as Response);
-
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useReresearch(), { wrapper: Wrapper });
-
-    result.current.mutate("nonexistent-todo");
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error?.message).toBe("Todo not found");
-  });
-
-  it("uses fallback error message when response has no error field", async () => {
-    const mockFetch = vi.mocked(global.fetch);
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: () => Promise.resolve({}),
-    } as Response);
-
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useReresearch(), { wrapper: Wrapper });
-
-    result.current.mutate("todo-1");
-
-    await waitFor(() => expect(result.current.isError).toBe(true));
-    expect(result.current.error?.message).toBe("Request failed (500)");
   });
 });
 

@@ -21,15 +21,14 @@ extension TodoSuggestion {
             payloadRecurrenceFrequency: api.payload.recurrence?.frequency.rawValue,
             payloadTitle: api.payload.title,
             payloadTitles: api.payload.titles,
-            payloadSearchQuery: api.payload.searchQuery,
-            payloadResearchType: api.payload.researchType
+            payloadSearchQuery: api.payload.searchQuery
         )
     }
 
     /// Apply the fields this suggestion type maps directly onto a todo. Mirrors
     /// the server's accept handler for the single-field types (title/due_date/
-    /// recurrence) — subtasks and research create new rows server-side, so
-    /// those are left for the next sync rather than synthesized locally.
+    /// recurrence) — subtasks create new rows server-side, so those are left
+    /// for the next sync rather than synthesized locally.
     func applyLocally(to todo: TodoItem) {
         switch type {
         case "title":

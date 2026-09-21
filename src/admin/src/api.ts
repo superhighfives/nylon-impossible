@@ -15,7 +15,6 @@ export interface AdminUserDetail extends AdminUserListItem {
   diagnostics: {
     todoCount: number;
     messageCount: number;
-    researchCount: number;
     lastTodoUpdatedAt: string | null;
   };
 }

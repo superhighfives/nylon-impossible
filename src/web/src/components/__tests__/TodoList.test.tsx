@@ -5,7 +5,6 @@ import { TodoGrid } from "../TodoGrid";
 
 vi.mock("@/hooks/useTodos", () => ({
   STALE_AI_MS: 60_000,
-  STALE_RESEARCH_MS: 5 * 60 * 1_000,
   useTodos: vi.fn(),
   useUpdateTodo: vi.fn(),
   useDeleteTodo: vi.fn(),
@@ -72,7 +71,6 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     updatedAt: "2026-01-01T00:00:00.000Z",
     needsInput: false,
     sticky: false,
-    research: null,
     messages: [],
     urls: [],
     suggestions: [],

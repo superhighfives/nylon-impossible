@@ -2,17 +2,8 @@ import type { Recurrence } from "@nylon-impossible/shared/schema";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
-import {
-  and,
-  eq,
-  getDb,
-  todoResearch,
-  todoSuggestions,
-  todos,
-  users,
-} from "../lib/db";
+import { and, eq, getDb, todoSuggestions, todos } from "../lib/db";
 import { apiError } from "../lib/errors";
-import { sendResearchJob } from "../lib/research";
 import { truncateTitle } from "../lib/url-helpers";
 import type { Env } from "../types";
 
@@ -147,44 +138,6 @@ export async function acceptSuggestion(c: Context<Env>) {
         .update(todos)
         .set({ recurrence: null, updatedAt: now })
         .where(eq(todos.id, todoId));
-      break;
-    }
-    case "research": {
-      const [existingResearch] = await db
-        .select({ id: todoResearch.id })
-        .from(todoResearch)
-        .where(eq(todoResearch.todoId, todoId));
-      if (existingResearch) {
-        return apiError(c, "suggestion_conflict");
-      }
-      const [user] = await db
-        .select({ location: users.location })
-        .from(users)
-        .where(eq(users.id, userId));
-
-      const payload = suggestion.payload as {
-        searchQuery: string | null;
-        researchType: "general" | "location";
-      };
-      const researchId = crypto.randomUUID();
-      await db.insert(todoResearch).values({
-        id: researchId,
-        todoId,
-        researchType: payload.researchType,
-        status: "pending",
-        searchQuery: payload.searchQuery,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      await sendResearchJob(db, c.env.RESEARCH_QUEUE, {
-        todoId,
-        userId,
-        query: payload.searchQuery ?? todo.title,
-        researchType: payload.researchType,
-        researchId,
-        userLocation: user?.location ?? null,
-      });
       break;
     }
   }

@@ -16,11 +16,9 @@ import {
   isNotNull,
   type Todo,
   type TodoMessage,
-  type TodoResearch,
   type TodoSuggestion,
   type TodoUrl,
   todoMessages,
-  todoResearch,
   todoSuggestions,
   todos,
   todoUrls,
@@ -95,7 +93,6 @@ function serializeUrl(url: TodoUrl) {
   return {
     id: url.id.toLowerCase(),
     todoId: url.todoId.toLowerCase(),
-    researchId: url.researchId?.toLowerCase() ?? null,
     url: url.url,
     title: url.title,
     description: url.description,
@@ -108,20 +105,6 @@ function serializeUrl(url: TodoUrl) {
     fetchedAt: url.fetchedAt?.toISOString() ?? null,
     createdAt: url.createdAt.toISOString(),
     updatedAt: url.updatedAt.toISOString(),
-  };
-}
-
-// Serialize research data
-function serializeResearch(research: TodoResearch | null) {
-  if (!research) return null;
-  return {
-    id: research.id.toLowerCase(),
-    status: research.status,
-    researchType: research.researchType,
-    summary: research.summary,
-    researchedAt: research.researchedAt?.toISOString() ?? null,
-    createdAt: research.createdAt.toISOString(),
-    updatedAt: research.updatedAt.toISOString(),
   };
 }
 
@@ -155,7 +138,6 @@ function serializeSuggestion(s: TodoSuggestion) {
 function serializeTodo(
   todo: typeof todos.$inferSelect,
   urls: ReturnType<typeof serializeUrl>[] = [],
-  research: TodoResearch | null = null,
   messages: ReturnType<typeof serializeMessage>[] = [],
   suggestions: ReturnType<typeof serializeSuggestion>[] = [],
 ) {
@@ -176,7 +158,6 @@ function serializeTodo(
     sticky: todo.sticky,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
-    research: serializeResearch(research),
     messages,
     urls,
     suggestions,
@@ -607,7 +588,6 @@ export async function syncTodos(c: Context<Env>) {
   // 3. Fetch all URLs for the returned todos
   const todoIds = serverTodos.map((t) => t.id);
   const allUrls: TodoUrl[] = [];
-  const allResearch: TodoResearch[] = [];
   const allMessages: TodoMessage[] = [];
   const allSuggestions: TodoSuggestion[] = [];
   if (todoIds.length > 0) {
@@ -615,16 +595,12 @@ export async function syncTodos(c: Context<Env>) {
     // with >100 todos would otherwise overflow a single statement. Each todoId
     // lands in one batch, so per-todo ordering survives grouping below.
     for (const chunkIds of chunkForD1(todoIds)) {
-      const [urls, research, messages, suggestions] = await Promise.all([
+      const [urls, messages, suggestions] = await Promise.all([
         db
           .select()
           .from(todoUrls)
           .where(inArray(todoUrls.todoId, chunkIds))
           .orderBy(asc(todoUrls.position)),
-        db
-          .select()
-          .from(todoResearch)
-          .where(inArray(todoResearch.todoId, chunkIds)),
         db
           .select()
           .from(todoMessages)
@@ -637,7 +613,6 @@ export async function syncTodos(c: Context<Env>) {
           .orderBy(asc(todoSuggestions.createdAt)),
       ]);
       allUrls.push(...urls);
-      allResearch.push(...research);
       allMessages.push(...messages);
       allSuggestions.push(...suggestions);
     }
@@ -650,12 +625,6 @@ export async function syncTodos(c: Context<Env>) {
     const existing = urlsByTodoId.get(url.todoId) ?? [];
     existing.push(serialized);
     urlsByTodoId.set(url.todoId, existing);
-  }
-
-  // Index research by todoId
-  const researchByTodoId = new Map<string, TodoResearch>();
-  for (const research of allResearch) {
-    researchByTodoId.set(research.todoId, research);
   }
 
   // Group messages by todoId (already ordered by createdAt asc)
@@ -687,7 +656,6 @@ export async function syncTodos(c: Context<Env>) {
       serializeTodo(
         todo,
         urlsByTodoId.get(todo.id) ?? [],
-        researchByTodoId.get(todo.id) ?? null,
         messagesByTodoId.get(todo.id) ?? [],
         suggestionsByTodoId.get(todo.id) ?? [],
       ),

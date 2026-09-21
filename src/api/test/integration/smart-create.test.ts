@@ -14,7 +14,7 @@ const AUTH_HEADER = { Authorization: "Bearer test-token" };
 
 async function smartCreate(
   text: string,
-  opts: { enrich?: boolean; research?: boolean } = {},
+  opts: { enrich?: boolean } = {},
 ) {
   return SELF.fetch("http://localhost/todos/smart", {
     method: "POST",

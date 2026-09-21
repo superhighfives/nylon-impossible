@@ -95,39 +95,7 @@ describe("enrichTodo", () => {
       expect(result!.dueDate).toBe("2026-03-28");
     });
 
-    it("detects general research intent for questions", async () => {
-      const ai = createMockAi({
-        title: "How does OAuth work",
-        research: { type: "general" },
-      });
-
-      const result = await enrichTodo(ai, "How does OAuth work");
-      expect(result).not.toBeNull();
-      expect(result!.title).toBe("How does OAuth work");
-      expect(result!.research).toEqual({ type: "general" });
-    });
-
-    it("detects general research intent for comparisons", async () => {
-      const ai = createMockAi({
-        title: "Dogs ages vs human ages",
-        research: { type: "general" },
-      });
-
-      const result = await enrichTodo(ai, "Dogs ages vs human ages");
-      expect(result!.research).toEqual({ type: "general" });
-    });
-
-    it("detects location research intent for venues", async () => {
-      const ai = createMockAi({
-        title: "Book dinner at San Jalisco",
-        research: { type: "location" },
-      });
-
-      const result = await enrichTodo(ai, "Book dinner at San Jalisco");
-      expect(result!.research).toEqual({ type: "location" });
-    });
-
-    it("does not set research for plain action items", async () => {
+    it("returns null for plain action items with no extractable metadata", async () => {
       const ai = createMockAi({
         title: "Buy milk",
       });
@@ -135,23 +103,6 @@ describe("enrichTodo", () => {
       const result = await enrichTodo(ai, "Buy milk");
       // No enrichment at all, returns null
       expect(result).toBeNull();
-    });
-
-    it("returns research-only enrichment (no URLs or date)", async () => {
-      const ai = createMockAi({
-        title: "Best practices for React Server Components",
-        research: { type: "general" },
-      });
-
-      const result = await enrichTodo(
-        ai,
-        "Best practices for React Server Components",
-      );
-      // Research alone is sufficient to return non-null
-      expect(result).not.toBeNull();
-      expect(result!.research).toEqual({ type: "general" });
-      expect(result!.urls).toBeUndefined();
-      expect(result!.dueDate).toBeUndefined();
     });
   });
 
@@ -216,7 +167,7 @@ describe("enrichTodo", () => {
           "https://remedies.com",
           "https://backpain.com",
         ],
-        research: { type: "general" },
+        dueDate: "2026-03-28",
       });
 
       const result = await enrichTodo(ai, "Research back pain remedies");
@@ -224,7 +175,7 @@ describe("enrichTodo", () => {
       // All URLs should be filtered out — none of those hostnames appear
       // in the input text.
       expect(result!.urls).toBeUndefined();
-      expect(result!.research).toEqual({ type: "general" });
+      expect(result!.dueDate).toBe("2026-03-28");
     });
 
     it("keeps URLs whose hostname appears in the text", async () => {
@@ -264,12 +215,12 @@ describe("enrichTodo", () => {
       // The model "cleaned" a fake URL from the title — without restoring
       // the title we'd end up with just "Research" which is worse than
       // the original "Research back pain remedies".
-      // Include research so the enrichment is non-null and we can assert
+      // Include a dueDate so the enrichment is non-null and we can assert
       // on the restored title.
       const ai = createMockAi({
         title: "Research",
         urls: ["https://backpainremedies.com"],
-        research: { type: "general" },
+        dueDate: "2026-03-28",
       });
 
       const result = await enrichTodo(ai, "Research back pain remedies");
@@ -279,8 +230,8 @@ describe("enrichTodo", () => {
     });
 
     it("returns null when only hallucinated URLs were extracted from plain text", async () => {
-      // No research, no date, and all urls filtered — equivalent
-      // to the model returning nothing useful.
+      // No date, and all urls filtered — equivalent to the model returning
+      // nothing useful.
       const ai = createMockAi({
         title: "Back pain remedies",
         urls: ["https://backpainremedies.com"],

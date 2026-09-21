@@ -134,7 +134,6 @@ struct UrlRowCompact: View {
         UrlRowCompact(url: APITodoUrl(
             id: "1",
             todoId: "todo1",
-            researchId: nil,
             url: "https://example.com",
             title: nil,
             description: nil,
@@ -152,7 +151,6 @@ struct UrlRowCompact: View {
         UrlRowCompact(url: APITodoUrl(
             id: "2",
             todoId: "todo1",
-            researchId: nil,
             url: "https://news.ycombinator.com",
             title: "Hacker News",
             description: nil,

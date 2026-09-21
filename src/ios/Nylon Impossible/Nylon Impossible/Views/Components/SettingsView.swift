@@ -132,7 +132,7 @@ struct SettingsView: View {
                 } header: {
                     Text("AI Features")
                 } footer: {
-                    Text("When enabled, AI helps enrich todos by doing research tasks, pulling out metadata, and finding locations.")
+                    Text("When enabled, AI helps enrich todos by pulling out metadata and finding locations.")
                 }
 
                 Section {
@@ -158,7 +158,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Location")
                 } footer: {
-                    Text("Used to find local venues when researching location todos.")
+                    Text("Used to find local venues for location-based todos.")
                 }
 
                 ImportSettingsSection()

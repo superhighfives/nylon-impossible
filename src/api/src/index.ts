@@ -9,7 +9,6 @@ import {
   updateUser,
 } from "./handlers/admin";
 import { acceptSuggestion } from "./handlers/apply-suggestion";
-import { cancelResearch } from "./handlers/cancel-research";
 import { dismissQuestion } from "./handlers/dismiss-question";
 import { dismissSuggestion } from "./handlers/dismiss-suggestion";
 import { enrichTodo } from "./handlers/enrich";
@@ -31,7 +30,6 @@ import {
 } from "./handlers/lists";
 import { processTodo } from "./handlers/process";
 import { replyToTodo } from "./handlers/reply";
-import { reresearchTodo } from "./handlers/reresearch";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
 import {
@@ -48,8 +46,7 @@ import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
 import { runListSweep } from "./lib/list-sweep";
-import { executeResearch } from "./lib/research";
-import type { Env, ResearchJobMessage } from "./types";
+import type { Env } from "./types";
 
 export { UserSync } from "./durable-objects/UserSync";
 
@@ -139,11 +136,9 @@ app.post("/todos", createTodo);
 app.get("/todos/:id", getTodo);
 app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
-app.post("/todos/:id/research", reresearchTodo);
-app.delete("/todos/:id/research", cancelResearch);
 app.post("/todos/:id/enrich", enrichTodo);
 // Link processing — deterministic, no AI, so it sits outside the aiEnabled gate
-// the enrich/research routes above honour.
+// the enrich route above honours.
 app.post("/todos/:id/process", processTodo);
 app.post("/todos/:id/reply", replyToTodo);
 app.delete("/todos/:id/question", dismissQuestion);
@@ -184,7 +179,7 @@ app.onError((err, c) => {
   return apiError(c, "internal_error");
 });
 
-const handler: ExportedHandler<Env["Bindings"], ResearchJobMessage> = {
+const handler: ExportedHandler<Env["Bindings"]> = {
   fetch: app.fetch,
   async scheduled(_event, env): Promise<void> {
     try {
@@ -196,35 +191,9 @@ const handler: ExportedHandler<Env["Bindings"], ResearchJobMessage> = {
       });
     }
   },
-  async queue(batch, env): Promise<void> {
-    const db = getDb(env.DB);
-    for (const message of batch.messages) {
-      const job = message.body;
-      try {
-        await executeResearch(
-          db,
-          env.AI,
-          env,
-          job.todoId,
-          job.userId,
-          job.query,
-          job.researchType,
-          job.researchId,
-          job.userLocation,
-        );
-      } catch (error) {
-        Sentry.captureException(error, {
-          tags: { area: "research-queue" },
-          extra: { researchType: job.researchType },
-        });
-        throw error;
-      }
-      message.ack();
-    }
-  },
 };
 
-export default Sentry.withSentry<Env["Bindings"], ResearchJobMessage>(
+export default Sentry.withSentry<Env["Bindings"]>(
   (env) => ({
     dsn: env.SENTRY_DSN,
     environment: env.ENVIRONMENT ?? "production",

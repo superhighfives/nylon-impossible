@@ -7,13 +7,13 @@
  * `aiEnabled` switch, and it's what the explicit "Process" action re-runs when
  * a fetch didn't land the first time.
  *
- * AI (enrich, research) is the other half, and stays opt-in and clearly
- * labelled as such — see `ai-enrich.ts`.
+ * AI enrichment is the other half, and stays opt-in and clearly labelled as
+ * such — see `ai-enrich.ts`.
  */
 
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
-import { and, eq, type getDb, inArray, isNull, todos, todoUrls } from "./db";
+import { eq, type getDb, inArray, todos, todoUrls } from "./db";
 import { notifySync } from "./notify-sync";
 import {
   extractUrlsFromText,
@@ -51,7 +51,6 @@ function normalizeUrl(url: string): string {
  *
  * `refetch` re-queues links that already have metadata — what an explicit
  * "Process" press means. Without it only links that never landed are retried.
- * Research sources are never touched: they belong to a research run.
  */
 export async function queueTodoLinks(
   db: Db,
@@ -69,7 +68,7 @@ export async function queueTodoLinks(
       position: todoUrls.position,
     })
     .from(todoUrls)
-    .where(and(eq(todoUrls.todoId, todoId), isNull(todoUrls.researchId)))
+    .where(eq(todoUrls.todoId, todoId))
     .orderBy(todoUrls.position);
 
   const seen = new Set(existing.map((row) => normalizeUrl(row.url)));
@@ -201,7 +200,7 @@ export async function applyLinkTitle(
       fetchStatus: todoUrls.fetchStatus,
     })
     .from(todoUrls)
-    .where(and(eq(todoUrls.todoId, todoId), isNull(todoUrls.researchId)))
+    .where(eq(todoUrls.todoId, todoId))
     .orderBy(todoUrls.position);
 
   // Match the placeholder to the link it was generated from, so a todo with

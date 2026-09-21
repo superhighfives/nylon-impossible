@@ -203,8 +203,9 @@ export async function importGoogleTasks(c: Context<Env>) {
   }
 
   // Enrich each imported todo the same way typed todos are. With AI on
-  // (aiEnabled) todos get full AI enrichment (research, URL metadata); with AI
-  // off they still get URL metadata so links resolve to favicons/titles.
+  // (aiEnabled) todos get full AI enrichment (title/date/recurrence/subtasks,
+  // URL metadata); with AI off they still get URL metadata so links resolve to
+  // favicons/titles.
   for (const row of rows) {
     if (useAI) {
       c.executionCtx.waitUntil(

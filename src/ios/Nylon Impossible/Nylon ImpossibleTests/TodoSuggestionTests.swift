@@ -62,7 +62,7 @@ struct TodoSuggestionTests {
         #expect(todo.recurrence?.frequency == .weekly)
     }
 
-    @Test("applyLocally is a no-op for subtasks and research suggestions")
+    @Test("applyLocally is a no-op for subtasks suggestions")
     func applyLocallyNoOpForRowCreatingTypes() {
         let todo = TodoItem(title: "Plan birthday party")
         let originalTitle = todo.title
@@ -74,13 +74,6 @@ struct TodoSuggestionTests {
             payloadTitles: ["Book venue", "Send invites"]
         )
         subtasks.applyLocally(to: todo)
-
-        let research = TodoSuggestion(
-            id: "s2", type: "research", label: "Research this",
-            status: "pending", createdAt: Date(), updatedAt: Date(),
-            payloadSearchQuery: "birthday party ideas", payloadResearchType: "general"
-        )
-        research.applyLocally(to: todo)
 
         #expect(todo.title == originalTitle)
         #expect(todo.dueDate == originalDueDate)
@@ -97,8 +90,7 @@ struct TodoSuggestionTests {
                 recurrence: nil,
                 title: nil,
                 titles: nil,
-                searchQuery: nil,
-                researchType: nil
+                searchQuery: nil
             ),
             label: "Set due date to Fri 25 Jul",
             status: "pending",

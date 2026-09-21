@@ -21,7 +21,6 @@ import {
   PinOff,
   RefreshCw,
   Repeat,
-  Sparkles,
   Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -31,7 +30,6 @@ import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
 import {
   STALE_AI_MS,
-  STALE_RESEARCH_MS,
   type useCreateTodo,
   type useDeleteTodo,
   type useUpdateTodo,
@@ -149,16 +147,14 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
 
 /**
  * Compact outline badges summarizing a completed todo's content — notes,
- * research, links — in place of the full previews shown while it's active. Keeps
+ * links — in place of the full previews shown while it's active. Keeps
  * the Completed section terse: a glance tells you what's inside, expand for more.
  */
 function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
   const hasNotes = !!todo.notes?.trim();
-  const hasResearch =
-    todo.research?.status === "completed" && !!todo.research.summary;
-  const linkCount = todo.urls?.filter((url) => !url.researchId).length ?? 0;
+  const linkCount = todo.urls?.length ?? 0;
 
-  if (!hasNotes && !hasResearch && linkCount === 0) return null;
+  if (!hasNotes && linkCount === 0) return null;
 
   const badge =
     "text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted";
@@ -169,12 +165,6 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
         <span className={badge}>
           <FileText size={10} />
           Notes
-        </span>
-      )}
-      {hasResearch && (
-        <span className={badge}>
-          <Sparkles size={10} />
-          Research
         </span>
       )}
       {linkCount > 0 && (
@@ -274,9 +264,6 @@ function TodoItemContent({
   const aiProcessing =
     (todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
     now - new Date(todo.createdAt).getTime() < STALE_AI_MS;
-  const researchPending =
-    todo.research?.status === "pending" &&
-    now - new Date(todo.research.createdAt).getTime() < STALE_RESEARCH_MS;
   const hasPendingSuggestions = todo.suggestions.some(
     (s) => s.status === "pending",
   );
@@ -292,7 +279,6 @@ function TodoItemContent({
     subtasks.length > 0 ||
     (hasNotes && !isCompleted) ||
     aiProcessing ||
-    researchPending ||
     !!todo.needsInput ||
     hasPendingSuggestions;
 
@@ -460,14 +446,6 @@ function TodoItemContent({
                     <Loader size="sm" className="text-gray-muted" />
                   </output>
                 )}
-                {researchPending && (
-                  <output
-                    className="ml-2 inline-flex items-center gap-1 align-middle text-gray-muted text-xs"
-                    aria-label="Researching"
-                  >
-                    <Loader size="sm" className="text-accent-muted" />
-                  </output>
-                )}
                 {todo.needsInput && (
                   <Button
                     variant="ghost"
@@ -511,36 +489,25 @@ function TodoItemContent({
           {isCompleted ? (
             <CompletedContentBadges todo={todo} />
           ) : (
-            <>
-              {!isExpanded &&
-                todo.research?.status === "completed" &&
-                todo.research.summary && (
-                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-pretty text-gray-muted">
-                    {todo.research.summary.replace(/\[\d+\]/g, "")}
-                  </p>
-                )}
-              {!urlOnly &&
-                todo.urls &&
-                (() => {
-                  const nonResearchUrls = todo.urls.filter(
-                    (url) => !url.researchId,
-                  );
-                  if (nonResearchUrls.length === 0) return null;
-                  const overflow = nonResearchUrls.length - 2;
-                  return (
-                    <div className="flex flex-col gap-1 mt-1.5">
-                      {nonResearchUrls.slice(0, 2).map((url) => (
-                        <UrlPreviewCard key={url.id} url={url} />
-                      ))}
-                      {overflow > 0 && (
-                        <span className="text-xs text-gray-muted">
-                          +{overflow} {overflow === 1 ? "link" : "links"}
-                        </span>
-                      )}
-                    </div>
-                  );
-                })()}
-            </>
+            !urlOnly &&
+            todo.urls &&
+            (() => {
+              const urls = todo.urls;
+              if (urls.length === 0) return null;
+              const overflow = urls.length - 2;
+              return (
+                <div className="flex flex-col gap-1 mt-1.5">
+                  {urls.slice(0, 2).map((url) => (
+                    <UrlPreviewCard key={url.id} url={url} />
+                  ))}
+                  {overflow > 0 && (
+                    <span className="text-xs text-gray-muted">
+                      +{overflow} {overflow === 1 ? "link" : "links"}
+                    </span>
+                  )}
+                </div>
+              );
+            })()
           )}
           {/* Active rows edit due date inline in the right-hand cluster; only
               completed rows keep the read-only indicators below the title. */}

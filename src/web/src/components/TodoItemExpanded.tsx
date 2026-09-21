@@ -6,7 +6,6 @@ import {
   Pin,
   PinOff,
   RefreshCw,
-  Search,
   Sparkles,
   Trash2,
   X,
@@ -16,7 +15,6 @@ import { useHints } from "@/hooks/useHints";
 import {
   useEnrichTodo,
   useProcessTodo,
-  useReresearch,
   useUpdateUrlPreview,
 } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
@@ -31,7 +29,6 @@ import type {
   TodoWithUrls,
 } from "@/types/database";
 import { ConversationSection } from "./ConversationSection";
-import { ResearchSection } from "./ResearchSection";
 import { SubtaskSection } from "./SubtaskSection";
 import { SuggestionsSection } from "./SuggestionsSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
@@ -170,19 +167,17 @@ export function TodoItemExpanded({
   const updateUrlPreview = useUpdateUrlPreview();
   const enrichTodo = useEnrichTodo();
   const processTodo = useProcessTodo();
-  const reresearch = useReresearch();
 
   // AI is intentional and gated on the aiEnabled master switch; the
-  // enrich/research actions only appear when AI is turned on for this user.
+  // enrich action only appears when AI is turned on for this user.
   const aiAvailable = user?.aiEnabled === true;
   const aiProcessing =
     todo.aiStatus === "pending" || todo.aiStatus === "processing";
   const aiFailed = todo.aiStatus === "failed";
 
-  // The todo's own links (research sources belong to a research run and are
-  // shown in its section instead). A pending one means a fetch is in flight;
-  // a failed one is what the Process action retries.
-  const links = todo.urls.filter((url) => !url.researchId);
+  // The todo's own links. A pending one means a fetch is in flight; a failed
+  // one is what the Process action retries.
+  const links = todo.urls;
   const linksProcessing = links.some((url) => url.fetchStatus === "pending");
   const failedLinkCount = links.filter(
     (url) => url.fetchStatus === "failed",
@@ -507,17 +502,6 @@ export function TodoItemExpanded({
                 {!enrichTodo.isPending && <Sparkles size={14} />}
                 Enrich
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                type="button"
-                onClick={() => reresearch.mutate(todo.id)}
-                disabled={reresearch.isPending}
-                loading={reresearch.isPending}
-              >
-                {!reresearch.isPending && <Search size={14} />}
-                Research
-              </Button>
             </div>
             {aiFailed && (
               <p className="text-sm text-red-muted">Enrichment failed.</p>
@@ -546,21 +530,10 @@ export function TodoItemExpanded({
       {/* Suggestions Section — proposed AI enrichment changes awaiting consent */}
       <SuggestionsSection todo={todo} />
 
-      {/* Research Section */}
-      {todo.research && (
-        <ResearchSection
-          todoId={todo.id}
-          research={todo.research}
-          researchUrls={todo.urls.filter(
-            (url) => url.researchId === todo.research?.id,
-          )}
-        />
-      )}
-
       {/* Conversation Section — agent questions and the user's replies */}
       <ConversationSection todo={todo} />
 
-      {/* URLs (user-provided, not research sources) */}
+      {/* URLs */}
       {links.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-gray-muted flex items-center gap-1">

@@ -38,10 +38,6 @@ struct TodoItemRow: View {
     private static let checkboxNudge: CGFloat = 4
     private static let syncDotSize: CGFloat = 6
 
-    private var nonResearchUrls: [APITodoUrl] {
-        urls.filter { $0.researchId == nil }
-    }
-
     /// The URL a title consists entirely of — a task captured as nothing but a
     /// link, whether shared in from elsewhere or typed straight into the add
     /// bar. Nil for a title that's prose, even prose containing a link.
@@ -319,14 +315,6 @@ struct TodoItemRow: View {
                             .accessibilityLabel("AI is processing")
                     }
 
-                    // Research pending indicator
-                    if !todo.isAIProcessing && todo.isResearchPending {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .tint(Color.appAccent)
-                            .accessibilityLabel("Researching")
-                    }
-
                     // Agent has a question awaiting the user's reply
                     if todo.needsInput {
                         Image(systemName: "bubble.left.fill")
@@ -392,19 +380,19 @@ struct TodoItemRow: View {
                         .font(.system(size: 12))
                         .foregroundStyle(Color.appSubtle)
 
-                    // Full note/research/link previews collapse to compact
-                    // outline badges once done. Matches web.
-                    CompletedContentBadges(todo: todo, linkCount: nonResearchUrls.count)
-                } else if !nonResearchUrls.isEmpty {
-                    // URL cards (compact) — hide research URLs, limit to 2 visible
+                    // Full note/link previews collapse to compact outline
+                    // badges once done. Matches web.
+                    CompletedContentBadges(todo: todo, linkCount: urls.count)
+                } else if !urls.isEmpty {
+                    // URL cards (compact), limit to 2 visible
                     FlowLayout(spacing: 6) {
-                        ForEach(Array(nonResearchUrls.prefix(2))) { url in
+                        ForEach(Array(urls.prefix(2))) { url in
                             UrlRowCompact(url: url)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    if nonResearchUrls.count > 2 {
-                        Text("+\(nonResearchUrls.count - 2) \(nonResearchUrls.count - 2 == 1 ? "link" : "links")")
+                    if urls.count > 2 {
+                        Text("+\(urls.count - 2) \(urls.count - 2 == 1 ? "link" : "links")")
                             .font(.system(size: 12))
                             .foregroundStyle(Color.appSubtle)
                     }
@@ -468,9 +456,9 @@ struct TodoItemRow: View {
 
 }
 
-/// Outline badges summarizing a completed todo's content — notes, research,
-/// links — in place of the full previews shown while it's active. Mirrors
-/// web's `CompletedContentBadges`.
+/// Outline badges summarizing a completed todo's content — notes, links — in
+/// place of the full previews shown while it's active. Mirrors web's
+/// `CompletedContentBadges`.
 private struct CompletedContentBadges: View {
     let todo: TodoItem
     let linkCount: Int
@@ -479,15 +467,10 @@ private struct CompletedContentBadges: View {
         let hasNotes = !(todo.itemNotes?
             .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
             .isEmpty ?? true)
-        let hasResearch = todo.researchStatus == "completed"
-            && !(todo.researchSummary?.isEmpty ?? true)
-        if hasNotes || hasResearch || linkCount > 0 {
+        if hasNotes || linkCount > 0 {
             FlowLayout(spacing: 6) {
                 if hasNotes {
                     badge("Notes", systemImage: "doc.text")
-                }
-                if hasResearch {
-                    badge("Research", systemImage: "sparkles")
                 }
                 if linkCount > 0 {
                     badge(
@@ -538,10 +521,8 @@ private struct CompletedContentBadges: View {
             )
             TodoItemRow(
                 todo: {
-                    let item = TodoItem(title: "Research dogs")
+                    let item = TodoItem(title: "Look into dog breeds")
                     item.isCompleted = true
-                    item.researchStatus = "completed"
-                    item.researchSummary = "Domestic dogs evolved from wolves…"
                     item.itemNotes = "Follow up on breed groups"
                     return item
                 }(),

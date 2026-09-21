@@ -12,14 +12,13 @@ import SwiftUI
 enum AICreateOption {
     case plain
     case enrich
-    case research
 }
 
 struct AddTaskInputView: View {
     @Binding var text: String
     var canAdd: Bool
     // When true (aiEnabled), the add button becomes a split button whose
-    // long-press menu offers enrich / research. A plain tap always adds with no AI.
+    // long-press menu offers enrich. A plain tap always adds with no AI.
     var aiAvailable: Bool = false
     // The selected list's `promptPhrase` ("today", "this week", "sometime"),
     // folded into the placeholder so the field also says which list you're
@@ -112,7 +111,7 @@ struct AddTaskInputView: View {
     }
 
     /// The add affordance. With AI available it's a split button: a plain tap
-    /// adds with no AI (primaryAction), a long-press opens enrich / research.
+    /// adds with no AI (primaryAction), a long-press opens enrich.
     /// Otherwise it's a plain add button.
     @ViewBuilder
     private var addButton: some View {
@@ -123,12 +122,6 @@ struct AddTaskInputView: View {
                     isFocused = false
                 } label: {
                     Label("Add + enrich", systemImage: "sparkles")
-                }
-                Button {
-                    onAdd(.research)
-                    isFocused = false
-                } label: {
-                    Label("Add + research", systemImage: "magnifyingglass")
                 }
             } label: {
                 addButtonLabel

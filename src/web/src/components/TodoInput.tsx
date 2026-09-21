@@ -1,5 +1,5 @@
 import { Menu as BaseMenu } from "@base-ui/react/menu";
-import { ChevronDown, Plus, Search, Sparkles } from "lucide-react";
+import { ChevronDown, Plus, Sparkles } from "lucide-react";
 import { type Ref, useState } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
@@ -25,7 +25,7 @@ export function TodoInput({
   // menu only appears when AI is on, so AI-off users see a plain Add button.
   const aiAvailable = user?.aiEnabled === true;
 
-  const submit = (opts: { enrich?: boolean; research?: boolean } = {}) => {
+  const submit = (opts: { enrich?: boolean } = {}) => {
     if (!trimmed || smartCreate.isPending) return;
     smartCreate.mutate(
       { text: trimmed, ...opts },
@@ -105,13 +105,6 @@ export function TodoInput({
                   >
                     <Sparkles size={14} />
                     Add + enrich
-                  </BaseMenu.Item>
-                  <BaseMenu.Item
-                    className={`${menuItemBase} text-gray`}
-                    onClick={() => submit({ research: true })}
-                  >
-                    <Search size={14} />
-                    Add + research
                   </BaseMenu.Item>
                 </BaseMenu.Popup>
               </BaseMenu.Positioner>

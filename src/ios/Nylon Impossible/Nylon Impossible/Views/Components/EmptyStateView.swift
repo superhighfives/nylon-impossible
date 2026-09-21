@@ -10,7 +10,7 @@ import SwiftUI
 struct EmptyStateView: View {
     var icon: String = "tray"
     var title: String = "Nothing to do yet"
-    var message: String = "Add a todo below to get started. Try “Buy groceries tomorrow” or paste a link to research."
+    var message: String = "Add a todo below to get started. Try “Buy groceries tomorrow” or paste a link."
 
     @State private var appeared = false
 

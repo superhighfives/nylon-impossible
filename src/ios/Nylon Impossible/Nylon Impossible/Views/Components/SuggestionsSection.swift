@@ -10,8 +10,8 @@ import SwiftUI
 
 /// Shows the agent's proposed enrichment changes as single-tap buttons the
 /// user accepts or dismisses. Accept applies the field locally first (where
-/// it maps onto a single todo field), so it survives offline; subtasks and
-/// research reconcile via the next sync.
+/// it maps onto a single todo field), so it survives offline; subtasks
+/// reconcile via the next sync.
 struct SuggestionsSection: View {
     let todo: TodoItem
     let apiService: APIService?

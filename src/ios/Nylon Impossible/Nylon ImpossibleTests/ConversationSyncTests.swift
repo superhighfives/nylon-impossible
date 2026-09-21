@@ -31,7 +31,6 @@ struct ConversationSyncTests {
             createdAt: updatedAt,
             updatedAt: updatedAt,
             urls: nil,
-            research: nil,
             messages: messages
         )
     }

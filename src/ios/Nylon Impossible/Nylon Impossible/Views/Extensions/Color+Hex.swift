@@ -53,10 +53,10 @@ extension Color {
     // same on iOS as they do on web.
     static let appBrandForeground = Color(hex: "#473B1F")
 
-    // Accent — used for research/citation/AI-question markers. The brand
-    // yellow reads well on dark surfaces but is too pale for text/icons on a
-    // light background, so light mode falls back to Radix yellow step 11
-    // (web's text-accent-muted) for contrast.
+    // Accent — used for AI-question/suggestion markers and other accent
+    // details. The brand yellow reads well on dark surfaces but is too pale
+    // for text/icons on a light background, so light mode falls back to
+    // Radix yellow step 11 (web's text-accent-muted) for contrast.
     static let appAccent = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(Color(hex: "#FFE629")) // yellow-9 / yellowdark-9

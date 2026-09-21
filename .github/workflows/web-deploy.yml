@@ -128,8 +128,8 @@ jobs:
   # Per-branch preview via Cloudflare Worker Previews (private beta). Replaces
   # the old fully-isolated per-PR stack: no config rewriting, no per-PR queue,
   # no custom domains, and no close-triggered cleanup — stale previews are
-  # auto-evicted by the platform. Previews share prod D1; the research queue
-  # consumer and hourly cron only ever run on production, never on a preview. See
+  # auto-evicted by the platform. Previews share prod D1; the hourly cron only
+  # ever runs on production, never on a preview. See
   # plans/in-progress/2026-08-13-migrate-pr-previews-to-worker-previews.md.
   #
   # Preview secrets are seeded by this job (see the "Set preview API/Web
@@ -246,9 +246,6 @@ jobs:
           printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
           printf '%s' "$CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler preview secret put CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
           printf '%s' "$CLOUDFLARE_API_TOKEN" | pnpm exec wrangler preview secret put CLOUDFLARE_API_TOKEN --name "$PREVIEW_NAME"
-          if [ -n "$TAVILY_API_KEY" ]; then
-            printf '%s' "$TAVILY_API_KEY" | pnpm exec wrangler preview secret put TAVILY_API_KEY --name "$PREVIEW_NAME"
-          fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -260,7 +257,6 @@ jobs:
           # the values differ. Same dev keys the marketing workflow already uses.
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
-          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
 
       - name: Build preview Web
         run: pnpm --filter @nylon-impossible/web run build

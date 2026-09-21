@@ -293,7 +293,6 @@ private func previewSocialUrl(
     APITodoUrl(
         id: id,
         todoId: "todo1",
-        researchId: nil,
         url: url,
         title: "Boris Cherny (@bcherny) on X",
         description: description,

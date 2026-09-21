@@ -1,12 +1,3 @@
-export interface ResearchJobMessage {
-  todoId: string;
-  userId: string;
-  query: string;
-  researchType: "general" | "location";
-  researchId: string;
-  userLocation?: string | null;
-}
-
 /**
  * Verified claims from a Google-signed ID token carried on requests from the
  * Gmail add-on. Only the fields we rely on are typed; `sub` and `email`
@@ -26,7 +17,6 @@ export type Env = {
     AI: Ai;
     DB: D1Database;
     USER_SYNC: DurableObjectNamespace;
-    RESEARCH_QUEUE: Queue<ResearchJobMessage>;
     CLERK_SECRET_KEY: string;
     CLERK_PUBLISHABLE_KEY: string;
     CLERK_WEBHOOK_SECRET?: string;
@@ -34,7 +24,6 @@ export type Env = {
     ENVIRONMENT?: string;
     CF_AI_GATEWAY_ID?: string;
     LOG_AI_DEBUG?: string;
-    TAVILY_API_KEY?: string;
     // Target audience the Gmail add-on's Google-signed ID tokens must carry in
     // their `aud` claim — the add-on endpoint URL configured in Google Cloud.
     // Public (not a secret); set in wrangler.jsonc. verifyGoogleIdToken fails

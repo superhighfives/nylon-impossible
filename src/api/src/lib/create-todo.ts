@@ -2,20 +2,10 @@ import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { enrichOrAskWithAI } from "./ai-enrich";
-import {
-  and,
-  eq,
-  type getDb,
-  isNull,
-  todoResearch,
-  todos,
-  todoUrls,
-  users,
-} from "./db";
+import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 import { finishTodoLinks } from "./process-todo";
-import { sendResearchJob } from "./research";
 import {
   cleanUrlString,
   createFallbackFromUrl,
@@ -102,10 +92,8 @@ function createInitialTodo(text: string): {
 export interface CreateSmartTodoOptions {
   /** Master AI switch for the user (from `users.aiEnabled`). */
   aiEnabled: boolean;
-  /** Run the enrichment model (which may in turn trigger research). */
+  /** Run the enrichment model. */
   enrich?: boolean;
-  /** Run research directly (independent of the enrichment model). */
-  research?: boolean;
   /**
    * Extra URLs to attach beyond those parsed from `text` — e.g. a link the
    * caller wants fetched for metadata. Deduped against parsed URLs; never
@@ -160,7 +148,7 @@ export class InvalidParentTodoError extends Error {
  * handler and the Gmail add-on. Given a resolved `userId` and free text, it
  * creates a todo (prepended to its list —
  * the user's top-level list, or a parent's subtasks when `parentId` is set),
- * extracts + attaches URLs, optionally kicks off AI enrichment / research in
+ * extracts + attaches URLs, optionally kicks off AI enrichment in
  * the background, and pokes connected clients to sync. Keeping this in one
  * place means AI/Pro gating, URL handling, positioning, and `notifySync`
  * behave identically everywhere.
@@ -178,10 +166,6 @@ export async function createSmartTodo(
   // only while the user's `aiEnabled` master switch is on. Plan does not gate
   // AI — it's available to anyone with AI turned on.
   const useAI = options.enrich === true && options.aiEnabled;
-  // Explicit research runs independently of the enrichment model's own
-  // detection. When enrich is also requested, let enrichment decide (it can
-  // trigger research itself) so we don't double-run.
-  const doResearch = options.research === true && options.aiEnabled && !useAI;
 
   const parentId = options.parentId ?? null;
   // Subtasks are implicitly scoped to their parent's list. Top-level todos
@@ -317,39 +301,6 @@ export async function createSmartTodo(
     options.waitUntil(
       enrichOrAskWithAI(db, env.AI, env, todoId, userId, trimmed),
     );
-  }
-
-  // Explicit research requested at creation (without enrich): create a pending
-  // research record and enqueue it directly, using the todo title as the query.
-  if (doResearch) {
-    const researchId = crypto.randomUUID();
-    await db.insert(todoResearch).values({
-      id: researchId,
-      todoId,
-      researchType: "general",
-      status: "pending",
-      searchQuery: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    const user = await db
-      .select({ location: users.location })
-      .from(users)
-      .where(eq(users.id, userId))
-      .then((rows) => rows[0]);
-
-    // A send failure (e.g. queue backpressure/quota) must not 500 the whole
-    // create request — the todo itself was already inserted. Mark the
-    // just-created research record failed instead.
-    await sendResearchJob(db, env.RESEARCH_QUEUE, {
-      todoId,
-      userId,
-      query: initial.title,
-      researchType: "general",
-      researchId,
-      userLocation: user?.location ?? null,
-    });
   }
 
   // Fetch the created todo to return

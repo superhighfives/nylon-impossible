@@ -19,14 +19,12 @@ export type SuggestionType =
   | "due_date"
   | "recurrence"
   | "title"
-  | "subtasks"
-  | "research";
+  | "subtasks";
 export type SuggestionPayload =
   | { dueDate: string }
   | { recurrence: Recurrence }
   | { title: string }
-  | { titles: string[] }
-  | { searchQuery: string | null; researchType: "general" | "location" };
+  | { titles: string[] };
 
 // Users table
 export const users = sqliteTable(
@@ -40,7 +38,7 @@ export const users = sqliteTable(
     plan: text("plan", { enum: ["free", "pro"] })
       .notNull()
       .default("free"),
-    location: text("location"), // Used to bias location research queries
+    location: text("location"),
     // Appearance preference, synced across devices. "system" follows the OS.
     theme: text("theme", { enum: ["light", "dark", "system"] })
       .notNull()
@@ -245,44 +243,6 @@ export const lists = sqliteTable(
   ],
 );
 
-// Todo research results
-export const todoResearch = sqliteTable(
-  "todo_research",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    todoId: text("todo_id")
-      .notNull()
-      .unique()
-      .references(() => todos.id, { onDelete: "cascade" }),
-    status: text("status", {
-      enum: ["pending", "completed", "failed"],
-    })
-      .notNull()
-      .default("pending"),
-    researchType: text("research_type", {
-      enum: ["general", "location"],
-    })
-      .notNull()
-      .default("general"),
-    summary: text("summary"),
-    searchQuery: text("search_query"),
-    researchedAt: integer("researched_at", { mode: "timestamp" }),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer("updated_at", { mode: "timestamp" })
-      .notNull()
-      .default(sql`(unixepoch())`)
-      .$onUpdate(() => new Date()),
-  },
-  (table) => [
-    index("idx_todo_research_todo_id").on(table.todoId),
-    index("idx_todo_research_status").on(table.status),
-  ],
-);
-
 // Todo URLs with fetched metadata
 export const todoUrls = sqliteTable(
   "todo_urls",
@@ -293,9 +253,6 @@ export const todoUrls = sqliteTable(
     todoId: text("todo_id")
       .notNull()
       .references(() => todos.id, { onDelete: "cascade" }),
-    researchId: text("research_id").references(() => todoResearch.id, {
-      onDelete: "cascade",
-    }), // If set, this URL is a research source
     url: text("url").notNull(),
     title: text("title"),
     description: text("description"),
@@ -323,10 +280,7 @@ export const todoUrls = sqliteTable(
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
   },
-  (table) => [
-    index("idx_todo_urls_todo").on(table.todoId),
-    index("idx_todo_urls_research_id").on(table.researchId),
-  ],
+  (table) => [index("idx_todo_urls_todo").on(table.todoId)],
 );
 
 // AI enrichment proposals for a todo. Server-authoritative: enrichment inserts
@@ -344,7 +298,7 @@ export const todoSuggestions = sqliteTable(
       .notNull()
       .references(() => todos.id, { onDelete: "cascade" }),
     type: text("type", {
-      enum: ["due_date", "recurrence", "title", "subtasks", "research"],
+      enum: ["due_date", "recurrence", "title", "subtasks"],
     }).$type<SuggestionType>().notNull(),
     // JSON payload of the proposed value, e.g. {"dueDate":"2026-07-25"},
     // {"titles":["...","..."]}. Shape depends on `type`.
@@ -396,7 +350,6 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
     references: [lists.id],
   }),
   todoUrls: many(todoUrls),
-  research: one(todoResearch),
   messages: many(todoMessages),
   suggestions: many(todoSuggestions),
 }));
@@ -426,25 +379,10 @@ export const listsRelations = relations(lists, ({ one, many }) => ({
   todos: many(todos),
 }));
 
-export const todoResearchRelations = relations(
-  todoResearch,
-  ({ one, many }) => ({
-    todo: one(todos, {
-      fields: [todoResearch.todoId],
-      references: [todos.id],
-    }),
-    urls: many(todoUrls),
-  }),
-);
-
 export const todoUrlsRelations = relations(todoUrls, ({ one }) => ({
   todo: one(todos, {
     fields: [todoUrls.todoId],
     references: [todos.id],
-  }),
-  research: one(todoResearch, {
-    fields: [todoUrls.researchId],
-    references: [todoResearch.id],
   }),
 }));
 
@@ -455,8 +393,6 @@ export type Todo = typeof todos.$inferSelect;
 export type NewTodo = typeof todos.$inferInsert;
 export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
-export type TodoResearch = typeof todoResearch.$inferSelect;
-export type NewTodoResearch = typeof todoResearch.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
 export type TodoMessage = typeof todoMessages.$inferSelect;
