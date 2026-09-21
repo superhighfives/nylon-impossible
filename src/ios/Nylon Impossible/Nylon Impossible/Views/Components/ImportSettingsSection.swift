@@ -74,7 +74,7 @@ struct ImportSettingsSection: View {
             Text("Import")
         } footer: {
             if googleTasksReady {
-                Text("Bring across open tasks from your Google Tasks “My Tasks” list, with due dates and link research. Already-imported tasks are skipped, so it's safe to run again.")
+                Text("Bring across open tasks from your Google Tasks “My Tasks” list, with due dates and link previews. Already-imported tasks are skipped, so it's safe to run again.")
             } else {
                 Text("Connect your Google account to import open tasks from Google Tasks. We only request read-only access to your tasks.")
             }

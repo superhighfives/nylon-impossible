@@ -165,7 +165,6 @@ export async function cleanDb() {
   await env.DB.exec("DELETE FROM todo_messages");
   await env.DB.exec("DELETE FROM todo_suggestions");
   await env.DB.exec("DELETE FROM todo_urls");
-  await env.DB.exec("DELETE FROM todo_research");
   await env.DB.exec("DELETE FROM todos");
   await env.DB.exec("DELETE FROM lists");
   await env.DB.exec("DELETE FROM gmail_addon_links");

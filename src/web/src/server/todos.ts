@@ -17,20 +17,8 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import { getSystemListId, verifyListOwnership } from "@/lib/lists";
-import type {
-  Todo,
-  TodoMessage,
-  TodoResearch,
-  TodoSuggestion,
-  TodoUrl,
-} from "@/lib/schema";
-import {
-  todoMessages,
-  todoResearch,
-  todoSuggestions,
-  todos,
-  todoUrls,
-} from "@/lib/schema";
+import type { Todo, TodoMessage, TodoSuggestion, TodoUrl } from "@/lib/schema";
+import { todoMessages, todoSuggestions, todos, todoUrls } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import {
   createTodoSchema,
@@ -39,7 +27,6 @@ import {
 } from "@/lib/validation";
 import type {
   CreateTodoInput,
-  SerializedResearch,
   SerializedTodoMessage,
   SerializedTodoSuggestion,
   SerializedTodoUrl,
@@ -52,7 +39,6 @@ function serializeUrl(url: TodoUrl): SerializedTodoUrl {
   return {
     id: url.id,
     todoId: url.todoId,
-    researchId: url.researchId,
     url: url.url,
     title: url.title,
     description: url.description,
@@ -65,18 +51,6 @@ function serializeUrl(url: TodoUrl): SerializedTodoUrl {
     fetchedAt: url.fetchedAt?.toISOString() ?? null,
     createdAt: url.createdAt.toISOString(),
     updatedAt: url.updatedAt.toISOString(),
-  };
-}
-
-/** Serialize research data for JSON response */
-function serializeResearch(research: TodoResearch): SerializedResearch {
-  return {
-    id: research.id,
-    status: research.status,
-    researchType: research.researchType,
-    summary: research.summary,
-    researchedAt: research.researchedAt?.toISOString() ?? null,
-    createdAt: research.createdAt.toISOString(),
   };
 }
 
@@ -108,11 +82,10 @@ function serializeSuggestion(
   };
 }
 
-/** Serialize a todo with URLs, research, messages and suggestions for JSON response */
+/** Serialize a todo with URLs, messages and suggestions for JSON response */
 function serializeTodoWithUrls(
   todo: Todo,
   urls: TodoUrl[],
-  research: TodoResearch | null,
   messages: TodoMessage[] = [],
   suggestions: TodoSuggestion[] = [],
 ): TodoWithUrls {
@@ -133,7 +106,6 @@ function serializeTodoWithUrls(
     sticky: todo.sticky,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
-    research: research ? serializeResearch(research) : null,
     messages: messages.map(serializeMessage),
     urls: urls.map(serializeUrl),
     suggestions: suggestions.map(serializeSuggestion),
@@ -161,10 +133,9 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
           }),
       });
 
-      // Fetch all URLs and research for the user's todos
+      // Fetch all URLs, messages and suggestions for the user's todos
       const todoIds = userTodos.map((t) => t.id);
       let allUrls: TodoUrl[] = [];
-      let allResearch: TodoResearch[] = [];
       let allMessages: TodoMessage[] = [];
       let allSuggestions: TodoSuggestion[] = [];
       if (todoIds.length > 0) {
@@ -173,54 +144,44 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         // (urls by position, messages/suggestions by createdAt) is preserved
         // once results are grouped by todoId below.
         const idBatches = chunkForD1(todoIds);
-        const [urls, research, messages, suggestions] =
-          yield* Effect.tryPromise({
-            try: () =>
-              Promise.all([
-                Promise.all(
-                  idBatches.map((ids) =>
-                    db
-                      .select()
-                      .from(todoUrls)
-                      .where(inArray(todoUrls.todoId, ids))
-                      .orderBy(asc(todoUrls.position)),
-                  ),
-                ).then((batches) => batches.flat()),
-                Promise.all(
-                  idBatches.map((ids) =>
-                    db
-                      .select()
-                      .from(todoResearch)
-                      .where(inArray(todoResearch.todoId, ids)),
-                  ),
-                ).then((batches) => batches.flat()),
-                Promise.all(
-                  idBatches.map((ids) =>
-                    db
-                      .select()
-                      .from(todoMessages)
-                      .where(inArray(todoMessages.todoId, ids))
-                      .orderBy(asc(todoMessages.createdAt)),
-                  ),
-                ).then((batches) => batches.flat()),
-                Promise.all(
-                  idBatches.map((ids) =>
-                    db
-                      .select()
-                      .from(todoSuggestions)
-                      .where(inArray(todoSuggestions.todoId, ids))
-                      .orderBy(asc(todoSuggestions.createdAt)),
-                  ),
-                ).then((batches) => batches.flat()),
-              ]),
-            catch: (error) =>
-              new DatabaseError({
-                operation: "getTodoUrlsAndResearch",
-                cause: error,
-              }),
-          });
+        const [urls, messages, suggestions] = yield* Effect.tryPromise({
+          try: () =>
+            Promise.all([
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoUrls)
+                    .where(inArray(todoUrls.todoId, ids))
+                    .orderBy(asc(todoUrls.position)),
+                ),
+              ).then((batches) => batches.flat()),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoMessages)
+                    .where(inArray(todoMessages.todoId, ids))
+                    .orderBy(asc(todoMessages.createdAt)),
+                ),
+              ).then((batches) => batches.flat()),
+              Promise.all(
+                idBatches.map((ids) =>
+                  db
+                    .select()
+                    .from(todoSuggestions)
+                    .where(inArray(todoSuggestions.todoId, ids))
+                    .orderBy(asc(todoSuggestions.createdAt)),
+                ),
+              ).then((batches) => batches.flat()),
+            ]),
+          catch: (error) =>
+            new DatabaseError({
+              operation: "getTodoUrls",
+              cause: error,
+            }),
+        });
         allUrls = urls;
-        allResearch = research;
         allMessages = messages;
         allSuggestions = suggestions;
       }
@@ -231,12 +192,6 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         const existing = urlsByTodoId.get(url.todoId) ?? [];
         existing.push(url);
         urlsByTodoId.set(url.todoId, existing);
-      }
-
-      // Index research by todoId
-      const researchByTodoId = new Map<string, TodoResearch>();
-      for (const research of allResearch) {
-        researchByTodoId.set(research.todoId, research);
       }
 
       // Group messages by todoId (already ordered by createdAt asc)
@@ -259,12 +214,11 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
         `Fetched ${userTodos.length} todos for user ${user.id}`,
       );
 
-      // Return todos with their URLs, research, messages and suggestions
+      // Return todos with their URLs, messages and suggestions
       return userTodos.map((todo) =>
         serializeTodoWithUrls(
           todo,
           urlsByTodoId.get(todo.id) ?? [],
-          researchByTodoId.get(todo.id) ?? null,
           messagesByTodoId.get(todo.id) ?? [],
           suggestionsByTodoId.get(todo.id) ?? [],
         ),

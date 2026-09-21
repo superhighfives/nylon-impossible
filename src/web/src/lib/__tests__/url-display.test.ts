@@ -11,7 +11,6 @@ function makeUrl(overrides?: Partial<SerializedTodoUrl>): SerializedTodoUrl {
   return {
     id: "u1",
     todoId: "t1",
-    researchId: null,
     url: "https://example.com/post",
     title: null,
     description: null,
@@ -101,7 +100,7 @@ describe("getUrlOnlyUrl", () => {
     ).toBeNull();
   });
 
-  it("returns null with zero or multiple non-research links", () => {
+  it("returns null with zero or multiple links", () => {
     expect(
       getUrlOnlyUrl({ title: "Check interfacecraft.dev", urls: [] }),
     ).toBeNull();
@@ -111,16 +110,6 @@ describe("getUrlOnlyUrl", () => {
         urls: [url, makeUrl({ id: "u2", url: "https://example.com" })],
       }),
     ).toBeNull();
-  });
-
-  it("ignores research-source URLs when counting links", () => {
-    const research = makeUrl({ id: "r", researchId: "res1" });
-    expect(
-      getUrlOnlyUrl({
-        title: "Check interfacecraft.dev",
-        urls: [url, research],
-      }),
-    ).toBe(url);
   });
 });
 

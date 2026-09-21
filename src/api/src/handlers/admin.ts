@@ -8,7 +8,6 @@ import {
   lt,
   sql,
   todoMessages,
-  todoResearch,
   todos,
   users,
 } from "../lib/db";
@@ -108,12 +107,6 @@ export async function getUser(c: Context<Env>) {
     .innerJoin(todos, eq(todoMessages.todoId, todos.id))
     .where(eq(todos.userId, id));
 
-  const [researchCountRow] = await db
-    .select({ value: count() })
-    .from(todoResearch)
-    .innerJoin(todos, eq(todoResearch.todoId, todos.id))
-    .where(eq(todos.userId, id));
-
   const lastTodo = await db
     .select({ updatedAt: todos.updatedAt })
     .from(todos)
@@ -133,7 +126,6 @@ export async function getUser(c: Context<Env>) {
     diagnostics: {
       todoCount: todoCountRow?.value ?? 0,
       messageCount: messageCountRow?.value ?? 0,
-      researchCount: researchCountRow?.value ?? 0,
       lastTodoUpdatedAt: lastTodo?.updatedAt.toISOString() ?? null,
     },
   });

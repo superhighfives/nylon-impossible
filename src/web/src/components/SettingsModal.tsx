@@ -325,15 +325,15 @@ export function SettingsModal({ origin }: { origin: string }) {
                   </LayerCard.Secondary>
                   <LayerCard.Primary>
                     <p className="text-xs text-gray-muted">
-                      When enabled, AI helps enrich todos by doing research
-                      tasks, pulling out metadata, and finding locations.
+                      When enabled, AI helps enrich todos by pulling out
+                      metadata and finding locations.
                     </p>
-                    {/* Location only feeds AI location research, so it shows
+                    {/* Location only feeds AI location handling, so it shows
                         once AI is enabled. */}
                     {aiEnabled && (
                       <Field
                         label="Your location"
-                        description="Used to find local venues when researching location todos."
+                        description="Used to find local venues for location-based todos."
                         className="pt-1"
                       >
                         <Input
@@ -386,7 +386,7 @@ export function SettingsModal({ origin }: { origin: string }) {
                       <>
                         <p className="text-xs text-gray-muted">
                           Bring across open tasks from your Google Tasks “My
-                          Tasks” list, with due dates and link research.
+                          Tasks” list, with due dates and links.
                         </p>
                         <Button
                           variant="outline"

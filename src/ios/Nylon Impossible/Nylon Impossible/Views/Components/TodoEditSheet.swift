@@ -35,9 +35,7 @@ struct TodoEditSheet: View {
     @State private var sticky: Bool
     @State private var selectedListId: String?
     @State private var urls: [APITodoUrl] = []
-    @State private var research: APIResearch?
     @State private var isLoadingUrls: Bool = false
-    @State private var isReresearching: Bool = false
     @State private var isEnriching: Bool = false
     @State private var isProcessing: Bool = false
     @State private var processMessage: String?
@@ -76,20 +74,6 @@ struct TodoEditSheet: View {
         _sticky = State(initialValue: todo.sticky)
         _selectedListId = State(initialValue: todo.listKey?.lowercased())
         _urls = State(initialValue: initialUrls)
-        let initialResearch: APIResearch?
-        if let researchId = todo.researchId {
-            initialResearch = APIResearch(
-                id: researchId,
-                status: todo.researchStatus ?? "pending",
-                researchType: todo.researchType ?? "general",
-                summary: todo.researchSummary,
-                researchedAt: todo.researchedAt,
-                createdAt: todo.researchCreatedAt ?? Date()
-            )
-        } else {
-            initialResearch = nil
-        }
-        _research = State(initialValue: initialResearch)
     }
     
     var body: some View {
@@ -201,36 +185,24 @@ struct TodoEditSheet: View {
                     onProcess: { Task { await processLinks() } }
                 )
 
-                // AI actions — explicit, opt-in enrich / research (nothing runs
+                // AI actions — explicit, opt-in enrich (nothing runs
                 // automatically). Gated on the aiEnabled master switch.
                 if preferencesService.aiEnabled {
                     AIActionsSection(
                         isEnriching: isEnriching,
-                        isReresearching: isReresearching,
-                        onEnrich: { Task { await enrichTodo() } },
-                        onResearch: { Task { await reresearch() } }
+                        onEnrich: { Task { await enrichTodo() } }
                     )
                 }
 
                 // Suggestions — proposed AI enrichment changes awaiting consent
                 SuggestionsSection(todo: todo, apiService: apiService)
 
-                // Research
-                if let research {
-                    ResearchSection(
-                        research: research,
-                        researchUrls: urls.filter { $0.researchId != nil },
-                        onReresearch: { await reresearch() },
-                        onCancelResearch: { await cancelResearch() }
-                    )
-                }
-
                 // Conversation — agent questions and the user's replies
                 ConversationSection(todo: todo, apiService: apiService)
 
-                // Links (non-research URLs only)
+                // Links
                 LinksSection(
-                    regularUrls: urls.filter { $0.researchId == nil },
+                    regularUrls: urls,
                     isLoading: isLoadingUrls && urls.isEmpty,
                     failedCount: failedLinkCount,
                     isRetrying: isProcessing || hasPendingLinks,
@@ -299,24 +271,6 @@ struct TodoEditSheet: View {
         return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
     }
     
-    private func reresearch() async {
-        guard let apiService else { return }
-        isReresearching = true
-        defer { isReresearching = false }
-        do {
-            try await apiService.reresearch(todoId: todo.id.uuidString.lowercased())
-            // Mark research as pending again immediately for responsive UI
-            research = research.map { APIResearch(
-                id: $0.id, status: "pending", researchType: $0.researchType,
-                summary: $0.summary, researchedAt: $0.researchedAt, createdAt: Date()
-            )}
-            // Reload todo detail to pick up new research record
-            await loadUrls()
-        } catch {
-            print("[Research] Re-research error: \(error)")
-        }
-    }
-
     private func enrichTodo() async {
         guard let apiService else { return }
         isEnriching = true
@@ -324,16 +278,16 @@ struct TodoEditSheet: View {
         do {
             try await apiService.enrich(todoId: todo.id.uuidString.lowercased())
             // Enrichment runs in the background server-side; the enriched fields
-            // arrive via the next sync. Reload detail to pick up any research.
+            // arrive via the next sync. Reload detail to pick up any changes.
             await loadUrls()
         } catch {
             print("[AI] Enrich error: \(error)")
         }
     }
 
-    /// The todo's own links — research sources belong to the research section.
+    /// The todo's own links.
     private var regularLinks: [APITodoUrl] {
-        urls.filter { $0.researchId == nil }
+        urls
     }
 
     private var hasPendingLinks: Bool {
@@ -375,29 +329,14 @@ struct TodoEditSheet: View {
         }
     }
 
-    private func cancelResearch() async {
-        guard let apiService else { return }
-        do {
-            try await apiService.cancelResearch(todoId: todo.id.uuidString.lowercased())
-        } catch {
-            print("[Research] Cancel research error: \(error)")
-        }
-        await loadUrls()
-    }
-
     private func loadUrls() async {
         guard let apiService = apiService else { return }
 
-        // Fetch if this is the first load (no URLs yet, or research exists but its
-        // source URLs haven't arrived yet), or if there are pending items to resolve.
+        // Fetch if this is the first load (no URLs yet), or if there are
+        // pending items to resolve.
         let hasPendingUrls = urls.contains(where: { $0.fetchStatus == .pending })
-        let hasPendingResearch = research?.status == "pending"
-        let needsInitialLoad: Bool = urls.isEmpty || {
-            guard let researchId = research?.id else { return false }
-            return !urls.contains(where: { $0.researchId == researchId })
-        }()
-        guard needsInitialLoad || hasPendingUrls || hasPendingResearch
-            || isReresearching || isProcessing else { return }
+        let needsInitialLoad = urls.isEmpty
+        guard needsInitialLoad || hasPendingUrls || isProcessing else { return }
 
         isLoadingUrls = true
         defer { isLoadingUrls = false }
@@ -405,9 +344,8 @@ struct TodoEditSheet: View {
         do {
             let todoWithUrls = try await apiService.getTodo(id: todo.id)
             urls = todoWithUrls.urls
-            research = todoWithUrls.research
         } catch {
-            // Silently fail - URLs and research are supplementary info
+            // Silently fail - URLs are supplementary info
             print("Failed to load todo detail: \(error)")
         }
     }
@@ -671,14 +609,12 @@ private struct TaskActionsSection: View {
     }
 }
 
-/// Explicit, opt-in AI actions for a todo — enrich and research. AI never runs
+/// Explicit, opt-in AI action for a todo — enrich. AI never runs
 /// automatically; this is the deliberate per-todo affordance (Pro + aiEnabled,
 /// gated by the caller).
 private struct AIActionsSection: View {
     let isEnriching: Bool
-    let isReresearching: Bool
     let onEnrich: () -> Void
-    let onResearch: () -> Void
 
     var body: some View {
         Section {
@@ -686,17 +622,13 @@ private struct AIActionsSection: View {
                 Label("Enrich", systemImage: "sparkles")
             }
             .disabled(isEnriching)
-            Button(action: onResearch) {
-                Label("Research", systemImage: "magnifyingglass")
-            }
-            .disabled(isReresearching)
         } header: {
             Text("AI")
         }
     }
 }
 
-/// Non-research URL links attached to a todo, or a loading state before the
+/// URL links attached to a todo, or a loading state before the
 /// first fetch resolves.
 private struct LinksSection: View {
     let regularUrls: [APITodoUrl]

@@ -454,7 +454,6 @@ struct SyncServiceTests {
                 urls: [APITodoUrl(
                     id: "url-id-1",
                     todoId: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
-                    researchId: nil,
                     url: "https://example.com",
                     title: "Example",
                     description: nil,
@@ -642,31 +641,6 @@ struct SyncServiceTests {
         #expect(todo.isAIProcessing == true)
     }
 
-    @Test("Fires a pending research once the todo has synced")
-    @MainActor
-    func firesPendingResearchAfterSync() async throws {
-        let auth = MockAuthService()
-        let api = MockAPIService()
-        let container = try makeContainer()
-        let context = container.mainContext
-
-        let todo = TodoItem(title: "Best cameras 2026", userId: "user_test_123", position: "a0")
-        todo.isSynced = true
-        todo.pendingResearch = true
-        context.insert(todo)
-        try context.save()
-
-        api.syncResponse = echoResponse(for: todo)
-
-        let service = SyncService(authService: auth, apiService: api)
-        service.setModelContext(context)
-
-        await service.sync()
-
-        #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
-        #expect(todo.pendingResearch == false)
-    }
-
     @Test("Leaves the pending enrich flag set when the enrich call fails")
     @MainActor
     func retainsPendingEnrichOnFailure() async throws {
@@ -695,36 +669,6 @@ struct SyncServiceTests {
         // Attempted, but the flag stays set so the next sync retries it.
         #expect(api.lastEnrichTodoId == todo.id.uuidString.lowercased())
         #expect(todo.pendingEnrich == true)
-    }
-
-    @Test("Leaves the pending research flag set when the research call fails transiently")
-    @MainActor
-    func retainsPendingResearchOnFailure() async throws {
-        let auth = MockAuthService()
-        let api = MockAPIService()
-        api.reresearchError = APIError.networkError(
-            URLError(.notConnectedToInternet),
-            url: "https://api.example.com/todos/x/research"
-        )
-        let container = try makeContainer()
-        let context = container.mainContext
-
-        let todo = TodoItem(title: "Best cameras 2026", userId: "user_test_123", position: "a0")
-        todo.isSynced = true
-        todo.pendingResearch = true
-        context.insert(todo)
-        try context.save()
-
-        api.syncResponse = echoResponse(for: todo)
-
-        let service = SyncService(authService: auth, apiService: api)
-        service.setModelContext(context)
-
-        await service.sync()
-
-        // Attempted, but the flag stays set so the next sync retries it.
-        #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
-        #expect(todo.pendingResearch == true)
     }
 
     @Test("Gives up the pending enrich on a permanent (non-transient) failure")
@@ -765,36 +709,6 @@ struct SyncServiceTests {
         #expect(todo.isAIProcessing == false)
     }
 
-    @Test("Gives up the pending research on a permanent failure")
-    @MainActor
-    func clearsPendingResearchOnPermanentFailure() async throws {
-        let auth = MockAuthService()
-        let api = MockAPIService()
-        api.reresearchError = APIError.serverError(
-            403,
-            "ai_disabled",
-            url: "https://api.example.com/todos/x/research"
-        )
-        let container = try makeContainer()
-        let context = container.mainContext
-
-        let todo = TodoItem(title: "Best cameras 2026", userId: "user_test_123", position: "a0")
-        todo.isSynced = true
-        todo.pendingResearch = true
-        context.insert(todo)
-        try context.save()
-
-        api.syncResponse = echoResponse(for: todo)
-
-        let service = SyncService(authService: auth, apiService: api)
-        service.setModelContext(context)
-
-        await service.sync()
-
-        #expect(api.lastReresearchTodoId == todo.id.uuidString.lowercased())
-        #expect(todo.pendingResearch == false)
-    }
-
     @Test("Persists a pending suggestion on the related TodoItem after sync")
     @MainActor
     func persistsSuggestionsOnTodoItem() async throws {
@@ -829,8 +743,7 @@ struct SyncServiceTests {
                         recurrence: nil,
                         title: nil,
                         titles: nil,
-                        searchQuery: nil,
-                        researchType: nil
+                        searchQuery: nil
                     ),
                     label: "Set due date to Fri 25 Jul",
                     status: "pending",

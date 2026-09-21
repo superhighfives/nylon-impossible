@@ -11,14 +11,10 @@ import {
   type getDb,
   isNull,
   todoMessages,
-  todoResearch,
   todos,
-  todoUrls,
-  users,
 } from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
-import { sendResearchJob } from "./research";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -199,9 +195,7 @@ export async function setTodoCompleted(
  *   - recurrence and subtasks are mutually exclusive (server-enforced),
  *   - completing a todo with an open question clears needsInput + awaitingReply,
  *   - completing a sticky todo clears sticky,
- *   - completion cascades to subtasks,
- *   - a title change re-fires research (if research already ran) against the
- *     new title.
+ *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
  * null if the todo doesn't exist or isn't owned by `userId` — callers decide
  * how to surface that (REST returns 404; a tool call reports failure back to
@@ -326,54 +320,6 @@ export async function updateTodoCore(
   }
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
-
-  // Re-fire research when the title changes and research already exists.
-  const titleChanged =
-    patch.title !== undefined && patch.title !== existing.title;
-  if (titleChanged) {
-    const [research] = await db
-      .select({ id: todoResearch.id, researchType: todoResearch.researchType })
-      .from(todoResearch)
-      .where(eq(todoResearch.todoId, todoId));
-
-    if (research) {
-      await db.delete(todoUrls).where(eq(todoUrls.researchId, research.id));
-      await db.delete(todoResearch).where(eq(todoResearch.id, research.id));
-
-      const newResearchId = crypto.randomUUID();
-      const now = new Date();
-      await db.insert(todoResearch).values({
-        id: newResearchId,
-        todoId,
-        researchType: research.researchType,
-        status: "pending",
-        // Title-edit changed the topic — discard the previous searchQuery
-        // and let this run fall back to the new title until the user
-        // re-enriches. (No LLM call here to keep edits cheap.)
-        searchQuery: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-
-      const [user] = await db
-        .select({ location: users.location })
-        .from(users)
-        .where(eq(users.id, userId));
-
-      const query = patch.title ?? existing.title;
-
-      // A send failure (e.g. queue backpressure/quota) must not 500 the
-      // title edit — mark the just-created research record failed instead.
-      await sendResearchJob(db, env.RESEARCH_QUEUE, {
-        todoId,
-        userId,
-        query,
-        researchType: research.researchType,
-        researchId: newResearchId,
-        userLocation: user?.location ?? null,
-      });
-    }
-  }
 
   await notifySync(env, userId);
 

@@ -202,8 +202,8 @@ struct ContentView: View {
 
                     // Create instantly and locally so the todo appears and persists
                     // even with no connection; sync (and any requested AI) run in
-                    // the background. Enrich/research is recorded on the todo and
-                    // fired once it has synced (SyncService.processPendingAI), so
+                    // the background. Enrich is recorded on the todo and fired
+                    // once it has synced (SyncService.processPendingAI), so
                     // choosing it offline still takes effect on reconnect.
                     guard let todo = TaskCreationService.createSmart(
                         text: text,
@@ -224,8 +224,6 @@ struct ContentView: View {
                             todo.aiStatus = TodoAIStatus.pending.rawValue
                             todo.aiStartedAt = Date()
                             todo.pendingEnrich = true
-                        case .research:
-                            todo.pendingResearch = true
                         case .plain:
                             break
                         }

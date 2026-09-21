@@ -11,7 +11,6 @@ import SwiftData
 @Model
 final class TodoUrl {
     var id: String
-    var researchId: String?  // Non-nil when this URL is a research citation source
     var url: String
     var title: String?
     var itemDescription: String?
@@ -33,13 +32,12 @@ final class TodoUrl {
     @Relationship(inverse: \TodoItem.urls) var todo: TodoItem?
 
     init(
-        id: String, researchId: String? = nil, url: String, title: String?, itemDescription: String?,
+        id: String, url: String, title: String?, itemDescription: String?,
         siteName: String?, favicon: String?, image: String?, showPreview: Bool = true,
         position: String,
         fetchStatus: String, fetchedAt: Date?, createdAt: Date, updatedAt: Date
     ) {
         self.id = id
-        self.researchId = researchId
         self.url = url
         self.title = title
         self.itemDescription = itemDescription

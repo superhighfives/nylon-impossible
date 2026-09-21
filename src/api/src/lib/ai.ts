@@ -15,13 +15,6 @@ export interface TodoEnrichment {
   recurrence?: {
     frequency: "daily" | "weekly" | "monthly" | "yearly";
   };
-  research?: {
-    type: "general" | "location";
-  };
-  // Search-optimized version of the topic — used as the Tavily query when
-  // research is set. Strips imperative verbs ("Research X" -> "X") so we
-  // don't search for the meta-topic of researching the thing.
-  searchQuery?: string;
   // Present if the agent decided to ask the user a clarifying question.
   question?: string;
   // Short subtask titles when the todo is a multi-step project. Mutually
@@ -105,25 +98,6 @@ export const enrichTodoTool = {
           },
           required: ["frequency"],
         },
-        research: {
-          type: "object",
-          description:
-            "Set when the todo has research intent - questions, comparisons, 'look up', 'how to', venue/place references. Do NOT set for plain action items ('buy milk', 'call mom').",
-          properties: {
-            type: {
-              type: "string",
-              enum: ["general", "location"],
-              description:
-                "'location' for venue/place todos (restaurants, bars, cafes, shops, specific addresses). 'general' for everything else (questions, comparisons, how-to, research topics).",
-            },
-          },
-          required: ["type"],
-        },
-        searchQuery: {
-          type: "string",
-          description:
-            "ONLY set when research is set. A search-engine-optimized version of the topic for Tavily. Strip imperative verbs and todo framing so the query reflects what the user wants to learn, not the meta-task of researching it. Examples: 'Research dogs' -> 'dogs'; 'Look up white chocolate recipe' -> 'white chocolate recipe'; 'How does OAuth work' -> 'how OAuth works'; 'Book dinner at San Jalisco' -> 'San Jalisco restaurant'. Keep proper nouns and topic-specific words; drop 'research', 'look up', 'find out about', 'check', 'book', etc.",
-        },
         subtasks: {
           type: "array",
           description:
@@ -166,7 +140,6 @@ Your ONLY job is to extract metadata from the user's text:
 1. URLs/domains - find them and remove them from the title
 2. Due dates - convert relative dates to ISO format
 3. Recurrence - "every day"/"daily", "every Monday"/"weekly", "monthly", "yearly". Pair with a dueDate for the next matching occurrence.
-4. Research intent - questions, comparisons, "look up", "how to", venue references
 
 CRITICAL RULES:
 - Do NOT rephrase, reword, or rewrite the title
@@ -175,12 +148,6 @@ CRITICAL RULES:
 - Keep everything else in the title exactly as written
 - Exception: when removing a URL/domain leaves ONLY a single generic word (e.g. "Research", "Check", "Look"), keep the domain name in the title (e.g. "Research https://google.com" → title: "Research google.com")
 - NEVER invent, guess, or fabricate URLs based on the topic. Only return URLs that literally appear in the user's text. If the text describes a concept without mentioning a URL (e.g. "Research back pain remedies", "Look up white chocolate recipe"), the urls array MUST be empty.
-
-RESEARCH DETECTION:
-- Set research.type = "general" for questions, comparisons, "look up", "how to", research topics
-- Set research.type = "location" for venue/place todos (restaurants, bars, cafes, shops, addresses)
-- Do NOT set research for plain action items (buy, call, email, fix, etc.)
-- WHEN research IS SET, you MUST also populate searchQuery: a Tavily-optimized phrasing of the topic. Strip imperative verbs ("Research", "Look up", "Find out about", "Check", "Book") and todo framing — the query should describe what the user wants to learn, not the act of researching it. Keep proper nouns and topic words. Examples below.
 
 SUBTASKS (breaking a project into steps):
 - When the todo is a multi-step PROJECT that naturally decomposes into distinct steps (e.g. "Plan a birthday party", "Launch the new website", "Move apartments", "Onboard a new hire", "Organize the garage"), populate subtasks with 2-6 short, action-oriented titles.
@@ -192,21 +159,12 @@ Examples:
 - "Hello google.com" → { title: "Hello", urls: ["https://google.com"] }
 - "Research https://google.com" → { title: "Research google.com", urls: ["https://google.com"] }
 - "Check out https://example.com/page tomorrow" → { title: "Check out tomorrow", urls: ["https://example.com/page"], dueDate: "${today}" }
-- "Buy milk" → { title: "Buy milk" } (no research - plain action)
+- "Buy milk" → { title: "Buy milk" } (plain action, nothing to extract)
 - "github.com/user/repo review this" → { title: "review this", urls: ["https://github.com/user/repo"] }
 - "Meeting next Friday" → { title: "Meeting next Friday", dueDate: "[next Friday's date]" }
 - "Every Monday review backlog" → { title: "review backlog", dueDate: "[next Monday]", recurrence: { frequency: "weekly" } }
 - "Daily standup at 10am" → { title: "Daily standup at 10am", dueDate: "${today}", recurrence: { frequency: "daily" } }
 - "Pay rent on the 1st of every month" → { title: "Pay rent", dueDate: "[next 1st of month]", recurrence: { frequency: "monthly" } }
-- "Dogs ages vs human ages" → { title: "Dogs ages vs human ages", research: { type: "general" }, searchQuery: "dog ages vs human ages" }
-- "How does OAuth work" → { title: "How does OAuth work", research: { type: "general" }, searchQuery: "how OAuth works" }
-- "Best practices for React Server Components" → { title: "Best practices for React Server Components", research: { type: "general" }, searchQuery: "React Server Components best practices" }
-- "Look up white chocolate recipe" → { title: "Look up white chocolate recipe", research: { type: "general" }, searchQuery: "white chocolate recipe" } (no urls — topic only, no URL in text)
-- "Research back pain remedies" → { title: "Research back pain remedies", research: { type: "general" }, searchQuery: "back pain remedies" } (no urls — do NOT invent domains like "backpainremedies.com")
-- "Research dogs" → { title: "Research dogs", research: { type: "general" }, searchQuery: "dogs" }
-- "Book dinner at San Jalisco" → { title: "Book dinner at San Jalisco", research: { type: "location" }, searchQuery: "San Jalisco restaurant" }
-- "Drinks at The Rusty Nail" → { title: "Drinks at The Rusty Nail", research: { type: "location" }, searchQuery: "The Rusty Nail bar" }
-- "Check out that new ramen place on Main St" → { title: "Check out that new ramen place on Main St", research: { type: "location" }, searchQuery: "ramen Main St" }
 - "Plan a birthday party" → { title: "Plan a birthday party", subtasks: ["Pick a date", "Make a guest list", "Send invitations", "Order the cake", "Buy decorations"] }
 - "Launch the new website" → { title: "Launch the new website", subtasks: ["Finalize the copy", "Set up hosting", "Test on mobile", "Announce on social"] }
 - "Onboard the new hire" → { title: "Onboard the new hire", subtasks: ["Set up their laptop", "Create accounts", "Schedule intro meetings", "Share the handbook"] }
@@ -450,7 +408,6 @@ export async function enrichTodo(
       keys: Object.keys(enrichment ?? {}),
       hasUrls: Array.isArray(enrichment?.urls) && enrichment.urls.length > 0,
       hasDueDate: Boolean(enrichment?.dueDate),
-      hasResearch: Boolean(enrichment?.research),
       titleChanged: enrichment?.title !== text,
     });
   }
@@ -495,12 +452,11 @@ export async function enrichTodo(
     }
   }
 
-  // If nothing was extracted (no URLs, no date, no research, no
-  // question, no subtasks), return null
+  // If nothing was extracted (no URLs, no date, no question, no subtasks),
+  // return null
   const hasEnrichment =
     (enrichment.urls && enrichment.urls.length > 0) ||
     enrichment.dueDate ||
-    enrichment.research ||
     enrichment.question ||
     (enrichment.subtasks && enrichment.subtasks.length > 0);
 

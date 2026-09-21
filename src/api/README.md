@@ -32,7 +32,6 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 | `DELETE` | `/todos/:id` | Delete todo | Yes |
 | `POST` | `/todos/:id/process` | Re-run link processing (fetch links, title the todo from them) — no AI | Yes |
 | `POST` | `/todos/:id/enrich` | Run AI enrichment (requires `aiEnabled`) | Yes |
-| `POST` | `/todos/:id/research` | Run AI research (requires `aiEnabled`) | Yes |
 | `POST` | `/gmail-addon/homepage` | Gmail add-on homepage card | Google ID token |
 | `POST` | `/gmail-addon/contextual` | Gmail add-on message card | Google ID token |
 | `POST` | `/gmail-addon/actions/*` | Gmail add-on card actions | Google ID token |
@@ -107,11 +106,6 @@ Required for the worker:
 - `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Clerk auth
 - `AI_GATEWAY_ID` — AI Gateway slug (already set in `.env.example`)
 
-Required for the `probe` script (Workers AI + Tavily access from outside the worker):
-
-- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-- `TAVILY_API_KEY` — get one at [tavily.com](https://tavily.com); the research feature won't work without it
-
 In production, set the same values as Workers secrets via `wrangler secret put`.
 
 ### Database
@@ -140,13 +134,10 @@ src/api/
 │   │   ├── users.ts              # Current-user endpoints
 │   │   ├── smart-create.ts       # Thin wrapper over createSmartTodo (background AI enrichment)
 │   │   ├── process.ts            # Re-run link processing for a todo (no AI)
-│   │   ├── reresearch.ts         # Manually re-run research for a todo
-│   │   ├── cancel-research.ts    # Cancel an in-flight research job
 │   │   └── gmail-addon/          # Gmail add-on card handlers (homepage, contextual, actions)
 │   ├── lib/
 │   │   ├── ai.ts                 # enrichTodo classifier + tool schema
-│   │   ├── ai-enrich.ts          # Background enrichment orchestration (DB writes, queue dispatch)
-│   │   ├── research.ts           # Tavily search + summarization for research-typed todos
+│   │   ├── ai-enrich.ts          # Background enrichment orchestration (DB writes)
 │   │   ├── auth.ts               # Clerk JWT verification middleware
 │   │   ├── addon-auth.ts         # Google ID-token verification + resolveNylonUser (Gmail add-on)
 │   │   ├── addon-cards.ts        # Pure JSON card builders + response envelopes
@@ -161,7 +152,8 @@ src/api/
 │   └── durable-objects/
 │       └── UserSync.ts           # WebSocket Durable Object
 ├── scripts/
-│   └── probe-research.ts         # Probe enrich / fetch / research outside the worker (see "Probing AI flows")
+│   ├── check-migrations-meta.mjs # Verify migration metadata is in sync
+│   └── test.mjs                  # Test runner entrypoint
 ├── migrations/                   # D1 migrations (drizzle-generated + raw SQL)
 ├── test/
 │   ├── helpers.ts                # Test utilities (seed, auth mock)
@@ -187,35 +179,6 @@ src/api/
 | `pnpm check` | Run Biome lint + format check |
 | `pnpm deploy` | Deploy to Cloudflare Workers |
 | `pnpm cf-typegen` | Generate Cloudflare binding types |
-| `pnpm probe` | Probe AI flows outside the app (see below) |
-
-## Probing AI flows
-
-The `probe` script (`scripts/probe-research.ts`) reproduces production's AI calls against the real Workers AI and Tavily APIs without booting the worker. Useful for tuning prompts, comparing models, and debugging extractor regressions.
-
-It reads `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `TAVILY_API_KEY` from `src/api/.env` (or the shell env).
-
-Three modes:
-
-| Mode | What it does |
-|------|--------------|
-| `enrich` | Runs the `enrichTodo` classifier — same prompt and tool schema as production. Reports the raw Workers AI response so you can inspect tool_calls and reasoning_content. |
-| `fetch` | Calls Tavily directly with the query. Sanity check that `TAVILY_API_KEY` works and returns sources. |
-| `research` | Full Tavily → kimi-k2.6 summarization chain that production runs for research-typed todos. |
-
-```bash
-pnpm probe enrich "Research dogs"
-pnpm probe fetch "Research dogs"
-pnpm probe research "Research dogs"
-```
-
-Override the Workers AI model (applies to `enrich` and `research`):
-
-```bash
-pnpm probe --model @cf/openai/gpt-oss-120b enrich "Research dogs"
-```
-
-The probe imports the actual prompt + tool schema from [`src/lib/ai.ts`](src/lib/ai.ts) and the summarize payload builder from [`src/lib/research.ts`](src/lib/research.ts), so it can't drift from production.
 
 ## Deployment
 

@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 // Mock the background-enrichment side effect so handlers (smart-create,
-// reresearch, todos) don't actually hit Workers AI in tests. The real
+// todos) don't actually hit Workers AI in tests. The real
 // enrichOrAskWithAI runs inside ctx.waitUntil() and would otherwise crash
 // because env.AI is not bound in wrangler.test.jsonc — leaving stderr full
 // of "Cannot read properties of undefined (reading 'run')" noise even

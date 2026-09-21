@@ -3,7 +3,7 @@
  *
  * Takes an existing todo and proposes AI-extracted metadata as suggestions the
  * user accepts or dismisses individually — it does NOT mutate the todo. Each
- * proposal (title cleanup, due date, recurrence, subtasks, research) becomes a
+ * proposal (title cleanup, due date, recurrence, subtasks) becomes a
  * `todoSuggestions` row; accepting one applies exactly that change via
  * `applySuggestion` (`handlers/apply-suggestion.ts`), reusing the same
  * validation/normalisation path as a manual edit.
@@ -21,7 +21,6 @@ import {
   eq,
   type getDb,
   todoMessages,
-  todoResearch,
   todoSuggestions,
   todos,
   todoUrls,
@@ -30,7 +29,6 @@ import { finishTodoLinks } from "./process-todo";
 import {
   dueDateSuggestionLabel,
   recurrenceSuggestionLabel,
-  researchSuggestionLabel,
   subtasksSuggestionLabel,
   titleSuggestionLabel,
 } from "./suggestion-labels";
@@ -39,8 +37,6 @@ import { truncateTitle } from "./url-helpers";
 /**
  * Enrich a todo with AI-extracted metadata in the background. Writes pending
  * suggestions instead of mutating the todo, and notifies connected clients.
- * If research intent is detected and no research exists yet, proposes running
- * it — running research itself only happens once that suggestion is accepted.
  */
 export async function enrichOrAskWithAI(
   db: ReturnType<typeof getDb>,
@@ -200,32 +196,6 @@ export async function enrichOrAskWithAI(
         createdAt: suggestionNow,
         updatedAt: suggestionNow,
       });
-    }
-
-    // Propose research if detected and none exists yet for this todo. A todo
-    // can have at most one research row (UNIQUE on todoId); running research
-    // is deferred until the suggestion is accepted (handlers/apply-suggestion.ts).
-    if (enrichment.research) {
-      const [existingResearch] = await db
-        .select({ id: todoResearch.id })
-        .from(todoResearch)
-        .where(eq(todoResearch.todoId, todoId));
-
-      if (!existingResearch) {
-        newSuggestions.push({
-          id: crypto.randomUUID(),
-          todoId,
-          type: "research",
-          payload: {
-            searchQuery: enrichment.searchQuery ?? null,
-            researchType: enrichment.research.type,
-          },
-          label: researchSuggestionLabel(),
-          status: "pending",
-          createdAt: suggestionNow,
-          updatedAt: suggestionNow,
-        });
-      }
     }
 
     // Re-running enrich supersedes any suggestions still pending from a prior

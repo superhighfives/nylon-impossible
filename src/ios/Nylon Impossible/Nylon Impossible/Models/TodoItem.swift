@@ -83,12 +83,6 @@ final class TodoItem {
     // from `createdAt`: enrichment is deferred (fired in SyncService once the todo
     // syncs), so for an offline-created todo it can start long after creation.
     var aiStartedAt: Date?
-    var researchId: String?           // Research record ID from server
-    var researchStatus: String?       // "pending" | "completed" | "failed"
-    var researchType: String?         // "general" | "location"
-    var researchSummary: String?
-    var researchedAt: Date?
-    var researchCreatedAt: Date?      // When research was started (for stale detection)
     var needsInput: Bool = false  // Agent has posted a question awaiting the user's reply
     // Sticky todos render above non-sticky ones and are reordered within their
     // own tier only. Clears to false when the todo is completed. Subtasks
@@ -97,10 +91,9 @@ final class TodoItem {
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
     // AI actions the user requested when creating the todo, but which can only
     // run once the todo exists on the server. Set locally at creation and fired
-    // (then cleared) after the item syncs — so an enrich/research chosen while
-    // offline still takes effect on reconnect rather than being lost.
+    // (then cleared) after the item syncs — so an enrich chosen while offline
+    // still takes effect on reconnect rather than being lost.
     var pendingEnrich: Bool = false
-    var pendingResearch: Bool = false
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
     @Relationship(deleteRule: .cascade) var messages: [TodoMessage] = []
     @Relationship(deleteRule: .cascade) var suggestions: [TodoSuggestion] = []
@@ -123,17 +116,10 @@ final class TodoItem {
         self.dueDate = nil
         self.recurrenceFrequency = nil
         self.aiStatus = nil
-        self.researchId = nil
-        self.researchStatus = nil
-        self.researchType = nil
-        self.researchSummary = nil
-        self.researchedAt = nil
-        self.researchCreatedAt = nil
         self.needsInput = false
         self.sticky = false
         self.pendingUrls = []
         self.pendingEnrich = false
-        self.pendingResearch = false
         self.aiStartedAt = nil
     }
     
@@ -192,17 +178,6 @@ final class TodoItem {
     var isAIProcessing: Bool {
         guard todoAIStatus == .pending || todoAIStatus == .processing else { return false }
         return Date().timeIntervalSince(aiStartedAt ?? createdAt) < 60
-    }
-
-    /// Check if research is currently pending
-    var isResearchPending: Bool {
-        researchStatus == "pending"
-    }
-
-    /// How long (in seconds) the current research record has been alive
-    var researchAge: TimeInterval? {
-        guard let createdAt = researchCreatedAt else { return nil }
-        return Date().timeIntervalSince(createdAt)
     }
 
     /// True when the agent has proposed changes the user hasn't reviewed yet.

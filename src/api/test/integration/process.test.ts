@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoResearch, todos, todoUrls, users } from "../../src/lib/db";
+import { getDb, todos, todoUrls, users } from "../../src/lib/db";
 import {
   applyLinkTitle,
   finishTodoLinks,
@@ -253,23 +253,6 @@ describe("Link processing", () => {
       expect(await applyLinkTitle(db, id)).toBe("Right one");
     });
 
-    it("never titles a todo after one of its research sources", async () => {
-      const db = getDb(env.DB);
-      const id = crypto.randomUUID();
-      await seedTodo(id, "user_test_123", { title: "Check example.com" });
-      const researchId = crypto.randomUUID();
-      await db
-        .insert(todoResearch)
-        .values({ id: researchId, todoId: id, status: "completed" });
-      const source = await seedTodoUrl(id, "https://example.com/page");
-      await db
-        .update(todoUrls)
-        .set({ fetchStatus: "fetched", title: "A cited source", researchId })
-        .where(eq(todoUrls.id, source.id));
-
-      expect(await applyLinkTitle(db, id)).toBeNull();
-      expect((await getTodo(id)).title).toBe("Check example.com");
-    });
   });
 
   describe("failed fetches", () => {

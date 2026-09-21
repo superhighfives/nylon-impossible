@@ -10,18 +10,10 @@ vi.mock("@/hooks/useUser", () => ({
 const updateUrlPreviewMutate = vi.fn();
 const enrichMutate = vi.fn();
 const processMutate = vi.fn();
-const reresearchMutate = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
   useUpdateUrlPreview: () => ({ mutate: updateUrlPreviewMutate }),
   useEnrichTodo: () => ({ mutate: enrichMutate, isPending: false }),
   useProcessTodo: () => ({ mutate: processMutate, isPending: false }),
-  useReresearch: () => ({ mutate: reresearchMutate, isPending: false }),
-}));
-
-vi.mock("../ResearchSection", () => ({
-  ResearchSection: ({ todoId }: { todoId: string }) => (
-    <div data-testid="research-section">research:{todoId}</div>
-  ),
 }));
 
 vi.mock("../ConversationSection", () => ({
@@ -56,7 +48,6 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     updatedAt: "2026-01-01T00:00:00.000Z",
     needsInput: false,
     sticky: false,
-    research: null,
     messages: [],
     urls: [],
     suggestions: [],
@@ -158,23 +149,7 @@ describe("TodoItemExpanded", () => {
     expect(onUpdate.mock.calls[0][0].dueDate).toBeInstanceOf(Date);
   });
 
-  it("renders the research section when research is present", () => {
-    renderExpanded({
-      research: {
-        id: "r1",
-        status: "completed",
-        researchType: "general",
-        summary: "Summary",
-        researchedAt: "2026-01-01T00:00:00.000Z",
-        createdAt: "2026-01-01T00:00:00.000Z",
-      },
-    });
-    expect(screen.getByTestId("research-section")).toHaveTextContent(
-      "research:todo-1",
-    );
-  });
-
-  it("runs enrich and research from the AI actions for a free user with AI enabled", () => {
+  it("runs enrich from the AI actions for a free user with AI enabled", () => {
     vi.mocked(useUser).mockReturnValue({
       data: { plan: "free", aiEnabled: true },
       isLoading: false,
@@ -183,9 +158,6 @@ describe("TodoItemExpanded", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /enrich/i }));
     expect(enrichMutate).toHaveBeenCalledWith("todo-1");
-
-    fireEvent.click(screen.getByRole("button", { name: /research/i }));
-    expect(reresearchMutate).toHaveBeenCalledWith("todo-1");
   });
 
   it("hides the AI actions when AI is unavailable", () => {
@@ -218,7 +190,6 @@ describe("TodoItemExpanded", () => {
     return {
       id: "url-1",
       todoId: "todo-1",
-      researchId: null,
       url: "https://www.interfacecraft.dev/",
       title: "Interface Craft",
       description: "A working library for those committed to design.",

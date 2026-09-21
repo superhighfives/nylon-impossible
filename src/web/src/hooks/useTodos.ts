@@ -35,25 +35,15 @@ async function getApiError(response: Response): Promise<string | undefined> {
 
 const TODOS_QUERY_KEY = ["todos"];
 
-// Must match RESEARCH_TIMEOUT_MS in src/api/src/lib/research.ts.
-export const STALE_RESEARCH_MS = 5 * 60 * 1_000;
-
 // AI enrichment has a 30s timeout (ENRICH_TIMEOUT_MS in ai.ts). Double it so
 // we don't hide the spinner while a legitimate enrichment is still running.
 export const STALE_AI_MS = 60 * 1_000;
-
-// Show cancel + retry buttons after this long while research is pending.
-export const SHOW_RETRY_MS = 30 * 1_000;
 
 export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
   return todos.some((todo) => {
     if (todo.aiStatus === "pending" || todo.aiStatus === "processing") {
       const age = Date.now() - new Date(todo.createdAt).getTime();
       return age < STALE_AI_MS;
-    }
-    if (todo.research?.status === "pending") {
-      const age = Date.now() - new Date(todo.research.createdAt).getTime();
-      return age < STALE_RESEARCH_MS;
     }
     return false;
   });
@@ -126,7 +116,6 @@ export function useCreateTodo() {
         sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        research: null,
         messages: [],
         urls: [],
         suggestions: [],
@@ -386,10 +375,9 @@ interface SmartCreateResponse {
 
 export interface SmartCreateInput {
   text: string;
-  // AI is opt-in per create: `enrich` runs the enrichment model, `research`
-  // runs research. Both are Pro/aiEnabled-gated server-side.
+  // AI is opt-in per create: `enrich` runs the enrichment model. Pro/aiEnabled
+  // -gated server-side.
   enrich?: boolean;
-  research?: boolean;
 }
 
 /**
@@ -405,7 +393,6 @@ export function useSmartCreate() {
     mutationFn: async ({
       text,
       enrich,
-      research,
     }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
@@ -414,7 +401,7 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text, enrich, research }),
+        body: JSON.stringify({ text, enrich }),
       });
 
       if (!response.ok) {
@@ -460,7 +447,6 @@ export function useSmartCreate() {
         sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        research: null,
         messages: [],
         urls: [],
         suggestions: [],
@@ -636,79 +622,6 @@ export function useEnrichTodo() {
 }
 
 /**
- * Hook to trigger re-research for a todo.
- * Deletes existing research and kicks off a fresh research run.
- */
-export function useReresearch() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async (todoId: string) => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/${todoId}/research`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
-    },
-    onError: (err) => {
-      Sentry.captureException(err, { tags: { mutation: "reresearch" } });
-      toast.error(messageFromError(err, "Couldn't start research"));
-    },
-  });
-}
-
-/**
- * Hook to cancel pending research for a todo.
- * Marks research as failed so the user isn't stuck on a spinner.
- * The queue worker checks for cancellation before writing results.
- */
-export function useCancelResearch() {
-  const queryClient = useQueryClient();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async (todoId: string) => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/${todoId}/research`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-    },
-    onError: (err) => {
-      Sentry.captureException(err, { tags: { mutation: "cancelResearch" } });
-      toast.error(messageFromError(err, "Couldn't cancel research"));
-    },
-  });
-}
-
-/**
  * Hook to reply to the agent's clarifying question on a todo.
  * Optimistically appends the user's message and clears the needs-input
  * indicator; re-enrichment runs server-side and arrives via sync.
@@ -850,9 +763,9 @@ export function useDismissTodoQuestion() {
 /**
  * Apply a suggestion's field change to a todo locally, for optimistic accept.
  * Mirrors exactly what the server's accept handler does for the types that
- * map onto a single todo field (title/due_date/recurrence) — subtasks and
- * research create new rows server-side, so those are left for the settled
- * refetch instead of being synthesized here.
+ * map onto a single todo field (title/due_date/recurrence) — subtasks
+ * create new rows server-side, so those are left for the settled refetch
+ * instead of being synthesized here.
  */
 function applySuggestionLocally(
   todo: TodoWithUrls,
@@ -878,8 +791,8 @@ function applySuggestionLocally(
 /**
  * Hook to accept an enrichment suggestion. Optimistically applies the
  * suggested field change (where it maps onto a single todo field) and marks
- * the suggestion accepted; the settled refetch reconciles subtasks/research
- * rows and anything the optimistic apply simplified.
+ * the suggestion accepted; the settled refetch reconciles subtask rows and
+ * anything the optimistic apply simplified.
  */
 export function useAcceptSuggestion() {
   const queryClient = useQueryClient();

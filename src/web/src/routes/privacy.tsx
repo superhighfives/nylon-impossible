@@ -31,7 +31,7 @@ function PrivacyPage() {
           </li>
           <li>
             <strong>Optional location.</strong> If you add a location in
-            settings, it's used to make location-related research more relevant.
+            settings, it's used to make location-related todos more relevant.
             You can remove it at any time.
           </li>
           <li>
@@ -46,7 +46,7 @@ function PrivacyPage() {
         <p>
           Your information is used to run the app: to sign you in, store and
           sync your todos across your devices, and power optional AI features
-          like parsing what you type and researching tasks. That's it. Your data
+          like parsing what you type and enriching tasks. That's it. Your data
           isn't sold, and it isn't used for advertising.
         </p>
       </LegalSection>

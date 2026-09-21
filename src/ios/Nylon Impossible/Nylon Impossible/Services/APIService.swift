@@ -10,15 +10,6 @@ import Sentry
 
 // MARK: - API Models
 
-struct APIResearch: Codable, Sendable {
-    let id: String
-    let status: String        // "pending" | "completed" | "failed"
-    let researchType: String  // "general" | "location"
-    let summary: String?
-    let researchedAt: Date?
-    let createdAt: Date
-}
-
 struct APITodoMessage: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
@@ -37,7 +28,6 @@ struct APISuggestionPayload: Codable, Sendable, Equatable {
     let title: String?
     let titles: [String]?
     let searchQuery: String?
-    let researchType: String?
 }
 
 /// Proposed AI enrichment change for a todo. Server-authoritative and terminal
@@ -45,7 +35,7 @@ struct APISuggestionPayload: Codable, Sendable, Equatable {
 struct APITodoSuggestion: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
-    let type: String       // "due_date" | "recurrence" | "title" | "subtasks" | "research"
+    let type: String       // "due_date" | "recurrence" | "title" | "subtasks"
     let payload: APISuggestionPayload
     let label: String      // Pre-rendered human string for the button
     let status: String     // "pending" | "accepted" | "dismissed"
@@ -71,7 +61,6 @@ struct APITodo: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
-    let research: APIResearch?
     let messages: [APITodoMessage]?  // Conversation included in sync response
     let suggestions: [APITodoSuggestion]?  // Enrichment proposals included in sync response
 
@@ -83,7 +72,7 @@ struct APITodo: Codable, Sendable {
         recurrence: Recurrence? = nil,
         aiStatus: AIStatus? = nil, needsInput: Bool? = nil, sticky: Bool? = nil,
         createdAt: Date, updatedAt: Date,
-        urls: [APITodoUrl]? = nil, research: APIResearch? = nil,
+        urls: [APITodoUrl]? = nil,
         messages: [APITodoMessage]? = nil,
         suggestions: [APITodoSuggestion]? = nil
     ) {
@@ -104,7 +93,6 @@ struct APITodo: Codable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls
-        self.research = research
         self.messages = messages
         self.suggestions = suggestions
     }
@@ -128,7 +116,6 @@ enum AIStatus: String, Codable, Sendable {
 struct APITodoUrl: Codable, Sendable, Identifiable {
     let id: String
     let todoId: String
-    let researchId: String?  // Non-nil when URL is a research citation source
     let url: String
     let title: String?
     let description: String?
@@ -148,7 +135,7 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     var showsPreview: Bool { showPreview ?? true }
 
     init(
-        id: String, todoId: String, researchId: String? = nil, url: String,
+        id: String, todoId: String, url: String,
         title: String?, description: String?, siteName: String?, favicon: String?,
         image: String? = nil, showPreview: Bool? = nil, position: String,
         fetchStatus: FetchStatus, fetchedAt: Date?,
@@ -156,7 +143,6 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
     ) {
         self.id = id
         self.todoId = todoId
-        self.researchId = researchId
         self.url = url
         self.title = title
         self.description = description
@@ -186,7 +172,6 @@ struct APITodoWithUrls: Codable, Sendable {
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]
-    let research: APIResearch?
 
     init(
         id: String, userId: String, title: String, notes: String? = nil,
@@ -195,7 +180,7 @@ struct APITodoWithUrls: Codable, Sendable {
         recurrence: Recurrence? = nil,
         aiStatus: AIStatus? = nil,
         createdAt: Date, updatedAt: Date,
-        urls: [APITodoUrl] = [], research: APIResearch? = nil
+        urls: [APITodoUrl] = []
     ) {
         self.id = id
         self.userId = userId
@@ -210,7 +195,6 @@ struct APITodoWithUrls: Codable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls
-        self.research = research
     }
 }
 
@@ -308,10 +292,8 @@ protocol APIProviding: Sendable {
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func importGoogleTasks() async throws -> GoogleTasksImportResponse
     func deleteMe() async throws
-    func reresearch(todoId: String) async throws
     func enrich(todoId: String) async throws
     func processTodo(todoId: String) async throws -> Int
-    func cancelResearch(todoId: String) async throws
     func replyToTodo(todoId: String, content: String) async throws -> String
     func dismissQuestion(todoId: String) async throws
     func acceptSuggestion(todoId: String, suggestionId: String) async throws
@@ -423,13 +405,6 @@ final class APIService: APIProviding {
         let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
 
-    // MARK: - Research
-
-    func reresearch(todoId: String) async throws {
-        struct ReresearchResponse: Decodable { let id: String }
-        let _: ReresearchResponse = try await post(path: "/todos/\(todoId)/research", body: EmptyBody())
-    }
-
     // MARK: - Enrich
 
     /// On-demand AI enrichment for an existing todo. AI is intentional — nothing
@@ -438,10 +413,6 @@ final class APIService: APIProviding {
     func enrich(todoId: String) async throws {
         struct EnrichResponse: Decodable { let status: String }
         let _: EnrichResponse = try await post(path: "/todos/\(todoId)/enrich", body: EmptyBody())
-    }
-
-    func cancelResearch(todoId: String) async throws {
-        let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/research")
     }
 
     // MARK: - Process

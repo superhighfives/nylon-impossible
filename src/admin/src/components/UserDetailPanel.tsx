@@ -233,7 +233,6 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
       <dl className="mt-3 space-y-3 text-sm">
         <Row label="Todos">{detail.diagnostics.todoCount}</Row>
         <Row label="Messages">{detail.diagnostics.messageCount}</Row>
-        <Row label="Research runs">{detail.diagnostics.researchCount}</Row>
         <Row label="Last todo update">
           {detail.diagnostics.lastTodoUpdatedAt
             ? new Date(detail.diagnostics.lastTodoUpdatedAt).toLocaleString()

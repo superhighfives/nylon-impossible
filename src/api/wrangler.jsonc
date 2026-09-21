@@ -51,20 +51,6 @@
     // to catch every timezone's midnight within an hour.
     "crons": ["0 * * * *"],
   },
-  "queues": {
-    "producers": [
-      { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },
-    ],
-    "consumers": [
-      {
-        "queue": "nylon-impossible-research",
-        "max_batch_size": 1,
-        "max_batch_timeout": 0,
-        "max_retries": 2,
-        "dead_letter_queue": "nylon-impossible-research-dlq",
-      },
-    ],
-  },
   "vars": {
     "ENVIRONMENT": "development",
     "CF_AI_GATEWAY_ID": "nylon-impossible",
@@ -94,12 +80,11 @@
   //     signup webhook only fires in prod.
   //   - USER_SYNC Durable Object state is auto-isolated per preview by the
   //     platform; the binding still has to be declared so the class resolves.
-  //   - The RESEARCH_QUEUE producer points at the prod queue (shared by name).
-  //     No consumer and no cron are configured: queue consumers and cron
+  //   - No consumer and no cron are configured: queue consumers and cron
   //     triggers only ever fire on the production deployment, never on previews
-  //     (`triggers` isn't even a valid key in this block). So the research
-  //     consumer and the hourly list-sweep cron do NOT run against prod D1 from
-  //     a preview — they're only exercised after merge.
+  //     (`triggers` isn't even a valid key in this block). So the hourly
+  //     list-sweep cron does NOT run against prod D1 from a preview — it's
+  //     only exercised after merge.
   // Secrets are not inherited either — CI seeds them per-preview against the
   // Clerk *development* instance (see the "Set preview API secrets" step in
   // web-deploy.yml and the migration plan for the base-config vs per-preview
@@ -129,11 +114,6 @@
     },
     "ai": {
       "binding": "AI",
-    },
-    "queues": {
-      "producers": [
-        { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },
-      ],
     },
     "observability": {
       "enabled": true,

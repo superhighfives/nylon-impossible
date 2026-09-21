@@ -15,7 +15,7 @@ import SwiftData
 @Model
 final class TodoSuggestion {
     var id: String
-    var type: String     // "due_date" | "recurrence" | "title" | "subtasks" | "research"
+    var type: String     // "due_date" | "recurrence" | "title" | "subtasks"
     var label: String    // Pre-rendered human string for the button
     var status: String   // "pending" | "accepted" | "dismissed"
     var createdAt: Date
@@ -28,7 +28,6 @@ final class TodoSuggestion {
     var payloadTitle: String?
     var payloadTitles: [String]?
     var payloadSearchQuery: String?
-    var payloadResearchType: String?
 
     // Inverse relationship — mirrors TodoMessage.todo.
     @Relationship(inverse: \TodoItem.suggestions) var todo: TodoItem?
@@ -44,8 +43,7 @@ final class TodoSuggestion {
         payloadRecurrenceFrequency: String? = nil,
         payloadTitle: String? = nil,
         payloadTitles: [String]? = nil,
-        payloadSearchQuery: String? = nil,
-        payloadResearchType: String? = nil
+        payloadSearchQuery: String? = nil
     ) {
         self.id = id
         self.type = type
@@ -58,7 +56,6 @@ final class TodoSuggestion {
         self.payloadTitle = payloadTitle
         self.payloadTitles = payloadTitles
         self.payloadSearchQuery = payloadSearchQuery
-        self.payloadResearchType = payloadResearchType
     }
 
     var isPending: Bool { status == "pending" }

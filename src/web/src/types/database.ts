@@ -73,22 +73,6 @@ export type FetchStatus = "pending" | "fetched" | "failed";
 /** AI processing status for todos */
 export type AiStatus = "pending" | "processing" | "complete" | "failed";
 
-/** Research status */
-export type ResearchStatus = "pending" | "completed" | "failed";
-
-/** Research type */
-export type ResearchType = "general" | "location";
-
-/** Serialized research data from the API */
-export interface SerializedResearch {
-  id: string;
-  status: ResearchStatus;
-  researchType: ResearchType;
-  summary: string | null;
-  researchedAt: string | null;
-  createdAt: string;
-}
-
 /** Serialized conversation message from the API */
 export interface SerializedTodoMessage {
   id: string;
@@ -103,7 +87,6 @@ export interface SerializedTodoMessage {
 export interface SerializedTodoUrl {
   id: string;
   todoId: string;
-  researchId: string | null;
   url: string;
   title: string | null;
   description: string | null;
@@ -152,7 +135,6 @@ export interface TodoWithUrls {
   sticky: boolean;
   createdAt: string;
   updatedAt: string;
-  research: SerializedResearch | null;
   messages: SerializedTodoMessage[];
   urls: SerializedTodoUrl[];
   suggestions: SerializedTodoSuggestion[];

@@ -54,15 +54,14 @@ export function getUrlDisplay(url: SerializedTodoUrl): UrlDisplay {
 /**
  * The single user-facing URL of a "URL-only" todo — one whose title is just the
  * URL itself or the auto-generated "Check {domain}" placeholder, and that has
- * exactly one non-research link. Returns null for todos with a real,
- * user-written title or with zero/multiple links so their rendering is
- * untouched.
+ * exactly one link. Returns null for todos with a real, user-written title or
+ * with zero/multiple links so their rendering is untouched.
  */
 export function getUrlOnlyUrl(todo: {
   title: string;
   urls: SerializedTodoUrl[];
 }): SerializedTodoUrl | null {
-  const links = todo.urls.filter((url) => !url.researchId);
+  const links = todo.urls;
   if (links.length !== 1) return null;
   const url = links[0];
   const title = todo.title.trim();

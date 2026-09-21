@@ -43,7 +43,7 @@ plain `vars` — must exist in `Env["Bindings"]` **and** in the relevant
 `wrangler.jsonc`. One that type-checks because someone widened the type but
 isn't in the wrangler config will fail at runtime, not at build.
 
-Secrets are the exception: `CLERK_SECRET_KEY`, `TAVILY_API_KEY`, `SENTRY_DSN`
+Secrets are the exception: `CLERK_SECRET_KEY`, `SENTRY_DSN`
 and friends are typed in `Env["Bindings"]` but set with `wrangler secret put`,
 so they deliberately don't appear in `wrangler.jsonc`.
 

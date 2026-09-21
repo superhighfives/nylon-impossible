@@ -2,16 +2,7 @@ import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import {
-  and,
-  asc,
-  eq,
-  getDb,
-  inArray,
-  todoResearch,
-  todos,
-  todoUrls,
-} from "../lib/db";
+import { and, asc, eq, getDb, inArray, todos, todoUrls } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
@@ -69,7 +60,6 @@ function serializeUrl(url: typeof todoUrls.$inferSelect) {
   return {
     id: url.id.toLowerCase(),
     todoId: url.todoId.toLowerCase(),
-    researchId: url.researchId,
     url: url.url,
     title: url.title,
     description: url.description,
@@ -252,15 +242,6 @@ export async function deleteTodo(c: Context<Env>) {
   if (!existing) {
     return apiError(c, "todo_not_found");
   }
-
-  // Cancel any pending research so the queue consumer exits cleanly via the
-  // cancel guard rather than hitting a FK violation when the todo is gone.
-  await db
-    .update(todoResearch)
-    .set({ status: "failed", updatedAt: new Date() })
-    .where(
-      and(eq(todoResearch.todoId, todoId), eq(todoResearch.status, "pending")),
-    );
 
   await db.delete(todos).where(eq(todos.id, todoId));
 

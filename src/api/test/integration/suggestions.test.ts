@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoResearch, todos, todoSuggestions } from "../../src/lib/db";
+import { getDb, todos, todoSuggestions } from "../../src/lib/db";
 import { cleanDb, seedSuggestion, seedTodo, seedUser } from "../helpers";
 
 const mockVerifyToken = verifyToken as ReturnType<
@@ -167,25 +167,6 @@ describe("POST /todos/:id/suggestions/:sid/accept", () => {
     expect(children.map((c) => c.title).sort()).toEqual(
       ["Book venue", "Send invites"].sort(),
     );
-  });
-
-  it("applies a research suggestion by creating a pending research row", async () => {
-    const suggestion = await seedSuggestion(TODO_ID, {
-      type: "research",
-      payload: { searchQuery: "best pizza NYC", researchType: "general" },
-      label: "Research this",
-    });
-
-    const res = await accept(TODO_ID, suggestion.id);
-    expect(res.status).toBe(200);
-
-    const db = getDb(env.DB);
-    const [research] = await db
-      .select()
-      .from(todoResearch)
-      .where(eq(todoResearch.todoId, TODO_ID));
-    expect(research.status).toBe("pending");
-    expect(research.searchQuery).toBe("best pizza NYC");
   });
 
   it("returns 409 when accepting an already-accepted suggestion", async () => {

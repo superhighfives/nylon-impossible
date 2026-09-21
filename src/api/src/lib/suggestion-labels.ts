@@ -32,7 +32,3 @@ export function subtasksSuggestionLabel(titles: string[]): string {
   const noun = titles.length === 1 ? "subtask" : "subtasks";
   return `Add ${titles.length} ${noun}: ${preview}${suffix}`;
 }
-
-export function researchSuggestionLabel(): string {
-  return "Research this";
-}
