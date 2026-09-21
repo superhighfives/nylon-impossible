@@ -31,8 +31,8 @@ function PrivacyPage() {
           </li>
           <li>
             <strong>Optional location.</strong> If you add a location in
-            settings, it's used to make location-related todos more relevant.
-            You can remove it at any time.
+            settings, it's stored on your profile but isn't currently used by
+            any feature. You can remove it at any time.
           </li>
           <li>
             <strong>Imported data.</strong> If you choose to import from Google

@@ -326,14 +326,12 @@ export function SettingsModal({ origin }: { origin: string }) {
                   <LayerCard.Primary>
                     <p className="text-xs text-gray-muted">
                       When enabled, AI helps enrich todos by pulling out
-                      metadata and finding locations.
+                      metadata like due dates and recurrence.
                     </p>
-                    {/* Location only feeds AI location handling, so it shows
-                        once AI is enabled. */}
                     {aiEnabled && (
                       <Field
                         label="Your location"
-                        description="Used to find local venues for location-based todos."
+                        description="Not currently used by any feature."
                         className="pt-1"
                       >
                         <Input
