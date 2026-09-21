@@ -8,9 +8,9 @@ This file is the repo-specific part.
 pnpm workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
 `src/marketing`. `@nylon-impossible/shared` is consumed by both `web` and `api`.
 
-`web`, `api`, `admin`, and `todo-agent` have their own check scripts, so `pnpm
-typecheck` and `pnpm lint` fan out to those four. Per-package variants are
-prefixed (`pnpm api:test`, `pnpm web:typecheck`).
+`web`, `api`, and `admin` have their own check scripts, so `pnpm typecheck` and
+`pnpm lint` fan out to those three. Per-package variants are prefixed (`pnpm
+api:test`, `pnpm web:typecheck`).
 
 Biome config lives at the root; each workspace invokes it with
 `--config-path ../..`. Don't add a per-workspace `biome.json`.
@@ -57,7 +57,7 @@ message strings at the call site.
 
 Deploy (`.github/workflows/web-deploy.yml`) **applies D1 migrations to the
 shared `nylon-impossible-db` before rolling out the workers** — migrate → deploy
-todo-agent → deploy API → deploy web. Both the `web` and `api` workers bind the
+API → deploy web. Both the `web` and `api` workers bind the
 same database, so during that window the schema is already new while the old
 worker code is still serving.
 

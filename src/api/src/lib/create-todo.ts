@@ -157,8 +157,8 @@ export class InvalidParentTodoError extends Error {
 
 /**
  * Core of the smart-create path, shared by the `POST /todos/smart` REST
- * handler, the Gmail add-on, and the todo-agent's `addSubtask` tool. Given a
- * resolved `userId` and free text, it creates a todo (prepended to its list —
+ * handler and the Gmail add-on. Given a resolved `userId` and free text, it
+ * creates a todo (prepended to its list —
  * the user's top-level list, or a parent's subtasks when `parentId` is set),
  * extracts + attaches URLs, optionally kicks off AI enrichment / research in
  * the background, and pokes connected clients to sync. Keeping this in one

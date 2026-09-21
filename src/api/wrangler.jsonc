@@ -82,12 +82,6 @@
   "ai": {
     "binding": "AI",
   },
-  "services": [
-    {
-      "binding": "TODO_AGENT",
-      "service": "nylon-impossible-todo-agent",
-    },
-  ],
   // Worker Previews (private beta): per-branch preview deployments created by
   // `wrangler preview`. Bindings and vars are NOT inherited from the top level,
   // so everything a preview needs is repeated here.
@@ -106,9 +100,6 @@
   //     (`triggers` isn't even a valid key in this block). So the research
   //     consumer and the hourly list-sweep cron do NOT run against prod D1 from
   //     a preview — they're only exercised after merge.
-  //   - The TODO_AGENT service binding from a preview always resolves to the
-  //     bound Worker's PRODUCTION deployment (platform constraint), so this
-  //     necessarily calls prod todo-agent.
   // Secrets are not inherited either — CI seeds them per-preview against the
   // Clerk *development* instance (see the "Set preview API secrets" step in
   // web-deploy.yml and the migration plan for the base-config vs per-preview
@@ -139,12 +130,6 @@
     "ai": {
       "binding": "AI",
     },
-    "services": [
-      {
-        "binding": "TODO_AGENT",
-        "service": "nylon-impossible-todo-agent",
-      },
-    ],
     "queues": {
       "producers": [
         { "binding": "RESEARCH_QUEUE", "queue": "nylon-impossible-research" },
@@ -155,8 +140,4 @@
     },
   },
   // Note: SENTRY_DSN should be configured as a secret via `wrangler secret put SENTRY_DSN`
-  // Note: INTERNAL_AGENT_SECRET (checked on /internal/agent/*, called by
-  // src/todo-agent) should be configured as a secret via `wrangler secret
-  // put INTERNAL_AGENT_SECRET` — the same value must also be set as a
-  // secret on the src/todo-agent Worker.
 }
