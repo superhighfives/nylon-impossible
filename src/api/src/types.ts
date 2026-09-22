@@ -14,7 +14,6 @@ export interface GoogleIdTokenClaims {
 
 export type Env = {
   Bindings: {
-    AI: Ai;
     DB: D1Database;
     USER_SYNC: DurableObjectNamespace;
     CLERK_SECRET_KEY: string;
@@ -22,8 +21,6 @@ export type Env = {
     CLERK_WEBHOOK_SECRET?: string;
     SENTRY_DSN?: string;
     ENVIRONMENT?: string;
-    CF_AI_GATEWAY_ID?: string;
-    LOG_AI_DEBUG?: string;
     // Target audience the Gmail add-on's Google-signed ID tokens must carry in
     // their `aud` claim — the add-on endpoint URL configured in Google Cloud.
     // Public (not a secret); set in wrangler.jsonc. verifyGoogleIdToken fails
@@ -39,7 +36,6 @@ export type Env = {
   };
   Variables: {
     userId: string;
-    aiEnabled: boolean;
     plan: "free" | "pro";
     role: "admin" | null;
     // Set by verifyGoogleIdToken on the /gmail-addon/* routes.

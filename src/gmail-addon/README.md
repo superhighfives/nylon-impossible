@@ -2,7 +2,7 @@
 
 A Google Workspace Add-on that puts Nylon in Gmail's right-hand side panel:
 quick-add, a list of open top-level todos you can tick, and an "Add to Nylon"
-card that turns the open message into a todo through the existing AI
+card that turns the open message into a todo through the existing
 smart-create path.
 
 It's built on the **HTTP-endpoint ("alternate runtime") model** — Google POSTs a

@@ -95,10 +95,6 @@ final class SyncService {
         state = .syncing
 
         do {
-            // 0. Push any pending offline replies so the server can re-enrich and
-            // return the updated conversation in this same sync round.
-            let pushedMessageIds = await pushPendingReplies(apiService: apiService, userId: userId)
-
             // 1. Gather local changes (unsynced items for this user)
             let localChanges = try gatherLocalChanges(userId: userId)
             let localChangeIds = Set(localChanges.map { $0.id })
@@ -114,8 +110,7 @@ final class SyncService {
             try applySync(
                 remoteTodos: response.todos,
                 localChangeIds: localChangeIds,
-                userId: userId,
-                justPushedMessageIds: pushedMessageIds
+                userId: userId
             )
 
             // Lists (Today/This Week/Sometime + custom) are server-authoritative
@@ -127,11 +122,6 @@ final class SyncService {
             if let modelContext {
                 BadgeService.refresh(modelContext: modelContext)
             }
-
-            // Fire any AI actions requested at creation now that their todos
-            // exist server-side. Deferred to here so an enrich chosen offline
-            // runs as soon as the todo reaches the server.
-            await processPendingAI(apiService: apiService, userId: userId)
 
             // 4. Update sync timestamp
             if let syncedAt = ISO8601DateFormatter().date(from: response.syncedAt) {
@@ -251,8 +241,7 @@ final class SyncService {
     private func applySync(
         remoteTodos: [APITodo],
         localChangeIds: Set<String>,
-        userId: String,
-        justPushedMessageIds: Set<String> = []
+        userId: String
     ) throws {
         guard let modelContext else { return }
 
@@ -290,16 +279,13 @@ final class SyncService {
                     local.position = remote.position ?? local.position
                     local.dueDate = remote.dueDate
                     local.recurrence = remote.recurrence
-                    local.aiStatus = remote.aiStatus?.rawValue
-                    // sticky is user-toggled (unlike needsInput below, which is
-                    // server-only), so it follows the same last-write-wins
-                    // resolution as the other user-editable fields here.
+                    // sticky is user-toggled, so it follows the same
+                    // last-write-wins resolution as the other user-editable
+                    // fields here.
                     local.sticky = remote.sticky ?? false
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
-                // Server is authoritative for the question flag.
-                local.needsInput = remote.needsInput ?? false
                 // If local is newer, it will be synced on next sync
             } else {
                 // New remote item - create locally
@@ -313,9 +299,7 @@ final class SyncService {
                 todo.completedAt = remote.completedAt
                 todo.dueDate = remote.dueDate
                 todo.recurrence = remote.recurrence
-                todo.aiStatus = remote.aiStatus?.rawValue
                 todo.sticky = remote.sticky ?? false
-                todo.needsInput = remote.needsInput ?? false
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
                 todo.isSynced = true
@@ -398,78 +382,6 @@ final class SyncService {
             todo.urls = updatedUrls
         }
 
-        // Step 6: Sync conversation messages (server authoritative). Messages are
-        // immutable except awaitingReply, so we update that in place and insert
-        // new ones. We only delete *synced* local messages that vanished from the
-        // server — unsynced ones are pending replies still waiting to be pushed.
-        for remote in remoteTodos {
-            guard let remoteId = UUID(uuidString: remote.id) else { continue }
-
-            let itemDescriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.id == remoteId }
-            )
-            guard let todo = try modelContext.fetch(itemDescriptor).first else { continue }
-
-            let remoteMessages = remote.messages ?? []
-            let remoteMessageIds = Set(remoteMessages.map { $0.id })
-            let existingById = todo.messages.reduce(into: [:]) { dict, m in dict[m.id] = m }
-
-            // Delete only synced messages no longer present on the server.
-            // Skip messages we just pushed in this round — the server may not
-            // have included them in this response yet (e.g. enrichment still
-            // running). They'll reconcile on the next sync.
-            for message in todo.messages
-            where message.isSynced
-                && !remoteMessageIds.contains(message.id)
-                && !justPushedMessageIds.contains(message.id) {
-                modelContext.delete(message)
-            }
-
-            for remoteMessage in remoteMessages {
-                if let existing = existingById[remoteMessage.id] {
-                    existing.content = remoteMessage.content
-                    existing.awaitingReply = remoteMessage.awaitingReply
-                    existing.isSynced = true
-                } else {
-                    let newMessage = TodoMessage(from: remoteMessage)
-                    newMessage.todo = todo
-                    modelContext.insert(newMessage)
-                }
-            }
-        }
-
-        // Step 7: Sync suggestions (server authoritative — upsert, like URLs).
-        // Unlike messages, suggestions have no local unsynced state to preserve:
-        // clients only ever push accept/dismiss, never create one.
-        for remote in remoteTodos {
-            guard let remoteId = UUID(uuidString: remote.id) else { continue }
-
-            let itemDescriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.id == remoteId }
-            )
-            guard let todo = try modelContext.fetch(itemDescriptor).first else { continue }
-
-            let remoteSuggestions = remote.suggestions ?? []
-            let remoteSuggestionIds = Set(remoteSuggestions.map { $0.id })
-            let existingById = todo.suggestions.reduce(into: [:]) { dict, s in dict[s.id] = s }
-
-            for suggestion in todo.suggestions where !remoteSuggestionIds.contains(suggestion.id) {
-                modelContext.delete(suggestion)
-            }
-
-            for remoteSuggestion in remoteSuggestions {
-                if let existing = existingById[remoteSuggestion.id] {
-                    existing.status = remoteSuggestion.status
-                    existing.label = remoteSuggestion.label
-                    existing.updatedAt = remoteSuggestion.updatedAt
-                } else {
-                    let newSuggestion = TodoSuggestion(from: remoteSuggestion)
-                    newSuggestion.todo = todo
-                    modelContext.insert(newSuggestion)
-                }
-            }
-        }
-
         // Single save for the entire operation
         try modelContext.save()
     }
@@ -483,108 +395,3 @@ final class SyncService {
     }
 }
 
-extension SyncService {
-    /// Push locally-created replies (offline or failed) to the server via the
-    /// dedicated reply endpoint. Returns the ids of messages successfully
-    /// pushed so the caller can skip them in the delete-sweep step (the server
-    /// may not include them in this same response if enrichment is still
-    /// running). Failures are left unsynced to retry next time; a single
-    /// failed reply must not abort the whole sync.
-    fileprivate func pushPendingReplies(apiService: any APIProviding, userId: String) async -> Set<String> {
-        guard let modelContext else { return [] }
-
-        let descriptor = FetchDescriptor<TodoMessage>(
-            predicate: #Predicate { $0.isSynced == false && $0.role == "user" }
-        )
-        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else {
-            return []
-        }
-
-        var didChange = false
-        var pushedIds: Set<String> = []
-        for message in pending {
-            guard let todo = message.todo, todo.userId == userId else { continue }
-            let todoId = todo.id.uuidString.lowercased()
-            do {
-                _ = try await apiService.replyToTodo(todoId: todoId, content: message.content)
-                message.isSynced = true
-                pushedIds.insert(message.id)
-                didChange = true
-            } catch {
-                // Network failures are already reported (or dropped when transient) by
-                // APIService; skip them here to avoid a duplicate Sentry issue.
-                if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
-                    SentrySDK.capture(error: error) { scope in
-                        scope.setTag(value: "reply-push", key: "area")
-                    }
-                }
-            }
-        }
-
-        if didChange {
-            try? modelContext.save()
-        }
-        return pushedIds
-    }
-
-    /// Fire enrich actions recorded on todos at creation, once those todos
-    /// have synced (so the server knows them). Runs only for synced,
-    /// non-deleted todos owned by this user. Clears the flag on success and
-    /// leaves it set to retry next sync on failure — a single failed call must
-    /// not abort the whole sync.
-    fileprivate func processPendingAI(apiService: any APIProviding, userId: String) async {
-        guard let modelContext else { return }
-
-        let descriptor = FetchDescriptor<TodoItem>(
-            predicate: #Predicate {
-                $0.userId == userId
-                    && $0.isSynced
-                    && !$0.isDeleted
-                    && $0.pendingEnrich
-            }
-        )
-        guard let pending = try? modelContext.fetch(descriptor), !pending.isEmpty else {
-            return
-        }
-
-        var didChange = false
-        for todo in pending {
-            let todoId = todo.id.uuidString.lowercased()
-
-            if todo.pendingEnrich {
-                do {
-                    try await apiService.enrich(todoId: todoId)
-                    todo.pendingEnrich = false
-                    // Keep the spinner up until the server reports back, and
-                    // re-stamp the start so the 60s window tracks when enrichment
-                    // actually began — not the (possibly much earlier) creation
-                    // time, which would leave the spinner already expired.
-                    todo.aiStatus = TodoAIStatus.pending.rawValue
-                    todo.aiStartedAt = Date()
-                    didChange = true
-                } catch {
-                    // Transient failures stay pending to retry next sync. A
-                    // permanent one (e.g. ai_disabled when the account's AI
-                    // switch is off, or todo_not_found) will never succeed, so
-                    // give up: clear the flag, drop the optimistic spinner, and
-                    // report once. Otherwise every future sync — which runs on
-                    // nearly every user action — would re-fire the doomed call
-                    // and re-report it to Sentry indefinitely.
-                    if !APIError.isNetworkFailure(error), !APIError.isTransientNetworkError(error) {
-                        todo.pendingEnrich = false
-                        todo.aiStatus = nil
-                        todo.aiStartedAt = nil
-                        didChange = true
-                        SentrySDK.capture(error: error) { scope in
-                            scope.setTag(value: "pending-enrich", key: "area")
-                        }
-                    }
-                }
-            }
-        }
-
-        if didChange {
-            try? modelContext.save()
-        }
-    }
-}

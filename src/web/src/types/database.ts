@@ -2,18 +2,12 @@
 export type {
   Recurrence,
   RecurrenceFrequency,
-  SuggestionPayload,
-  SuggestionType,
   Todo,
   TodoUrl,
   User,
 } from "@/lib/schema";
 
-import type {
-  Recurrence,
-  SuggestionPayload,
-  SuggestionType,
-} from "@/lib/schema";
+import type { Recurrence } from "@/lib/schema";
 
 export interface CreateTodoInput {
   title: string;
@@ -70,19 +64,6 @@ export interface SerializedList {
 /** Fetch status for URL metadata */
 export type FetchStatus = "pending" | "fetched" | "failed";
 
-/** AI processing status for todos */
-export type AiStatus = "pending" | "processing" | "complete" | "failed";
-
-/** Serialized conversation message from the API */
-export interface SerializedTodoMessage {
-  id: string;
-  todoId: string;
-  role: "assistant" | "user";
-  content: string;
-  createdAt: string; // ISO
-  awaitingReply: boolean;
-}
-
 /** Serialized URL metadata from the API */
 export interface SerializedTodoUrl {
   id: string;
@@ -102,21 +83,6 @@ export interface SerializedTodoUrl {
   updatedAt: string;
 }
 
-/** Status of a proposed AI enrichment change */
-export type SuggestionStatus = "pending" | "accepted" | "dismissed";
-
-/** Serialized enrichment suggestion from the API */
-export interface SerializedTodoSuggestion {
-  id: string;
-  todoId: string;
-  type: SuggestionType;
-  payload: SuggestionPayload;
-  label: string;
-  status: SuggestionStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
 /** A todo with its associated URLs */
 export interface TodoWithUrls {
   id: string;
@@ -130,12 +96,8 @@ export interface TodoWithUrls {
   position: string;
   dueDate: string | null;
   recurrence: Recurrence | null;
-  aiStatus: AiStatus | null;
-  needsInput: boolean;
   sticky: boolean;
   createdAt: string;
   updatedAt: string;
-  messages: SerializedTodoMessage[];
   urls: SerializedTodoUrl[];
-  suggestions: SerializedTodoSuggestion[];
 }

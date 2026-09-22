@@ -36,7 +36,6 @@ struct TodoEditSheet: View {
     @State private var selectedListId: String?
     @State private var urls: [APITodoUrl] = []
     @State private var isLoadingUrls: Bool = false
-    @State private var isEnriching: Bool = false
     @State private var isProcessing: Bool = false
     @State private var processMessage: String?
 
@@ -175,30 +174,12 @@ struct TodoEditSheet: View {
                     )
                 }
 
-                // Link processing — deterministic, no model involved, so it
-                // sits in its own section above the AI one and shows up whether
-                // or not AI is on. Which button spends a model call should
-                // never be ambiguous.
+                // Link processing — deterministic, no model involved.
                 TaskActionsSection(
                     isProcessing: isProcessing || hasPendingLinks,
                     message: processMessage,
                     onProcess: { Task { await processLinks() } }
                 )
-
-                // AI actions — explicit, opt-in enrich (nothing runs
-                // automatically). Gated on the aiEnabled master switch.
-                if preferencesService.aiEnabled {
-                    AIActionsSection(
-                        isEnriching: isEnriching,
-                        onEnrich: { Task { await enrichTodo() } }
-                    )
-                }
-
-                // Suggestions — proposed AI enrichment changes awaiting consent
-                SuggestionsSection(todo: todo, apiService: apiService)
-
-                // Conversation — agent questions and the user's replies
-                ConversationSection(todo: todo, apiService: apiService)
 
                 // Links
                 LinksSection(
@@ -271,20 +252,6 @@ struct TodoEditSheet: View {
         return formatter.string(from: NSNumber(value: n)) ?? "\(n)"
     }
     
-    private func enrichTodo() async {
-        guard let apiService else { return }
-        isEnriching = true
-        defer { isEnriching = false }
-        do {
-            try await apiService.enrich(todoId: todo.id.uuidString.lowercased())
-            // Enrichment runs in the background server-side; the enriched fields
-            // arrive via the next sync. Reload detail to pick up any changes.
-            await loadUrls()
-        } catch {
-            print("[AI] Enrich error: \(error)")
-        }
-    }
-
     /// The todo's own links.
     private var regularLinks: [APITodoUrl] {
         urls
@@ -605,25 +572,6 @@ private struct TaskActionsSection: View {
             Text("Task")
         } footer: {
             Text(message ?? "Fetches each link and titles the task after it. No AI involved.")
-        }
-    }
-}
-
-/// Explicit, opt-in AI action for a todo — enrich. AI never runs
-/// automatically; this is the deliberate per-todo affordance (Pro + aiEnabled,
-/// gated by the caller).
-private struct AIActionsSection: View {
-    let isEnriching: Bool
-    let onEnrich: () -> Void
-
-    var body: some View {
-        Section {
-            Button(action: onEnrich) {
-                Label("Enrich", systemImage: "sparkles")
-            }
-            .disabled(isEnriching)
-        } header: {
-            Text("AI")
         }
     }
 }

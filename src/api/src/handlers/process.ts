@@ -12,9 +12,9 @@ import type { Env } from "../types";
  * fetch what's behind them, and replace a placeholder title ("Check x.com")
  * with what actually turned up.
  *
- * Deliberately **not** an AI action — no model runs, nothing is proposed for
- * consent, and it's ungated by `aiEnabled`. It's the deterministic work that
- * already happens on create, exposed as something the user can ask for again:
+ * Deliberately deterministic — no model runs, nothing is proposed for
+ * consent. It's the same work that already happens on create, exposed as
+ * something the user can ask for again:
  * the retry for a link whose fetch failed, and the way a todo captured before
  * any of this existed catches up.
  */

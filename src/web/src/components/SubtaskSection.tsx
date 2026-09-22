@@ -209,7 +209,7 @@ export function SubtaskSection({
 
       {/* Add subtask — sits above the active list, next to where a newly
           added subtask actually lands (see handleAdd's position insert). */}
-      <div className="flex items-center gap-1.5 pl-6">
+      <div className="flex items-center gap-1.5">
         <Input
           type="text"
           value={newTitle}

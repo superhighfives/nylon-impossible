@@ -112,29 +112,6 @@ struct SettingsView: View {
                 // Completed todos collapse via the bottom-of-list accordion
                 // (matching web), so there's no separate settings toggle here.
 
-                // AI features are gated on this toggle (not the plan), so it's
-                // available to every user to turn on or off.
-                Section {
-                    Toggle("Use AI", isOn: Binding(
-                        get: { preferencesService.aiEnabled },
-                        set: { newValue in
-                            Task {
-                                await preferencesService.setAI(enabled: newValue)
-                            }
-                        }
-                    ))
-
-                    if let error = preferencesService.error {
-                        Text(error.localizedDescription)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                } header: {
-                    Text("AI Features")
-                } footer: {
-                    Text("When enabled, AI helps enrich todos by pulling out metadata and finding locations.")
-                }
-
                 Section {
                     TextField("e.g. Los Angeles, CA", text: $locationText)
                         .onSubmit {
@@ -278,7 +255,6 @@ struct SettingsView: View {
     private func clearLocalData() {
         do {
             try modelContext.delete(model: TodoItem.self)
-            try modelContext.delete(model: TodoMessage.self)
             try modelContext.delete(model: TodoUrl.self)
             try modelContext.save()
         } catch {
@@ -300,7 +276,7 @@ struct SettingsView: View {
         .environment(authService)
         .environment(Clerk.shared)
         .modelContainer(
-            for: [TodoItem.self, TodoUrl.self, TodoMessage.self],
+            for: [TodoItem.self, TodoUrl.self],
             inMemory: true
         )
 }

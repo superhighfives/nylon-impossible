@@ -11,7 +11,7 @@ import SwiftData
 
 enum SharedModelContainer {
     static let shared: ModelContainer = {
-        let schema = Schema([TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self, TodoListModel.self])
+        let schema = Schema([TodoItem.self, TodoUrl.self, TodoListModel.self])
         
         // Every target — app, share extension, intents — opens this one store in
         // the App Group container. Without that container there's no agreed

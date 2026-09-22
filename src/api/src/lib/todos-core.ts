@@ -3,16 +3,7 @@ import {
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
 import type { Env } from "../types";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  type getDb,
-  isNull,
-  todoMessages,
-  todos,
-} from "./db";
+import { and, asc, desc, eq, type getDb, isNull, todos } from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
 
@@ -87,7 +78,6 @@ export async function listOpenTodos(db: Db, userId: string) {
  * rules as the REST `updateTodo` handler:
  *   - a recurring todo being completed rolls its dueDate forward instead of
  *     persisting the completion (completed stays false, completedAt stamped),
- *   - completing a todo with an open question clears needsInput + awaitingReply,
  *   - completing a sticky todo clears sticky,
  *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
@@ -147,20 +137,6 @@ export async function setTodoCompleted(
     }
   }
 
-  // Completing a todo with an open question clears the question automatically.
-  if (completingRow && existing.needsInput) {
-    updates.needsInput = false;
-    await db
-      .update(todoMessages)
-      .set({ awaitingReply: false })
-      .where(
-        and(
-          eq(todoMessages.todoId, todoId),
-          eq(todoMessages.awaitingReply, true),
-        ),
-      );
-  }
-
   // Completing a sticky todo unsticks it — it sorts as an ordinary completed
   // todo, not pinned.
   if (completingRow && existing.sticky) updates.sticky = false;
@@ -193,7 +169,6 @@ export async function setTodoCompleted(
  *   - a recurring todo being completed for the first time rolls its dueDate
  *     forward instead of persisting the completion,
  *   - recurrence and subtasks are mutually exclusive (server-enforced),
- *   - completing a todo with an open question clears needsInput + awaitingReply,
  *   - completing a sticky todo clears sticky,
  *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
@@ -280,20 +255,6 @@ export async function updateTodoCore(
         updates.listEnteredAt = now;
       }
     }
-  }
-
-  // Completing a todo with an open question clears the question automatically.
-  if (completingRow && existing.needsInput) {
-    updates.needsInput = false;
-    await db
-      .update(todoMessages)
-      .set({ awaitingReply: false })
-      .where(
-        and(
-          eq(todoMessages.todoId, todoId),
-          eq(todoMessages.awaitingReply, true),
-        ),
-      );
   }
 
   // Completing a sticky todo unsticks it — it sorts as an ordinary completed

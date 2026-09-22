@@ -5,7 +5,7 @@ import { useTodos, useUpdateTodo } from "@/hooks/useTodos";
 import { formatDate } from "@/lib/date";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import type { RecurrenceFrequency, TodoWithUrls } from "@/types/database";
-import { Button, Loader, Select } from "./ui";
+import { Button, Select } from "./ui";
 
 const DUE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
   month: "short",
@@ -14,9 +14,9 @@ const DUE_DATE_FORMAT: Intl.DateTimeFormatOptions = {
 };
 
 /**
- * A single dated todo in the review list. Reads the *live* todo so that, as
- * background AI enrichment lands, the dropdown fills in with the guessed
- * schedule. Each change persists immediately via the normal update path.
+ * A single dated todo in the review list. Reads the *live* todo so that
+ * changes made elsewhere are reflected here. Each change persists immediately
+ * via the normal update path.
  */
 function ReviewRow({ todo }: { todo: TodoWithUrls }) {
   const updateTodo = useUpdateTodo();
@@ -25,12 +25,6 @@ function ReviewRow({ todo }: { todo: TodoWithUrls }) {
   const dueDate = todo.dueDate; // guaranteed non-null: only dated todos land here
   const anchor = dueDate ? new Date(dueDate) : null;
   const value = todo.recurrence?.frequency ?? "none";
-
-  // While enrichment is still running the dropdown may yet auto-fill, so hint
-  // that a guess is on the way rather than implying "None" is settled.
-  const guessing =
-    (todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
-    !todo.recurrence;
 
   const handleChange = (next: unknown) => {
     if (next === null || next === undefined) return;
@@ -54,12 +48,6 @@ function ReviewRow({ todo }: { todo: TodoWithUrls }) {
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {guessing && (
-          <span className="flex items-center gap-1 text-xs text-gray-muted">
-            <Loader size="sm" />
-            Guessing…
-          </span>
-        )}
         <div className="w-40">
           <Select
             size="sm"
@@ -100,14 +88,10 @@ export function ImportReviewModal() {
       position: "",
       dueDate: review.dueDate,
       recurrence: null,
-      aiStatus: "pending",
-      needsInput: false,
       sticky: false,
       createdAt: review.dueDate,
       updatedAt: review.dueDate,
-      messages: [],
       urls: [],
-      suggestions: [],
     };
   });
 

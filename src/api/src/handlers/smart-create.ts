@@ -7,9 +7,6 @@ import type { Env } from "../types";
 
 const smartCreateSchema = z.object({
   text: z.string().min(1, "Text is required").max(10000, "Text is too long"),
-  // AI is opt-in per request. `enrich` runs the enrichment model, and requires
-  // the `aiEnabled` master switch server-side, regardless of the client.
-  enrich: z.boolean().optional(),
 });
 
 // POST /todos/smart — thin wrapper over the shared createSmartTodo core so the
@@ -29,17 +26,15 @@ export async function smartCreate(c: Context<Env>) {
     return apiError(c, "text_required");
   }
 
-  const { todo, ai } = await createSmartTodo(
+  const { todo } = await createSmartTodo(
     getDb(c.env.DB),
     c.env,
     c.get("userId"),
     text,
     {
-      aiEnabled: c.get("aiEnabled"),
-      enrich: parsed.data.enrich,
       waitUntil: (p) => c.executionCtx.waitUntil(p),
     },
   );
 
-  return c.json({ todos: [todo], ai });
+  return c.json({ todos: [todo] });
 }

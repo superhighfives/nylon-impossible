@@ -8,10 +8,6 @@ import {
   listUsers,
   updateUser,
 } from "./handlers/admin";
-import { acceptSuggestion } from "./handlers/apply-suggestion";
-import { dismissQuestion } from "./handlers/dismiss-question";
-import { dismissSuggestion } from "./handlers/dismiss-suggestion";
-import { enrichTodo } from "./handlers/enrich";
 import {
   gmailAddonAddFromMessage,
   gmailAddonQuickAdd,
@@ -29,7 +25,6 @@ import {
   updateList,
 } from "./handlers/lists";
 import { processTodo } from "./handlers/process";
-import { replyToTodo } from "./handlers/reply";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
 import {
@@ -136,14 +131,8 @@ app.post("/todos", createTodo);
 app.get("/todos/:id", getTodo);
 app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
-app.post("/todos/:id/enrich", enrichTodo);
-// Link processing — deterministic, no AI, so it sits outside the aiEnabled gate
-// the enrich route above honours.
+// Link processing — deterministic, no AI.
 app.post("/todos/:id/process", processTodo);
-app.post("/todos/:id/reply", replyToTodo);
-app.delete("/todos/:id/question", dismissQuestion);
-app.post("/todos/:id/suggestions/:sid/accept", acceptSuggestion);
-app.post("/todos/:id/suggestions/:sid/dismiss", dismissSuggestion);
 
 // List routes
 app.get("/lists", getLists);

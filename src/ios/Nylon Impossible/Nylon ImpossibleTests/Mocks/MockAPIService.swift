@@ -14,7 +14,6 @@ final class MockAPIService: APIProviding {
     var getMeResponse: APIUser = APIUser(
         id: "mock-user-id",
         email: "test@example.com",
-        aiEnabled: true,
         plan: "pro",
         location: nil,
         theme: "system",
@@ -57,7 +56,6 @@ final class MockAPIService: APIProviding {
         return updateMeResponse ?? APIUser(
             id: getMeResponse.id,
             email: getMeResponse.email,
-            aiEnabled: request.aiEnabled ?? getMeResponse.aiEnabled,
             plan: getMeResponse.plan,
             location: newLocation,
             theme: request.theme ?? getMeResponse.theme,
@@ -94,16 +92,6 @@ final class MockAPIService: APIProviding {
         }
     }
 
-    var enrichError: Error?
-    var lastEnrichTodoId: String?
-
-    func enrich(todoId: String) async throws {
-        lastEnrichTodoId = todoId
-        if let error = enrichError {
-            throw error
-        }
-    }
-
     var processTodoError: Error?
     var processTodoLinkCount: Int = 1
     var lastProcessTodoId: String?
@@ -114,48 +102,6 @@ final class MockAPIService: APIProviding {
             throw error
         }
         return processTodoLinkCount
-    }
-
-    var replyError: Error?
-    var replyResponseId: String = "mock-message-id"
-    var lastReply: (todoId: String, content: String)?
-
-    func replyToTodo(todoId: String, content: String) async throws -> String {
-        lastReply = (todoId, content)
-        if let error = replyError {
-            throw error
-        }
-        return replyResponseId
-    }
-
-    var dismissQuestionError: Error?
-    var lastDismissTodoId: String?
-
-    func dismissQuestion(todoId: String) async throws {
-        lastDismissTodoId = todoId
-        if let error = dismissQuestionError {
-            throw error
-        }
-    }
-
-    var acceptSuggestionError: Error?
-    var lastAcceptSuggestion: (todoId: String, suggestionId: String)?
-
-    func acceptSuggestion(todoId: String, suggestionId: String) async throws {
-        lastAcceptSuggestion = (todoId, suggestionId)
-        if let error = acceptSuggestionError {
-            throw error
-        }
-    }
-
-    var dismissSuggestionError: Error?
-    var lastDismissSuggestion: (todoId: String, suggestionId: String)?
-
-    func dismissSuggestion(todoId: String, suggestionId: String) async throws {
-        lastDismissSuggestion = (todoId, suggestionId)
-        if let error = dismissSuggestionError {
-            throw error
-        }
     }
 
     var listsToReturn: [APIList] = []

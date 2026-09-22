@@ -15,10 +15,6 @@ export const API_ERRORS = {
     status: 403,
     message: "This feature requires a Pro plan",
   },
-  ai_disabled: {
-    status: 403,
-    message: "AI features are turned off",
-  },
   invalid_signature: { status: 401, message: "Invalid webhook signature" },
   websocket_upgrade_required: {
     status: 400,
@@ -30,16 +26,6 @@ export const API_ERRORS = {
   invalid_parent_todo: {
     status: 400,
     message: "parentId must reference one of the user's top-level todos",
-  },
-  suggestion_id_required: { status: 400, message: "Suggestion ID required" },
-  suggestion_not_found: { status: 404, message: "Suggestion not found" },
-  suggestion_not_pending: {
-    status: 409,
-    message: "Suggestion has already been acted on",
-  },
-  suggestion_conflict: {
-    status: 409,
-    message: "Todo has changed since this suggestion was proposed",
   },
   list_id_required: { status: 400, message: "List ID required" },
   list_not_found: { status: 404, message: "List not found" },

@@ -1,14 +1,9 @@
 /**
- * Link processing — the non-AI half of "make something of this".
- *
- * Attaching the URLs in a todo's text, fetching what's behind them, and naming
- * the todo after what turned up is all deterministic: it's HTTP and string
- * handling, no model involved. So it runs for everyone regardless of the
- * `aiEnabled` switch, and it's what the explicit "Process" action re-runs when
- * a fetch didn't land the first time.
- *
- * AI enrichment is the other half, and stays opt-in and clearly labelled as
- * such — see `ai-enrich.ts`.
+ * Link processing — attaching the URLs in a todo's text, fetching what's
+ * behind them, and naming the todo after what turned up. All deterministic:
+ * it's HTTP and string handling, no model involved. Runs for everyone on
+ * create, and is what the explicit "Process" action re-runs when a fetch
+ * didn't land the first time.
  */
 
 import * as Sentry from "@sentry/cloudflare";

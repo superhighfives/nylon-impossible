@@ -14,27 +14,12 @@ import {
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
 export type Recurrence = { frequency: RecurrenceFrequency };
 
-// Proposed change carried by a todoSuggestions row. Shape depends on `type`.
-export type SuggestionType =
-  | "due_date"
-  | "recurrence"
-  | "title"
-  | "subtasks";
-export type SuggestionPayload =
-  | { dueDate: string }
-  | { recurrence: Recurrence }
-  | { title: string }
-  | { titles: string[] };
-
 // Users table
 export const users = sqliteTable(
   "users",
   {
     id: text("id").primaryKey(),
     email: text("email").notNull(),
-    aiEnabled: integer("ai_enabled", { mode: "boolean" })
-      .notNull()
-      .default(true),
     plan: text("plan", { enum: ["free", "pro"] })
       .notNull()
       .default("free"),
@@ -114,14 +99,6 @@ export const todos = sqliteTable(
       .notNull()
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
-    aiStatus: text("ai_status", {
-      enum: ["pending", "processing", "complete", "failed"],
-    }),
-    // Cheap signal for the list view: true when the agent has posted a question
-    // awaiting the user's reply. Orthogonal to aiStatus (both can be set at once).
-    needsInput: integer("needs_input", { mode: "boolean" })
-      .notNull()
-      .default(false),
     // Source task id when this todo was imported from Google Tasks. Null for
     // todos created in-app. Used to dedupe on re-import.
     googleTaskId: text("google_task_id"),
@@ -174,31 +151,6 @@ export const gmailAddonLinks = sqliteTable(
   },
   (table) => [
     index("idx_gmail_addon_links_clerk_user").on(table.clerkUserId),
-  ],
-);
-
-// Conversation thread on a todo. Append-only and immutable except for
-// awaitingReply, which clears (to false) when the user replies or dismisses.
-export const todoMessages = sqliteTable(
-  "todo_messages",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    todoId: text("todo_id")
-      .notNull()
-      .references(() => todos.id, { onDelete: "cascade" }),
-    role: text("role", { enum: ["assistant", "user"] }).notNull(),
-    content: text("content").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(sql`(unixepoch())`),
-    awaitingReply: integer("awaiting_reply", { mode: "boolean" })
-      .notNull()
-      .default(false),
-  },
-  (table) => [
-    index("idx_todo_messages_todo_id").on(table.todoId, table.createdAt),
   ],
 );
 
@@ -283,51 +235,6 @@ export const todoUrls = sqliteTable(
   (table) => [index("idx_todo_urls_todo").on(table.todoId)],
 );
 
-// AI enrichment proposals for a todo. Server-authoritative: enrichment inserts
-// pending rows instead of mutating the todo directly; the user accepts or
-// dismisses each individually. Accept/dismiss is terminal — a dismissed or
-// accepted suggestion never reappears; re-running enrich only replaces rows
-// still `pending`.
-export const todoSuggestions = sqliteTable(
-  "todo_suggestions",
-  {
-    id: text("id")
-      .primaryKey()
-      .$defaultFn(() => crypto.randomUUID()),
-    todoId: text("todo_id")
-      .notNull()
-      .references(() => todos.id, { onDelete: "cascade" }),
-    type: text("type", {
-      enum: ["due_date", "recurrence", "title", "subtasks"],
-    }).$type<SuggestionType>().notNull(),
-    // JSON payload of the proposed value, e.g. {"dueDate":"2026-07-25"},
-    // {"titles":["...","..."]}. Shape depends on `type`.
-    payload: text("payload", { mode: "json" })
-      .$type<SuggestionPayload>()
-      .notNull(),
-    // Pre-rendered human string for the button, e.g. "Set due date to Fri 25 Jul".
-    // Server renders this so web and iOS stay identical without duplicating
-    // formatting logic.
-    label: text("label").notNull(),
-    status: text("status", {
-      enum: ["pending", "accepted", "dismissed"],
-    })
-      .notNull()
-      .default("pending"),
-    createdAt: integer("created_at", { mode: "timestamp" })
-      .notNull()
-      .default(sql`(unixepoch())`),
-    updatedAt: integer("updated_at", { mode: "timestamp" })
-      .notNull()
-      .default(sql`(unixepoch())`)
-      .$onUpdate(() => new Date()),
-  },
-  (table) => [
-    index("idx_todo_suggestions_todo_id").on(table.todoId),
-    index("idx_todo_suggestions_status").on(table.status),
-  ],
-);
-
 // Relations (for relational query API)
 export const usersRelations = relations(users, ({ many }) => ({
   todos: many(todos),
@@ -350,25 +257,6 @@ export const todosRelations = relations(todos, ({ one, many }) => ({
     references: [lists.id],
   }),
   todoUrls: many(todoUrls),
-  messages: many(todoMessages),
-  suggestions: many(todoSuggestions),
-}));
-
-export const todoSuggestionsRelations = relations(
-  todoSuggestions,
-  ({ one }) => ({
-    todo: one(todos, {
-      fields: [todoSuggestions.todoId],
-      references: [todos.id],
-    }),
-  }),
-);
-
-export const todoMessagesRelations = relations(todoMessages, ({ one }) => ({
-  todo: one(todos, {
-    fields: [todoMessages.todoId],
-    references: [todos.id],
-  }),
 }));
 
 export const listsRelations = relations(lists, ({ one, many }) => ({
@@ -395,9 +283,5 @@ export type List = typeof lists.$inferSelect;
 export type NewList = typeof lists.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
-export type TodoMessage = typeof todoMessages.$inferSelect;
-export type NewTodoMessage = typeof todoMessages.$inferInsert;
-export type TodoSuggestion = typeof todoSuggestions.$inferSelect;
-export type NewTodoSuggestion = typeof todoSuggestions.$inferInsert;
 export type GmailAddonLink = typeof gmailAddonLinks.$inferSelect;
 export type NewGmailAddonLink = typeof gmailAddonLinks.$inferInsert;

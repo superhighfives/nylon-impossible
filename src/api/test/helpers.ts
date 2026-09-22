@@ -1,15 +1,5 @@
 import { env } from "cloudflare:test";
-import {
-  and,
-  eq,
-  getDb,
-  lists,
-  todoMessages,
-  todoSuggestions,
-  todos,
-  todoUrls,
-  users,
-} from "../src/lib/db";
+import { and, eq, getDb, lists, todos, todoUrls, users } from "../src/lib/db";
 
 /**
  * Seed the system lists (Today/This Week/Sometime/Completed) for a user,
@@ -82,9 +72,8 @@ export async function seedUser(
   overrides: Partial<typeof users.$inferInsert> = {},
 ) {
   const db = getDb(env.DB);
-  // Default test users to the "pro" plan so the existing AI-path tests keep
-  // exercising AI behavior. Tests that explicitly verify the free-tier gate
-  // can pass `{ plan: "free" }`.
+  // Default test users to the "pro" plan. Tests that explicitly verify the
+  // free-tier gate can pass `{ plan: "free" }`.
   await db
     .insert(users)
     .values({ id: userId, email, plan: "pro", ...overrides })
@@ -122,48 +111,7 @@ export async function seedTodo(
   return inserted;
 }
 
-export async function seedMessage(
-  todoId: string,
-  overrides: Partial<typeof todoMessages.$inferInsert> = {},
-) {
-  const db = getDb(env.DB);
-  const [inserted] = await db
-    .insert(todoMessages)
-    .values({
-      id: crypto.randomUUID(),
-      todoId,
-      role: "assistant",
-      content: "Where to, and when?",
-      awaitingReply: true,
-      ...overrides,
-    })
-    .returning();
-  return inserted;
-}
-
-export async function seedSuggestion(
-  todoId: string,
-  overrides: Partial<typeof todoSuggestions.$inferInsert> = {},
-) {
-  const db = getDb(env.DB);
-  const [inserted] = await db
-    .insert(todoSuggestions)
-    .values({
-      id: crypto.randomUUID(),
-      todoId,
-      type: "title",
-      payload: { title: "Buy milk" },
-      label: 'Rename to "Buy milk"',
-      status: "pending",
-      ...overrides,
-    })
-    .returning();
-  return inserted;
-}
-
 export async function cleanDb() {
-  await env.DB.exec("DELETE FROM todo_messages");
-  await env.DB.exec("DELETE FROM todo_suggestions");
   await env.DB.exec("DELETE FROM todo_urls");
   await env.DB.exec("DELETE FROM todos");
   await env.DB.exec("DELETE FROM lists");

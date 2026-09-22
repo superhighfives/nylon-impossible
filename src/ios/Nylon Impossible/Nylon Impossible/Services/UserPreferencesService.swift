@@ -15,7 +15,6 @@ final class UserPreferencesService {
     /// `com.nylonimpossible.lastSyncedAt`) and avoid collisions.
     private static let hideCompletedDefaultsKey = "com.nylonimpossible.hideCompleted"
 
-    var aiEnabled: Bool = true
     var plan: String = "free"
     var location: String? = nil
     /// Appearance preference: "light" | "dark" | "system". Synced across devices.
@@ -37,8 +36,7 @@ final class UserPreferencesService {
     var isLoading: Bool = false
     var error: Error?
 
-    /// Whether the user is on the paid plan. AI is no longer gated on this —
-    /// it follows the `aiEnabled` toggle — but the plan is still tracked.
+    /// Whether the user is on the paid plan.
     var isPro: Bool { plan == "pro" }
 
     init(apiService: APIService) {
@@ -60,7 +58,6 @@ final class UserPreferencesService {
 
         do {
             let user = try await apiService.getMe()
-            aiEnabled = user.aiEnabled
             plan = user.plan ?? "free"
             location = user.location
             theme = user.theme ?? "system"
@@ -73,21 +70,6 @@ final class UserPreferencesService {
         isLoading = false
     }
 
-    func setAI(enabled: Bool) async {
-        let previousValue = aiEnabled
-        aiEnabled = enabled
-        error = nil
-
-        do {
-            let user = try await apiService.updateMe(UpdateUserRequest(aiEnabled: enabled, location: nil))
-            aiEnabled = user.aiEnabled
-        } catch {
-            aiEnabled = previousValue
-            self.error = error
-            print("Failed to update AI preference: \(error)")
-        }
-    }
-
     func setTheme(_ newTheme: String) async {
         let previousTheme = theme
         theme = newTheme
@@ -95,7 +77,7 @@ final class UserPreferencesService {
 
         do {
             let user = try await apiService.updateMe(
-                UpdateUserRequest(aiEnabled: nil, location: nil, theme: newTheme))
+                UpdateUserRequest(location: nil, theme: newTheme))
             theme = user.theme ?? "system"
         } catch {
             theme = previousTheme
@@ -111,7 +93,7 @@ final class UserPreferencesService {
 
         do {
             let user = try await apiService.updateMe(
-                UpdateUserRequest(aiEnabled: nil, location: nil, hideCompleted: newValue))
+                UpdateUserRequest(location: nil, hideCompleted: newValue))
             hideCompleted = user.hideCompleted ?? false
         } catch {
             hideCompleted = previousValue
@@ -128,7 +110,7 @@ final class UserPreferencesService {
         error = nil
 
         do {
-            let user = try await apiService.updateMe(UpdateUserRequest(aiEnabled: nil, location: .some(newLocation)))
+            let user = try await apiService.updateMe(UpdateUserRequest(location: .some(newLocation)))
             location = user.location
         } catch {
             location = previousLocation

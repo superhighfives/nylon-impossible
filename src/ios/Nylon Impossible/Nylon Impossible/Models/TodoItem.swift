@@ -8,14 +8,6 @@
 import Foundation
 import SwiftData
 
-/// AI processing status for todos
-enum TodoAIStatus: String, Codable, CaseIterable {
-    case pending
-    case processing
-    case complete
-    case failed
-}
-
 /// Recurrence frequency for a repeating todo. Anchored on the todo's `dueDate`.
 enum RecurrenceFrequency: String, Codable, CaseIterable {
     case daily
@@ -78,25 +70,12 @@ final class TodoItem {
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
     var recurrenceFrequency: String?  // RecurrenceFrequency raw value; nil = non-repeating
-    var aiStatus: String?         // AI processing status: pending, processing, complete, failed
-    // When enrichment actually kicked off, used to time-box the spinner. Distinct
-    // from `createdAt`: enrichment is deferred (fired in SyncService once the todo
-    // syncs), so for an offline-created todo it can start long after creation.
-    var aiStartedAt: Date?
-    var needsInput: Bool = false  // Agent has posted a question awaiting the user's reply
     // Sticky todos render above non-sticky ones and are reordered within their
     // own tier only. Clears to false when the todo is completed. Subtasks
     // never get this — no row toggle, no edit-sheet option.
     var sticky: Bool = false
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
-    // AI actions the user requested when creating the todo, but which can only
-    // run once the todo exists on the server. Set locally at creation and fired
-    // (then cleared) after the item syncs — so an enrich chosen while offline
-    // still takes effect on reconnect rather than being lost.
-    var pendingEnrich: Bool = false
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
-    @Relationship(deleteRule: .cascade) var messages: [TodoMessage] = []
-    @Relationship(deleteRule: .cascade) var suggestions: [TodoSuggestion] = []
 
     init(title: String, userId: String? = nil, position: String = "a0") {
         self.id = UUID()
@@ -115,12 +94,8 @@ final class TodoItem {
         self.isDeleted = false
         self.dueDate = nil
         self.recurrenceFrequency = nil
-        self.aiStatus = nil
-        self.needsInput = false
         self.sticky = false
         self.pendingUrls = []
-        self.pendingEnrich = false
-        self.aiStartedAt = nil
     }
     
     /// Mark as modified (for sync tracking)
@@ -156,33 +131,4 @@ final class TodoItem {
         return dueDate < Date()
     }
     
-    /// Get AI status as enum
-    var todoAIStatus: TodoAIStatus? {
-        get {
-            guard let aiStatus = aiStatus else { return nil }
-            return TodoAIStatus(rawValue: aiStatus)
-        }
-        set {
-            aiStatus = newValue?.rawValue
-        }
-    }
-    
-    /// Check if AI is currently processing this todo.
-    /// Considered stale after 60 seconds (2x the 30s enrichment timeout)
-    /// so the spinner auto-hides if the server failed to update the status.
-    /// Timed from `aiStartedAt` (when enrichment was actually kicked off) rather
-    /// than `createdAt`, so an enrich deferred past creation — e.g. requested
-    /// offline and fired minutes later on reconnect — still shows the spinner.
-    /// Falls back to `createdAt` for AI status arriving from the server (web /
-    /// another device), where no local start time was stamped.
-    var isAIProcessing: Bool {
-        guard todoAIStatus == .pending || todoAIStatus == .processing else { return false }
-        return Date().timeIntervalSince(aiStartedAt ?? createdAt) < 60
-    }
-
-    /// True when the agent has proposed changes the user hasn't reviewed yet.
-    /// Drives the yellow "needs attention" dot in the list row.
-    var hasPendingSuggestions: Bool {
-        suggestions.contains { $0.isPending }
-    }
 }

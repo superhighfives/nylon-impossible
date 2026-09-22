@@ -4,7 +4,6 @@ export interface AdminUserListItem {
   id: string;
   email: string;
   plan: "free" | "pro";
-  aiEnabled: boolean;
   todoCount: number;
   createdAt: string;
 }
@@ -14,7 +13,6 @@ export interface AdminUserDetail extends AdminUserListItem {
   updatedAt: string;
   diagnostics: {
     todoCount: number;
-    messageCount: number;
     lastTodoUpdatedAt: string | null;
   };
 }
@@ -63,7 +61,6 @@ export function getUser(token: string, id: string) {
 
 export interface AdminUserUpdate {
   plan?: "free" | "pro";
-  aiEnabled?: boolean;
   location?: string | null;
 }
 
@@ -71,7 +68,6 @@ export interface UpdateUserResponse {
   id: string;
   email: string;
   plan: "free" | "pro";
-  aiEnabled: boolean;
   location: string | null;
   updatedAt: string;
 }

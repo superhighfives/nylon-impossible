@@ -521,13 +521,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "priority": {
-          "name": "priority",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "completed": {
           "name": "completed",
           "type": "integer",

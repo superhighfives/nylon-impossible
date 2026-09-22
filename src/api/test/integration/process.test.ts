@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todos, todoUrls, users } from "../../src/lib/db";
+import { getDb, todos, todoUrls } from "../../src/lib/db";
 import {
   applyLinkTitle,
   finishTodoLinks,
@@ -114,21 +114,6 @@ describe("Link processing", () => {
       const res = await callProcess(id);
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({ status: "idle", links: 0 });
-    });
-
-    it("runs with AI turned off — it isn't an AI feature", async () => {
-      const db = getDb(env.DB);
-      await db
-        .update(users)
-        .set({ aiEnabled: false })
-        .where(eq(users.id, "user_test_123"));
-      const id = crypto.randomUUID();
-      await seedTodo(id, "user_test_123", { title: "Check x.com" });
-      await seedTodoUrl(id, TWEET_URL);
-
-      const res = await callProcess(id);
-      expect(res.status).toBe(200);
-      expect(await res.json()).toMatchObject({ links: 1 });
     });
 
     it("404s for another user's todo", async () => {

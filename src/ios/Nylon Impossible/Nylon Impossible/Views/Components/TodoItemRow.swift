@@ -303,33 +303,8 @@ struct TodoItemRow: View {
             // activation VoiceOver expects. A gesture on a container carries no
             // such semantics on its own.
             VStack(alignment: .leading, spacing: 4) {
-                // Title row with AI status.
                 HStack(spacing: 6) {
                     titleView
-
-                    // AI processing indicator
-                    if todo.isAIProcessing {
-                        ProgressView()
-                            .scaleEffect(0.7)
-                            .tint(Color.appSubtle)
-                            .accessibilityLabel("AI is processing")
-                    }
-
-                    // Agent has a question awaiting the user's reply
-                    if todo.needsInput {
-                        Image(systemName: "bubble.left.fill")
-                            .font(.system(size: 11))
-                            .foregroundStyle(Color.appAccent)
-                            .accessibilityLabel("The assistant has a question")
-                    }
-
-                    // Agent has proposed changes awaiting review
-                    if todo.hasPendingSuggestions {
-                        Circle()
-                            .fill(Color.appAccent)
-                            .frame(width: 8, height: 8)
-                            .accessibilityLabel("AI has suggestions")
-                    }
 
                     // Subtask progress (n/m), mirroring the web badge.
                     if !subtasks.isEmpty {

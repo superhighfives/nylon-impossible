@@ -34,6 +34,7 @@ import {
   useState,
   type WheelEvent,
 } from "react";
+import { EditableSidePanelTitle } from "@/components/EditableSidePanelTitle";
 import {
   CompletedColumn,
   ErrorState,
@@ -1157,7 +1158,17 @@ export function TodoGrid() {
             onOpenChange={(open) => {
               if (!open) setExpandedId(null);
             }}
-            title={expandedTodo?.title ?? "Todo details"}
+            title={
+              expandedTodo ? (
+                <EditableSidePanelTitle
+                  key={expandedTodo.id}
+                  todo={expandedTodo}
+                  onUpdate={handleUpdateExpanded(expandedTodo.id)}
+                />
+              ) : (
+                "Todo details"
+              )
+            }
           >
             {expandedTodo && (
               <ExpandedSection
