@@ -61,16 +61,15 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   c.set("role", auth.role);
   Sentry.setUser({ id: auth.userId });
 
-  // Load user preferences + plan in one query
+  // Load user plan
   const db = getDb(c.env.DB);
   const user = await db
-    .select({ aiEnabled: users.aiEnabled, plan: users.plan })
+    .select({ plan: users.plan })
     .from(users)
     .where(eq(users.id, auth.userId))
     .limit(1)
     .then((rows) => rows[0]);
 
-  c.set("aiEnabled", user?.aiEnabled ?? true);
   c.set("plan", user?.plan ?? "free");
 
   await next();

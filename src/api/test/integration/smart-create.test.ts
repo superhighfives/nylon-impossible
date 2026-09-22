@@ -2,7 +2,7 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoUrls, users } from "../../src/lib/db";
+import { getDb, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -12,31 +12,12 @@ const mockVerifyToken = verifyToken as ReturnType<
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 
-async function smartCreate(
-  text: string,
-  opts: { enrich?: boolean } = {},
-) {
+async function smartCreate(text: string) {
   return SELF.fetch("http://localhost/todos/smart", {
     method: "POST",
     headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-    body: JSON.stringify({ text, ...opts }),
+    body: JSON.stringify({ text }),
   });
-}
-
-async function enableAI() {
-  const db = getDb(env.DB);
-  await db
-    .update(users)
-    .set({ aiEnabled: true })
-    .where(eq(users.id, "user_test_123"));
-}
-
-async function disableAI() {
-  const db = getDb(env.DB);
-  await db
-    .update(users)
-    .set({ aiEnabled: false })
-    .where(eq(users.id, "user_test_123"));
 }
 
 describe("Smart create endpoint", () => {
@@ -47,20 +28,14 @@ describe("Smart create endpoint", () => {
     await seedUser();
   });
 
-  describe("immediate creation (AI disabled)", () => {
-    beforeEach(async () => {
-      await disableAI();
-    });
-
+  describe("immediate creation", () => {
     it("creates single todo from simple text", async () => {
       const res = await smartCreate("Buy milk");
       expect(res.status).toBe(200);
 
-      const body = await res.json<{ todos: any[]; ai: boolean }>();
+      const body = await res.json<{ todos: any[] }>();
       expect(body.todos).toHaveLength(1);
       expect(body.todos[0].title).toBe("Buy milk");
-      expect(body.todos[0].aiStatus).toBeNull();
-      expect(body.ai).toBe(false);
     });
 
     it("creates todo with trimmed text", async () => {
@@ -90,72 +65,6 @@ describe("Smart create endpoint", () => {
       expect(body.todos).toHaveLength(1);
       // Title must be truncated to 500 chars max
       expect(body.todos[0].title.length).toBeLessThanOrEqual(500);
-    });
-  });
-
-  describe("immediate creation (AI enabled + enrich requested)", () => {
-    beforeEach(async () => {
-      await enableAI();
-    });
-
-    it("creates todo immediately with aiStatus pending when enrich is requested", async () => {
-      const res = await smartCreate("buy milk and eggs tomorrow", {
-        enrich: true,
-      });
-      expect(res.status).toBe(200);
-
-      const body = await res.json<{ todos: any[]; ai: boolean }>();
-      expect(body.todos).toHaveLength(1);
-      // Todo is created immediately with original text
-      expect(body.todos[0].title).toBe("buy milk and eggs tomorrow");
-      // AI processing happens in background
-      expect(body.todos[0].aiStatus).toBe("pending");
-      expect(body.ai).toBe(true);
-    });
-
-    it("creates todo with aiStatus pending for multi-line text", async () => {
-      const res = await smartCreate("Buy milk\nCall mom", { enrich: true });
-      expect(res.status).toBe(200);
-
-      const body = await res.json<{ todos: any[]; ai: boolean }>();
-      // Immediately creates single todo with full text
-      expect(body.todos).toHaveLength(1);
-      expect(body.todos[0].aiStatus).toBe("pending");
-      expect(body.ai).toBe(true);
-    });
-
-    it("does NOT run AI when enrich is not requested (intentional opt-in)", async () => {
-      const res = await smartCreate("buy milk and eggs tomorrow");
-      expect(res.status).toBe(200);
-
-      const body = await res.json<{ todos: any[]; ai: boolean }>();
-      expect(body.todos).toHaveLength(1);
-      expect(body.todos[0].aiStatus).toBeNull();
-      expect(body.ai).toBe(false);
-    });
-  });
-
-  describe("plan-independent AI", () => {
-    beforeEach(async () => {
-      // AI is gated on aiEnabled only — plan no longer matters.
-      await enableAI();
-      const db = getDb(env.DB);
-      await db
-        .update(users)
-        .set({ plan: "free" })
-        .where(eq(users.id, "user_test_123"));
-    });
-
-    it("runs AI for free-plan users when enrich is requested", async () => {
-      const res = await smartCreate("buy milk and eggs tomorrow", {
-        enrich: true,
-      });
-      expect(res.status).toBe(200);
-
-      const body = await res.json<{ todos: any[]; ai: boolean }>();
-      expect(body.todos).toHaveLength(1);
-      expect(body.todos[0].aiStatus).toBe("pending");
-      expect(body.ai).toBe(true);
     });
   });
 

@@ -1,8 +1,8 @@
 {
-  "id": "396dda2c-ff6e-4d9d-85e2-4fe9f660cf80",
-  "prevId": "eb87f886-db02-45f3-9172-3bfc2b17bc2d",
   "version": "6",
   "dialect": "sqlite",
+  "id": "2a92f8dc-b2b9-404c-a525-843db5cf1f5e",
+  "prevId": "5f67db4a-762b-44b0-8f03-66eb856aeb1c",
   "tables": {
     "gmail_addon_links": {
       "name": "gmail_addon_links",
@@ -50,15 +50,15 @@
         "gmail_addon_links_clerk_user_id_users_id_fk": {
           "name": "gmail_addon_links_clerk_user_id_users_id_fk",
           "tableFrom": "gmail_addon_links",
+          "tableTo": "users",
           "columnsFrom": [
             "clerk_user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -89,6 +89,21 @@
           "notNull": true,
           "autoincrement": false
         },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'custom'"
+        },
+        "system_kind": {
+          "name": "system_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "position": {
           "name": "position",
           "type": "text",
@@ -112,21 +127,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
-        },
-        "kind": {
-          "name": "kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'custom'"
-        },
-        "system_kind": {
-          "name": "system_kind",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         }
       },
       "indexes": {
@@ -150,303 +150,15 @@
         "lists_user_id_users_id_fk": {
           "name": "lists_user_id_users_id_fk",
           "tableFrom": "lists",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_messages": {
-      "name": "todo_messages",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "todo_id": {
-          "name": "todo_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "role": {
-          "name": "role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "content": {
-          "name": "content",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        },
-        "awaiting_reply": {
-          "name": "awaiting_reply",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        }
-      },
-      "indexes": {
-        "idx_todo_messages_todo_id": {
-          "name": "idx_todo_messages_todo_id",
-          "columns": [
-            "todo_id",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todo_messages_todo_id_todos_id_fk": {
-          "name": "todo_messages_todo_id_todos_id_fk",
-          "tableFrom": "todo_messages",
-          "columnsFrom": [
-            "todo_id"
-          ],
-          "tableTo": "todos",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_research": {
-      "name": "todo_research",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "todo_id": {
-          "name": "todo_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'pending'"
-        },
-        "research_type": {
-          "name": "research_type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'general'"
-        },
-        "summary": {
-          "name": "summary",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "search_query": {
-          "name": "search_query",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "researched_at": {
-          "name": "researched_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "todo_research_todo_id_unique": {
-          "name": "todo_research_todo_id_unique",
-          "columns": [
-            "todo_id"
-          ],
-          "isUnique": true
-        },
-        "idx_todo_research_todo_id": {
-          "name": "idx_todo_research_todo_id",
-          "columns": [
-            "todo_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todo_research_status": {
-          "name": "idx_todo_research_status",
-          "columns": [
-            "status"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todo_research_todo_id_todos_id_fk": {
-          "name": "todo_research_todo_id_todos_id_fk",
-          "tableFrom": "todo_research",
-          "columnsFrom": [
-            "todo_id"
-          ],
-          "tableTo": "todos",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_suggestions": {
-      "name": "todo_suggestions",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "todo_id": {
-          "name": "todo_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "payload": {
-          "name": "payload",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "label": {
-          "name": "label",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'pending'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "idx_todo_suggestions_todo_id": {
-          "name": "idx_todo_suggestions_todo_id",
-          "columns": [
-            "todo_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todo_suggestions_status": {
-          "name": "idx_todo_suggestions_status",
-          "columns": [
-            "status"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todo_suggestions_todo_id_todos_id_fk": {
-          "name": "todo_suggestions_todo_id_todos_id_fk",
-          "tableFrom": "todo_suggestions",
-          "columnsFrom": [
-            "todo_id"
-          ],
-          "tableTo": "todos",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -468,13 +180,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "research_id": {
-          "name": "research_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "url": {
@@ -574,41 +279,21 @@
             "todo_id"
           ],
           "isUnique": false
-        },
-        "idx_todo_urls_research_id": {
-          "name": "idx_todo_urls_research_id",
-          "columns": [
-            "research_id"
-          ],
-          "isUnique": false
         }
       },
       "foreignKeys": {
         "todo_urls_todo_id_todos_id_fk": {
           "name": "todo_urls_todo_id_todos_id_fk",
           "tableFrom": "todo_urls",
+          "tableTo": "todos",
           "columnsFrom": [
             "todo_id"
           ],
-          "tableTo": "todos",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
-        },
-        "todo_urls_research_id_todo_research_id_fk": {
-          "name": "todo_urls_research_id_todo_research_id_fk",
-          "tableFrom": "todo_urls",
-          "columnsFrom": [
-            "research_id"
-          ],
-          "tableTo": "todo_research",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -721,21 +406,6 @@
           "autoincrement": false,
           "default": "(unixepoch())"
         },
-        "ai_status": {
-          "name": "ai_status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "needs_input": {
-          "name": "needs_input",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "google_task_id": {
           "name": "google_task_id",
           "type": "text",
@@ -777,14 +447,6 @@
           ],
           "isUnique": false
         },
-        "idx_todos_user_google_task": {
-          "name": "idx_todos_user_google_task",
-          "columns": [
-            "user_id",
-            "google_task_id"
-          ],
-          "isUnique": true
-        },
         "idx_todos_user_list_position": {
           "name": "idx_todos_user_list_position",
           "columns": [
@@ -793,47 +455,55 @@
             "position"
           ],
           "isUnique": false
+        },
+        "idx_todos_user_google_task": {
+          "name": "idx_todos_user_google_task",
+          "columns": [
+            "user_id",
+            "google_task_id"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
         "todos_user_id_users_id_fk": {
           "name": "todos_user_id_users_id_fk",
           "tableFrom": "todos",
+          "tableTo": "users",
           "columnsFrom": [
             "user_id"
           ],
-          "tableTo": "users",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "todos_parent_id_todos_id_fk": {
           "name": "todos_parent_id_todos_id_fk",
           "tableFrom": "todos",
+          "tableTo": "todos",
           "columnsFrom": [
             "parent_id"
           ],
-          "tableTo": "todos",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         },
         "todos_list_id_lists_id_fk": {
           "name": "todos_list_id_lists_id_fk",
           "tableFrom": "todos",
+          "tableTo": "lists",
           "columnsFrom": [
             "list_id"
           ],
-          "tableTo": "lists",
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "cascade"
+          "onDelete": "cascade",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -856,14 +526,6 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
-        },
-        "ai_enabled": {
-          "name": "ai_enabled",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": true
         },
         "plan": {
           "name": "plan",
@@ -896,6 +558,14 @@
           "autoincrement": false,
           "default": false
         },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UTC'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -911,14 +581,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
-        },
-        "timezone": {
-          "name": "timezone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "'UTC'"
         }
       },
       "indexes": {
@@ -939,9 +601,9 @@
   "views": {},
   "enums": {},
   "_meta": {
-    "columns": {},
     "schemas": {},
-    "tables": {}
+    "tables": {},
+    "columns": {}
   },
   "internal": {
     "indexes": {}

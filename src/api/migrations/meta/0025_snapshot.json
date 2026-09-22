@@ -698,13 +698,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "priority": {
-          "name": "priority",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "recurrence": {
           "name": "recurrence",
           "type": "text",

@@ -1,13 +1,13 @@
 import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoMessages, todos } from "../../src/lib/db";
+import { getDb, todos } from "../../src/lib/db";
 import {
   listOpenTodos,
   setTodoCompleted,
   updateTodoCore,
 } from "../../src/lib/todos-core";
-import { cleanDb, seedMessage, seedTodo, seedUser } from "../helpers";
+import { cleanDb, seedTodo, seedUser } from "../helpers";
 
 const USER = "user_test_123";
 
@@ -95,31 +95,6 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
       [childRow] = await db.select().from(todos).where(eq(todos.id, child));
       expect(childRow.completed).toBe(false);
     });
-
-    it("clears needsInput and the awaiting-reply message on completion", async () => {
-      const id = "99999999-9999-9999-9999-999999999999";
-      await seedTodo(id, USER, {
-        title: "Answer the question",
-        completed: false,
-        needsInput: true,
-      });
-      const message = await seedMessage(id, {
-        role: "assistant",
-        awaitingReply: true,
-      });
-
-      await setTodoCompleted(getDb(env.DB), env, USER, id, true);
-
-      const db = getDb(env.DB);
-      const [todo] = await db.select().from(todos).where(eq(todos.id, id));
-      expect(todo.completed).toBe(true);
-      expect(todo.needsInput).toBe(false);
-      const [reloaded] = await db
-        .select()
-        .from(todoMessages)
-        .where(eq(todoMessages.id, message.id));
-      expect(reloaded.awaitingReply).toBe(false);
-    });
   });
 
   describe("updateTodoCore", () => {
@@ -188,31 +163,6 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
       const db = getDb(env.DB);
       const [childRow] = await db.select().from(todos).where(eq(todos.id, child));
       expect(childRow.completed).toBe(true);
-    });
-
-    it("clears needsInput and the awaiting-reply message on completion", async () => {
-      const id = "aaaaaaaa-6666-6666-6666-666666666666";
-      await seedTodo(id, USER, {
-        title: "Answer the question",
-        completed: false,
-        needsInput: true,
-      });
-      const message = await seedMessage(id, {
-        role: "assistant",
-        awaitingReply: true,
-      });
-
-      await updateTodoCore(getDb(env.DB), env, USER, id, { completed: true });
-
-      const db = getDb(env.DB);
-      const [todo] = await db.select().from(todos).where(eq(todos.id, id));
-      expect(todo.completed).toBe(true);
-      expect(todo.needsInput).toBe(false);
-      const [reloaded] = await db
-        .select()
-        .from(todoMessages)
-        .where(eq(todoMessages.id, message.id));
-      expect(reloaded.awaitingReply).toBe(false);
     });
   });
 });

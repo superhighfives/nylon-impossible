@@ -65,8 +65,7 @@ describe("Google Tasks import", () => {
     mockVerifyToken.mockReset();
     mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
     mockCreateClerkClient.mockReset();
-    // AI off keeps the import on the fast (non-AI) path for deterministic tests.
-    await seedUser("user_test_123", "test@example.com", { aiEnabled: false });
+    await seedUser("user_test_123", "test@example.com");
   });
 
   afterEach(() => {

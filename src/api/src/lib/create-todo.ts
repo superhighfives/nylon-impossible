@@ -1,7 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
-import { enrichOrAskWithAI } from "./ai-enrich";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
@@ -28,7 +27,6 @@ export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
-    aiStatus: todo.aiStatus,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -90,10 +88,6 @@ function createInitialTodo(text: string): {
 }
 
 export interface CreateSmartTodoOptions {
-  /** Master AI switch for the user (from `users.aiEnabled`). */
-  aiEnabled: boolean;
-  /** Run the enrichment model. */
-  enrich?: boolean;
   /**
    * Extra URLs to attach beyond those parsed from `text` — e.g. a link the
    * caller wants fetched for metadata. Deduped against parsed URLs; never
@@ -128,7 +122,6 @@ export interface CreateSmartTodoOptions {
 
 export interface CreateSmartTodoResult {
   todo: ReturnType<typeof serializeCreatedTodo>;
-  ai: boolean;
 }
 
 /**
@@ -161,11 +154,6 @@ export async function createSmartTodo(
   options: CreateSmartTodoOptions,
 ): Promise<CreateSmartTodoResult> {
   const trimmed = text.trim();
-
-  // AI is intentional: it only runs when the caller explicitly asks for it, and
-  // only while the user's `aiEnabled` master switch is on. Plan does not gate
-  // AI — it's available to anyone with AI turned on.
-  const useAI = options.enrich === true && options.aiEnabled;
 
   const parentId = options.parentId ?? null;
   // Subtasks are implicitly scoped to their parent's list. Top-level todos
@@ -256,7 +244,6 @@ export async function createSmartTodo(
     title: initial.title,
     completed: false,
     position,
-    aiStatus: useAI ? "pending" : null,
     createdAt: now,
     updatedAt: now,
   });
@@ -296,13 +283,6 @@ export async function createSmartTodo(
     }
   }
 
-  // If AI is enabled, enrich in background
-  if (useAI) {
-    options.waitUntil(
-      enrichOrAskWithAI(db, env.AI, env, todoId, userId, trimmed),
-    );
-  }
-
   // Fetch the created todo to return
   const created = await db
     .select()
@@ -319,7 +299,7 @@ export async function createSmartTodo(
 
   await notifySync(env, userId);
 
-  return { todo: serializeCreatedTodo(created), ai: useAI };
+  return { todo: serializeCreatedTodo(created) };
 }
 
 /**

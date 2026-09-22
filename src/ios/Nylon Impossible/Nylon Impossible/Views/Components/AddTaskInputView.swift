@@ -7,19 +7,9 @@
 
 import SwiftUI
 
-/// How a new todo should be created. AI is intentional — `.plain` is the default
-/// and runs no AI; the others opt in per create.
-enum AICreateOption {
-    case plain
-    case enrich
-}
-
 struct AddTaskInputView: View {
     @Binding var text: String
     var canAdd: Bool
-    // When true (aiEnabled), the add button becomes a split button whose
-    // long-press menu offers enrich. A plain tap always adds with no AI.
-    var aiAvailable: Bool = false
     // The selected list's `promptPhrase` ("today", "this week", "sometime"),
     // folded into the placeholder so the field also says which list you're
     // adding to. nil for custom lists — see TodoListModel.promptPhrase.
@@ -29,7 +19,7 @@ struct AddTaskInputView: View {
     // been taken, so it reads as a one-shot request rather than a state the
     // caller has to keep in sync with the keyboard.
     var focusRequested: Binding<Bool> = .constant(false)
-    var onAdd: (AICreateOption) -> Void
+    var onAdd: () -> Void
 
     @FocusState private var isFocused: Bool
 
@@ -51,7 +41,7 @@ struct AddTaskInputView: View {
                 .lineLimit(1...4)
                 .onSubmit {
                     if canAdd {
-                        onAdd(.plain)
+                        onAdd()
                     }
                 }
                 // A vertical-axis TextField's Return key inserts a newline
@@ -65,7 +55,7 @@ struct AddTaskInputView: View {
                     else { return }
                     text = String(newValue.dropLast())
                     if canAdd {
-                        onAdd(.plain)
+                        onAdd()
                     }
                 }
                 // Dictation is enabled by default on iOS TextField; keyboardType
@@ -110,36 +100,15 @@ struct AddTaskInputView: View {
         Task { isFocused = true }
     }
 
-    /// The add affordance. With AI available it's a split button: a plain tap
-    /// adds with no AI (primaryAction), a long-press opens enrich.
-    /// Otherwise it's a plain add button.
-    @ViewBuilder
+    /// The add affordance.
     private var addButton: some View {
-        if aiAvailable {
-            Menu {
-                Button {
-                    onAdd(.enrich)
-                    isFocused = false
-                } label: {
-                    Label("Add + enrich", systemImage: "sparkles")
-                }
-            } label: {
-                addButtonLabel
-            } primaryAction: {
-                onAdd(.plain)
-                isFocused = false
-            }
-            .accessibilityLabel("Add todo")
-            .accessibilityHint("Long press for AI options")
-        } else {
-            Button {
-                onAdd(.plain)
-                isFocused = false
-            } label: {
-                addButtonLabel
-            }
-            .accessibilityLabel("Add todo")
+        Button {
+            onAdd()
+            isFocused = false
+        } label: {
+            addButtonLabel
         }
+        .accessibilityLabel("Add todo")
     }
 
     private var addButtonLabel: some View {
@@ -161,24 +130,23 @@ struct AddTaskInputView: View {
             AddTaskInputView(
                 text: .constant(""),
                 canAdd: false,
-                onAdd: { _ in }
+                onAdd: {}
             )
             AddTaskInputView(
                 text: .constant(""),
                 canAdd: false,
                 listPhrase: "this week",
-                onAdd: { _ in }
+                onAdd: {}
             )
             AddTaskInputView(
                 text: .constant("Buy groceries"),
                 canAdd: true,
-                onAdd: { _ in }
+                onAdd: {}
             )
             AddTaskInputView(
                 text: .constant("Plan a birthday party"),
                 canAdd: true,
-                aiAvailable: true,
-                onAdd: { _ in }
+                onAdd: {}
             )
         }
         .padding()

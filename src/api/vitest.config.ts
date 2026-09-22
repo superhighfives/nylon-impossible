@@ -6,17 +6,11 @@ import {
 import { Log, LogLevel } from "miniflare";
 import { defineConfig } from "vitest/config";
 
-// Use AI-enabled config when RUN_AI_TESTS=true
-const useAI = process.env.RUN_AI_TESTS === "true";
-const wranglerConfig = useAI
-  ? "./wrangler.test-ai.jsonc"
-  : "./wrangler.test.jsonc";
-
 export default defineConfig(async () => {
   const migrationsPath = path.join(__dirname, "migrations");
   const migrations = await readD1Migrations(migrationsPath);
 
-  // Build aliases - always mock Clerk, optionally mock AI
+  // Build aliases - always mock Clerk
   const aliases: Record<string, string> = {
     "@clerk/backend": path.join(
       __dirname,
@@ -27,9 +21,6 @@ export default defineConfig(async () => {
   };
 
   // Always mock URL metadata fetching to prevent real HTTP requests in tests.
-  // (The AI side is mocked via test/setup-mocks.ts using vi.mock — aliases
-  // here only fire on literal import-string matches, so they couldn't reach
-  // ai-enrich.ts's `./ai` import or the handlers' background enrichment.)
   const urlMetadataMock = path.join(
     __dirname,
     "test",
@@ -41,20 +32,12 @@ export default defineConfig(async () => {
   aliases["../lib/url-metadata"] = urlMetadataMock;
   aliases["./url-metadata"] = urlMetadataMock;
 
-  // AI Gateway bindings for real AI tests (injected from environment)
-  const aiBindings = useAI
-    ? {
-        CF_ACCOUNT_ID: process.env.CLOUDFLARE_ACCOUNT_ID ?? "",
-        CLOUDFLARE_API_TOKEN: process.env.CLOUDFLARE_API_TOKEN ?? "",
-      }
-    : {};
-
   return {
     plugins: [
       cloudflareTest({
         isolatedStorage: false,
         singleWorker: true,
-        wrangler: { configPath: wranglerConfig },
+        wrangler: { configPath: "./wrangler.test.jsonc" },
         miniflare: {
           // Silence the [vpw:debug]/[vpw:info] compatibility-flag chatter that
           // miniflare prints for every isolate. WARN keeps real problems
@@ -64,7 +47,6 @@ export default defineConfig(async () => {
             TEST_MIGRATIONS: migrations,
             CLERK_SECRET_KEY: "sk_test_fake",
             CLERK_PUBLISHABLE_KEY: "pk_test_fake",
-            ...aiBindings,
           },
         },
       }),
@@ -73,7 +55,7 @@ export default defineConfig(async () => {
       alias: aliases,
     },
     test: {
-      setupFiles: ["./test/setup-mocks.ts", "./test/apply-migrations.ts"],
+      setupFiles: ["./test/apply-migrations.ts"],
     },
   };
 });

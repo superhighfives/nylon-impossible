@@ -1,16 +1,6 @@
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import {
-  count,
-  desc,
-  eq,
-  getDb,
-  lt,
-  sql,
-  todoMessages,
-  todos,
-  users,
-} from "../lib/db";
+import { count, desc, eq, getDb, lt, sql, todos, users } from "../lib/db";
 import { deleteUserCascade } from "../lib/delete-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
@@ -46,7 +36,6 @@ export async function listUsers(c: Context<Env>) {
       id: users.id,
       email: users.email,
       plan: users.plan,
-      aiEnabled: users.aiEnabled,
       createdAt: users.createdAt,
       // Columns must be table-qualified: drizzle renders interpolated column
       // refs unqualified, and a bare `id` inside `FROM todos` binds to todos.id
@@ -73,7 +62,6 @@ export async function listUsers(c: Context<Env>) {
       id: u.id,
       email: u.email,
       plan: u.plan,
-      aiEnabled: u.aiEnabled,
       todoCount: Number(u.todoCount),
       createdAt: u.createdAt.toISOString(),
     })),
@@ -101,12 +89,6 @@ export async function getUser(c: Context<Env>) {
     .from(todos)
     .where(eq(todos.userId, id));
 
-  const [messageCountRow] = await db
-    .select({ value: count() })
-    .from(todoMessages)
-    .innerJoin(todos, eq(todoMessages.todoId, todos.id))
-    .where(eq(todos.userId, id));
-
   const lastTodo = await db
     .select({ updatedAt: todos.updatedAt })
     .from(todos)
@@ -119,13 +101,11 @@ export async function getUser(c: Context<Env>) {
     id: user.id,
     email: user.email,
     plan: user.plan,
-    aiEnabled: user.aiEnabled,
     location: user.location,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
     diagnostics: {
       todoCount: todoCountRow?.value ?? 0,
-      messageCount: messageCountRow?.value ?? 0,
       lastTodoUpdatedAt: lastTodo?.updatedAt.toISOString() ?? null,
     },
   });
@@ -133,7 +113,6 @@ export async function getUser(c: Context<Env>) {
 
 const updateUserSchema = z.object({
   plan: z.enum(["free", "pro"]).optional(),
-  aiEnabled: z.boolean().optional(),
   location: z.string().max(200).nullable().optional(),
 });
 
@@ -148,13 +127,9 @@ export async function updateUser(c: Context<Env>) {
 
   const updates: Partial<{
     plan: "free" | "pro";
-    aiEnabled: boolean;
     location: string | null;
   }> = {};
   if (parsed.data.plan !== undefined) updates.plan = parsed.data.plan;
-  if (parsed.data.aiEnabled !== undefined) {
-    updates.aiEnabled = parsed.data.aiEnabled;
-  }
   if (parsed.data.location !== undefined) {
     updates.location = parsed.data.location;
   }
@@ -183,7 +158,6 @@ export async function updateUser(c: Context<Env>) {
       id: users.id,
       email: users.email,
       plan: users.plan,
-      aiEnabled: users.aiEnabled,
       location: users.location,
       updatedAt: users.updatedAt,
     })
@@ -198,7 +172,6 @@ export async function updateUser(c: Context<Env>) {
     id: user.id,
     email: user.email,
     plan: user.plan,
-    aiEnabled: user.aiEnabled,
     location: user.location,
     updatedAt: user.updatedAt.toISOString(),
   });

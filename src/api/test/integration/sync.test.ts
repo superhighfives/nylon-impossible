@@ -3,7 +3,7 @@ import { verifyToken } from "@clerk/backend";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, lists, todos, todoUrls } from "../../src/lib/db";
-import { cleanDb, seedMessage, seedTodo, seedUser } from "../helpers";
+import { cleanDb, seedTodo, seedTodoUrl, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -57,19 +57,19 @@ describe("Sync endpoint", () => {
         title: `Todo ${i}`,
       });
     }
-    // Exercise the messages join too (the query that threw in production logs).
-    const withMessage = await seedTodo(crypto.randomUUID(), "user_test_123", {
-      title: "Has message",
+    // Exercise the URLs join too (the query that threw in production logs).
+    const withUrl = await seedTodo(crypto.randomUUID(), "user_test_123", {
+      title: "Has url",
     });
-    await seedMessage(withMessage.id);
+    await seedTodoUrl(withUrl.id, "https://example.com");
 
     const res = await syncRequest({ changes: [] });
     expect(res.status).toBe(200);
 
     const body = await res.json<any>();
     expect(body.todos).toHaveLength(TODO_COUNT + 1);
-    const messaged = body.todos.find((t: any) => t.id === withMessage.id);
-    expect(messaged?.messages).toHaveLength(1);
+    const withUrls = body.todos.find((t: any) => t.id === withUrl.id);
+    expect(withUrls?.urls).toHaveLength(1);
   });
 
   it("creates a new todo via sync", async () => {
@@ -622,87 +622,6 @@ describe("Sync endpoint", () => {
     });
   });
 
-  describe("conversation messages and needsInput", () => {
-    const TODO_ID = "33333333-3333-3333-3333-333333333333";
-
-    it("returns messages and needsInput on todos that have them", async () => {
-      await seedTodo(TODO_ID, "user_test_123", { needsInput: true });
-      await seedMessage(TODO_ID, {
-        role: "assistant",
-        content: "Where to, and when?",
-        awaitingReply: true,
-      });
-
-      const res = await syncRequest({ changes: [] });
-      expect(res.status).toBe(200);
-      const data = (await res.json()) as {
-        todos: Array<{
-          id: string;
-          needsInput: boolean;
-          messages: Array<{
-            role: string;
-            content: string;
-            awaitingReply: boolean;
-          }>;
-        }>;
-      };
-
-      const todo = data.todos.find((t) => t.id === TODO_ID);
-      expect(todo).toBeDefined();
-      expect(todo?.needsInput).toBe(true);
-      expect(todo?.messages).toHaveLength(1);
-      expect(todo?.messages[0]).toMatchObject({
-        role: "assistant",
-        content: "Where to, and when?",
-        awaitingReply: true,
-      });
-    });
-
-    it("returns an empty messages array and needsInput=false by default", async () => {
-      await seedTodo(TODO_ID, "user_test_123");
-
-      const res = await syncRequest({ changes: [] });
-      const data = (await res.json()) as {
-        todos: Array<{ id: string; needsInput: boolean; messages: unknown[] }>;
-      };
-      const todo = data.todos.find((t) => t.id === TODO_ID);
-      expect(todo?.needsInput).toBe(false);
-      expect(todo?.messages).toEqual([]);
-    });
-
-    it("returns messages in chronological order", async () => {
-      await seedTodo(TODO_ID, "user_test_123");
-      await seedMessage(TODO_ID, {
-        role: "assistant",
-        content: "first",
-        awaitingReply: false,
-        createdAt: new Date("2026-01-01T00:00:00.000Z"),
-      });
-      await seedMessage(TODO_ID, {
-        role: "user",
-        content: "second",
-        awaitingReply: false,
-        createdAt: new Date("2026-01-02T00:00:00.000Z"),
-      });
-      await seedMessage(TODO_ID, {
-        role: "assistant",
-        content: "third",
-        awaitingReply: true,
-        createdAt: new Date("2026-01-03T00:00:00.000Z"),
-      });
-
-      const res = await syncRequest({ changes: [] });
-      const data = (await res.json()) as {
-        todos: Array<{ id: string; messages: Array<{ content: string }> }>;
-      };
-      const todo = data.todos.find((t) => t.id === TODO_ID);
-      expect(todo?.messages.map((m) => m.content)).toEqual([
-        "first",
-        "second",
-        "third",
-      ]);
-    });
-  });
 });
 
 describe("Sync — subtasks", () => {

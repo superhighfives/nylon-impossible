@@ -18,7 +18,6 @@ import {
 } from "@/server/todos";
 import type {
   CreateTodoInput,
-  SuggestionType,
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
@@ -35,30 +34,11 @@ async function getApiError(response: Response): Promise<string | undefined> {
 
 const TODOS_QUERY_KEY = ["todos"];
 
-// AI enrichment has a 30s timeout (ENRICH_TIMEOUT_MS in ai.ts). Double it so
-// we don't hide the spinner while a legitimate enrichment is still running.
-export const STALE_AI_MS = 60 * 1_000;
-
-export function hasPendingNonStaleWork(todos: TodoWithUrls[]): boolean {
-  return todos.some((todo) => {
-    if (todo.aiStatus === "pending" || todo.aiStatus === "processing") {
-      const age = Date.now() - new Date(todo.createdAt).getTime();
-      return age < STALE_AI_MS;
-    }
-    return false;
-  });
-}
-
 export function useTodos() {
   const queryClient = useQueryClient();
   const query = useQuery<TodoWithUrls[]>({
     queryKey: TODOS_QUERY_KEY,
     queryFn: () => getTodos(),
-    refetchInterval: (q) => {
-      const data = q.state.data;
-      if (!data) return false;
-      return hasPendingNonStaleWork(data) ? 3000 : false;
-    },
   });
 
   // Keep the app badge in sync with the visible cache. Recomputed whenever
@@ -111,14 +91,10 @@ export function useCreateTodo() {
         position: input.position ?? "a0",
         dueDate: input.dueDate?.toISOString() ?? null,
         recurrence: input.recurrence ?? null,
-        aiStatus: null,
-        needsInput: false,
         sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        messages: [],
         urls: [],
-        suggestions: [],
       };
 
       queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
@@ -370,19 +346,16 @@ export function useTodoWithUrls(todoId: string | null) {
 
 interface SmartCreateResponse {
   todos: TodoWithUrls[];
-  ai: boolean;
 }
 
 export interface SmartCreateInput {
   text: string;
-  // AI is opt-in per create: `enrich` runs the enrichment model. Pro/aiEnabled
-  // -gated server-side.
-  enrich?: boolean;
 }
 
 /**
  * Hook to create todos via the smart create API endpoint.
- * Routes through AI extraction when the text contains multiple items or dates.
+ * Extracts URLs and titles from pasted text, splitting multiple lines into
+ * separate todos.
  */
 export function useSmartCreate() {
   const queryClient = useQueryClient();
@@ -392,7 +365,6 @@ export function useSmartCreate() {
   return useMutation({
     mutationFn: async ({
       text,
-      enrich,
     }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
@@ -401,7 +373,7 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text, enrich }),
+        body: JSON.stringify({ text }),
       });
 
       if (!response.ok) {
@@ -442,14 +414,10 @@ export function useSmartCreate() {
         position: generateKeyBetween(null, minPosition),
         dueDate: null,
         recurrence: null,
-        aiStatus: null,
-        needsInput: false,
         sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        messages: [],
         urls: [],
-        suggestions: [],
       };
 
       queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
@@ -579,357 +547,6 @@ export function useProcessTodo() {
     onError: (err) => {
       Sentry.captureException(err, { tags: { mutation: "processTodo" } });
       toast.error(messageFromError(err, "Couldn't process todo"));
-    },
-  });
-}
-
-/**
- * Hook to run AI enrichment on an existing todo on demand. AI is intentional —
- * nothing enriches automatically — so this backs the explicit per-todo "Enrich"
- * action. Marks the todo pending server-side; the result arrives via sync.
- */
-export function useEnrichTodo() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async (todoId: string) => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/${todoId}/enrich`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
-    },
-    onError: (err) => {
-      Sentry.captureException(err, { tags: { mutation: "enrichTodo" } });
-      toast.error(messageFromError(err, "Couldn't enrich todo"));
-    },
-  });
-}
-
-/**
- * Hook to reply to the agent's clarifying question on a todo.
- * Optimistically appends the user's message and clears the needs-input
- * indicator; re-enrichment runs server-side and arrives via sync.
- */
-export function useReplyToTodo() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({
-      todoId,
-      content,
-    }: {
-      todoId: string;
-      content: string;
-    }) => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/${todoId}/reply`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ content }),
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onMutate: async ({ todoId, content }) => {
-      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
-      const previousTodos =
-        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
-
-      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
-        old?.map((todo) =>
-          todo.id === todoId
-            ? {
-                ...todo,
-                needsInput: false,
-                messages: [
-                  ...todo.messages,
-                  {
-                    id: `temp-${crypto.randomUUID()}`,
-                    todoId,
-                    role: "user" as const,
-                    content,
-                    createdAt: new Date().toISOString(),
-                    awaitingReply: false,
-                  },
-                ],
-              }
-            : todo,
-        ),
-      );
-
-      return { previousTodos };
-    },
-    onError: (err, _vars, context) => {
-      if (context?.previousTodos) {
-        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
-      }
-      Sentry.captureException(err, { tags: { mutation: "replyToTodo" } });
-      toast.error(messageFromError(err, "Couldn't send reply"));
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
-    },
-  });
-}
-
-/**
- * Hook to dismiss the agent's open question without answering. Clears the
- * needs-input indicator optimistically; the message stays in history.
- */
-export function useDismissTodoQuestion() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({ todoId }: { todoId: string }) => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/${todoId}/question`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onMutate: async ({ todoId }) => {
-      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
-      const previousTodos =
-        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
-
-      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
-        old?.map((todo) =>
-          todo.id === todoId
-            ? {
-                ...todo,
-                needsInput: false,
-                messages: todo.messages.map((m) =>
-                  m.awaitingReply ? { ...m, awaitingReply: false } : m,
-                ),
-              }
-            : todo,
-        ),
-      );
-
-      return { previousTodos };
-    },
-    onError: (err, _vars, context) => {
-      if (context?.previousTodos) {
-        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
-      }
-      Sentry.captureException(err, { tags: { mutation: "dismissQuestion" } });
-      toast.error(messageFromError(err, "Couldn't dismiss question"));
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
-    },
-  });
-}
-
-/**
- * Apply a suggestion's field change to a todo locally, for optimistic accept.
- * Mirrors exactly what the server's accept handler does for the types that
- * map onto a single todo field (title/due_date/recurrence) — subtasks
- * create new rows server-side, so those are left for the settled refetch
- * instead of being synthesized here.
- */
-function applySuggestionLocally(
-  todo: TodoWithUrls,
-  type: SuggestionType,
-  payload: unknown,
-): TodoWithUrls {
-  switch (type) {
-    case "title":
-      return { ...todo, title: (payload as { title: string }).title };
-    case "due_date":
-      return { ...todo, dueDate: (payload as { dueDate: string }).dueDate };
-    case "recurrence":
-      return {
-        ...todo,
-        recurrence: (payload as { recurrence: TodoWithUrls["recurrence"] })
-          .recurrence,
-      };
-    default:
-      return todo;
-  }
-}
-
-/**
- * Hook to accept an enrichment suggestion. Optimistically applies the
- * suggested field change (where it maps onto a single todo field) and marks
- * the suggestion accepted; the settled refetch reconciles subtask rows and
- * anything the optimistic apply simplified.
- */
-export function useAcceptSuggestion() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({
-      todoId,
-      suggestionId,
-    }: {
-      todoId: string;
-      suggestionId: string;
-    }) => {
-      const token = await getToken();
-      const response = await fetch(
-        `${API_URL}/todos/${todoId}/suggestions/${suggestionId}/accept`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onMutate: async ({ todoId, suggestionId }) => {
-      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
-      const previousTodos =
-        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
-
-      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
-        old?.map((todo) => {
-          if (todo.id !== todoId) return todo;
-          const suggestion = todo.suggestions.find(
-            (s) => s.id === suggestionId,
-          );
-          if (!suggestion) return todo;
-          const applied = applySuggestionLocally(
-            todo,
-            suggestion.type,
-            suggestion.payload,
-          );
-          return {
-            ...applied,
-            suggestions: applied.suggestions.map((s) =>
-              s.id === suggestionId ? { ...s, status: "accepted" } : s,
-            ),
-          };
-        }),
-      );
-
-      return { previousTodos };
-    },
-    onError: (err, _vars, context) => {
-      if (context?.previousTodos) {
-        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
-      }
-      Sentry.captureException(err, { tags: { mutation: "acceptSuggestion" } });
-      toast.error(messageFromError(err, "Couldn't apply suggestion"));
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
-    },
-  });
-}
-
-/**
- * Hook to dismiss an enrichment suggestion. Terminal — a dismissed
- * suggestion never reappears, including across future re-enrich runs.
- */
-export function useDismissSuggestion() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async ({
-      todoId,
-      suggestionId,
-    }: {
-      todoId: string;
-      suggestionId: string;
-    }) => {
-      const token = await getToken();
-      const response = await fetch(
-        `${API_URL}/todos/${todoId}/suggestions/${suggestionId}/dismiss`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onMutate: async ({ todoId, suggestionId }) => {
-      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
-      const previousTodos =
-        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
-
-      queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, (old) =>
-        old?.map((todo) =>
-          todo.id === todoId
-            ? {
-                ...todo,
-                suggestions: todo.suggestions.map((s) =>
-                  s.id === suggestionId ? { ...s, status: "dismissed" } : s,
-                ),
-              }
-            : todo,
-        ),
-      );
-
-      return { previousTodos };
-    },
-    onError: (err, _vars, context) => {
-      if (context?.previousTodos) {
-        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
-      }
-      Sentry.captureException(err, {
-        tags: { mutation: "dismissSuggestion" },
-      });
-      toast.error(messageFromError(err, "Couldn't dismiss suggestion"));
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-      notifyChanged();
     },
   });
 }

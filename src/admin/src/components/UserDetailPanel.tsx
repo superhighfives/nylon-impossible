@@ -10,7 +10,6 @@ interface Props {
 
 interface EditForm {
   plan: "free" | "pro";
-  aiEnabled: boolean;
   location: string;
 }
 
@@ -22,7 +21,6 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<EditForm>({
     plan: "free",
-    aiEnabled: false,
     location: "",
   });
 
@@ -47,7 +45,6 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
     if (!detail) return;
     setForm({
       plan: detail.plan,
-      aiEnabled: detail.aiEnabled,
       location: detail.location ?? "",
     });
     setEditing(true);
@@ -62,13 +59,11 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
         form.location.trim() === "" ? null : form.location.trim();
       const updated = await updateUser(token, userId, {
         plan: form.plan,
-        aiEnabled: form.aiEnabled,
         location,
       });
       setDetail({
         ...detail,
         plan: updated.plan,
-        aiEnabled: updated.aiEnabled,
         location: updated.location,
         updatedAt: updated.updatedAt,
       });
@@ -162,17 +157,6 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
             </select>
           </label>
           <label className="flex items-center justify-between gap-4">
-            <span className="text-neutral-500">AI enabled</span>
-            <input
-              type="checkbox"
-              checked={form.aiEnabled}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, aiEnabled: e.target.checked }))
-              }
-              className="h-4 w-4"
-            />
-          </label>
-          <label className="flex items-center justify-between gap-4">
             <span className="text-neutral-500">Location</span>
             <input
               type="text"
@@ -216,7 +200,6 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
               {detail.plan}
             </span>
           </Row>
-          <Row label="AI enabled">{detail.aiEnabled ? "Yes" : "No"}</Row>
           <Row label="Location">{detail.location ?? "—"}</Row>
           <Row label="Created">
             {new Date(detail.createdAt).toLocaleString()}
@@ -232,7 +215,6 @@ export function UserDetailPanel({ userId, onClose, onDeleted }: Props) {
       </h3>
       <dl className="mt-3 space-y-3 text-sm">
         <Row label="Todos">{detail.diagnostics.todoCount}</Row>
-        <Row label="Messages">{detail.diagnostics.messageCount}</Row>
         <Row label="Last todo update">
           {detail.diagnostics.lastTodoUpdatedAt
             ? new Date(detail.diagnostics.lastTodoUpdatedAt).toLocaleString()

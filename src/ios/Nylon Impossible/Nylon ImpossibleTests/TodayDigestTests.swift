@@ -18,7 +18,7 @@ struct TodayDigestTests {
     private func makeContainer() throws -> ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         return try ModelContainer(
-            for: TodoItem.self, TodoUrl.self, TodoMessage.self, TodoSuggestion.self,
+            for: TodoItem.self, TodoUrl.self,
             TodoListModel.self,
             configurations: config
         )

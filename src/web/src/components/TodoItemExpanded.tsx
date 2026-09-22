@@ -6,18 +6,12 @@ import {
   Pin,
   PinOff,
   RefreshCw,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useHints } from "@/hooks/useHints";
-import {
-  useEnrichTodo,
-  useProcessTodo,
-  useUpdateUrlPreview,
-} from "@/hooks/useTodos";
-import { useUser } from "@/hooks/useUser";
+import { useProcessTodo, useUpdateUrlPreview } from "@/hooks/useTodos";
 import { getEmailUrlInfo } from "@/lib/email-urls";
 import { buildRecurrenceItems } from "@/lib/recurrence";
 import { getSocialUrlInfo } from "@/lib/social-urls";
@@ -28,9 +22,7 @@ import type {
   SerializedTodoUrl,
   TodoWithUrls,
 } from "@/types/database";
-import { ConversationSection } from "./ConversationSection";
 import { SubtaskSection } from "./SubtaskSection";
-import { SuggestionsSection } from "./SuggestionsSection";
 import { Button, Input, Loader, Select, Textarea } from "./ui";
 import { EmailPreviewCard } from "./ui/EmailPreviewCard";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
@@ -162,18 +154,9 @@ export function TodoItemExpanded({
   onDeleteSubtask,
   onReorderSubtask,
 }: TodoItemExpandedProps) {
-  const { data: user } = useUser();
   const { timeZone } = useHints();
   const updateUrlPreview = useUpdateUrlPreview();
-  const enrichTodo = useEnrichTodo();
   const processTodo = useProcessTodo();
-
-  // AI is intentional and gated on the aiEnabled master switch; the
-  // enrich action only appears when AI is turned on for this user.
-  const aiAvailable = user?.aiEnabled === true;
-  const aiProcessing =
-    todo.aiStatus === "pending" || todo.aiStatus === "processing";
-  const aiFailed = todo.aiStatus === "failed";
 
   // The todo's own links. A pending one means a fetch is in flight; a failed
   // one is what the Process action retries.
@@ -184,30 +167,23 @@ export function TodoItemExpanded({
   ).length;
 
   // Local state for form fields. We track which fields the user has touched
-  // so that background updates to the todo (e.g. AI re-enrichment after a
-  // conversation reply) propagate into untouched fields, while preserving any
-  // edits the user has actually made in this form.
-  const [title, setTitle] = useState(todo.title);
+  // so that background updates to the todo propagate into untouched fields,
+  // while preserving any edits the user has actually made in this form.
   const [notes, setNotes] = useState(todo.notes ?? "");
   const [dueDate, setDueDate] = useState(formatDate(todo.dueDate));
   const [recurrence, setRecurrence] = useState<RecurrenceFrequency | "none">(
     todo.recurrence?.frequency ?? "none",
   );
   const [touched, setTouched] = useState<{
-    title?: boolean;
     notes?: boolean;
     dueDate?: boolean;
     recurrence?: boolean;
   }>({});
 
-  const todoTitle = todo.title;
   const todoNotes = todo.notes ?? "";
   const todoDueDate = formatDate(todo.dueDate);
   const todoRecurrence = todo.recurrence?.frequency ?? "none";
 
-  useEffect(() => {
-    if (!touched.title) setTitle(todoTitle);
-  }, [todoTitle, touched.title]);
   useEffect(() => {
     if (!touched.notes) setNotes(todoNotes);
   }, [todoNotes, touched.notes]);
@@ -228,19 +204,16 @@ export function TodoItemExpanded({
     : recurrence;
 
   // Auto-save. There's no Save button: discrete fields (due date, repeat)
-  // commit immediately in their handlers; free-text fields (title,
-  // notes) debounce while typing and flush on blur / when the row collapses.
-  // `touched` still guards each field so an in-flight server update (e.g. AI
-  // re-enrichment) can't clobber a value being edited; committing clears it.
+  // commit immediately in their handlers; notes debounce while typing and
+  // flush on blur / when the row collapses. `touched` still guards the field
+  // so an in-flight server update can't clobber a value being edited;
+  // committing clears it.
   const AUTOSAVE_DELAY = 700;
   const timers = useRef<{
-    title?: ReturnType<typeof setTimeout>;
     notes?: ReturnType<typeof setTimeout>;
   }>({});
   // Latest values / callbacks for the unmount flush, which captures the
   // first-render closure.
-  const titleRef = useRef(title);
-  titleRef.current = title;
   const notesRef = useRef(notes);
   notesRef.current = notes;
   const onUpdateRef = useRef(onUpdate);
@@ -248,46 +221,34 @@ export function TodoItemExpanded({
   const todoRef = useRef(todo);
   todoRef.current = todo;
 
-  const commitTitle = (value: string) => {
-    const trimmed = value.trim();
-    // Title is required — never persist a blank; keep the last good value.
-    if (!trimmed || trimmed === (todoRef.current.title ?? "")) return;
-    onUpdateRef.current({ title: trimmed });
-  };
   const commitNotes = (value: string) => {
     const trimmed = value.trim();
     if (trimmed === (todoRef.current.notes ?? "")) return;
     onUpdateRef.current({ notes: trimmed || null });
   };
 
-  const scheduleTextCommit = (field: "title" | "notes", value: string) => {
+  const scheduleTextCommit = (field: "notes", value: string) => {
     const pending = timers.current[field];
     if (pending) clearTimeout(pending);
     timers.current[field] = setTimeout(() => {
       timers.current[field] = undefined;
-      if (field === "title") commitTitle(value);
-      else commitNotes(value);
+      commitNotes(value);
       setTouched((t) => ({ ...t, [field]: false }));
     }, AUTOSAVE_DELAY);
   };
 
-  const flushTextCommit = (field: "title" | "notes") => {
+  const flushTextCommit = (field: "notes") => {
     const pending = timers.current[field];
     if (!pending) return;
     clearTimeout(pending);
     timers.current[field] = undefined;
-    if (field === "title") commitTitle(titleRef.current);
-    else commitNotes(notesRef.current);
+    commitNotes(notesRef.current);
     setTouched((t) => ({ ...t, [field]: false }));
   };
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once; the cleanup flushes pending text edits via refs when the row unmounts (collapses).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally runs once; the cleanup flushes a pending notes edit via refs when the row unmounts (collapses).
   useEffect(() => {
     return () => {
-      if (timers.current.title) {
-        clearTimeout(timers.current.title);
-        commitTitle(titleRef.current);
-      }
       if (timers.current.notes) {
         clearTimeout(timers.current.notes);
         commitNotes(notesRef.current);
@@ -333,29 +294,6 @@ export function TodoItemExpanded({
 
   return (
     <div className="mt-3 space-y-5">
-      {/* Title */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor={`title-${todo.id}`}
-          className="text-xs font-medium text-gray-muted"
-        >
-          Title
-        </label>
-        <Input
-          id={`title-${todo.id}`}
-          type="text"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            setTouched((t) => ({ ...t, title: true }));
-            scheduleTextCommit("title", e.target.value);
-          }}
-          onBlur={() => flushTextCommit("title")}
-          className="w-full"
-          inputSize="sm"
-        />
-      </div>
-
       {/* Notes */}
       <div className="space-y-1.5">
         <label
@@ -378,63 +316,64 @@ export function TodoItemExpanded({
         />
       </div>
 
-      {/* Due Date */}
-      <div className="space-y-1.5">
-        <label
-          htmlFor={`due-${todo.id}`}
-          className="text-xs font-medium text-gray-muted flex items-center gap-1.5"
-        >
-          <Calendar size={12} />
-          Due date
-        </label>
-        <div className="flex items-center gap-1.5">
-          <Input
-            id={`due-${todo.id}`}
-            type="date"
-            value={dueDate}
-            onChange={(e) => handleDueDateChange(e.target.value)}
-            className="flex-1 min-w-0"
-            inputSize="sm"
-          />
-          {dueDate && (
-            <Button
-              variant="ghost"
-              size="sm"
-              shape="square"
-              onClick={handleClearDueDate}
-              aria-label="Clear due date"
-            >
-              <X size={14} />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Repeat — disabled until a due date is set, since the rule has no
-          anchor without one. Hidden when the todo has subtasks: recurrence and
-          subtasks are mutually exclusive. */}
-      {subtasks.length === 0 && (
+      {/* Due Date + Repeat side by side — Repeat is disabled until a due date
+          is set, since the rule has no anchor without one, and hidden when the
+          todo has subtasks (recurrence and subtasks are mutually exclusive). */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label
-            htmlFor={`repeat-${todo.id}`}
-            className="text-xs font-medium text-gray-muted"
+            htmlFor={`due-${todo.id}`}
+            className="text-xs font-medium text-gray-muted flex items-center gap-1.5"
           >
-            Repeat
+            <Calendar size={12} />
+            Due date
           </label>
-          <Select
-            size="sm"
-            value={effectiveRecurrence}
-            onValueChange={handleRecurrenceChange}
-            disabled={recurrenceDisabled}
-            items={recurrenceItems}
-          />
-          {recurrenceDisabled && (
-            <p className="text-xs text-gray-muted">
-              Set a due date to enable repeats.
-            </p>
-          )}
+          <div className="flex items-center gap-1.5">
+            <Input
+              id={`due-${todo.id}`}
+              type="date"
+              value={dueDate}
+              onChange={(e) => handleDueDateChange(e.target.value)}
+              className="flex-1 min-w-0"
+              inputSize="sm"
+            />
+            {dueDate && (
+              <Button
+                variant="ghost"
+                size="sm"
+                shape="square"
+                onClick={handleClearDueDate}
+                aria-label="Clear due date"
+              >
+                <X size={14} />
+              </Button>
+            )}
+          </div>
         </div>
-      )}
+
+        {subtasks.length === 0 && (
+          <div className="space-y-1.5">
+            <label
+              htmlFor={`repeat-${todo.id}`}
+              className="text-xs font-medium text-gray-muted"
+            >
+              Repeat
+            </label>
+            <Select
+              size="sm"
+              value={effectiveRecurrence}
+              onValueChange={handleRecurrenceChange}
+              disabled={recurrenceDisabled}
+              items={recurrenceItems}
+            />
+            {recurrenceDisabled && (
+              <p className="text-xs text-gray-muted">
+                Set a due date to enable repeats.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Subtasks — hidden on a recurring todo (mutually exclusive with
           recurrence). Once a subtask is added, the Repeat control above hides. */}
@@ -449,13 +388,9 @@ export function TodoItemExpanded({
         />
       )}
 
-      {/* Actions, split by what actually runs. "Task" is deterministic work
-          that's always available — pinning, and fetching what's behind the
-          todo's links. "AI" is the opt-in half (aiEnabled only), where a model
-          proposes changes for you to accept. Keeping them in separate labelled
-          groups is the point: it should never be ambiguous which button spends
-          a model call. Sticky commits on click with no debounce — instantly
-          reversible, like the Repeat select. */}
+      {/* Actions — deterministic work that's always available: pinning, and
+          fetching what's behind the todo's links. Sticky commits on click
+          with no debounce — instantly reversible, like the Repeat select. */}
       <div className="space-y-4">
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-gray-muted">Task</p>
@@ -487,27 +422,6 @@ export function TodoItemExpanded({
             Fetches each link and titles the task after it. No AI involved.
           </p>
         </div>
-        {aiAvailable && (
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-gray-muted">AI</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                type="button"
-                onClick={() => enrichTodo.mutate(todo.id)}
-                disabled={enrichTodo.isPending || aiProcessing}
-                loading={enrichTodo.isPending}
-              >
-                {!enrichTodo.isPending && <Sparkles size={14} />}
-                Enrich
-              </Button>
-            </div>
-            {aiFailed && (
-              <p className="text-sm text-red-muted">Enrichment failed.</p>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Delete row. Edits auto-save (no Save button); the toast in
@@ -526,12 +440,6 @@ export function TodoItemExpanded({
           Delete
         </Button>
       </div>
-
-      {/* Suggestions Section — proposed AI enrichment changes awaiting consent */}
-      <SuggestionsSection todo={todo} />
-
-      {/* Conversation Section — agent questions and the user's replies */}
-      <ConversationSection todo={todo} />
 
       {/* URLs */}
       {links.length > 0 && (

@@ -7,7 +7,6 @@ export type Theme = "light" | "dark" | "system";
 export interface User {
   id: string;
   email: string;
-  aiEnabled: boolean;
   plan: "free" | "pro";
   location: string | null;
   theme: Theme;
@@ -18,7 +17,6 @@ export interface User {
 }
 
 type UserUpdate = {
-  aiEnabled?: boolean;
   location?: string | null;
   theme?: Theme;
   hideCompleted?: boolean;
@@ -116,9 +114,6 @@ export function useUpdateUser() {
       if (previousUser) {
         // Only spread defined values to preserve explicit null for location
         const updates: Partial<User> = {};
-        if (newData.aiEnabled !== undefined) {
-          updates.aiEnabled = newData.aiEnabled;
-        }
         if (newData.location !== undefined) {
           updates.location = newData.location;
         }

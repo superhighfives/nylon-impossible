@@ -7,7 +7,6 @@ import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
 const updatePreferencesSchema = z.object({
-  aiEnabled: z.boolean().optional(),
   location: z.string().max(200).nullable().optional(),
   theme: z.enum(["light", "dark", "system"]).optional(),
   hideCompleted: z.boolean().optional(),
@@ -29,7 +28,6 @@ export async function getMe(c: Context<Env>) {
     .select({
       id: users.id,
       email: users.email,
-      aiEnabled: users.aiEnabled,
       plan: users.plan,
       location: users.location,
       theme: users.theme,
@@ -50,7 +48,6 @@ export async function getMe(c: Context<Env>) {
   return c.json({
     id: user.id,
     email: user.email,
-    aiEnabled: user.aiEnabled,
     plan: user.plan,
     location: user.location,
     theme: user.theme,
@@ -75,15 +72,11 @@ export async function updateMe(c: Context<Env>) {
   const userId = c.get("userId");
 
   const updates: Partial<{
-    aiEnabled: boolean;
     location: string | null;
     theme: "light" | "dark" | "system";
     hideCompleted: boolean;
     timezone: string;
   }> = {};
-  if (parsed.data.aiEnabled !== undefined) {
-    updates.aiEnabled = parsed.data.aiEnabled;
-  }
   if (parsed.data.location !== undefined) {
     updates.location = parsed.data.location;
   }
@@ -111,7 +104,6 @@ export async function updateMe(c: Context<Env>) {
     .select({
       id: users.id,
       email: users.email,
-      aiEnabled: users.aiEnabled,
       plan: users.plan,
       location: users.location,
       theme: users.theme,
@@ -132,7 +124,6 @@ export async function updateMe(c: Context<Env>) {
   return c.json({
     id: user.id,
     email: user.email,
-    aiEnabled: user.aiEnabled,
     plan: user.plan,
     location: user.location,
     theme: user.theme,

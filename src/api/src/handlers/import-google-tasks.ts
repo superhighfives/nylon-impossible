@@ -1,7 +1,6 @@
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
-import { enrichOrAskWithAI } from "../lib/ai-enrich";
 import { clerkClient } from "../lib/clerk";
 import { eq, getDb, todos, todoUrls } from "../lib/db";
 import { apiError } from "../lib/errors";
@@ -23,15 +22,15 @@ interface GoogleTask {
 }
 
 // D1 caps bound parameters at 100 per statement. Each inserted todo row binds
-// 15 params: the 13 fields set below (id, userId, listId, listEnteredAt,
-// title, notes, completed, position, dueDate, googleTaskId, aiStatus,
-// createdAt, updatedAt) PLUS `needsInput` and `sticky` — NOT NULL columns
-// with defaults that Drizzle still binds even though we don't set them.
-// Chunk at 6 rows (90 params) to stay under the cap; a larger chunk throws a
-// D1_ERROR mid-import. Count the generated SQL params, not the fields set
-// here — NOT NULL defaulted columns are easy to miss.
-const TODO_INSERT_COLUMNS = 15;
-const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 6
+// 14 params: the 12 fields set below (id, userId, listId, listEnteredAt,
+// title, notes, completed, position, dueDate, googleTaskId, createdAt,
+// updatedAt) PLUS `needsInput` and `sticky` — NOT NULL columns with defaults
+// that Drizzle still binds even though we don't set them. Chunk at 7 rows
+// (98 params) to stay under the cap; a larger chunk throws a D1_ERROR
+// mid-import. Count the generated SQL params, not the fields set here — NOT
+// NULL defaulted columns are easy to miss.
+const TODO_INSERT_COLUMNS = 14;
+const INSERT_CHUNK_SIZE = Math.floor(100 / TODO_INSERT_COLUMNS); // 7
 
 // todoUrls rows bind 7 params (all NOT NULL columns are set explicitly, so
 // there's no hidden defaulted column like todos' needsInput). Chunk the same
@@ -93,9 +92,6 @@ function parseGoogleDueDate(due: string | undefined): Date | null {
 // POST /todos/import/google-tasks
 export async function importGoogleTasks(c: Context<Env>) {
   const userId = c.get("userId");
-  // AI enrichment on import follows the aiEnabled master switch; plan no longer
-  // gates it. AI-off users take the fast path.
-  const useAI = c.get("aiEnabled");
 
   // Exchange the Clerk-held Google connection for an access token.
   let accessToken: string | undefined;
@@ -193,7 +189,6 @@ export async function importGoogleTasks(c: Context<Env>) {
     position: positions[index],
     dueDate: parseGoogleDueDate(task.due),
     googleTaskId: task.id,
-    aiStatus: useAI ? ("pending" as const) : null,
     createdAt: now,
     updatedAt: now,
   }));
@@ -202,34 +197,13 @@ export async function importGoogleTasks(c: Context<Env>) {
     await db.insert(todos).values(rows.slice(i, i + INSERT_CHUNK_SIZE));
   }
 
-  // Enrich each imported todo the same way typed todos are. With AI on
-  // (aiEnabled) todos get full AI enrichment (title/date/recurrence/subtasks,
-  // URL metadata); with AI off they still get URL metadata so links resolve to
-  // favicons/titles.
+  // Every imported todo gets URL metadata so links resolve to favicons/titles.
   for (const row of rows) {
-    if (useAI) {
+    const urls = extractUrlsFromText(`${row.title}\n${row.notes ?? ""}`);
+    if (urls.length > 0) {
       c.executionCtx.waitUntil(
-        enrichOrAskWithAI(
-          db,
-          c.env.AI,
-          c.env,
-          row.id,
-          userId,
-          row.title,
-          undefined,
-          // The imported task already carries an authoritative due date from
-          // Google — don't let AI extraction overwrite it, but pass it through
-          // so an AI-inferred repeat schedule still has an anchor to attach to.
-          { preserveExistingDueDate: true, existingDueDate: row.dueDate },
-        ),
+        fetchImportedUrlMetadata(db, row.id, urls, c.env, userId),
       );
-    } else {
-      const urls = extractUrlsFromText(`${row.title}\n${row.notes ?? ""}`);
-      if (urls.length > 0) {
-        c.executionCtx.waitUntil(
-          fetchImportedUrlMetadata(db, row.id, urls, c.env, userId),
-        );
-      }
     }
   }
 
@@ -254,7 +228,7 @@ export async function importGoogleTasks(c: Context<Env>) {
 
 /**
  * Insert URL records for an imported todo and fetch their metadata in the
- * background. Used for non-AI users, who don't go through enrichOrAskWithAI.
+ * background.
  */
 async function fetchImportedUrlMetadata(
   db: ReturnType<typeof getDb>,

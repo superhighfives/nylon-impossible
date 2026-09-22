@@ -26,11 +26,7 @@
       "new_classes": ["UserSync"]
     }
   ],
-  // AI Gateway vars for mocked tests. Actual values not needed since extractTodos is mocked.
   "vars": {
-    "CF_ACCOUNT_ID": "test-account",
-    "AI_GATEWAY_ID": "test-gateway",
-    "CLOUDFLARE_API_TOKEN": "test-token",
     "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon",
     "WEB_BASE_URL": "https://www.nylonimpossible.com",
     "GMAIL_ADDON_STATE_SECRET": "test-addon-state-secret"

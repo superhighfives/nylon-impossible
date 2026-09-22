@@ -15,11 +15,7 @@ import {
   inArray,
   isNotNull,
   type Todo,
-  type TodoMessage,
-  type TodoSuggestion,
   type TodoUrl,
-  todoMessages,
-  todoSuggestions,
   todos,
   todoUrls,
 } from "../lib/db";
@@ -108,38 +104,10 @@ function serializeUrl(url: TodoUrl) {
   };
 }
 
-// Serialize a conversation message with ISO8601 dates and lowercase IDs
-function serializeMessage(m: TodoMessage) {
-  return {
-    id: m.id.toLowerCase(),
-    todoId: m.todoId.toLowerCase(),
-    role: m.role,
-    content: m.content,
-    createdAt: m.createdAt.toISOString(),
-    awaitingReply: m.awaitingReply,
-  };
-}
-
-// Serialize a suggestion with ISO8601 dates and lowercase IDs
-function serializeSuggestion(s: TodoSuggestion) {
-  return {
-    id: s.id.toLowerCase(),
-    todoId: s.todoId.toLowerCase(),
-    type: s.type,
-    payload: s.payload,
-    label: s.label,
-    status: s.status,
-    createdAt: s.createdAt.toISOString(),
-    updatedAt: s.updatedAt.toISOString(),
-  };
-}
-
 // Serialize a todo with explicit ISO8601 dates and lowercase ID
 function serializeTodo(
   todo: typeof todos.$inferSelect,
   urls: ReturnType<typeof serializeUrl>[] = [],
-  messages: ReturnType<typeof serializeMessage>[] = [],
-  suggestions: ReturnType<typeof serializeSuggestion>[] = [],
 ) {
   return {
     id: todo.id.toLowerCase(),
@@ -153,14 +121,10 @@ function serializeTodo(
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
-    aiStatus: todo.aiStatus,
-    needsInput: todo.needsInput,
     sticky: todo.sticky,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
-    messages,
     urls,
-    suggestions,
   };
 }
 
@@ -588,33 +552,17 @@ export async function syncTodos(c: Context<Env>) {
   // 3. Fetch all URLs for the returned todos
   const todoIds = serverTodos.map((t) => t.id);
   const allUrls: TodoUrl[] = [];
-  const allMessages: TodoMessage[] = [];
-  const allSuggestions: TodoSuggestion[] = [];
   if (todoIds.length > 0) {
     // Batch by D1's bound-param cap: one `inArray` param per todoId, so a user
     // with >100 todos would otherwise overflow a single statement. Each todoId
     // lands in one batch, so per-todo ordering survives grouping below.
     for (const chunkIds of chunkForD1(todoIds)) {
-      const [urls, messages, suggestions] = await Promise.all([
-        db
-          .select()
-          .from(todoUrls)
-          .where(inArray(todoUrls.todoId, chunkIds))
-          .orderBy(asc(todoUrls.position)),
-        db
-          .select()
-          .from(todoMessages)
-          .where(inArray(todoMessages.todoId, chunkIds))
-          .orderBy(asc(todoMessages.createdAt)),
-        db
-          .select()
-          .from(todoSuggestions)
-          .where(inArray(todoSuggestions.todoId, chunkIds))
-          .orderBy(asc(todoSuggestions.createdAt)),
-      ]);
+      const urls = await db
+        .select()
+        .from(todoUrls)
+        .where(inArray(todoUrls.todoId, chunkIds))
+        .orderBy(asc(todoUrls.position));
       allUrls.push(...urls);
-      allMessages.push(...messages);
-      allSuggestions.push(...suggestions);
     }
   }
 
@@ -627,38 +575,9 @@ export async function syncTodos(c: Context<Env>) {
     urlsByTodoId.set(url.todoId, existing);
   }
 
-  // Group messages by todoId (already ordered by createdAt asc)
-  const messagesByTodoId = new Map<
-    string,
-    ReturnType<typeof serializeMessage>[]
-  >();
-  for (const message of allMessages) {
-    const serialized = serializeMessage(message);
-    const existing = messagesByTodoId.get(message.todoId) ?? [];
-    existing.push(serialized);
-    messagesByTodoId.set(message.todoId, existing);
-  }
-
-  // Group suggestions by todoId (already ordered by createdAt asc)
-  const suggestionsByTodoId = new Map<
-    string,
-    ReturnType<typeof serializeSuggestion>[]
-  >();
-  for (const suggestion of allSuggestions) {
-    const serialized = serializeSuggestion(suggestion);
-    const existing = suggestionsByTodoId.get(suggestion.todoId) ?? [];
-    existing.push(serialized);
-    suggestionsByTodoId.set(suggestion.todoId, existing);
-  }
-
   return c.json({
     todos: serverTodos.map((todo) =>
-      serializeTodo(
-        todo,
-        urlsByTodoId.get(todo.id) ?? [],
-        messagesByTodoId.get(todo.id) ?? [],
-        suggestionsByTodoId.get(todo.id) ?? [],
-      ),
+      serializeTodo(todo, urlsByTodoId.get(todo.id) ?? []),
     ),
     syncedAt: syncedAt.toISOString(),
     conflicts,

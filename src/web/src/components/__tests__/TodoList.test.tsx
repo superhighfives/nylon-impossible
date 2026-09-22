@@ -4,7 +4,6 @@ import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { TodoGrid } from "../TodoGrid";
 
 vi.mock("@/hooks/useTodos", () => ({
-  STALE_AI_MS: 60_000,
   useTodos: vi.fn(),
   useUpdateTodo: vi.fn(),
   useDeleteTodo: vi.fn(),
@@ -66,14 +65,10 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     position: "a0",
     dueDate: null,
     recurrence: null,
-    aiStatus: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    needsInput: false,
     sticky: false,
-    messages: [],
     urls: [],
-    suggestions: [],
     ...overrides,
   };
 }
@@ -167,35 +162,6 @@ describe("TodoGrid", () => {
     render(<TodoGrid />);
     expect(screen.getByText("First thing")).toBeInTheDocument();
     expect(screen.getByText("Second thing")).toBeInTheDocument();
-  });
-
-  it("shows a accent dot only when a todo has a pending suggestion", () => {
-    stubTodos([
-      makeTodo({
-        id: "a",
-        title: "Has a suggestion",
-        suggestions: [
-          {
-            id: "s1",
-            todoId: "a",
-            type: "title",
-            payload: { title: "Renamed" },
-            label: 'Rename to "Renamed"',
-            status: "pending",
-            createdAt: "2026-01-01T00:00:00.000Z",
-            updatedAt: "2026-01-01T00:00:00.000Z",
-          },
-        ],
-      }),
-      makeTodo({ id: "b", title: "No suggestions", suggestions: [] }),
-    ]);
-
-    render(<TodoGrid />);
-    expect(
-      screen.getByRole("button", {
-        name: "AI has suggestions — open to review",
-      }),
-    ).toBeInTheDocument();
   });
 
   it("marks only the active todos that have notes", () => {

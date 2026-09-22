@@ -16,7 +16,6 @@ import {
   Inbox,
   Link2,
   ListTree,
-  MessageCircle,
   Pin,
   PinOff,
   RefreshCw,
@@ -28,18 +27,17 @@ import { InlineDueDate } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
-import {
-  STALE_AI_MS,
-  type useCreateTodo,
-  type useDeleteTodo,
-  type useUpdateTodo,
+import type {
+  useCreateTodo,
+  useDeleteTodo,
+  useUpdateTodo,
 } from "@/hooks/useTodos";
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
 import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
-import { Button, Checkbox, focusRing, Loader, UrlPreviewCard } from "./ui";
+import { Button, Checkbox, focusRing, UrlPreviewCard } from "./ui";
 
 /**
  * Sorted, hidden-filtered incomplete todos for one list — sticky-first, by
@@ -260,13 +258,6 @@ function TodoItemContent({
   // states, so there's no need to gate this on a title having fetched yet.
   // Completed rows stay terse, so they keep the inline title treatment below.
   const showUrlOnlyCard = !isCompleted && !!urlOnly;
-  const now = Date.now();
-  const aiProcessing =
-    (todo.aiStatus === "pending" || todo.aiStatus === "processing") &&
-    now - new Date(todo.createdAt).getTime() < STALE_AI_MS;
-  const hasPendingSuggestions = todo.suggestions.some(
-    (s) => s.status === "pending",
-  );
   // Notes are only visible once a row is expanded, so an active row carrying
   // one gets a quiet inline mark to say there's something to open. Completed
   // rows already spell it out in CompletedContentBadges.
@@ -275,12 +266,7 @@ function TodoItemContent({
   // badges, so the card sits flush at the top of the row. space-y-1 then only
   // adds a gap when the title line is actually present.
   const showTitleLine =
-    !showUrlOnlyCard ||
-    subtasks.length > 0 ||
-    (hasNotes && !isCompleted) ||
-    aiProcessing ||
-    !!todo.needsInput ||
-    hasPendingSuggestions;
+    !showUrlOnlyCard || subtasks.length > 0 || (hasNotes && !isCompleted);
 
   // Inline due-date editing on active rows. Set values render as editable
   // badges (bottom-left); the quick-add affordances for unset values live in
@@ -437,40 +423,6 @@ function TodoItemContent({
                   >
                     <FileText size={12} aria-hidden="true" />
                   </span>
-                )}
-                {aiProcessing && (
-                  <output
-                    className="ml-2 inline-flex items-center gap-1 align-middle text-gray-muted text-xs"
-                    aria-label="AI is processing"
-                  >
-                    <Loader size="sm" className="text-gray-muted" />
-                  </output>
-                )}
-                {todo.needsInput && (
-                  <Button
-                    variant="ghost"
-                    size="xs"
-                    shape="circle"
-                    type="button"
-                    onClick={() => onToggleExpand(todo.id)}
-                    aria-label="The assistant has a question — open to reply"
-                    className="ml-2 inline-flex align-middle bg-accent-base hover:bg-accent-hover text-accent"
-                  >
-                    <MessageCircle size={12} />
-                  </Button>
-                )}
-                {hasPendingSuggestions && (
-                  <button
-                    type="button"
-                    onClick={() => onToggleExpand(todo.id)}
-                    aria-label="AI has suggestions — open to review"
-                    className="ml-2 inline-flex shrink-0 items-center justify-center p-1 align-middle"
-                  >
-                    <span
-                      className="block size-2 rounded-full bg-accent-solid"
-                      aria-hidden="true"
-                    />
-                  </button>
                 )}
               </div>
             )}
@@ -923,8 +875,8 @@ export interface TodoListColumnProps {
 }
 
 /**
- * One list's rows: sticky-tier sort, subtasks, URL previews, AI status
- * badges. Completed todos across every list render in their own aggregate
+ * One list's rows: sticky-tier sort, subtasks, URL previews. Completed todos
+ * across every list render in their own aggregate
  * `CompletedColumn` instead of an inline accordion here. Drag-and-drop
  * *within* this list is driven by dnd-kit hooks here (`useSortable` on each row); the
  * shared `DndContext` those hooks attach to — along with cross-list drop

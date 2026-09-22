@@ -1,9 +1,8 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { useClerk, useUser as useClerkUser } from "@clerk/tanstack-react-start";
 import { useLocation } from "@tanstack/react-router";
-import { MapPin, Monitor, Moon, Settings, Sun } from "lucide-react";
+import { Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
-import { z } from "zod";
 import { useImportReview } from "@/hooks/useImportReview";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSettings } from "@/hooks/useSettings";
@@ -19,15 +18,7 @@ import {
   DevEnvironmentDetails,
   useDevEnvironment,
 } from "./DevEnvironmentIndicator";
-import {
-  Button,
-  Field,
-  InfoTooltip,
-  Input,
-  LayerCard,
-  Loader,
-  Select,
-} from "./ui";
+import { Button, InfoTooltip, LayerCard, Loader, Select } from "./ui";
 
 // Full IANA timezone list from the runtime — avoids hand-maintaining a
 // curated subset, and every value round-trips through Intl.DateTimeFormat
@@ -42,18 +33,6 @@ const TIMEZONE_ITEMS = (
 // (`tasks.readonly`) with invalid_scope, so the fully-qualified URL is used
 // both here and in the Clerk connection's additional scopes.
 const GOOGLE_TASKS_SCOPE = "https://www.googleapis.com/auth/tasks.readonly";
-
-const NominatimSchema = z.object({
-  address: z
-    .object({
-      city: z.string().optional(),
-      town: z.string().optional(),
-      village: z.string().optional(),
-      state: z.string().optional(),
-      country: z.string().optional(),
-    })
-    .optional(),
-});
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -77,10 +56,7 @@ export function SettingsModal({ origin }: { origin: string }) {
   // so production renders nothing (and no empty heading).
   const devEnv = useDevEnvironment(origin);
   const pathname = useLocation({ select: (loc) => loc.pathname });
-  const [location, setLocation] = useState("");
-  const [aiEnabled, setAiEnabled] = useState(false);
   const [timezone, setTimezone] = useState("UTC");
-  const [isLocating, setIsLocating] = useState(false);
   const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
 
   // A Google account is only usable for import once it's connected *and* has
@@ -134,8 +110,6 @@ export function SettingsModal({ origin }: { origin: string }) {
   // Sync local state when user data loads or modal opens
   useEffect(() => {
     if (user && open) {
-      setLocation(user.location ?? "");
-      setAiEnabled(user.aiEnabled);
       // "UTC" is the migration/creation default, not a deliberate choice —
       // default to the browser's detected zone the first time settings are
       // opened rather than leaving a new user stuck on UTC.
@@ -148,9 +122,8 @@ export function SettingsModal({ origin }: { origin: string }) {
   }, [user, open]);
 
   const handleSave = () => {
-    const trimmedLocation = location.trim();
     updateUser.mutate(
-      { location: trimmedLocation || null, aiEnabled, timezone },
+      { timezone },
       {
         onSuccess: () => setOpen(false),
         onError: (err) => {
@@ -160,45 +133,7 @@ export function SettingsModal({ origin }: { origin: string }) {
     );
   };
 
-  const handleUseCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      toast.error("Location isn't available in this browser");
-      return;
-    }
-    setIsLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.coords.latitude}&lon=${pos.coords.longitude}`,
-            { headers: { "Accept-Language": "en" } },
-          );
-          const data = NominatimSchema.parse(await res.json());
-          const { city, town, village, state, country } = data.address ?? {};
-          const place = city || town || village || "";
-          const region = state || country || "";
-          const label = [place, region].filter(Boolean).join(", ");
-          if (label) {
-            setLocation(label);
-          } else {
-            toast.error("Couldn't figure out your location");
-          }
-        } catch (err) {
-          toast.error(messageFromError(err, "Couldn't look up your location"));
-        }
-        setIsLocating(false);
-      },
-      () => {
-        setIsLocating(false);
-        toast.error("Couldn't access your location");
-      },
-    );
-  };
-
-  const hasChanges =
-    location.trim() !== (user?.location ?? "") ||
-    aiEnabled !== user?.aiEnabled ||
-    (user !== undefined && timezone !== user?.timezone);
+  const hasChanges = user !== undefined && timezone !== user?.timezone;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -297,60 +232,6 @@ export function SettingsModal({ origin }: { origin: string }) {
                       Drives when Today's todos age into This Week, and This
                       Week into Sometime — always at your local midnight.
                     </p>
-                  </LayerCard.Primary>
-                </LayerCard>
-                {/* AI features are gated on this toggle (not the plan), so it's
-                    available to every user to turn on or off. */}
-                <LayerCard className="sm:col-span-2">
-                  <LayerCard.Secondary className="justify-between">
-                    <span>AI features</span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={aiEnabled}
-                      aria-label={
-                        aiEnabled ? "Disable AI features" : "Enable AI features"
-                      }
-                      onClick={() => setAiEnabled(!aiEnabled)}
-                      disabled={updateUser.isPending}
-                      // The visual track stays 16×28px; a -inset-3 pseudo-element
-                      // extends the clickable area to ~40×52px for an accessible
-                      // touch target without changing the design.
-                      className={`relative shrink-0 inline-flex h-4 w-7 items-center rounded-full transition-colors before:absolute before:-inset-3 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50 ${aiEnabled ? "bg-accent-solid" : "bg-gray-active"}`}
-                    >
-                      <span
-                        className={`inline-block h-3 w-3 transform rounded-full bg-gray-12 shadow-sm transition-transform ${aiEnabled ? "translate-x-3.5" : "translate-x-0.5"}`}
-                      />
-                    </button>
-                  </LayerCard.Secondary>
-                  <LayerCard.Primary>
-                    <p className="text-xs text-gray-muted">
-                      When enabled, AI helps enrich todos by pulling out
-                      metadata like due dates and recurrence.
-                    </p>
-                    {aiEnabled && (
-                      <Field
-                        label="Your location"
-                        description="Not currently used by any feature."
-                        className="pt-1"
-                      >
-                        <Input
-                          value={location}
-                          onChange={(e) => setLocation(e.target.value)}
-                          placeholder="e.g. Los Angeles, CA"
-                          disabled={updateUser.isPending || isLocating}
-                        />
-                        <button
-                          type="button"
-                          onClick={handleUseCurrentLocation}
-                          disabled={updateUser.isPending || isLocating}
-                          className="flex items-center gap-1.5 text-xs text-gray-muted hover:text-gray transition-colors disabled:opacity-50 disabled:pointer-events-none"
-                        >
-                          <MapPin size={12} />
-                          {isLocating ? "Locating…" : "Use current location"}
-                        </button>
-                      </Field>
-                    )}
                   </LayerCard.Primary>
                 </LayerCard>
                 <LayerCard>

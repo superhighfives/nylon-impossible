@@ -193,42 +193,21 @@ struct ContentView: View {
                 AddTaskInputView(
                     text: $viewModel.newTaskText,
                     canAdd: viewModel.canAddTask,
-                    aiAvailable: preferencesService.aiEnabled,
                     listPhrase: selectedList?.promptPhrase,
                     focusRequested: $focusAddTask
-                ) { option in
+                ) {
                     let text = viewModel.newTaskText
                     viewModel.newTaskText = ""
 
                     // Create instantly and locally so the todo appears and persists
-                    // even with no connection; sync (and any requested AI) run in
-                    // the background. Enrich is recorded on the todo and fired
-                    // once it has synced (SyncService.processPendingAI), so
-                    // choosing it offline still takes effect on reconnect.
-                    guard let todo = TaskCreationService.createSmart(
+                    // even with no connection; sync runs in the background.
+                    guard TaskCreationService.createSmart(
                         text: text,
                         userId: authService.userId,
                         context: modelContext,
                         allTodos: todos,
                         listId: viewModel.selectedListId
-                    ) else { return }
-
-                    if preferencesService.aiEnabled {
-                        switch option {
-                        case .enrich:
-                            // Show the AI spinner immediately; the server flips this
-                            // through processing → complete once enrichment runs.
-                            // aiStartedAt is re-stamped when the enrich call actually
-                            // fires (processPendingAI), so the spinner stays honest
-                            // even if syncing is delayed while offline.
-                            todo.aiStatus = TodoAIStatus.pending.rawValue
-                            todo.aiStartedAt = Date()
-                            todo.pendingEnrich = true
-                        case .plain:
-                            break
-                        }
-                        try? modelContext.save()
-                    }
+                    ) != nil else { return }
 
                     syncService.syncAfterAction()
                 }
@@ -290,7 +269,7 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [TodoItem.self, TodoUrl.self, TodoMessage.self, TodoListModel.self], inMemory: true)
+        .modelContainer(for: [TodoItem.self, TodoUrl.self, TodoListModel.self], inMemory: true)
         .environment(AuthService())
         .environment(SyncService(authService: AuthService()))
 }

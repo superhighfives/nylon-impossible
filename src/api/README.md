@@ -30,8 +30,7 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 | `POST` | `/todos/sync` | Sync todos (bulk create/update/delete) | Yes |
 | `PUT` | `/todos/:id` | Update todo | Yes |
 | `DELETE` | `/todos/:id` | Delete todo | Yes |
-| `POST` | `/todos/:id/process` | Re-run link processing (fetch links, title the todo from them) — no AI | Yes |
-| `POST` | `/todos/:id/enrich` | Run AI enrichment (requires `aiEnabled`) | Yes |
+| `POST` | `/todos/:id/process` | Re-run link processing (fetch links, title the todo from them) | Yes |
 | `POST` | `/gmail-addon/homepage` | Gmail add-on homepage card | Google ID token |
 | `POST` | `/gmail-addon/contextual` | Gmail add-on message card | Google ID token |
 | `POST` | `/gmail-addon/actions/*` | Gmail add-on card actions | Google ID token |
@@ -64,7 +63,7 @@ Google's JWKS with an `aud`/`iss` check — the same "signature is the auth"
 pattern as the Clerk webhook route.
 
 Card actions reuse the exact REST code paths (`createSmartTodo`,
-`listOpenTodos`, `setTodoCompleted`), so AI/URL handling, positioning, and
+`listOpenTodos`, `setTodoCompleted`), so URL handling, positioning, and
 `notifySync` stay identical to the web/iOS surfaces. A verified Google identity
 is mapped to a Nylon Clerk user by `resolveNylonUser` (existing link →
 email auto-link → "Connect Nylon" card). Requesting only current-message
@@ -104,7 +103,6 @@ cp .env.example .env
 Required for the worker:
 
 - `CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY` — Clerk auth
-- `AI_GATEWAY_ID` — AI Gateway slug (already set in `.env.example`)
 
 In production, set the same values as Workers secrets via `wrangler secret put`.
 
@@ -132,12 +130,10 @@ src/api/
 │   │   ├── todos.ts              # CRUD endpoint handlers
 │   │   ├── sync.ts               # Sync endpoint with conflict resolution
 │   │   ├── users.ts              # Current-user endpoints
-│   │   ├── smart-create.ts       # Thin wrapper over createSmartTodo (background AI enrichment)
-│   │   ├── process.ts            # Re-run link processing for a todo (no AI)
+│   │   ├── smart-create.ts       # Thin wrapper over createSmartTodo
+│   │   ├── process.ts            # Re-run link processing for a todo
 │   │   └── gmail-addon/          # Gmail add-on card handlers (homepage, contextual, actions)
 │   ├── lib/
-│   │   ├── ai.ts                 # enrichTodo classifier + tool schema
-│   │   ├── ai-enrich.ts          # Background enrichment orchestration (DB writes)
 │   │   ├── auth.ts               # Clerk JWT verification middleware
 │   │   ├── addon-auth.ts         # Google ID-token verification + resolveNylonUser (Gmail add-on)
 │   │   ├── addon-cards.ts        # Pure JSON card builders + response envelopes
@@ -146,7 +142,7 @@ src/api/
 │   │   ├── db.ts                 # Drizzle schema and database client
 │   │   ├── errors.ts             # Shared error types
 │   │   ├── notify-sync.ts        # Poke the sync Durable Object after writes
-│   │   ├── process-todo.ts       # Non-AI link processing: attach, fetch, title from metadata
+│   │   ├── process-todo.ts       # Link processing: attach, fetch, title from metadata
 │   │   ├── url-helpers.ts        # URL parsing / title-truncation utilities
 │   │   └── url-metadata.ts       # OG metadata fetching for extracted URLs
 │   └── durable-objects/

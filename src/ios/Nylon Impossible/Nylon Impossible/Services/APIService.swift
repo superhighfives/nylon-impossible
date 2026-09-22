@@ -10,39 +10,6 @@ import Sentry
 
 // MARK: - API Models
 
-struct APITodoMessage: Codable, Sendable, Identifiable {
-    let id: String
-    let todoId: String
-    let role: String         // "assistant" | "user"
-    let content: String
-    let createdAt: Date
-    let awaitingReply: Bool
-}
-
-/// Union of every shape a suggestion's payload can take. Which fields are set
-/// depends on `APITodoSuggestion.type`; unrelated fields decode as nil since
-/// every property is optional. Mirrors the server's `SuggestionPayload` type.
-struct APISuggestionPayload: Codable, Sendable, Equatable {
-    let dueDate: String?
-    let recurrence: Recurrence?
-    let title: String?
-    let titles: [String]?
-    let searchQuery: String?
-}
-
-/// Proposed AI enrichment change for a todo. Server-authoritative and terminal
-/// once accepted/dismissed — clients upsert on sync, never generate these.
-struct APITodoSuggestion: Codable, Sendable, Identifiable {
-    let id: String
-    let todoId: String
-    let type: String       // "due_date" | "recurrence" | "title" | "subtasks"
-    let payload: APISuggestionPayload
-    let label: String      // Pre-rendered human string for the button
-    let status: String     // "pending" | "accepted" | "dismissed"
-    let createdAt: Date
-    let updatedAt: Date
-}
-
 struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
@@ -55,14 +22,10 @@ struct APITodo: Codable, Sendable {
     let position: String?
     let dueDate: Date?
     let recurrence: Recurrence?
-    let aiStatus: AIStatus?
-    let needsInput: Bool?
     let sticky: Bool?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
-    let messages: [APITodoMessage]?  // Conversation included in sync response
-    let suggestions: [APITodoSuggestion]?  // Enrichment proposals included in sync response
 
     init(
         id: String, userId: String, parentId: String? = nil, listId: String? = nil, title: String,
@@ -70,11 +33,9 @@ struct APITodo: Codable, Sendable {
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
         recurrence: Recurrence? = nil,
-        aiStatus: AIStatus? = nil, needsInput: Bool? = nil, sticky: Bool? = nil,
+        sticky: Bool? = nil,
         createdAt: Date, updatedAt: Date,
-        urls: [APITodoUrl]? = nil,
-        messages: [APITodoMessage]? = nil,
-        suggestions: [APITodoSuggestion]? = nil
+        urls: [APITodoUrl]? = nil
     ) {
         self.id = id
         self.userId = userId
@@ -87,14 +48,10 @@ struct APITodo: Codable, Sendable {
         self.position = position
         self.dueDate = dueDate
         self.recurrence = recurrence
-        self.aiStatus = aiStatus
-        self.needsInput = needsInput
         self.sticky = sticky
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls
-        self.messages = messages
-        self.suggestions = suggestions
     }
 }
 
@@ -102,14 +59,6 @@ struct APITodo: Codable, Sendable {
 enum FetchStatus: String, Codable, Sendable {
     case pending
     case fetched
-    case failed
-}
-
-/// AI processing status for todos
-enum AIStatus: String, Codable, Sendable {
-    case pending
-    case processing
-    case complete
     case failed
 }
 
@@ -168,7 +117,6 @@ struct APITodoWithUrls: Codable, Sendable {
     let position: String?
     let dueDate: Date?
     let recurrence: Recurrence?
-    let aiStatus: AIStatus?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]
@@ -178,7 +126,6 @@ struct APITodoWithUrls: Codable, Sendable {
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
         recurrence: Recurrence? = nil,
-        aiStatus: AIStatus? = nil,
         createdAt: Date, updatedAt: Date,
         urls: [APITodoUrl] = []
     ) {
@@ -191,7 +138,6 @@ struct APITodoWithUrls: Codable, Sendable {
         self.position = position
         self.dueDate = dueDate
         self.recurrence = recurrence
-        self.aiStatus = aiStatus
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls
@@ -216,7 +162,6 @@ struct SyncConflict: Codable, Sendable {
 struct APIUser: Codable, Sendable {
     let id: String
     let email: String
-    let aiEnabled: Bool
     // "free" | "pro". Optional so the client still decodes against an older API
     // that predates the field; treated as "free" when absent.
     let plan: String?
@@ -232,26 +177,22 @@ struct APIUser: Codable, Sendable {
 }
 
 struct UpdateUserRequest: Encodable, Sendable {
-    let aiEnabled: Bool?
     // Double optional: nil = omit field, .some(nil) = send null, .some(value) = send value
     let location: String??
     // Single optional (theme is never nulled): nil = omit, value = send. `var`
     // with a default keeps it in the memberwise init (a defaulted `let` would be
-    // dropped from it), so existing aiEnabled/location call sites still compile.
+    // dropped from it), so existing location call sites still compile.
     var theme: String? = nil
     // Single optional (never nulled): nil = omit, value = send. Defaulted `var`
     // for the same memberwise-init reason as `theme`.
     var hideCompleted: Bool? = nil
 
     enum CodingKeys: String, CodingKey {
-        case aiEnabled, location, theme, hideCompleted
+        case location, theme, hideCompleted
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if let aiEnabled {
-            try container.encode(aiEnabled, forKey: .aiEnabled)
-        }
         if case .some(let loc) = location {
             try container.encode(loc, forKey: .location)
         }
@@ -292,12 +233,7 @@ protocol APIProviding: Sendable {
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func importGoogleTasks() async throws -> GoogleTasksImportResponse
     func deleteMe() async throws
-    func enrich(todoId: String) async throws
     func processTodo(todoId: String) async throws -> Int
-    func replyToTodo(todoId: String, content: String) async throws -> String
-    func dismissQuestion(todoId: String) async throws
-    func acceptSuggestion(todoId: String, suggestionId: String) async throws
-    func dismissSuggestion(todoId: String, suggestionId: String) async throws
 
     // MARK: - Lists
     func listLists() async throws -> [APIList]
@@ -405,16 +341,6 @@ final class APIService: APIProviding {
         let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
 
-    // MARK: - Enrich
-
-    /// On-demand AI enrichment for an existing todo. AI is intentional — nothing
-    /// enriches automatically — so this backs the explicit per-todo "Enrich"
-    /// action. Gated on the aiEnabled switch server-side.
-    func enrich(todoId: String) async throws {
-        struct EnrichResponse: Decodable { let status: String }
-        let _: EnrichResponse = try await post(path: "/todos/\(todoId)/enrich", body: EmptyBody())
-    }
-
     // MARK: - Process
 
     /// Re-run link processing for a todo: attach any URLs in its text, fetch
@@ -431,46 +357,6 @@ final class APIService: APIProviding {
             body: EmptyBody()
         )
         return response.links
-    }
-
-    // MARK: - Conversation
-
-    /// Reply to the agent's clarifying question. Returns the server message id.
-    func replyToTodo(todoId: String, content: String) async throws -> String {
-        struct ReplyRequest: Codable { let content: String }
-        struct ReplyResponse: Decodable { let id: String }
-        let response: ReplyResponse = try await post(
-            path: "/todos/\(todoId)/reply",
-            body: ReplyRequest(content: content)
-        )
-        return response.id
-    }
-
-    /// Dismiss the agent's open question without answering.
-    func dismissQuestion(todoId: String) async throws {
-        let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/question")
-    }
-
-    // MARK: - Suggestions
-
-    /// Accept an enrichment suggestion. Applies exactly that change server-side
-    /// and marks it accepted — terminal, it never reapplies.
-    func acceptSuggestion(todoId: String, suggestionId: String) async throws {
-        struct AcceptResponse: Decodable { let id: String; let status: String }
-        let _: AcceptResponse = try await post(
-            path: "/todos/\(todoId)/suggestions/\(suggestionId)/accept",
-            body: EmptyBody()
-        )
-    }
-
-    /// Dismiss an enrichment suggestion without applying it. Terminal — never
-    /// reappears, including across future re-enrich runs.
-    func dismissSuggestion(todoId: String, suggestionId: String) async throws {
-        struct DismissResponse: Decodable { let id: String; let status: String }
-        let _: DismissResponse = try await post(
-            path: "/todos/\(todoId)/suggestions/\(suggestionId)/dismiss",
-            body: EmptyBody()
-        )
     }
 
     // MARK: - User Preferences

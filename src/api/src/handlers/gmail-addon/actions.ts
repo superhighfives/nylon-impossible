@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
 import { buildHomepageCard, QUICK_ADD_INPUT } from "../../lib/addon-cards";
 import { createSmartTodo } from "../../lib/create-todo";
-import { eq, getDb, users } from "../../lib/db";
+import { getDb } from "../../lib/db";
 import { listOpenTodos, setTodoCompleted } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import {
@@ -16,19 +16,6 @@ import {
 } from "./shared";
 
 const HOMEPAGE_TODO_LIMIT = 10;
-
-/** Load the user's AI master switch so card creates mirror POST /todos/smart. */
-async function loadAiEnabled(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-): Promise<boolean> {
-  const [user] = await db
-    .select({ aiEnabled: users.aiEnabled })
-    .from(users)
-    .where(eq(users.id, userId))
-    .limit(1);
-  return user?.aiEnabled ?? true;
-}
 
 /** Rebuild the homepage card from the current open-todos list, with a toast. */
 async function refreshedHomepage(
@@ -83,8 +70,6 @@ export async function gmailAddonQuickAdd(c: Context<Env>) {
   }
 
   await createSmartTodo(db, c.env, resolved.userId, text, {
-    aiEnabled: await loadAiEnabled(db, resolved.userId),
-    enrich: true,
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 
@@ -115,8 +100,6 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
   const subject = readParameter(event, "subject");
 
   await createSmartTodo(db, c.env, resolved.userId, text, {
-    aiEnabled: await loadAiEnabled(db, resolved.userId),
-    enrich: true,
     // Attach the thread permalink with the subject as its title so it renders
     // as an email link (subject + Gmail icon) without a doomed metadata fetch.
     attachedUrls: permalink

@@ -6,10 +6,6 @@ vi.mock("@/hooks/useTodos", () => ({
   useSmartCreate: vi.fn(),
 }));
 
-vi.mock("@/hooks/useUser", () => ({
-  useUser: vi.fn(),
-}));
-
 vi.mock("@/lib/toast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), dismiss: vi.fn() },
   messageFromError: (err: unknown, fallback: string) =>
@@ -17,7 +13,6 @@ vi.mock("@/lib/toast", () => ({
 }));
 
 import { useSmartCreate } from "@/hooks/useTodos";
-import { useUser } from "@/hooks/useUser";
 import { toast } from "@/lib/toast";
 
 type MutateCallbacks = {
@@ -37,12 +32,6 @@ function stubSmartCreate({ isPending = false }: { isPending?: boolean } = {}) {
 describe("TodoInput", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default to AI off — the AI split-button menu is hidden, so the plain
-    // Add button behaviour under test is unaffected.
-    vi.mocked(useUser).mockReturnValue({
-      data: { plan: "free", aiEnabled: false },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
   });
 
   it("hides the submit button when the input is empty", () => {
@@ -167,46 +156,5 @@ describe("TodoInput", () => {
     fireEvent.change(textarea, { target: { value: "   " } });
     fireEvent.keyDown(textarea, { key: "Enter" });
     expect(mutate).not.toHaveBeenCalled();
-  });
-
-  it("hides the AI split-button when AI is disabled", () => {
-    stubSmartCreate();
-    render(<TodoInput />);
-    fireEvent.change(screen.getByLabelText("New todo"), {
-      target: { value: "Buy milk" },
-    });
-    expect(
-      screen.queryByRole("button", { name: /add with ai/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("offers the AI split-button for a free user with AI enabled (plan-independent)", () => {
-    vi.mocked(useUser).mockReturnValue({
-      data: { plan: "free", aiEnabled: true },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
-    stubSmartCreate();
-    render(<TodoInput />);
-    fireEvent.change(screen.getByLabelText("New todo"), {
-      target: { value: "Buy milk" },
-    });
-    expect(
-      screen.getByRole("button", { name: /add with ai/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("offers the AI split-button for a pro user with AI enabled", () => {
-    vi.mocked(useUser).mockReturnValue({
-      data: { plan: "pro", aiEnabled: true },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
-    stubSmartCreate();
-    render(<TodoInput />);
-    fireEvent.change(screen.getByLabelText("New todo"), {
-      target: { value: "Buy milk" },
-    });
-    expect(
-      screen.getByRole("button", { name: /add with ai/i }),
-    ).toBeInTheDocument();
   });
 });

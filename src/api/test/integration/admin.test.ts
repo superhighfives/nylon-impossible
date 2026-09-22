@@ -80,11 +80,11 @@ describe("Admin endpoints", () => {
       expect(updated?.plan).toBe("pro");
     });
 
-    it("updates aiEnabled and location together", async () => {
+    it("updates plan and location together", async () => {
       mockAsAdmin();
       await seedUser("admin_test_1", "admin@example.com");
       await seedUser("target_user", "target@example.com", {
-        aiEnabled: true,
+        plan: "free",
         location: "Los Angeles, CA",
       });
 
@@ -93,23 +93,23 @@ describe("Admin endpoints", () => {
         {
           method: "PATCH",
           headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ aiEnabled: false, location: null }),
+          body: JSON.stringify({ plan: "pro", location: null }),
         },
       );
       expect(res.status).toBe(200);
       const body = await res.json<{
-        aiEnabled: boolean;
+        plan: string;
         location: string | null;
       }>();
-      expect(body.aiEnabled).toBe(false);
+      expect(body.plan).toBe("pro");
       expect(body.location).toBeNull();
 
       const db = getDb(env.DB);
       const [updated] = await db
-        .select({ aiEnabled: users.aiEnabled, location: users.location })
+        .select({ plan: users.plan, location: users.location })
         .from(users)
         .where(eq(users.id, "target_user"));
-      expect(updated?.aiEnabled).toBe(false);
+      expect(updated?.plan).toBe("pro");
       expect(updated?.location).toBeNull();
     });
 

@@ -3,32 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoItemExpanded } from "../TodoItemExpanded";
 
-vi.mock("@/hooks/useUser", () => ({
-  useUser: vi.fn(),
-}));
-
 const updateUrlPreviewMutate = vi.fn();
-const enrichMutate = vi.fn();
 const processMutate = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
   useUpdateUrlPreview: () => ({ mutate: updateUrlPreviewMutate }),
-  useEnrichTodo: () => ({ mutate: enrichMutate, isPending: false }),
   useProcessTodo: () => ({ mutate: processMutate, isPending: false }),
 }));
-
-vi.mock("../ConversationSection", () => ({
-  ConversationSection: ({ todo }: { todo: { id: string } }) => (
-    <div data-testid="conversation-section">conversation:{todo.id}</div>
-  ),
-}));
-
-vi.mock("../SuggestionsSection", () => ({
-  SuggestionsSection: ({ todo }: { todo: { id: string } }) => (
-    <div data-testid="suggestions-section">suggestions:{todo.id}</div>
-  ),
-}));
-
-import { useUser } from "@/hooks/useUser";
 
 function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   return {
@@ -43,14 +23,10 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     position: "a0",
     dueDate: null,
     recurrence: null,
-    aiStatus: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    needsInput: false,
     sticky: false,
-    messages: [],
     urls: [],
-    suggestions: [],
     ...overrides,
   };
 }
@@ -77,10 +53,6 @@ function renderExpanded(overrides: Partial<TodoWithUrls> = {}) {
 describe("TodoItemExpanded", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useUser).mockReturnValue({
-      data: { aiEnabled: false },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
   });
 
   it("has no Save button — edits auto-save", () => {
@@ -88,38 +60,6 @@ describe("TodoItemExpanded", () => {
     expect(
       screen.queryByRole("button", { name: /save changes/i }),
     ).not.toBeInTheDocument();
-  });
-
-  it("auto-saves the title on blur, sending only the changed field", () => {
-    const { onUpdate } = renderExpanded();
-    const input = screen.getByLabelText("Title") as HTMLInputElement;
-    fireEvent.change(input, { target: { value: "Buy oat milk" } });
-    fireEvent.blur(input);
-
-    expect(onUpdate).toHaveBeenCalledWith({ title: "Buy oat milk" });
-  });
-
-  it("auto-saves the title after the debounce elapses", () => {
-    vi.useFakeTimers();
-    try {
-      const { onUpdate } = renderExpanded();
-      fireEvent.change(screen.getByLabelText("Title"), {
-        target: { value: "Buy oat milk" },
-      });
-      expect(onUpdate).not.toHaveBeenCalled();
-      vi.advanceTimersByTime(700);
-      expect(onUpdate).toHaveBeenCalledWith({ title: "Buy oat milk" });
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("never auto-saves a blank title", () => {
-    const { onUpdate } = renderExpanded();
-    const input = screen.getByLabelText("Title");
-    fireEvent.change(input, { target: { value: "   " } });
-    fireEvent.blur(input);
-    expect(onUpdate).not.toHaveBeenCalled();
   });
 
   it("calls onDelete with the todo id", () => {
@@ -149,43 +89,6 @@ describe("TodoItemExpanded", () => {
     expect(onUpdate.mock.calls[0][0].dueDate).toBeInstanceOf(Date);
   });
 
-  it("runs enrich from the AI actions for a free user with AI enabled", () => {
-    vi.mocked(useUser).mockReturnValue({
-      data: { plan: "free", aiEnabled: true },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
-    renderExpanded();
-
-    fireEvent.click(screen.getByRole("button", { name: /enrich/i }));
-    expect(enrichMutate).toHaveBeenCalledWith("todo-1");
-  });
-
-  it("hides the AI actions when AI is unavailable", () => {
-    // beforeEach sets aiEnabled:false → AI unavailable.
-    renderExpanded();
-    expect(
-      screen.queryByRole("button", { name: /enrich/i }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows 'Enrichment failed.' when aiStatus is failed", () => {
-    vi.mocked(useUser).mockReturnValue({
-      data: { plan: "pro", aiEnabled: true },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
-    renderExpanded({ aiStatus: "failed" });
-    expect(screen.getByText("Enrichment failed.")).toBeInTheDocument();
-  });
-
-  it("does not show 'Enrichment failed.' when aiStatus is pending", () => {
-    vi.mocked(useUser).mockReturnValue({
-      data: { plan: "pro", aiEnabled: true },
-      isLoading: false,
-    } as unknown as ReturnType<typeof useUser>);
-    renderExpanded({ aiStatus: "pending" });
-    expect(screen.queryByText("Enrichment failed.")).not.toBeInTheDocument();
-  });
-
   function urlFixture(overrides: Partial<TodoWithUrls["urls"][number]> = {}) {
     return {
       id: "url-1",
@@ -206,9 +109,7 @@ describe("TodoItemExpanded", () => {
     };
   }
 
-  it("processes links without AI, and offers it with AI turned off", () => {
-    // beforeEach sets aiEnabled:false — Process is not an AI action, so it's
-    // there regardless.
+  it("processes links without AI", () => {
     renderExpanded();
     fireEvent.click(screen.getByRole("button", { name: /process links/i }));
     expect(processMutate).toHaveBeenCalledWith("todo-1");
