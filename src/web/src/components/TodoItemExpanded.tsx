@@ -23,7 +23,7 @@ import type {
   TodoWithUrls,
 } from "@/types/database";
 import { SubtaskSection } from "./SubtaskSection";
-import { Button, Input, Loader, Select, Textarea } from "./ui";
+import { Button, EditableText, Input, Loader, Select } from "./ui";
 import { EmailPreviewCard } from "./ui/EmailPreviewCard";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
 
@@ -302,17 +302,16 @@ export function TodoItemExpanded({
         >
           Notes
         </label>
-        <Textarea
+        <EditableText
           id={`notes-${todo.id}`}
           value={notes}
-          onChange={(e) => {
-            setNotes(e.target.value);
+          onChange={(value) => {
+            setNotes(value);
             setTouched((t) => ({ ...t, notes: true }));
-            scheduleTextCommit("notes", e.target.value);
+            scheduleTextCommit("notes", value);
           }}
           onBlur={() => flushTextCommit("notes")}
           placeholder="Add a note..."
-          className="resize-y"
         />
       </div>
 
