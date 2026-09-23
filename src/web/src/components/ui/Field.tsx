@@ -1,6 +1,6 @@
 import { Field as BaseField } from "@base-ui/react/field";
 import type { ComponentProps, ReactNode } from "react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 
 export interface FieldProps extends ComponentProps<typeof BaseField.Root> {
   label?: string;
@@ -151,11 +151,12 @@ export function EditableText({
   className,
 }: EditableTextProps) {
   const [focused, setFocused] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Auto-grow to fit content instead of scrolling inside a fixed box.
-  useEffect(() => {
-    const el = textareaRef.current;
+  // Auto-grow to fit content instead of scrolling inside a fixed box. A
+  // callback ref (not useEffect) so this runs when the textarea mounts on
+  // focus, not just once on the component's own mount (when it isn't
+  // rendered at all).
+  const autoGrow = useCallback((el: HTMLTextAreaElement | null) => {
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
@@ -164,7 +165,7 @@ export function EditableText({
   if (focused) {
     return (
       <textarea
-        ref={textareaRef}
+        ref={autoGrow}
         id={id}
         value={value}
         // biome-ignore lint/a11y/noAutofocus: this only mounts by replacing the rendered view the user just clicked/focused into, not on page load.
