@@ -52,6 +52,7 @@ export function BoardChrome({
           <Button
             variant="accentOutline"
             size="sm"
+            ringOffset="app"
             type="button"
             onClick={openSettings}
             className="font-display font-bold"

@@ -36,6 +36,7 @@ export function ErrorView({ reset }: ErrorViewProps) {
           <Button
             variant="primary"
             size="lg"
+            ringOffset="app"
             className="w-full"
             onClick={reset}
           >
@@ -46,6 +47,7 @@ export function ErrorView({ reset }: ErrorViewProps) {
           render={<Link to="/" />}
           variant="outline"
           size="lg"
+          ringOffset="app"
           className="w-full"
         >
           Go home

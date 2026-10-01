@@ -4,7 +4,9 @@ import {
   buildFaviconErrorHandler,
   getFetchedPreviewTitle,
   getUrlDisplay,
-  getUrlOnlyUrl,
+  isPlaceholderTitle,
+  placeholderTitleForUrl,
+  stripLinkedUrlsFromTitle,
 } from "../url-display";
 
 function makeUrl(overrides?: Partial<SerializedTodoUrl>): SerializedTodoUrl {
@@ -79,37 +81,82 @@ describe("getUrlDisplay", () => {
   });
 });
 
-describe("getUrlOnlyUrl", () => {
+describe("isPlaceholderTitle", () => {
+  const url = "https://www.interfacecraft.dev/";
+
+  it("matches the raw URL", () => {
+    expect(isPlaceholderTitle("https://www.interfacecraft.dev/", url)).toBe(
+      true,
+    );
+  });
+
+  it("matches the auto-generated 'Check {domain}' placeholder", () => {
+    expect(isPlaceholderTitle("Check interfacecraft.dev", url)).toBe(true);
+  });
+
+  it("returns false for a real, user-written title", () => {
+    expect(isPlaceholderTitle("Read this design library", url)).toBe(false);
+  });
+});
+
+describe("placeholderTitleForUrl", () => {
+  it("builds 'Check {domain}', stripping www.", () => {
+    expect(placeholderTitleForUrl("https://www.interfacecraft.dev/post")).toBe(
+      "Check interfacecraft.dev",
+    );
+  });
+
+  it("falls back to the raw URL when it's malformed", () => {
+    expect(placeholderTitleForUrl("not a url")).toBe("not a url");
+  });
+});
+
+describe("stripLinkedUrlsFromTitle", () => {
   const url = makeUrl({ url: "https://www.interfacecraft.dev/" });
 
-  it("matches a todo titled with the raw URL", () => {
+  it("removes a trailing linked URL, leaving the surrounding text", () => {
     expect(
-      getUrlOnlyUrl({ title: "https://www.interfacecraft.dev/", urls: [url] }),
-    ).toBe(url);
+      stripLinkedUrlsFromTitle(
+        "Use for inspiration https://www.interfacecraft.dev/",
+        [url],
+      ),
+    ).toBe("Use for inspiration");
   });
 
-  it("matches the auto-generated 'Check {domain}' placeholder title", () => {
+  it("removes a linked URL wherever it sits in the text", () => {
     expect(
-      getUrlOnlyUrl({ title: "Check interfacecraft.dev", urls: [url] }),
-    ).toBe(url);
+      stripLinkedUrlsFromTitle(
+        "See https://www.interfacecraft.dev/ for the brief",
+        [url],
+      ),
+    ).toBe("See for the brief");
   });
 
-  it("returns null when the user wrote a real title", () => {
-    expect(
-      getUrlOnlyUrl({ title: "Read this design library", urls: [url] }),
-    ).toBeNull();
+  it("leaves the title untouched when it has no matching URL", () => {
+    expect(stripLinkedUrlsFromTitle("Read this design library", [url])).toBe(
+      "Read this design library",
+    );
+    expect(stripLinkedUrlsFromTitle("Read this design library", [])).toBe(
+      "Read this design library",
+    );
   });
 
-  it("returns null with zero or multiple links", () => {
+  it("strips trailing punctuation attached to the URL", () => {
     expect(
-      getUrlOnlyUrl({ title: "Check interfacecraft.dev", urls: [] }),
-    ).toBeNull();
+      stripLinkedUrlsFromTitle(
+        "Use for inspiration (https://www.interfacecraft.dev/).",
+        [url],
+      ),
+    ).toBe("Use for inspiration.");
     expect(
-      getUrlOnlyUrl({
-        title: "Check interfacecraft.dev",
-        urls: [url, makeUrl({ id: "u2", url: "https://example.com" })],
-      }),
-    ).toBeNull();
+      stripLinkedUrlsFromTitle(
+        "Read https://www.interfacecraft.dev/, then sketch",
+        [url],
+      ),
+    ).toBe("Read, then sketch");
+    expect(
+      stripLinkedUrlsFromTitle("See [https://www.interfacecraft.dev/]", [url]),
+    ).toBe("See");
   });
 });
 

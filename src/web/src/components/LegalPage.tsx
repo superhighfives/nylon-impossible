@@ -26,13 +26,22 @@ export function LegalPage({ title, lastUpdated, children }: LegalPageProps) {
       <hr className="border-gray-subtle" />
 
       <div className="flex flex-wrap gap-4 text-sm text-gray-muted">
-        <Link to="/" className="hover:text-gray transition-colors">
+        <Link
+          to="/"
+          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+        >
           Home
         </Link>
-        <Link to="/privacy" className="hover:text-gray transition-colors">
+        <Link
+          to="/privacy"
+          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+        >
           Privacy
         </Link>
-        <Link to="/terms" className="hover:text-gray transition-colors">
+        <Link
+          to="/terms"
+          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+        >
           Terms
         </Link>
       </div>

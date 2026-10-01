@@ -1,7 +1,6 @@
 import { Popover } from "@base-ui/react/popover";
 import { AlertCircle, ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useState } from "react";
-import { focusRing } from "@/components/ui";
 import { useHints } from "@/hooks/useHints";
 
 // --- Date helpers -----------------------------------------------------------
@@ -78,7 +77,7 @@ function DueDateCalendar({
           type="button"
           onClick={() => shiftMonth(-1)}
           aria-label="Previous month"
-          className="flex size-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray"
+          className="flex size-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           <ChevronLeft size={16} aria-hidden="true" />
         </button>
@@ -89,7 +88,7 @@ function DueDateCalendar({
           type="button"
           onClick={() => shiftMonth(1)}
           aria-label="Next month"
-          className="flex size-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray"
+          className="flex size-7 items-center justify-center rounded-md text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           <ChevronRight size={16} aria-hidden="true" />
         </button>
@@ -120,7 +119,7 @@ function DueDateCalendar({
               onClick={() => onSelect(ymd)}
               aria-label={ymd}
               aria-pressed={isSelected}
-              className={`flex size-7 items-center justify-center rounded-md text-xs tabular-nums transition-colors ${
+              className={`flex size-7 items-center justify-center rounded-md text-xs tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset ${
                 isSelected
                   ? "bg-accent-solid text-accent-contrast hover:bg-accent-solid-hover"
                   : isToday
@@ -137,7 +136,7 @@ function DueDateCalendar({
         <button
           type="button"
           onClick={() => onSelect(todayYmd)}
-          className="rounded-md px-2 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray"
+          className="rounded-md px-2 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           Today
         </button>
@@ -145,7 +144,7 @@ function DueDateCalendar({
           type="button"
           onClick={onClear}
           disabled={!value}
-          className="rounded-md px-2 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray disabled:pointer-events-none disabled:opacity-40"
+          className="rounded-md px-2 py-1 text-xs text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           Clear
         </button>
@@ -210,7 +209,11 @@ export function InlineDueDate({
               type="button"
               disabled={disabled}
               aria-label={`Due ${label}. Change due date`}
-              className={`inline-flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-1 transition-colors disabled:opacity-50 ${focusRing}`}
+              // ring-inset, not the shared `focusRing` — this button sits
+              // inside the pill's own tinted background (gray-base/red-base),
+              // not the app background, so an offset ring would paint a
+              // mismatched gap the same way the old Button bug did.
+              className="inline-flex items-center gap-1 rounded-md py-0.5 pl-1.5 pr-1 transition-colors disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
             >
               {isOverdue && <AlertCircle size={10} aria-hidden="true" />}
               {label}
@@ -222,7 +225,7 @@ export function InlineDueDate({
           disabled={disabled}
           onClick={handleClear}
           aria-label="Clear due date"
-          className={`rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50 ${focusRing}`}
+          className="rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           <X size={11} aria-hidden="true" />
         </button>

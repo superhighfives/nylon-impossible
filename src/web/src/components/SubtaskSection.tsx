@@ -96,7 +96,7 @@ function ActiveSubtaskRow({
       <button
         type="button"
         disabled={disabled}
-        className="cursor-grab touch-none select-none [-webkit-touch-callout:none] text-gray-muted/40 transition-[transform,opacity,color] hover:text-gray-muted active:scale-[0.96] active:cursor-grabbing sm:opacity-0 sm:group-hover/sub:opacity-100 disabled:opacity-50"
+        className="cursor-grab touch-none select-none [-webkit-touch-callout:none] rounded-md text-gray-muted/40 transition-[transform,opacity,color] hover:text-gray-muted active:scale-[0.96] active:cursor-grabbing sm:opacity-0 sm:group-hover/sub:opacity-100 disabled:opacity-50 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         aria-label={`Reorder "${subtask.title}"`}
         {...attributes}
         {...listeners}

@@ -53,7 +53,7 @@ export function EmailPreviewCard({ url }: { url: SerializedTodoUrl }) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link"
+      className="flex items-start gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-surface"
     >
       <EmailIcon url={url} className="w-4 h-4 mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">
@@ -75,7 +75,7 @@ export function EmailPreviewCardCompact({ url }: { url: SerializedTodoUrl }) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-center gap-3 rounded-lg bg-gray-surface p-3 shadow-sm transition-shadow hover:shadow-base group/link"
+      className="flex items-center gap-3 rounded-lg bg-gray-surface p-3 shadow-sm transition-shadow hover:shadow-base group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
     >
       <EmailIcon url={url} className="w-4 h-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate text-sm text-gray group-hover/link:underline">

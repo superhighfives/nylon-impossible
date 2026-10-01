@@ -29,7 +29,7 @@ export function InfoTooltip({ render }: { render: ReactNode }) {
     <Tooltip render={render}>
       <button
         type="button"
-        className="inline-flex items-center justify-center text-gray-muted hover:text-gray transition-colors"
+        className="inline-flex items-center justify-center rounded-full text-gray-muted transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
         aria-label="More information"
       >
         <Info size={13} />

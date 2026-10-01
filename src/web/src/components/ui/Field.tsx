@@ -45,12 +45,24 @@ export interface TextareaProps extends ComponentProps<"textarea"> {
   variant?: "default" | "error";
   /** Tailwind min-h-* utility to use instead of the default 80px. */
   minHeightClassName?: string;
+  /**
+   * The focus ring's offset is filled with this color, so it needs to match
+   * whatever the textarea actually sits on — see Button's `ringOffset` for
+   * the same convention.
+   */
+  ringOffset?: "surface" | "app";
 }
+
+const TEXTAREA_RING_OFFSET = {
+  surface: "focus-visible:ring-offset-gray-surface",
+  app: "focus-visible:ring-offset-gray-app",
+} as const;
 
 export function Textarea({
   className,
   variant = "default",
   minHeightClassName = "min-h-[80px]",
+  ringOffset = "surface",
   ...props
 }: TextareaProps) {
   const variantClasses = {
@@ -60,7 +72,7 @@ export function Textarea({
 
   return (
     <textarea
-      className={`flex ${minHeightClassName} w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base ${variantClasses[variant]} ${className ?? ""}`}
+      className={`flex ${minHeightClassName} w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${TEXTAREA_RING_OFFSET[ringOffset]} disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base ${variantClasses[variant]} ${className ?? ""}`}
       {...props}
     />
   );
@@ -84,7 +96,7 @@ function renderLink(key: string, href: string, label: string): ReactNode {
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
-      className="underline decoration-gray-subtle underline-offset-2 hover:decoration-gray"
+      className="rounded-sm underline decoration-gray-subtle underline-offset-2 hover:decoration-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
     >
       {label}
     </a>
@@ -182,7 +194,7 @@ export function EditableText({
           onBlur?.();
         }}
         placeholder={placeholder}
-        className={`block ${minHeightClassName} w-full resize-none overflow-hidden bg-transparent p-0 text-sm leading-relaxed text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none [@supports(-webkit-touch-callout:none)]:!text-base ${className ?? ""}`}
+        className={`block ${minHeightClassName} w-full resize-none overflow-hidden rounded-md bg-transparent p-0 text-sm leading-relaxed text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset [@supports(-webkit-touch-callout:none)]:!text-base ${className ?? ""}`}
       />
     );
   }
@@ -206,7 +218,10 @@ export function EditableText({
           setFocused(true);
         }
       }}
-      className={`block ${minHeightClassName} w-full cursor-text text-sm leading-relaxed text-gray whitespace-pre-wrap break-words transition-colors focus-visible:outline-none ${className ?? ""}`}
+      // ring-inset (no ring-offset) reads as a subtle highlight rather than a
+      // boxed input — Notes intentionally reads as plain prose, not a form
+      // field, so a floating offset ring would undo that.
+      className={`block ${minHeightClassName} w-full cursor-text rounded-md text-sm leading-relaxed text-gray whitespace-pre-wrap break-words transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset ${className ?? ""}`}
     >
       {value ? (
         renderNotes(value)

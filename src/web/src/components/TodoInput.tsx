@@ -68,7 +68,7 @@ export function TodoInput({
   return (
     <div className="todo-input-wrapper">
       <form onSubmit={handleSubmit}>
-        <div className="todo-input-container flex items-center gap-1 rounded-full bg-gray-surface shadow-lg ring-1 ring-gray-subtle">
+        <div className="todo-input-container flex items-center gap-1 rounded-full bg-gray-surface shadow-lg ring-1 ring-gray-subtle transition-shadow focus-within:ring-2 focus-within:ring-accent-strong">
           <Textarea
             ref={textareaRef}
             value={text}

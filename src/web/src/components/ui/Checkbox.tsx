@@ -2,6 +2,18 @@ import { Checkbox as BaseCheckbox } from "@base-ui/react/checkbox";
 import { Check, Minus } from "lucide-react";
 import { type ComponentProps, useId } from "react";
 
+/**
+ * The focus ring's offset is filled with this color, so it needs to match
+ * whatever the checkbox actually sits on — a panel/dialog/card (gray-surface,
+ * the default) or the app background directly (the main todo row). Mismatching
+ * the two paints a visible halo instead of a clean ring — see Button's
+ * `ringOffset` for the same convention.
+ */
+const RING_OFFSET = {
+  surface: "focus-visible:ring-offset-gray-surface",
+  app: "focus-visible:ring-offset-gray-app",
+} as const;
+
 export interface CheckboxProps
   extends Omit<
     ComponentProps<typeof BaseCheckbox.Root>,
@@ -11,6 +23,7 @@ export interface CheckboxProps
   indeterminate?: boolean;
   checked?: boolean;
   variant?: "default" | "subtle";
+  ringOffset?: keyof typeof RING_OFFSET;
 }
 
 export function Checkbox({
@@ -19,6 +32,7 @@ export function Checkbox({
   indeterminate,
   checked,
   variant = "default",
+  ringOffset = "surface",
   id: providedId,
   ...props
 }: CheckboxProps) {
@@ -38,7 +52,7 @@ export function Checkbox({
         indeterminate={indeterminate}
         className={`
           h-5 w-5 shrink-0 rounded-md border-2 border-gray-12 dark:border-graydark-12 bg-transparent cursor-pointer
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app
+          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 ${RING_OFFSET[ringOffset]}
           disabled:cursor-not-allowed disabled:opacity-50
           ${checkedStyle}
           transition-colors
