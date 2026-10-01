@@ -68,7 +68,7 @@ import type {
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
-import { Button, ConfirmDialog, Input, SidePanel } from "./ui";
+import { Button, ConfirmDialog, focusRing, Input, SidePanel } from "./ui";
 
 // Keyboard reorder only ever moves up/down (see `verticalKeyboardCoordinates`
 // below), so it's always locked to vertical. Pointer/touch drags used to be
@@ -283,7 +283,7 @@ function NewTodoInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder opacity-0 transition-[opacity,color] hover:text-gray-muted focus-visible:opacity-100 group-hover/column:opacity-100 group-focus-within/column:opacity-100 max-sm:opacity-100"
+        className={`mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder opacity-0 transition-[opacity,color] hover:text-gray-muted focus-visible:opacity-100 group-hover/column:opacity-100 group-focus-within/column:opacity-100 max-sm:opacity-100 ${focusRing}`}
       >
         <span
           aria-hidden="true"
@@ -319,7 +319,7 @@ function NewTodoInline({
           if (e.key === "Escape") close();
         }}
         placeholder="New todo"
-        className="flex-1 border-none bg-transparent p-0 text-sm text-gray outline-none placeholder:text-gray-muted"
+        className="flex-1 rounded-md border-none bg-transparent p-0 text-sm text-gray outline-none placeholder:text-gray-muted focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
       />
     </form>
   );
@@ -366,7 +366,7 @@ function ListHeader({
         <button
           type="button"
           aria-label={`Reorder "${list.name}"`}
-          className="cursor-grab touch-none select-none text-gray-muted opacity-0 transition-opacity active:cursor-grabbing group-hover/header:opacity-100"
+          className={`cursor-grab touch-none select-none text-gray-muted opacity-0 transition-opacity active:cursor-grabbing group-hover/header:opacity-100 ${focusRing}`}
           {...attributes}
           {...listeners}
         >
@@ -387,6 +387,7 @@ function ListHeader({
             }
           }}
           inputSize="sm"
+          ringOffset="app"
           className="flex-1 font-display font-bold"
         />
       ) : (
@@ -400,6 +401,7 @@ function ListHeader({
             variant="ghost"
             size="xs"
             shape="square"
+            ringOffset="app"
             type="button"
             aria-label={`Rename "${list.name}"`}
             onClick={() => setRenaming(true)}
@@ -410,6 +412,7 @@ function ListHeader({
             variant="ghost"
             size="xs"
             shape="square"
+            ringOffset="app"
             type="button"
             aria-label={`Delete "${list.name}"`}
             onClick={() => setConfirmDelete(true)}
@@ -483,12 +486,14 @@ function NewListColumn() {
               }}
               placeholder="List name"
               inputSize="sm"
+              ringOffset="app"
               className="flex-1 font-display font-bold"
             />
             <Button
               variant="ghost"
               size="xs"
               shape="square"
+              ringOffset="app"
               type="button"
               aria-label="Cancel"
               onClick={() => setOpen(false)}

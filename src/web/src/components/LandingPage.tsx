@@ -55,12 +55,22 @@ export function LandingPage() {
         </div>
         <div className="flex flex-col gap-3 text-sm">
           <SignInButton mode="modal">
-            <Button variant="primary" size="lg" className="w-full">
+            <Button
+              variant="primary"
+              size="lg"
+              ringOffset="app"
+              className="w-full"
+            >
               Sign in
             </Button>
           </SignInButton>
           <SignUpButton mode="modal">
-            <Button variant="outline" size="lg" className="w-full">
+            <Button
+              variant="outline"
+              size="lg"
+              ringOffset="app"
+              className="w-full"
+            >
               Create account
             </Button>
           </SignUpButton>
@@ -82,10 +92,16 @@ export function LandingPage() {
       </ul>
 
       <footer className="flex justify-center gap-4 text-xs text-gray-muted">
-        <Link to="/privacy" className="hover:text-gray transition-colors">
+        <Link
+          to="/privacy"
+          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+        >
           Privacy
         </Link>
-        <Link to="/terms" className="hover:text-gray transition-colors">
+        <Link
+          to="/terms"
+          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+        >
           Terms
         </Link>
       </footer>

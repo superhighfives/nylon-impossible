@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
 const inputVariants = cva(
-  "flex w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base",
+  "flex w-full rounded-lg bg-gray-surface px-3 py-2 text-sm text-gray placeholder:text-gray-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [@supports(-webkit-touch-callout:none)]:!text-base",
   {
     variants: {
       variant: {
@@ -16,10 +16,21 @@ const inputVariants = cva(
         base: "h-9 px-3 text-sm",
         lg: "h-10 px-4 text-base",
       },
+      // The focus ring's offset is filled with this color, so it needs to
+      // match whatever the input actually sits on — a panel/dialog/card
+      // (gray-surface, the default) or the app background directly (an
+      // inline board control). Mismatching the two paints a visible halo
+      // instead of a clean ring — see Button's `ringOffset` for the same
+      // convention.
+      ringOffset: {
+        surface: "focus-visible:ring-offset-gray-surface",
+        app: "focus-visible:ring-offset-gray-app",
+      },
     },
     defaultVariants: {
       variant: "default",
       inputSize: "base",
+      ringOffset: "surface",
     },
   },
 );
@@ -28,10 +39,16 @@ export interface InputProps
   extends Omit<ComponentProps<typeof BaseInput>, "size">,
     VariantProps<typeof inputVariants> {}
 
-export function Input({ className, variant, inputSize, ...props }: InputProps) {
+export function Input({
+  className,
+  variant,
+  inputSize,
+  ringOffset,
+  ...props
+}: InputProps) {
   return (
     <BaseInput
-      className={inputVariants({ variant, inputSize, className })}
+      className={inputVariants({ variant, inputSize, ringOffset, className })}
       {...props}
     />
   );

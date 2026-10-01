@@ -3,9 +3,18 @@ import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,color,transform] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-surface disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,color,transform] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
+      // The focus ring's offset is filled with this color, so it needs to
+      // match whatever the button actually sits on — a panel/dialog/card
+      // (gray-surface, the default) or the app background directly (a todo
+      // row's hover pill, hover-revealed row actions). Mismatching the two
+      // paints a visible halo instead of a clean ring.
+      ringOffset: {
+        surface: "focus-visible:ring-offset-gray-surface",
+        app: "focus-visible:ring-offset-gray-app",
+      },
       variant: {
         primary:
           "bg-accent-solid hover:bg-accent-solid-hover text-accent-contrast",
@@ -38,6 +47,7 @@ const buttonVariants = cva(
       variant: "secondary",
       size: "base",
       shape: "base",
+      ringOffset: "surface",
     },
   },
 );
@@ -53,6 +63,7 @@ export function Button({
   variant,
   size,
   shape,
+  ringOffset,
   loading,
   disabled,
   children,
@@ -60,7 +71,13 @@ export function Button({
 }: ButtonProps) {
   return (
     <BaseButton
-      className={buttonVariants({ variant, size, shape, className })}
+      className={buttonVariants({
+        variant,
+        size,
+        shape,
+        ringOffset,
+        className,
+      })}
       disabled={disabled || loading}
       {...props}
     >

@@ -88,7 +88,7 @@ export function SocialPreviewCard({ url }: SocialPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex flex-col rounded-xl border border-gray-line bg-gray-surface shadow-sm hover:shadow-base transition-shadow overflow-hidden group/link"
+      className="flex flex-col rounded-xl border border-gray-line bg-gray-surface shadow-sm hover:shadow-base transition-shadow overflow-hidden group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-surface"
     >
       {/* Header row */}
       <div className="flex items-center gap-2.5 px-3 pt-3 pb-2">
@@ -165,7 +165,7 @@ export function SocialPreviewCardCompact({ url }: SocialPreviewCardProps) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="group/link flex flex-col gap-1 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface max-w-full"
+      className="group/link flex flex-col gap-1 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface max-w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
     >
       <span className="flex items-center gap-2">
         <PlatformBadge platform={social.platform} />

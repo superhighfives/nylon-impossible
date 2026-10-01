@@ -31,6 +31,7 @@ export function NotFound() {
         render={<Link to="/" />}
         variant="primary"
         size="lg"
+        ringOffset="app"
         className="w-full"
       >
         Go home

@@ -53,7 +53,10 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
         </div>
         <Toast.Close
           aria-label="Dismiss"
-          className="shrink-0 rounded-md p-1 text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+          // ring-inset, not an offset ring — the toast surface color varies by
+          // type (accent/red/gray), so there's no single offset color that
+          // would match all three; an inset ring needs none.
+          className="shrink-0 rounded-md p-1 text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           <X size={14} />
         </Toast.Close>

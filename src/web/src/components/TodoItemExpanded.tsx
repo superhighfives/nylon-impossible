@@ -60,7 +60,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
         href={url.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link"
+        className="flex items-center gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-surface"
       >
         {favicon ? (
           <img
@@ -99,7 +99,7 @@ function UrlCard({ url }: { url: SerializedTodoUrl }) {
       href={url.url}
       target="_blank"
       rel="noopener noreferrer"
-      className="flex items-start gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link"
+      className="flex items-start gap-3 p-3 rounded-lg bg-gray-surface shadow-sm transition-shadow hover:shadow-base group/link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-surface"
     >
       {isPending ? (
         <Loader size="sm" className="w-4 h-4 mt-0.5 shrink-0 text-gray-muted" />
@@ -464,7 +464,7 @@ export function TodoItemExpanded({
                       disabled={updateUrlPreview.isPending}
                       // aria-pressed reflects "URL-only mode" being active.
                       aria-pressed={!url.showPreview}
-                      className="-mx-1.5 inline-flex min-h-8 items-center px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
+                      className="-mx-1.5 inline-flex min-h-8 items-center rounded-md px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
                     >
                       {url.showPreview ? "Show just the URL" : "Show preview"}
                     </button>
@@ -488,7 +488,7 @@ export function TodoItemExpanded({
                 type="button"
                 onClick={() => processTodo.mutate(todo.id)}
                 disabled={processTodo.isPending || linksProcessing}
-                className="-mx-1.5 inline-flex min-h-8 items-center gap-1 px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50"
+                className="-mx-1.5 inline-flex min-h-8 items-center gap-1 rounded-md px-1.5 py-1 text-xs text-gray-muted transition-colors hover:text-gray disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
               >
                 <RefreshCw size={12} />
                 Try again

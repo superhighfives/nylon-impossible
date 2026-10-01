@@ -30,7 +30,7 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
         href={url.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="group/link flex items-center gap-2.5 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface"
+        className="group/link flex items-center gap-2.5 rounded-lg border border-gray-subtle px-2.5 py-1.5 transition-colors hover:border-gray hover:bg-gray-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
       >
         {favicon ? (
           <img

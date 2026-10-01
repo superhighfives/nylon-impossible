@@ -55,10 +55,14 @@ function PillHeader({
       <header className="pointer-events-auto flex items-center -space-x-2 rounded-full bg-gray-1/80 dark:bg-graydark-2/85 backdrop-blur-xl border border-gray-subtle shadow-lg p-1">
         <Link
           to="/"
-          className="overflow-hidden size-7 rounded-full flex items-center justify-center shrink-0"
+          // overflow-hidden sits on the inner span, not this element, so the
+          // focus ring below isn't clipped along with the oversized logo image.
+          className="size-7 rounded-full flex items-center justify-center shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
           aria-label="Nylon Impossible"
         >
-          <img src="/logo192.png" alt="Nylon Impossible" className="size-8" />
+          <span className="size-7 overflow-hidden rounded-full flex items-center justify-center">
+            <img src="/logo192.png" alt="Nylon Impossible" className="size-8" />
+          </span>
         </Link>
         <Show when="signed-in">
           <UserButton>

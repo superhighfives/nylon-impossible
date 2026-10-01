@@ -147,7 +147,12 @@ export function SettingsModal({ origin }: { origin: string }) {
         >
           <Dialog.Trigger
             render={
-              <Button variant="outline" size="sm" aria-label="Settings">
+              <Button
+                variant="outline"
+                size="sm"
+                ringOffset="app"
+                aria-label="Settings"
+              >
                 <Settings size={16} />
                 Settings
               </Button>
@@ -201,7 +206,7 @@ export function SettingsModal({ origin }: { origin: string }) {
                                 },
                               );
                             }}
-                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50 ${
+                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset disabled:opacity-50 ${
                               selected
                                 ? "bg-gray-surface text-gray shadow-sm"
                                 : "text-gray-muted hover:text-gray"

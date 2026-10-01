@@ -26,7 +26,10 @@ export function LinkifiedText({ text }: { text: string }): ReactNode {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="underline decoration-gray-line underline-offset-2 hover:decoration-gray break-all"
+          // No ring-offset — this renders inline across many different
+          // backgrounds (rows, panels, cards), so a flush ring (no offset gap
+          // to color-match) is the only version that's never mismatched.
+          className="rounded-sm underline decoration-gray-line underline-offset-2 hover:decoration-gray break-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
         >
           {href}
         </a>

@@ -9,7 +9,7 @@ export interface SelectItem {
 }
 
 const selectTriggerVariants = cva(
-  "flex w-full items-center justify-between rounded-lg bg-gray-surface text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base",
+  "flex w-full items-center justify-between rounded-lg bg-gray-surface text-gray ring-1 ring-gray-subtle placeholder:text-gray-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 transition-colors [@supports(-webkit-touch-callout:none)]:!text-base",
   {
     variants: {
       size: {
@@ -18,9 +18,17 @@ const selectTriggerVariants = cva(
         base: "h-9 px-3 text-sm",
         lg: "h-10 px-4 text-base",
       },
+      // The focus ring's offset is filled with this color, so it needs to
+      // match whatever the trigger actually sits on — see Button's
+      // `ringOffset` for the same convention.
+      ringOffset: {
+        surface: "focus-visible:ring-offset-gray-surface",
+        app: "focus-visible:ring-offset-gray-app",
+      },
     },
     defaultVariants: {
       size: "base",
+      ringOffset: "surface",
     },
   },
 );
@@ -37,13 +45,14 @@ export function Select({
   placeholder = "Select an option",
   items,
   size,
+  ringOffset,
   className,
   ...props
 }: SelectProps) {
   return (
     <BaseSelect.Root items={items} {...props}>
       <BaseSelect.Trigger
-        className={selectTriggerVariants({ size, className })}
+        className={selectTriggerVariants({ size, ringOffset, className })}
       >
         <BaseSelect.Value placeholder={placeholder} />
         <BaseSelect.Icon>
@@ -62,7 +71,7 @@ export function Select({
                 <BaseSelect.Item
                   key={item.value}
                   value={item.value}
-                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-gray outline-none hover:bg-gray-hover focus:bg-gray-hover data-disabled:pointer-events-none data-disabled:opacity-50 data-selected:bg-gray-active"
+                  className="relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm text-gray outline-none hover:bg-gray-hover focus:bg-gray-hover focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset data-disabled:pointer-events-none data-disabled:opacity-50 data-selected:bg-gray-active"
                 >
                   <BaseSelect.ItemIndicator className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
                     <Check className="h-4 w-4" />

@@ -100,7 +100,7 @@ function PrivacyPage() {
           Questions about privacy? Email{" "}
           <a
             href={`mailto:${CONTACT_EMAIL}`}
-            className="text-gray underline hover:no-underline"
+            className="rounded-sm text-gray underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
           >
             {CONTACT_EMAIL}
           </a>
