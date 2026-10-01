@@ -26,7 +26,8 @@ export function EditableSidePanelTitle({
 
   const commit = () => {
     setTouched(false);
-    const trimmed = title.trim();
+    // Enter is blocked, but a paste can still carry newlines into the textarea.
+    const trimmed = title.replace(/\s+/g, " ").trim();
     if (trimmed === todo.title) {
       setTitle(todo.title);
       return;

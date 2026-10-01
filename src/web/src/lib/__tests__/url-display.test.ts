@@ -147,7 +147,16 @@ describe("stripLinkedUrlsFromTitle", () => {
         "Use for inspiration (https://www.interfacecraft.dev/).",
         [url],
       ),
-    ).toBe("Use for inspiration (");
+    ).toBe("Use for inspiration.");
+    expect(
+      stripLinkedUrlsFromTitle(
+        "Read https://www.interfacecraft.dev/, then sketch",
+        [url],
+      ),
+    ).toBe("Read, then sketch");
+    expect(
+      stripLinkedUrlsFromTitle("See [https://www.interfacecraft.dev/]", [url]),
+    ).toBe("See");
   });
 });
 

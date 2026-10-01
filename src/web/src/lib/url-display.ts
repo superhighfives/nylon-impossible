@@ -84,8 +84,9 @@ export function placeholderTitleForUrl(url: string): string {
   return domain ? `Check ${domain}` : url;
 }
 
-const EMBEDDED_URL_REGEX = /https?:\/\/[^\s]+/g;
+const EMBEDDED_URL_REGEX = /(\s*)([([]?)(https?:\/\/[^\s]+)/g;
 const TRAILING_URL_PUNCTUATION = /[.,;:!?)\]]+$/;
+const CLOSING_BRACKET: Record<string, string> = { "(": ")", "[": "]" };
 
 /**
  * Strip any attached-link URL that appears verbatim inside a todo's title, so
@@ -99,10 +100,29 @@ export function stripLinkedUrlsFromTitle(
 ): string {
   if (urls.length === 0) return title;
   const known = new Set(urls.map((url) => url.url));
-  const stripped = title.replace(EMBEDDED_URL_REGEX, (match) => {
-    const trimmed = match.replace(TRAILING_URL_PUNCTUATION, "");
-    return known.has(match) || known.has(trimmed) ? "" : match;
-  });
+  const stripped = title.replace(
+    EMBEDDED_URL_REGEX,
+    (match, space: string, open: string, found: string) => {
+      const trimmed = found.replace(TRAILING_URL_PUNCTUATION, "");
+      const bare = known.has(found)
+        ? found
+        : known.has(trimmed)
+          ? trimmed
+          : null;
+      if (!bare) return match;
+      // Keep the punctuation that trailed the URL, but drop a bracket pair
+      // that only wrapped it, so "(url)." leaves "." rather than "(".
+      let tail = found.slice(bare.length);
+      let lead = open;
+      if (open && tail.startsWith(CLOSING_BRACKET[open])) {
+        tail = tail.slice(1);
+        lead = "";
+      }
+      // Punctuation that's left hugs the preceding word: "see (url)." → "see."
+      if (!lead && /^[.,;:!?]/.test(tail)) return tail;
+      return space + lead + tail;
+    },
+  );
   return stripped.replace(/\s+/g, " ").trim();
 }
 
