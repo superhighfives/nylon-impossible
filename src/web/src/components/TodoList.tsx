@@ -35,7 +35,11 @@ import type {
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
-import { getFetchedPreviewTitle, getUrlOnlyUrl } from "@/lib/url-display";
+import {
+  getFetchedPreviewTitle,
+  isPlaceholderTitle,
+  stripLinkedUrlsFromTitle,
+} from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { Button, Checkbox, focusRing, UrlPreviewCard } from "./ui";
 
@@ -209,6 +213,7 @@ function InlineIndicators({
         variant="ghost"
         size="xs"
         shape="square"
+        ringOffset="app"
         type="button"
         onClick={onStickyToggle}
         disabled={disabled}
@@ -242,31 +247,32 @@ function TodoItemContent({
   // A repeat completed today reads as done (checkbox, strike-through) until the
   // user's local midnight, even though `completed` stays false in the DB.
   const isCompleted = isEffectivelyCompleted(todo, timeZone, new Date());
-  // A todo that is essentially just a captured URL renders the fetched page
-  // title as its main line instead of the "Check {domain}" placeholder — for
-  // completed rows too, so the title stays consistent after completion. Active
-  // rows also get the URL as a subtitle; completed rows stay terse (the URL is
-  // summarized by the link badge below). Removing the preview (showPreview =
-  // false) collapses it back to just the URL.
-  const urlOnly = getUrlOnlyUrl(todo);
-  const previewTitle = urlOnly?.showPreview
-    ? getFetchedPreviewTitle(urlOnly)
-    : null;
-  // Active URL-only rows always render as a single hoverable card (favicon +
-  // title + description + URL), for consistency with the URL card in the
-  // expanded editor — UrlPreviewCard has its own loading/failed/raw-URL
-  // states, so there's no need to gate this on a title having fetched yet.
-  // Completed rows stay terse, so they keep the inline title treatment below.
-  const showUrlOnlyCard = !isCompleted && !!urlOnly;
+  const linkedUrls = todo.urls ?? [];
+  const singleLinkedUrl = linkedUrls.length === 1 ? linkedUrls[0] : null;
+  // A todo whose title is just the capture-time placeholder (the raw URL, or
+  // "Check {domain}") rather than something the user actually typed.
+  const isTitlePlaceholder =
+    !!singleLinkedUrl && isPlaceholderTitle(todo.title, singleLinkedUrl.url);
+  // A placeholder-titled todo renders the fetched page title as its main line
+  // once it resolves — for completed rows too, so the title stays consistent
+  // after completion. Removing the preview (showPreview = false) collapses it
+  // back to just the placeholder text below.
+  const previewTitle =
+    isTitlePlaceholder && singleLinkedUrl?.showPreview
+      ? getFetchedPreviewTitle(singleLinkedUrl)
+      : null;
+  // For todos with a real title plus an attached link (e.g. "Use for
+  // inspiration <url>"), the URL text is stripped from the title once it's
+  // linked — the card below is the single place the URL itself appears,
+  // instead of duplicating it inline. Empty for a placeholder-only title,
+  // where there's no real user text to keep.
+  const strippedTitle = isTitlePlaceholder
+    ? ""
+    : stripLinkedUrlsFromTitle(todo.title, linkedUrls);
   // Notes are only visible once a row is expanded, so an active row carrying
   // one gets a quiet inline mark to say there's something to open. Completed
   // rows already spell it out in CompletedContentBadges.
   const hasNotes = !!todo.notes?.trim();
-  // Skip the inline title line entirely for a URL-only card with no status
-  // badges, so the card sits flush at the top of the row. space-y-1 then only
-  // adds a gap when the title line is actually present.
-  const showTitleLine =
-    !showUrlOnlyCard || subtasks.length > 0 || (hasNotes && !isCompleted);
 
   // Inline due-date editing on active rows. Set values render as editable
   // badges (bottom-left); the quick-add affordances for unset values live in
@@ -312,6 +318,7 @@ function TodoItemContent({
         variant="ghost"
         size="xs"
         shape="square"
+        ringOffset="app"
         type="button"
         onClick={() => onToggleExpand(todo.id)}
         aria-expanded={isExpanded}
@@ -338,6 +345,7 @@ function TodoItemContent({
           variant="ghost"
           size="xs"
           shape="square"
+          ringOffset="app"
           type="button"
           onClick={() => onDelete(todo.id)}
           disabled={deletePending}
@@ -359,6 +367,7 @@ function TodoItemContent({
             onCheckedChange={() => onToggle(todo.id, isCompleted)}
             disabled={updatePending}
             variant={isCompleted ? "subtle" : "default"}
+            ringOffset="app"
             aria-label={
               isCompleted
                 ? `Mark "${todo.title}" as not completed`
@@ -368,65 +377,76 @@ function TodoItemContent({
         </div>
         <div className="flex-1 min-w-0">
           <div className="space-y-1">
-            {showTitleLine && (
-              <div>
-                {!showUrlOnlyCard && (
+            <div>
+              {(() => {
+                // Real user text wins; otherwise the fetched page title once
+                // it resolves; otherwise the placeholder itself, muted so it
+                // reads as "not a real title yet" rather than content.
+                if (strippedTitle.length > 0 || previewTitle) {
+                  return (
+                    <p
+                      className={`inline leading-snug wrap-anywhere ${
+                        isCompleted
+                          ? "text-sm line-through text-gray-placeholder"
+                          : "text-[15px] font-semibold text-gray"
+                      }`}
+                    >
+                      {strippedTitle.length > 0 ? (
+                        <LinkifiedText text={strippedTitle} />
+                      ) : (
+                        previewTitle
+                      )}
+                    </p>
+                  );
+                }
+                return (
                   <p
-                    className={`inline leading-snug wrap-anywhere ${
+                    className={`inline leading-snug wrap-anywhere text-[15px] ${
                       isCompleted
                         ? "text-sm line-through text-gray-placeholder"
-                        : "text-[15px] font-semibold text-gray"
+                        : "text-gray-muted"
                     }`}
                   >
-                    {urlOnly ? (
-                      previewTitle ? (
-                        previewTitle
-                      ) : (
-                        <LinkifiedText text={urlOnly.url} />
-                      )
-                    ) : (
-                      <LinkifiedText text={todo.title} />
-                    )}
+                    <LinkifiedText text={todo.title} />
                   </p>
-                )}
-                {showInlineEditing && (
-                  <InlineDueDate
-                    value={dueValueStr}
-                    label={dueLabel}
-                    isOverdue={isOverdue}
-                    onChange={handleInlineDueDate}
-                    disabled={updatePending}
-                    className="ml-2 align-middle"
-                  />
-                )}
-                {subtasks.length > 0 &&
-                  (() => {
-                    const doneSubtasks = subtasks.filter(
-                      (s) => s.completed,
-                    ).length;
-                    return (
-                      <span
-                        role="img"
-                        className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs tabular-nums text-gray-muted"
-                        aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
-                      >
-                        <ListTree size={10} aria-hidden="true" />
-                        {doneSubtasks}/{subtasks.length}
-                      </span>
-                    );
-                  })()}
-                {hasNotes && !isCompleted && (
-                  <span
-                    role="img"
-                    className="ml-2 inline-flex shrink-0 align-middle text-gray-muted"
-                    aria-label="Has notes"
-                  >
-                    <FileText size={12} aria-hidden="true" />
-                  </span>
-                )}
-              </div>
-            )}
-            {showUrlOnlyCard && urlOnly && <UrlPreviewCard url={urlOnly} />}
+                );
+              })()}
+              {showInlineEditing && (
+                <InlineDueDate
+                  value={dueValueStr}
+                  label={dueLabel}
+                  isOverdue={isOverdue}
+                  onChange={handleInlineDueDate}
+                  disabled={updatePending}
+                  className="ml-2 align-middle"
+                />
+              )}
+              {subtasks.length > 0 &&
+                (() => {
+                  const doneSubtasks = subtasks.filter(
+                    (s) => s.completed,
+                  ).length;
+                  return (
+                    <span
+                      role="img"
+                      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs tabular-nums text-gray-muted"
+                      aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
+                    >
+                      <ListTree size={10} aria-hidden="true" />
+                      {doneSubtasks}/{subtasks.length}
+                    </span>
+                  );
+                })()}
+              {hasNotes && !isCompleted && (
+                <span
+                  role="img"
+                  className="ml-2 inline-flex shrink-0 align-middle text-gray-muted"
+                  aria-label="Has notes"
+                >
+                  <FileText size={12} aria-hidden="true" />
+                </span>
+              )}
+            </div>
           </div>
           {isCompleted && (
             <p className="text-xs text-gray-muted mt-0.5">
@@ -441,7 +461,6 @@ function TodoItemContent({
           {isCompleted ? (
             <CompletedContentBadges todo={todo} />
           ) : (
-            !urlOnly &&
             todo.urls &&
             (() => {
               const urls = todo.urls;
@@ -828,6 +847,7 @@ export function ErrorState({
       <Button
         variant="secondary"
         size="sm"
+        ringOffset="app"
         onClick={onRetry}
         loading={isRetrying}
         disabled={isRetrying}
@@ -1109,7 +1129,7 @@ export function CompletedColumn({
         onClick={onToggleCollapsed}
         aria-expanded={!collapsed}
         aria-label={`${collapsed ? "Show" : "Hide"} completed items`}
-        className="flex min-h-10 w-full items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong"
+        className={`flex min-h-10 w-full items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray ${focusRing}`}
       >
         <ChevronRight
           size={14}

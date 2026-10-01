@@ -51,30 +51,59 @@ export function getUrlDisplay(url: SerializedTodoUrl): UrlDisplay {
   };
 }
 
-/**
- * The single user-facing URL of a "URL-only" todo — one whose title is just the
- * URL itself or the auto-generated "Check {domain}" placeholder, and that has
- * exactly one link. Returns null for todos with a real, user-written title or
- * with zero/multiple links so their rendering is untouched.
- */
-export function getUrlOnlyUrl(todo: {
-  title: string;
-  urls: SerializedTodoUrl[];
-}): SerializedTodoUrl | null {
-  const links = todo.urls;
-  if (links.length !== 1) return null;
-  const url = links[0];
-  const title = todo.title.trim();
-  if (title === url.url.trim()) return url;
-
-  let domain: string | null = null;
+/** Hostname with the `www.` prefix stripped, or null for a malformed URL. */
+function extractDomain(url: string): string | null {
   try {
-    domain = new URL(url.url).hostname.replace(/^www\./, "");
+    return new URL(url).hostname.replace(/^www\./, "");
   } catch {
-    // Malformed URL — no domain to match against.
+    return null;
   }
-  if (domain && title === `Check ${domain}`) return url;
-  return null;
+}
+
+/**
+ * Whether `title` is one of the placeholders generated for a captured link —
+ * the raw URL itself, or the API's `createFallbackFromUrl` "Check {domain}" —
+ * rather than something the user actually typed. Mirrors the API's own
+ * `isPlaceholderTitle` (src/api/src/lib/url-helpers.ts), which gates whether
+ * fetched metadata is allowed to overwrite the title.
+ */
+export function isPlaceholderTitle(title: string, url: string): boolean {
+  const trimmed = title.trim();
+  if (trimmed === url.trim()) return true;
+  const domain = extractDomain(url);
+  return domain !== null && trimmed === `Check ${domain}`;
+}
+
+/**
+ * A short placeholder title for a bare captured link — "Check {domain}",
+ * matching the API's `createFallbackFromUrl`, or the raw URL if it's
+ * malformed and has no domain to name.
+ */
+export function placeholderTitleForUrl(url: string): string {
+  const domain = extractDomain(url);
+  return domain ? `Check ${domain}` : url;
+}
+
+const EMBEDDED_URL_REGEX = /https?:\/\/[^\s]+/g;
+const TRAILING_URL_PUNCTUATION = /[.,;:!?)\]]+$/;
+
+/**
+ * Strip any attached-link URL that appears verbatim inside a todo's title, so
+ * the URL only ever shows once — in the preview card below — rather than
+ * duplicated inline in the title text. A title with unrelated text and no
+ * matching URL substring is returned unchanged.
+ */
+export function stripLinkedUrlsFromTitle(
+  title: string,
+  urls: SerializedTodoUrl[],
+): string {
+  if (urls.length === 0) return title;
+  const known = new Set(urls.map((url) => url.url));
+  const stripped = title.replace(EMBEDDED_URL_REGEX, (match) => {
+    const trimmed = match.replace(TRAILING_URL_PUNCTUATION, "");
+    return known.has(match) || known.has(trimmed) ? "" : match;
+  });
+  return stripped.replace(/\s+/g, " ").trim();
 }
 
 /**
