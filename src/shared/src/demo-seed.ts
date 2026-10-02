@@ -91,20 +91,20 @@ export const DEMO_SEED_TODOS: DemoSeedTodo[] = [
     // Real title with two attached links, one of which overflows into the
     // "+1 link" summary.
     list: "thisWeek",
-    title: "Prep the LLM-personalization demo",
+    title: "Prep the conference talk",
     urls: [
       {
         url: "https://x.com/markphelps/status/1877654321098765432",
         title: "Mark Phelps (@markphelps)",
         description:
-          "We live in wild times. Want to know anything about anything? Want it extremely personalized to you? Use this repo. Tell it to generate a tutorial, say 'how LLMs actually work, but use Go' https://t.co/5n7e9iAJ0T Then tell Opus to write code to turn that output into an epub",
+          "Just finished the deck for next week's talk, slides are looking good https://t.co/5n7e9iAJ0T",
         siteName: "x.com",
         fetchStatus: "fetched",
       },
       {
         url: "https://github.com/deverjarvis/lathe",
         title: "deverjarvis/lathe",
-        description: "A tutorial generator for LLM-personalized epubs.",
+        description: "A tutorial generator for slide decks.",
         siteName: "GitHub",
         fetchStatus: "fetched",
       },

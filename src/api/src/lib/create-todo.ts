@@ -113,9 +113,9 @@ export interface CreateSmartTodoOptions {
    */
   parentId?: string;
   /**
-   * Schedule background work (URL metadata fetch, AI enrichment). In a Worker
-   * request this is `c.executionCtx.waitUntil`. Callers with no execution
-   * context can pass a function that awaits or ignores the promise.
+   * Schedule background work (URL metadata fetch). In a Worker request this
+   * is `c.executionCtx.waitUntil`. Callers with no execution context can pass
+   * a function that awaits or ignores the promise.
    */
   waitUntil: (promise: Promise<unknown>) => void;
 }
@@ -141,10 +141,9 @@ export class InvalidParentTodoError extends Error {
  * handler and the Gmail add-on. Given a resolved `userId` and free text, it
  * creates a todo (prepended to its list —
  * the user's top-level list, or a parent's subtasks when `parentId` is set),
- * extracts + attaches URLs, optionally kicks off AI enrichment in
- * the background, and pokes connected clients to sync. Keeping this in one
- * place means AI/Pro gating, URL handling, positioning, and `notifySync`
- * behave identically everywhere.
+ * extracts + attaches URLs in the background, and pokes connected clients to
+ * sync. Keeping this in one place means URL handling, positioning, and
+ * `notifySync` behave identically everywhere.
  */
 export async function createSmartTodo(
   db: Db,
@@ -157,8 +156,8 @@ export async function createSmartTodo(
 
   const parentId = options.parentId ?? null;
   // Subtasks are implicitly scoped to their parent's list. Top-level todos
-  // created via this path (smart-create, AI-added subtasks) default to
-  // Today, same as a plain create.
+  // created via this path (smart-create) default to Today, same as a plain
+  // create.
   let listId: string | null = null;
   if (parentId) {
     const [parent] = await db

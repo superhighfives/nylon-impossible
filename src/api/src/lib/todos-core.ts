@@ -173,8 +173,7 @@ export async function setTodoCompleted(
  *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
  * null if the todo doesn't exist or isn't owned by `userId` — callers decide
- * how to surface that (REST returns 404; a tool call reports failure back to
- * the agent).
+ * how to surface that (REST returns 404).
  */
 export async function updateTodoCore(
   db: Db,

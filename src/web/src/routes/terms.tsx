@@ -55,14 +55,6 @@ function TermsPage() {
         </p>
       </LegalSection>
 
-      <LegalSection heading="AI features">
-        <p>
-          Some features use AI to parse input and enrich tasks. AI output can be
-          inaccurate or incomplete, so please use your own judgement and don't
-          rely on it for anything important without checking.
-        </p>
-      </LegalSection>
-
       <LegalSection heading="Availability and warranty">
         <p>
           The app is provided "as is" and "as available," without warranties of

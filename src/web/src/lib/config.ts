@@ -1,5 +1,5 @@
 // 127.0.0.1 counts too — otherwise a dev session opened by IP silently
-// points AI/agent calls at the production API with a dev-instance token.
+// points API calls at the production API with a dev-instance token.
 const isLocalhost =
   typeof window !== "undefined" &&
   ["localhost", "127.0.0.1"].includes(window.location.hostname);

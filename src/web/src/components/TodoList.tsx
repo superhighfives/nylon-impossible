@@ -819,7 +819,7 @@ export function EmptyState() {
       <h2 className="text-sm font-medium text-gray">Nothing to do yet</h2>
       <p className="text-xs text-gray-muted mt-1 max-w-xs">
         Add a todo above to get started. Try &ldquo;Buy groceries
-        tomorrow&rdquo; or paste a link to research.
+        tomorrow&rdquo; or paste a link.
       </p>
     </div>
   );
