@@ -350,6 +350,7 @@ interface SmartCreateResponse {
 
 export interface SmartCreateInput {
   text: string;
+  listId?: string;
 }
 
 /**
@@ -365,6 +366,7 @@ export function useSmartCreate() {
   return useMutation({
     mutationFn: async ({
       text,
+      listId,
     }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
@@ -373,7 +375,7 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(listId ? { text, listId } : { text }),
       });
 
       if (!response.ok) {
@@ -383,7 +385,7 @@ export function useSmartCreate() {
 
       return response.json();
     },
-    onMutate: async ({ text }) => {
+    onMutate: async ({ text, listId }) => {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
       const previousTodos =
         queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
@@ -404,9 +406,10 @@ export function useSmartCreate() {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
         parentId: null,
-        // Smart-create defaults to Today server-side; the placeholder is
-        // reconciled wholesale by the onSettled refetch regardless.
-        listId: "",
+        // Smart-create defaults to Today server-side when no listId is given;
+        // the placeholder is reconciled wholesale by the onSettled refetch
+        // regardless.
+        listId: listId ?? "",
         title: text.trim(),
         notes: null,
         completed: false,

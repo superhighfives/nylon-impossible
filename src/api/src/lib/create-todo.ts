@@ -113,6 +113,14 @@ export interface CreateSmartTodoOptions {
    */
   parentId?: string;
   /**
+   * Place the new top-level todo in this list instead of the Today default.
+   * Ignored when `parentId` is set (subtasks are always scoped to their
+   * parent's list). Callers MUST verify this belongs to `userId` first (e.g.
+   * via `verifyListOwnership`) — this function trusts it as already-checked,
+   * matching how `updateTodoCore` treats an incoming `listId` patch.
+   */
+  listId?: string;
+  /**
    * Schedule background work (URL metadata fetch). In a Worker request this
    * is `c.executionCtx.waitUntil`. Callers with no execution context can pass
    * a function that awaits or ignores the promise.
@@ -155,9 +163,8 @@ export async function createSmartTodo(
   const trimmed = text.trim();
 
   const parentId = options.parentId ?? null;
-  // Subtasks are implicitly scoped to their parent's list. Top-level todos
-  // created via this path (smart-create) default to Today, same as a plain
-  // create.
+  // Subtasks are implicitly scoped to their parent's list. A top-level todo
+  // uses the caller-supplied (already-verified) list, or defaults to Today.
   let listId: string | null = null;
   if (parentId) {
     const [parent] = await db
@@ -169,7 +176,7 @@ export async function createSmartTodo(
     }
     listId = parent.listId;
   } else {
-    listId = await getSystemListId(db, userId, "today");
+    listId = options.listId ?? (await getSystemListId(db, userId, "today"));
   }
   if (!listId) {
     throw new Error(`No list found to place todo into for user ${userId}`);

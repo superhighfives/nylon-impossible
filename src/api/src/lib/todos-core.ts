@@ -3,7 +3,18 @@ import {
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
 import type { Env } from "../types";
-import { and, asc, desc, eq, type getDb, isNull, todos } from "./db";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  type getDb,
+  isNull,
+  lists,
+  ne,
+  or,
+  todos,
+} from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
 
@@ -43,34 +54,55 @@ export interface UpdateTodoPatch {
 }
 
 /**
- * The user's open, top-level todos in the Today list, in list order. Shared
- * by the Gmail add-on homepage card and any REST surface that needs the same
- * "what's on my plate" view, so the two can't drift. Excludes completed
- * todos and subtasks (parentId IS NULL), matching the top-level list shown
- * on web/iOS. Scoped to Today only — the Gmail add-on doesn't yet surface
- * This Week/Sometime/custom lists.
+ * The user's open, top-level todos across every list (system and custom), in
+ * list order then item order. Shared by the Gmail add-on homepage card and
+ * any REST surface that needs the same "what's on my plate" view, so the two
+ * can't drift. Excludes completed todos and subtasks (parentId IS NULL),
+ * matching the top-level list shown on web/iOS.
+ *
+ * Ordered by `lists.position` first — system lists are seeded before any
+ * custom list and keep lower positions, so this naturally sorts Today / This
+ * Week / Sometime ahead of custom lists in creation/reorder order — then by
+ * sticky/position within each list, matching the web board's own ordering.
  */
 export async function listOpenTodos(db: Db, userId: string) {
-  const todayListId = await getSystemListId(db, userId, "today");
-  if (!todayListId) return [];
-
   return db
     .select({
       id: todos.id,
       title: todos.title,
       position: todos.position,
       dueDate: todos.dueDate,
+      listId: todos.listId,
+      listName: lists.name,
     })
     .from(todos)
+    .innerJoin(lists, eq(lists.id, todos.listId))
     .where(
       and(
         eq(todos.userId, userId),
-        eq(todos.listId, todayListId),
         isNull(todos.parentId),
         eq(todos.completed, false),
       ),
     )
-    .orderBy(desc(todos.sticky), asc(todos.position));
+    .orderBy(asc(lists.position), desc(todos.sticky), asc(todos.position));
+}
+
+/**
+ * The user's lists in display order (system lists first, then custom),
+ * trimmed to what the Gmail add-on needs: an id to write `listId` with and a
+ * name for the quick-add dropdown / open-todos section headers.
+ */
+export async function listListsForUser(db: Db, userId: string) {
+  return db
+    .select({ id: lists.id, name: lists.name, systemKind: lists.systemKind })
+    .from(lists)
+    .where(
+      and(
+        eq(lists.userId, userId),
+        or(isNull(lists.systemKind), ne(lists.systemKind, "completed")),
+      ),
+    )
+    .orderBy(asc(lists.position));
 }
 
 /**

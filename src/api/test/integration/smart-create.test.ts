@@ -1,9 +1,9 @@
 import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, todoUrls } from "../../src/lib/db";
-import { cleanDb, seedUser } from "../helpers";
+import { getDb, lists, todoUrls } from "../../src/lib/db";
+import { cleanDb, getTodayListId, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -12,12 +12,28 @@ const mockVerifyToken = verifyToken as ReturnType<
 
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 
-async function smartCreate(text: string) {
+async function smartCreate(text: string, listId?: string) {
   return SELF.fetch("http://localhost/todos/smart", {
     method: "POST",
     headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(listId ? { text, listId } : { text }),
   });
+}
+
+async function getSometimeListId(userId = "user_test_123") {
+  const db = getDb(env.DB);
+  const [list] = await db
+    .select({ id: lists.id })
+    .from(lists)
+    .where(
+      and(
+        eq(lists.userId, userId),
+        eq(lists.kind, "system"),
+        eq(lists.systemKind, "sometime"),
+      ),
+    );
+  if (!list) throw new Error(`No Sometime list seeded for user ${userId}`);
+  return list.id;
 }
 
 describe("Smart create endpoint", () => {
@@ -218,6 +234,35 @@ describe("Smart create endpoint", () => {
       const text = "a".repeat(10001);
       const res = await smartCreate(text);
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe("listId", () => {
+    it("defaults to the Today list when omitted", async () => {
+      const res = await smartCreate("Buy milk");
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].listId).toBe(await getTodayListId());
+    });
+
+    it("places the todo in the given list", async () => {
+      const sometimeId = await getSometimeListId();
+      const res = await smartCreate("Someday maybe", sometimeId);
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].listId).toBe(sometimeId);
+    });
+
+    it("returns 404 for a listId that doesn't exist", async () => {
+      const res = await smartCreate("Buy milk", crypto.randomUUID());
+      expect(res.status).toBe(404);
+    });
+
+    it("returns 404 for another user's list", async () => {
+      await seedUser("user_other_456", "other@example.com");
+      const otherSometimeId = await getSometimeListId("user_other_456");
+      const res = await smartCreate("Buy milk", otherSometimeId);
+      expect(res.status).toBe(404);
     });
   });
 

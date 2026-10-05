@@ -1,8 +1,9 @@
 import { Plus } from "lucide-react";
 import { type Ref, useState } from "react";
+import { useLists } from "@/hooks/useLists";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { messageFromError, toast } from "@/lib/toast";
-import { Button, Loader, Textarea } from "./ui";
+import { Button, Loader, Select, Textarea } from "./ui";
 
 export function TodoInput({
   textareaRef,
@@ -11,6 +12,13 @@ export function TodoInput({
   textareaRef?: Ref<HTMLTextAreaElement>;
 }) {
   const [text, setText] = useState("");
+  const { data: lists } = useLists();
+  // null until the user picks a list explicitly — falls back to Today below,
+  // computed from `lists` directly so Select never flips from an
+  // uncontrolled (undefined) value to a controlled one after mount.
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const todayListId = lists?.find((list) => list.systemKind === "today")?.id;
+  const listId = selectedListId ?? todayListId;
 
   const smartCreate = useSmartCreate();
   const trimmed = text.trim();
@@ -18,7 +26,7 @@ export function TodoInput({
   const submit = () => {
     if (!trimmed || smartCreate.isPending) return;
     smartCreate.mutate(
-      { text: trimmed },
+      { text: trimmed, listId },
       {
         onSuccess: (result) => {
           setText("");
@@ -69,11 +77,26 @@ export function TodoInput({
     <div className="todo-input-wrapper">
       <form onSubmit={handleSubmit}>
         <div className="todo-input-container flex items-center gap-1 rounded-full bg-gray-surface shadow-lg ring-1 ring-gray-subtle transition-shadow focus-within:ring-2 focus-within:ring-accent-strong">
+          {lists && lists.length > 0 && (
+            <div className="w-20 shrink-0 pl-1">
+              <Select
+                size="xs"
+                value={listId ?? undefined}
+                onValueChange={(value) => setSelectedListId(value as string)}
+                disabled={smartCreate.isPending}
+                aria-label="List to add to"
+                items={lists.map((list) => ({
+                  value: list.id,
+                  label: list.name,
+                }))}
+              />
+            </div>
+          )}
           <Textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Add to Today…"
+            placeholder="Add a todo…"
             aria-label="New todo"
             disabled={smartCreate.isPending}
             rows={1}
