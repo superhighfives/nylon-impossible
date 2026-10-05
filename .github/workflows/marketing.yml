@@ -116,7 +116,7 @@ jobs:
       # of a red run. Nothing is restored on the very first run, so a total
       # capture failure there still fails loudly — as it should.
       - name: Restore last good web screenshots
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             src/marketing/source/web-light.png
@@ -133,7 +133,7 @@ jobs:
       # if the simulator then flakes there's something to fall back to.
       - name: Restore iOS screenshots for this app revision
         id: ios-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: |
             src/marketing/source/ios-light.png
@@ -237,7 +237,7 @@ jobs:
 
       - name: Save iOS screenshots for this app revision
         if: always() && steps.captured.outputs.ios_fresh == '1'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             src/marketing/source/ios-light.png
@@ -246,7 +246,7 @@ jobs:
 
       - name: Save last good web screenshots
         if: always() && steps.captured.outputs.web_present == '1'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: |
             src/marketing/source/web-light.png
