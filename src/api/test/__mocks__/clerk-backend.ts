@@ -13,14 +13,9 @@ export const mockGetUserList = vi.fn().mockResolvedValue({
   totalCount: 0,
 });
 
-export const mockGetUserOauthAccessToken = vi.fn().mockResolvedValue({
-  data: [],
-});
-
 export const createClerkClient = vi.fn(() => ({
   users: {
     getUser: mockGetUser,
     getUserList: mockGetUserList,
-    getUserOauthAccessToken: mockGetUserOauthAccessToken,
   },
 }));

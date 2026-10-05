@@ -205,25 +205,6 @@ struct UpdateUserRequest: Encodable, Sendable {
     }
 }
 
-// MARK: - Import Models
-
-/// Result of a Google Tasks import. Mirrors the API's JSON response.
-struct GoogleTasksImportResponse: Codable, Sendable {
-    let imported: Int
-    let skipped: Int
-    /// IDs of every todo created by this import.
-    let importedIds: [String]
-    /// The subset of imports carrying a due date — the only ones that can hold a
-    /// repeat schedule, offered to the user in a post-import review step.
-    let datedTodos: [ImportedDatedTodo]
-}
-
-struct ImportedDatedTodo: Codable, Sendable, Identifiable {
-    let id: String
-    let title: String
-    let dueDate: Date
-}
-
 // MARK: - API Protocol
 
 @MainActor
@@ -231,7 +212,6 @@ protocol APIProviding: Sendable {
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse
     func getMe() async throws -> APIUser
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
-    func importGoogleTasks() async throws -> GoogleTasksImportResponse
     func deleteMe() async throws
     func processTodo(todoId: String) async throws -> Int
 
@@ -374,16 +354,6 @@ final class APIService: APIProviding {
     /// only needs to sign out and clear local data afterward.
     func deleteMe() async throws {
         let _: EmptyResponse = try await delete(path: "/users/me")
-    }
-
-    // MARK: - Import
-
-    /// Import open tasks from the user's Google Tasks "My Tasks" list. The server
-    /// reads the user's Google OAuth token from Clerk, so the client only needs a
-    /// connected Google account that has granted the Tasks scope. Safe to re-run:
-    /// already-imported tasks are skipped server-side.
-    func importGoogleTasks() async throws -> GoogleTasksImportResponse {
-        return try await post(path: "/todos/import/google-tasks", body: EmptyBody())
     }
 
     // MARK: - Lists

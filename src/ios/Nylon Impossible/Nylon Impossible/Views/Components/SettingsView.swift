@@ -138,8 +138,6 @@ struct SettingsView: View {
                     Text("Used to find local venues for location-based todos.")
                 }
 
-                ImportSettingsSection()
-
                 aboutSection
 
                 #if DEBUG

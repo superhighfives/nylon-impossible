@@ -350,6 +350,7 @@ interface SmartCreateResponse {
 
 export interface SmartCreateInput {
   text: string;
+  listId?: string;
 }
 
 /**
@@ -365,6 +366,7 @@ export function useSmartCreate() {
   return useMutation({
     mutationFn: async ({
       text,
+      listId,
     }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
@@ -373,7 +375,7 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(listId ? { text, listId } : { text }),
       });
 
       if (!response.ok) {
@@ -383,7 +385,7 @@ export function useSmartCreate() {
 
       return response.json();
     },
-    onMutate: async ({ text }) => {
+    onMutate: async ({ text, listId }) => {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
       const previousTodos =
         queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
@@ -404,9 +406,10 @@ export function useSmartCreate() {
         id: `temp-${crypto.randomUUID()}`,
         userId: userId ?? "",
         parentId: null,
-        // Smart-create defaults to Today server-side; the placeholder is
-        // reconciled wholesale by the onSettled refetch regardless.
-        listId: "",
+        // Smart-create defaults to Today server-side when no listId is given;
+        // the placeholder is reconciled wholesale by the onSettled refetch
+        // regardless.
+        listId: listId ?? "",
         title: text.trim(),
         notes: null,
         completed: false,
@@ -446,58 +449,6 @@ export function useSmartCreate() {
     },
     onSuccess: () => {
       notifyChanged();
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-    },
-  });
-}
-
-/**
- * Hook to import todos from the user's Google Tasks account. Surfaces a
- * success/skip summary via toast and refreshes the list on completion.
- */
-export function useImportGoogleTasks() {
-  const queryClient = useQueryClient();
-  const { notifyChanged } = useWebSocketSync();
-  const { getToken } = useAuth();
-
-  return useMutation({
-    mutationFn: async (): Promise<{
-      imported: number;
-      skipped: number;
-      importedIds: string[];
-      datedTodos: { id: string; title: string; dueDate: string }[];
-    }> => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/import/google-tasks`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    onSuccess: ({ imported, skipped }) => {
-      // The success toast for imported > 0 is deferred: it fires once the
-      // caller finishes the post-import repeat-schedule review, alongside
-      // revealing the new rows. Only the no-op outcomes toast here.
-      if (imported === 0) {
-        toast.info(
-          skipped > 0
-            ? "Your Google Tasks are already imported"
-            : "No Google Tasks to import",
-        );
-      }
-      notifyChanged();
-    },
-    onError: (err) => {
-      Sentry.captureException(err, { tags: { mutation: "importGoogleTasks" } });
-      toast.error(messageFromError(err, "Couldn't import from Google Tasks"));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });

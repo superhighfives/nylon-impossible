@@ -65,23 +65,6 @@ final class MockAPIService: APIProviding {
         )
     }
 
-    var importGoogleTasksResponse: GoogleTasksImportResponse = GoogleTasksImportResponse(
-        imported: 0,
-        skipped: 0,
-        importedIds: [],
-        datedTodos: []
-    )
-    var importGoogleTasksError: Error?
-    var importGoogleTasksCallCount = 0
-
-    func importGoogleTasks() async throws -> GoogleTasksImportResponse {
-        importGoogleTasksCallCount += 1
-        if let error = importGoogleTasksError {
-            throw error
-        }
-        return importGoogleTasksResponse
-    }
-
     var deleteMeError: Error?
     var deleteMeCallCount = 0
 

@@ -18,7 +18,6 @@ import { useEffect } from "react";
 import { ClientHintCheck } from "../components/ClientHintCheck";
 import { ErrorView } from "../components/ErrorView";
 import Header from "../components/Header";
-import { ImportReviewModal } from "../components/ImportReviewModal";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
 import { SettingsModal } from "../components/SettingsModal";
@@ -29,10 +28,6 @@ import {
 } from "../components/ThemeSync";
 import { Toaster } from "../components/ui";
 import { HintsProvider } from "../hooks/useHints";
-import {
-  ImportReviewContext,
-  useImportReviewValue,
-} from "../hooks/useImportReview";
 import {
   OnlineStatusContext,
   useOnlineStatusValue,
@@ -137,7 +132,6 @@ function SentryUserSync() {
 function RootDocument() {
   const { origin, hints } = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
-  const importReview = useImportReviewValue();
   const settings = useSettingsValue();
 
   return (
@@ -168,20 +162,17 @@ function RootDocument() {
               fallback={({ resetError }) => <ErrorView reset={resetError} />}
             >
               <OnlineStatusContext.Provider value={onlineStatus}>
-                <ImportReviewContext.Provider value={importReview}>
-                  <SettingsContext.Provider value={settings}>
-                    <OfflineBanner />
-                    <Header />
-                    <div className="pt-header-offset">
-                      <Outlet />
-                    </div>
-                    <Show when="signed-in">
-                      <SettingsModal origin={origin} />
-                      <ImportReviewModal />
-                    </Show>
-                    <Toaster />
-                  </SettingsContext.Provider>
-                </ImportReviewContext.Provider>
+                <SettingsContext.Provider value={settings}>
+                  <OfflineBanner />
+                  <Header />
+                  <div className="pt-header-offset">
+                    <Outlet />
+                  </div>
+                  <Show when="signed-in">
+                    <SettingsModal origin={origin} />
+                  </Show>
+                  <Toaster />
+                </SettingsContext.Provider>
               </OnlineStatusContext.Provider>
             </Sentry.ErrorBoundary>
             <TanStackDevtools

@@ -16,7 +16,6 @@ import {
 } from "./handlers/gmail-addon/actions";
 import { gmailAddonContextual } from "./handlers/gmail-addon/contextual";
 import { gmailAddonHomepage } from "./handlers/gmail-addon/homepage";
-import { importGoogleTasks } from "./handlers/import-google-tasks";
 import {
   createList,
   deleteList,
@@ -124,7 +123,6 @@ app.post("/gmail-addon/actions/refresh", gmailAddonRefresh);
 
 // Todo routes
 app.post("/todos/smart", smartCreate);
-app.post("/todos/import/google-tasks", importGoogleTasks);
 app.post("/todos/sync", syncTodos);
 app.get("/todos", listTodos);
 app.post("/todos", createTodo);
