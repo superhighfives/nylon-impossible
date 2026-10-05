@@ -1,12 +1,10 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { useClerk, useUser as useClerkUser } from "@clerk/tanstack-react-start";
+import { useClerk } from "@clerk/tanstack-react-start";
 import { useLocation } from "@tanstack/react-router";
 import { Monitor, Moon, Settings, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useImportReview } from "@/hooks/useImportReview";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSettings } from "@/hooks/useSettings";
-import { useImportGoogleTasks } from "@/hooks/useTodos";
 import {
   type Theme,
   useDeleteCurrentUser,
@@ -18,7 +16,7 @@ import {
   DevEnvironmentDetails,
   useDevEnvironment,
 } from "./DevEnvironmentIndicator";
-import { Button, InfoTooltip, LayerCard, Loader, Select } from "./ui";
+import { Button, LayerCard, Loader, Select } from "./ui";
 
 // Full IANA timezone list from the runtime — avoids hand-maintaining a
 // curated subset, and every value round-trips through Intl.DateTimeFormat
@@ -28,11 +26,6 @@ const TIMEZONE_ITEMS = (
     ? Intl.supportedValuesOf("timeZone")
     : ["UTC"]
 ).map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") }));
-
-// Full Google scope required to read Tasks. Google rejects the shorthand
-// (`tasks.readonly`) with invalid_scope, so the fully-qualified URL is used
-// both here and in the Clerk connection's additional scopes.
-const GOOGLE_TASKS_SCOPE = "https://www.googleapis.com/auth/tasks.readonly";
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -44,9 +37,6 @@ export function SettingsModal({ origin }: { origin: string }) {
   const { data: user, isLoading: isLoadingUser } = useUser();
   const updateUser = useUpdateUser();
   const deleteUser = useDeleteCurrentUser();
-  const importGoogleTasks = useImportGoogleTasks();
-  const { startReview } = useImportReview();
-  const { user: clerkUser, isLoaded: isClerkLoaded } = useClerkUser();
   const { signOut } = useClerk();
   // Open state is shared so the nav dropdown (mobile) and the floating button
   // (desktop) can both drive the same modal.
@@ -57,39 +47,6 @@ export function SettingsModal({ origin }: { origin: string }) {
   const devEnv = useDevEnvironment(origin);
   const pathname = useLocation({ select: (loc) => loc.pathname });
   const [timezone, setTimezone] = useState("UTC");
-  const [isConnectingGoogle, setIsConnectingGoogle] = useState(false);
-
-  // A Google account is only usable for import once it's connected *and* has
-  // granted the Tasks scope — a plain sign-in connection won't have it.
-  const googleAccount = clerkUser?.externalAccounts.find(
-    (account) => account.provider === "google",
-  );
-  const googleTasksReady = Boolean(
-    googleAccount?.approvedScopes?.includes(GOOGLE_TASKS_SCOPE),
-  );
-
-  const handleConnectGoogle = async () => {
-    if (!clerkUser) return;
-    setIsConnectingGoogle(true);
-    try {
-      const externalAccount = await clerkUser.createExternalAccount({
-        strategy: "oauth_google",
-        redirectUrl: window.location.href,
-        additionalScopes: [GOOGLE_TASKS_SCOPE],
-      });
-      const redirect =
-        externalAccount.verification?.externalVerificationRedirectURL;
-      if (redirect) {
-        window.location.href = redirect.toString();
-        return; // navigating away; keep the spinner until unload
-      }
-      setIsConnectingGoogle(false);
-      toast.error("Couldn't start the Google connection");
-    } catch (err) {
-      setIsConnectingGoogle(false);
-      toast.error(messageFromError(err, "Couldn't connect Google"));
-    }
-  };
 
   const handleDeleteAccount = () => {
     const confirmed = window.confirm(
@@ -237,91 +194,6 @@ export function SettingsModal({ origin }: { origin: string }) {
                       Drives when Today's todos age into This Week, and This
                       Week into Sometime — always at your local midnight.
                     </p>
-                  </LayerCard.Primary>
-                </LayerCard>
-                <LayerCard>
-                  <LayerCard.Secondary>
-                    Import
-                    {isClerkLoaded && googleTasksReady && (
-                      <InfoTooltip
-                        render={
-                          <>
-                            Google doesn't share repeat schedules, so we'll help
-                            you set those afterwards. We only import open tasks,
-                            so a repeating to-do you've already completed in
-                            Google today won't come across — re-import once its
-                            next occurrence is due. Already-imported tasks are
-                            skipped, so it's safe to run again.
-                          </>
-                        }
-                      />
-                    )}
-                  </LayerCard.Secondary>
-                  <LayerCard.Primary>
-                    {!isClerkLoaded ? (
-                      <div
-                        className="flex items-center gap-2 text-xs text-gray-muted py-1"
-                        aria-live="polite"
-                      >
-                        <Loader size="sm" />
-                        <span>Checking Google connection…</span>
-                      </div>
-                    ) : googleTasksReady ? (
-                      <>
-                        <p className="text-xs text-gray-muted">
-                          Bring across open tasks from your Google Tasks “My
-                          Tasks” list, with due dates and links.
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            importGoogleTasks.mutate(undefined, {
-                              onSuccess: ({
-                                imported,
-                                importedIds,
-                                datedTodos,
-                              }) => {
-                                if (!importedIds?.length) return;
-                                // Step out of Settings and into the focused
-                                // repeat-schedule review for the new dated tasks.
-                                setOpen(false);
-                                startReview({
-                                  importedIds,
-                                  datedTodos,
-                                  imported,
-                                });
-                              },
-                            })
-                          }
-                          disabled={importGoogleTasks.isPending}
-                          loading={importGoogleTasks.isPending}
-                          className="self-start"
-                        >
-                          Import from Google Tasks
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-xs text-gray-muted">
-                          Connect your Google account to import open tasks from
-                          Google Tasks. We only request read-only access to your
-                          tasks.
-                        </p>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleConnectGoogle}
-                          disabled={isConnectingGoogle}
-                          loading={isConnectingGoogle}
-                          className="self-start"
-                        >
-                          {googleAccount
-                            ? "Reconnect Google for Tasks"
-                            : "Connect Google"}
-                        </Button>
-                      </>
-                    )}
                   </LayerCard.Primary>
                 </LayerCard>
                 <LayerCard>

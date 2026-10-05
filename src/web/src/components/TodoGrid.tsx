@@ -46,7 +46,6 @@ import {
   TodoSkeleton,
 } from "@/components/TodoList";
 import { useHints } from "@/hooks/useHints";
-import { useImportReview } from "@/hooks/useImportReview";
 import {
   useCreateList,
   useDeleteList,
@@ -629,7 +628,6 @@ export function TodoGrid() {
   const createTodo = useCreateTodo();
   const updateList = useUpdateList();
   const { data: user } = useUser();
-  const { highlightIds, hiddenIds } = useImportReview();
   const { timeZone } = useHints();
   useLocalMidnightTick();
 
@@ -793,7 +791,7 @@ export function TodoGrid() {
     const sourceListTodos = todosByList.get(todo.listId) ?? [];
     const sourceOrder =
       localOrderByList[todo.listId] ??
-      getIncompleteOrder(sourceListTodos, timeZone, hiddenIds);
+      getIncompleteOrder(sourceListTodos, timeZone);
     const lastPosition =
       sourceOrder.length > 0
         ? sourceOrder[sourceOrder.length - 1].position
@@ -877,7 +875,7 @@ export function TodoGrid() {
     const sourceListTodos = todosByList.get(sourceListId) ?? [];
     const sourceOrder =
       localOrderByList[sourceListId] ??
-      getIncompleteOrder(sourceListTodos, timeZone, hiddenIds);
+      getIncompleteOrder(sourceListTodos, timeZone);
 
     if (targetListId === sourceListId) {
       if (active.id === over.id) return;
@@ -928,7 +926,7 @@ export function TodoGrid() {
     const targetListTodos = todosByList.get(targetListId) ?? [];
     const targetOrder =
       localOrderByList[targetListId] ??
-      getIncompleteOrder(targetListTodos, timeZone, hiddenIds);
+      getIncompleteOrder(targetListTodos, timeZone);
 
     const prevItem = draggedItem.sticky
       ? null
@@ -970,9 +968,7 @@ export function TodoGrid() {
     ? allTodos.filter((t) => t.parentId === expandedTodo.id)
     : [];
 
-  const completedTodos = sortTopLevelTodos(allTodos, timeZone).completed.filter(
-    (t) => !hiddenIds.has(t.id),
-  );
+  const completedTodos = sortTopLevelTodos(allTodos, timeZone).completed;
 
   const activeTodo = activeId
     ? (allTodos.find((t) => t.id === activeId) ?? null)
@@ -1036,7 +1032,7 @@ export function TodoGrid() {
                 const listTodos = todosByList.get(list.id) ?? [];
                 const incompleteOrder =
                   localOrderByList[list.id] ??
-                  getIncompleteOrder(listTodos, timeZone, hiddenIds);
+                  getIncompleteOrder(listTodos, timeZone);
                 const isDropZone = crossListTargetId === list.id;
                 // Same slot handleDragEnd will use — top of the dragged row's
                 // own tier — so the stand-in shown here is where it lands, not
@@ -1081,8 +1077,6 @@ export function TodoGrid() {
                         updateTodo={updateTodo}
                         deleteTodo={deleteTodo}
                         createTodo={createTodo}
-                        highlightIds={highlightIds}
-                        hiddenIds={hiddenIds}
                         timeZone={timeZone}
                         isKeyboardDragging={isKeyboardDragging}
                         localIncompleteTodos={localOrderByList[list.id] ?? null}

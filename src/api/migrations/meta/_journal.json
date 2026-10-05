@@ -204,6 +204,13 @@
       "when": 1790094413248,
       "tag": "0028_drop_ai_enrichment",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1791232013250,
+      "tag": "0029_drop_google_task_id",
+      "breakpoints": true
     }
   ]
 }

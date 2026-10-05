@@ -44,7 +44,7 @@ import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { Button, Checkbox, focusRing, UrlPreviewCard } from "./ui";
 
 /**
- * Sorted, hidden-filtered incomplete todos for one list — sticky-first, by
+ * Sorted incomplete todos for one list — sticky-first, by
  * position within each tier. Shared by `TodoListColumn` (its own display
  * order) and `TodoGrid` (computing the source/target list's neighbors when a
  * cross-list drag needs a new position), so the two orderings never drift.
@@ -52,11 +52,8 @@ import { Button, Checkbox, focusRing, UrlPreviewCard } from "./ui";
 export function getIncompleteOrder(
   todos: TodoWithUrls[],
   timeZone: string,
-  hiddenIds: ReadonlySet<string>,
 ): TodoWithUrls[] {
-  return sortTopLevelTodos(todos, timeZone).incomplete.filter(
-    (t) => !hiddenIds.has(t.id),
-  );
+  return sortTopLevelTodos(todos, timeZone).incomplete;
 }
 
 interface SubtaskHandlers {
@@ -634,7 +631,6 @@ function SortableTodoItem(
      * stand-in stays put and goes neutral, because the slot it's headed for is
      * shown in that other column instead. */
     isLeavingList: boolean;
-    highlighted: boolean;
     onUpdateExpanded: (updates: {
       title?: string;
       notes?: string | null;
@@ -699,10 +695,6 @@ function SortableTodoItem(
       ref={setNodeRef}
       style={style}
       className={`group relative rounded-lg py-3 transition-colors duration-1000 ease-out ${
-        // Freshly imported rows glow briefly, then the tint transitions out
-        // once the highlight clears — a gentle "these are new" cue.
-        !isDragging && props.highlighted ? "bg-accent-base" : ""
-      } ${
         // Stays visually selected while its side panel is open, for context.
         !isDragging && props.isExpanded ? "bg-gray-base" : ""
       }`}
@@ -876,8 +868,6 @@ export interface TodoListColumnProps {
   updateTodo: ReturnType<typeof useUpdateTodo>;
   deleteTodo: ReturnType<typeof useDeleteTodo>;
   createTodo: ReturnType<typeof useCreateTodo>;
-  highlightIds: ReadonlySet<string>;
-  hiddenIds: ReadonlySet<string>;
   timeZone: string;
   /** True while a keyboard-initiated drag is in progress anywhere on the board. */
   isKeyboardDragging: boolean;
@@ -913,8 +903,6 @@ export function TodoListColumn({
   updateTodo,
   deleteTodo,
   createTodo,
-  highlightIds,
-  hiddenIds,
   timeZone,
   isKeyboardDragging,
   localIncompleteTodos,
@@ -1017,7 +1005,7 @@ export function TodoListColumn({
   }
 
   const displayIncompleteTodos =
-    localIncompleteTodos ?? getIncompleteOrder(todos, timeZone, hiddenIds);
+    localIncompleteTodos ?? getIncompleteOrder(todos, timeZone);
 
   const sharedProps = (todo: TodoWithUrls) => ({
     todo,
@@ -1037,7 +1025,6 @@ export function TodoListColumn({
       {...sharedProps(todo)}
       isKeyboardDragging={isKeyboardDragging}
       isLeavingList={isLeavingList}
-      highlighted={highlightIds.has(todo.id)}
       onUpdateExpanded={handleUpdateExpanded(todo.id)}
       subtaskHandlers={subtaskHandlers}
     />
