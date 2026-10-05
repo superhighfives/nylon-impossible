@@ -1,21 +1,46 @@
 # Format/lint-fix the working tree, then re-stage the files that were staged
 # for this commit so the fixes land here. Without this, check:fix leaves the
 # fixes unstaged and CI's `biome check` (no --write) fails on the unformatted
-# committed version. Only previously-staged files are re-added, so partial or
-# unrelated working-tree changes stay out of the commit. NUL-delimited to
-# survive spaces in paths.
-tmp=$(mktemp)
-git diff --cached --name-only --diff-filter=ACMR -z >"$tmp"
+# committed version.
+#
+# A file that is only partly staged (it also has unstaged changes) can't be
+# re-added from the working tree: that would sweep its unstaged hunks into the
+# commit. For those, biome fixes the staged copy itself and the result is
+# written straight back to the index, leaving the working tree's extra hunks
+# out of the commit.
+staged=$(mktemp)
+unstaged=$(mktemp)
+partial=$(mktemp)
+cleanup() { rm -f "$staged" "$unstaged" "$partial"; }
+
+git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$staged"
+# Captured before check:fix, which itself leaves unstaged formatting changes.
+git -c core.quotePath=false diff --name-only --diff-filter=ACMR >"$unstaged"
+grep -Fxf "$unstaged" "$staged" >"$partial" || true
 
 if ! pnpm check:fix; then
-  rm -f "$tmp"
+  cleanup
   exit 1
 fi
 
 if ! pnpm db:check-meta; then
-  rm -f "$tmp"
+  cleanup
   exit 1
 fi
 
-[ -s "$tmp" ] && xargs -0 git add -- <"$tmp"
-rm -f "$tmp"
+grep -Fvxf "$partial" "$staged" | tr '\n' '\0' | xargs -0 git add --
+
+while IFS= read -r f; do
+  fixed=$(mktemp)
+  git show ":$f" |
+    pnpm exec biome check --write --stdin-file-path "$f" >"$fixed" 2>/dev/null
+  # Biome prints nothing for file types it doesn't handle; keep the staged
+  # copy as-is rather than staging an empty file.
+  if [ -s "$fixed" ]; then
+    mode=$(git ls-files -s -- "$f" | cut -d' ' -f1)
+    git update-index --cacheinfo "$mode,$(git hash-object -w -- "$fixed"),$f"
+  fi
+  rm -f "$fixed"
+done <"$partial"
+
+cleanup
