@@ -94,7 +94,7 @@ export async function listOpenTodos(db: Db, userId: string) {
  */
 export async function listListsForUser(db: Db, userId: string) {
   return db
-    .select({ id: lists.id, name: lists.name, systemKind: lists.systemKind })
+    .select({ id: lists.id, name: lists.name })
     .from(lists)
     .where(
       and(
