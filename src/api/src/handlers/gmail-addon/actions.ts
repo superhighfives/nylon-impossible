@@ -1,10 +1,12 @@
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
-import { buildHomepageCard, QUICK_ADD_INPUT } from "../../lib/addon-cards";
+import { QUICK_ADD_INPUT, QUICK_ADD_LIST_INPUT } from "../../lib/addon-cards";
 import { createSmartTodo } from "../../lib/create-todo";
 import { getDb } from "../../lib/db";
-import { listOpenTodos, setTodoCompleted } from "../../lib/todos-core";
+import { verifyListOwnership } from "../../lib/lists";
+import { setTodoCompleted } from "../../lib/todos-core";
 import type { Env } from "../../types";
+import { buildRefreshedHomepageCard } from "./homepage";
 import {
   cardResponse,
   connectResponse,
@@ -12,10 +14,7 @@ import {
   readAddonEvent,
   readFormInput,
   readParameter,
-  requestBaseUrl,
 } from "./shared";
-
-const HOMEPAGE_TODO_LIMIT = 10;
 
 /** Rebuild the homepage card from the current open-todos list, with a toast. */
 async function refreshedHomepage(
@@ -23,14 +22,7 @@ async function refreshedHomepage(
   userId: string,
   notification: string,
 ) {
-  const open = await listOpenTodos(getDb(c.env.DB), userId);
-  const card = buildHomepageCard(
-    requestBaseUrl(c),
-    open.slice(0, HOMEPAGE_TODO_LIMIT).map((t) => ({
-      id: t.id.toLowerCase(),
-      title: t.title,
-    })),
-  );
+  const card = await buildRefreshedHomepageCard(c, getDb(c.env.DB), userId);
   return cardResponse(c, card, { asAction: true, notification });
 }
 
@@ -69,7 +61,14 @@ export async function gmailAddonQuickAdd(c: Context<Env>) {
     return refreshedHomepage(c, resolved.userId, "That todo is too long");
   }
 
+  const selectedListId = readFormInput(event, QUICK_ADD_LIST_INPUT);
+  const listId = selectedListId
+    ? ((await verifyListOwnership(db, resolved.userId, selectedListId)) ??
+      undefined)
+    : undefined;
+
   await createSmartTodo(db, c.env, resolved.userId, text, {
+    listId,
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 

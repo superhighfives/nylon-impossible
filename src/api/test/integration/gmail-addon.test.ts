@@ -1,18 +1,33 @@
 import { env, SELF } from "cloudflare:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { generateKeyPair, type JWTVerifyGetKey, SignJWT } from "jose";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
-import { mockGetUserList } from "../__mocks__/clerk-backend";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { __setGoogleJwksForTest } from "../../src/lib/addon-auth";
-import { gmailAddonLinks, getDb, todos, todoUrls } from "../../src/lib/db";
-import { cleanDb, seedTodo, seedUser } from "../helpers";
+import {
+  getDb,
+  gmailAddonLinks,
+  lists,
+  todos,
+  todoUrls,
+} from "../../src/lib/db";
+import { mockGetUserList } from "../__mocks__/clerk-backend";
+import { cleanDb, getTodayListId, seedTodo, seedUser } from "../helpers";
+
+async function getSometimeListId(userId = "user_test_123") {
+  const db = getDb(env.DB);
+  const [list] = await db
+    .select({ id: lists.id })
+    .from(lists)
+    .where(
+      and(
+        eq(lists.userId, userId),
+        eq(lists.kind, "system"),
+        eq(lists.systemKind, "sometime"),
+      ),
+    );
+  if (!list) throw new Error(`No Sometime list seeded for user ${userId}`);
+  return list.id;
+}
 
 const AUDIENCE = "https://api.nylonimpossible.com/gmail-addon";
 const ISSUER = "https://accounts.google.com";
@@ -44,7 +59,9 @@ async function post(
   token: string | null,
   body: unknown = {},
 ): Promise<Response> {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
   if (token) headers.Authorization = `Bearer ${token}`;
   return SELF.fetch(`http://localhost${path}`, {
     method: "POST",
@@ -147,10 +164,8 @@ describe("Gmail add-on", () => {
         .from(gmailAddonLinks)
         .where(eq(gmailAddonLinks.googleSub, GOOGLE_SUB));
       expect(link.clerkUserId).toBe("user_test_123");
-      // The open todo appears in the "Open todos" section.
-      const openSection = card.sections.find(
-        (s: any) => s.header === "Open todos",
-      );
+      // The open todo appears under its list's own section header.
+      const openSection = card.sections.find((s: any) => s.header === "Today");
       expect(openSection.widgets[0].decoratedText.text).toBe("Open one");
     });
 
@@ -203,13 +218,78 @@ describe("Gmail add-on", () => {
       const res = await post("/gmail-addon/homepage", token);
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
-      const openSection = card.sections.find(
-        (s: any) => s.header === "Open todos",
-      );
-      const titles = openSection.widgets.map(
-        (w: any) => w.decoratedText.text,
-      );
+      const openSection = card.sections.find((s: any) => s.header === "Today");
+      const titles = openSection.widgets.map((w: any) => w.decoratedText.text);
       expect(titles).toEqual(["Still open"]);
+    });
+
+    it("groups open todos from every list, not just Today", async () => {
+      await linkUser();
+      const sometimeId = await getSometimeListId();
+      await seedTodo("66666666-6666-6666-6666-666666666666", "user_test_123", {
+        title: "In Today",
+        position: "a0",
+      });
+      await seedTodo("77777777-7777-7777-7777-777777777777", "user_test_123", {
+        title: "In Sometime",
+        position: "a0",
+        listId: sometimeId,
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      const todaySection = card.sections.find((s: any) => s.header === "Today");
+      const sometimeSection = card.sections.find(
+        (s: any) => s.header === "Sometime",
+      );
+      expect(todaySection.widgets[0].decoratedText.text).toBe("In Today");
+      expect(sometimeSection.widgets[0].decoratedText.text).toBe("In Sometime");
+
+      // The quick-add dropdown offers every list, defaulting to Today.
+      const listInput = card.sections[0].widgets[1].selectionInput;
+      expect(listInput.items.map((i: any) => i.text)).toEqual(
+        expect.arrayContaining(["Today", "This Week", "Sometime"]),
+      );
+      const selected = listInput.items.find((i: any) => i.selected);
+      expect(selected.text).toBe("Today");
+    });
+
+    it("caps each list so a full Today list can't hide the others", async () => {
+      await linkUser();
+      const sometimeId = await getSometimeListId();
+      for (let i = 0; i < 12; i++) {
+        const n = i.toString(16).padStart(2, "0");
+        await seedTodo(
+          `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa${n}`,
+          "user_test_123",
+          {
+            title: `Today ${i}`,
+            position: `a${n}`,
+          },
+        );
+      }
+      await seedTodo("88888888-8888-8888-8888-888888888888", "user_test_123", {
+        title: "In Sometime",
+        position: "a0",
+        listId: sometimeId,
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      const todaySection = card.sections.find((s: any) => s.header === "Today");
+      const sometimeSection = card.sections.find(
+        (s: any) => s.header === "Sometime",
+      );
+      expect(
+        todaySection.widgets.filter((w: any) => w.decoratedText),
+      ).toHaveLength(5);
+      expect(sometimeSection.widgets[0].decoratedText.text).toBe("In Sometime");
     });
   });
 
@@ -218,7 +298,11 @@ describe("Gmail add-on", () => {
       await linkUser();
       const token = await idToken();
       const res = await post("/gmail-addon/contextual", token, {
-        gmail: { messageId: "m1", threadId: "thread-xyz", subject: "Reply to Sam" },
+        gmail: {
+          messageId: "m1",
+          threadId: "thread-xyz",
+          subject: "Reply to Sam",
+        },
       });
       expect(res.status).toBe(200);
       const body = await res.json<any>();
@@ -250,7 +334,9 @@ describe("Gmail add-on", () => {
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       // Action responses update the card and flash a toast.
-      expect(body.renderActions.action.notification.text).toBe("Added to Nylon");
+      expect(body.renderActions.action.notification.text).toBe(
+        "Added to Nylon",
+      );
 
       const db = getDb(env.DB);
       const rows = await db
@@ -259,6 +345,52 @@ describe("Gmail add-on", () => {
         .where(eq(todos.userId, "user_test_123"));
       expect(rows).toHaveLength(1);
       expect(rows[0].title).toBe("Buy stamps");
+    });
+
+    it("quick-add places the todo in the selected list", async () => {
+      await linkUser();
+      const sometimeId = await getSometimeListId();
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/quick-add", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: ["Buy stamps"] } },
+            listId: { stringInputs: { value: [sometimeId] } },
+          },
+        },
+      });
+      expect(res.status).toBe(200);
+
+      const db = getDb(env.DB);
+      const [row] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(row.listId).toBe(sometimeId);
+    });
+
+    it("falls back to Today when the selected list isn't the user's own", async () => {
+      await linkUser();
+      await seedUser("user_other_456", "other@example.com");
+      const otherSometimeId = await getSometimeListId("user_other_456");
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/quick-add", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: ["Buy stamps"] } },
+            listId: { stringInputs: { value: [otherSometimeId] } },
+          },
+        },
+      });
+      expect(res.status).toBe(200);
+
+      const db = getDb(env.DB);
+      const [row] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      const todayId = await getTodayListId();
+      expect(row.listId).toBe(todayId);
     });
 
     it("rejects an over-length quick-add without creating a todo", async () => {
@@ -415,9 +547,7 @@ describe("Gmail add-on", () => {
       const card = body.renderActions.action.navigations[0].updateCard;
       expect(card.header.title).toBe("Nylon");
       expect(body.renderActions.action.notification.text).toBe("Connected");
-      const openSection = card.sections.find(
-        (s: any) => s.header === "Open todos",
-      );
+      const openSection = card.sections.find((s: any) => s.header === "Today");
       expect(openSection.widgets[0].decoratedText.text).toBe("Now visible");
     });
   });

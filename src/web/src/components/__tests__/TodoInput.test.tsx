@@ -6,14 +6,25 @@ vi.mock("@/hooks/useTodos", () => ({
   useSmartCreate: vi.fn(),
 }));
 
+vi.mock("@/hooks/useLists", () => ({
+  useLists: vi.fn(() => ({ data: undefined })),
+}));
+
 vi.mock("@/lib/toast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), dismiss: vi.fn() },
   messageFromError: (err: unknown, fallback: string) =>
     err instanceof Error && err.message ? err.message : fallback,
 }));
 
+import { useLists } from "@/hooks/useLists";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { toast } from "@/lib/toast";
+
+const LISTS = [
+  { id: "today-id", name: "Today", systemKind: "today" },
+  { id: "week-id", name: "This Week", systemKind: "thisWeek" },
+  { id: "sometime-id", name: "Sometime", systemKind: "sometime" },
+];
 
 type MutateCallbacks = {
   onSuccess?: (result: { todos: unknown[]; ai: boolean }) => void;
@@ -32,6 +43,11 @@ function stubSmartCreate({ isPending = false }: { isPending?: boolean } = {}) {
 describe("TodoInput", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks resets calls but not a previous mockReturnValue, so
+    // explicitly restore the "lists haven't loaded" default each test.
+    vi.mocked(useLists).mockReturnValue({
+      data: undefined,
+    } as unknown as ReturnType<typeof useLists>);
   });
 
   it("hides the submit button when the input is empty", () => {
@@ -156,5 +172,31 @@ describe("TodoInput", () => {
     fireEvent.change(textarea, { target: { value: "   " } });
     fireEvent.keyDown(textarea, { key: "Enter" });
     expect(mutate).not.toHaveBeenCalled();
+  });
+
+  it("defaults the list dropdown to Today and submits with its id", () => {
+    vi.mocked(useLists).mockReturnValue({
+      data: LISTS,
+    } as unknown as ReturnType<typeof useLists>);
+    const mutate = stubSmartCreate();
+    render(<TodoInput />);
+
+    expect(screen.getByLabelText("List to add to")).toHaveTextContent("Today");
+
+    fireEvent.change(screen.getByLabelText("New todo"), {
+      target: { value: "Buy milk" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { text: "Buy milk", listId: "today-id" },
+      expect.any(Object),
+    );
+  });
+
+  it("does not render a list dropdown while lists haven't loaded", () => {
+    stubSmartCreate();
+    render(<TodoInput />);
+    expect(screen.queryByLabelText("List to add to")).toBeNull();
   });
 });

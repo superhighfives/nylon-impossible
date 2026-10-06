@@ -39,6 +39,8 @@ export interface SelectProps
   placeholder?: string;
   items: SelectItem[];
   className?: string;
+  /** Forwarded to the trigger button — Select.Root renders no DOM of its own. */
+  "aria-label"?: string;
 }
 
 export function Select({
@@ -47,11 +49,13 @@ export function Select({
   size,
   ringOffset,
   className,
+  "aria-label": ariaLabel,
   ...props
 }: SelectProps) {
   return (
     <BaseSelect.Root items={items} {...props}>
       <BaseSelect.Trigger
+        aria-label={ariaLabel}
         className={selectTriggerVariants({ size, ringOffset, className })}
       >
         <BaseSelect.Value placeholder={placeholder} />

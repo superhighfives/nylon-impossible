@@ -38,6 +38,12 @@ interface Widget {
     value?: string;
     hintText?: string;
   };
+  selectionInput?: {
+    name: string;
+    label?: string;
+    type: "DROPDOWN";
+    items: { text: string; value: string; selected?: boolean }[];
+  };
   buttonList?: { buttons: Button[] };
   divider?: Record<string, never>;
 }
@@ -110,19 +116,34 @@ function actionUrl(baseUrl: string, path: string): string {
 /** Name of the quick-add text input, referenced by the submit action handler. */
 export const QUICK_ADD_INPUT = "todoText";
 
+/** Name of the quick-add list dropdown, referenced by the submit action handler. */
+export const QUICK_ADD_LIST_INPUT = "listId";
+
 export interface OpenTodoCard {
   id: string;
   title: string;
+  listId: string;
+  listName: string;
+}
+
+export interface AddonListOption {
+  id: string;
+  name: string;
 }
 
 /**
- * Homepage card: a quick-add box over the user's open top-level todos, each
- * tickable. `todos` is expected to already be trimmed to a display-friendly
- * count by the caller.
+ * Homepage card: a quick-add box (with a list dropdown, defaulting to
+ * `defaultListId`) over the user's open top-level todos, each tickable and
+ * grouped under a section per list so todos outside Today aren't hidden.
+ * `todos` is expected to already be trimmed to a display-friendly count by
+ * the caller; `lists` is every list the dropdown and section headers can
+ * reference.
  */
 export function buildHomepageCard(
   baseUrl: string,
   todos: OpenTodoCard[],
+  lists: AddonListOption[],
+  defaultListId: string,
 ): Card {
   const sections: Section[] = [
     {
@@ -133,6 +154,18 @@ export function buildHomepageCard(
             name: QUICK_ADD_INPUT,
             label: "Add a todo",
             hintText: "e.g. Book dentist appointment",
+          },
+        },
+        {
+          selectionInput: {
+            name: QUICK_ADD_LIST_INPUT,
+            label: "List",
+            type: "DROPDOWN",
+            items: lists.map((list) => ({
+              text: list.name,
+              value: list.id,
+              selected: list.id === defaultListId,
+            })),
           },
         },
         {
@@ -154,10 +187,14 @@ export function buildHomepageCard(
   ];
 
   if (todos.length > 0) {
-    sections.push({
-      header: "Open todos",
-      widgets: todos.map((todo) => todoRowWidget(baseUrl, todo)),
-    });
+    for (const list of lists) {
+      const inList = todos.filter((todo) => todo.listId === list.id);
+      if (inList.length === 0) continue;
+      sections.push({
+        header: list.name,
+        widgets: inList.map((todo) => todoRowWidget(baseUrl, todo)),
+      });
+    }
   } else {
     sections.push({
       widgets: [
