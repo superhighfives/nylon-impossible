@@ -2,15 +2,15 @@ import { env, SELF } from "cloudflare:test";
 import { and, eq } from "drizzle-orm";
 import { generateKeyPair, type JWTVerifyGetKey, SignJWT } from "jose";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { mockGetUserList } from "../__mocks__/clerk-backend";
 import { __setGoogleJwksForTest } from "../../src/lib/addon-auth";
 import {
-  gmailAddonLinks,
   getDb,
+  gmailAddonLinks,
   lists,
   todos,
   todoUrls,
 } from "../../src/lib/db";
+import { mockGetUserList } from "../__mocks__/clerk-backend";
 import { cleanDb, getTodayListId, seedTodo, seedUser } from "../helpers";
 
 async function getSometimeListId(userId = "user_test_123") {
@@ -255,6 +255,41 @@ describe("Gmail add-on", () => {
       );
       const selected = listInput.items.find((i: any) => i.selected);
       expect(selected.text).toBe("Today");
+    });
+
+    it("caps each list so a full Today list can't hide the others", async () => {
+      await linkUser();
+      const sometimeId = await getSometimeListId();
+      for (let i = 0; i < 12; i++) {
+        const n = i.toString(16).padStart(2, "0");
+        await seedTodo(
+          `aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaa${n}`,
+          "user_test_123",
+          {
+            title: `Today ${i}`,
+            position: `a${n}`,
+          },
+        );
+      }
+      await seedTodo("88888888-8888-8888-8888-888888888888", "user_test_123", {
+        title: "In Sometime",
+        position: "a0",
+        listId: sometimeId,
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      const todaySection = card.sections.find((s: any) => s.header === "Today");
+      const sometimeSection = card.sections.find(
+        (s: any) => s.header === "Sometime",
+      );
+      expect(
+        todaySection.widgets.filter((w: any) => w.decoratedText),
+      ).toHaveLength(5);
+      expect(sometimeSection.widgets[0].decoratedText.text).toBe("In Sometime");
     });
   });
 

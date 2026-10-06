@@ -7,8 +7,13 @@ import { listListsForUser, listOpenTodos } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import { cardResponse, connectResponse, requestBaseUrl } from "./shared";
 
-/** How many open todos to show on the homepage card. */
-const HOMEPAGE_TODO_LIMIT = 10;
+/**
+ * Open todos shown per list on the homepage card, so a long Today list can't
+ * push every other list off the card.
+ */
+const HOMEPAGE_TODOS_PER_LIST = 5;
+/** Overall ceiling across all lists, to keep the card a manageable size. */
+const HOMEPAGE_TODO_LIMIT = 20;
 
 // POST /gmail-addon/homepage — panel opened with no message in context.
 export async function gmailAddonHomepage(c: Context<Env>) {
@@ -39,9 +44,20 @@ export async function buildRefreshedHomepageCard(
     throw new Error(`No Today list found for user ${userId}`);
   }
 
+  // `open` is already in list order, so a per-list count is enough.
+  const shownPerList = new Map<string, number>();
+  const shown = open
+    .filter((t) => {
+      const count = shownPerList.get(t.listId) ?? 0;
+      if (count >= HOMEPAGE_TODOS_PER_LIST) return false;
+      shownPerList.set(t.listId, count + 1);
+      return true;
+    })
+    .slice(0, HOMEPAGE_TODO_LIMIT);
+
   return buildHomepageCard(
     requestBaseUrl(c),
-    open.slice(0, HOMEPAGE_TODO_LIMIT).map((t) => ({
+    shown.map((t) => ({
       id: t.id.toLowerCase(),
       title: t.title,
       listId: t.listId,
