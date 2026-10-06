@@ -10,7 +10,7 @@ const CONTACT_EMAIL = "hi@charliegleason.com";
 
 function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="July 2, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 5, 2026">
       <p>
         This is the privacy policy for Nylon Impossible ("the app"). It explains
         what information the app collects, why, and what happens to it. The
@@ -34,20 +34,14 @@ function PrivacyPage() {
             settings, it's stored on your profile but isn't currently used by
             any feature. You can remove it at any time.
           </li>
-          <li>
-            <strong>Imported data.</strong> If you choose to import from Google
-            Tasks, the app reads your tasks so it can copy them in. It only
-            requests read access, and only when you start an import.
-          </li>
         </ul>
       </LegalSection>
 
       <LegalSection heading="How the app uses your information">
         <p>
           Your information is used to run the app: to sign you in, store and
-          sync your todos across your devices, and power optional AI features
-          like parsing what you type and enriching tasks. That's it. Your data
-          isn't sold, and it isn't used for advertising.
+          sync your todos across your devices. That's it. Your data isn't sold,
+          and it isn't used for advertising.
         </p>
       </LegalSection>
 
@@ -61,11 +55,10 @@ function PrivacyPage() {
             <strong>Clerk</strong> — accounts and sign-in.
           </li>
           <li>
-            <strong>Cloudflare</strong> — hosting, database, and AI features.
+            <strong>Cloudflare</strong> — hosting and database.
           </li>
           <li>
-            <strong>Google</strong> — only if you connect your account to import
-            tasks.
+            <strong>Google</strong> — only if you use the Gmail add-on.
           </li>
           <li>
             <strong>Sentry</strong> — error monitoring so bugs can be fixed.
