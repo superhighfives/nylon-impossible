@@ -10,7 +10,7 @@ const CONTACT_EMAIL = "hi@charliegleason.com";
 
 function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="July 2, 2026">
+    <LegalPage title="Terms of Service" lastUpdated="October 5, 2026">
       <p>
         These terms cover your use of Nylon Impossible ("the app"). By using the
         app, you agree to them. They're meant to be reasonable and easy to read.
@@ -18,9 +18,8 @@ function TermsPage() {
 
       <LegalSection heading="The service">
         <p>
-          Nylon Impossible is a todo app for web and iOS with optional AI
-          features. It's offered as-is and may change over time as features are
-          added, improved, or removed.
+          Nylon Impossible is a todo app for web and iOS. It's offered as-is and
+          may change over time as features are added, improved, or removed.
         </p>
       </LegalSection>
 
