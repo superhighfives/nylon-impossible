@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import { devtools } from '@tanstack/devtools-vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
-import viteTsConfigPaths from 'vite-tsconfig-paths'
 import tailwindcss from '@tailwindcss/vite'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
@@ -16,10 +15,6 @@ const config = defineConfig({
     cloudflare({
       viteEnvironment: { name: 'ssr' },
       persistState: { path: '../../.wrangler/state' },
-    }),
-    // this is the plugin that enables path aliases
-    viteTsConfigPaths({
-      projects: ['./tsconfig.json'],
     }),
     tailwindcss(),
     tanstackStart(),
@@ -37,6 +32,9 @@ const config = defineConfig({
     include: ["cookie"],
   },
   resolve: {
+    // Replaces the vite-tsconfig-paths plugin; Vite 8 resolves tsconfig
+    // `paths` aliases natively.
+    tsconfigPaths: true,
     alias: [
       {
         find: "use-sync-external-store/shim/index.js",
