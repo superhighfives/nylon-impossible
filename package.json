@@ -65,15 +65,9 @@
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=22.18.0"
+    "node": ">=24.21.0"
   },
   "packageManager": "pnpm@9.15.0",
-  "pnpm": {
-    "overrides": {
-      "vite": "^8.2.1",
-      "solid-js": "^1.9.15"
-    }
-  },
   "devDependencies": {
     "@biomejs/biome": "2.5.8",
     "drizzle-kit": "^0.31.8",

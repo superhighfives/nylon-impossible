@@ -74,7 +74,7 @@ The application uses TanStack Query's optimistic update pattern for instant UI f
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 24.21.0+
 - pnpm 9+
 - Cloudflare account (for deployment)
 - Clerk account (for authentication)

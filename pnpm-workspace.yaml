@@ -4,3 +4,7 @@ packages:
   - "src/api"
   - "src/admin"
   - "src/marketing"
+
+overrides:
+  vite: ^8.2.1
+  solid-js: ^1.9.15
