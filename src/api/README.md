@@ -77,7 +77,7 @@ deployment manifest live in [`src/gmail-addon/`](../gmail-addon/README.md).
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 24.21.0+
 - pnpm 9+
 
 ### Development

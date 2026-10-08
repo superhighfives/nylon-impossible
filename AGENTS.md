@@ -42,7 +42,7 @@ This repo uses **pnpm** with workspaces. Always use `pnpm`, never `npm` or `yarn
 pnpm install          # Install all dependencies
 ```
 
-Node.js 22+ is required.
+Node.js 24.21.0+ is required.
 
 ## Key Commands
 
