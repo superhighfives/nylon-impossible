@@ -344,4 +344,37 @@ struct TodayDigestTests {
         let context = container.mainContext
         #expect(TodayDigest.fetch(userId: Self.userId, context: context, now: Self.now).isEmpty)
     }
+
+    /// A todo that isn't a SwiftData model — the shape the widget builds from
+    /// the server's response — to pin that `select` applies the same rule
+    /// without a store behind it.
+    private struct PlainTodo: TodayDigestCandidate {
+        let title: String
+        var userId: String? = TodayDigestTests.userId
+        var isTopLevel = true
+        var listKey: String?
+        var dueDate: Date?
+        var sticky = false
+        var position = "a0"
+        var isEffectivelyCompleted = false
+    }
+
+    @Test("select applies the digest rule to plain values")
+    @MainActor
+    func selectPlainValues() {
+        let now = Self.now
+        let todos = [
+            PlainTodo(title: "Planned", listKey: Self.todayListId.uppercased(), position: "a2"),
+            PlainTodo(title: "Overdue elsewhere", listKey: Self.sometimeListId, dueDate: now.addingTimeInterval(-3600)),
+            PlainTodo(title: "Sticky", listKey: Self.todayListId, sticky: true, position: "a3"),
+            PlainTodo(title: "Tomorrow", listKey: Self.sometimeListId, dueDate: now.addingTimeInterval(24 * 3600)),
+            PlainTodo(title: "Done", listKey: Self.todayListId, isEffectivelyCompleted: true),
+            PlainTodo(title: "Subtask", isTopLevel: false, listKey: Self.todayListId),
+            PlainTodo(title: "Someone else's", userId: "user_other", listKey: Self.todayListId),
+        ]
+
+        let selected = TodayDigest.select(todos, userId: Self.userId, todayListId: Self.todayListId, now: now)
+
+        #expect(selected.map(\.title) == ["Sticky", "Overdue elsewhere", "Planned"])
+    }
 }

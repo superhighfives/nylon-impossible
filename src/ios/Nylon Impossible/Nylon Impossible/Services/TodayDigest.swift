@@ -67,19 +67,35 @@ enum TodayDigest {
         // are awkward (see `fetchAllTodos`), and `isEffectivelyCompleted` —
         // which keeps a repeat completed today out of the list until local
         // midnight — is a computed property a predicate can't reach at all.
+        let ordered = select(
+            todos,
+            userId: userId,
+            todayListId: todayListId(userId: userId, context: context),
+            now: now
+        )
+        guard let limit else { return ordered }
+        return Array(ordered.prefix(limit))
+    }
+
+    /// The filter and ordering behind `fetch`, over anything shaped like a
+    /// todo — so the widget can apply the same rule to todos it fetched from
+    /// the server as to the ones in the local store. `todayListId` must
+    /// already be lowercased; nil falls back to due dates alone.
+    static func select<Todo: TodayDigestCandidate>(
+        _ todos: [Todo],
+        userId: String,
+        todayListId: String?,
+        now: Date = Date()
+    ) -> [Todo] {
         let cutoff = startOfTomorrow(after: now)
-        let todayList = todayListId(userId: userId, context: context)
         let forToday = todos.filter { todo in
-            guard todo.userId == userId, todo.parentId == nil else { return false }
+            guard todo.userId == userId, todo.isTopLevel else { return false }
             guard !todo.isEffectivelyCompleted else { return false }
-            if let todayList, todo.listKey?.lowercased() == todayList { return true }
+            if let todayListId, todo.listKey?.lowercased() == todayListId { return true }
             guard let dueDate = todo.dueDate else { return false }
             return dueDate < cutoff
         }
-
-        let ordered = sorted(forToday)
-        guard let limit else { return ordered }
-        return Array(ordered.prefix(limit))
+        return sorted(forToday)
     }
 
     /// The id of the user's Today list, lowercased to match the way `listKey`
@@ -105,7 +121,7 @@ enum TodayDigest {
     /// them, and undated Today items (`.distantFuture`) after everything with
     /// a date — then by position, so todos that sort alike keep the order they
     /// have in the app.
-    static func sorted(_ todos: [TodoItem]) -> [TodoItem] {
+    static func sorted<Todo: TodayDigestCandidate>(_ todos: [Todo]) -> [Todo] {
         todos.sorted { a, b in
             if a.sticky != b.sticky { return a.sticky }
             let aDue = a.dueDate ?? .distantFuture
@@ -114,4 +130,20 @@ enum TodayDigest {
             return a.position < b.position
         }
     }
+}
+
+/// What `TodayDigest` needs to know about a todo. `TodoItem` is the local
+/// store's; the widget conforms the server's shape too.
+protocol TodayDigestCandidate {
+    var userId: String? { get }
+    var isTopLevel: Bool { get }
+    var listKey: String? { get }
+    var dueDate: Date? { get }
+    var sticky: Bool { get }
+    var position: String { get }
+    var isEffectivelyCompleted: Bool { get }
+}
+
+extension TodoItem: TodayDigestCandidate {
+    var isTopLevel: Bool { parentId == nil }
 }
