@@ -7,13 +7,14 @@
 
 # Nylon Impossible
 
-A todo app for web and iOS. Describe what you need to do — AI handles the rest.
+A todo app for web and iOS. Fast, simple, and in sync everywhere you are.
 
-> **Note:** This is an exploratory project, not a production template. It was built to experiment with Cloudflare's developer platform — specifically Workers AI (for natural language todo parsing), Durable Objects (for WebSocket-based real-time sync), D1 (SQLite at the edge), and the Workers runtime in general. Expect rough edges, opinionated choices, and things that exist because they were interesting to build.
+> **Note:** This is an exploratory project, not a production template. It was built to experiment with Cloudflare's developer platform — specifically Durable Objects (for WebSocket-based real-time sync), D1 (SQLite at the edge), and the Workers runtime in general. Expect rough edges, opinionated choices, and things that exist because they were interesting to build.
 
 ## Features
 
-- **AI task creation** — type naturally and due dates, priorities, and URLs are parsed automatically using Workers AI
+- **Lists, subtasks, and repeating todos** — organise tasks into lists, break them down into steps, and set them to recur
+- **Link previews** — paste a URL and Nylon fetches its title and metadata for you
 - **Real-time sync** — changes appear instantly across all devices via WebSockets and Durable Objects
 - **iOS native** — SwiftUI app with Siri integration and Share Sheet support, synced to the same account
 - **Optimistic updates** — keep the UI fast and responsive; changes sync automatically when back online
