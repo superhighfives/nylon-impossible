@@ -45,7 +45,7 @@ enum RemoteToday {
                 return try await (todos, lists)
             }
             let todayListId = lists.first { $0.systemKind == "today" }?.id.lowercased()
-            let rows = overlayPendingLocalChanges(on: todos.compactMap(Row.init), userId: userId)
+            let rows = try overlayPendingLocalChanges(on: todos.compactMap(Row.init), userId: userId)
             let digest = TodayDigest.select(rows, userId: userId, todayListId: todayListId, now: now)
             let elapsed = String(describing: ContinuousClock.now - started)
             log.info("remote digest: \(digest.count) of \(todos.count) todos in \(elapsed, privacy: .public)")
@@ -61,14 +61,16 @@ enum RemoteToday {
     /// tapped on this widget, a todo added from Siri or the share sheet — so
     /// the local store's unsynced rows win over the server's copy. Without
     /// this, ticking something off here would bring it straight back on the
-    /// next remote refresh.
+    /// next remote refresh. A store that can't be read throws rather than
+    /// passing for "nothing pending", so the digest falls back to the local
+    /// store's own view instead of rendering the server copy over it.
     @MainActor
-    private static func overlayPendingLocalChanges(on remote: [Row], userId: String) -> [Row] {
+    private static func overlayPendingLocalChanges(on remote: [Row], userId: String) throws -> [Row] {
         let context = ModelContext(SharedModelContainer.shared)
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate { $0.userId == userId && !$0.isSynced }
         )
-        let pending = (try? context.fetch(descriptor)) ?? []
+        let pending = try context.fetch(descriptor)
         guard !pending.isEmpty else { return remote }
 
         let pendingById = Dictionary(pending.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
