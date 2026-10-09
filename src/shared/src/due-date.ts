@@ -3,10 +3,10 @@
  * and the canonical form is midnight UTC of the picked day — that's what the
  * web calendar writes and what recurrence steps through.
  *
- * Older iOS builds wrote local midnight instead (e.g. 07:00Z for a Pacific
- * user, or 14:00Z the previous day for Sydney). Rounding to the *nearest* UTC
- * midnight recovers the intended day from either form for any offset within
- * ±12h, so every reader goes through `dueDayKey` rather than reading UTC or
+ * Every writer stores that form, so stored values are already canonical.
+ * Rounding to the *nearest* UTC midnight is a guard for stray non-midnight
+ * values (a local-midnight instant maps back to its day for any offset within
+ * ±12h). Every reader goes through `dueDayKey` rather than reading UTC or
  * local fields directly, and writers normalize with `toDueDay`.
  */
 

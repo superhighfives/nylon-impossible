@@ -11,9 +11,10 @@ import Foundation
 
 /// Due dates are calendar days, not instants. The canonical stored form is
 /// midnight UTC of the picked day (what the web calendar writes and what the
-/// API normalizes to). Older builds of this app wrote local midnight instead;
-/// rounding to the *nearest* UTC midnight recovers the intended day from either
-/// form for any offset within ±12h. Mirrors src/shared/src/due-date.ts.
+/// API normalizes to), and `fromLocal(_:)` writes it too. Rounding to the
+/// *nearest* UTC midnight is a guard for stray non-midnight values (a
+/// local-midnight instant maps back to its day for any offset within ±12h).
+/// Mirrors src/shared/src/due-date.ts.
 ///
 /// Never format or compare a raw `dueDate` in the device's zone — go through
 /// `localDate(_:)` (display / local comparisons) or `fromLocal(_:)` (writes).

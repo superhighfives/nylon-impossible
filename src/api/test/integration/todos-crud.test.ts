@@ -196,7 +196,7 @@ describe("Todos CRUD", () => {
       const createRes = await createTodoViaAPI("Dentist");
       const created = await createRes.json<any>();
 
-      // Older iOS builds send local midnight; Sydney's is 14:00Z the day before.
+      // A non-canonical local midnight (Sydney: 14:00Z the day before) is normalized.
       const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
         method: "PUT",
         headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
