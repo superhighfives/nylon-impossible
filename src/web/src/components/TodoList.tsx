@@ -319,8 +319,12 @@ function TodoItemContent({
     ) {
       return;
     }
-    const target = e.target as Element;
-    if (target.closest("a, button, input, textarea, [role='checkbox']")) return;
+    if (!(e.target instanceof Element)) return;
+    // Portaled descendants (the due-date popover) bubble through the React
+    // tree but aren't DOM children of the row — ignore them.
+    if (!e.currentTarget.contains(e.target)) return;
+    if (e.target.closest("a, button, input, textarea, [role='checkbox']"))
+      return;
     if (window.getSelection()?.toString()) return;
     onToggleExpand(todo.id);
   };
@@ -330,8 +334,7 @@ function TodoItemContent({
     onInlineUpdate(todo.id, { sticky: !todo.sticky });
   };
 
-  // Shared between the desktop hover pill and the always-visible mobile row
-  // below — same controls, just different containers.
+  // Controls for the desktop hover pill.
   const rowActions = (
     <>
       {/* Opens the details panel — the title itself is now a plain,
