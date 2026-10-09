@@ -1,10 +1,16 @@
+import { dayKeyIn, daysBetweenKeys, dueDayKey } from "./due-date";
 import type { Recurrence } from "./schema";
 
 /**
  * Compute the next due date for a repeating todo: the first occurrence of the
- * recurrence rule strictly after `now`. Missed occurrences are not stored or
- * surfaced — a daily todo left unchecked for a week jumps straight to
- * tomorrow's date rather than producing a backlog of seven overdue rows.
+ * recurrence rule on a calendar day after today, where "today" is `now` in
+ * the user's `timeZone`. Missed occurrences are not stored or surfaced — a
+ * daily todo left unchecked for a week jumps straight to tomorrow's date
+ * rather than producing a backlog of seven overdue rows.
+ *
+ * Compares calendar days, not instants: due dates are stored as UTC midnight,
+ * so comparing instants made a Pacific user who completed a daily repeat in
+ * the evening (after tomorrow's UTC midnight had passed) skip a day.
  *
  * The Swift port lives at src/ios/Nylon Impossible/Nylon Impossible/Utils/Recurrence.swift
  * and must produce the same result for the same inputs (covered by parity
@@ -14,9 +20,11 @@ export function nextDueDate(
   recurrence: Recurrence,
   from: Date,
   now: Date,
+  timeZone = "UTC",
 ): Date {
+  const today = dayKeyIn(now, timeZone);
   let next = advance(recurrence, from);
-  while (next.getTime() <= now.getTime()) {
+  while (dueDayKey(next) <= today) {
     next = advance(recurrence, next);
   }
   return next;
@@ -37,18 +45,14 @@ export type ListPlacement = "today" | "thisWeek" | "sometime";
  * Mirrored in the Swift port at
  * src/ios/Nylon Impossible/Nylon Impossible/Utils/Recurrence.swift.
  */
-export function placementForDueDate(dueDate: Date, now: Date): ListPlacement {
-  const startOfToday = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const daysUntilDue = Math.floor(
-    (Date.UTC(
-      dueDate.getUTCFullYear(),
-      dueDate.getUTCMonth(),
-      dueDate.getUTCDate(),
-    ) -
-      startOfToday.getTime()) /
-      (24 * 60 * 60 * 1000),
+export function placementForDueDate(
+  dueDate: Date,
+  now: Date,
+  timeZone = "UTC",
+): ListPlacement {
+  const daysUntilDue = daysBetweenKeys(
+    dayKeyIn(now, timeZone),
+    dueDayKey(dueDate),
   );
   if (daysUntilDue <= 1) return "today";
   if (daysUntilDue <= 7) return "thisWeek";

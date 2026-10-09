@@ -1,4 +1,8 @@
-import { TODO_NOTES_MAX, TODO_TITLE_MAX } from "@nylon-impossible/shared";
+import {
+  TODO_NOTES_MAX,
+  TODO_TITLE_MAX,
+  toDueDay,
+} from "@nylon-impossible/shared";
 import { z } from "zod";
 
 export const recurrenceSchema = z.object({
@@ -27,7 +31,8 @@ export const createTodoSchema = z.object({
     .max(TODO_NOTES_MAX, "Notes are too long")
     .nullable()
     .optional(),
-  dueDate: z.coerce.date().nullable().optional(),
+  // Normalized to UTC midnight — due dates are calendar days.
+  dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   // Parent todo id when creating a subtask; omit/null for a top-level todo.
   parentId: z.string().uuid().nullable().optional(),
@@ -48,7 +53,8 @@ export const updateTodoSchema = z.object({
     .optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),
-  dueDate: z.coerce.date().nullable().optional(),
+  // Normalized to UTC midnight — due dates are calendar days.
+  dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   // Only sent to undo a completed repeat (cleared to null). Normal completions
   // are stamped server-side, not by the client.

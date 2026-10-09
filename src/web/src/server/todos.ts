@@ -2,6 +2,7 @@
  * Server functions for todos using Effect for type-safe error handling
  */
 
+import { toDueDay } from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
   nextDueDate,
@@ -19,6 +20,7 @@ import {
 import { getSystemListId, verifyListOwnership } from "@/lib/lists";
 import type { Todo, TodoUrl } from "@/lib/schema";
 import { todos, todoUrls } from "@/lib/schema";
+import { getUserTimezone } from "@/lib/user-timezone";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import {
   createTodoSchema,
@@ -229,11 +231,15 @@ export const createTodo = createServerFn({ method: "POST" })
           // A new recurring todo (which always has a due date) is placed by
           // that due date's distance instead of defaulting to Today.
           listId = yield* Effect.tryPromise({
-            try: () =>
+            try: async () =>
               getSystemListId(
                 db,
                 user.id,
-                placementForDueDate(validated.dueDate as Date, new Date()),
+                placementForDueDate(
+                  validated.dueDate as Date,
+                  new Date(),
+                  await getUserTimezone(db, user.id),
+                ),
               ),
             catch: (error) =>
               new DatabaseError({
@@ -473,7 +479,14 @@ export const updateTodo = createServerFn({ method: "POST" })
         // stamp completedAt so the UI keeps it in Completed until local midnight.
         if (becameComplete && recurrence && anchor) {
           const now = new Date();
-          const nextDue = nextDueDate(recurrence, anchor, now);
+          const timeZone = yield* Effect.tryPromise({
+            try: () => getUserTimezone(db, user.id),
+            catch: (error) =>
+              new DatabaseError({ operation: "getUserTimezone", cause: error }),
+          });
+          const nextDue = toDueDay(
+            nextDueDate(recurrence, anchor, now, timeZone),
+          );
           updates.completed = false;
           updates.completedAt = now;
           updates.dueDate = nextDue;
@@ -483,7 +496,11 @@ export const updateTodo = createServerFn({ method: "POST" })
           if (validated.listId === undefined) {
             const placementListId = yield* Effect.tryPromise({
               try: () =>
-                getSystemListId(db, user.id, placementForDueDate(nextDue, now)),
+                getSystemListId(
+                  db,
+                  user.id,
+                  placementForDueDate(nextDue, now, timeZone),
+                ),
               catch: (error) =>
                 new DatabaseError({
                   operation: "getPlacementList",
