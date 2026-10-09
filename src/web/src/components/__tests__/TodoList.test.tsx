@@ -14,6 +14,9 @@ vi.mock("@/hooks/useTodos", () => ({
   })),
   // TodoGrid renders the floating composer (TodoInput), which smart-creates.
   useSmartCreate: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  // The expanded details panel refreshes link previews and re-runs AI.
+  useUpdateUrlPreview: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
+  useProcessTodo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
 vi.mock("@/hooks/useLists", () => ({
@@ -303,5 +306,27 @@ describe("TodoGrid", () => {
     expect(
       screen.queryByRole("button", { name: /completed/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("opens a todo's details when the row itself is tapped", () => {
+    stubTodos([makeTodo()]);
+    render(<TodoGrid />);
+
+    fireEvent.click(screen.getByText("Buy milk"));
+
+    expect(screen.getByLabelText("Todo title")).toBeInTheDocument();
+  });
+
+  it("ignores clicks that bubble up from the portaled due-date popover", () => {
+    stubTodos([makeTodo({ dueDate: "2026-03-15T00:00:00.000Z" })]);
+    // Mount on <body>, as the app does, so the portal shares the root's event
+    // listener — a detached container would dispatch the click twice.
+    render(<TodoGrid />, { container: document.body });
+
+    fireEvent.click(screen.getByRole("button", { name: /Change due date/ }));
+    // The month header is plain text inside the calendar, not a control.
+    fireEvent.click(screen.getByText("March 2026", { selector: "span" }));
+
+    expect(screen.queryByLabelText("Todo title")).not.toBeInTheDocument();
   });
 });
