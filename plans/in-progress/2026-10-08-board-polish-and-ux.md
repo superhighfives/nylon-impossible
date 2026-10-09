@@ -486,13 +486,9 @@ Deviations:
 
 ## Follow-ups (not in this plan's PRs)
 
-- **Due date off-by-one (pre-existing bug).** The calendar and side panel
-  treat `dueDate` as a UTC calendar day (`toISOString().split("T")[0]`), but
-  the row badge formats it in the user's timezone (`formatDate(d,
-  timeZone)`). West of UTC, picking Aug 28 shows "8/27" on the row while
-  the panel says Aug 28. This needs one convention across web, API and iOS.
-  iOS may store local-midnight instants, so check before changing either
-  side.
+- **Due date off-by-one:** fixed separately in "Treat due dates as calendar
+  days everywhere" (branch `fix-due-date-days`). Due dates are calendar days
+  at their nearest UTC midnight; "today" is the user's local day.
 
 ### Phase 6 — reduced motion and touch rows (2026-10-09, branch `board-polish-phase-6`)
 

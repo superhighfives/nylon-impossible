@@ -68,7 +68,8 @@ struct TodoEditSheet: View {
         _title = State(initialValue: todo.title)
         _notes = State(initialValue: todo.itemNotes ?? "")
         _hasDueDate = State(initialValue: todo.dueDate != nil)
-        _dueDate = State(initialValue: todo.dueDate ?? Date())
+        // Edited as a local date; stored as UTC midnight of that day (see DueDay).
+        _dueDate = State(initialValue: todo.dueDate.map { DueDay.localDate($0) } ?? Date())
         _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
         _sticky = State(initialValue: todo.sticky)
         _selectedListId = State(initialValue: todo.listKey?.lowercased())
@@ -222,7 +223,7 @@ struct TodoEditSheet: View {
 
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let notesValue = trimmedNotes.isEmpty ? nil : trimmedNotes
-        let dueDateValue = hasDueDate ? dueDate : nil
+        let dueDateValue = hasDueDate ? DueDay.fromLocal(dueDate) : nil
         let recurrenceValue: Recurrence? = (hasDueDate && subtasks.isEmpty)
             ? recurrenceFrequency.map { Recurrence(frequency: $0) }
             : nil

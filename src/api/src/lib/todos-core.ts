@@ -1,3 +1,4 @@
+import { toDueDay } from "@nylon-impossible/shared";
 import {
   nextDueDate,
   placementForDueDate,
@@ -17,6 +18,7 @@ import {
 } from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
+import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -152,7 +154,10 @@ export async function setTodoCompleted(
     if (isSubtask || hasChildren) recurrence = null;
   }
   if (completingRow && recurrence && existing.dueDate) {
-    const nextDue = nextDueDate(recurrence, existing.dueDate, now);
+    const timeZone = await getUserTimezone(db, userId);
+    const nextDue = toDueDay(
+      nextDueDate(recurrence, existing.dueDate, now, timeZone),
+    );
     updates.completed = false;
     updates.completedAt = now;
     updates.dueDate = nextDue;
@@ -161,7 +166,7 @@ export async function setTodoCompleted(
     const placementListId = await getSystemListId(
       db,
       userId,
-      placementForDueDate(nextDue, now),
+      placementForDueDate(nextDue, now, timeZone),
     );
     if (placementListId && placementListId !== existing.listId) {
       updates.listId = placementListId;
@@ -268,7 +273,8 @@ export async function updateTodoCore(
   const anchor = patch.dueDate !== undefined ? patch.dueDate : existing.dueDate;
   if (completingRow && recurrence && anchor) {
     const now = new Date();
-    const nextDue = nextDueDate(recurrence, anchor, now);
+    const timeZone = await getUserTimezone(db, userId);
+    const nextDue = toDueDay(nextDueDate(recurrence, anchor, now, timeZone));
     updates.completed = false;
     updates.completedAt = now;
     updates.dueDate = nextDue;
@@ -279,7 +285,7 @@ export async function updateTodoCore(
       const placementListId = await getSystemListId(
         db,
         userId,
-        placementForDueDate(nextDue, now),
+        placementForDueDate(nextDue, now, timeZone),
       );
       if (placementListId && placementListId !== existing.listId) {
         updates.listId = placementListId;

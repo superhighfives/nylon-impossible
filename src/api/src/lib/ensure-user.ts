@@ -128,7 +128,14 @@ async function seedDemoTodos(
         dueDate:
           t.dueInDays === undefined
             ? null
-            : new Date(now.getTime() + t.dueInDays * 86_400_000),
+            : // Due dates are calendar days at UTC midnight.
+              new Date(
+                Date.UTC(
+                  now.getUTCFullYear(),
+                  now.getUTCMonth(),
+                  now.getUTCDate() + t.dueInDays,
+                ),
+              ),
         createdAt: now,
         updatedAt: now,
       },
