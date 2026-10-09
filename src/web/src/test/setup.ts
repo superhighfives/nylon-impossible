@@ -22,3 +22,12 @@ class MockIntersectionObserver implements IntersectionObserver {
   }
 }
 vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
+
+// jsdom doesn't implement ResizeObserver either (used by SegmentedControl to
+// keep its sliding indicator aligned).
+class MockResizeObserver implements ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+vi.stubGlobal("ResizeObserver", MockResizeObserver);

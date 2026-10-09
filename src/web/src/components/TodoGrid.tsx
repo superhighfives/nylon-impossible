@@ -23,6 +23,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { splitTodoText } from "@nylon-impossible/shared";
 import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -245,7 +246,8 @@ function NewTodoInline({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const createTodo = useCreateTodo();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const overflowsToNotes = splitTodoText(title).notes !== null;
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -257,14 +259,17 @@ function NewTodoInline({
   };
 
   const submit = () => {
-    const trimmed = title.trim();
-    if (!trimmed) {
+    if (!title.trim()) {
       close();
       return;
     }
+    // Long pastes (a 2KB URL, a copied paragraph) keep their overflow in
+    // notes instead of failing the 500-char title limit.
+    const { title: todoTitle, notes } = splitTodoText(title);
     createTodo.mutate(
       {
-        title: trimmed,
+        title: todoTitle,
+        notes,
         listId,
         position: generateKeyBetween(null, firstPosition),
       },
@@ -301,25 +306,40 @@ function NewTodoInline({
         e.preventDefault();
         submit();
       }}
-      className="mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2"
+      className="mb-1 flex min-h-9 w-full items-start gap-3 py-1"
     >
       <span
         aria-hidden="true"
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-gray-strong"
+        className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-gray-strong"
       >
         <Plus size={12} />
       </span>
-      <input
-        ref={inputRef}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={() => (title.trim() ? submit() : close())}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") close();
-        }}
-        placeholder="New todo"
-        className="flex-1 rounded-md border-none bg-transparent p-0 text-sm text-gray outline-none placeholder:text-gray-muted focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
-      />
+      <div className="min-w-0 flex-1">
+        {/* Negative margin + matching padding gives the text room inside the
+            focus ring while keeping it flush with the row titles below. */}
+        <textarea
+          ref={inputRef}
+          rows={1}
+          value={title}
+          aria-label="New todo"
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => (title.trim() ? submit() : close())}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") close();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder="New todo"
+          className="field-sizing-content -mx-2 block max-h-48 w-[calc(100%+1rem)] resize-none rounded-md bg-transparent px-2 py-1 text-[15px] font-semibold leading-snug text-gray outline-none wrap-anywhere placeholder:font-normal placeholder:text-gray-muted focus-visible:ring-2 focus-visible:ring-accent-strong [@supports(-webkit-touch-callout:none)]:!text-base"
+        />
+        {overflowsToNotes && (
+          <p className="mt-1 text-xs text-gray-muted">
+            The rest will be saved to notes.
+          </p>
+        )}
+      </div>
     </form>
   );
 }
