@@ -2,3 +2,4 @@
 export * from "./addon-state";
 export * from "./recurrence";
 export * from "./schema";
+export * from "./todo-text";

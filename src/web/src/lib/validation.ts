@@ -1,3 +1,4 @@
+import { TODO_NOTES_MAX, TODO_TITLE_MAX } from "@nylon-impossible/shared";
 import { z } from "zod";
 
 export const recurrenceSchema = z.object({
@@ -17,8 +18,15 @@ export const listIdSchema = z
   );
 
 export const createTodoSchema = z.object({
-  title: z.string().min(1, "Title is required").max(500),
-  notes: z.string().max(10000).nullable().optional(),
+  title: z
+    .string()
+    .min(1, "Title is required")
+    .max(TODO_TITLE_MAX, "Title is too long"),
+  notes: z
+    .string()
+    .max(TODO_NOTES_MAX, "Notes are too long")
+    .nullable()
+    .optional(),
   dueDate: z.coerce.date().nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   // Parent todo id when creating a subtask; omit/null for a top-level todo.
@@ -32,8 +40,12 @@ export const createTodoSchema = z.object({
 });
 
 export const updateTodoSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
-  notes: z.string().max(10000).nullable().optional(),
+  title: z.string().min(1).max(TODO_TITLE_MAX, "Title is too long").optional(),
+  notes: z
+    .string()
+    .max(TODO_NOTES_MAX, "Notes are too long")
+    .nullable()
+    .optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),
   dueDate: z.coerce.date().nullable().optional(),

@@ -237,7 +237,6 @@ describe("Link processing", () => {
 
       expect(await applyLinkTitle(db, id)).toBe("Right one");
     });
-
   });
 
   describe("failed fetches", () => {

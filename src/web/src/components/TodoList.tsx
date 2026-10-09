@@ -17,7 +17,6 @@ import {
   Link2,
   ListTree,
   Pin,
-  PinOff,
   RefreshCw,
   Repeat,
   Trash2,
@@ -26,11 +25,13 @@ import type { ReactNode } from "react";
 import { InlineDueDate } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
+import { useCompletionHold } from "@/hooks/useCompletionHold";
 import { useHints } from "@/hooks/useHints";
-import type {
-  useCreateTodo,
-  useDeleteTodo,
-  useUpdateTodo,
+import {
+  type useCreateTodo,
+  type useDeleteTodo,
+  usePendingTodoIds,
+  type useUpdateTodo,
 } from "@/hooks/useTodos";
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
@@ -73,6 +74,12 @@ interface TodoItemProps {
   onInlineUpdate: (id: string, updates: UpdateTodoInput) => void;
   updatePending: boolean;
   deletePending: boolean;
+  /**
+   * Just checked off and briefly held in place so the check and strike-through
+   * register before the row moves to Completed. Visual only — the row keeps
+   * its active layout so nothing reflows during the hold.
+   */
+  isCompleting?: boolean;
 }
 
 interface ExpandedSectionProps {
@@ -126,8 +133,8 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         <span
           className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
             isOverdue
-              ? "bg-red-base hover:bg-red-hover active:bg-red-active text-red-muted"
-              : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
+              ? "bg-red-base text-red-muted"
+              : "bg-gray-base text-gray-muted"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
@@ -135,7 +142,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         </span>
       )}
       {todo.recurrence && (
-        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted">
+        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base text-gray-muted">
           <Repeat size={10} />
           {recurrenceLabel(todo.recurrence, dueDate, timeZone)}
         </span>
@@ -219,10 +226,10 @@ function InlineIndicators({
         className={
           sticky
             ? "text-gray hover:bg-gray-base"
-            : "text-gray-muted hover:bg-gray-base sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            : "text-gray-muted hover:bg-gray-base pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
         }
       >
-        {sticky ? <Pin size={14} /> : <PinOff size={14} />}
+        <Pin size={14} className={sticky ? "fill-current" : ""} />
       </Button>
     </div>
   );
@@ -238,6 +245,7 @@ function TodoItemContent({
   onInlineUpdate,
   updatePending,
   deletePending,
+  isCompleting = false,
   showActions = true,
 }: TodoItemProps & { showActions?: boolean }) {
   const { timeZone } = useHints();
@@ -356,11 +364,14 @@ function TodoItemContent({
   );
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div
+      data-todo-row
+      className="flex flex-col gap-1.5 transition-[opacity,translate] duration-200 ease-out-strong"
+    >
       <div className="flex items-start gap-3">
         <div className="mt-[3px]">
           <Checkbox
-            checked={isCompleted}
+            checked={isCompleted || isCompleting}
             onCheckedChange={() => onToggle(todo.id, isCompleted)}
             disabled={updatePending}
             variant={isCompleted ? "subtle" : "default"}
@@ -372,7 +383,15 @@ function TodoItemContent({
             }
           />
         </div>
-        <div className="flex-1 min-w-0">
+        <div
+          // A pill that's always showing (pinned / repeating) would sit over
+          // the end of a long title, so reserve its width. The hover-only
+          // pill overlays instead — reserving for it would reflow the title
+          // on every hover.
+          className={`min-w-0 flex-1 ${
+            showActions && hasVisiblePillState ? "sm:pointer-fine:pr-24" : ""
+          }`}
+        >
           <div className="space-y-1">
             <div>
               {(() => {
@@ -382,10 +401,12 @@ function TodoItemContent({
                 if (strippedTitle.length > 0 || previewTitle) {
                   return (
                     <p
-                      className={`inline leading-snug wrap-anywhere ${
+                      className={`inline leading-snug wrap-anywhere transition-colors duration-200 ${
                         isCompleted
                           ? "text-sm line-through text-gray-placeholder"
-                          : "text-[15px] font-semibold text-gray"
+                          : isCompleting
+                            ? "text-[15px] font-semibold line-through text-gray-placeholder"
+                            : "text-[15px] font-semibold text-gray"
                       }`}
                     >
                       {strippedTitle.length > 0 ? (
@@ -398,10 +419,12 @@ function TodoItemContent({
                 }
                 return (
                   <p
-                    className={`inline leading-snug wrap-anywhere text-[15px] ${
+                    className={`inline leading-snug wrap-anywhere text-[15px] transition-colors duration-200 ${
                       isCompleted
                         ? "text-sm line-through text-gray-placeholder"
-                        : "text-gray-muted"
+                        : isCompleting
+                          ? "line-through text-gray-placeholder"
+                          : "text-gray-muted"
                     }`}
                   >
                     <LinkifiedText text={todo.title} />
@@ -485,11 +508,11 @@ function TodoItemContent({
       {/* Desktop: actions float as a pill over the row instead of reserving
           their own line — it stays put when it's carrying real state (due
           date, recurrence, pin) and is otherwise a hover/focus affordance.
-          Touch has no hover, so mobile gets its own always-visible row
-          below instead of this floating pill. */}
+          Gated on a fine pointer as well as width: a tablet is wide enough
+          for this layout but can't hover to reveal it. */}
       {showActions && (
         <div
-          className={`absolute right-1 top-1 z-10 hidden items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity sm:flex ${
+          className={`absolute right-1 top-1 z-10 hidden items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity sm:pointer-fine:flex ${
             hasVisiblePillState
               ? "opacity-100"
               : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
@@ -498,10 +521,13 @@ function TodoItemContent({
           {rowActions}
         </div>
       )}
-      {/* Touch: same actions as the desktop pill, always visible as a row
-          below the content instead of a hover-revealed overlay. */}
+      {/* Touch (or narrow): same actions as the desktop pill, always visible
+          as a row below the content instead of a hover-revealed overlay, and
+          sized up to finger-friendly targets on a coarse pointer. */}
       {showActions && (
-        <div className="flex items-center gap-0.5 sm:hidden">{rowActions}</div>
+        <div className="flex items-center gap-0.5 sm:pointer-fine:hidden pointer-coarse:gap-1 pointer-coarse:[&_button]:size-9">
+          {rowActions}
+        </div>
       )}
     </div>
   );
@@ -575,16 +601,9 @@ function GhostRowContent(props: TodoItemProps) {
  */
 function RowGhost({
   children,
-  variant = "target",
   ring = false,
 }: {
   children: ReactNode;
-  /**
-   * `target` is the slot the row will land in — brand-tinted, with the
-   * insertion line. `origin` is the space it vacated in a column it's on its
-   * way out of: neutral, and without a line, since nothing lands there.
-   */
-  variant?: "target" | "origin";
   /** Keyboard drags get a stronger outline — there's no pointer to follow. */
   ring?: boolean;
 }) {
@@ -595,42 +614,27 @@ function RowGhost({
       </div>
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 rounded-lg border border-dashed ${
-          variant === "target"
-            ? "border-accent-strong bg-accent-base/60"
-            : "border-gray-strong bg-gray-base/40"
-        } ${ring ? "ring-2 ring-accent-strong" : ""}`}
+        className={`pointer-events-none absolute inset-0 rounded-lg border border-dashed border-accent-strong bg-accent-base/60 ${
+          ring ? "ring-2 ring-accent-strong" : ""
+        }`}
       >
-        {variant === "target" && (
-          <span className="absolute inset-x-0 -top-px h-0.5 rounded-full bg-accent-solid" />
-        )}
+        <span className="absolute inset-x-0 -top-px h-0.5 rounded-full bg-accent-solid" />
       </span>
     </>
   );
 }
 
-/**
- * A standalone stand-in for a row that isn't in this column yet: the slot a
- * cross-column drag will land in. `SortableTodoItem` draws the same thing
- * inside the row the drag lifted, so both columns show the same shape.
- */
-export function TodoRowGhost(props: TodoItemProps) {
-  return (
-    <div className="relative rounded-lg py-3">
-      <RowGhost>
-        <GhostRowContent {...props} />
-      </RowGhost>
-    </div>
-  );
-}
+// Rows making room for a drag slide rather than snap, using the same strong
+// ease-out as the rest of the board's motion.
+const SORT_TRANSITION = {
+  duration: 200,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+};
+const SORT_TRANSITION_CSS = `transform ${SORT_TRANSITION.duration}ms ${SORT_TRANSITION.easing}`;
 
 function SortableTodoItem(
   props: TodoItemProps & {
     isKeyboardDragging: boolean;
-    /** True while this row is being dragged toward a different list — its
-     * stand-in stays put and goes neutral, because the slot it's headed for is
-     * shown in that other column instead. */
-    isLeavingList: boolean;
     onUpdateExpanded: (updates: {
       title?: string;
       notes?: string | null;
@@ -649,12 +653,17 @@ function SortableTodoItem(
     over,
     overIndex,
     rect,
-  } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
+    transition,
+  } = useSortable({
+    id: props.todo.id,
+    disabled: props.isExpanded,
+    transition: SORT_TRANSITION,
+  });
 
-  // Rows reflow to open a gap at the target so it's clear where the item lands.
-  // No transition — rows (and the placeholder) snap into place instead of
-  // sliding, which is what kept the drop cue from feeling static. Translate
-  // only, no scaleY, so variable-height rows never squish or stretch.
+  // Rows reflow to open a gap at the target so it's clear where the item lands,
+  // sliding with a short ease-out (SORT_TRANSITION) so the eye can follow
+  // which rows moved. Translate only, no scaleY, so variable-height rows never
+  // squish or stretch.
   //
   // The dragged row never follows the pointer — a DragOverlay (rendered in
   // TodoGrid) does that, so the moving card isn't clipped by the column's
@@ -672,7 +681,7 @@ function SortableTodoItem(
   // with a DragOverlay mounted it describes the floating overlay instead.)
   const draggedRect = rect.current;
   const gapShift = (() => {
-    if (!isDragging || props.isLeavingList) return 0;
+    if (!isDragging) return 0;
     if (!over || !draggedRect || overIndex === -1) return 0;
     if (overIndex === activeIndex) return 0;
     return overIndex > activeIndex
@@ -688,13 +697,15 @@ function SortableTodoItem(
         ? `translate3d(0, ${gapShift}px, 0)`
         : undefined
       : CSS.Translate.toString(transform),
+    // The stand-in glides into each new gap alongside the rows making room.
+    transition: isDragging ? SORT_TRANSITION_CSS : (transition ?? undefined),
   };
 
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative rounded-lg py-3 transition-colors duration-1000 ease-out ${
+      className={`group relative rounded-lg py-3 transition-colors duration-200 ease-out ${
         // Stays visually selected while its side panel is open, for context.
         !isDragging && props.isExpanded ? "bg-gray-base" : ""
       }`}
@@ -712,10 +723,7 @@ function SortableTodoItem(
         // the drag from it via document-level listeners — unmounting it
         // would drop focus to <body> for the rest of the drag.
         <>
-          <RowGhost
-            variant={props.isLeavingList ? "origin" : "target"}
-            ring={props.isKeyboardDragging && !props.isLeavingList}
-          >
+          <RowGhost ring={props.isKeyboardDragging}>
             <GhostRowContent {...props} />
           </RowGhost>
           <button
@@ -733,11 +741,12 @@ function SortableTodoItem(
         <div className="flex items-start">
           {/* Reorder grip: inline on mobile; on desktop it hangs off the left
               edge (out of the row's flow) so checkboxes sit flush with the
-              column title, per the design. Hover-revealed either way. */}
+              column title, per the design. Hover-revealed only where the
+              pointer can hover; always visible on touch. */}
           <button
             type="button"
             disabled={props.isExpanded}
-            className={`${GRIP_BOX_CLASS} cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+            className={`relative ${GRIP_BOX_CLASS} before:absolute before:content-[''] before:-inset-y-2.5 before:-left-2.5 before:-right-1 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
             aria-label={`Reorder "${props.todo.title}"`}
             {...attributes}
             {...listeners}
@@ -873,15 +882,6 @@ export interface TodoListColumnProps {
   isKeyboardDragging: boolean;
   /** Mid-drag optimistic order override for this list, or null to use the derived order. */
   localIncompleteTodos: TodoWithUrls[] | null;
-  /**
-   * Set only on the column a cross-list drag is currently over: where the
-   * dragged row will land (an index into this column's displayed order) and
-   * the stand-in to show there — a `TodoRowGhost` built by TodoGrid, which is
-   * the only place that knows which row is being dragged.
-   */
-  crossListDrop: { index: number; ghost: ReactNode } | null;
-  /** True while one of *this* list's rows is being dragged toward another list. */
-  isLeavingList: boolean;
 }
 
 /**
@@ -906,8 +906,6 @@ export function TodoListColumn({
   timeZone,
   isKeyboardDragging,
   localIncompleteTodos,
-  crossListDrop,
-  isLeavingList,
 }: TodoListColumnProps) {
   // Registers the whole column as a drop target so a drag can land in empty
   // space (an empty list, or below the last row) and still resolve to this
@@ -915,20 +913,15 @@ export function TodoListColumn({
   const { setNodeRef: setColumnDropRef } = useDroppable({
     id: `column-${listId}`,
   });
-
-  if (todos.length === 0) {
-    // Fills the column so a cross-list drag can drop anywhere in the empty
-    // space, not just a sliver under the title.
-    return (
-      <div ref={setColumnDropRef} className="h-full min-h-24">
-        {crossListDrop?.ghost}
-      </div>
-    );
-  }
+  const pending = usePendingTodoIds();
+  const completing = useCompletionHold();
 
   const handleToggle = (id: string, completed: boolean) => {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
+    // A second press during the completion hold is an undo: cancel it before
+    // anything was sent.
+    if (completing.cancel(id)) return;
     if (completed) {
       // Undo a repeat that's checked via completedAt (stamped, not persistently
       // done). Always clear the stamp so it can never stay stuck as completed —
@@ -958,7 +951,9 @@ export function TodoListColumn({
         input: { completed: false, position: newPosition },
       });
     } else {
-      updateTodo.mutate({ id, input: { completed: true } });
+      completing.start(id, () =>
+        updateTodo.mutate({ id, input: { completed: true } }),
+      );
     }
   };
 
@@ -1015,8 +1010,9 @@ export function TodoListColumn({
     onDelete: onRequestDelete,
     onToggleExpand,
     onInlineUpdate: handleInlineUpdate,
-    updatePending: updateTodo.isPending,
-    deletePending: deleteTodo.isPending,
+    updatePending: pending.updating.has(todo.id),
+    deletePending: pending.deleting.has(todo.id),
+    isCompleting: completing.ids.has(todo.id),
   });
 
   const rows: ReactNode[] = displayIncompleteTodos.map((todo) => (
@@ -1024,21 +1020,15 @@ export function TodoListColumn({
       key={todo.id}
       {...sharedProps(todo)}
       isKeyboardDragging={isKeyboardDragging}
-      isLeavingList={isLeavingList}
       onUpdateExpanded={handleUpdateExpanded(todo.id)}
       subtaskHandlers={subtaskHandlers}
     />
   ));
 
-  // A cross-list drag lands at the top of its own tier here (see
-  // TodoGrid.handleDragEnd), so the stand-in goes in at that index rather than
-  // under the pointer — it shows where the row will actually end up.
-  if (crossListDrop) {
-    rows.splice(crossListDrop.index, 0, crossListDrop.ghost);
-  }
-
   return (
-    <div ref={setColumnDropRef}>
+    // Fills the column so a cross-list drag can drop anywhere in it — an empty
+    // list, or the space below the last row — not just onto a row.
+    <div ref={setColumnDropRef} className="h-full min-h-24">
       <SortableContext
         id={`list:${listId}`}
         items={displayIncompleteTodos.map((t) => t.id)}
@@ -1061,8 +1051,6 @@ export interface CompletedColumnProps {
   expandedId: string | null;
   onToggleExpand: (id: string) => void;
   onRequestDelete: (id: string) => void;
-  updateTodo: ReturnType<typeof useUpdateTodo>;
-  deleteTodo: ReturnType<typeof useDeleteTodo>;
   /** Un-completes a todo, restoring it to the end of its own list's
    * incomplete order (or rolling back a stamped recurrence) — the same
    * logic the old per-list accordion used, now computed once at the grid
@@ -1088,13 +1076,12 @@ export function CompletedColumn({
   expandedId,
   onToggleExpand,
   onRequestDelete,
-  updateTodo,
-  deleteTodo,
   onUncomplete,
   collapsed,
   onToggleCollapsed,
   known,
 }: CompletedColumnProps) {
+  const pending = usePendingTodoIds();
   const subtasksByParent = new Map<string, TodoWithUrls[]>();
   for (const t of allTodos) {
     if (t.parentId) {
@@ -1133,35 +1120,47 @@ export function CompletedColumn({
             : "Hide completed"}
         </span>
       </button>
-      {!collapsed &&
-        completedTodos.map((todo) => (
-          <div
-            key={todo.id}
-            className={`group rounded-lg py-2 ${
-              expandedId === todo.id ? "bg-gray-base" : ""
-            }`}
-          >
-            <div className="flex items-start gap-2">
-              {/* Mobile-only spacer matching the active rows' inline grip
-                  width; on desktop the grip hangs in the margin, so
-                  completed rows are already flush. */}
-              <div className="w-4 shrink-0 sm:hidden" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <TodoItemContent
-                  todo={todo}
-                  subtasks={subtasksByParent.get(todo.id) ?? []}
-                  isExpanded={expandedId === todo.id}
-                  onToggle={() => onUncomplete(todo)}
-                  onDelete={onRequestDelete}
-                  onToggleExpand={onToggleExpand}
-                  onInlineUpdate={() => {}}
-                  updatePending={updateTodo.isPending}
-                  deletePending={deleteTodo.isPending}
-                />
+      {/* Always mounted so it can animate open and closed; `inert` keeps the
+          collapsed rows out of the tab order and away from screen readers. */}
+      <div
+        inert={collapsed}
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out-strong ${
+          collapsed
+            ? "grid-rows-[0fr] opacity-0"
+            : "grid-rows-[1fr] opacity-100"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          {completedTodos.map((todo) => (
+            <div
+              key={todo.id}
+              className={`group rounded-lg py-2 ${
+                expandedId === todo.id ? "bg-gray-base" : ""
+              }`}
+            >
+              <div className="flex items-start gap-1.5">
+                {/* Mobile-only spacer matching the active rows' inline grip
+                      width; on desktop the grip hangs in the margin, so
+                      completed rows are already flush. */}
+                <div className="w-5 shrink-0 sm:hidden" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <TodoItemContent
+                    todo={todo}
+                    subtasks={subtasksByParent.get(todo.id) ?? []}
+                    isExpanded={expandedId === todo.id}
+                    onToggle={() => onUncomplete(todo)}
+                    onDelete={onRequestDelete}
+                    onToggleExpand={onToggleExpand}
+                    onInlineUpdate={() => {}}
+                    updatePending={pending.updating.has(todo.id)}
+                    deletePending={pending.deleting.has(todo.id)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

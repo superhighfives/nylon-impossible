@@ -62,14 +62,11 @@ describe("Admin endpoints", () => {
       await seedUser("admin_test_1", "admin@example.com");
       await seedUser("target_user", "target@example.com", { plan: "free" });
 
-      const res = await SELF.fetch(
-        "http://localhost/admin/users/target_user",
-        {
-          method: "PATCH",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: "pro" }),
-        },
-      );
+      const res = await SELF.fetch("http://localhost/admin/users/target_user", {
+        method: "PATCH",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro" }),
+      });
       expect(res.status).toBe(200);
 
       const db = getDb(env.DB);
@@ -88,14 +85,11 @@ describe("Admin endpoints", () => {
         location: "Los Angeles, CA",
       });
 
-      const res = await SELF.fetch(
-        "http://localhost/admin/users/target_user",
-        {
-          method: "PATCH",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({ plan: "pro", location: null }),
-        },
-      );
+      const res = await SELF.fetch("http://localhost/admin/users/target_user", {
+        method: "PATCH",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: "pro", location: null }),
+      });
       expect(res.status).toBe(200);
       const body = await res.json<{
         plan: string;
@@ -118,14 +112,11 @@ describe("Admin endpoints", () => {
       await seedUser("admin_test_1", "admin@example.com");
       await seedUser("target_user", "target@example.com");
 
-      const res = await SELF.fetch(
-        "http://localhost/admin/users/target_user",
-        {
-          method: "PATCH",
-          headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-          body: JSON.stringify({}),
-        },
-      );
+      const res = await SELF.fetch("http://localhost/admin/users/target_user", {
+        method: "PATCH",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
       expect(res.status).toBe(400);
     });
 

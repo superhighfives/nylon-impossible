@@ -154,8 +154,8 @@ src/api/
 ├── test/
 │   ├── helpers.ts                # Test utilities (seed, auth mock)
 │   ├── apply-migrations.ts       # D1 migration setup for tests
-│   ├── __mocks__/                # Per-module mocks (ai, clerk-backend, url-metadata)
-│   ├── unit/                     # Pure-logic tests (ai, auth, errors, url-helpers, ...)
+│   ├── __mocks__/                # Per-module mocks (clerk-backend, url-metadata)
+│   ├── unit/                     # Pure-logic tests (auth, errors, url-helpers, ...)
 │   └── integration/              # Tests against real D1 + Workers runtime
 ├── drizzle.config.ts             # Drizzle Kit config
 ├── vitest.config.ts              # Vitest with Workers pool config

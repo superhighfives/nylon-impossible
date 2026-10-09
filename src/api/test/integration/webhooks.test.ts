@@ -67,7 +67,10 @@ describe("Clerk webhook", () => {
   });
 
   it("rejects missing signature with 401", async () => {
-    const res = await postWebhook(JSON.stringify({ type: "user.deleted" }), null);
+    const res = await postWebhook(
+      JSON.stringify({ type: "user.deleted" }),
+      null,
+    );
     expect(res.status).toBe(401);
   });
 

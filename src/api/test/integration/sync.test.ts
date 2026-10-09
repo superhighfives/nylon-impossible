@@ -573,9 +573,7 @@ describe("Sync endpoint", () => {
         ],
       });
       expect(res.status).toBe(404);
-      expect((await res.json<{ code: string }>()).code).toBe(
-        "list_not_found",
-      );
+      expect((await res.json<{ code: string }>()).code).toBe("list_not_found");
 
       const db = getDb(env.DB);
       const [stored] = await db
@@ -609,9 +607,7 @@ describe("Sync endpoint", () => {
         ],
       });
       expect(res.status).toBe(404);
-      expect((await res.json<{ code: string }>()).code).toBe(
-        "list_not_found",
-      );
+      expect((await res.json<{ code: string }>()).code).toBe("list_not_found");
 
       const db = getDb(env.DB);
       const [stored] = await db
@@ -621,7 +617,6 @@ describe("Sync endpoint", () => {
       expect(stored.listId).toBe(created?.listId);
     });
   });
-
 });
 
 describe("Sync — subtasks", () => {
@@ -778,7 +773,10 @@ describe("Sync — subtasks", () => {
   });
 
   it("reopens subtasks when the parent is unchecked", async () => {
-    await seedTodo(PARENT, "user_test_123", { title: "Parent", completed: true });
+    await seedTodo(PARENT, "user_test_123", {
+      title: "Parent",
+      completed: true,
+    });
     await seedTodo(CHILD_A, "user_test_123", {
       parentId: PARENT,
       completed: true,

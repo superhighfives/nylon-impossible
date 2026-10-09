@@ -68,7 +68,13 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
         recurrence: { frequency: "daily" },
       });
 
-      const updated = await setTodoCompleted(getDb(env.DB), env, USER, id, true);
+      const updated = await setTodoCompleted(
+        getDb(env.DB),
+        env,
+        USER,
+        id,
+        true,
+      );
       expect(updated).not.toBeNull();
       // Recurrence completion doesn't persist as done; it advances the date.
       expect(updated?.completed).toBe(false);
@@ -161,7 +167,10 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
       });
 
       const db = getDb(env.DB);
-      const [childRow] = await db.select().from(todos).where(eq(todos.id, child));
+      const [childRow] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.id, child));
       expect(childRow.completed).toBe(true);
     });
   });

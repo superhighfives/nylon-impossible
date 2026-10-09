@@ -51,16 +51,19 @@ export function Checkbox({
         checked={checked}
         indeterminate={indeterminate}
         className={`
-          h-5 w-5 shrink-0 rounded-md border-2 border-gray-12 dark:border-graydark-12 bg-transparent cursor-pointer
+          relative before:absolute before:content-[''] before:-inset-2 h-5 w-5 shrink-0 rounded-md border-2 border-gray-12 dark:border-graydark-12 bg-transparent cursor-pointer
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 ${RING_OFFSET[ringOffset]}
           disabled:cursor-not-allowed disabled:opacity-50
           ${checkedStyle}
-          transition-colors
+          transition-[color,background-color,border-color,scale] duration-150 active:scale-[0.92]
           ${className ?? ""}
         `}
         {...props}
       >
-        <BaseCheckbox.Indicator className="flex items-center justify-center text-current">
+        <BaseCheckbox.Indicator
+          keepMounted
+          className="flex items-center justify-center text-current transition-[opacity,scale,filter] duration-200 ease-out-strong data-unchecked:scale-50 data-unchecked:opacity-0 data-unchecked:blur-[2px]"
+        >
           {indeterminate ? (
             <Minus className="h-3 w-3" />
           ) : (

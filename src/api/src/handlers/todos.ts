@@ -1,3 +1,4 @@
+import { TODO_TITLE_MAX } from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
@@ -16,12 +17,12 @@ const recurrenceSchema = z.object({
 // Validation schemas
 const createTodoSchema = z.object({
   id: z.string().uuid().optional(),
-  title: z.string().min(1).max(500),
+  title: z.string().min(1).max(TODO_TITLE_MAX),
   listId: listIdSchema.optional(),
 });
 
 const updateTodoSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
+  title: z.string().min(1).max(TODO_TITLE_MAX).optional(),
   notes: z.string().nullable().optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),

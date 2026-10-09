@@ -72,21 +72,25 @@ describe("TodoItemExpanded", () => {
     const { onUpdate } = renderExpanded({
       dueDate: "2026-05-01T00:00:00.000Z",
     });
-    const input = screen.getByLabelText("Due date") as HTMLInputElement;
-    expect(input.value).toBe("2026-05-01");
+    const picker = screen.getByLabelText("Due date");
+    expect(picker).toHaveTextContent("2026");
 
     fireEvent.click(screen.getByRole("button", { name: /clear due date/i }));
-    expect(input.value).toBe("");
+    expect(picker).toHaveTextContent("No due date");
     expect(onUpdate).toHaveBeenCalledWith({ dueDate: null });
   });
 
-  it("auto-saves a due-date change immediately", () => {
-    const { onUpdate } = renderExpanded();
-    fireEvent.change(screen.getByLabelText("Due date"), {
-      target: { value: "2026-05-01" },
+  it("auto-saves a due date picked from the calendar", async () => {
+    const { onUpdate } = renderExpanded({
+      dueDate: "2026-05-01T00:00:00.000Z",
     });
+    fireEvent.click(screen.getByLabelText("Due date"));
+    fireEvent.click(await screen.findByRole("button", { name: "2026-05-14" }));
     expect(onUpdate).toHaveBeenCalledTimes(1);
     expect(onUpdate.mock.calls[0][0].dueDate).toBeInstanceOf(Date);
+    expect(onUpdate.mock.calls[0][0].dueDate.toISOString()).toContain(
+      "2026-05-14",
+    );
   });
 
   function urlFixture(overrides: Partial<TodoWithUrls["urls"][number]> = {}) {

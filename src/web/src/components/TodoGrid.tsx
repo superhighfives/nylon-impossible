@@ -6,11 +6,16 @@ import {
   type DragOverEvent,
   DragOverlay,
   type DragStartEvent,
+  type DropAnimation,
+  defaultDropAnimationSideEffects,
+  getFirstCollision,
   type KeyboardCoordinateGetter,
   KeyboardSensor,
+  MeasuringStrategy,
   type Modifier,
   PointerSensor,
   pointerWithin,
+  rectIntersection,
   TouchSensor,
   useSensor,
   useSensors,
@@ -23,6 +28,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { splitTodoText } from "@nylon-impossible/shared";
 import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
@@ -41,7 +47,6 @@ import {
   ExpandedSection,
   getIncompleteOrder,
   TodoListColumn,
-  TodoRowGhost,
   TodoRowPreview,
   TodoSkeleton,
 } from "@/components/TodoList";
@@ -60,6 +65,7 @@ import {
   useUpdateTodo,
 } from "@/hooks/useTodos";
 import { useUser } from "@/hooks/useUser";
+import { insertInTier, positionAt } from "@/lib/dragOrder";
 import { messageFromError, toast } from "@/lib/toast";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
 import type {
@@ -69,86 +75,97 @@ import type {
 } from "@/types/database";
 import { Button, ConfirmDialog, focusRing, Input, SidePanel } from "./ui";
 
-// Keyboard reorder only ever moves up/down (see `verticalKeyboardCoordinates`
-// below), so it's always locked to vertical. Pointer/touch drags used to be
-// locked unconditionally too, which silently broke cross-list drag: the
-// collision rect never left the source column's x position, so `over` could
-// never resolve to a todo or column in a different list. A small dead zone
-// (a few px of incidental horizontal jitter from an imperfectly-vertical
-// mouse/finger movement) keeps ordinary in-column reordering feeling
-// vertical-only; past that, the transform follows the pointer's real x so
-// the item can visibly travel into — and register a drop against — another
-// column.
 const HORIZONTAL_DRAG_DEAD_ZONE = 12;
 
-const restrictToVerticalAxisForKeyboard =
+// Pointer drags ignore a few px of incidental sideways jitter so ordinary
+// in-column reordering feels vertical-only; past that the overlay follows the
+// pointer so it can travel into another column. Keyboard drags are left
+// alone — their coordinates come from `boardKeyboardCoordinates`, which keeps
+// x fixed for up/down and jumps it for left/right.
+const pointerDeadZone =
   (isKeyboardDragging: boolean): Modifier =>
   ({ transform }) => {
-    if (isKeyboardDragging) return { ...transform, x: 0 };
+    if (isKeyboardDragging) return transform;
     if (Math.abs(transform.x) < HORIZONTAL_DRAG_DEAD_ZONE) {
       return { ...transform, x: 0 };
     }
     return transform;
   };
 
-// Multi-container drag needs a collision strategy that can tell a column
-// drop zone from a row drop zone reliably. `pointerWithin` — is the pointer
-// actually over this rect? — gets that right for pointer/touch drags;
-// `closestCenter` is the fallback for keyboard drags, which have no pointer
-// position to test against.
-//
-// Row-level precision only applies within the dragged item's own list —
-// crossing into a different list is a coarse, whole-column drop (it always
-// lands at the top of its tier there; see handleDragEnd). So hits against
-// individual rows belonging to a *different* list are filtered out here,
-// leaving only same-list rows (fine-grained reorder) and column droppables
-// (`column-*`, coarse cross-list move) as valid targets.
-const makeItemCollisionDetection = (
-  listIdByTodoId: Map<string, string>,
-): CollisionDetection => {
-  const isValidHit = (id: string, sourceListId: string | undefined) =>
-    id.startsWith("column-") ||
-    !listIdByTodoId.has(id) ||
-    listIdByTodoId.get(id) === sourceListId;
-
-  return (args) => {
-    const sourceListId = listIdByTodoId.get(args.active.id as string);
-    const hits = pointerWithin(args).filter((hit) =>
-      isValidHit(hit.id as string, sourceListId),
-    );
-    if (hits.length > 0) return hits;
-    return closestCenter(args).filter((hit) =>
-      isValidHit(hit.id as string, sourceListId),
-    );
-  };
+// Rows move between columns mid-drag, so droppable rects must be re-measured
+// continuously rather than once at drag start.
+const DROPPABLE_MEASURING = {
+  droppable: { strategy: MeasuringStrategy.Always },
 };
 
-const verticalKeyboardCoordinates: KeyboardCoordinateGetter = (
+// The overlay settles into the row's slot with the same strong ease-out used
+// elsewhere, rather than dnd-kit's default linear-ish curve.
+const DROP_ANIMATION: DropAnimation = {
+  duration: 220,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.4" } },
+  }),
+};
+
+// Each list column registers itself as a droppable under this prefix, so a
+// drag can resolve to a list even when it's over empty space rather than a row.
+const COLUMN_DROP_PREFIX = "column-";
+
+// Keyboard drags: up/down step to the next row in the same column; left/right
+// jump to the neighbouring list's column at the same height, where
+// handleDragOver moves the row in just as it would for a pointer drag.
+const boardKeyboardCoordinates: KeyboardCoordinateGetter = (
   event,
   { context: { active, collisionRect, droppableContainers } },
 ) => {
-  if (event.code !== "ArrowDown" && event.code !== "ArrowUp") return undefined;
-  if (!active || !collisionRect) return undefined;
+  const horizontal = event.code === "ArrowLeft" || event.code === "ArrowRight";
+  const vertical = event.code === "ArrowDown" || event.code === "ArrowUp";
+  if ((!horizontal && !vertical) || !active || !collisionRect) return undefined;
   event.preventDefault();
 
-  const activeTop = collisionRect.top;
-  const others: DOMRect[] = [];
+  const rows: DOMRect[] = [];
+  const columns: DOMRect[] = [];
   for (const container of droppableContainers.getEnabled()) {
     if (!container || container.disabled || container.id === active.id)
       continue;
-    const node = container.node.current;
-    if (node) others.push(node.getBoundingClientRect());
+    const rect = container.node.current?.getBoundingClientRect();
+    if (!rect) continue;
+    if (String(container.id).startsWith(COLUMN_DROP_PREFIX)) columns.push(rect);
+    else rows.push(rect);
   }
 
+  if (horizontal) {
+    const centerX = collisionRect.left + collisionRect.width / 2;
+    const toRight = event.code === "ArrowRight";
+    const column = columns
+      .filter((r) => {
+        const x = r.left + r.width / 2;
+        return toRight ? x > centerX + 1 : x < centerX - 1;
+      })
+      .sort((a, b) => (toRight ? a.left - b.left : b.left - a.left))[0];
+    if (!column) return undefined;
+    const maxTop = Math.max(column.top, column.bottom - collisionRect.height);
+    return {
+      x: column.left + (column.width - collisionRect.width) / 2,
+      y: Math.min(Math.max(collisionRect.top, column.top), maxTop),
+    };
+  }
+
+  // Only rows in the same column — ones that overlap horizontally.
+  const sameColumn = rows.filter(
+    (r) => r.right > collisionRect.left && r.left < collisionRect.right,
+  );
+  const activeTop = collisionRect.top;
   if (event.code === "ArrowDown") {
-    const below = others
+    const below = sameColumn
       .filter((r) => r.top > activeTop + 1)
       .sort((a, b) => a.top - b.top)[0];
     if (!below) return undefined;
     return { x: collisionRect.left, y: activeTop + below.height };
   }
 
-  const above = others
+  const above = sameColumn
     .filter((r) => r.top < activeTop - 1)
     .sort((a, b) => b.top - a.top)[0];
   if (!above) return undefined;
@@ -192,11 +209,20 @@ function BoardScaffold({
   children: ReactNode;
   scrollRef?: RefObject<HTMLDivElement | null>;
 }) {
+  // Rows only fade in once the board has painted — otherwise every row would
+  // play its enter animation on page load (see `data-todo-row` in styles.css).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   // overscroll-x-contain stops edge swipes chaining into the page's
   // rubber-band / browser back gesture.
   return (
     <div
       ref={scrollRef}
+      data-board-ready={ready ? "" : undefined}
       className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain md:snap-none"
     >
       <div className="flex h-full min-w-max">
@@ -245,7 +271,8 @@ function NewTodoInline({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const createTodo = useCreateTodo();
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const overflowsToNotes = splitTodoText(title).notes !== null;
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -257,14 +284,17 @@ function NewTodoInline({
   };
 
   const submit = () => {
-    const trimmed = title.trim();
-    if (!trimmed) {
+    if (!title.trim()) {
       close();
       return;
     }
+    // Long pastes (a 2KB URL, a copied paragraph) keep their overflow in
+    // notes instead of failing the 500-char title limit.
+    const { title: todoTitle, notes } = splitTodoText(title);
     createTodo.mutate(
       {
-        title: trimmed,
+        title: todoTitle,
+        notes,
         listId,
         position: generateKeyBetween(null, firstPosition),
       },
@@ -282,7 +312,7 @@ function NewTodoInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder opacity-0 transition-[opacity,color] hover:text-gray-muted focus-visible:opacity-100 group-hover/column:opacity-100 group-focus-within/column:opacity-100 max-sm:opacity-100 ${focusRing}`}
+        className={`mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder transition-[opacity,color] hover:text-gray-muted pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover/column:opacity-100 pointer-fine:group-focus-within/column:opacity-100 ${focusRing}`}
       >
         <span
           aria-hidden="true"
@@ -301,25 +331,40 @@ function NewTodoInline({
         e.preventDefault();
         submit();
       }}
-      className="mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2"
+      className="mb-1 flex min-h-9 w-full items-start gap-3 py-1"
     >
       <span
         aria-hidden="true"
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-gray-strong"
+        className="mt-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 border-dashed border-gray-strong"
       >
         <Plus size={12} />
       </span>
-      <input
-        ref={inputRef}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={() => (title.trim() ? submit() : close())}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") close();
-        }}
-        placeholder="New todo"
-        className="flex-1 rounded-md border-none bg-transparent p-0 text-sm text-gray outline-none placeholder:text-gray-muted focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
-      />
+      <div className="min-w-0 flex-1">
+        {/* Negative margin + matching padding gives the text room inside the
+            focus ring while keeping it flush with the row titles below. */}
+        <textarea
+          ref={inputRef}
+          rows={1}
+          value={title}
+          aria-label="New todo"
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={() => (title.trim() ? submit() : close())}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") close();
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              submit();
+            }
+          }}
+          placeholder="New todo"
+          className="field-sizing-content -mx-2 block max-h-48 w-[calc(100%+1rem)] resize-none rounded-md bg-transparent px-2 py-1 text-[15px] font-semibold leading-snug text-gray outline-none wrap-anywhere placeholder:font-normal placeholder:text-gray-muted focus-visible:ring-2 focus-visible:ring-accent-strong [@supports(-webkit-touch-callout:none)]:!text-base"
+        />
+        {overflowsToNotes && (
+          <p className="mt-1 text-xs text-gray-muted">
+            The rest will be saved to notes.
+          </p>
+        )}
+      </div>
     </form>
   );
 }
@@ -365,7 +410,7 @@ function ListHeader({
         <button
           type="button"
           aria-label={`Reorder "${list.name}"`}
-          className={`cursor-grab touch-none select-none text-gray-muted opacity-0 transition-opacity active:cursor-grabbing group-hover/header:opacity-100 ${focusRing}`}
+          className={`relative cursor-grab touch-none select-none text-gray-muted transition-opacity before:absolute before:content-[''] before:-inset-2.5 active:cursor-grabbing pointer-fine:opacity-0 pointer-fine:group-hover/header:opacity-100 pointer-fine:group-focus-within/header:opacity-100 ${focusRing}`}
           {...attributes}
           {...listeners}
         >
@@ -395,7 +440,7 @@ function ListHeader({
         </h2>
       )}
       {list.kind === "custom" && !renaming && (
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100">
+        <div className="flex items-center gap-0.5 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/header:opacity-100 pointer-fine:group-focus-within/header:opacity-100">
           <Button
             variant="ghost"
             size="xs"
@@ -405,7 +450,7 @@ function ListHeader({
             aria-label={`Rename "${list.name}"`}
             onClick={() => setRenaming(true)}
           >
-            <Pencil size={12} />
+            <Pencil size={14} />
           </Button>
           <Button
             variant="ghost"
@@ -416,7 +461,7 @@ function ListHeader({
             aria-label={`Delete "${list.name}"`}
             onClick={() => setConfirmDelete(true)}
           >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
           </Button>
         </div>
       )}
@@ -529,9 +574,9 @@ function ColumnScroller({
 }: {
   onWheel: (e: WheelEvent<HTMLDivElement>) => void;
   /**
-   * True while a cross-column drag is hovering this column. Frames the rows
-   * area as a drop zone — the coarse target a cross-list drop actually
-   * resolves against, rather than any one row inside it.
+   * True while a cross-column drag has carried a row into this column. A
+   * quiet tint marks the destination list; the row's own dashed slot shows
+   * exactly where it will land.
    */
   isDropZone?: boolean;
   children: ReactNode;
@@ -571,7 +616,7 @@ function ColumnScroller({
     <div className="relative isolate min-h-0 flex-1">
       <div
         aria-hidden
-        className={`pointer-events-none absolute -inset-x-2 inset-y-0 -z-10 rounded-2xl border-2 border-dashed border-accent-strong bg-accent-base/60 transition-opacity duration-150 ${
+        className={`pointer-events-none absolute -inset-x-2 inset-y-0 -z-10 rounded-2xl bg-accent-base/25 ring-1 ring-accent-subtle transition-opacity duration-200 ${
           isDropZone ? "opacity-100" : "opacity-0"
         }`}
       />
@@ -636,11 +681,17 @@ export function TodoGrid() {
   const [isKeyboardDragging, setIsKeyboardDragging] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [activeWidth, setActiveWidth] = useState<number | undefined>(undefined);
-  // The list a drag is currently over, tracked so a cross-column drag can show
-  // the target column's drop zone and the slot the row will land in. Same-list
-  // hovers are handled by dnd-kit's own reflow, so this is only *used* when it
-  // differs from the dragged row's own list.
-  const [overListId, setOverListId] = useState<string | null>(null);
+  // The list the dragged row currently sits in. It starts as the row's own
+  // list and changes as the drag crosses columns (handleDragOver moves the row
+  // into the hovered list's local order). Mirrored in a ref because collision
+  // detection and the drag handlers need the latest value between renders.
+  const [dragListId, setDragListId] = useState<string | null>(null);
+  const dragListIdRef = useRef<string | null>(null);
+  // Multiple-containers bookkeeping, as in dnd-kit's own example: the last
+  // resolved drop target, and whether the row just changed lists (so the
+  // collision pass doesn't bounce while the new column's layout settles).
+  const lastOverIdRef = useRef<string | null>(null);
+  const recentlyMovedRef = useRef(false);
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
@@ -674,7 +725,7 @@ export function TodoGrid() {
       activationConstraint: { delay: 200, tolerance: 5 },
     }),
     useSensor(KeyboardSensor, {
-      coordinateGetter: verticalKeyboardCoordinates,
+      coordinateGetter: boardKeyboardCoordinates,
     }),
   );
 
@@ -693,8 +744,21 @@ export function TodoGrid() {
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: todos is intentionally used as a trigger to reset local order when server data refreshes
   useEffect(() => {
+    // Not mid-drag, though: a sync refetch landing then would yank the
+    // dragged row back out of the list it's hovering. handleDragEnd/Cancel
+    // settle the order themselves.
+    if (dragListIdRef.current) return;
     setLocalOrderByList({});
   }, [todos]);
+
+  // Clear the "just changed lists" flag once the new column has laid out.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs after each local order change
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      recentlyMovedRef.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [localOrderByList]);
 
   if (listsLoading || todosLoading) {
     return (
@@ -743,7 +807,6 @@ export function TodoGrid() {
 
   const allTodos = todos ?? [];
   const listIdByTodoId = new Map(allTodos.map((t) => [t.id, t.listId]));
-  const itemCollisionDetection = makeItemCollisionDetection(listIdByTodoId);
 
   const handleRequestDelete = (id: string) => setConfirmDeleteId(id);
   const handleToggleExpand = (id: string) =>
@@ -803,17 +866,35 @@ export function TodoGrid() {
     });
   };
 
+  // The incomplete order a list shows right now: the mid-drag override if
+  // there is one, otherwise derived from the cache.
+  const orderFor = (listId: string): TodoWithUrls[] =>
+    localOrderByList[listId] ??
+    getIncompleteOrder(todosByList.get(listId) ?? [], timeZone);
+
+  const endDrag = () => {
+    setIsKeyboardDragging(false);
+    setActiveId(null);
+    setDragListId(null);
+    dragListIdRef.current = null;
+    lastOverIdRef.current = null;
+  };
+
   const handleDragStart = ({ active, activatorEvent }: DragStartEvent) => {
     setIsKeyboardDragging(activatorEvent instanceof KeyboardEvent);
     setActiveId(active.id as string);
     setActiveWidth(active.rect.current.initial?.width);
-    setOverListId(null);
+    const listId = listIdByTodoId.get(active.id as string) ?? null;
+    setDragListId(listId);
+    dragListIdRef.current = listId;
   };
 
+  // Escape puts everything back: the dragged row may have been moved into
+  // another list's local order on the way, so drop every override and let
+  // the columns re-derive from the cache.
   const handleDragCancel = () => {
-    setIsKeyboardDragging(false);
-    setActiveId(null);
-    setOverListId(null);
+    endDrag();
+    setLocalOrderByList({});
   };
 
   // Column-header reorder — custom lists only, drag the header to move a
@@ -848,113 +929,124 @@ export function TodoGrid() {
     });
   };
 
-  const resolveListIdFromOverId = (overId: string): string | null => {
-    if (overId.startsWith("column-")) return overId.slice("column-".length);
-    const todo = allTodos.find((t) => t.id === overId);
-    return todo?.listId ?? null;
-  };
-
-  const handleDragOver = ({ over }: DragOverEvent) => {
-    setOverListId(over ? resolveListIdFromOverId(over.id as string) : null);
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setIsKeyboardDragging(false);
-    setActiveId(null);
-    setOverListId(null);
-    const { active, over } = event;
-    if (!over) return;
-
-    const draggedItem = allTodos.find((t) => t.id === active.id);
-    if (!draggedItem) return;
-
-    const sourceListId = draggedItem.listId;
-    const targetListId = resolveListIdFromOverId(over.id as string);
-    if (!targetListId) return;
-
-    const sourceListTodos = todosByList.get(sourceListId) ?? [];
-    const sourceOrder =
-      localOrderByList[sourceListId] ??
-      getIncompleteOrder(sourceListTodos, timeZone);
-
-    if (targetListId === sourceListId) {
-      if (active.id === over.id) return;
-      // Same-list: reorder within the sticky/non-sticky tier only, mirroring
-      // the single-list drag behavior.
-      const tierItems = sourceOrder.filter(
-        (t) => t.sticky === draggedItem.sticky,
-      );
-      const oldIndex = tierItems.findIndex((t) => t.id === active.id);
-      if (oldIndex === -1) return;
-      let newIndex = tierItems.findIndex((t) => t.id === over.id);
-      if (newIndex === -1) {
-        const overIndexInAll = sourceOrder.findIndex((t) => t.id === over.id);
-        const oldIndexInAll = sourceOrder.findIndex((t) => t.id === active.id);
-        if (overIndexInAll === -1) return;
-        newIndex = overIndexInAll > oldIndexInAll ? tierItems.length - 1 : 0;
+  // Multiple-containers collision: find what the pointer is over, and if
+  // that's a column with rows in it, resolve to the closest of *those* rows so
+  // the drop lands at a precise index. The last hit is remembered so the
+  // target doesn't flicker to nothing while rows shift under the pointer —
+  // the same approach as dnd-kit's multiple-containers example.
+  const itemCollisionDetection: CollisionDetection = (args) => {
+    const pointerHits = pointerWithin(args);
+    const hits = pointerHits.length > 0 ? pointerHits : rectIntersection(args);
+    let overId = getFirstCollision(hits, "id") as string | null;
+    if (overId != null) {
+      if (overId.startsWith(COLUMN_DROP_PREFIX)) {
+        const rowIds = new Set(
+          orderFor(overId.slice(COLUMN_DROP_PREFIX.length)).map((t) => t.id),
+        );
+        if (rowIds.size > 0) {
+          const closest = closestCenter({
+            ...args,
+            droppableContainers: args.droppableContainers.filter((c) =>
+              rowIds.has(c.id as string),
+            ),
+          });
+          overId = (closest[0]?.id as string | undefined) ?? overId;
+        }
       }
+      lastOverIdRef.current = overId;
+      return [{ id: overId }];
+    }
+    // Just moved into a new list: the layout hasn't settled, so hold on the
+    // dragged row itself rather than snapping back to the old target.
+    if (recentlyMovedRef.current) {
+      lastOverIdRef.current = args.active.id as string;
+    }
+    return lastOverIdRef.current ? [{ id: lastOverIdRef.current }] : [];
+  };
 
-      const reorderedTier = arrayMove(tierItems, oldIndex, newIndex);
-      let tierCursor = 0;
-      const reordered = sourceOrder.map((t) =>
-        t.sticky === draggedItem.sticky ? reorderedTier[tierCursor++] : t,
-      );
-      setLocalOrderByList((prev) => ({ ...prev, [sourceListId]: reordered }));
+  // Crossing into another list moves the dragged row into that list's local
+  // order at the hovered slot, so the target column's own SortableContext
+  // opens a gap there (and keeps sorting it) exactly as it would for one of
+  // its own rows. Same-list hovers are left to dnd-kit's sorting.
+  const handleDragOver = ({ active, over }: DragOverEvent) => {
+    const overId = over?.id as string | undefined;
+    if (!over || !overId || overId === active.id) return;
+    const dragged = allTodos.find((t) => t.id === active.id);
+    if (!dragged) return;
 
-      const prevItem =
-        newIndex > 0 ? reorderedTier[newIndex - 1].position : null;
-      const nextItem =
-        newIndex < reorderedTier.length - 1
-          ? reorderedTier[newIndex + 1].position
-          : null;
-      const newPosition = generateKeyBetween(
-        prevItem ?? null,
-        nextItem ?? null,
-      );
-      updateTodo.mutate({
-        id: active.id as string,
-        input: { position: newPosition },
-      });
+    const fromListId = dragListIdRef.current ?? dragged.listId;
+    const toListId = overId.startsWith(COLUMN_DROP_PREFIX)
+      ? overId.slice(COLUMN_DROP_PREFIX.length)
+      : listIdByTodoId.get(overId);
+    if (!toListId || toListId === fromListId) return;
+
+    const fromItems = orderFor(fromListId).filter((t) => t.id !== dragged.id);
+    const toItems = orderFor(toListId).filter((t) => t.id !== dragged.id);
+    let index = toItems.length;
+    if (!overId.startsWith(COLUMN_DROP_PREFIX)) {
+      const overIndex = toItems.findIndex((t) => t.id === overId);
+      const translated = active.rect.current.translated;
+      const isBelowOver =
+        !!translated &&
+        translated.top + translated.height / 2 >
+          over.rect.top + over.rect.height / 2;
+      if (overIndex !== -1) index = overIndex + (isBelowOver ? 1 : 0);
+    }
+
+    recentlyMovedRef.current = true;
+    dragListIdRef.current = toListId;
+    setDragListId(toListId);
+    setLocalOrderByList((prev) => ({
+      ...prev,
+      [fromListId]: fromItems,
+      [toListId]: insertInTier(toItems, dragged, index),
+    }));
+  };
+
+  // Commits wherever the row ended up — one path for same-list reorders and
+  // cross-list moves, since by now the row already sits in its final list's
+  // local order.
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    const dragged = allTodos.find((t) => t.id === active.id);
+    const listId = dragListIdRef.current ?? dragged?.listId;
+    endDrag();
+    if (!dragged || !listId || !over) {
+      setLocalOrderByList({});
       return;
     }
 
-    // Cross-list: the whole column is the dropzone (collision detection
-    // above never resolves `over` to an individual row in a different list),
-    // so there's no drop-index to honor — the item always lands at the top
-    // of its own tier in the target list, preserving the "pinned always
-    // first" invariant instead of trying to land at an arbitrary row.
-    const targetListTodos = todosByList.get(targetListId) ?? [];
-    const targetOrder =
-      localOrderByList[targetListId] ??
-      getIncompleteOrder(targetListTodos, timeZone);
+    let items = orderFor(listId);
+    const from = items.findIndex((t) => t.id === dragged.id);
+    if (from === -1) {
+      setLocalOrderByList({});
+      return;
+    }
+    const overIndex = items.findIndex((t) => t.id === over.id);
+    if (overIndex !== -1 && overIndex !== from) {
+      const rest = items.filter((t) => t.id !== dragged.id);
+      items = insertInTier(rest, dragged, overIndex);
+    }
+    const index = items.findIndex((t) => t.id === dragged.id);
 
-    const prevItem = draggedItem.sticky
-      ? null
-      : (targetOrder.filter((t) => t.sticky).at(-1) ?? null);
-    const firstOfTier = targetOrder.find(
-      (t) => t.sticky === draggedItem.sticky,
+    const changedList = listId !== dragged.listId;
+    const original = getIncompleteOrder(
+      todosByList.get(dragged.listId) ?? [],
+      timeZone,
     );
-    const newPosition = generateKeyBetween(
-      prevItem?.position ?? null,
-      firstOfTier?.position ?? null,
-    );
-    const insertIndex = draggedItem.sticky
-      ? 0
-      : targetOrder.filter((t) => t.sticky).length;
+    const unchanged =
+      !changedList &&
+      items.length === original.length &&
+      items.every((t, i) => t.id === original[i].id);
+    if (unchanged) {
+      setLocalOrderByList({});
+      return;
+    }
 
-    setLocalOrderByList((prev) => ({
-      ...prev,
-      [sourceListId]: sourceOrder.filter((t) => t.id !== active.id),
-      [targetListId]: [
-        ...targetOrder.slice(0, insertIndex),
-        draggedItem,
-        ...targetOrder.slice(insertIndex),
-      ],
-    }));
-
+    const position = positionAt(items, index);
+    setLocalOrderByList((prev) => ({ ...prev, [listId]: items }));
     updateTodo.mutate({
-      id: active.id as string,
-      input: { listId: targetListId, position: newPosition },
+      id: dragged.id,
+      input: changedList ? { listId, position } : { position },
     });
   };
 
@@ -974,32 +1066,12 @@ export function TodoGrid() {
     ? (allTodos.find((t) => t.id === activeId) ?? null)
     : null;
 
-  // The list a cross-column drag would land in right now, or null while the
-  // drag is still over its own column (dnd-kit's reflow already shows that
-  // case) or over nothing at all.
+  // The list a cross-column drag has carried the row into, or null while it's
+  // still in its own list. Frames that column as the destination.
   const crossListTargetId =
-    activeTodo && overListId && overListId !== activeTodo.listId
-      ? overListId
+    activeTodo && dragListId && dragListId !== activeTodo.listId
+      ? dragListId
       : null;
-
-  // The stand-in the target column shows for a row that isn't in it yet.
-  // Built here because this is the only level that knows which row is being
-  // dragged; it renders the row's own content (hidden) so the slot it marks
-  // out is exactly the size the row will be.
-  const crossListGhost = activeTodo ? (
-    <TodoRowGhost
-      key="cross-list-drop"
-      todo={activeTodo}
-      subtasks={allTodos.filter((t) => t.parentId === activeTodo.id)}
-      isExpanded={false}
-      onToggle={() => {}}
-      onDelete={() => {}}
-      onToggleExpand={() => {}}
-      onInlineUpdate={() => {}}
-      updatePending={false}
-      deletePending={false}
-    />
-  ) : null;
 
   return (
     // Two independent DndContexts: this outer one reorders custom-list
@@ -1019,7 +1091,8 @@ export function TodoGrid() {
         <DndContext
           sensors={sensors}
           collisionDetection={itemCollisionDetection}
-          modifiers={[restrictToVerticalAxisForKeyboard(isKeyboardDragging)]}
+          measuring={DROPPABLE_MEASURING}
+          modifiers={[pointerDeadZone(isKeyboardDragging)]}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
@@ -1034,18 +1107,6 @@ export function TodoGrid() {
                   localOrderByList[list.id] ??
                   getIncompleteOrder(listTodos, timeZone);
                 const isDropZone = crossListTargetId === list.id;
-                // Same slot handleDragEnd will use — top of the dragged row's
-                // own tier — so the stand-in shown here is where it lands, not
-                // wherever the pointer happens to be.
-                const crossListDrop =
-                  isDropZone && activeTodo && crossListGhost
-                    ? {
-                        index: activeTodo.sticky
-                          ? 0
-                          : incompleteOrder.filter((t) => t.sticky).length,
-                        ghost: crossListGhost,
-                      }
-                    : null;
                 return (
                   <section
                     key={list.id}
@@ -1080,11 +1141,6 @@ export function TodoGrid() {
                         timeZone={timeZone}
                         isKeyboardDragging={isKeyboardDragging}
                         localIncompleteTodos={localOrderByList[list.id] ?? null}
-                        crossListDrop={crossListDrop}
-                        isLeavingList={
-                          crossListTargetId !== null &&
-                          activeTodo?.listId === list.id
-                        }
                       />
                     </ColumnScroller>
                   </section>
@@ -1108,8 +1164,6 @@ export function TodoGrid() {
                   expandedId={expandedId}
                   onToggleExpand={handleToggleExpand}
                   onRequestDelete={handleRequestDelete}
-                  updateTodo={updateTodo}
-                  deleteTodo={deleteTodo}
                   onUncomplete={handleUncomplete}
                   collapsed={
                     completedColumnCollapsed ?? user?.hideCompleted ?? false
@@ -1121,7 +1175,8 @@ export function TodoGrid() {
             </section>
           </BoardScaffold>
           <DragOverlay
-            modifiers={[restrictToVerticalAxisForKeyboard(isKeyboardDragging)]}
+            modifiers={[pointerDeadZone(isKeyboardDragging)]}
+            dropAnimation={DROP_ANIMATION}
           >
             {activeTodo && (
               <TodoRowPreview

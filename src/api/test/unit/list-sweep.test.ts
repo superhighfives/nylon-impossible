@@ -42,7 +42,10 @@ describe("isLocalMidnightHour", () => {
 
   it("never sweeps on an invalid/unknown IANA identifier rather than guessing", () => {
     expect(
-      isLocalMidnightHour("Not/A_Real_Timezone", new Date("2026-06-15T00:30:00Z")),
+      isLocalMidnightHour(
+        "Not/A_Real_Timezone",
+        new Date("2026-06-15T00:30:00Z"),
+      ),
     ).toBe(false);
     expect(isLocalMidnightHour("", new Date("2026-06-15T00:30:00Z"))).toBe(
       false,

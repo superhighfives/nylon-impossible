@@ -26,19 +26,19 @@ that with `as string` rather than fix the annotation.
 
 ```ts
 // Good
-export async function enrichTodo(c: Context<Env>) {
+export async function processTodo(c: Context<Env>) {
   const userId = c.get("userId"); // already string
 }
 
 // Bad
-export async function enrichTodo(c: Context<{ Bindings: Env }>) {
+export async function processTodo(c: Context<{ Bindings: Env }>) {
   const userId = c.get("userId") as string;
 }
 ```
 
 ## Bindings
 
-Resource bindings reached via `c.env.*` — D1, Durable Objects, Queues, AI, and
+Resource bindings reached via `c.env.*` — D1, Durable Objects, Queues, and
 plain `vars` — must exist in `Env["Bindings"]` **and** in the relevant
 `wrangler.jsonc`. One that type-checks because someone widened the type but
 isn't in the wrangler config will fail at runtime, not at build.

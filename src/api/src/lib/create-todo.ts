@@ -1,3 +1,4 @@
+import { splitTodoText } from "@nylon-impossible/shared";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
@@ -5,11 +6,7 @@ import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 import { finishTodoLinks } from "./process-todo";
-import {
-  cleanUrlString,
-  createFallbackFromUrl,
-  truncateTitle,
-} from "./url-helpers";
+import { cleanUrlString, createFallbackFromUrl } from "./url-helpers";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -63,6 +60,7 @@ function normalizeHttpUrl(raw: string): string | null {
  */
 function createInitialTodo(text: string): {
   title: string;
+  notes: string | null;
   urls: string[];
 } {
   // Check if input is primarily a URL (URL takes up >80% of the text)
@@ -71,7 +69,7 @@ function createInitialTodo(text: string): {
     const cleanedUrl = cleanUrlString(urlMatch[0]);
     const fallback = createFallbackFromUrl(cleanedUrl);
     if (fallback) {
-      return { title: fallback.title, urls: [fallback.url] };
+      return { title: fallback.title, notes: null, urls: [fallback.url] };
     }
   }
 
@@ -81,8 +79,12 @@ function createInitialTodo(text: string): {
     .map(normalizeHttpUrl)
     .filter((url): url is string => url !== null);
 
+  // Text that won't fit a title (or spans lines) keeps the overflow in notes
+  // rather than being truncated away.
+  const { title, notes } = splitTodoText(text);
   return {
-    title: truncateTitle(text),
+    title,
+    notes,
     urls: Array.from(new Set(urls)),
   };
 }
@@ -248,6 +250,7 @@ export async function createSmartTodo(
     listId,
     listEnteredAt: now,
     title: initial.title,
+    notes: initial.notes,
     completed: false,
     position,
     createdAt: now,

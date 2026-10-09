@@ -13,6 +13,11 @@ export { focusRing } from "./focus";
 export { Input, type InputProps } from "./Input";
 export { LayerCard, type LayerCardProps } from "./LayerCard";
 export { Loader, type LoaderProps } from "./Loader";
+export {
+  SegmentedControl,
+  type SegmentedControlItem,
+  type SegmentedControlProps,
+} from "./SegmentedControl";
 export { Select, type SelectProps } from "./Select";
 export { SidePanel, type SidePanelProps } from "./SidePanel";
 export { Toaster } from "./Toast";

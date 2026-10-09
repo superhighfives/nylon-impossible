@@ -144,9 +144,7 @@ describe("Todos CRUD", () => {
         }),
       });
       expect(res.status).toBe(404);
-      expect((await res.json<{ code: string }>()).code).toBe(
-        "list_not_found",
-      );
+      expect((await res.json<{ code: string }>()).code).toBe("list_not_found");
 
       const db = getDb(env.DB);
       const stored = await db
@@ -168,9 +166,7 @@ describe("Todos CRUD", () => {
         }),
       });
       expect(res.status).toBe(404);
-      expect((await res.json<{ code: string }>()).code).toBe(
-        "list_not_found",
-      );
+      expect((await res.json<{ code: string }>()).code).toBe("list_not_found");
 
       const db = getDb(env.DB);
       const stored = await db
@@ -393,9 +389,7 @@ describe("Todos CRUD", () => {
         body: JSON.stringify({ listId: otherUsersListId }),
       });
       expect(res.status).toBe(404);
-      expect((await res.json<{ code: string }>()).code).toBe(
-        "list_not_found",
-      );
+      expect((await res.json<{ code: string }>()).code).toBe("list_not_found");
 
       // The todo's listId is untouched.
       const db = getDb(env.DB);
@@ -418,9 +412,7 @@ describe("Todos CRUD", () => {
         body: JSON.stringify({ listId: completedListId }),
       });
       expect(res.status).toBe(404);
-      expect((await res.json<{ code: string }>()).code).toBe(
-        "list_not_found",
-      );
+      expect((await res.json<{ code: string }>()).code).toBe("list_not_found");
 
       // The todo's listId is untouched.
       const db = getDb(env.DB);

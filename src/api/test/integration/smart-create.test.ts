@@ -81,6 +81,30 @@ describe("Smart create endpoint", () => {
       expect(body.todos).toHaveLength(1);
       // Title must be truncated to 500 chars max
       expect(body.todos[0].title.length).toBeLessThanOrEqual(500);
+      // ...and the full text survives in notes rather than being dropped.
+      expect(body.todos[0].notes).toBe(longText);
+    });
+
+    it("keeps long prose in notes with a short title", async () => {
+      const prose = Array.from({ length: 300 }, (_, i) => `word${i}`).join(" ");
+      const res = await smartCreate(prose);
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].title.length).toBeLessThanOrEqual(120);
+      expect(body.todos[0].title.endsWith("…")).toBe(true);
+      expect(body.todos[0].notes).toBe(prose);
+    });
+
+    it("uses the first line as title and the rest as notes", async () => {
+      const res = await smartCreate(
+        "Call the bank\nAsk about the fee\nRef 1234",
+      );
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].title).toBe("Call the bank");
+      expect(body.todos[0].notes).toBe("Ask about the fee\nRef 1234");
     });
   });
 

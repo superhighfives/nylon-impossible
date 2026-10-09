@@ -155,8 +155,6 @@ describe("runListSweep", () => {
       .where(eq(todos.id, tokyoTodoId));
 
     expect(utcStored.listId).toBe(utcTodayList);
-    expect(tokyoStored.listId).toBe(
-      await getListId("user_tokyo", "thisWeek"),
-    );
+    expect(tokyoStored.listId).toBe(await getListId("user_tokyo", "thisWeek"));
   });
 });

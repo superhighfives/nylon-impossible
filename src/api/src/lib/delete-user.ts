@@ -4,8 +4,8 @@ import { clerkClient } from "./clerk";
 import { eq, getDb, users } from "./db";
 
 /**
- * Remove a user from the local DB. Child tables (todos, lists, messages, urls)
- * cascade via ON DELETE constraints in the schema. Optionally also deletes the
+ * Remove a user from the local DB. Child tables (todos, lists, urls, Gmail
+ * add-on links) cascade via ON DELETE constraints in the schema. Optionally also deletes the
  * Clerk user — set `deleteClerk: false` when called from a Clerk webhook where
  * the Clerk record is already gone (avoids 404 churn and idempotency loops).
  */

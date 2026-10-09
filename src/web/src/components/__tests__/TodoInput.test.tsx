@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TodoInput } from "../TodoInput";
 
@@ -24,6 +24,8 @@ const LISTS = [
   { id: "today-id", name: "Today", systemKind: "today" },
   { id: "week-id", name: "This Week", systemKind: "thisWeek" },
   { id: "sometime-id", name: "Sometime", systemKind: "sometime" },
+  { id: "completed-id", name: "Completed", systemKind: "completed" },
+  { id: "custom-id", name: "Groceries", systemKind: null, position: "a0" },
 ];
 
 type MutateCallbacks = {
@@ -156,13 +158,46 @@ describe("TodoInput", () => {
     expect(toast.error).toHaveBeenCalledWith("Network down");
   });
 
-  it("disables the textarea and shows a loader while pending", () => {
+  it("keeps the textarea usable while a create is in flight", () => {
     stubSmartCreate({ isPending: true });
     render(<TodoInput />);
-    expect(screen.getByLabelText("New todo")).toBeDisabled();
+    const textarea = screen.getByLabelText("New todo") as HTMLTextAreaElement;
+    expect(textarea).not.toBeDisabled();
+    // Rapid multi-add: typing during a pending create still offers submit.
+    fireEvent.change(textarea, { target: { value: "Next one" } });
     expect(
-      screen.queryByRole("button", { name: /add todo/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", { name: /add todo/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("clears immediately on submit and restores the text on failure", () => {
+    let fail: ((err: unknown) => void) | undefined;
+    const mutate = vi.fn((_text: string, cbs?: MutateCallbacks) => {
+      fail = cbs?.onError;
+    });
+    vi.mocked(useSmartCreate).mockReturnValue({
+      mutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useSmartCreate>);
+
+    render(<TodoInput />);
+    const textarea = screen.getByLabelText("New todo") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "Buy milk" } });
+    fireEvent.keyDown(textarea, { key: "Enter" });
+    expect(textarea.value).toBe("");
+
+    act(() => fail?.(new Error("Network down")));
+    expect(textarea.value).toBe("Buy milk");
+  });
+
+  it("hints that overflowing text will go to notes", () => {
+    stubSmartCreate();
+    render(<TodoInput />);
+    expect(screen.queryByText(/saved to notes/i)).toBeNull();
+    fireEvent.change(screen.getByLabelText("New todo"), {
+      target: { value: "a".repeat(501) },
+    });
+    expect(screen.getByText(/saved to notes/i)).toBeInTheDocument();
   });
 
   it("does not submit whitespace-only text", () => {
@@ -174,14 +209,17 @@ describe("TodoInput", () => {
     expect(mutate).not.toHaveBeenCalled();
   });
 
-  it("defaults the list dropdown to Today and submits with its id", () => {
+  it("defaults the list picker to Today and submits with its id", () => {
     vi.mocked(useLists).mockReturnValue({
       data: LISTS,
     } as unknown as ReturnType<typeof useLists>);
     const mutate = stubSmartCreate();
     render(<TodoInput />);
 
-    expect(screen.getByLabelText("List to add to")).toHaveTextContent("Today");
+    expect(screen.getByRole("button", { name: "Today" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
 
     fireEvent.change(screen.getByLabelText("New todo"), {
       target: { value: "Buy milk" },
@@ -194,7 +232,47 @@ describe("TodoInput", () => {
     );
   });
 
-  it("does not render a list dropdown while lists haven't loaded", () => {
+  it("submits to the segment the user picks", () => {
+    vi.mocked(useLists).mockReturnValue({
+      data: LISTS,
+    } as unknown as ReturnType<typeof useLists>);
+    const mutate = stubSmartCreate();
+    render(<TodoInput />);
+
+    fireEvent.click(screen.getByRole("button", { name: "This Week" }));
+    expect(screen.getByLabelText("New todo")).toHaveAttribute(
+      "placeholder",
+      "Add to This Week…",
+    );
+    fireEvent.change(screen.getByLabelText("New todo"), {
+      target: { value: "Plan trip" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
+
+    expect(mutate).toHaveBeenCalledWith(
+      { text: "Plan trip", listId: "week-id" },
+      expect.any(Object),
+    );
+  });
+
+  it("offers system lists as segments, custom lists behind more, never Completed", () => {
+    vi.mocked(useLists).mockReturnValue({
+      data: LISTS,
+    } as unknown as ReturnType<typeof useLists>);
+    stubSmartCreate();
+    render(<TodoInput />);
+
+    expect(
+      screen.getByRole("button", { name: "Sometime" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Completed" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Groceries" })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "More lists" }),
+    ).toBeInTheDocument();
+  });
+
+  it("does not render a list picker while lists haven't loaded", () => {
     stubSmartCreate();
     render(<TodoInput />);
     expect(screen.queryByLabelText("List to add to")).toBeNull();

@@ -1,3 +1,4 @@
+import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
   nextDueDate,
@@ -41,7 +42,7 @@ const syncRequestSchema = z.object({
       // only on create — parentId is immutable, so it is ignored on update.
       parentId: z.string().uuid().nullable().optional(),
       title: z.string().min(1).optional(),
-      notes: z.string().max(10000).nullable().optional(),
+      notes: z.string().max(TODO_NOTES_MAX).nullable().optional(),
       completed: z.boolean().optional(),
       position: z.string().optional(),
       dueDate: z.coerce.date().nullable().optional(),
