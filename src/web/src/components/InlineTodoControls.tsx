@@ -245,3 +245,71 @@ export function InlineDueDate({
     </Popover.Root>
   );
 }
+
+export interface DueDatePickerProps {
+  id?: string;
+  /** `yyyy-mm-dd`, or "" for no date. */
+  value: string;
+  onChange: (ymd: string) => void;
+  onClear: () => void;
+}
+
+/**
+ * Field-style due date control for the detail panel. Opens the same calendar
+ * the row's due-date pill uses, so there's one date picker in the app rather
+ * than this plus the browser's native one.
+ */
+export function DueDatePicker({
+  id,
+  value,
+  onChange,
+  onClear,
+}: DueDatePickerProps) {
+  const { timeZone } = useHints();
+  const [open, setOpen] = useState(false);
+  const label = value
+    ? ymdToDate(value).toLocaleDateString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      })
+    : "No due date";
+
+  return (
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger
+        render={
+          <button
+            id={id}
+            type="button"
+            className={`flex h-8 w-full min-w-0 items-center rounded-lg bg-gray-surface px-2.5 text-left text-sm tabular-nums ring-1 ring-gray-subtle transition-colors hover:ring-gray-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong ${
+              value ? "text-gray" : "text-gray-muted"
+            }`}
+          >
+            <span className="truncate">{label}</span>
+          </button>
+        }
+      />
+      <Popover.Portal>
+        <Popover.Positioner sideOffset={6} align="start" className="z-[90]">
+          <Popover.Popup className="popup-motion rounded-xl border border-gray-subtle bg-gray-surface p-2.5 shadow-lg outline-none">
+            <DueDateCalendar
+              value={value || null}
+              timeZone={timeZone}
+              onSelect={(ymd) => {
+                onChange(ymd);
+                setOpen(false);
+              }}
+              onClear={() => {
+                onClear();
+                setOpen(false);
+              }}
+            />
+          </Popover.Popup>
+        </Popover.Positioner>
+      </Popover.Portal>
+    </Popover.Root>
+  );
+}
