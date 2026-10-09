@@ -145,6 +145,19 @@ export function useCreateTodo() {
 const UPDATE_TODO_MUTATION_KEY = ["todos", "update"] as const;
 const DELETE_TODO_MUTATION_KEY = ["todos", "delete"] as const;
 
+/** The todo id from a `useUpdateTodo` mutation's `{ id, input }` variables. */
+function updateVariablesId(variables: unknown): string | undefined {
+  if (
+    typeof variables === "object" &&
+    variables !== null &&
+    "id" in variables &&
+    typeof variables.id === "string"
+  ) {
+    return variables.id;
+  }
+  return undefined;
+}
+
 /**
  * Ids of todos with an update or delete in flight. Lets a row guard only its
  * own controls — a single shared `isPending` would dim every row in the
@@ -153,15 +166,16 @@ const DELETE_TODO_MUTATION_KEY = ["todos", "delete"] as const;
 export function usePendingTodoIds() {
   const updating = useMutationState({
     filters: { mutationKey: UPDATE_TODO_MUTATION_KEY, status: "pending" },
-    select: (m) => (m.state.variables as { id: string } | undefined)?.id,
+    select: (m) => updateVariablesId(m.state.variables),
   });
   const deleting = useMutationState({
     filters: { mutationKey: DELETE_TODO_MUTATION_KEY, status: "pending" },
-    select: (m) => m.state.variables as string | undefined,
+    select: (m) =>
+      typeof m.state.variables === "string" ? m.state.variables : undefined,
   });
   return {
-    updating: new Set(updating.filter(Boolean)),
-    deleting: new Set(deleting.filter(Boolean)),
+    updating: new Set(updating.filter((id) => id !== undefined)),
+    deleting: new Set(deleting.filter((id) => id !== undefined)),
   };
 }
 
