@@ -225,14 +225,14 @@ export function InlineDueDate({
           disabled={disabled}
           onClick={handleClear}
           aria-label="Clear due date"
-          className="rounded-md py-0.5 pr-1 opacity-60 transition-opacity hover:opacity-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
+          className="relative rounded-md py-0.5 pr-1 opacity-60 transition-opacity before:absolute before:content-[''] before:-inset-y-2.5 before:left-0 before:-right-2.5 hover:opacity-100 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         >
           <X size={11} aria-hidden="true" />
         </button>
       </span>
       <Popover.Portal>
-        <Popover.Positioner sideOffset={6} align="start">
-          <Popover.Popup className="z-50 rounded-lg border border-gray-subtle bg-gray-surface p-3 shadow-lg outline-none">
+        <Popover.Positioner sideOffset={6} align="start" className="z-50">
+          <Popover.Popup className="rounded-lg border border-gray-subtle bg-gray-surface p-3 shadow-lg outline-none">
             <DueDateCalendar
               value={value}
               timeZone={timeZone}

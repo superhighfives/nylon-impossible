@@ -366,3 +366,36 @@ Deviations from the spec above:
   Sentry MCP was unreachable. The fix removes oversized titles at the source;
   check the event's stack trace before resolving it.
 - `--ease-out-strong` was added to `@theme` now rather than in Phase 3.
+
+### Phase 2 — implemented (2026-10-08, branch `board-polish-phase-2`)
+
+Deviations and notes:
+
+- **No custom `hover-capable` variant:** Tailwind 4 already ships
+  `pointer-fine:` and `pointer-coarse:`, so hover-reveal is gated on
+  `pointer-fine:` instead. Width (`sm:`) still decides layout (grip in the
+  margin, floating pill); `pointer-fine` decides whether controls hide until
+  hover. The floating pill is `sm:pointer-fine:flex`. A wide touch device
+  gets the always-visible action row, with buttons sized up to 36px under
+  `pointer-coarse:`.
+- **Per-row pending state:** `useUpdateTodo` / `useDeleteTodo` now carry
+  mutation keys. `usePendingTodoIds()` reads the in-flight ids through
+  `useMutationState`, so a row only guards its own controls.
+  `CompletedColumn` no longer takes the `updateTodo` / `deleteTodo` props.
+- **Dialogs:** these use Base UI's `Dialog.Viewport` as the centering
+  container, with the card as the `Popup`. Base UI treats a press on an
+  ancestor of the popup as an outside press, so clicking the dim area now
+  dismisses. Both dialogs also got their Phase 3 enter/exit animation
+  (opacity + scale 0.96, `ease-out-strong`), since the same lines were being
+  rewritten anyway.
+- **Hit areas:** these use the same `before:` pseudo-element pattern, sized per
+  control so neighbouring targets don't overlap. The due-date clear only
+  extends rightward, because the date button sits immediately to its left.
+
+Follow-ups spotted while testing on an emulated iPad:
+
+- The always-visible action row under every todo is functional but visually
+  heavy on touch. Consider tap-to-open for the details panel plus swipe
+  actions, and dropping the per-row toolbar entirely.
+- Unpinned rows show `PinOff` (a crossed-out pin) as the "pin this"
+  affordance, which reads as "unpin". Use `Pin` at reduced opacity instead.

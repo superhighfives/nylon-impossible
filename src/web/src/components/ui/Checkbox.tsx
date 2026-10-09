@@ -51,7 +51,7 @@ export function Checkbox({
         checked={checked}
         indeterminate={indeterminate}
         className={`
-          h-5 w-5 shrink-0 rounded-md border-2 border-gray-12 dark:border-graydark-12 bg-transparent cursor-pointer
+          relative before:absolute before:content-[''] before:-inset-2 h-5 w-5 shrink-0 rounded-md border-2 border-gray-12 dark:border-graydark-12 bg-transparent cursor-pointer
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 ${RING_OFFSET[ringOffset]}
           disabled:cursor-not-allowed disabled:opacity-50
           ${checkedStyle}

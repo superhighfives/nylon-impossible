@@ -8,6 +8,10 @@ vi.mock("@/hooks/useTodos", () => ({
   useUpdateTodo: vi.fn(),
   useDeleteTodo: vi.fn(),
   useCreateTodo: vi.fn(),
+  usePendingTodoIds: vi.fn(() => ({
+    updating: new Set<string>(),
+    deleting: new Set<string>(),
+  })),
   // TodoGrid renders the floating composer (TodoInput), which smart-creates.
   useSmartCreate: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));

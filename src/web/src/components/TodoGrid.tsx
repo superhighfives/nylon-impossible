@@ -287,7 +287,7 @@ function NewTodoInline({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder opacity-0 transition-[opacity,color] hover:text-gray-muted focus-visible:opacity-100 group-hover/column:opacity-100 group-focus-within/column:opacity-100 max-sm:opacity-100 ${focusRing}`}
+        className={`mb-1 flex min-h-9 w-full items-center gap-3 rounded-lg py-2 text-left text-sm text-gray-placeholder transition-[opacity,color] hover:text-gray-muted pointer-fine:opacity-0 pointer-fine:focus-visible:opacity-100 pointer-fine:group-hover/column:opacity-100 pointer-fine:group-focus-within/column:opacity-100 ${focusRing}`}
       >
         <span
           aria-hidden="true"
@@ -385,7 +385,7 @@ function ListHeader({
         <button
           type="button"
           aria-label={`Reorder "${list.name}"`}
-          className={`cursor-grab touch-none select-none text-gray-muted opacity-0 transition-opacity active:cursor-grabbing group-hover/header:opacity-100 ${focusRing}`}
+          className={`relative cursor-grab touch-none select-none text-gray-muted transition-opacity before:absolute before:content-[''] before:-inset-2.5 active:cursor-grabbing pointer-fine:opacity-0 pointer-fine:group-hover/header:opacity-100 pointer-fine:group-focus-within/header:opacity-100 ${focusRing}`}
           {...attributes}
           {...listeners}
         >
@@ -415,7 +415,7 @@ function ListHeader({
         </h2>
       )}
       {list.kind === "custom" && !renaming && (
-        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/header:opacity-100 group-focus-within/header:opacity-100">
+        <div className="flex items-center gap-0.5 transition-opacity pointer-fine:opacity-0 pointer-fine:group-hover/header:opacity-100 pointer-fine:group-focus-within/header:opacity-100">
           <Button
             variant="ghost"
             size="xs"
@@ -1128,8 +1128,6 @@ export function TodoGrid() {
                   expandedId={expandedId}
                   onToggleExpand={handleToggleExpand}
                   onRequestDelete={handleRequestDelete}
-                  updateTodo={updateTodo}
-                  deleteTodo={deleteTodo}
                   onUncomplete={handleUncomplete}
                   collapsed={
                     completedColumnCollapsed ?? user?.hideCompleted ?? false

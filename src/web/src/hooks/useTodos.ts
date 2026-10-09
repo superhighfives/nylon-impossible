@@ -1,6 +1,11 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useMutationState,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { generateKeyBetween } from "fractional-indexing";
 import { useEffect } from "react";
 import { z } from "zod";
@@ -137,11 +142,35 @@ export function useCreateTodo() {
   });
 }
 
+const UPDATE_TODO_MUTATION_KEY = ["todos", "update"] as const;
+const DELETE_TODO_MUTATION_KEY = ["todos", "delete"] as const;
+
+/**
+ * Ids of todos with an update or delete in flight. Lets a row guard only its
+ * own controls — a single shared `isPending` would dim every row in the
+ * column whenever any one of them is saving.
+ */
+export function usePendingTodoIds() {
+  const updating = useMutationState({
+    filters: { mutationKey: UPDATE_TODO_MUTATION_KEY, status: "pending" },
+    select: (m) => (m.state.variables as { id: string } | undefined)?.id,
+  });
+  const deleting = useMutationState({
+    filters: { mutationKey: DELETE_TODO_MUTATION_KEY, status: "pending" },
+    select: (m) => m.state.variables as string | undefined,
+  });
+  return {
+    updating: new Set(updating.filter(Boolean)),
+    deleting: new Set(deleting.filter(Boolean)),
+  };
+}
+
 export function useUpdateTodo() {
   const queryClient = useQueryClient();
   const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
+    mutationKey: UPDATE_TODO_MUTATION_KEY,
     mutationFn: ({ id, input }: { id: string; input: UpdateTodoInput }) =>
       updateTodo({ data: { id, input } }),
     onMutate: async ({ id, input }) => {
@@ -281,6 +310,7 @@ export function useDeleteTodo() {
   const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
+    mutationKey: DELETE_TODO_MUTATION_KEY,
     mutationFn: (id: string) => deleteTodo({ data: id }),
     onMutate: async (id) => {
       // Cancel outgoing refetches

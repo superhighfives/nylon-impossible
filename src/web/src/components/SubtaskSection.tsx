@@ -64,7 +64,7 @@ function CompletedSubtaskRow({
         onClick={() => onDelete(subtask.id)}
         disabled={disabled}
         aria-label={`Delete subtask "${subtask.title}"`}
-        className="text-gray-muted opacity-0 transition-opacity hover:text-red group-hover/sub:opacity-100"
+        className="text-gray-muted transition-opacity hover:text-red pointer-fine:opacity-0 pointer-fine:group-hover/sub:opacity-100 pointer-fine:group-focus-within/sub:opacity-100"
       >
         <Trash2 size={13} />
       </Button>
@@ -96,7 +96,7 @@ function ActiveSubtaskRow({
       <button
         type="button"
         disabled={disabled}
-        className="cursor-grab touch-none select-none [-webkit-touch-callout:none] rounded-md text-gray-muted/40 transition-[transform,opacity,color] hover:text-gray-muted active:scale-[0.96] active:cursor-grabbing sm:opacity-0 sm:group-hover/sub:opacity-100 disabled:opacity-50 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
+        className="relative cursor-grab touch-none select-none [-webkit-touch-callout:none] rounded-md text-gray-muted/40 transition-[transform,opacity,color] before:absolute before:content-[''] before:-inset-y-2.5 before:-left-2.5 before:-right-1 hover:text-gray-muted active:scale-[0.96] active:cursor-grabbing pointer-fine:opacity-0 pointer-fine:group-hover/sub:opacity-100 pointer-fine:group-focus-within/sub:opacity-100 disabled:opacity-50 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
         aria-label={`Reorder "${subtask.title}"`}
         {...attributes}
         {...listeners}
@@ -120,7 +120,7 @@ function ActiveSubtaskRow({
         onClick={() => onDelete(subtask.id)}
         disabled={disabled}
         aria-label={`Delete subtask "${subtask.title}"`}
-        className="text-gray-muted opacity-0 transition-opacity hover:text-red group-hover/sub:opacity-100"
+        className="text-gray-muted transition-opacity hover:text-red pointer-fine:opacity-0 pointer-fine:group-hover/sub:opacity-100 pointer-fine:group-focus-within/sub:opacity-100"
       >
         <Trash2 size={13} />
       </Button>

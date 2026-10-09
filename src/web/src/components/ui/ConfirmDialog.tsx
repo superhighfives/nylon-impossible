@@ -25,9 +25,11 @@ export function ConfirmDialog({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-90" />
-        <Dialog.Popup className="fixed inset-0 z-100 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-gray-surface rounded-xl shadow-lg p-6 space-y-4">
+        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-90 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        {/* The viewport centers the card; the card itself is the popup, so a
+            click on the dimmed area around it counts as outside and closes. */}
+        <Dialog.Viewport className="fixed inset-0 z-100 flex items-center justify-center p-4">
+          <Dialog.Popup className="w-full max-w-sm bg-gray-surface rounded-xl shadow-lg p-6 space-y-4 outline-none origin-center transition-[opacity,scale] duration-200 ease-out-strong data-ending-style:scale-[0.96] data-ending-style:opacity-0 data-ending-style:duration-150 data-starting-style:scale-[0.96] data-starting-style:opacity-0">
             <div className="space-y-1.5">
               <Dialog.Title className="text-base font-semibold text-gray">
                 {title}
@@ -57,8 +59,8 @@ export function ConfirmDialog({
                 {confirmLabel}
               </Button>
             </div>
-          </div>
-        </Dialog.Popup>
+          </Dialog.Popup>
+        </Dialog.Viewport>
       </Dialog.Portal>
     </Dialog.Root>
   );

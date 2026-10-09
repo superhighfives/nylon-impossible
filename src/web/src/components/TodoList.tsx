@@ -27,10 +27,11 @@ import { InlineDueDate } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useHints } from "@/hooks/useHints";
-import type {
-  useCreateTodo,
-  useDeleteTodo,
-  useUpdateTodo,
+import {
+  type useCreateTodo,
+  type useDeleteTodo,
+  usePendingTodoIds,
+  type useUpdateTodo,
 } from "@/hooks/useTodos";
 import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
@@ -219,7 +220,7 @@ function InlineIndicators({
         className={
           sticky
             ? "text-gray hover:bg-gray-base"
-            : "text-gray-muted hover:bg-gray-base sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+            : "text-gray-muted hover:bg-gray-base pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
         }
       >
         {sticky ? <Pin size={14} /> : <PinOff size={14} />}
@@ -485,11 +486,11 @@ function TodoItemContent({
       {/* Desktop: actions float as a pill over the row instead of reserving
           their own line — it stays put when it's carrying real state (due
           date, recurrence, pin) and is otherwise a hover/focus affordance.
-          Touch has no hover, so mobile gets its own always-visible row
-          below instead of this floating pill. */}
+          Gated on a fine pointer as well as width: a tablet is wide enough
+          for this layout but can't hover to reveal it. */}
       {showActions && (
         <div
-          className={`absolute right-1 top-1 z-10 hidden items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity sm:flex ${
+          className={`absolute right-1 top-1 z-10 hidden items-center gap-0.5 rounded-full bg-gray-surface/95 px-1 py-0.5 shadow-sm ring-1 ring-gray-subtle backdrop-blur-sm transition-opacity sm:pointer-fine:flex ${
             hasVisiblePillState
               ? "opacity-100"
               : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
@@ -498,10 +499,13 @@ function TodoItemContent({
           {rowActions}
         </div>
       )}
-      {/* Touch: same actions as the desktop pill, always visible as a row
-          below the content instead of a hover-revealed overlay. */}
+      {/* Touch (or narrow): same actions as the desktop pill, always visible
+          as a row below the content instead of a hover-revealed overlay, and
+          sized up to finger-friendly targets on a coarse pointer. */}
       {showActions && (
-        <div className="flex items-center gap-0.5 sm:hidden">{rowActions}</div>
+        <div className="flex items-center gap-0.5 sm:pointer-fine:hidden pointer-coarse:gap-1 pointer-coarse:[&_button]:size-9">
+          {rowActions}
+        </div>
       )}
     </div>
   );
@@ -733,11 +737,12 @@ function SortableTodoItem(
         <div className="flex items-start">
           {/* Reorder grip: inline on mobile; on desktop it hangs off the left
               edge (out of the row's flow) so checkboxes sit flush with the
-              column title, per the design. Hover-revealed either way. */}
+              column title, per the design. Hover-revealed only where the
+              pointer can hover; always visible on touch. */}
           <button
             type="button"
             disabled={props.isExpanded}
-            className={`${GRIP_BOX_CLASS} cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
+            className={`relative ${GRIP_BOX_CLASS} before:absolute before:content-[''] before:-inset-y-2.5 before:-left-2.5 before:-right-1 cursor-grab active:cursor-grabbing text-gray-muted hover:text-gray touch-none select-none [-webkit-touch-callout:none] transition-[transform,opacity,color] active:scale-[0.96] pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100 disabled:opacity-50 disabled:cursor-default disabled:hover:text-gray-muted ${focusRing}`}
             aria-label={`Reorder "${props.todo.title}"`}
             {...attributes}
             {...listeners}
@@ -915,6 +920,7 @@ export function TodoListColumn({
   const { setNodeRef: setColumnDropRef } = useDroppable({
     id: `column-${listId}`,
   });
+  const pending = usePendingTodoIds();
 
   if (todos.length === 0) {
     // Fills the column so a cross-list drag can drop anywhere in the empty
@@ -1015,8 +1021,8 @@ export function TodoListColumn({
     onDelete: onRequestDelete,
     onToggleExpand,
     onInlineUpdate: handleInlineUpdate,
-    updatePending: updateTodo.isPending,
-    deletePending: deleteTodo.isPending,
+    updatePending: pending.updating.has(todo.id),
+    deletePending: pending.deleting.has(todo.id),
   });
 
   const rows: ReactNode[] = displayIncompleteTodos.map((todo) => (
@@ -1061,8 +1067,6 @@ export interface CompletedColumnProps {
   expandedId: string | null;
   onToggleExpand: (id: string) => void;
   onRequestDelete: (id: string) => void;
-  updateTodo: ReturnType<typeof useUpdateTodo>;
-  deleteTodo: ReturnType<typeof useDeleteTodo>;
   /** Un-completes a todo, restoring it to the end of its own list's
    * incomplete order (or rolling back a stamped recurrence) — the same
    * logic the old per-list accordion used, now computed once at the grid
@@ -1088,13 +1092,12 @@ export function CompletedColumn({
   expandedId,
   onToggleExpand,
   onRequestDelete,
-  updateTodo,
-  deleteTodo,
   onUncomplete,
   collapsed,
   onToggleCollapsed,
   known,
 }: CompletedColumnProps) {
+  const pending = usePendingTodoIds();
   const subtasksByParent = new Map<string, TodoWithUrls[]>();
   for (const t of allTodos) {
     if (t.parentId) {
@@ -1155,8 +1158,8 @@ export function CompletedColumn({
                   onDelete={onRequestDelete}
                   onToggleExpand={onToggleExpand}
                   onInlineUpdate={() => {}}
-                  updatePending={updateTodo.isPending}
-                  deletePending={deleteTodo.isPending}
+                  updatePending={pending.updating.has(todo.id)}
+                  deletePending={pending.deleting.has(todo.id)}
                 />
               </div>
             </div>
