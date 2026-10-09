@@ -17,7 +17,6 @@ import {
   Link2,
   ListTree,
   Pin,
-  PinOff,
   RefreshCw,
   Repeat,
   Trash2,
@@ -134,8 +133,8 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         <span
           className={`text-xs tabular-nums px-1.5 py-0.5 rounded-md flex items-center gap-1 ${
             isOverdue
-              ? "bg-red-base hover:bg-red-hover active:bg-red-active text-red-muted"
-              : "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted"
+              ? "bg-red-base text-red-muted"
+              : "bg-gray-base text-gray-muted"
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
@@ -143,7 +142,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
         </span>
       )}
       {todo.recurrence && (
-        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray-muted">
+        <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base text-gray-muted">
           <Repeat size={10} />
           {recurrenceLabel(todo.recurrence, dueDate, timeZone)}
         </span>
@@ -230,7 +229,7 @@ function InlineIndicators({
             : "text-gray-muted hover:bg-gray-base pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
         }
       >
-        {sticky ? <Pin size={14} /> : <PinOff size={14} />}
+        <Pin size={14} className={sticky ? "fill-current" : ""} />
       </Button>
     </div>
   );
@@ -384,7 +383,15 @@ function TodoItemContent({
             }
           />
         </div>
-        <div className="flex-1 min-w-0">
+        <div
+          // A pill that's always showing (pinned / repeating) would sit over
+          // the end of a long title, so reserve its width. The hover-only
+          // pill overlays instead — reserving for it would reflow the title
+          // on every hover.
+          className={`min-w-0 flex-1 ${
+            showActions && hasVisiblePillState ? "sm:pointer-fine:pr-24" : ""
+          }`}
+        >
           <div className="space-y-1">
             <div>
               {(() => {

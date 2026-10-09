@@ -450,7 +450,7 @@ function ListHeader({
             aria-label={`Rename "${list.name}"`}
             onClick={() => setRenaming(true)}
           >
-            <Pencil size={12} />
+            <Pencil size={14} />
           </Button>
           <Button
             variant="ghost"
@@ -461,7 +461,7 @@ function ListHeader({
             aria-label={`Delete "${list.name}"`}
             onClick={() => setConfirmDelete(true)}
           >
-            <Trash2 size={12} />
+            <Trash2 size={14} />
           </Button>
         </div>
       )}
