@@ -2,7 +2,6 @@ import { Dialog } from "@base-ui/react/dialog";
 import { useClerk } from "@clerk/tanstack-react-start";
 import { useLocation } from "@tanstack/react-router";
 import { Monitor, Moon, Settings, Sun } from "lucide-react";
-import { useEffect, useState } from "react";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { useSettings } from "@/hooks/useSettings";
 import {
@@ -46,11 +45,10 @@ export function SettingsModal({ origin }: { origin: string }) {
   // so production renders nothing (and no empty heading).
   const devEnv = useDevEnvironment(origin);
   const pathname = useLocation({ select: (loc) => loc.pathname });
-  const [timezone, setTimezone] = useState("UTC");
 
   const handleDeleteAccount = () => {
     const confirmed = window.confirm(
-      "Permanently delete your account? All of your todos, lists, and conversation history will be removed and cannot be recovered.",
+      "Permanently delete your account? All of your todos and lists will be removed and cannot be recovered.",
     );
     if (!confirmed) return;
     deleteUser.mutate(undefined, {
@@ -64,33 +62,32 @@ export function SettingsModal({ origin }: { origin: string }) {
     });
   };
 
-  // Sync local state when user data loads or modal opens
-  useEffect(() => {
-    if (user && open) {
-      // "UTC" is the migration/creation default, not a deliberate choice —
-      // default to the browser's detected zone the first time settings are
-      // opened rather than leaving a new user stuck on UTC.
-      setTimezone(
-        user.timezone === "UTC"
-          ? Intl.DateTimeFormat().resolvedOptions().timeZone
-          : user.timezone,
-      );
-    }
-  }, [user, open]);
-
-  const handleSave = () => {
+  // Like Theme, the timezone saves the moment it's picked — no Save step.
+  const timezone = user?.timezone ?? "UTC";
+  const detectedTimezone =
+    typeof Intl !== "undefined"
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : "UTC";
+  // V8 leaves "UTC" (and legacy aliases like Asia/Calcutta) out of
+  // supportedValuesOf, so keep the saved zone selectable or the Select
+  // renders blank for default-UTC accounts.
+  const timezoneItems = TIMEZONE_ITEMS.some((item) => item.value === timezone)
+    ? TIMEZONE_ITEMS
+    : [
+        { value: timezone, label: timezone.replace(/_/g, " ") },
+        ...TIMEZONE_ITEMS,
+      ];
+  const saveTimezone = (next: string) => {
+    if (next === timezone) return;
     updateUser.mutate(
-      { timezone },
+      { timezone: next },
       {
-        onSuccess: () => setOpen(false),
         onError: (err) => {
-          toast.error(messageFromError(err, "Couldn't save settings"));
+          toast.error(messageFromError(err, "Couldn't change timezone"));
         },
       },
     );
   };
-
-  const hasChanges = user !== undefined && timezone !== user?.timezone;
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -118,9 +115,11 @@ export function SettingsModal({ origin }: { origin: string }) {
         </div>
       )}
       <Dialog.Portal>
-        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-70" />
-        <Dialog.Popup className="fixed inset-0 z-80 flex items-center justify-center p-4">
-          <div className="w-full max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-gray-surface rounded-xl shadow-lg p-6 space-y-4">
+        <Dialog.Backdrop className="fixed inset-0 bg-black/40 z-70 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0" />
+        {/* The viewport centers the card; the card itself is the popup, so a
+            click on the dimmed area around it counts as outside and closes. */}
+        <Dialog.Viewport className="fixed inset-0 z-80 flex items-center justify-center p-4">
+          <Dialog.Popup className="w-full max-w-xl max-h-[calc(100dvh-2rem)] overflow-y-auto bg-gray-surface rounded-xl shadow-lg p-6 space-y-4 outline-none origin-center transition-[opacity,scale] duration-200 ease-out-strong data-ending-style:scale-[0.96] data-ending-style:opacity-0 data-ending-style:duration-150 data-starting-style:scale-[0.96] data-starting-style:opacity-0">
             <Dialog.Title className="text-lg font-semibold text-gray">
               Settings
             </Dialog.Title>
@@ -184,12 +183,27 @@ export function SettingsModal({ origin }: { origin: string }) {
                   <LayerCard.Secondary>Timezone</LayerCard.Secondary>
                   <LayerCard.Primary>
                     <Select
-                      items={TIMEZONE_ITEMS}
+                      items={timezoneItems}
                       value={timezone}
-                      onValueChange={(value) => setTimezone(value as string)}
+                      onValueChange={(value) => {
+                        if (typeof value === "string") saveTimezone(value);
+                      }}
                       disabled={updateUser.isPending}
                       size="sm"
                     />
+                    {/* "UTC" is the account default, not usually a choice — offer
+                        the device's zone instead of silently switching it. */}
+                    {timezone !== detectedTimezone && (
+                      <button
+                        type="button"
+                        onClick={() => saveTimezone(detectedTimezone)}
+                        disabled={updateUser.isPending}
+                        className="self-start rounded-md text-left text-xs font-medium text-accent-muted underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50"
+                      >
+                        Use this device's timezone (
+                        {detectedTimezone.replace(/_/g, " ")})
+                      </button>
+                    )}
                     <p className="text-xs text-gray-muted">
                       Drives when Today's todos age into This Week, and This
                       Week into Sometime — always at your local midnight.
@@ -211,7 +225,7 @@ export function SettingsModal({ origin }: { origin: string }) {
                       onClick={handleDeleteAccount}
                       disabled={deleteUser.isPending || updateUser.isPending}
                       loading={deleteUser.isPending}
-                      className="self-start text-red border-red-base hover:bg-red-base"
+                      className="self-start text-red-muted ring-red-subtle hover:bg-red-base"
                     >
                       Delete my account
                     </Button>
@@ -234,23 +248,11 @@ export function SettingsModal({ origin }: { origin: string }) {
             )}
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close
-                render={
-                  <Button variant="ghost" disabled={updateUser.isPending}>
-                    Done
-                  </Button>
-                }
+                render={<Button variant="secondary">Done</Button>}
               />
-              <Button
-                variant="primary"
-                onClick={handleSave}
-                disabled={!hasChanges || updateUser.isPending}
-                loading={updateUser.isPending}
-              >
-                Save
-              </Button>
             </div>
-          </div>
-        </Dialog.Popup>
+          </Dialog.Popup>
+        </Dialog.Viewport>
       </Dialog.Portal>
     </Dialog.Root>
   );

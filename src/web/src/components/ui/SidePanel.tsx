@@ -19,8 +19,8 @@ export function SidePanel({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal keepMounted>
-        <Dialog.Backdrop className="fixed inset-0 z-70 bg-black/40 transition-opacity duration-300 ease-out data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed inset-y-0 right-0 z-80 flex w-full max-w-md flex-col bg-gray-surface shadow-xl outline-none transition-transform duration-300 ease-out focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset data-ending-style:translate-x-full data-starting-style:translate-x-full sm:inset-y-2 sm:right-2 sm:rounded-xl sm:border sm:border-gray-subtle">
+        <Dialog.Backdrop className="fixed inset-0 z-70 bg-black/40 transition-opacity duration-300 ease-out data-ending-style:opacity-0 data-ending-style:duration-200 data-starting-style:opacity-0" />
+        <Dialog.Popup className="fixed inset-y-0 right-0 z-80 flex w-full max-w-md flex-col bg-gray-surface shadow-xl outline-none transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] data-ending-style:duration-200 focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset data-ending-style:translate-x-full data-starting-style:translate-x-full sm:inset-y-2 sm:right-2 sm:rounded-xl sm:border sm:border-gray-subtle">
           <div className="flex shrink-0 items-center justify-between gap-2 border-b border-gray-subtle px-4 py-3">
             {/* Close comes first in DOM/tab order (order-last visually) so
                 tabbing from the panel goes Close -> title -> body content,

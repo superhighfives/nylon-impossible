@@ -69,7 +69,7 @@ export function Select({
           sideOffset={4}
           alignItemWithTrigger={false}
         >
-          <BaseSelect.Popup className="min-w-32 overflow-hidden rounded-lg border border-gray-subtle bg-gray-surface p-1 shadow-lg">
+          <BaseSelect.Popup className="popup-motion min-w-32 overflow-hidden rounded-lg border border-gray-subtle bg-gray-surface p-1 shadow-lg">
             <BaseSelect.List className="flex flex-col">
               {items.map((item) => (
                 <BaseSelect.Item
