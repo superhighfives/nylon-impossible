@@ -45,21 +45,47 @@ struct TodayProvider: TimelineProvider {
         }
     }
 
+    /// SPIKE: how often to ask for a reload while a remote fetch is
+    /// possible. WidgetKit treats this as a floor, not a schedule, and rations
+    /// reloads across the day; 30 minutes keeps well inside that budget.
+    static let remoteRefreshInterval: TimeInterval = 30 * 60
+
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodayEntry>) -> Void) {
         Task { @MainActor in
-            let entry = Self.currentEntry()
+            let now = Date()
+            let entry = await Self.remoteEntry(now: now) ?? Self.currentEntry(now: now)
 
-            // A single entry, refetched at local midnight — which is both when
-            // "due before midnight" starts meaning a different set of todos
-            // and when a date-only due date tips into overdue. The overnight
-            // sweep that ages todos out of the Today list is the server's, so
-            // it lands here with a sync rather than on this schedule — and
-            // that, like every other way the list changes (an edit in the app,
-            // the toggle below), ends in a `WidgetRefresh.reload()`, so
-            // there's nothing to poll for in between.
-            let midnight = TodayDigest.startOfTomorrow(after: entry.date)
-            completion(Timeline(entries: [entry], policy: .after(midnight)))
+            // Local midnight is still a hard boundary — it's when "due before
+            // midnight" starts meaning a different set of todos and when a
+            // date-only due date tips into overdue. Between midnights, come
+            // back periodically for whatever changed on another device; the
+            // app, the share extension, the Siri intent and the toggle below
+            // still reload the widget directly whenever they write locally.
+            let midnight = TodayDigest.startOfTomorrow(after: now)
+            let next = min(midnight, now.addingTimeInterval(Self.remoteRefreshInterval))
+            completion(Timeline(entries: [entry], policy: .after(next)))
         }
+    }
+
+    /// SPIKE: the digest straight from the server, or nil to fall back to the
+    /// local store — signed out, no Clerk session to borrow, offline, or slow.
+    @MainActor
+    private static func remoteEntry(now: Date) async -> TodayEntry? {
+        let defaults = UserDefaults(suiteName: BackgroundSyncService.appGroupSuiteName)
+        guard let userId = defaults?.string(forKey: BackgroundSyncService.userIdKey),
+              let digest = await RemoteToday.digest(userId: userId, now: now)
+        else { return nil }
+
+        let shown = digest.prefix(maxRows).map { row in
+            WidgetTodo(
+                id: row.id,
+                title: row.title,
+                dueDate: row.dueDate,
+                isSticky: row.sticky,
+                isRepeating: row.isRepeating
+            )
+        }
+        return TodayEntry(date: now, content: .todos(Array(shown), total: digest.count))
     }
 
     @MainActor

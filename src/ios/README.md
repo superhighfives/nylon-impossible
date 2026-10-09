@@ -148,8 +148,8 @@ Three things are easy to get wrong here:
   counts due-or-overdue only, because a badge is an attention count rather than
   a plan for the day. It still takes its cutoff from `TodayDigest`, so the two
   can't disagree about when the day ends.
-- **Nothing polls.** A widget re-renders when its timeline expires (midnight,
-  here) or when something calls `WidgetCenter.reloadTimelines`. Every write
+- **Local writes reload it directly.** A widget re-renders when its timeline
+  expires (see the remote refresh below) or when something calls `WidgetCenter.reloadTimelines`. Every write
   path ends in `WidgetRefresh.reload()` — the app on backgrounding and on
   sign-in/out, the share extension, the Siri intent, and the completion itself.
   A new write path needs one too.
@@ -171,6 +171,23 @@ Three things are easy to get wrong here:
 The toggle uploads immediately via `BackgroundSyncService` when there's a valid
 token, and otherwise leaves the todo unsynced for the app's next foreground
 sync — an extension can't schedule a `BGTask` to retry sooner.
+
+### Remote refresh (spike)
+
+`TodayProvider.getTimeline` first tries `RemoteToday.digest`: mint a Clerk
+session token from inside the widget (`WidgetSessionToken`), fetch `GET /todos`
+and `GET /lists`, overlay any local rows still waiting to upload, and run the
+same `TodayDigest.select` rule. Any failure falls back to the local store. The
+timeline then asks to come back in 30 minutes (or at midnight, if sooner), so
+edits made on another device show up without opening the app.
+
+The token comes from ClerkKit's own keychain items, which live under the app's
+bundle id in the `.shared` access group. If ClerkKit is linked into the widget
+target, the SDK is configured against them; otherwise the widget reads them
+directly and calls Clerk's Frontend API — that path depends on ClerkKit's
+private storage layout, so recheck it on every ClerkKit upgrade. Known gap:
+a row that exists only on the server can't be completed from the widget yet —
+`CompleteTodoIntent` only knows the local store.
 
 ## Deployment
 

@@ -2,8 +2,9 @@
 //  WidgetRefresh.swift
 //  Nylon Impossible
 //
-//  A widget never goes looking for new data — it renders the timeline it was
-//  last given until somebody tells WidgetKit to ask again. So every place that
+//  A widget renders the timeline it was last given until it expires (the
+//  widget's own periodic remote refresh) or somebody tells WidgetKit to ask
+//  again. So every place that
 //  writes todos to the shared store calls this: the app on backgrounding (its
 //  one refresh, covering both its own edits and anything a sync pulled down),
 //  the share extension, the Siri intent, and the widget's own completion.
