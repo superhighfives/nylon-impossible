@@ -1,4 +1,4 @@
-import { TODO_TITLE_MAX } from "@nylon-impossible/shared";
+import { TODO_TITLE_MAX, toDueDay } from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
@@ -26,7 +26,8 @@ const updateTodoSchema = z.object({
   notes: z.string().nullable().optional(),
   completed: z.boolean().optional(),
   position: z.string().optional(),
-  dueDate: z.coerce.date().nullable().optional(),
+  // Normalized to UTC midnight — due dates are calendar days.
+  dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
   // Client-set only to undo a completed repeat (cleared to null). Normal
   // completions are stamped server-side.

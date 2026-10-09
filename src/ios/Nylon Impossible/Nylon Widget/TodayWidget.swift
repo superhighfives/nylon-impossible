@@ -75,7 +75,7 @@ struct TodayProvider: TimelineProvider {
             WidgetTodo(
                 id: todo.id,
                 title: todo.title,
-                dueDate: todo.dueDate,
+                dueDate: todo.dueDate.map { DueDay.localDate($0) },
                 isSticky: todo.sticky,
                 isRepeating: todo.recurrence != nil
             )

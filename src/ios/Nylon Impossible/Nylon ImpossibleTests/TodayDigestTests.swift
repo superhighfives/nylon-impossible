@@ -37,6 +37,14 @@ struct TodayDigestTests {
         Calendar.current.startOfDay(for: Date()).addingTimeInterval(12 * 60 * 60)
     }
 
+    /// Today as a stored due date: the calendar day at UTC midnight, the form
+    /// every due date takes after `DueDay.normalize`. Fixtures are dated off
+    /// this, not off `now`, so the suite matches what sync writes and doesn't
+    /// depend on how far the runner's timezone is from UTC.
+    private static var dueToday: Date {
+        DueDay.today(now, in: .current)
+    }
+
     private static let userId = "user_123"
 
     /// Server list ids are dashless lowercase hex, not UUIDs — see
@@ -108,17 +116,18 @@ struct TodayDigestTests {
     @MainActor
     func includesTodayAndOverdue() throws {
         let now = Self.now
+        let dueToday = Self.dueToday
         let container = try makeContainer()
         let context = container.mainContext
 
-        insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-86_400))
-        insert(context, title: "Later today", dueDate: now.addingTimeInterval(3600))
-        insert(context, title: "Tomorrow", dueDate: now.addingTimeInterval(86_400))
+        insert(context, title: "Overdue", dueDate: dueToday.addingTimeInterval(-86_400))
+        insert(context, title: "Today", dueDate: dueToday)
+        insert(context, title: "Tomorrow", dueDate: dueToday.addingTimeInterval(86_400))
         insert(context, title: "No due date", dueDate: nil)
 
         let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
-        #expect(due.map(\.title) == ["Overdue", "Later today"])
+        #expect(due.map(\.title) == ["Overdue", "Today"])
     }
 
     @Test("Includes everything on the Today list, due date or not")
@@ -134,7 +143,7 @@ struct TodayDigestTests {
         insert(context, title: "Undated", dueDate: nil, listKey: Self.todayListId, position: "a1")
         insert(
             context, title: "Due in three weeks",
-            dueDate: now.addingTimeInterval(21 * 86_400), listKey: Self.todayListId, position: "a2"
+            dueDate: Self.dueToday.addingTimeInterval(21 * 86_400), listKey: Self.todayListId, position: "a2"
         )
         insert(context, title: "Parked", dueDate: nil, listKey: Self.sometimeListId, position: "a3")
 
@@ -155,7 +164,7 @@ struct TodayDigestTests {
         // has to reach across lists for these or they go unseen all day.
         insert(
             context, title: "Overdue in Sometime",
-            dueDate: now.addingTimeInterval(-86_400), listKey: Self.sometimeListId
+            dueDate: Self.dueToday.addingTimeInterval(-86_400), listKey: Self.sometimeListId
         )
         insert(context, title: "On the list", dueDate: nil, listKey: Self.todayListId)
 
@@ -189,7 +198,7 @@ struct TodayDigestTests {
 
         // No `TodoListModel` rows at all — a fresh install where the widget
         // reads the store before the first sync lands.
-        insert(context, title: "Due today", dueDate: now, listKey: Self.todayListId)
+        insert(context, title: "Due today", dueDate: Self.dueToday, listKey: Self.todayListId)
         insert(context, title: "Undated", dueDate: nil, listKey: Self.todayListId)
 
         let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
@@ -211,7 +220,7 @@ struct TodayDigestTests {
         // still holding it back until midnight.
         insert(
             context, title: "Watered the plants",
-            dueDate: now.addingTimeInterval(86_400), listKey: Self.todayListId,
+            dueDate: Self.dueToday.addingTimeInterval(86_400), listKey: Self.todayListId,
             completedAt: now, recurrence: Recurrence(frequency: .daily)
         )
 
@@ -224,7 +233,7 @@ struct TodayDigestTests {
         let now = Self.now
         let container = try makeContainer()
         let context = container.mainContext
-        let dueToday = now.addingTimeInterval(-60)
+        let dueToday = Self.dueToday
 
         insert(context, title: "Open", dueDate: dueToday)
         insert(context, title: "Completed", dueDate: dueToday, completed: true)
@@ -249,7 +258,7 @@ struct TodayDigestTests {
         insert(
             context,
             title: "Watered the plants",
-            dueDate: now.addingTimeInterval(-3600),
+            dueDate: Self.dueToday,
             completedAt: now,
             recurrence: Recurrence(frequency: .daily)
         )
@@ -263,7 +272,7 @@ struct TodayDigestTests {
         let now = Self.now
         let container = try makeContainer()
         let context = container.mainContext
-        let dueToday = now.addingTimeInterval(-60)
+        let dueToday = Self.dueToday
 
         insert(context, title: "Mine", dueDate: dueToday)
         insert(context, title: "Theirs", dueDate: dueToday, userId: "user_456")
@@ -283,10 +292,11 @@ struct TodayDigestTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        insert(context, title: "Same day, later position", dueDate: now, position: "a2")
-        insert(context, title: "Same day, earlier position", dueDate: now, position: "a1")
-        insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-86_400), position: "a9")
-        insert(context, title: "Pinned", dueDate: now, position: "a9", sticky: true)
+        let dueToday = Self.dueToday
+        insert(context, title: "Same day, later position", dueDate: dueToday, position: "a2")
+        insert(context, title: "Same day, earlier position", dueDate: dueToday, position: "a1")
+        insert(context, title: "Overdue", dueDate: dueToday.addingTimeInterval(-86_400), position: "a9")
+        insert(context, title: "Pinned", dueDate: dueToday, position: "a9", sticky: true)
 
         let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
@@ -308,7 +318,7 @@ struct TodayDigestTests {
 
         insert(context, title: "Undated, later position", dueDate: nil, listKey: Self.todayListId, position: "a2")
         insert(context, title: "Undated, earlier position", dueDate: nil, listKey: Self.todayListId, position: "a1")
-        insert(context, title: "Overdue", dueDate: now.addingTimeInterval(-3600), position: "a9")
+        insert(context, title: "Overdue", dueDate: Self.dueToday.addingTimeInterval(-86_400), position: "a9")
         insert(context, title: "Pinned and undated", dueDate: nil, listKey: Self.todayListId, position: "a9", sticky: true)
 
         let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
@@ -328,9 +338,10 @@ struct TodayDigestTests {
         let container = try makeContainer()
         let context = container.mainContext
 
-        insert(context, title: "First", dueDate: now, position: "a1")
-        insert(context, title: "Second", dueDate: now, position: "a2")
-        insert(context, title: "Third", dueDate: now, position: "a3")
+        let dueToday = Self.dueToday
+        insert(context, title: "First", dueDate: dueToday, position: "a1")
+        insert(context, title: "Second", dueDate: dueToday, position: "a2")
+        insert(context, title: "Third", dueDate: dueToday, position: "a3")
 
         let due = TodayDigest.fetch(userId: Self.userId, limit: 2, context: context, now: now)
 

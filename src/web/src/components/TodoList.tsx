@@ -5,6 +5,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { dueDayKey } from "@nylon-impossible/shared";
 import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -33,7 +34,13 @@ import {
   usePendingTodoIds,
   type useUpdateTodo,
 } from "@/hooks/useTodos";
-import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
+import {
+  formatDate,
+  formatDueDate,
+  isDueDateOverdue,
+  isEffectivelyCompleted,
+  relativeDueDay,
+} from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
 import {
@@ -116,7 +123,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
       <div className="flex items-center gap-1.5 mt-1">
         <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted">
           <Clock size={10} />
-          Next: {relativeDay(dueDate, timeZone, now)}
+          Next: {relativeDueDay(dueDate, timeZone, now)}
           <Repeat size={10} />
         </span>
       </div>
@@ -125,7 +132,8 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
 
   // A repeat sitting in Completed (completedAt today) has already rolled its
   // dueDate forward, so it's never overdue; guard on effective completion too.
-  const isOverdue = dueDate && dueDate < now && !isCompleted;
+  const isOverdue =
+    !!dueDate && isDueDateOverdue(dueDate, timeZone, now) && !isCompleted;
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
@@ -138,13 +146,13 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
-          {formatDate(dueDate, timeZone)}
+          {formatDueDate(dueDate)}
         </span>
       )}
       {todo.recurrence && (
         <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base text-gray-muted">
           <Repeat size={10} />
-          {recurrenceLabel(todo.recurrence, dueDate, timeZone)}
+          {recurrenceLabel(todo.recurrence, dueDate)}
         </span>
       )}
     </div>
@@ -284,11 +292,12 @@ function TodoItemContent({
   // the right-side hover cluster. Recurrence stays read-only inline (its
   // anchor logic belongs in the expanded form).
   const dueDateObj = todo.dueDate ? new Date(todo.dueDate) : null;
-  const dueValueStr = dueDateObj
-    ? dueDateObj.toISOString().split("T")[0]
-    : null;
-  const dueLabel = dueDateObj ? formatDate(dueDateObj, timeZone) : null;
-  const isOverdue = !!dueDateObj && dueDateObj < new Date() && !isCompleted;
+  const dueValueStr = dueDateObj ? dueDayKey(dueDateObj) : null;
+  const dueLabel = dueDateObj ? formatDueDate(dueDateObj) : null;
+  const isOverdue =
+    !!dueDateObj &&
+    isDueDateOverdue(dueDateObj, timeZone, new Date()) &&
+    !isCompleted;
   const hasRecurrence = !!todo.recurrence;
   const showInlineEditing = !isCompleted;
   // The actions pill floats over the row instead of reserving its own line —
@@ -308,13 +317,33 @@ function TodoItemContent({
     }
   };
 
+  // Touch / narrow layout: a tap anywhere on the row that isn't already a
+  // control (checkbox, date pill, link, chevron) opens the details panel.
+  // Desktop keeps its hover pill, so clicks there do nothing new.
+  const handleRowTap = (e: React.MouseEvent) => {
+    if (!showActions) return;
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(min-width: 40rem) and (pointer: fine)").matches
+    ) {
+      return;
+    }
+    if (!(e.target instanceof Element)) return;
+    // Portaled descendants (the due-date popover) bubble through the React
+    // tree but aren't DOM children of the row — ignore them.
+    if (!e.currentTarget.contains(e.target)) return;
+    if (e.target.closest("a, button, input, textarea, [role='checkbox']"))
+      return;
+    if (window.getSelection()?.toString()) return;
+    onToggleExpand(todo.id);
+  };
+
   // Non-destructive, instantly reversible — toggle directly, no confirm step.
   const handleStickyToggle = () => {
     onInlineUpdate(todo.id, { sticky: !todo.sticky });
   };
 
-  // Shared between the desktop hover pill and the always-visible mobile row
-  // below — same controls, just different containers.
+  // Controls for the desktop hover pill.
   const rowActions = (
     <>
       {/* Opens the details panel — the title itself is now a plain,
@@ -337,7 +366,7 @@ function TodoItemContent({
           recurrence={todo.recurrence}
           recurrenceLabel={
             todo.recurrence
-              ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
+              ? recurrenceLabel(todo.recurrence, dueDateObj)
               : null
           }
           sticky={todo.sticky}
@@ -364,8 +393,11 @@ function TodoItemContent({
   );
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: tap-anywhere is a touch shortcut; the chevron button is the accessible equivalent
+    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard users open details via the chevron button
     <div
       data-todo-row
+      onClick={handleRowTap}
       className="flex flex-col gap-1.5 transition-[opacity,translate] duration-200 ease-out-strong"
     >
       <div className="flex items-start gap-3">
@@ -466,6 +498,23 @@ function TodoItemContent({
                   <FileText size={12} aria-hidden="true" />
                 </span>
               )}
+              {/* Compact layout shows pinned/repeating as quiet read-only
+                  state; the desktop pill carries the interactive versions. */}
+              {showActions && showInlineEditing && todo.recurrence && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs text-gray-muted sm:pointer-fine:hidden">
+                  <Repeat size={10} aria-hidden="true" />
+                  {recurrenceLabel(todo.recurrence, dueDateObj)}
+                </span>
+              )}
+              {showActions && showInlineEditing && todo.sticky && (
+                <span
+                  role="img"
+                  aria-label="Pinned"
+                  className="ml-2 inline-flex align-middle text-gray-muted sm:pointer-fine:hidden"
+                >
+                  <Pin size={12} className="fill-current" aria-hidden="true" />
+                </span>
+              )}
             </div>
           </div>
           {isCompleted && (
@@ -504,6 +553,24 @@ function TodoItemContent({
               completed rows keep the read-only indicators below the title. */}
           {!showInlineEditing && <TodoIndicators todo={todo} />}
         </div>
+        {/* Touch / narrow layout: no per-row toolbar. Tapping the row opens
+            its details (pin and delete live there); this chevron is the
+            visible, keyboard-reachable way in. */}
+        {showActions && (
+          <Button
+            variant="ghost"
+            size="xs"
+            shape="square"
+            ringOffset="app"
+            type="button"
+            onClick={() => onToggleExpand(todo.id)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}" details`}
+            className="-mr-1 -mt-0.5 shrink-0 text-gray-muted hover:text-gray sm:pointer-fine:hidden pointer-coarse:size-9"
+          >
+            <ChevronRight size={16} />
+          </Button>
+        )}
       </div>
       {/* Desktop: actions float as a pill over the row instead of reserving
           their own line — it stays put when it's carrying real state (due
@@ -518,14 +585,6 @@ function TodoItemContent({
               : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
           }`}
         >
-          {rowActions}
-        </div>
-      )}
-      {/* Touch (or narrow): same actions as the desktop pill, always visible
-          as a row below the content instead of a hover-revealed overlay, and
-          sized up to finger-friendly targets on a coarse pointer. */}
-      {showActions && (
-        <div className="flex items-center gap-0.5 sm:pointer-fine:hidden pointer-coarse:gap-1 pointer-coarse:[&_button]:size-9">
           {rowActions}
         </div>
       )}

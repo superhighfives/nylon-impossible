@@ -1,3 +1,10 @@
+import {
+  dayKeyIn,
+  daysBetweenKeys,
+  dueDayKey,
+  toDueDay,
+} from "@nylon-impossible/shared";
+
 /**
  * Formats a date in the user's time zone (from the time-zone client hint) so the
  * calendar day is correct regardless of where the code runs — SSR on Cloudflare
@@ -39,39 +46,47 @@ export function isSameLocalDay(
   );
 }
 
-/** Whole calendar days from `now` to `date` in `timeZone` (positive = future). */
-function localDayDiff(date: Date, now: Date, timeZone: string): number {
-  const key = (d: Date) =>
-    d.toLocaleDateString("en-CA", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      timeZone,
-    });
-  const a = new Date(`${key(date)}T00:00:00Z`).getTime();
-  const b = new Date(`${key(now)}T00:00:00Z`).getTime();
-  return Math.round((a - b) / 86_400_000);
+/**
+ * A due date as a readable date ("8/28/2026", or per `options`). Due dates are
+ * calendar days stored at UTC midnight, so they're formatted in UTC — reading
+ * them in the viewer's zone shows the previous day anywhere west of UTC.
+ */
+export function formatDueDate(
+  date: Date | string,
+  options?: Intl.DateTimeFormatOptions,
+): string {
+  return toDueDay(new Date(date)).toLocaleDateString(undefined, {
+    ...options,
+    timeZone: "UTC",
+  });
+}
+
+/** True when a due date's day is before today in the user's `timeZone`. */
+export function isDueDateOverdue(
+  date: Date | string,
+  timeZone: string,
+  now: Date,
+): boolean {
+  return dueDayKey(date) < dayKeyIn(now, timeZone);
 }
 
 /**
- * Relative calendar-day label in `timeZone`: "Today", "Tomorrow", "Yesterday",
- * a weekday within the coming week ("Monday"), else an abbreviated date
- * ("8 Jul"). Powers the "Next: …" badge on completed repeating todos, so the
- * next occurrence reads at a glance rather than as a raw date.
+ * Relative label for a due date: "Today", "Tomorrow", "Yesterday", a weekday
+ * within the coming week ("Monday"), else an abbreviated date ("8 Jul").
+ * "Today" is `now` in the user's `timeZone`; the due date is its own calendar
+ * day. Powers the "Next: …" badge on completed repeating todos.
  */
-export function relativeDay(
+export function relativeDueDay(
   date: Date | string,
   timeZone: string,
   now: Date,
 ): string {
-  const d = typeof date === "string" ? new Date(date) : date;
-  const diff = localDayDiff(d, now, timeZone);
+  const diff = daysBetweenKeys(dayKeyIn(now, timeZone), dueDayKey(date));
   if (diff === 0) return "Today";
   if (diff === 1) return "Tomorrow";
   if (diff === -1) return "Yesterday";
-  if (diff > 1 && diff < 7)
-    return d.toLocaleDateString(undefined, { weekday: "long", timeZone });
-  return formatDate(d, timeZone, { day: "numeric", month: "short" });
+  if (diff > 1 && diff < 7) return formatDueDate(date, { weekday: "long" });
+  return formatDueDate(date, { day: "numeric", month: "short" });
 }
 
 /**
