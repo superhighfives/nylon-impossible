@@ -176,7 +176,9 @@ export function SettingsModal({ origin }: { origin: string }) {
                     <Select
                       items={TIMEZONE_ITEMS}
                       value={timezone}
-                      onValueChange={(value) => saveTimezone(value as string)}
+                      onValueChange={(value) => {
+                        if (typeof value === "string") saveTimezone(value);
+                      }}
                       disabled={updateUser.isPending}
                       size="sm"
                     />
