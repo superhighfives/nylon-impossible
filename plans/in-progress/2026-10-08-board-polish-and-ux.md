@@ -421,3 +421,39 @@ Follow-ups spotted while testing on an emulated iPad:
 - **Deferred: reduced-motion reset.** It still zeroes all transitions. Allowing
   opacity fades through needs a per-property override that the blanket
   `!important` reset doesn't allow; revisit with Phase 5.
+
+### Phase 4 — implemented (2026-10-08, branch `board-polish-phase-4`)
+
+- **Followed the plan closely:** multiple-containers collision with
+  `lastOverIdRef` / `recentlyMovedRef`. `handleDragOver` moves the row
+  into the hovered list's `localOrderByList` at the hovered slot, clamped to
+  its tier, and a single `handleDragEnd` path commits `{ listId?, position }`.
+  The ordering math (`clampToTier`, `insertInTier`, `positionAt`) lives in
+  `lib/dragOrder.ts` with unit tests.
+- **Removed:** `TodoRowGhost`, the `crossListDrop` / `isLeavingList` props,
+  and the "origin" ghost variant. The row now moves between
+  `SortableContext`s, so its own sortable stand-in serves as the
+  target slot.
+- **Rows slide** (200ms strong ease-out) instead of snapping. This deliberately
+  reverses the earlier "no transition" choice, because the precise in-column
+  gap reads better with motion. The stand-in transitions into each new gap too.
+- **Keyboard:** `boardKeyboardCoordinates` replaces the vertical-only getter.
+  Up/down only consider rows in the same column; left/right jump to the
+  neighbouring column at the same height. The keyboard x-axis lock is gone,
+  because the getter itself keeps x fixed for vertical moves.
+- **Sync refetch:** the `todos` refetch effect skips resetting local orders
+  mid-drag. Cancel drops all overrides and re-derives.
+- **Drop zone:** the column drop-zone frame is now a quiet tint plus a
+  hairline ring rather than a dashed border, so it doesn't compete with the
+  row slot.
+- **Empty columns:** the empty-column early return in `TodoListColumn` is gone.
+  The column droppable is always `h-full min-h-24`, so empty lists and the
+  space below the last row accept drops.
+- Verified in the browser:
+  - a cross-list drop at a precise index, which persists across a reload
+  - a cross-list drag cancelled with Escape
+  - a same-list reorder
+  - a keyboard drag with ArrowLeft into the neighbouring column, cancelled
+    with Escape
+- **Not done:** auto-scroll tuning. dnd-kit's default reached the columns in
+  testing, so no `autoScroll` override was added.

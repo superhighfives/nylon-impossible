@@ -594,16 +594,9 @@ function GhostRowContent(props: TodoItemProps) {
  */
 function RowGhost({
   children,
-  variant = "target",
   ring = false,
 }: {
   children: ReactNode;
-  /**
-   * `target` is the slot the row will land in — brand-tinted, with the
-   * insertion line. `origin` is the space it vacated in a column it's on its
-   * way out of: neutral, and without a line, since nothing lands there.
-   */
-  variant?: "target" | "origin";
   /** Keyboard drags get a stronger outline — there's no pointer to follow. */
   ring?: boolean;
 }) {
@@ -614,42 +607,27 @@ function RowGhost({
       </div>
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 rounded-lg border border-dashed ${
-          variant === "target"
-            ? "border-accent-strong bg-accent-base/60"
-            : "border-gray-strong bg-gray-base/40"
-        } ${ring ? "ring-2 ring-accent-strong" : ""}`}
+        className={`pointer-events-none absolute inset-0 rounded-lg border border-dashed border-accent-strong bg-accent-base/60 ${
+          ring ? "ring-2 ring-accent-strong" : ""
+        }`}
       >
-        {variant === "target" && (
-          <span className="absolute inset-x-0 -top-px h-0.5 rounded-full bg-accent-solid" />
-        )}
+        <span className="absolute inset-x-0 -top-px h-0.5 rounded-full bg-accent-solid" />
       </span>
     </>
   );
 }
 
-/**
- * A standalone stand-in for a row that isn't in this column yet: the slot a
- * cross-column drag will land in. `SortableTodoItem` draws the same thing
- * inside the row the drag lifted, so both columns show the same shape.
- */
-export function TodoRowGhost(props: TodoItemProps) {
-  return (
-    <div className="relative rounded-lg py-3">
-      <RowGhost>
-        <GhostRowContent {...props} />
-      </RowGhost>
-    </div>
-  );
-}
+// Rows making room for a drag slide rather than snap, using the same strong
+// ease-out as the rest of the board's motion.
+const SORT_TRANSITION = {
+  duration: 200,
+  easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+};
+const SORT_TRANSITION_CSS = `transform ${SORT_TRANSITION.duration}ms ${SORT_TRANSITION.easing}`;
 
 function SortableTodoItem(
   props: TodoItemProps & {
     isKeyboardDragging: boolean;
-    /** True while this row is being dragged toward a different list — its
-     * stand-in stays put and goes neutral, because the slot it's headed for is
-     * shown in that other column instead. */
-    isLeavingList: boolean;
     onUpdateExpanded: (updates: {
       title?: string;
       notes?: string | null;
@@ -668,12 +646,17 @@ function SortableTodoItem(
     over,
     overIndex,
     rect,
-  } = useSortable({ id: props.todo.id, disabled: props.isExpanded });
+    transition,
+  } = useSortable({
+    id: props.todo.id,
+    disabled: props.isExpanded,
+    transition: SORT_TRANSITION,
+  });
 
-  // Rows reflow to open a gap at the target so it's clear where the item lands.
-  // No transition — rows (and the placeholder) snap into place instead of
-  // sliding, which is what kept the drop cue from feeling static. Translate
-  // only, no scaleY, so variable-height rows never squish or stretch.
+  // Rows reflow to open a gap at the target so it's clear where the item lands,
+  // sliding with a short ease-out (SORT_TRANSITION) so the eye can follow
+  // which rows moved. Translate only, no scaleY, so variable-height rows never
+  // squish or stretch.
   //
   // The dragged row never follows the pointer — a DragOverlay (rendered in
   // TodoGrid) does that, so the moving card isn't clipped by the column's
@@ -691,7 +674,7 @@ function SortableTodoItem(
   // with a DragOverlay mounted it describes the floating overlay instead.)
   const draggedRect = rect.current;
   const gapShift = (() => {
-    if (!isDragging || props.isLeavingList) return 0;
+    if (!isDragging) return 0;
     if (!over || !draggedRect || overIndex === -1) return 0;
     if (overIndex === activeIndex) return 0;
     return overIndex > activeIndex
@@ -707,6 +690,8 @@ function SortableTodoItem(
         ? `translate3d(0, ${gapShift}px, 0)`
         : undefined
       : CSS.Translate.toString(transform),
+    // The stand-in glides into each new gap alongside the rows making room.
+    transition: isDragging ? SORT_TRANSITION_CSS : (transition ?? undefined),
   };
 
   return (
@@ -731,10 +716,7 @@ function SortableTodoItem(
         // the drag from it via document-level listeners — unmounting it
         // would drop focus to <body> for the rest of the drag.
         <>
-          <RowGhost
-            variant={props.isLeavingList ? "origin" : "target"}
-            ring={props.isKeyboardDragging && !props.isLeavingList}
-          >
+          <RowGhost ring={props.isKeyboardDragging}>
             <GhostRowContent {...props} />
           </RowGhost>
           <button
@@ -893,15 +875,6 @@ export interface TodoListColumnProps {
   isKeyboardDragging: boolean;
   /** Mid-drag optimistic order override for this list, or null to use the derived order. */
   localIncompleteTodos: TodoWithUrls[] | null;
-  /**
-   * Set only on the column a cross-list drag is currently over: where the
-   * dragged row will land (an index into this column's displayed order) and
-   * the stand-in to show there — a `TodoRowGhost` built by TodoGrid, which is
-   * the only place that knows which row is being dragged.
-   */
-  crossListDrop: { index: number; ghost: ReactNode } | null;
-  /** True while one of *this* list's rows is being dragged toward another list. */
-  isLeavingList: boolean;
 }
 
 /**
@@ -926,8 +899,6 @@ export function TodoListColumn({
   timeZone,
   isKeyboardDragging,
   localIncompleteTodos,
-  crossListDrop,
-  isLeavingList,
 }: TodoListColumnProps) {
   // Registers the whole column as a drop target so a drag can land in empty
   // space (an empty list, or below the last row) and still resolve to this
@@ -937,16 +908,6 @@ export function TodoListColumn({
   });
   const pending = usePendingTodoIds();
   const completing = useCompletionHold();
-
-  if (todos.length === 0) {
-    // Fills the column so a cross-list drag can drop anywhere in the empty
-    // space, not just a sliver under the title.
-    return (
-      <div ref={setColumnDropRef} className="h-full min-h-24">
-        {crossListDrop?.ghost}
-      </div>
-    );
-  }
 
   const handleToggle = (id: string, completed: boolean) => {
     const todo = todos.find((t) => t.id === id);
@@ -1052,21 +1013,15 @@ export function TodoListColumn({
       key={todo.id}
       {...sharedProps(todo)}
       isKeyboardDragging={isKeyboardDragging}
-      isLeavingList={isLeavingList}
       onUpdateExpanded={handleUpdateExpanded(todo.id)}
       subtaskHandlers={subtaskHandlers}
     />
   ));
 
-  // A cross-list drag lands at the top of its own tier here (see
-  // TodoGrid.handleDragEnd), so the stand-in goes in at that index rather than
-  // under the pointer — it shows where the row will actually end up.
-  if (crossListDrop) {
-    rows.splice(crossListDrop.index, 0, crossListDrop.ghost);
-  }
-
   return (
-    <div ref={setColumnDropRef}>
+    // Fills the column so a cross-list drag can drop anywhere in it — an empty
+    // list, or the space below the last row — not just onto a row.
+    <div ref={setColumnDropRef} className="h-full min-h-24">
       <SortableContext
         id={`list:${listId}`}
         items={displayIncompleteTodos.map((t) => t.id)}
