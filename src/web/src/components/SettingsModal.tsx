@@ -68,6 +68,15 @@ export function SettingsModal({ origin }: { origin: string }) {
     typeof Intl !== "undefined"
       ? Intl.DateTimeFormat().resolvedOptions().timeZone
       : "UTC";
+  // V8 leaves "UTC" (and legacy aliases like Asia/Calcutta) out of
+  // supportedValuesOf, so keep the saved zone selectable or the Select
+  // renders blank for default-UTC accounts.
+  const timezoneItems = TIMEZONE_ITEMS.some((item) => item.value === timezone)
+    ? TIMEZONE_ITEMS
+    : [
+        { value: timezone, label: timezone.replace(/_/g, " ") },
+        ...TIMEZONE_ITEMS,
+      ];
   const saveTimezone = (next: string) => {
     if (next === timezone) return;
     updateUser.mutate(
@@ -174,7 +183,7 @@ export function SettingsModal({ origin }: { origin: string }) {
                   <LayerCard.Secondary>Timezone</LayerCard.Secondary>
                   <LayerCard.Primary>
                     <Select
-                      items={TIMEZONE_ITEMS}
+                      items={timezoneItems}
                       value={timezone}
                       onValueChange={(value) => {
                         if (typeof value === "string") saveTimezone(value);
