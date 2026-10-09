@@ -26,6 +26,7 @@ import type { ReactNode } from "react";
 import { InlineDueDate } from "@/components/InlineTodoControls";
 import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
+import { useCompletionHold } from "@/hooks/useCompletionHold";
 import { useHints } from "@/hooks/useHints";
 import {
   type useCreateTodo,
@@ -74,6 +75,12 @@ interface TodoItemProps {
   onInlineUpdate: (id: string, updates: UpdateTodoInput) => void;
   updatePending: boolean;
   deletePending: boolean;
+  /**
+   * Just checked off and briefly held in place so the check and strike-through
+   * register before the row moves to Completed. Visual only — the row keeps
+   * its active layout so nothing reflows during the hold.
+   */
+  isCompleting?: boolean;
 }
 
 interface ExpandedSectionProps {
@@ -239,6 +246,7 @@ function TodoItemContent({
   onInlineUpdate,
   updatePending,
   deletePending,
+  isCompleting = false,
   showActions = true,
 }: TodoItemProps & { showActions?: boolean }) {
   const { timeZone } = useHints();
@@ -357,11 +365,14 @@ function TodoItemContent({
   );
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div
+      data-todo-row
+      className="flex flex-col gap-1.5 transition-[opacity,translate] duration-200 ease-out-strong"
+    >
       <div className="flex items-start gap-3">
         <div className="mt-[3px]">
           <Checkbox
-            checked={isCompleted}
+            checked={isCompleted || isCompleting}
             onCheckedChange={() => onToggle(todo.id, isCompleted)}
             disabled={updatePending}
             variant={isCompleted ? "subtle" : "default"}
@@ -383,10 +394,12 @@ function TodoItemContent({
                 if (strippedTitle.length > 0 || previewTitle) {
                   return (
                     <p
-                      className={`inline leading-snug wrap-anywhere ${
+                      className={`inline leading-snug wrap-anywhere transition-colors duration-200 ${
                         isCompleted
                           ? "text-sm line-through text-gray-placeholder"
-                          : "text-[15px] font-semibold text-gray"
+                          : isCompleting
+                            ? "text-[15px] font-semibold line-through text-gray-placeholder"
+                            : "text-[15px] font-semibold text-gray"
                       }`}
                     >
                       {strippedTitle.length > 0 ? (
@@ -399,10 +412,12 @@ function TodoItemContent({
                 }
                 return (
                   <p
-                    className={`inline leading-snug wrap-anywhere text-[15px] ${
+                    className={`inline leading-snug wrap-anywhere text-[15px] transition-colors duration-200 ${
                       isCompleted
                         ? "text-sm line-through text-gray-placeholder"
-                        : "text-gray-muted"
+                        : isCompleting
+                          ? "line-through text-gray-placeholder"
+                          : "text-gray-muted"
                     }`}
                   >
                     <LinkifiedText text={todo.title} />
@@ -698,7 +713,7 @@ function SortableTodoItem(
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative rounded-lg py-3 transition-colors duration-1000 ease-out ${
+      className={`group relative rounded-lg py-3 transition-colors duration-200 ease-out ${
         // Stays visually selected while its side panel is open, for context.
         !isDragging && props.isExpanded ? "bg-gray-base" : ""
       }`}
@@ -921,6 +936,7 @@ export function TodoListColumn({
     id: `column-${listId}`,
   });
   const pending = usePendingTodoIds();
+  const completing = useCompletionHold();
 
   if (todos.length === 0) {
     // Fills the column so a cross-list drag can drop anywhere in the empty
@@ -935,6 +951,9 @@ export function TodoListColumn({
   const handleToggle = (id: string, completed: boolean) => {
     const todo = todos.find((t) => t.id === id);
     if (!todo) return;
+    // A second press during the completion hold is an undo: cancel it before
+    // anything was sent.
+    if (completing.cancel(id)) return;
     if (completed) {
       // Undo a repeat that's checked via completedAt (stamped, not persistently
       // done). Always clear the stamp so it can never stay stuck as completed —
@@ -964,7 +983,9 @@ export function TodoListColumn({
         input: { completed: false, position: newPosition },
       });
     } else {
-      updateTodo.mutate({ id, input: { completed: true } });
+      completing.start(id, () =>
+        updateTodo.mutate({ id, input: { completed: true } }),
+      );
     }
   };
 
@@ -1023,6 +1044,7 @@ export function TodoListColumn({
     onInlineUpdate: handleInlineUpdate,
     updatePending: pending.updating.has(todo.id),
     deletePending: pending.deleting.has(todo.id),
+    isCompleting: completing.ids.has(todo.id),
   });
 
   const rows: ReactNode[] = displayIncompleteTodos.map((todo) => (
@@ -1136,35 +1158,47 @@ export function CompletedColumn({
             : "Hide completed"}
         </span>
       </button>
-      {!collapsed &&
-        completedTodos.map((todo) => (
-          <div
-            key={todo.id}
-            className={`group rounded-lg py-2 ${
-              expandedId === todo.id ? "bg-gray-base" : ""
-            }`}
-          >
-            <div className="flex items-start gap-2">
-              {/* Mobile-only spacer matching the active rows' inline grip
-                  width; on desktop the grip hangs in the margin, so
-                  completed rows are already flush. */}
-              <div className="w-4 shrink-0 sm:hidden" aria-hidden="true" />
-              <div className="flex-1 min-w-0">
-                <TodoItemContent
-                  todo={todo}
-                  subtasks={subtasksByParent.get(todo.id) ?? []}
-                  isExpanded={expandedId === todo.id}
-                  onToggle={() => onUncomplete(todo)}
-                  onDelete={onRequestDelete}
-                  onToggleExpand={onToggleExpand}
-                  onInlineUpdate={() => {}}
-                  updatePending={pending.updating.has(todo.id)}
-                  deletePending={pending.deleting.has(todo.id)}
-                />
+      {/* Always mounted so it can animate open and closed; `inert` keeps the
+          collapsed rows out of the tab order and away from screen readers. */}
+      <div
+        inert={collapsed}
+        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out-strong ${
+          collapsed
+            ? "grid-rows-[0fr] opacity-0"
+            : "grid-rows-[1fr] opacity-100"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          {completedTodos.map((todo) => (
+            <div
+              key={todo.id}
+              className={`group rounded-lg py-2 ${
+                expandedId === todo.id ? "bg-gray-base" : ""
+              }`}
+            >
+              <div className="flex items-start gap-1.5">
+                {/* Mobile-only spacer matching the active rows' inline grip
+                      width; on desktop the grip hangs in the margin, so
+                      completed rows are already flush. */}
+                <div className="w-5 shrink-0 sm:hidden" aria-hidden="true" />
+                <div className="flex-1 min-w-0">
+                  <TodoItemContent
+                    todo={todo}
+                    subtasks={subtasksByParent.get(todo.id) ?? []}
+                    isExpanded={expandedId === todo.id}
+                    onToggle={() => onUncomplete(todo)}
+                    onDelete={onRequestDelete}
+                    onToggleExpand={onToggleExpand}
+                    onInlineUpdate={() => {}}
+                    updatePending={pending.updating.has(todo.id)}
+                    deletePending={pending.deleting.has(todo.id)}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

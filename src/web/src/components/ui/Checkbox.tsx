@@ -55,12 +55,15 @@ export function Checkbox({
           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 ${RING_OFFSET[ringOffset]}
           disabled:cursor-not-allowed disabled:opacity-50
           ${checkedStyle}
-          transition-colors
+          transition-[color,background-color,border-color,scale] duration-150 active:scale-[0.92]
           ${className ?? ""}
         `}
         {...props}
       >
-        <BaseCheckbox.Indicator className="flex items-center justify-center text-current">
+        <BaseCheckbox.Indicator
+          keepMounted
+          className="flex items-center justify-center text-current transition-[opacity,scale,filter] duration-200 ease-out-strong data-unchecked:scale-50 data-unchecked:opacity-0 data-unchecked:blur-[2px]"
+        >
           {indeterminate ? (
             <Minus className="h-3 w-3" />
           ) : (

@@ -399,3 +399,25 @@ Follow-ups spotted while testing on an emulated iPad:
   actions, and dropping the per-row toolbar entirely.
 - Unpinned rows show `PinOff` (a crossed-out pin) as the "pin this"
   affordance, which reads as "unpin". Use `Pin` at reduced opacity instead.
+
+### Phase 3 — implemented (2026-10-08, branch `board-polish-phase-3`)
+
+- **Popup motion:** a single `popup-motion` utility in `styles.css` covers
+  Select, Popover (the due-date calendar), Tooltip and the segmented
+  control's Menu, instead of repeating the class string at each call site.
+- **Completion hold:** `useCompletionHold` (`hooks/useCompletionHold.ts`)
+  delays the commit by 350ms, not by re-ordering the cache. During the hold
+  the row is drawn checked and struck through but keeps its active layout.
+  A second press cancels it. Pending commits are flushed on unmount, and
+  reduced motion skips the hold. Settled completed rows keep their smaller
+  `text-sm` type in the Completed column; the hold keeps 15px, so the row
+  doesn't reflow before it leaves.
+- **Row enter** uses CSS `@starting-style` on `[data-todo-row]`, gated by
+  `data-board-ready` on the board scaffold so the first paint doesn't fade
+  every row in.
+- **Completed column:** stays mounted and animates with
+  `grid-template-rows`, `inert` while collapsed. Two grid tests now assert
+  inertness instead of absence.
+- **Deferred: reduced-motion reset.** It still zeroes all transitions. Allowing
+  opacity fades through needs a per-property override that the blanket
+  `!important` reset doesn't allow; revisit with Phase 5.

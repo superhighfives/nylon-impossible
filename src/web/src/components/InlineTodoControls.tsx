@@ -232,7 +232,7 @@ export function InlineDueDate({
       </span>
       <Popover.Portal>
         <Popover.Positioner sideOffset={6} align="start" className="z-50">
-          <Popover.Popup className="rounded-lg border border-gray-subtle bg-gray-surface p-3 shadow-lg outline-none">
+          <Popover.Popup className="popup-motion rounded-xl border border-gray-subtle bg-gray-surface p-2.5 shadow-lg outline-none">
             <DueDateCalendar
               value={value}
               timeZone={timeZone}

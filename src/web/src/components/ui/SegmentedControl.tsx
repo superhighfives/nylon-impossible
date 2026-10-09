@@ -133,7 +133,7 @@ export function SegmentedControl({
           </Menu.Trigger>
           <Menu.Portal>
             <Menu.Positioner className="z-[90]" sideOffset={6} align="end">
-              <Menu.Popup className="max-h-72 min-w-40 origin-(--transform-origin) overflow-y-auto rounded-xl border border-gray-subtle bg-gray-surface p-1 shadow-lg transition-[opacity,scale] duration-150 ease-out-strong data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-ending-style:duration-100 data-starting-style:scale-[0.97] data-starting-style:opacity-0">
+              <Menu.Popup className="popup-motion max-h-72 min-w-40 overflow-y-auto rounded-xl border border-gray-subtle bg-gray-surface p-1 shadow-lg">
                 <Menu.RadioGroup
                   value={overflowSelected?.value ?? null}
                   onValueChange={(next) => onValueChange(next as string)}

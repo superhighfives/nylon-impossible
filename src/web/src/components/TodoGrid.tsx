@@ -193,11 +193,20 @@ function BoardScaffold({
   children: ReactNode;
   scrollRef?: RefObject<HTMLDivElement | null>;
 }) {
+  // Rows only fade in once the board has painted — otherwise every row would
+  // play its enter animation on page load (see `data-todo-row` in styles.css).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
   // overscroll-x-contain stops edge swipes chaining into the page's
   // rubber-band / browser back gesture.
   return (
     <div
       ref={scrollRef}
+      data-board-ready={ready ? "" : undefined}
       className="fixed inset-0 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain md:snap-none"
     >
       <div className="flex h-full min-w-max">
