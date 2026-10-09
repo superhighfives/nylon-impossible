@@ -24,7 +24,10 @@ export interface AddonStatePayload {
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function base64UrlDecode(input: string): Uint8Array {
@@ -68,9 +71,7 @@ export async function signAddonState(
   ttlSeconds = 600,
 ): Promise<string> {
   const full: AddonStatePayload = { ...payload, exp: nowSeconds + ttlSeconds };
-  const body = base64UrlEncode(
-    new TextEncoder().encode(JSON.stringify(full)),
-  );
+  const body = base64UrlEncode(new TextEncoder().encode(JSON.stringify(full)));
   const key = await hmacKey(secret);
   const signature = new Uint8Array(
     await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(body)),

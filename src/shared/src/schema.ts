@@ -62,10 +62,9 @@ export const todos = sqliteTable(
     // one level only (a subtask cannot itself have subtasks). Immutable after
     // creation — subtasks are permanently bound to their parent. Deleting a
     // parent cascades to its children.
-    parentId: text("parent_id").references(
-      (): AnySQLiteColumn => todos.id,
-      { onDelete: "cascade" },
-    ),
+    parentId: text("parent_id").references((): AnySQLiteColumn => todos.id, {
+      onDelete: "cascade",
+    }),
     // Which list this todo belongs to (Today/This Week/Sometime, or a custom
     // list). A todo belongs to exactly one list. Independent of dueDate —
     // list membership never implies or derives a due date, and vice versa.
@@ -140,9 +139,7 @@ export const gmailAddonLinks = sqliteTable(
       .notNull()
       .default(sql`(unixepoch())`),
   },
-  (table) => [
-    index("idx_gmail_addon_links_clerk_user").on(table.clerkUserId),
-  ],
+  (table) => [index("idx_gmail_addon_links_clerk_user").on(table.clerkUserId)],
 );
 
 // Lists table. Three system lists per user (Today/This Week/Sometime,

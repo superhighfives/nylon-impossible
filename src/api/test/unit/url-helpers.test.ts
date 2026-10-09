@@ -226,9 +226,9 @@ describe("isPlaceholderTitle", () => {
   });
 
   it("ignores a trailing slash the URL constructor added", () => {
-    expect(isPlaceholderTitle("https://example.com", "https://example.com/")).toBe(
-      true,
-    );
+    expect(
+      isPlaceholderTitle("https://example.com", "https://example.com/"),
+    ).toBe(true);
   });
 
   it("treats an empty title as a placeholder", () => {

@@ -73,6 +73,12 @@ export function splitTodoText(text: string): {
   return { title: clip(firstLine, OVERFLOW_TITLE_LENGTH), notes };
 }
 
+/**
+ * Cap notes in UTF-16 code units — what the zod `.max()` validators count —
+ * without leaving half of a surrogate pair at the cut.
+ */
 function capNotes(text: string): string {
-  return Array.from(text).slice(0, TODO_NOTES_MAX).join("");
+  if (text.length <= TODO_NOTES_MAX) return text;
+  const cut = text.slice(0, TODO_NOTES_MAX);
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
 }

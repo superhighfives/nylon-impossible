@@ -53,6 +53,12 @@ describe("splitTodoText", () => {
     });
   });
 
+  it("caps emoji-heavy notes in UTF-16 units without splitting a pair", () => {
+    const { notes } = splitTodoText("😀".repeat(TODO_NOTES_MAX));
+    expect(notes?.length).toBeLessThanOrEqual(TODO_NOTES_MAX);
+    expect(notes).not.toMatch(/[\uD800-\uDBFF]$/);
+  });
+
   it("caps notes at the notes limit", () => {
     const { notes } = splitTodoText("a".repeat(TODO_NOTES_MAX + 50));
     expect(notes?.length).toBe(TODO_NOTES_MAX);
