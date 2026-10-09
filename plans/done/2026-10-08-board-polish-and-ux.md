@@ -1,7 +1,60 @@
 # Board polish and UX
 
 **Date**: 2026-10-08
-**Status**: In Progress
+**Status**: Complete (2026-10-09)
+
+## Overview
+
+Shipped in PRs #364–#370, landed on main via #364 plus a follow-up that
+carried #369 and #370 across after the stacked merges stranded them.
+
+- **Inputs:** long pastes keep their overflow in notes instead of failing
+  the 500-char title limit. The composer's list dropdown became a segmented
+  control, and both todo inputs wrap and grow.
+- **Touch:** row controls are reachable by hover-capability rather than
+  screen width. Touch and narrow rows dropped their per-row toolbar for
+  tap-to-open plus a chevron. Small targets got larger hit areas, and each
+  row tracks its own pending state.
+- **Motion:** shared popup motion, a short hold when a todo is checked off,
+  an animated Completed column, rows fading in, and reduced motion that
+  keeps fades but drops movement.
+- **Drag between lists:** follows dnd-kit's multiple-containers pattern, so
+  the todo lands at the exact slot you point at.
+- **Consistency:** one date picker, inert badges, a filled/outline pin, and
+  Settings that save on change.
+- **Due dates** are calendar days everywhere: a due date's day is its
+  nearest UTC midnight, and "today" is the user's local day.
+
+## Architecture
+
+### Key decisions
+
+- **Overflow helper:** `splitTodoText` (shared) is the single overflow rule,
+  used server-side in smart-create and client-side in the column input.
+- **Composer picker:** the composer lives in a ~288px header slot, so the
+  segmented picker unfolds *below* the field rather than sitting inline.
+- **Drag state:** cross-list drag moves the row between `SortableContext`s
+  during the drag (`localOrderByList`), and one commit path handles both
+  same-list and cross-list drops. The ordering math is in `lib/dragOrder.ts`.
+- **Reduced motion:** narrows `transition-property` to opacity and colours
+  instead of zeroing durations.
+- **Due dates:** the `due-date` module (`toDueDay`, `dueDayKey`, `dayKeyIn`)
+  is mirrored in Swift as `DueDay`. The API normalizes on write, and
+  recurrence takes the user's timezone setting. Since the app has no users
+  yet, there was no legacy data to reconcile.
+
+### Deviations
+
+The per-phase "Progress" notes below record the deviations. The main ones:
+
+- No custom hover variant; it uses Tailwind's `pointer-fine:`.
+- Dialogs use `Dialog.Viewport`.
+- Settings dropped its Save button.
+- Swipe actions weren't built.
+- The due-date fix grew from one label into web + API + iOS.
+
+The stacked-PR merge order also stranded #369/#370 on intermediate branches.
+They were re-landed by cherry-picking onto main.
 
 ## Problem
 
