@@ -308,6 +308,23 @@ function TodoItemContent({
     }
   };
 
+  // Touch / narrow layout: a tap anywhere on the row that isn't already a
+  // control (checkbox, date pill, link, chevron) opens the details panel.
+  // Desktop keeps its hover pill, so clicks there do nothing new.
+  const handleRowTap = (e: React.MouseEvent) => {
+    if (!showActions) return;
+    if (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(min-width: 40rem) and (pointer: fine)").matches
+    ) {
+      return;
+    }
+    const target = e.target as Element;
+    if (target.closest("a, button, input, textarea, [role='checkbox']")) return;
+    if (window.getSelection()?.toString()) return;
+    onToggleExpand(todo.id);
+  };
+
   // Non-destructive, instantly reversible — toggle directly, no confirm step.
   const handleStickyToggle = () => {
     onInlineUpdate(todo.id, { sticky: !todo.sticky });
@@ -364,8 +381,11 @@ function TodoItemContent({
   );
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: tap-anywhere is a touch shortcut; the chevron button is the accessible equivalent
+    // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard users open details via the chevron button
     <div
       data-todo-row
+      onClick={handleRowTap}
       className="flex flex-col gap-1.5 transition-[opacity,translate] duration-200 ease-out-strong"
     >
       <div className="flex items-start gap-3">
@@ -466,6 +486,23 @@ function TodoItemContent({
                   <FileText size={12} aria-hidden="true" />
                 </span>
               )}
+              {/* Compact layout shows pinned/repeating as quiet read-only
+                  state; the desktop pill carries the interactive versions. */}
+              {showActions && showInlineEditing && todo.recurrence && (
+                <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs text-gray-muted sm:pointer-fine:hidden">
+                  <Repeat size={10} aria-hidden="true" />
+                  {recurrenceLabel(todo.recurrence, dueDateObj, timeZone)}
+                </span>
+              )}
+              {showActions && showInlineEditing && todo.sticky && (
+                <span
+                  role="img"
+                  aria-label="Pinned"
+                  className="ml-2 inline-flex align-middle text-gray-muted sm:pointer-fine:hidden"
+                >
+                  <Pin size={12} className="fill-current" aria-hidden="true" />
+                </span>
+              )}
             </div>
           </div>
           {isCompleted && (
@@ -504,6 +541,24 @@ function TodoItemContent({
               completed rows keep the read-only indicators below the title. */}
           {!showInlineEditing && <TodoIndicators todo={todo} />}
         </div>
+        {/* Touch / narrow layout: no per-row toolbar. Tapping the row opens
+            its details (pin and delete live there); this chevron is the
+            visible, keyboard-reachable way in. */}
+        {showActions && (
+          <Button
+            variant="ghost"
+            size="xs"
+            shape="square"
+            ringOffset="app"
+            type="button"
+            onClick={() => onToggleExpand(todo.id)}
+            aria-expanded={isExpanded}
+            aria-label={`${isExpanded ? "Collapse" : "Expand"} "${todo.title}" details`}
+            className="-mr-1 -mt-0.5 shrink-0 text-gray-muted hover:text-gray sm:pointer-fine:hidden pointer-coarse:size-9"
+          >
+            <ChevronRight size={16} />
+          </Button>
+        )}
       </div>
       {/* Desktop: actions float as a pill over the row instead of reserving
           their own line — it stays put when it's carrying real state (due
@@ -518,14 +573,6 @@ function TodoItemContent({
               : "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
           }`}
         >
-          {rowActions}
-        </div>
-      )}
-      {/* Touch (or narrow): same actions as the desktop pill, always visible
-          as a row below the content instead of a hover-revealed overlay, and
-          sized up to finger-friendly targets on a coarse pointer. */}
-      {showActions && (
-        <div className="flex items-center gap-0.5 sm:pointer-fine:hidden pointer-coarse:gap-1 pointer-coarse:[&_button]:size-9">
           {rowActions}
         </div>
       )}

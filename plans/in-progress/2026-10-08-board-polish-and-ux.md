@@ -493,7 +493,18 @@ Deviations:
   the panel says Aug 28. This needs one convention across web, API and iOS.
   iOS may store local-midnight instants, so check before changing either
   side.
-- **Reduced-motion reset** still zeroes every transition. Let opacity and
-  colour fades through, with transforms removed.
-- **Touch row actions:** the always-visible action row under each todo is
-  heavy on touch. Consider tap-to-open details plus swipe actions.
+
+### Phase 6 — reduced motion and touch rows (2026-10-09, branch `board-polish-phase-6`)
+
+- **Reduced motion:** the reset now narrows `transition-property` to
+  opacity and colours instead of zeroing durations. Fades keep their authored
+  timing; movement, scaling and resizing (including dnd-kit's inline
+  transitions) snap. Keyframe animations are still stopped. The completion
+  hold now applies under reduced motion too, because it's feedback, not
+  movement.
+- **Touch / narrow rows:** the per-row toolbar is gone. Tapping a row outside
+  its controls opens the details panel, which already has pin and delete, and
+  a trailing chevron is the visible, keyboard-reachable way in. Pinned and
+  repeating state show as read-only indicators next to the due date. Swipe
+  actions were considered but not built, because they compete with the
+  touch drag sensor and the panel covers the same actions.

@@ -114,15 +114,23 @@ code {
 
 /* Honor a reduced-motion preference. Server-resolved via the epic-web client
    hint and reflected on <html data-reduced-motion="reduce"> (see __root.tsx),
-   so it's correct on first paint. Neutralizes animations, transitions, and
-   smooth scrolling app-wide. !important is required so the reset beats
-   animation/transition utilities (the conventional reduced-motion pattern). */
+   so it's correct on first paint.
+
+   Reduced motion means less movement, not no feedback: transitions are
+   narrowed to opacity and colour, so fades, tints and the check-off strike
+   still read, while anything that moves, scales or resizes (popups, the side
+   panel, rows making room during a drag, collapsing sections) snaps straight
+   to its end state. Keyframe animations (spinners, skeleton pulses) are
+   stopped outright. !important is required so this beats transition
+   utilities and dnd-kit's inline transitions. */
 [data-reduced-motion="reduce"] *,
 [data-reduced-motion="reduce"] *::before,
 [data-reduced-motion="reduce"] *::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+  transition-property:
+    opacity, color, background-color, border-color, outline-color,
+    text-decoration-color, fill, stroke !important;
   scroll-behavior: auto !important;
 }
 
