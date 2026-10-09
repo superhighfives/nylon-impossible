@@ -399,3 +399,101 @@ Follow-ups spotted while testing on an emulated iPad:
   actions, and dropping the per-row toolbar entirely.
 - Unpinned rows show `PinOff` (a crossed-out pin) as the "pin this"
   affordance, which reads as "unpin". Use `Pin` at reduced opacity instead.
+
+### Phase 3 — implemented (2026-10-08, branch `board-polish-phase-3`)
+
+- **Popup motion:** a single `popup-motion` utility in `styles.css` covers
+  Select, Popover (the due-date calendar), Tooltip and the segmented
+  control's Menu, instead of repeating the class string at each call site.
+- **Completion hold:** `useCompletionHold` (`hooks/useCompletionHold.ts`)
+  delays the commit by 350ms, not by re-ordering the cache. During the hold
+  the row is drawn checked and struck through but keeps its active layout.
+  A second press cancels it. Pending commits are flushed on unmount, and
+  reduced motion skips the hold. Settled completed rows keep their smaller
+  `text-sm` type in the Completed column; the hold keeps 15px, so the row
+  doesn't reflow before it leaves.
+- **Row enter** uses CSS `@starting-style` on `[data-todo-row]`, gated by
+  `data-board-ready` on the board scaffold so the first paint doesn't fade
+  every row in.
+- **Completed column:** stays mounted and animates with
+  `grid-template-rows`, `inert` while collapsed. Two grid tests now assert
+  inertness instead of absence.
+- **Deferred: reduced-motion reset.** It still zeroes all transitions. Allowing
+  opacity fades through needs a per-property override that the blanket
+  `!important` reset doesn't allow; revisit with Phase 5.
+
+### Phase 4 — implemented (2026-10-08, branch `board-polish-phase-4`)
+
+- **Followed the plan closely:** multiple-containers collision with
+  `lastOverIdRef` / `recentlyMovedRef`. `handleDragOver` moves the row
+  into the hovered list's `localOrderByList` at the hovered slot, clamped to
+  its tier, and a single `handleDragEnd` path commits `{ listId?, position }`.
+  The ordering math (`clampToTier`, `insertInTier`, `positionAt`) lives in
+  `lib/dragOrder.ts` with unit tests.
+- **Removed:** `TodoRowGhost`, the `crossListDrop` / `isLeavingList` props,
+  and the "origin" ghost variant. The row now moves between
+  `SortableContext`s, so its own sortable stand-in serves as the
+  target slot.
+- **Rows slide** (200ms strong ease-out) instead of snapping. This deliberately
+  reverses the earlier "no transition" choice, because the precise in-column
+  gap reads better with motion. The stand-in transitions into each new gap too.
+- **Keyboard:** `boardKeyboardCoordinates` replaces the vertical-only getter.
+  Up/down only consider rows in the same column; left/right jump to the
+  neighbouring column at the same height. The keyboard x-axis lock is gone,
+  because the getter itself keeps x fixed for vertical moves.
+- **Sync refetch:** the `todos` refetch effect skips resetting local orders
+  mid-drag. Cancel drops all overrides and re-derives.
+- **Drop zone:** the column drop-zone frame is now a quiet tint plus a
+  hairline ring rather than a dashed border, so it doesn't compete with the
+  row slot.
+- **Empty columns:** the empty-column early return in `TodoListColumn` is gone.
+  The column droppable is always `h-full min-h-24`, so empty lists and the
+  space below the last row accept drops.
+- Verified in the browser:
+  - a cross-list drop at a precise index, which persists across a reload
+  - a cross-list drag cancelled with Escape
+  - a same-list reorder
+  - a keyboard drag with ArrowLeft into the neighbouring column, cancelled
+    with Escape
+- **Not done:** auto-scroll tuning. dnd-kit's default reached the columns in
+  testing, so no `autoScroll` override was added.
+
+### Phase 5 — implemented (2026-10-08, branch `board-polish-phase-5`)
+
+Done as specced:
+
+- Inert badges.
+- Subtask alignment and type size.
+- 14px icons.
+- One date picker: a new `DueDatePicker` in `InlineTodoControls` wraps the
+  same calendar the row pill uses.
+- Delete moved to the end of the side panel.
+- Danger button ring.
+
+Deviations:
+
+- **Title reserve:** the title reserves `pr-24` only when the pill is
+  permanently visible (pinned or repeating). Reserving for the hover-only
+  pill would reflow the title on every hover, so it overlays instead.
+- **Timezone saves on change**, like Theme, and the Save button is gone. The
+  old modal silently prefilled the device timezone for a `UTC` account,
+  which only persisted if you pressed Save. Now the real value is shown,
+  with a one-click "Use this device's timezone" link when they differ.
+- **Pin icon:** unpinned rows now show an outline `Pin` instead of `PinOff`
+  (a crossed-out pin read as "unpin"). Pinned rows show a filled `Pin`.
+- **Copy:** dropped the leftover AI copy ("No AI involved", "conversation
+  history").
+
+## Follow-ups (not in this plan's PRs)
+
+- **Due date off-by-one (pre-existing bug).** The calendar and side panel
+  treat `dueDate` as a UTC calendar day (`toISOString().split("T")[0]`), but
+  the row badge formats it in the user's timezone (`formatDate(d,
+  timeZone)`). West of UTC, picking Aug 28 shows "8/27" on the row while
+  the panel says Aug 28. This needs one convention across web, API and iOS.
+  iOS may store local-midnight instants, so check before changing either
+  side.
+- **Reduced-motion reset** still zeroes every transition. Let opacity and
+  colour fades through, with transforms removed.
+- **Touch row actions:** the always-visible action row under each todo is
+  heavy on touch. Consider tap-to-open details plus swipe actions.

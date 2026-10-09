@@ -80,6 +80,38 @@ code {
   @apply font-mono;
 }
 
+/* Shared enter/exit for anchored popups (popover, select, menu, tooltip):
+   a quick fade + slight scale that grows from the trigger via Base UI's
+   --transform-origin. Exits are faster than entrances so dismissing feels
+   immediate. */
+@utility popup-motion {
+  transform-origin: var(--transform-origin);
+  transition-property: opacity, scale;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-out-strong);
+  &[data-starting-style],
+  &[data-ending-style] {
+    opacity: 0;
+    scale: 0.97;
+  }
+  &[data-ending-style] {
+    transition-duration: 100ms;
+  }
+  /* Tooltips moving between adjacent triggers shouldn't re-animate. */
+  &[data-instant] {
+    transition-duration: 0ms;
+  }
+}
+
+/* Rows that appear after the board has painted (a new todo, one dropped in
+   from another list, one arriving over sync) fade and settle into place. */
+@starting-style {
+  [data-board-ready] [data-todo-row] {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
 /* Honor a reduced-motion preference. Server-resolved via the epic-web client
    hint and reflected on <html data-reduced-motion="reduce"> (see __root.tsx),
    so it's correct on first paint. Neutralizes animations, transitions, and

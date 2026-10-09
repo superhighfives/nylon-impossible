@@ -13,8 +13,8 @@ export function Tooltip({ children, render }: TooltipProps) {
     <BaseTooltip.Root>
       <BaseTooltip.Trigger render={<span />}>{children}</BaseTooltip.Trigger>
       <BaseTooltip.Portal>
-        <BaseTooltip.Positioner sideOffset={6}>
-          <BaseTooltip.Popup className="z-50 max-w-64 rounded-lg border border-gray-subtle bg-gray-surface px-2.5 py-1.5 text-xs text-gray shadow-lg">
+        <BaseTooltip.Positioner sideOffset={6} className="z-50">
+          <BaseTooltip.Popup className="popup-motion max-w-64 rounded-lg border border-gray-subtle bg-gray-surface px-2.5 py-1.5 text-xs text-gray shadow-lg">
             {render}
           </BaseTooltip.Popup>
         </BaseTooltip.Positioner>

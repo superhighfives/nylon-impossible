@@ -4,7 +4,6 @@ import {
   ExternalLink,
   Link2,
   Pin,
-  PinOff,
   RefreshCw,
   Trash2,
   X,
@@ -22,8 +21,9 @@ import type {
   SerializedTodoUrl,
   TodoWithUrls,
 } from "@/types/database";
+import { DueDatePicker } from "./InlineTodoControls";
 import { SubtaskSection } from "./SubtaskSection";
-import { Button, EditableText, Input, Loader, Select } from "./ui";
+import { Button, EditableText, Loader, Select } from "./ui";
 import { EmailPreviewCard } from "./ui/EmailPreviewCard";
 import { SocialPreviewCard } from "./ui/SocialPreviewCard";
 
@@ -328,14 +328,14 @@ export function TodoItemExpanded({
             Due date
           </label>
           <div className="flex items-center gap-1.5">
-            <Input
-              id={`due-${todo.id}`}
-              type="date"
-              value={dueDate}
-              onChange={(e) => handleDueDateChange(e.target.value)}
-              className="flex-1 min-w-0"
-              inputSize="sm"
-            />
+            <div className="min-w-0 flex-1">
+              <DueDatePicker
+                id={`due-${todo.id}`}
+                value={dueDate}
+                onChange={handleDueDateChange}
+                onClear={handleClearDueDate}
+              />
+            </div>
             {dueDate && (
               <Button
                 variant="ghost"
@@ -401,7 +401,7 @@ export function TodoItemExpanded({
               onClick={() => onUpdate({ sticky: !todo.sticky })}
               aria-pressed={todo.sticky}
             >
-              {todo.sticky ? <Pin size={14} /> : <PinOff size={14} />}
+              <Pin size={14} className={todo.sticky ? "fill-current" : ""} />
               {todo.sticky ? "Pinned to top" : "Pin to top"}
             </Button>
             <Button
@@ -418,26 +418,9 @@ export function TodoItemExpanded({
             </Button>
           </div>
           <p className="text-xs text-gray-muted">
-            Fetches each link and titles the task after it. No AI involved.
+            Fetches each link and titles the task after it.
           </p>
         </div>
-      </div>
-
-      {/* Delete row. Edits auto-save (no Save button); the toast in
-          useUpdateTodo surfaces any failure. */}
-      <div className="flex items-center justify-between pt-4 border-t border-gray-subtle">
-        <Button
-          variant="ghost"
-          size="sm"
-          type="button"
-          onClick={() => onDelete(todo.id)}
-          disabled={deletePending}
-          aria-label={`Delete "${todo.title}"`}
-          className="text-red-muted hover:text-red hover:bg-red-base"
-        >
-          <Trash2 size={14} />
-          Delete
-        </Button>
       </div>
 
       {/* URLs */}
@@ -497,6 +480,24 @@ export function TodoItemExpanded({
           )}
         </div>
       )}
+
+      {/* Delete row, last so the destructive action sits apart from the
+          fields. Edits auto-save (no Save button); the toast in useUpdateTodo
+          surfaces any failure. */}
+      <div className="flex items-center justify-between pt-4 border-t border-gray-subtle">
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={() => onDelete(todo.id)}
+          disabled={deletePending}
+          aria-label={`Delete "${todo.title}"`}
+          className="text-red-muted hover:text-red hover:bg-red-base"
+        >
+          <Trash2 size={14} />
+          Delete
+        </Button>
+      </div>
     </div>
   );
 }

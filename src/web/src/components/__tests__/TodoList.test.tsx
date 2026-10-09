@@ -200,7 +200,8 @@ describe("TodoGrid", () => {
 
     render(<TodoGrid />);
     expect(screen.getByText("Active thing")).toBeInTheDocument();
-    expect(screen.queryByText("Done thing")).not.toBeInTheDocument();
+    // Collapsed rows stay mounted (so the section can animate) but inert.
+    expect(screen.getByText("Done thing").closest("[inert]")).not.toBeNull();
   });
 
   it("shows a collapsed completed accordion with a count when hideCompleted is true", () => {
@@ -215,7 +216,7 @@ describe("TodoGrid", () => {
     const accordion = screen.getByRole("button", { name: /completed/i });
     expect(accordion).toHaveAttribute("aria-expanded", "false");
     expect(accordion).toHaveTextContent("2");
-    expect(screen.queryByText("Done one")).not.toBeInTheDocument();
+    expect(screen.getByText("Done one").closest("[inert]")).not.toBeNull();
   });
 
   it("expands the completed accordion locally when clicked, without syncing the preference", () => {

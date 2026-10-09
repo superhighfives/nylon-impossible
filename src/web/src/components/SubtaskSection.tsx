@@ -45,7 +45,7 @@ function CompletedSubtaskRow({
   disabled,
 }: SubtaskRowProps) {
   return (
-    <div className="group/sub flex items-center gap-2 py-1 pl-6">
+    <div className="group/sub flex items-center gap-1.5 py-1 pl-5">
       <Checkbox
         checked
         onCheckedChange={() => onToggle(subtask.id, true)}
@@ -53,7 +53,7 @@ function CompletedSubtaskRow({
         variant="subtle"
         aria-label={`Mark "${subtask.title}" as not completed`}
       />
-      <span className="min-w-0 flex-1 wrap-anywhere text-xs text-gray-muted line-through">
+      <span className="min-w-0 flex-1 wrap-anywhere text-sm text-gray-muted line-through">
         {subtask.title}
       </span>
       <Button
@@ -66,7 +66,7 @@ function CompletedSubtaskRow({
         aria-label={`Delete subtask "${subtask.title}"`}
         className="text-gray-muted transition-opacity hover:text-red pointer-fine:opacity-0 pointer-fine:group-hover/sub:opacity-100 pointer-fine:group-focus-within/sub:opacity-100"
       >
-        <Trash2 size={13} />
+        <Trash2 size={14} />
       </Button>
     </div>
   );
@@ -122,7 +122,7 @@ function ActiveSubtaskRow({
         aria-label={`Delete subtask "${subtask.title}"`}
         className="text-gray-muted transition-opacity hover:text-red pointer-fine:opacity-0 pointer-fine:group-hover/sub:opacity-100 pointer-fine:group-focus-within/sub:opacity-100"
       >
-        <Trash2 size={13} />
+        <Trash2 size={14} />
       </Button>
     </div>
   );
