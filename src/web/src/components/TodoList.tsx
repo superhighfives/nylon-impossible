@@ -5,6 +5,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { dueDayKey } from "@nylon-impossible/shared";
 import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -33,7 +34,13 @@ import {
   usePendingTodoIds,
   type useUpdateTodo,
 } from "@/hooks/useTodos";
-import { formatDate, isEffectivelyCompleted, relativeDay } from "@/lib/date";
+import {
+  formatDate,
+  formatDueDate,
+  isDueDateOverdue,
+  isEffectivelyCompleted,
+  relativeDueDay,
+} from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
 import {
@@ -116,7 +123,7 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
       <div className="flex items-center gap-1.5 mt-1">
         <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-gray-line text-gray-muted">
           <Clock size={10} />
-          Next: {relativeDay(dueDate, timeZone, now)}
+          Next: {relativeDueDay(dueDate, timeZone, now)}
           <Repeat size={10} />
         </span>
       </div>
@@ -125,7 +132,8 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
 
   // A repeat sitting in Completed (completedAt today) has already rolled its
   // dueDate forward, so it's never overdue; guard on effective completion too.
-  const isOverdue = dueDate && dueDate < now && !isCompleted;
+  const isOverdue =
+    !!dueDate && isDueDateOverdue(dueDate, timeZone, now) && !isCompleted;
 
   return (
     <div className="flex items-center gap-1.5 mt-1">
@@ -138,13 +146,13 @@ function TodoIndicators({ todo }: { todo: TodoWithUrls }) {
           }`}
         >
           {isOverdue && <AlertCircle size={10} />}
-          {formatDate(dueDate, timeZone)}
+          {formatDueDate(dueDate)}
         </span>
       )}
       {todo.recurrence && (
         <span className="text-xs px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-gray-base text-gray-muted">
           <Repeat size={10} />
-          {recurrenceLabel(todo.recurrence, dueDate, timeZone)}
+          {recurrenceLabel(todo.recurrence, dueDate)}
         </span>
       )}
     </div>
@@ -284,11 +292,12 @@ function TodoItemContent({
   // the right-side hover cluster. Recurrence stays read-only inline (its
   // anchor logic belongs in the expanded form).
   const dueDateObj = todo.dueDate ? new Date(todo.dueDate) : null;
-  const dueValueStr = dueDateObj
-    ? dueDateObj.toISOString().split("T")[0]
-    : null;
-  const dueLabel = dueDateObj ? formatDate(dueDateObj, timeZone) : null;
-  const isOverdue = !!dueDateObj && dueDateObj < new Date() && !isCompleted;
+  const dueValueStr = dueDateObj ? dueDayKey(dueDateObj) : null;
+  const dueLabel = dueDateObj ? formatDueDate(dueDateObj) : null;
+  const isOverdue =
+    !!dueDateObj &&
+    isDueDateOverdue(dueDateObj, timeZone, new Date()) &&
+    !isCompleted;
   const hasRecurrence = !!todo.recurrence;
   const showInlineEditing = !isCompleted;
   // The actions pill floats over the row instead of reserving its own line —
@@ -354,7 +363,7 @@ function TodoItemContent({
           recurrence={todo.recurrence}
           recurrenceLabel={
             todo.recurrence
-              ? recurrenceLabel(todo.recurrence, dueDateObj, timeZone)
+              ? recurrenceLabel(todo.recurrence, dueDateObj)
               : null
           }
           sticky={todo.sticky}
@@ -491,7 +500,7 @@ function TodoItemContent({
               {showActions && showInlineEditing && todo.recurrence && (
                 <span className="ml-2 inline-flex items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs text-gray-muted sm:pointer-fine:hidden">
                   <Repeat size={10} aria-hidden="true" />
-                  {recurrenceLabel(todo.recurrence, dueDateObj, timeZone)}
+                  {recurrenceLabel(todo.recurrence, dueDateObj)}
                 </span>
               )}
               {showActions && showInlineEditing && todo.sticky && (

@@ -192,6 +192,21 @@ describe("Todos CRUD", () => {
       expect(body.title).toBe("Updated title");
     });
 
+    it("stores a due date as its calendar day's UTC midnight", async () => {
+      const createRes = await createTodoViaAPI("Dentist");
+      const created = await createRes.json<any>();
+
+      // Older iOS builds send local midnight; Sydney's is 14:00Z the day before.
+      const res = await SELF.fetch(`http://localhost/todos/${created.id}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ dueDate: "2026-08-27T14:00:00.000Z" }),
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      expect(body.dueDate).toBe("2026-08-28T00:00:00.000Z");
+    });
+
     it("toggles completed", async () => {
       const createRes = await createTodoViaAPI("Toggle me");
       const created = await createRes.json<any>();

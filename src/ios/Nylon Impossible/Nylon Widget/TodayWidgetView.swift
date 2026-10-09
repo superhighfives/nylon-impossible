@@ -173,10 +173,8 @@ private struct TodayRow: View {
         }
     }
 
-    /// How late, for the rows with room to say. Only for a due date from a
-    /// previous day: a todo due today at midnight counts as overdue from
-    /// 00:01, and printing today's date next to a widget headed "Today" says
-    /// nothing the red icon hasn't already.
+    /// How late, for the rows with room to say. Overdue only ever means a
+    /// previous day, so this is that day.
     private var overdueDate: String? {
         guard !isCompact, let dueDate = todo.dueDate else { return nil }
         guard !Calendar.current.isDate(dueDate, inSameDayAs: now) else { return nil }
