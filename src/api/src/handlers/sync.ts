@@ -146,6 +146,10 @@ export async function syncTodos(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const conflicts: SyncConflict[] = [];
   const syncedAt = new Date();
+  // Looked up at most once per batch — only repeating todos need it.
+  let userTimeZone: string | undefined;
+  const timeZoneForUser = async () =>
+    (userTimeZone ??= await getUserTimezone(db, userId));
 
   // Ensure user exists before inserting todos (FK constraint). Shared with
   // /users/me so both entry points provision identically.
@@ -232,7 +236,7 @@ export async function syncTodos(c: Context<Env>) {
         let recurrencePlacementListId: string | null = null;
         if (completing && nextRecurrence && nextDueDateValue) {
           const now = new Date();
-          const timeZone = await getUserTimezone(db, userId);
+          const timeZone = await timeZoneForUser();
           dueDateToWrite = toDueDay(
             nextDueDate(nextRecurrence, nextDueDateValue, now, timeZone),
           );
@@ -378,7 +382,7 @@ export async function syncTodos(c: Context<Env>) {
                 placementForDueDate(
                   change.dueDate,
                   new Date(),
-                  await getUserTimezone(db, userId),
+                  await timeZoneForUser(),
                 ),
               )
             : null) ??
