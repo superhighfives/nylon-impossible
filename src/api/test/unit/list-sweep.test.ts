@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLocalMidnightHour } from "../../src/lib/list-sweep";
+import { isLocalMidnightHour, localMidnight } from "../../src/lib/list-sweep";
 
 describe("isLocalMidnightHour", () => {
   it("is true at UTC midnight in UTC", () => {
@@ -50,5 +50,23 @@ describe("isLocalMidnightHour", () => {
     expect(isLocalMidnightHour("", new Date("2026-06-15T00:30:00Z"))).toBe(
       false,
     );
+  });
+});
+
+describe("localMidnight", () => {
+  it("drops the minutes and seconds past local midnight", () => {
+    expect(
+      localMidnight("UTC", new Date("2026-06-15T00:15:42.500Z")).toISOString(),
+    ).toBe("2026-06-15T00:00:00.000Z");
+  });
+
+  it("finds midnight in a half-hour-offset timezone", () => {
+    // 19:00 UTC = 00:30 in Kolkata (UTC+5:30); midnight there was 18:30 UTC.
+    expect(
+      localMidnight(
+        "Asia/Kolkata",
+        new Date("2026-06-15T19:00:00Z"),
+      ).toISOString(),
+    ).toBe("2026-06-15T18:30:00.000Z");
   });
 });

@@ -206,7 +206,8 @@ export function SettingsModal({ origin }: { origin: string }) {
                     )}
                     <p className="text-xs text-gray-muted">
                       Drives when Today's todos age into This Week, and This
-                      Week into Sometime — always at your local midnight.
+                      Week into Sometime — always at your local midnight. A todo
+                      gets at least a full day in Today before it moves.
                     </p>
                   </LayerCard.Primary>
                 </LayerCard>
