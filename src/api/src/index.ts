@@ -40,6 +40,7 @@ import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
 import { runListSweep } from "./lib/list-sweep";
+import { withRetry } from "./lib/retry";
 import type { Env } from "./types";
 
 export { UserSync } from "./durable-objects/UserSync";
@@ -169,9 +170,12 @@ app.onError((err, c) => {
 const handler: ExportedHandler<Env["Bindings"]> = {
   fetch: app.fetch,
   async scheduled(_event, env): Promise<void> {
+    // One `now` for every attempt, so a retry still sweeps the users whose
+    // midnight hour the original run was for. The sweep is idempotent: a
+    // re-run only moves todos that are still due to move.
+    const now = new Date();
     try {
-      const db = getDb(env.DB);
-      await runListSweep(db, env, new Date());
+      await withRetry(() => runListSweep(getDb(env.DB), env, now));
     } catch (error) {
       Sentry.captureException(error, {
         tags: { area: "cron-list-sweep" },
