@@ -29,7 +29,11 @@ describe("runListSweep", () => {
     await seedUser(USER, "test@example.com", { timezone: "UTC" });
     const todayListId = await getListId(USER, "today");
     const todoId = "550e8400-e29b-41d4-a716-446655440001";
-    await seedTodo(todoId, USER, { listId: todayListId, completed: false });
+    await seedTodo(todoId, USER, {
+      listId: todayListId,
+      completed: false,
+      listEnteredAt: new Date("2026-06-13T12:00:00Z"),
+    });
 
     const db = getDb(env.DB);
     // UTC midnight — this user is due for the sweep.
@@ -62,6 +66,58 @@ describe("runListSweep", () => {
 
     const db = getDb(env.DB);
     await runListSweep(db, env, new Date("2026-06-15T00:15:00Z"));
+
+    const [stored] = await db.select().from(todos).where(eq(todos.id, todoId));
+    expect(stored.listId).toBe(todayListId);
+  });
+
+  it("keeps a Today todo through the next full day before demoting it", async () => {
+    await seedUser(USER, "test@example.com", { timezone: "UTC" });
+    const todayListId = await getListId(USER, "today");
+    const thisWeekListId = await getListId(USER, "thisWeek");
+    const db = getDb(env.DB);
+
+    // Added 4am Tuesday, 8pm Tuesday, and 00:01 Tuesday (2026-06-16).
+    const cases = [
+      ["550e8400-e29b-41d4-a716-446655440009", "2026-06-16T04:00:00Z"],
+      ["550e8400-e29b-41d4-a716-44665544000a", "2026-06-16T20:00:00Z"],
+      ["550e8400-e29b-41d4-a716-44665544000b", "2026-06-16T00:01:00Z"],
+    ] as const;
+    for (const [id, enteredAt] of cases) {
+      await seedTodo(id, USER, {
+        listId: todayListId,
+        completed: false,
+        listEnteredAt: new Date(enteredAt),
+      });
+    }
+
+    const listOf = async (id: string) =>
+      (await db.select().from(todos).where(eq(todos.id, id)))[0].listId;
+
+    // Midnight starting Wednesday: none has had 24 hours yet.
+    await runListSweep(db, env, new Date("2026-06-17T00:05:00Z"));
+    for (const [id] of cases) expect(await listOf(id)).toBe(todayListId);
+
+    // Midnight starting Thursday: all three move.
+    await runListSweep(db, env, new Date("2026-06-18T00:05:00Z"));
+    for (const [id] of cases) expect(await listOf(id)).toBe(thisWeekListId);
+  });
+
+  it("measures the 24 hours from midnight, not from when the sweep runs", async () => {
+    await seedUser(USER, "test@example.com", { timezone: "UTC" });
+    const todayListId = await getListId(USER, "today");
+    const todoId = "550e8400-e29b-41d4-a716-44665544000c";
+    // Added just after the previous midnight's sweep.
+    await seedTodo(todoId, USER, {
+      listId: todayListId,
+      completed: false,
+      listEnteredAt: new Date("2026-06-14T00:00:30Z"),
+    });
+
+    const db = getDb(env.DB);
+    // A late-firing run (or a retry) is still more than 24h after it was
+    // added, but the midnight it's sweeping for isn't.
+    await runListSweep(db, env, new Date("2026-06-15T00:45:00Z"));
 
     const [stored] = await db.select().from(todos).where(eq(todos.id, todoId));
     expect(stored.listId).toBe(todayListId);
@@ -135,10 +191,12 @@ describe("runListSweep", () => {
     await seedTodo(utcTodoId, "user_utc", {
       listId: utcTodayList,
       completed: false,
+      listEnteredAt: new Date("2026-06-13T12:00:00Z"),
     });
     await seedTodo(tokyoTodoId, "user_tokyo", {
       listId: tokyoTodayList,
       completed: false,
+      listEnteredAt: new Date("2026-06-13T12:00:00Z"),
     });
 
     const db = getDb(env.DB);

@@ -1,11 +1,12 @@
-import { and, eq, type getDb, lt, todos, users } from "./db";
+import { and, eq, type getDb, lt, lte, todos, users } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = { USER_SYNC: DurableObjectNamespace };
 
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 
 /**
  * True when it's currently the midnight hour (00:xx) in `timezone`. The
@@ -32,10 +33,40 @@ export function isLocalMidnightHour(timezone: string, now: Date): boolean {
 }
 
 /**
- * Hourly aging sweep: for every user whose local midnight just passed,
- * demote non-completed Today items into This Week, and non-completed This
- * Week items that have sat there 7+ days into Sometime. Sometime is
- * terminal. Never touches completed todos, due dates, or custom lists.
+ * The local midnight that started the current hour's day in `timezone`, as
+ * an instant. Only meaningful during the midnight hour, where it's `now`
+ * minus the local minutes and seconds past 00:00. Anchoring to midnight
+ * rather than `now` keeps the sweep's cutoffs independent of when in the
+ * hour the cron fires (or a retry re-runs) — half-hour-offset zones are
+ * swept at 00:30 local, not 00:00.
+ */
+export function localMidnight(timezone: string, now: Date): Date {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    minute: "numeric",
+    second: "numeric",
+  }).formatToParts(now);
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  const second = Number(parts.find((p) => p.type === "second")?.value ?? 0);
+  return new Date(
+    now.getTime() - (minute * 60 + second) * 1000 - now.getMilliseconds(),
+  );
+}
+
+/**
+ * Hourly aging sweep. For every user whose local midnight just passed:
+ *
+ * - Today → This Week: non-completed todos that entered Today at least 24
+ *   hours before this midnight. So a todo moves at the first midnight that's
+ *   24+ hours after it arrived — added 4am Tuesday or 8pm Tuesday, it stays
+ *   through Wednesday and moves at the midnight ending Wednesday. Something
+ *   added late in the day still gets a full day in Today.
+ * - This Week → Sometime: non-completed todos that have sat in This Week
+ *   for 7+ days.
+ *
+ * Sometime is terminal. Never touches completed todos, due dates, or custom
+ * lists. Every list move stamps `listEnteredAt`, so moving a todo back into
+ * Today restarts its 24 hours.
  */
 export async function runListSweep(
   db: Db,
@@ -58,6 +89,10 @@ export async function runListSweep(
     ]);
     if (!todayListId || !thisWeekListId) continue;
 
+    const todayCutoff = new Date(
+      localMidnight(user.timezone, now).getTime() - DAY_MS,
+    );
+
     await db
       .update(todos)
       .set({ listId: thisWeekListId, listEnteredAt: now })
@@ -66,6 +101,7 @@ export async function runListSweep(
           eq(todos.userId, user.id),
           eq(todos.listId, todayListId),
           eq(todos.completed, false),
+          lte(todos.listEnteredAt, todayCutoff),
         ),
       );
 
