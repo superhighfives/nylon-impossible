@@ -1,0 +1,22 @@
+@cloudflare/vitest-pool-workers rewrites every `import.meta.url` in the
+modules it serves to workerd with a quoted file URL, including ones inside
+string literals. This hint string then becomes `"…createRequire("file:///…")…"`,
+which fails to parse ("Unexpected identifier 'file'") and stops every api test
+before it runs. `.` evaluates to "." so the message is unchanged.
+
+Drop this patch once the pool supports vitest 5:
+https://github.com/cloudflare/workers-sdk/issues/15618
+
+diff --git a/dist/module-evaluator.js b/dist/module-evaluator.js
+index 21d171ef4fa8398913bb5395bb65e13d41ca6662..dbe7bb550b2fc4119d4253660afc61495be07775 100644
+--- a/dist/module-evaluator.js
++++ b/dist/module-evaluator.js
+@@ -388,7 +388,7 @@ const CJS_GLOBALS_REFERENCE_ERROR_RE = /^(module|exports|require|__filename|__di
+ const ESM_HINTS = {
+ 	module: "use \"export\" declarations instead of \"module.exports\"",
+ 	exports: "use \"export\" declarations instead of \"exports\"",
+-	require: "use \"import\" declarations or \"createRequire(import.meta.url)\" instead of \"require\"",
++	require: "use \"import\" declarations or \"createRequire(import\u002emeta.url)\" instead of \"require\"",
+ 	__filename: "use \"import.meta.filename\" instead of \"__filename\"",
+ 	__dirname: "use \"import.meta.dirname\" instead of \"__dirname\""
+ };
