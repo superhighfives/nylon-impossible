@@ -4,10 +4,7 @@ import { COMPLETION_HOLD_MS, useCompletionHold } from "../useCompletionHold";
 
 describe("useCompletionHold", () => {
   beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    vi.useRealTimers();
-    delete document.documentElement.dataset.reducedMotion;
-  });
+  afterEach(() => vi.useRealTimers());
 
   it("marks the id as completing and commits after the hold", () => {
     const commit = vi.fn();
@@ -50,15 +47,5 @@ describe("useCompletionHold", () => {
     act(() => result.current.start("a", commit));
     unmount();
     expect(commit).toHaveBeenCalledTimes(1);
-  });
-
-  it("commits immediately under reduced motion", () => {
-    document.documentElement.dataset.reducedMotion = "reduce";
-    const commit = vi.fn();
-    const { result } = renderHook(() => useCompletionHold());
-
-    act(() => result.current.start("a", commit));
-    expect(commit).toHaveBeenCalledTimes(1);
-    expect(result.current.ids.has("a")).toBe(false);
   });
 });

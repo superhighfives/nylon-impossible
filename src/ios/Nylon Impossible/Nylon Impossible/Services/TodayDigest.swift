@@ -16,6 +16,15 @@ enum TodayDigest {
     /// Midnight at the start of the next calendar day in the user's local
     /// timezone. Anything due before this is "today or overdue" — matching the
     /// shared definition in plans/done/2026-03-21-repeating-todos.md.
+    /// Due dates strictly before this instant fall on today or earlier (for the
+    /// device's day). Due dates are calendar days stored at UTC midnight, and
+    /// `DueDay.normalize` rounds to the nearest midnight, so a raw value is on
+    /// or before today exactly when it's before today's UTC midnight + 12h.
+    /// Kept as a plain instant so SwiftData predicates can use it.
+    static func dueByEndOfTodayCutoff(now: Date = Date()) -> Date {
+        DueDay.today(now, in: .current).addingTimeInterval(12 * 60 * 60)
+    }
+
     static func startOfTomorrow(after now: Date = Date()) -> Date {
         let calendar = Calendar.current
         let startOfToday = calendar.startOfDay(for: now)
@@ -67,7 +76,7 @@ enum TodayDigest {
         // are awkward (see `fetchAllTodos`), and `isEffectivelyCompleted` —
         // which keeps a repeat completed today out of the list until local
         // midnight — is a computed property a predicate can't reach at all.
-        let cutoff = startOfTomorrow(after: now)
+        let cutoff = dueByEndOfTodayCutoff(now: now)
         let todayList = todayListId(userId: userId, context: context)
         let forToday = todos.filter { todo in
             guard todo.userId == userId, todo.parentId == nil else { return false }

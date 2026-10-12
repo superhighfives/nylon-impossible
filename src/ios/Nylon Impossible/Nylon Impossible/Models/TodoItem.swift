@@ -128,7 +128,7 @@ final class TodoItem {
     /// Check if todo is overdue
     var isOverdue: Bool {
         guard let dueDate = dueDate, !isEffectivelyCompleted else { return false }
-        return dueDate < Date()
+        return DueDay.isOverdue(dueDate)
     }
     
 }

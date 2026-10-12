@@ -11,7 +11,8 @@ export const COMPLETION_HOLD_MS = 350;
  * `start` schedules the commit and marks the id as completing; `cancel` undoes
  * a pending one (a second press during the hold) and reports whether there was
  * anything to cancel. Pending commits are flushed on unmount rather than
- * dropped. Under reduced motion the commit happens immediately.
+ * dropped. The hold applies under reduced motion too — it's feedback, not
+ * movement, and the strike-through only fades.
  */
 export function useCompletionHold(delay = COMPLETION_HOLD_MS) {
   const [ids, setIds] = useState<ReadonlySet<string>>(() => new Set());
@@ -43,13 +44,6 @@ export function useCompletionHold(delay = COMPLETION_HOLD_MS) {
 
   const start = useCallback(
     (id: string, commit: () => void) => {
-      if (
-        typeof document !== "undefined" &&
-        document.documentElement.dataset.reducedMotion === "reduce"
-      ) {
-        commit();
-        return;
-      }
       const timer = setTimeout(() => {
         pending.current.delete(id);
         commit();

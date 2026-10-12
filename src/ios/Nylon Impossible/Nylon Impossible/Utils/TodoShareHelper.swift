@@ -11,7 +11,7 @@ func shareText(for todo: TodoItem, urls: [APITodoUrl]) -> String {
         lines.append(description)
     }
     if let dueDate = todo.dueDate {
-        lines.append("Due: \(dueDate.formatted(date: .abbreviated, time: .omitted))")
+        lines.append("Due: \(DueDay.localDate(dueDate).formatted(date: .abbreviated, time: .omitted))")
     }
     if !urls.isEmpty {
         lines.append(contentsOf: urls.map { $0.url })

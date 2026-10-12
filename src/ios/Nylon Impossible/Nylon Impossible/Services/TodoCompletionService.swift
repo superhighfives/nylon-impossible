@@ -39,7 +39,9 @@ enum TodoCompletionService {
            let recurrence = todo.recurrence,
            let anchor = todo.dueDate {
             let now = Date()
-            let nextDue = RecurrenceHelper.nextDueDate(recurrence, from: anchor, now: now)
+            let nextDue = DueDay.normalize(
+                RecurrenceHelper.nextDueDate(recurrence, from: anchor, now: now, timeZone: .current)
+            )
             todo.dueDate = nextDue
             todo.completedAt = now
             // Completing a sticky todo unsticks it — matches the server-side
@@ -48,7 +50,7 @@ enum TodoCompletionService {
             // The new occurrence is placed by its due date's distance, per
             // the settled recurrence heuristic — then ages normally
             // afterward. Matches the server's canonical advance.
-            let placement = RecurrenceHelper.placement(forDueDate: nextDue, now: now)
+            let placement = RecurrenceHelper.placement(forDueDate: nextDue, now: now, timeZone: .current)
             let targetKind = SystemListKind(rawValue: placement.rawValue)
             if let placedList = lists.first(where: { $0.systemKind == targetKind }) {
                 todo.listKey = placedList.id

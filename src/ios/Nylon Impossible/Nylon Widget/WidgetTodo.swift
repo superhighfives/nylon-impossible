@@ -20,11 +20,12 @@ struct WidgetTodo: Identifiable, Hashable, Sendable {
     let isSticky: Bool
     let isRepeating: Bool
 
-    /// Overdue is relative to when the entry renders, not when it was built —
-    /// which is why the provider schedules an entry at each of the day's due
-    /// times rather than leaving a morning render to describe the evening.
+    /// Overdue is relative to when the entry renders, not when it was built.
+    /// `dueDate` is local midnight of the due day (see `DueDay.localDate`), so
+    /// a todo is overdue once that day has ended — the provider's refresh at
+    /// local midnight is what tips it over.
     func isOverdue(at date: Date) -> Bool {
         guard let dueDate else { return false }
-        return dueDate < date
+        return dueDate < Calendar.current.startOfDay(for: date)
     }
 }

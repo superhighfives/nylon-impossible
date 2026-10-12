@@ -103,11 +103,11 @@ struct TodoItemRow: View {
         if todo.dueDate != nil || todo.recurrence != nil {
             HStack(spacing: 6) {
                 if isCompletedRecurring, let dueDate = todo.dueDate {
-                    nextBadge(relativeDay(dueDate))
+                    nextBadge(relativeDay(DueDay.localDate(dueDate)))
                 } else {
                     if let dueDate = todo.dueDate {
                         badge(
-                            dueDate.formatted(date: .abbreviated, time: .omitted),
+                            DueDay.localDate(dueDate).formatted(date: .abbreviated, time: .omitted),
                             foreground: todo.isOverdue ? Color.appDanger : Color.appSubtle,
                             background: todo.isOverdue ? Color.appDanger.opacity(0.15) : Color.appTint,
                             systemImage: todo.isOverdue ? "exclamationmark.circle.fill" : nil
@@ -180,20 +180,20 @@ struct TodoItemRow: View {
     }
 
     /// Human label for the recurrence rule ("Daily", "Weekly on Wednesday",
-    /// "Monthly on the 1st", "Yearly"), anchored on the due date and using the
-    /// device locale/timezone. Mirrors `recurrenceLabel` on web.
+    /// "Monthly on the 1st", "Yearly"), anchored on the due date's calendar day
+    /// in the device locale. Mirrors `recurrenceLabel` on web.
     private var recurrenceBadgeText: String? {
         guard let recurrence = todo.recurrence else { return nil }
         switch recurrence.frequency {
         case .daily:
             return "Daily"
         case .weekly:
-            guard let due = todo.dueDate else { return "Weekly" }
+            guard let due = todo.dueDate.map({ DueDay.localDate($0) }) else { return "Weekly" }
             let formatter = DateFormatter()
             formatter.dateFormat = "EEEE"
             return "Weekly on \(formatter.string(from: due))"
         case .monthly:
-            guard let due = todo.dueDate else { return "Monthly" }
+            guard let due = todo.dueDate.map({ DueDay.localDate($0) }) else { return "Monthly" }
             let day = Calendar.current.component(.day, from: due)
             return "Monthly on the \(ordinal(day))"
         case .yearly:

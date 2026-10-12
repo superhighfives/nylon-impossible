@@ -1,7 +1,60 @@
 # Board polish and UX
 
 **Date**: 2026-10-08
-**Status**: In Progress
+**Status**: Complete (2026-10-09)
+
+## Overview
+
+Shipped in PRs #364–#370, landed on main via #364 plus a follow-up that
+carried #369 and #370 across after the stacked merges stranded them.
+
+- **Inputs:** long pastes keep their overflow in notes instead of failing
+  the 500-char title limit. The composer's list dropdown became a segmented
+  control, and both todo inputs wrap and grow.
+- **Touch:** row controls are reachable by hover-capability rather than
+  screen width. Touch and narrow rows dropped their per-row toolbar for
+  tap-to-open plus a chevron. Small targets got larger hit areas, and each
+  row tracks its own pending state.
+- **Motion:** shared popup motion, a short hold when a todo is checked off,
+  an animated Completed column, rows fading in, and reduced motion that
+  keeps fades but drops movement.
+- **Drag between lists:** follows dnd-kit's multiple-containers pattern, so
+  the todo lands at the exact slot you point at.
+- **Consistency:** one date picker, inert badges, a filled/outline pin, and
+  Settings that save on change.
+- **Due dates** are calendar days everywhere: a due date's day is its
+  nearest UTC midnight, and "today" is the user's local day.
+
+## Architecture
+
+### Key decisions
+
+- **Overflow helper:** `splitTodoText` (shared) is the single overflow rule,
+  used server-side in smart-create and client-side in the column input.
+- **Composer picker:** the composer lives in a ~288px header slot, so the
+  segmented picker unfolds *below* the field rather than sitting inline.
+- **Drag state:** cross-list drag moves the row between `SortableContext`s
+  during the drag (`localOrderByList`), and one commit path handles both
+  same-list and cross-list drops. The ordering math is in `lib/dragOrder.ts`.
+- **Reduced motion:** narrows `transition-property` to opacity and colours
+  instead of zeroing durations.
+- **Due dates:** the `due-date` module (`toDueDay`, `dueDayKey`, `dayKeyIn`)
+  is mirrored in Swift as `DueDay`. The API normalizes on write, and
+  recurrence takes the user's timezone setting. Since the app has no users
+  yet, there was no legacy data to reconcile.
+
+### Deviations
+
+The per-phase "Progress" notes below record the deviations. The main ones:
+
+- No custom hover variant; it uses Tailwind's `pointer-fine:`.
+- Dialogs use `Dialog.Viewport`.
+- Settings dropped its Save button.
+- Swipe actions weren't built.
+- The due-date fix grew from one label into web + API + iOS.
+
+The stacked-PR merge order also stranded #369/#370 on intermediate branches.
+They were re-landed by cherry-picking onto main.
 
 ## Problem
 
@@ -486,14 +539,21 @@ Deviations:
 
 ## Follow-ups (not in this plan's PRs)
 
-- **Due date off-by-one (pre-existing bug).** The calendar and side panel
-  treat `dueDate` as a UTC calendar day (`toISOString().split("T")[0]`), but
-  the row badge formats it in the user's timezone (`formatDate(d,
-  timeZone)`). West of UTC, picking Aug 28 shows "8/27" on the row while
-  the panel says Aug 28. This needs one convention across web, API and iOS.
-  iOS may store local-midnight instants, so check before changing either
-  side.
-- **Reduced-motion reset** still zeroes every transition. Let opacity and
-  colour fades through, with transforms removed.
-- **Touch row actions:** the always-visible action row under each todo is
-  heavy on touch. Consider tap-to-open details plus swipe actions.
+- **Due date off-by-one:** fixed separately in "Treat due dates as calendar
+  days everywhere" (branch `fix-due-date-days`). Due dates are calendar days
+  at their nearest UTC midnight; "today" is the user's local day.
+
+### Phase 6 — reduced motion and touch rows (2026-10-09, branch `board-polish-phase-6`)
+
+- **Reduced motion:** the reset now narrows `transition-property` to
+  opacity and colours instead of zeroing durations. Fades keep their authored
+  timing; movement, scaling and resizing (including dnd-kit's inline
+  transitions) snap. Keyframe animations are still stopped. The completion
+  hold now applies under reduced motion too, because it's feedback, not
+  movement.
+- **Touch / narrow rows:** the per-row toolbar is gone. Tapping a row outside
+  its controls opens the details panel, which already has pin and delete, and
+  a trailing chevron is the visible, keyboard-reachable way in. Pinned and
+  repeating state show as read-only indicators next to the due date. Swipe
+  actions were considered but not built, because they compete with the
+  touch drag sensor and the panel covers the same actions.

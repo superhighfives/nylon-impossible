@@ -1,3 +1,4 @@
+import { dueDayKey } from "@nylon-impossible/shared";
 import {
   AlertCircle,
   Calendar,
@@ -9,7 +10,6 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useHints } from "@/hooks/useHints";
 import { useProcessTodo, useUpdateUrlPreview } from "@/hooks/useTodos";
 import { getEmailUrlInfo } from "@/lib/email-urls";
 import { buildRecurrenceItems } from "@/lib/recurrence";
@@ -45,10 +45,9 @@ interface TodoItemExpandedProps {
   onReorderSubtask: (id: string, position: string) => void;
 }
 
+/** A due date's calendar day as `yyyy-mm-dd`, or "" for none. */
 function formatDate(isoString: string | null): string {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  return date.toISOString().split("T")[0];
+  return isoString ? dueDayKey(isoString) : "";
 }
 
 function UrlCard({ url }: { url: SerializedTodoUrl }) {
@@ -154,7 +153,6 @@ export function TodoItemExpanded({
   onDeleteSubtask,
   onReorderSubtask,
 }: TodoItemExpandedProps) {
-  const { timeZone } = useHints();
   const updateUrlPreview = useUpdateUrlPreview();
   const processTodo = useProcessTodo();
 
@@ -288,8 +286,7 @@ export function TodoItemExpanded({
 
   // Label reflects the anchor — "Weekly on Wednesday", "Monthly on the 14th".
   const recurrenceItems = buildRecurrenceItems(
-    dueDate ? new Date(`${dueDate}T00:00:00`) : null,
-    timeZone,
+    dueDate ? new Date(`${dueDate}T00:00:00Z`) : null,
   );
 
   return (

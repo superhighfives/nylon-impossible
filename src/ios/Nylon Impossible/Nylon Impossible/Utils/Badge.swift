@@ -3,7 +3,8 @@
 //  Nylon Impossible
 //
 //  App icon badge count: number of todos due today or overdue (`completed =
-//  false` and `dueDate < startOfTomorrowLocal`). Recomputed after every sync
+//  false` and the due day on or before today — see
+//  `TodayDigest.dueByEndOfTodayCutoff`). Recomputed after every sync
 //  and on app foreground so it crosses the day boundary even without a sync.
 //
 
@@ -25,7 +26,7 @@ enum BadgeService {
     }
 
     static func computeCount(modelContext: ModelContext) -> Int {
-        let cutoff = TodayDigest.startOfTomorrow()
+        let cutoff = TodayDigest.dueByEndOfTodayCutoff()
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate { todo in
                 !todo.isCompleted &&

@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/tanstack-react-start";
+import { toDueDay } from "@nylon-impossible/shared";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import {
   useMutation,
@@ -240,10 +241,13 @@ export function useUpdateTodo() {
             if (becameComplete && merged.recurrence && anchor) {
               merged.completed = false;
               merged.completedAt = new Date().toISOString();
-              merged.dueDate = nextDueDate(
-                merged.recurrence,
-                anchor,
-                new Date(),
+              merged.dueDate = toDueDay(
+                nextDueDate(
+                  merged.recurrence,
+                  anchor,
+                  new Date(),
+                  Intl.DateTimeFormat().resolvedOptions().timeZone,
+                ),
               ).toISOString();
             }
             if (becameComplete && merged.sticky) {

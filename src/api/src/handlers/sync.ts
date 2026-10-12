@@ -1,4 +1,4 @@
-import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
+import { TODO_NOTES_MAX, toDueDay } from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
   nextDueDate,
@@ -26,6 +26,7 @@ import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { finishTodoLinks } from "../lib/process-todo";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
+import { getUserTimezone } from "../lib/user-timezone";
 import type { Env } from "../types";
 
 const recurrenceSchema = z.object({
@@ -45,7 +46,8 @@ const syncRequestSchema = z.object({
       notes: z.string().max(TODO_NOTES_MAX).nullable().optional(),
       completed: z.boolean().optional(),
       position: z.string().optional(),
-      dueDate: z.coerce.date().nullable().optional(),
+      // Normalized to UTC midnight — due dates are calendar days.
+      dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
       recurrence: recurrenceSchema.nullable().optional(),
       // When a repeat is completed, the client advances dueDate and sends the
       // completion timestamp here (completed stays false). Cleared to null to
@@ -144,6 +146,10 @@ export async function syncTodos(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const conflicts: SyncConflict[] = [];
   const syncedAt = new Date();
+  // Looked up at most once per batch — only repeating todos need it.
+  let userTimeZone: string | undefined;
+  const timeZoneForUser = async () =>
+    (userTimeZone ??= await getUserTimezone(db, userId));
 
   // Ensure user exists before inserting todos (FK constraint). Shared with
   // /users/me so both entry points provision identically.
@@ -230,7 +236,10 @@ export async function syncTodos(c: Context<Env>) {
         let recurrencePlacementListId: string | null = null;
         if (completing && nextRecurrence && nextDueDateValue) {
           const now = new Date();
-          dueDateToWrite = nextDueDate(nextRecurrence, nextDueDateValue, now);
+          const timeZone = await timeZoneForUser();
+          dueDateToWrite = toDueDay(
+            nextDueDate(nextRecurrence, nextDueDateValue, now, timeZone),
+          );
           completedToWrite = false;
           completedAtToWrite = now;
           // The new occurrence is placed by its due date's distance, per the
@@ -240,7 +249,7 @@ export async function syncTodos(c: Context<Env>) {
             recurrencePlacementListId = await getSystemListId(
               db,
               userId,
-              placementForDueDate(dueDateToWrite, now),
+              placementForDueDate(dueDateToWrite, now, timeZone),
             );
           }
         }
@@ -370,7 +379,11 @@ export async function syncTodos(c: Context<Env>) {
             ? await getSystemListId(
                 db,
                 userId,
-                placementForDueDate(change.dueDate, new Date()),
+                placementForDueDate(
+                  change.dueDate,
+                  new Date(),
+                  await timeZoneForUser(),
+                ),
               )
             : null) ??
           (await getSystemListId(db, userId, "today"));

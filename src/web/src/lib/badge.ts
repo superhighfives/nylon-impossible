@@ -1,3 +1,4 @@
+import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
 import type { TodoWithUrls } from "@/types/database";
 
 /**
@@ -27,22 +28,16 @@ export function updateAppBadge(todos: TodoWithUrls[]): void {
 }
 
 function countDueByEndOfToday(todos: TodoWithUrls[]): number {
-  const cutoff = startOfTomorrowLocal();
+  // Due dates are calendar days; "today" is the browser's local day.
+  const today = dayKeyIn(
+    new Date(),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  );
   let count = 0;
   for (const todo of todos) {
     if (todo.completed) continue;
     if (!todo.dueDate) continue;
-    if (new Date(todo.dueDate) < cutoff) count += 1;
+    if (dueDayKey(todo.dueDate) <= today) count += 1;
   }
   return count;
-}
-
-// Midnight at the start of the next calendar day in the user's local
-// timezone. dueDate is a UTC timestamp, so each surface converts it to its
-// local day before comparing.
-function startOfTomorrowLocal(): Date {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  start.setDate(start.getDate() + 1);
-  return start;
 }
