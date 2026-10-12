@@ -21,6 +21,13 @@ export async function withRetry<T>(
     } catch (error) {
       lastError = error;
       if (attempt < attempts) {
+        // Only the final failure reaches Sentry, so log the ones a later
+        // attempt recovers from — otherwise a run that needs a retry every
+        // night looks perfectly healthy.
+        console.warn(
+          `Attempt ${attempt} of ${attempts} failed, retrying`,
+          error,
+        );
         await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
       }
     }

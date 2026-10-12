@@ -13,9 +13,13 @@ describe("withRetry", () => {
       .fn()
       .mockRejectedValueOnce(new Error("D1_ERROR: Network connection lost"))
       .mockResolvedValue("ok");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     await expect(withRetry(fn, { delayMs: 0 })).resolves.toBe("ok");
     expect(fn).toHaveBeenCalledTimes(2);
     expect(fn).toHaveBeenLastCalledWith(2);
+    // The recovered failure is still logged, since it never reaches Sentry.
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
   });
 
   it("rethrows the last error once every attempt fails", async () => {
