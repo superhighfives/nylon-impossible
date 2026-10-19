@@ -1,5 +1,5 @@
 -- Database seed script for local development
--- Run with: wrangler d1 execute nylon-impossible-db --local --persist-to ../../.wrangler/state --file=src/db/seeds/seed.sql
+-- Run with: wrangler d1 execute DB --local --persist-to ../../.wrangler/state --file=src/db/seeds/seed.sql
 
 -- Clear existing data (in correct order to respect foreign keys).
 DELETE FROM todo_urls;

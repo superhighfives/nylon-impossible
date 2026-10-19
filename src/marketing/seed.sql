@@ -1,7 +1,7 @@
 -- Marketing screenshot seed data.
 -- Inserts the Clerk development test user and a realistic set of todos into the local D1.
 -- Run from src/api directory:
---   npx wrangler d1 execute nylon-impossible-db --local \
+--   npx wrangler d1 execute DB --local \
 --     --persist-to ../../.wrangler/state \
 --     --file=../../src/marketing/seed.sql
 

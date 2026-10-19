@@ -32,9 +32,9 @@ jobs:
 
       - name: Apply D1 migrations and seed marketing data
         run: |
-          npx wrangler d1 migrations apply nylon-impossible-db --local \
+          npx wrangler d1 migrations apply DB --local \
             --persist-to ../../.wrangler/state
-          npx wrangler d1 execute nylon-impossible-db --local \
+          npx wrangler d1 execute DB --local \
             --persist-to ../../.wrangler/state \
             --file=../../src/marketing/seed.sql
         working-directory: src/api

@@ -20,6 +20,9 @@
   "d1_databases": [
     {
       "binding": "DB",
+      // TODO(backend-reset): swap for the new database — see scripts/db-reset/README.md.
+      // This and preview_database_id below still point at the pre-reset
+      // databases, whose migration history doesn't match 0000_baseline.sql.
       "database_name": "nylon-impossible-db",
       "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
       "migrations_dir": "./migrations",
@@ -94,6 +97,7 @@
     "d1_databases": [
       {
         "binding": "DB",
+        // TODO(backend-reset): swap for the new database — see scripts/db-reset/README.md.
         "database_name": "nylon-impossible-preview-db",
         "database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
         "migrations_dir": "./migrations",
