@@ -4,6 +4,8 @@
 @import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
 @import "tailwindcss-radix-colors/dist/red-colors-only.css";
 @import "./styles/radix-utilities.css";
+/* Generated from src/shared/design/tokens.json (`pnpm tokens`). */
+@import "./styles/tokens.css";
 @import "tw-animate-css";
 @import "@fontsource-variable/archivo";
 

@@ -284,7 +284,9 @@ describe("TodoInput", () => {
       expect(screen.getByText(/Due Tomorrow/)).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
-      const [input] = mutate.mock.calls[0];
+      const [input] = mutate.mock.calls[0] as unknown as [
+        { text: string; parseDate?: boolean; dueDate?: Date | null },
+      ];
       expect(input.text).toBe("Pay rent");
       expect(input.parseDate).toBe(false);
       expect(input.dueDate).toBeInstanceOf(Date);

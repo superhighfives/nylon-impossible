@@ -5,10 +5,15 @@ on:
     branches: [main]
     paths:
       - "src/ios/**"
+      # Shared with the iOS tests (typed-date fixtures) and Theme.swift's source.
+      - "src/shared/src/todo-date-fixtures.json"
+      - "src/shared/design/**"
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - "src/ios/**"
+      - "src/shared/src/todo-date-fixtures.json"
+      - "src/shared/design/**"
   workflow_dispatch:
 
 permissions:

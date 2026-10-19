@@ -30,6 +30,7 @@ jobs:
             src:
               - 'src/web/**'
               - 'src/api/**'
+              - 'src/shared/**'
               - 'package.json'
               - '.github/workflows/web-test.yml'
 
@@ -47,6 +48,10 @@ jobs:
       - name: Lint & typecheck API
         if: steps.changes.outputs.src == 'true'
         run: pnpm api:check && pnpm api:typecheck
+
+      - name: Check generated design tokens
+        if: steps.changes.outputs.src == 'true'
+        run: pnpm tokens:check
 
       - name: Check migration metadata
         if: steps.changes.outputs.src == 'true'
