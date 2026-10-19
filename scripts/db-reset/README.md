@@ -35,7 +35,9 @@ gitignored. **Don't commit these files: they hold real todo data.**
 
 - Run everything from the repo root, on the `backend-reset` branch, after
   `pnpm install`.
-- `wrangler whoami` must show the account that owns `nylon-impossible-db`.
+- `wrangler whoami` must show the account that owns the production database.
+  Its Cloudflare name is `too-doo-db` (id `effd712c…`). `nylon-impossible-db`
+  is only the label in `wrangler.jsonc`, so address it by the `DB` binding.
 - Pick a quiet window. The current TestFlight build only understands the
   `sometime` and `completed` list kinds, so web, API and iOS should change
   over together and you should accept a short gap.
@@ -50,7 +52,7 @@ This step is read-only.
 
 ```sh
 mkdir -p .wrangler/backups
-npx wrangler d1 export nylon-impossible-db --remote \
+npx wrangler d1 export DB --remote \
   -c src/api/wrangler.jsonc \
   --output .wrangler/backups/pre-reset-$(date +%Y%m%d).sql
 ```
@@ -176,7 +178,7 @@ Once the new databases have run cleanly for a while (a couple of weeks),
 delete the old ones, along with the backup files if you no longer want them:
 
 ```sh
-npx wrangler d1 delete nylon-impossible-db
+npx wrangler d1 delete too-doo-db
 npx wrangler d1 delete nylon-impossible-preview-db
 ```
 
