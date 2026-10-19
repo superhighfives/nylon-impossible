@@ -109,14 +109,14 @@ enum TodayDigest {
         return lists.first { $0.systemKind == .today }?.id.lowercased()
     }
 
-    /// Sticky first (the app's own top tier), then soonest-due — which puts
+    /// Pinned first (the app's own top tier), then soonest-due — which puts
     /// overdue items above the rest of the day without a separate rule for
     /// them, and undated Today items (`.distantFuture`) after everything with
     /// a date — then by position, so todos that sort alike keep the order they
     /// have in the app.
     static func sorted(_ todos: [TodoItem]) -> [TodoItem] {
         todos.sorted { a, b in
-            if a.sticky != b.sticky { return a.sticky }
+            if a.pinned != b.pinned { return a.pinned }
             let aDue = a.dueDate ?? .distantFuture
             let bDue = b.dueDate ?? .distantFuture
             if aDue != bDue { return aDue < bDue }

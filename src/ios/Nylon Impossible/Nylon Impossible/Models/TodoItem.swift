@@ -70,10 +70,14 @@ final class TodoItem {
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
     var recurrenceFrequency: String?  // RecurrenceFrequency raw value; nil = non-repeating
-    // Sticky todos render above non-sticky ones and are reordered within their
+    // Pinned todos render above unpinned ones and are reordered within their
     // own tier only. Clears to false when the todo is completed. Subtasks
     // never get this — no row toggle, no edit-sheet option.
-    var sticky: Bool = false
+    //
+    // Was `sticky` before the Sticky → Pin rename. `originalName` lets
+    // SwiftData's lightweight migration carry existing local values across
+    // instead of dropping the column and defaulting every row to false.
+    @Attribute(originalName: "sticky") var pinned: Bool = false
     var pendingUrls: [String] = [] // URLs waiting to be synced to server
     @Relationship(deleteRule: .cascade) var urls: [TodoUrl] = []
 
@@ -94,7 +98,7 @@ final class TodoItem {
         self.isDeleted = false
         self.dueDate = nil
         self.recurrenceFrequency = nil
-        self.sticky = false
+        self.pinned = false
         self.pendingUrls = []
     }
     

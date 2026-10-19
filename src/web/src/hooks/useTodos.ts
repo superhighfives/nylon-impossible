@@ -97,7 +97,7 @@ export function useCreateTodo() {
         position: input.position ?? "a0",
         dueDate: input.dueDate?.toISOString() ?? null,
         recurrence: input.recurrence ?? null,
-        sticky: false,
+        pinned: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         urls: [],
@@ -230,7 +230,7 @@ export function useUpdateTodo() {
               ...(input.completedAt !== undefined && {
                 completedAt: input.completedAt?.toISOString() ?? null,
               }),
-              ...(input.sticky !== undefined && { sticky: input.sticky }),
+              ...(input.pinned !== undefined && { pinned: input.pinned }),
             };
             // Optimistic recurrence advance: if this update marks a recurring
             // todo complete, roll dueDate forward, keep completed = false, and
@@ -250,8 +250,8 @@ export function useUpdateTodo() {
                 ),
               ).toISOString();
             }
-            if (becameComplete && merged.sticky) {
-              merged.sticky = false;
+            if (becameComplete && merged.pinned) {
+              merged.pinned = false;
             }
             return merged;
           }),
@@ -436,7 +436,7 @@ export function useSmartCreate() {
         position: generateKeyBetween(null, minPosition),
         dueDate: null,
         recurrence: null,
-        sticky: false,
+        pinned: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         urls: [],

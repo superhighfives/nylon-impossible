@@ -22,10 +22,17 @@ struct APITodo: Codable, Sendable {
     let position: String?
     let dueDate: Date?
     let recurrence: Recurrence?
+    let pinned: Bool?
+    // Legacy spelling of `pinned`. The API sends both during the Sticky → Pin
+    // expand/contract; read it only as a fallback so a response from a server
+    // that predates `pinned` still keeps pins.
     let sticky: Bool?
     let createdAt: Date
     let updatedAt: Date
     let urls: [APITodoUrl]?  // URLs included in sync response
+
+    /// Whether the todo is pinned, preferring `pinned` over the legacy key.
+    var isPinned: Bool { pinned ?? sticky ?? false }
 
     init(
         id: String, userId: String, parentId: String? = nil, listId: String? = nil, title: String,
@@ -33,7 +40,7 @@ struct APITodo: Codable, Sendable {
         completed: Bool, completedAt: Date? = nil, position: String? = nil,
         dueDate: Date? = nil,
         recurrence: Recurrence? = nil,
-        sticky: Bool? = nil,
+        pinned: Bool? = nil,
         createdAt: Date, updatedAt: Date,
         urls: [APITodoUrl]? = nil
     ) {
@@ -48,7 +55,8 @@ struct APITodo: Codable, Sendable {
         self.position = position
         self.dueDate = dueDate
         self.recurrence = recurrence
-        self.sticky = sticky
+        self.pinned = pinned
+        self.sticky = nil
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.urls = urls

@@ -388,7 +388,7 @@ struct TodoItemRow: View {
             // row carries no persistent pin control at all, only the
             // swipe-revealed one. Non-interactive here since a tap would
             // fight the container's own tap-to-edit gesture.
-            if todo.sticky {
+            if todo.pinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 14))
                     .foregroundStyle(Color.appAccent)
@@ -413,8 +413,8 @@ struct TodoItemRow: View {
                 initialUrls: urls,
                 subtasks: subtasks,
                 availableLists: availableLists,
-                onSave: { title, notes, dueDate, recurrence, sticky in
-                    onSave(title, notes, dueDate, recurrence, sticky)
+                onSave: { title, notes, dueDate, recurrence, pinned in
+                    onSave(title, notes, dueDate, recurrence, pinned)
                     showingEditSheet = false
                 },
                 onCancel: {

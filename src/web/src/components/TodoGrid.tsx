@@ -249,7 +249,7 @@ function NewTodoInline({
   listId: string;
   /**
    * Position of the list's current top incomplete todo. Quick-adds insert
-   * above it (top of the non-sticky tier), right where this affordance sits —
+   * above it (top of the unpinned tier), right where this affordance sits —
    * so new rows appear next to the control that created them.
    */
   firstPosition: string | null;
@@ -803,7 +803,7 @@ export function TodoGrid() {
       title?: string;
       notes?: string | null;
       dueDate?: Date | null;
-      sticky?: boolean;
+      pinned?: boolean;
     }) => {
       updateTodo.mutate({ id, input: updates });
     };
@@ -1060,7 +1060,7 @@ export function TodoGrid() {
                   <NewTodoInline
                     listId={list.id}
                     firstPosition={
-                      incompleteOrder.find((t) => !t.sticky)?.position ?? null
+                      incompleteOrder.find((t) => !t.pinned)?.position ?? null
                     }
                   />
                   <ColumnScroller

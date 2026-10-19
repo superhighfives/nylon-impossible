@@ -230,7 +230,7 @@ final class SyncService {
                 completedAt: todo.isDeleted ? nil : todo.completedAt,
                 updatedAt: todo.updatedAt,
                 deleted: todo.isDeleted ? true : nil,
-                sticky: todo.isDeleted ? nil : todo.sticky,
+                pinned: todo.isDeleted ? nil : todo.pinned,
                 urls: pendingUrlChanges
             )
         }
@@ -279,10 +279,10 @@ final class SyncService {
                     local.position = remote.position ?? local.position
                     local.dueDate = remote.dueDate
                     local.recurrence = remote.recurrence
-                    // sticky is user-toggled, so it follows the same
+                    // pinned is user-toggled, so it follows the same
                     // last-write-wins resolution as the other user-editable
                     // fields here.
-                    local.sticky = remote.sticky ?? false
+                    local.pinned = remote.isPinned
                     local.updatedAt = remote.updatedAt
                     local.isSynced = true
                 }
@@ -299,7 +299,7 @@ final class SyncService {
                 todo.completedAt = remote.completedAt
                 todo.dueDate = remote.dueDate
                 todo.recurrence = remote.recurrence
-                todo.sticky = remote.sticky ?? false
+                todo.pinned = remote.isPinned
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
                 todo.isSynced = true

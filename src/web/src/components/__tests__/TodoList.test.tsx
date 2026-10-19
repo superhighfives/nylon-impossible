@@ -88,7 +88,7 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
     recurrence: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    sticky: false,
+    pinned: false,
     urls: [],
     ...overrides,
   };
@@ -218,7 +218,7 @@ describe("TodoGrid", () => {
         mutate,
         isPending: false,
       } as unknown as ReturnType<typeof useUpdateTodo>);
-      stubTodos([makeTodo({ position: "a5", sticky: true })]);
+      stubTodos([makeTodo({ position: "a5", pinned: true })]);
 
       render(<TodoGrid />);
       fireEvent.click(
@@ -249,7 +249,7 @@ describe("TodoGrid", () => {
       });
       expect(mutate).toHaveBeenLastCalledWith({
         id: "todo-1",
-        input: { completed: false, position: "a5", sticky: true },
+        input: { completed: false, position: "a5", pinned: true },
       });
     } finally {
       vi.useRealTimers();

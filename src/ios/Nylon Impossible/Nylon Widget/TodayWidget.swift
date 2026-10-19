@@ -76,7 +76,7 @@ struct TodayProvider: TimelineProvider {
                 id: todo.id,
                 title: todo.title,
                 dueDate: todo.dueDate.map { DueDay.localDate($0) },
-                isSticky: todo.sticky,
+                isPinned: todo.pinned,
                 isRepeating: todo.recurrence != nil
             )
         }
@@ -112,28 +112,28 @@ extension WidgetTodo {
             id: UUID(),
             title: "Renew passport",
             dueDate: Date().addingTimeInterval(-3600),
-            isSticky: false,
+            isPinned: false,
             isRepeating: false
         ),
         WidgetTodo(
             id: UUID(),
             title: "Book the rehearsal room",
             dueDate: Date().addingTimeInterval(7200),
-            isSticky: true,
+            isPinned: true,
             isRepeating: false
         ),
         WidgetTodo(
             id: UUID(),
             title: "Water the monstera",
             dueDate: Date().addingTimeInterval(18_000),
-            isSticky: false,
+            isPinned: false,
             isRepeating: true
         ),
         WidgetTodo(
             id: UUID(),
             title: "Reply to the venue about Thursday",
             dueDate: nil,
-            isSticky: false,
+            isPinned: false,
             isRepeating: false
         ),
     ]

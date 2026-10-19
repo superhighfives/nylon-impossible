@@ -152,7 +152,7 @@ private struct TodayRow: View {
                     .font(.system(size: 9))
                     .foregroundStyle(Color.appSubtle)
             }
-            if todo.isSticky {
+            if todo.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 9))
                     .foregroundStyle(Color.appSubtle)

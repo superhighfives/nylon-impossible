@@ -10,7 +10,7 @@ import { eq, type getDb, lists, todos, todoUrls, users } from "./db";
 // D1 caps bound parameters at 100 per statement (see chunkForD1 in
 // @nylon-impossible/shared/d1 for the general case). The demo-todo row here
 // sets 10 fields explicitly; NOT NULL columns left unset (listEnteredAt,
-// needsInput, sticky) may still bind hidden default params, so budget for up
+// needsInput, pinned) may still bind hidden default params, so budget for up
 // to 13 and chunk conservatively.
 const TODO_INSERT_CHUNK_SIZE = 6;
 // The demo-url row sets all non-null-default-only columns explicitly, so

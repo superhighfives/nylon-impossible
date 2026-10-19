@@ -32,7 +32,7 @@ export interface UpdateTodoInput {
   // Set explicitly only to undo a completed repeat (clear it to null). On a
   // normal completion the server stamps this itself.
   completedAt?: Date | null;
-  sticky?: boolean;
+  pinned?: boolean;
   listId?: string;
 }
 
@@ -96,7 +96,7 @@ export interface TodoWithUrls {
   position: string;
   dueDate: string | null;
   recurrence: Recurrence | null;
-  sticky: boolean;
+  pinned: boolean;
   createdAt: string;
   updatedAt: string;
   urls: SerializedTodoUrl[];

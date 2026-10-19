@@ -107,8 +107,8 @@ struct TaskListView: View {
         let departingTo = departures[todo.id]
         let arrived = arrivals.contains(todo.id)
 
-        let toggleSticky = {
-            viewModel.toggleSticky(todo)
+        let togglePinned = {
+            viewModel.togglePinned(todo)
             syncService.syncAfterAction()
         }
         let moveToList: (String) -> Void = { listId in
@@ -126,14 +126,14 @@ struct TaskListView: View {
                 viewModel.toggleTodo(todo, allTodos: allTodos, lists: orderedLists)
                 syncService.syncAfterAction()
             },
-            onSave: { title, notes, dueDate, recurrence, sticky in
+            onSave: { title, notes, dueDate, recurrence, pinned in
                 viewModel.updateTodo(
                     todo,
                     title: title,
                     notes: notes,
                     dueDate: dueDate,
                     recurrence: recurrence,
-                    sticky: sticky
+                    pinned: pinned
                 )
                 syncService.syncAfterAction()
             },
@@ -213,7 +213,7 @@ struct TaskListView: View {
         // SwiftUI's default for a trailing edge's first action) — pin is a
         // second, partial-swipe-only action alongside it. Pin hides once
         // completed, matching the old persistent button (see TodoItemRow's
-        // pin indicator) — completing already clears sticky.
+        // pin indicator) — completing already clears pinned.
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { pendingDeleteTodo = todo } label: {
                 Label("Delete", systemImage: "trash")
@@ -221,10 +221,10 @@ struct TaskListView: View {
             if !todo.isEffectivelyCompleted {
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
-                        toggleSticky()
+                        togglePinned()
                     }
                 } label: {
-                    Label(todo.sticky ? "Unpin" : "Pin", systemImage: todo.sticky ? "pin.slash.fill" : "pin.fill")
+                    Label(todo.pinned ? "Unpin" : "Pin", systemImage: todo.pinned ? "pin.slash.fill" : "pin.fill")
                 }
                 .tint(Color.appAccent)
             }

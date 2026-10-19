@@ -74,7 +74,7 @@ struct BackgroundSyncService {
                     completedAt: todo.isDeleted ? nil : todo.completedAt,
                     updatedAt: todo.updatedAt,
                     deleted: todo.isDeleted ? true : nil,
-                    sticky: todo.isDeleted ? nil : todo.sticky,
+                    pinned: todo.isDeleted ? nil : todo.pinned,
                     urls: pendingUrlChanges
                 )
             }

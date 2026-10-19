@@ -3,7 +3,7 @@
 //  Nylon Impossible
 //
 //  Completing a todo is more than flipping a flag: a repeat rolls its dueDate
-//  forward and re-places itself, a completed todo unsticks, unchecking moves
+//  forward and re-places itself, a completed todo unpins, unchecking moves
 //  the todo to the end of its list, and subtasks follow their parent. That
 //  logic started in `TodoViewModel` and lives here so contexts without a view
 //  model — the widget's toggle intent — get the same behaviour rather than a
@@ -44,9 +44,9 @@ enum TodoCompletionService {
             )
             todo.dueDate = nextDue
             todo.completedAt = now
-            // Completing a sticky todo unsticks it — matches the server-side
+            // Completing a pinned todo unpins it — matches the server-side
             // clear in updateTodo / syncTodos.
-            todo.sticky = false
+            todo.pinned = false
             // The new occurrence is placed by its due date's distance, per
             // the settled recurrence heuristic — then ages normally
             // afterward. Matches the server's canonical advance.
@@ -74,9 +74,9 @@ enum TodoCompletionService {
                 .sorted { $0.position < $1.position }
             todo.position = generateKeyBetween(incompleteTodos.last?.position, nil)
         }
-        // Completing a sticky todo unsticks it — matches the server-side clear.
-        if !todo.isCompleted && todo.sticky {
-            todo.sticky = false
+        // Completing a pinned todo unpins it — matches the server-side clear.
+        if !todo.isCompleted && todo.pinned {
+            todo.pinned = false
         }
         todo.isCompleted.toggle()
         todo.markModified()

@@ -12,7 +12,7 @@ import SwiftData
 ///
 /// Completion runs through `TodoCompletionService` — the same code path the
 /// app's checkbox uses — so a repeat rolls its due date forward and re-places
-/// itself, a sticky todo unsticks, and subtasks follow their parent, rather
+/// itself, a pinned todo unpins, and subtasks follow their parent, rather
 /// than the widget inventing a simpler rule and quietly disagreeing with the
 /// app.
 ///

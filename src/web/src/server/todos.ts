@@ -68,7 +68,7 @@ function serializeTodoWithUrls(todo: Todo, urls: TodoUrl[]): TodoWithUrls {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
-    sticky: todo.sticky,
+    pinned: todo.pinned,
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     urls: urls.map(serializeUrl),
@@ -408,7 +408,7 @@ export const updateTodo = createServerFn({ method: "POST" })
         // normal completion stamps it server-side just below.
         if (validated.completedAt !== undefined)
           updates.completedAt = validated.completedAt;
-        if (validated.sticky !== undefined) updates.sticky = validated.sticky;
+        if (validated.pinned !== undefined) updates.pinned = validated.pinned;
         if (
           validated.listId !== undefined &&
           validated.listId !== existing.listId
@@ -514,9 +514,9 @@ export const updateTodo = createServerFn({ method: "POST" })
           }
         }
 
-        // Completing a sticky todo unsticks it — it sorts as an ordinary
+        // Completing a pinned todo unpins it — it sorts as an ordinary
         // completed todo, not pinned.
-        if (becameComplete && existing.sticky) updates.sticky = false;
+        if (becameComplete && existing.pinned) updates.pinned = false;
 
         // Update todo with compound where clause for authorization
         const [result] = yield* Effect.tryPromise({

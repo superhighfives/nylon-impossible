@@ -17,7 +17,7 @@ struct WidgetTodo: Identifiable, Hashable, Sendable {
     let id: UUID
     let title: String
     let dueDate: Date?
-    let isSticky: Bool
+    let isPinned: Bool
     let isRepeating: Bool
 
     /// Overdue is relative to when the entry renders, not when it was built.

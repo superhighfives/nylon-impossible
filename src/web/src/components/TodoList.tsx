@@ -50,7 +50,7 @@ import { Button, Checkbox, focusRing, UrlPreviewCard } from "./ui";
 const DONE_TOAST_MS = 5000;
 
 /**
- * Sorted incomplete todos for one list — sticky-first, by
+ * Sorted incomplete todos for one list — pinned-first, by
  * position within each tier. Shared by `TodoListColumn` (its own display
  * order) and `TodoGrid` (computing the source/target list's neighbors when a
  * cross-list drag needs a new position), so the two orderings never drift.
@@ -94,7 +94,7 @@ interface ExpandedSectionProps {
     title?: string;
     notes?: string | null;
     dueDate?: Date | null;
-    sticky?: boolean;
+    pinned?: boolean;
   }) => void;
   onDelete: (id: string) => void;
   deletePending: boolean;
@@ -198,14 +198,14 @@ function CompletedContentBadges({ todo }: { todo: TodoWithUrls }) {
 function InlineIndicators({
   recurrence,
   recurrenceLabel,
-  sticky,
-  onStickyToggle,
+  pinned,
+  onPinToggle,
   disabled,
 }: {
   recurrence: TodoWithUrls["recurrence"];
   recurrenceLabel: string | null;
-  sticky: boolean;
-  onStickyToggle: () => void;
+  pinned: boolean;
+  onPinToggle: () => void;
   disabled: boolean;
 }) {
   return (
@@ -225,17 +225,17 @@ function InlineIndicators({
         shape="square"
         ringOffset="app"
         type="button"
-        onClick={onStickyToggle}
+        onClick={onPinToggle}
         disabled={disabled}
-        aria-label={sticky ? "Unpin todo" : "Pin todo to top"}
-        aria-pressed={sticky}
+        aria-label={pinned ? "Unpin todo" : "Pin todo to top"}
+        aria-pressed={pinned}
         className={
-          sticky
+          pinned
             ? "text-gray hover:bg-gray-base"
             : "text-gray-muted hover:bg-gray-base pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100"
         }
       >
-        <Pin size={14} className={sticky ? "fill-current" : ""} />
+        <Pin size={14} className={pinned ? "fill-current" : ""} />
       </Button>
     </div>
   );
@@ -303,7 +303,7 @@ function TodoItemContent({
   // is otherwise a hover/focus affordance on desktop (always visible on
   // touch, where hover doesn't exist). Due date lives inline with the title
   // instead, so it doesn't force the pill open.
-  const hasVisiblePillState = hasRecurrence || !!todo.sticky;
+  const hasVisiblePillState = hasRecurrence || !!todo.pinned;
 
   const handleInlineDueDate = (date: Date | null) => {
     // Clearing a due date also clears any recurrence — a repeat has no anchor
@@ -337,8 +337,8 @@ function TodoItemContent({
   };
 
   // Non-destructive, instantly reversible — toggle directly, no confirm step.
-  const handleStickyToggle = () => {
-    onInlineUpdate(todo.id, { sticky: !todo.sticky });
+  const handlePinToggle = () => {
+    onInlineUpdate(todo.id, { pinned: !todo.pinned });
   };
 
   // Controls for the desktop hover pill.
@@ -367,8 +367,8 @@ function TodoItemContent({
               ? recurrenceLabel(todo.recurrence, dueDateObj)
               : null
           }
-          sticky={todo.sticky}
-          onStickyToggle={handleStickyToggle}
+          pinned={todo.pinned}
+          onPinToggle={handlePinToggle}
           disabled={updatePending}
         />
       )}
@@ -504,7 +504,7 @@ function TodoItemContent({
                   {recurrenceLabel(todo.recurrence, dueDateObj)}
                 </span>
               )}
-              {showActions && showInlineEditing && todo.sticky && (
+              {showActions && showInlineEditing && todo.pinned && (
                 <span
                   role="img"
                   aria-label="Pinned"
@@ -917,7 +917,7 @@ export interface TodoListColumnProps {
 }
 
 /**
- * One list's rows: sticky-tier sort, subtasks, URL previews. Completed todos
+ * One list's rows: pinned-tier sort, subtasks, URL previews. Completed todos
  * leave the list after a short hold, with a "Done · Undo" toast; they aren't
  * shown anywhere else on the board. Drag-and-drop
  * *within* this list is driven by dnd-kit hooks here (`useSortable` on each row); the
@@ -1001,7 +1001,7 @@ export function TodoListColumn({
           listId: todo.listId,
         }
       : { completed: false, position: todo.position };
-    if (todo.sticky) undo.sticky = true;
+    if (todo.pinned) undo.pinned = true;
     const toastId = toast.success("Done", {
       timeout: DONE_TOAST_MS,
       actionProps: {

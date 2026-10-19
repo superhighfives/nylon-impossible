@@ -41,7 +41,7 @@ struct ListPageView: View {
     /// between this render and the `onChange` that will classify it.
     ///
     /// A held todo keeps its natural slot: it still carries its `position` and
-    /// `sticky`, so re-sorting the combined set puts it back exactly where it
+    /// `pinned`, so re-sorting the combined set puts it back exactly where it
     /// was. A held todo that has actually been deleted simply isn't in
     /// `allTodos` any more, so it falls out here without special handling.
     private var displayedTodos: [TodoItem] {

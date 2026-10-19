@@ -5,6 +5,7 @@ import type { Env } from "../types";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
+import { pinnedResponseFields } from "./pinned";
 import { finishTodoLinks } from "./process-todo";
 import { cleanUrlString, createFallbackFromUrl } from "./url-helpers";
 
@@ -24,6 +25,7 @@ export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
+    ...pinnedResponseFields(todo.pinned),
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
