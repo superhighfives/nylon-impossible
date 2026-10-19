@@ -1,0 +1,632 @@
+{
+  "$comment": "Parity fixtures for parseTodoDate (src/shared/src/todo-date.ts) and TodoDateParser.swift. dueDay is the yyyy-mm-dd calendar day (stored as midnight UTC); matched is the matched words as typed. Both test suites load this file, so add cases here rather than in either test.",
+  "cases": [
+    {
+      "name": "tomorrow at the end",
+      "text": "Pay rent tomorrow",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "today at the end",
+      "text": "Pay rent today",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-14",
+        "matched": "today"
+      }
+    },
+    {
+      "name": "tonight means today",
+      "text": "Finish slides tonight",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Finish slides",
+        "dueDay": "2026-10-14",
+        "matched": "tonight"
+      }
+    },
+    {
+      "name": "tmrw abbreviation",
+      "text": "Call the bank tmrw",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Call the bank",
+        "dueDay": "2026-10-15",
+        "matched": "tmrw"
+      }
+    },
+    {
+      "name": "tomorrow at the start",
+      "text": "tomorrow call the bank",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "call the bank",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "tomorrow in the middle",
+      "text": "Pick up tomorrow the dry cleaning",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pick up the dry cleaning",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "case-insensitive relative word",
+      "text": "Pay rent TOMORROW",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-15",
+        "matched": "TOMORROW"
+      }
+    },
+    {
+      "name": "by prefix on a relative word",
+      "text": "Submit report by tomorrow",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Submit report",
+        "dueDay": "2026-10-15",
+        "matched": "by tomorrow"
+      }
+    },
+    {
+      "name": "due prefix on a relative word",
+      "text": "Pay rent due tomorrow",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-15",
+        "matched": "due tomorrow"
+      }
+    },
+    {
+      "name": "trailing punctuation joins the title",
+      "text": "Pay rent tomorrow.",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay rent.",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "month day at the end",
+      "text": "Mix the new EP oct 30",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Mix the new EP",
+        "dueDay": "2026-10-30",
+        "matched": "oct 30"
+      }
+    },
+    {
+      "name": "month day with ordinal and capital",
+      "text": "Mix the new EP Oct 30th",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Mix the new EP",
+        "dueDay": "2026-10-30",
+        "matched": "Oct 30th"
+      }
+    },
+    {
+      "name": "day month at the end",
+      "text": "Book flights 30 oct",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Book flights",
+        "dueDay": "2026-10-30",
+        "matched": "30 oct"
+      }
+    },
+    {
+      "name": "full month name already passed rolls to next year",
+      "text": "Renew passport october 3",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Renew passport",
+        "dueDay": "2027-10-03",
+        "matched": "october 3"
+      }
+    },
+    {
+      "name": "month date equal to today stays this year",
+      "text": "Dentist oct 14",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Dentist",
+        "dueDay": "2026-10-14",
+        "matched": "oct 14"
+      }
+    },
+    {
+      "name": "due prefix on a month date",
+      "text": "Send card due dec 25",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Send card",
+        "dueDay": "2026-12-25",
+        "matched": "due dec 25"
+      }
+    },
+    {
+      "name": "sept abbreviation already passed",
+      "text": "Ship it Sept 9",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Ship it",
+        "dueDay": "2027-09-09",
+        "matched": "Sept 9"
+      }
+    },
+    {
+      "name": "day then sept",
+      "text": "Prep 9 sept",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Prep",
+        "dueDay": "2027-09-09",
+        "matched": "9 sept"
+      }
+    },
+    {
+      "name": "impossible day of month does not parse",
+      "text": "Plan party feb 30",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Plan party feb 30",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "weekday short form",
+      "text": "Dinner with Sam fri",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Dinner with Sam",
+        "dueDay": "2026-10-16",
+        "matched": "fri"
+      }
+    },
+    {
+      "name": "on prefix with full weekday",
+      "text": "Dinner with Sam on Friday",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Dinner with Sam",
+        "dueDay": "2026-10-16",
+        "matched": "on Friday"
+      }
+    },
+    {
+      "name": "weekday equal to today means next week",
+      "text": "Water plants wed",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Water plants",
+        "dueDay": "2026-10-21",
+        "matched": "wed"
+      }
+    },
+    {
+      "name": "by prefix on a weekday",
+      "text": "Water plants by mon",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Water plants",
+        "dueDay": "2026-10-19",
+        "matched": "by mon"
+      }
+    },
+    {
+      "name": "due prefix with thurs",
+      "text": "Return books due thurs",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Return books",
+        "dueDay": "2026-10-15",
+        "matched": "due thurs"
+      }
+    },
+    {
+      "name": "sunday later this week",
+      "text": "Clean gutters sunday",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Clean gutters",
+        "dueDay": "2026-10-18",
+        "matched": "sunday"
+      }
+    },
+    {
+      "name": "uppercase prefix and weekday",
+      "text": "Call DAD ON FRI",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Call DAD",
+        "dueDay": "2026-10-16",
+        "matched": "ON FRI"
+      }
+    },
+    {
+      "name": "weekday mid-sentence does not parse",
+      "text": "Call Mum about Sunday lunch",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Call Mum about Sunday lunch",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "weekday alone would empty the title",
+      "text": "fri",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "fri",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "prefixed weekday alone would empty the title",
+      "text": "on friday",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "on friday",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "relative word alone would empty the title",
+      "text": "tomorrow",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "tomorrow",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "relative word plus punctuation would leave no words",
+      "text": "tomorrow.",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "tomorrow.",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "weekday not at the end",
+      "text": "Fix the friday bug",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Fix the friday bug",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "weekday at the start",
+      "text": "Friday drinks planning",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Friday drinks planning",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "weekday inside the text",
+      "text": "Move Monday standup",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Move Monday standup",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "hyphenated weekday is not a word start",
+      "text": "Do the pre-fri",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Do the pre-fri",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "next week at the end means the following Monday",
+      "text": "Plan offsite next week",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Plan offsite",
+        "dueDay": "2026-10-19",
+        "matched": "next week"
+      }
+    },
+    {
+      "name": "next week not at the end",
+      "text": "Review next week's goals",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Review next week's goals",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "possessive today does not parse",
+      "text": "Read today's paper",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Read today's paper",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "curly possessive tomorrow does not parse",
+      "text": "Submit tomorrow’s draft",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Submit tomorrow’s draft",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "relative word inside a longer word",
+      "text": "Buy tickets for Tomorrowland",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Buy tickets for Tomorrowland",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "a number before a non-month word",
+      "text": "Email about 30 day trial",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Email about 30 day trial",
+        "dueDay": null,
+        "matched": null
+      }
+    },
+    {
+      "name": "extra whitespace around the date",
+      "text": "  Pay   rent   tomorrow  ",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay   rent",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "trailing whitespace after a weekday",
+      "text": "Dinner with Sam fri   ",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Dinner with Sam",
+        "dueDay": "2026-10-16",
+        "matched": "fri"
+      }
+    },
+    {
+      "name": "end-of-text date wins over a relative word",
+      "text": "Pay rent tomorrow fri",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "Pay rent tomorrow",
+        "dueDay": "2026-10-16",
+        "matched": "fri"
+      }
+    },
+    {
+      "name": "Los Angeles is still on the 14th at 23:30Z",
+      "text": "Pay rent tomorrow",
+      "now": "2026-10-14T23:30:00Z",
+      "timeZone": "America/Los_Angeles",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "Auckland is already on the 15th at 23:30Z",
+      "text": "Pay rent tomorrow",
+      "now": "2026-10-14T23:30:00Z",
+      "timeZone": "Pacific/Auckland",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-16",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "Tokyo today is the 15th at 23:30Z",
+      "text": "Call home today",
+      "now": "2026-10-14T23:30:00Z",
+      "timeZone": "Asia/Tokyo",
+      "expected": {
+        "title": "Call home",
+        "dueDay": "2026-10-15",
+        "matched": "today"
+      }
+    },
+    {
+      "name": "one minute before local midnight",
+      "text": "Pay rent tomorrow",
+      "now": "2026-10-15T06:59:00Z",
+      "timeZone": "America/Los_Angeles",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "exactly local midnight",
+      "text": "Pay rent tomorrow",
+      "now": "2026-10-15T07:00:00Z",
+      "timeZone": "America/Los_Angeles",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-16",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "weekday is today in Auckland so it means next week",
+      "text": "Dinner fri",
+      "now": "2026-10-15T23:30:00Z",
+      "timeZone": "Pacific/Auckland",
+      "expected": {
+        "title": "Dinner",
+        "dueDay": "2026-10-23",
+        "matched": "fri"
+      }
+    },
+    {
+      "name": "same instant in UTC is still Thursday",
+      "text": "Dinner fri",
+      "now": "2026-10-15T23:30:00Z",
+      "timeZone": "UTC",
+      "expected": {
+        "title": "Dinner",
+        "dueDay": "2026-10-16",
+        "matched": "fri"
+      }
+    },
+    {
+      "name": "month date across the new year",
+      "text": "Send invoice jan 2",
+      "now": "2026-12-31T12:00:00Z",
+      "timeZone": "UTC",
+      "expected": {
+        "title": "Send invoice",
+        "dueDay": "2027-01-02",
+        "matched": "jan 2"
+      }
+    },
+    {
+      "name": "month date on new year's eve itself",
+      "text": "Send invoice dec 31",
+      "now": "2026-12-31T12:00:00Z",
+      "timeZone": "UTC",
+      "expected": {
+        "title": "Send invoice",
+        "dueDay": "2026-12-31",
+        "matched": "dec 31"
+      }
+    },
+    {
+      "name": "Kiritimati is already in the new year",
+      "text": "Party tomorrow",
+      "now": "2026-12-31T12:00:00Z",
+      "timeZone": "Pacific/Kiritimati",
+      "expected": {
+        "title": "Party",
+        "dueDay": "2027-01-02",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "unknown time zone falls back to UTC",
+      "text": "Pay rent tomorrow",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Mars/Olympus",
+      "expected": {
+        "title": "Pay rent",
+        "dueDay": "2026-10-15",
+        "matched": "tomorrow"
+      }
+    },
+    {
+      "name": "feb 29 skips to the next leap year",
+      "text": "Celebrate feb 29",
+      "now": "2027-03-01T12:00:00Z",
+      "timeZone": "UTC",
+      "expected": {
+        "title": "Celebrate",
+        "dueDay": "2028-02-29",
+        "matched": "feb 29"
+      }
+    },
+    {
+      "name": "empty input stays empty",
+      "text": "",
+      "now": "2026-10-14T12:00:00Z",
+      "timeZone": "Europe/London",
+      "expected": {
+        "title": "",
+        "dueDay": null,
+        "matched": null
+      }
+    }
+  ]
+}

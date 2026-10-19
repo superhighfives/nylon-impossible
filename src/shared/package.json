@@ -10,6 +10,8 @@
     "./schema": "./src/schema.ts",
     "./recurrence": "./src/recurrence.ts",
     "./recurrence-test-fixtures": "./src/recurrence-test-fixtures.ts",
+    "./todo-date": "./src/todo-date.ts",
+    "./todo-date-fixtures.json": "./src/todo-date-fixtures.json",
     "./addon-state": "./src/addon-state.ts",
     "./demo-seed": "./src/demo-seed.ts"
   },
