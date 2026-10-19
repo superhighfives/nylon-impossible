@@ -1,9 +1,70 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "1ae97325-345e-4bbf-9d11-8142225d0591",
+  "id": "5350579c-4623-4bf7-afc6-13b06203679c",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "gmail_addon_links": {
+      "name": "gmail_addon_links",
+      "columns": {
+        "google_sub": {
+          "name": "google_sub",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "clerk_user_id": {
+          "name": "clerk_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        }
+      },
+      "indexes": {
+        "idx_gmail_addon_links_clerk_user": {
+          "name": "idx_gmail_addon_links_clerk_user",
+          "columns": [
+            "clerk_user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "gmail_addon_links_clerk_user_id_users_id_fk": {
+          "name": "gmail_addon_links_clerk_user_id_users_id_fk",
+          "tableFrom": "gmail_addon_links",
+          "tableTo": "users",
+          "columnsFrom": [
+            "clerk_user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "lists": {
       "name": "lists",
       "columns": {
@@ -26,6 +87,21 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'custom'"
+        },
+        "system_kind": {
+          "name": "system_kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "position": {
@@ -60,6 +136,14 @@
             "user_id"
           ],
           "isUnique": false
+        },
+        "idx_lists_user_system_kind": {
+          "name": "idx_lists_user_system_kind",
+          "columns": [
+            "user_id",
+            "system_kind"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -78,88 +162,6 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
-    "todo_lists": {
-      "name": "todo_lists",
-      "columns": {
-        "todo_id": {
-          "name": "todo_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "list_id": {
-          "name": "list_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch())"
-        }
-      },
-      "indexes": {
-        "idx_todo_lists_todo": {
-          "name": "idx_todo_lists_todo",
-          "columns": [
-            "todo_id"
-          ],
-          "isUnique": false
-        },
-        "idx_todo_lists_list": {
-          "name": "idx_todo_lists_list",
-          "columns": [
-            "list_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "todo_lists_todo_id_todos_id_fk": {
-          "name": "todo_lists_todo_id_todos_id_fk",
-          "tableFrom": "todo_lists",
-          "tableTo": "todos",
-          "columnsFrom": [
-            "todo_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "todo_lists_list_id_lists_id_fk": {
-          "name": "todo_lists_list_id_lists_id_fk",
-          "tableFrom": "todo_lists",
-          "tableTo": "lists",
-          "columnsFrom": [
-            "list_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {
-        "todo_lists_todo_id_list_id_pk": {
-          "columns": [
-            "todo_id",
-            "list_id"
-          ],
-          "name": "todo_lists_todo_id_list_id_pk"
-        }
-      },
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
@@ -215,6 +217,21 @@
           "notNull": false,
           "autoincrement": false
         },
+        "image": {
+          "name": "image",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "show_preview": {
+          "name": "show_preview",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
         "position": {
           "name": "position",
           "type": "text",
@@ -222,6 +239,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'a0'"
+        },
+        "fetch_status": {
+          "name": "fetch_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'pending'"
         },
         "fetched_at": {
           "name": "fetched_at",
@@ -292,6 +317,28 @@
           "notNull": true,
           "autoincrement": false
         },
+        "parent_id": {
+          "name": "parent_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "list_id": {
+          "name": "list_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "list_entered_at": {
+          "name": "list_entered_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "(unixepoch())"
+        },
         "title": {
           "name": "title",
           "type": "text",
@@ -307,6 +354,13 @@
           "autoincrement": false,
           "default": false
         },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "position": {
           "name": "position",
           "type": "text",
@@ -315,8 +369,8 @@
           "autoincrement": false,
           "default": "'a0'"
         },
-        "description": {
-          "name": "description",
+        "notes": {
+          "name": "notes",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -329,8 +383,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "priority": {
-          "name": "priority",
+        "recurrence": {
+          "name": "recurrence",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -351,6 +405,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "(unixepoch())"
+        },
+        "sticky": {
+          "name": "sticky",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {
@@ -368,6 +430,24 @@
             "position"
           ],
           "isUnique": false
+        },
+        "idx_todos_user_parent_position": {
+          "name": "idx_todos_user_parent_position",
+          "columns": [
+            "user_id",
+            "parent_id",
+            "position"
+          ],
+          "isUnique": false
+        },
+        "idx_todos_user_list_position": {
+          "name": "idx_todos_user_list_position",
+          "columns": [
+            "user_id",
+            "list_id",
+            "position"
+          ],
+          "isUnique": false
         }
       },
       "foreignKeys": {
@@ -377,6 +457,32 @@
           "tableTo": "users",
           "columnsFrom": [
             "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "todos_parent_id_todos_id_fk": {
+          "name": "todos_parent_id_todos_id_fk",
+          "tableFrom": "todos",
+          "tableTo": "todos",
+          "columnsFrom": [
+            "parent_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "todos_list_id_lists_id_fk": {
+          "name": "todos_list_id_lists_id_fk",
+          "tableFrom": "todos",
+          "tableTo": "lists",
+          "columnsFrom": [
+            "list_id"
           ],
           "columnsTo": [
             "id"
@@ -406,6 +512,22 @@
           "notNull": true,
           "autoincrement": false
         },
+        "theme": {
+          "name": "theme",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'system'"
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UTC'"
+        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -429,7 +551,7 @@
           "columns": [
             "email"
           ],
-          "isUnique": false
+          "isUnique": true
         }
       },
       "foreignKeys": {},

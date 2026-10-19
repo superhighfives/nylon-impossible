@@ -20,18 +20,10 @@ export const users = sqliteTable(
   {
     id: text("id").primaryKey(),
     email: text("email").notNull(),
-    plan: text("plan", { enum: ["free", "pro"] })
-      .notNull()
-      .default("free"),
-    location: text("location"),
     // Appearance preference, synced across devices. "system" follows the OS.
     theme: text("theme", { enum: ["light", "dark", "system"] })
       .notNull()
       .default("system"),
-    // When true, completed todos are hidden from the list. Synced across devices.
-    hideCompleted: integer("hide_completed", { mode: "boolean" })
-      .notNull()
-      .default(false),
     // IANA identifier (e.g. "America/New_York"). Drives the aging sweep's
     // per-account "local midnight" calculation.
     timezone: text("timezone").notNull().default("UTC"),
@@ -65,7 +57,7 @@ export const todos = sqliteTable(
     parentId: text("parent_id").references((): AnySQLiteColumn => todos.id, {
       onDelete: "cascade",
     }),
-    // Which list this todo belongs to (Today/This Week/Sometime, or a custom
+    // Which list this todo belongs to (Today/This Week/Someday, or a custom
     // list). A todo belongs to exactly one list. Independent of dueDate —
     // list membership never implies or derives a due date, and vice versa.
     listId: text("list_id")
@@ -83,8 +75,8 @@ export const todos = sqliteTable(
       .default(false),
     // When a repeating todo is "completed" it isn't persisted as done (the
     // dueDate rolls forward instead); this records the moment it was checked so
-    // the UI can show it in the Completed section until the user's local
-    // midnight, after which it derives back to active. Null for todos that have
+    // the UI can briefly show it as done (and offer Undo) before it derives
+    // back to active. Null for todos that have
     // never been completed-as-a-repeat.
     completedAt: integer("completed_at", { mode: "timestamp" }),
     position: text("position").notNull().default("a0"),
@@ -142,7 +134,7 @@ export const gmailAddonLinks = sqliteTable(
   (table) => [index("idx_gmail_addon_links_clerk_user").on(table.clerkUserId)],
 );
 
-// Lists table. Three system lists per user (Today/This Week/Sometime,
+// Lists table. Three system lists per user (Today/This Week/Someday,
 // kind = "system", fixed first-three order) plus unlimited user-named
 // custom lists (kind = "custom"). A todo belongs to exactly one list via
 // todos.listId.
@@ -163,7 +155,7 @@ export const lists = sqliteTable(
     // lists — never collides under idx_lists_user_system_kind since SQLite
     // treats multiple NULLs as distinct.
     systemKind: text("system_kind", {
-      enum: ["today", "thisWeek", "sometime", "completed"],
+      enum: ["today", "thisWeek", "someday"],
     }),
     position: text("position").notNull().default("a0"),
     createdAt: integer("created_at", { mode: "timestamp" })

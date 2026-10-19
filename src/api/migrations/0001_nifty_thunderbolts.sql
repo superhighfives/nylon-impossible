@@ -1,1 +1,0 @@
-ALTER TABLE `todo_urls` ADD `fetch_status` text DEFAULT 'pending' NOT NULL;
