@@ -173,23 +173,48 @@ struct APIUser: Codable, Sendable {
     // "light" | "dark" | "system". Optional so the client still decodes against
     // an older API that predates the field; treated as "system" when absent.
     let theme: String?
+    // IANA zone the aging sweep uses for "local midnight", and whether it
+    // follows the device. Optional for the same older-API reason as `theme`;
+    // a missing `timezoneAuto` means automatic.
+    let timezone: String?
+    let timezoneAuto: Bool?
     let createdAt: Date
     let updatedAt: Date
+
+    init(
+        id: String,
+        email: String,
+        theme: String?,
+        timezone: String? = nil,
+        timezoneAuto: Bool? = nil,
+        createdAt: Date,
+        updatedAt: Date
+    ) {
+        self.id = id
+        self.email = email
+        self.theme = theme
+        self.timezone = timezone
+        self.timezoneAuto = timezoneAuto
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
 }
 
 struct UpdateUserRequest: Encodable, Sendable {
-    // Theme is never nulled: nil = omit, value = send.
+    // Never nulled: nil = omit, value = send.
     var theme: String?
+    var timezone: String?
+    var timezoneAuto: Bool?
 
     enum CodingKeys: String, CodingKey {
-        case theme
+        case theme, timezone, timezoneAuto
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if let theme {
-            try container.encode(theme, forKey: .theme)
-        }
+        try container.encodeIfPresent(theme, forKey: .theme)
+        try container.encodeIfPresent(timezone, forKey: .timezone)
+        try container.encodeIfPresent(timezoneAuto, forKey: .timezoneAuto)
     }
 }
 

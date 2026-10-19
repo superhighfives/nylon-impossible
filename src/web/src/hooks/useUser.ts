@@ -9,6 +9,8 @@ export interface User {
   email: string;
   theme: Theme;
   timezone: string;
+  // Absent from servers that predate it; treat a missing value as true.
+  timezoneAuto?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,6 +18,7 @@ export interface User {
 type UserUpdate = {
   theme?: Theme;
   timezone?: string;
+  timezoneAuto?: boolean;
 };
 
 const USER_QUERY_KEY = ["user", "me"] as const;
@@ -114,6 +117,9 @@ export function useUpdateUser() {
         }
         if (newData.timezone !== undefined) {
           updates.timezone = newData.timezone;
+        }
+        if (newData.timezoneAuto !== undefined) {
+          updates.timezoneAuto = newData.timezoneAuto;
         }
         queryClient.setQueryData<User>(USER_QUERY_KEY, {
           ...previousUser,

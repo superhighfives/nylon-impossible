@@ -27,6 +27,12 @@ export const users = sqliteTable(
     // IANA identifier (e.g. "America/New_York"). Drives the aging sweep's
     // per-account "local midnight" calculation.
     timezone: text("timezone").notNull().default("UTC"),
+    // When true, clients keep `timezone` in step with the device zone (web via
+    // `Intl`, iOS via `TimeZone.current`). Picking a zone by hand in Settings
+    // sets it false so a travelling device stops overwriting the choice.
+    timezoneAuto: integer("timezone_auto", { mode: "boolean" })
+      .notNull()
+      .default(true),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
