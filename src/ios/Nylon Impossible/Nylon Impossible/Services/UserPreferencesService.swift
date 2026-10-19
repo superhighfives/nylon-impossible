@@ -30,7 +30,7 @@ final class UserPreferencesService {
 
     /// The device's current zone. `autoupdatingCurrent` follows a change made
     /// while the app is running, which `TimeZone.current` may not.
-    static var deviceTimeZone: String { TimeZone.autoupdatingCurrent.identifier }
+    nonisolated static var deviceTimeZone: String { TimeZone.autoupdatingCurrent.identifier }
 
     /// Clears locally-held preference state on sign out so a subsequent sign-in
     /// with a different account doesn't inherit the previous account's theme.

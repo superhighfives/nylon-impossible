@@ -26,6 +26,18 @@ struct ContentView: View {
     // Home Screen "New Task" quick action. AddTaskInputView lowers it again
     // once it has focus.
     @State private var focusAddTask = false
+    // The add bar's typed-date match the user dismissed with ×, lowercased.
+    // Cleared on submit so the next todo parses afresh.
+    @State private var dismissedDateMatch: String?
+
+    /// The typed date in the add bar, or an empty result once dismissed.
+    private var typedDate: TodoDateParser.Result {
+        let parsed = TodoDateParser.parse(viewModel.newTaskText)
+        guard parsed.dueDay != nil, parsed.matched?.lowercased() != dismissedDateMatch else {
+            return TodoDateParser.Result(title: viewModel.newTaskText, dueDay: nil, matched: nil)
+        }
+        return parsed
+    }
 
     /// Lists in the fixed order: Today, This Week, Someday, then custom
     /// lists by position. A system list whose kind this build doesn't know
@@ -173,6 +185,17 @@ struct ContentView: View {
             // Floating input bar — liquid glass, anchored to the bottom and
             // rising with the keyboard (like Discord) since it does not ignore
             // the keyboard safe area.
+            VStack(alignment: .leading, spacing: 6) {
+            // "Due Fri ×" — the date the add bar parsed from what's typed.
+            // Minimal; Phase 3's composer gives it the full chip row.
+            if let dueDay = typedDate.dueDay, let matched = typedDate.matched {
+                DueChipView(dueDay: dueDay) {
+                    dismissedDateMatch = matched.lowercased()
+                }
+                .padding(.leading, 20)
+                .transition(.opacity)
+            }
+
             AddTaskInputView(
                 text: $viewModel.newTaskText,
                 canAdd: viewModel.canAddTask,
@@ -180,7 +203,9 @@ struct ContentView: View {
                 focusRequested: $focusAddTask
             ) {
                 let text = viewModel.newTaskText
+                let parseDate = typedDate.dueDay != nil
                 viewModel.newTaskText = ""
+                dismissedDateMatch = nil
 
                 // Create instantly and locally so the todo appears and persists
                 // even with no connection; sync runs in the background.
@@ -189,7 +214,8 @@ struct ContentView: View {
                     userId: authService.userId,
                     context: modelContext,
                     allTodos: todos,
-                    listId: viewModel.selectedListId
+                    listId: viewModel.selectedListId,
+                    parseDate: parseDate
                 ) != nil else { return }
 
                 syncService.syncAfterAction()
@@ -197,6 +223,8 @@ struct ContentView: View {
             .padding(.horizontal, 16)
             .padding(.top, 10)
             .padding(.bottom, 6)
+            }
+            .animation(.easeInOut(duration: 0.15), value: typedDate.dueDay)
         }
         .animation(.easeInOut(duration: 0.3), value: todos.count)
         .refreshable {
