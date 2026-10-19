@@ -22,8 +22,7 @@ const TODO_URL_INSERT_CHUNK_SIZE = 7;
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
   { name: "This Week", systemKind: "thisWeek" as const },
-  { name: "Sometime", systemKind: "sometime" as const },
-  { name: "Completed", systemKind: "completed" as const },
+  { name: "Someday", systemKind: "someday" as const },
 ];
 
 /**

@@ -14,9 +14,9 @@ import type { Env } from "../types";
  *
  * Deliberately deterministic — no model runs, nothing is proposed for
  * consent. It's the same work that already happens on create, exposed as
- * something the user can ask for again:
- * the retry for a link whose fetch failed, and the way a todo captured before
- * any of this existed catches up.
+ * something the user can ask for again: the retry for a link whose fetch
+ * failed. (The standalone "Process links" button is gone; this route now only
+ * backs that per-link retry.)
  */
 export async function processTodo(c: Context<Env>) {
   const idParam = c.req.param("id");

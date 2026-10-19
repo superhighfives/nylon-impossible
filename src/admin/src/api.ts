@@ -3,18 +3,8 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 export interface AdminUserListItem {
   id: string;
   email: string;
-  plan: "free" | "pro";
   todoCount: number;
   createdAt: string;
-}
-
-export interface AdminUserDetail extends AdminUserListItem {
-  location: string | null;
-  updatedAt: string;
-  diagnostics: {
-    todoCount: number;
-    lastTodoUpdatedAt: string | null;
-  };
 }
 
 export interface ListUsersResponse {
@@ -53,34 +43,6 @@ async function request<T>(
 export function listUsers(token: string, cursor: string | null) {
   const qs = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
   return request<ListUsersResponse>(token, `/admin/users${qs}`);
-}
-
-export function getUser(token: string, id: string) {
-  return request<AdminUserDetail>(token, `/admin/users/${id}`);
-}
-
-export interface AdminUserUpdate {
-  plan?: "free" | "pro";
-  location?: string | null;
-}
-
-export interface UpdateUserResponse {
-  id: string;
-  email: string;
-  plan: "free" | "pro";
-  location: string | null;
-  updatedAt: string;
-}
-
-export function updateUser(
-  token: string,
-  id: string,
-  updates: AdminUserUpdate,
-) {
-  return request<UpdateUserResponse>(token, `/admin/users/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(updates),
-  });
 }
 
 export function deleteUser(token: string, id: string) {

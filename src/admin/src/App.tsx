@@ -7,7 +7,6 @@ import {
   useUser,
 } from "@clerk/react";
 import { useEffect, useState } from "react";
-import { UserDetailPanel } from "./components/UserDetailPanel";
 import { UsersTable } from "./components/UsersTable";
 
 export function App() {
@@ -40,7 +39,6 @@ function Gate() {
 function AdminShell() {
   const { user } = useUser();
   const role = (user?.publicMetadata as { role?: string } | undefined)?.role;
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   if (role !== "admin") {
     return (
@@ -64,23 +62,8 @@ function AdminShell() {
         <h1 className="text-lg font-semibold">Nylon Admin</h1>
         <UserButton />
       </header>
-      <main className="flex flex-1 overflow-hidden">
-        <section className="flex-1 overflow-auto p-6">
-          <UsersTable
-            selectedId={selectedId}
-            onSelect={(id) => setSelectedId(id)}
-          />
-        </section>
-        {selectedId && (
-          <aside className="w-[420px] overflow-auto border-l border-neutral-200 bg-white">
-            <UserDetailPanel
-              key={selectedId}
-              userId={selectedId}
-              onClose={() => setSelectedId(null)}
-              onDeleted={() => setSelectedId(null)}
-            />
-          </aside>
-        )}
+      <main className="flex-1 overflow-auto p-6">
+        <UsersTable />
       </main>
     </div>
   );

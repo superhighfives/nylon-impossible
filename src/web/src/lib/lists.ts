@@ -1,5 +1,5 @@
 import { DEMO_SEED_TODOS } from "@nylon-impossible/shared/demo-seed";
-import { and, eq, isNull, ne, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { SystemListKind } from "@/types/database";
 import type { DbClient } from "./db";
@@ -17,12 +17,11 @@ const TODO_URL_INSERT_CHUNK_SIZE = 7;
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
   { name: "This Week", systemKind: "thisWeek" as const },
-  { name: "Sometime", systemKind: "sometime" as const },
-  { name: "Completed", systemKind: "completed" as const },
+  { name: "Someday", systemKind: "someday" as const },
 ];
 
 /**
- * Seed the system lists (Today/This Week/Sometime/Completed) for a user, if
+ * Seed the system lists (Today/This Week/Someday) for a user, if
  * they don't already exist. Web-only signups create their user row via
  * `ensureUserExists` rather than the API worker's `sync.ts` — this is the
  * matching provisioning step for that path, so a web-only user always has
@@ -146,7 +145,7 @@ export async function seedDemoTodos(
   }
 }
 
-/** Look up one of a user's system list ids (Today/This Week/Sometime/Completed). */
+/** Look up one of a user's system list ids (Today/This Week/Someday). */
 export async function getSystemListId(
   db: DbClient,
   userId: string,
@@ -174,12 +173,6 @@ export async function getSystemListId(
  * the moment the *other* user deletes that list. Returns the id back for a
  * convenient `??`/ternary at the call site, or null if it isn't owned by
  * `userId`.
- *
- * Also excludes the `completed` system list: no todo's `listId` is ever
- * meant to point there (its contents are a synthesized aggregate, not a real
- * scope — see the migration that created it), so a todo pointed at it would
- * silently vanish from every UI. Custom lists have a null `systemKind`, so
- * that case must stay eligible.
  */
 export async function verifyListOwnership(
   db: DbClient,
@@ -189,12 +182,6 @@ export async function verifyListOwnership(
   const [list] = await db
     .select({ id: lists.id })
     .from(lists)
-    .where(
-      and(
-        eq(lists.id, listId),
-        eq(lists.userId, userId),
-        or(isNull(lists.systemKind), ne(lists.systemKind, "completed")),
-      ),
-    );
+    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
   return list?.id ?? null;
 }

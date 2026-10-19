@@ -1,1 +1,0 @@
-ALTER TABLE todo_urls ADD COLUMN show_preview INTEGER NOT NULL DEFAULT 1;

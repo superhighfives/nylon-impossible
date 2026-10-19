@@ -1,8 +1,7 @@
 import type { Context } from "hono";
-import { z } from "zod/v4";
-import { count, desc, eq, getDb, lt, sql, todos, users } from "../lib/db";
+import { desc, eq, getDb, lt, sql, users } from "../lib/db";
 import { deleteUserCascade } from "../lib/delete-user";
-import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
+import { apiError } from "../lib/errors";
 import type { Env } from "../types";
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -35,7 +34,6 @@ export async function listUsers(c: Context<Env>) {
     .select({
       id: users.id,
       email: users.email,
-      plan: users.plan,
       createdAt: users.createdAt,
       // Columns must be table-qualified: drizzle renders interpolated column
       // refs unqualified, and a bare `id` inside `FROM todos` binds to todos.id
@@ -61,119 +59,10 @@ export async function listUsers(c: Context<Env>) {
     users: page.map((u) => ({
       id: u.id,
       email: u.email,
-      plan: u.plan,
       todoCount: Number(u.todoCount),
       createdAt: u.createdAt.toISOString(),
     })),
     nextCursor,
-  });
-}
-
-// GET /admin/users/:id
-export async function getUser(c: Context<Env>) {
-  const id = c.req.param("id");
-  if (!id) return apiError(c, "user_id_required");
-  const db = getDb(c.env.DB);
-
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  if (!user) return apiError(c, "user_not_found");
-
-  const [todoCountRow] = await db
-    .select({ value: count() })
-    .from(todos)
-    .where(eq(todos.userId, id));
-
-  const lastTodo = await db
-    .select({ updatedAt: todos.updatedAt })
-    .from(todos)
-    .where(eq(todos.userId, id))
-    .orderBy(desc(todos.updatedAt))
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  return c.json({
-    id: user.id,
-    email: user.email,
-    plan: user.plan,
-    location: user.location,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-    diagnostics: {
-      todoCount: todoCountRow?.value ?? 0,
-      lastTodoUpdatedAt: lastTodo?.updatedAt.toISOString() ?? null,
-    },
-  });
-}
-
-const updateUserSchema = z.object({
-  plan: z.enum(["free", "pro"]).optional(),
-  location: z.string().max(200).nullable().optional(),
-});
-
-// PATCH /admin/users/:id
-export async function updateUser(c: Context<Env>) {
-  const id = c.req.param("id");
-  if (!id) return apiError(c, "user_id_required");
-  const json = await readJsonBody(c);
-  if (!json.ok) return json.response;
-  const parsed = updateUserSchema.safeParse(json.body);
-  if (!parsed.success) return apiValidationError(c, parsed.error);
-
-  const updates: Partial<{
-    plan: "free" | "pro";
-    location: string | null;
-  }> = {};
-  if (parsed.data.plan !== undefined) updates.plan = parsed.data.plan;
-  if (parsed.data.location !== undefined) {
-    updates.location = parsed.data.location;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    return apiError(c, "no_valid_fields");
-  }
-
-  const db = getDb(c.env.DB);
-  const existing = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  if (!existing) return apiError(c, "user_not_found");
-
-  await db
-    .update(users)
-    .set({ ...updates, updatedAt: new Date() })
-    .where(eq(users.id, id));
-
-  const user = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      plan: users.plan,
-      location: users.location,
-      updatedAt: users.updatedAt,
-    })
-    .from(users)
-    .where(eq(users.id, id))
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  if (!user) return apiError(c, "user_not_found");
-
-  return c.json({
-    id: user.id,
-    email: user.email,
-    plan: user.plan,
-    location: user.location,
-    updatedAt: user.updatedAt.toISOString(),
   });
 }
 

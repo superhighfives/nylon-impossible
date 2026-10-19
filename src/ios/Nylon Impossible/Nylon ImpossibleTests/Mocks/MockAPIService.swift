@@ -14,10 +14,7 @@ final class MockAPIService: APIProviding {
     var getMeResponse: APIUser = APIUser(
         id: "mock-user-id",
         email: "test@example.com",
-        plan: "pro",
-        location: nil,
         theme: "system",
-        hideCompleted: false,
         createdAt: Date(timeIntervalSince1970: 1735689600),
         updatedAt: Date(timeIntervalSince1970: 1735689600)
     )
@@ -47,19 +44,10 @@ final class MockAPIService: APIProviding {
         if let error = updateMeError {
             throw error
         }
-        let newLocation: String?
-        if case .some(let loc) = request.location {
-            newLocation = loc
-        } else {
-            newLocation = getMeResponse.location
-        }
         return updateMeResponse ?? APIUser(
             id: getMeResponse.id,
             email: getMeResponse.email,
-            plan: getMeResponse.plan,
-            location: newLocation,
             theme: request.theme ?? getMeResponse.theme,
-            hideCompleted: request.hideCompleted ?? getMeResponse.hideCompleted,
             createdAt: getMeResponse.createdAt,
             updatedAt: Date()
         )

@@ -51,6 +51,9 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
             </Toast.Description>
           ) : null}
         </div>
+        {/* Renders only when the toast was added with `actionProps` (e.g. the
+            "Undo" on "Done"). */}
+        <Toast.Action className="relative shrink-0 rounded-md px-2 py-1 text-sm font-medium text-gray underline-offset-2 before:absolute before:content-[''] before:-inset-1.5 transition-colors hover:bg-gray-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset" />
         <Toast.Close
           aria-label="Dismiss"
           // ring-inset, not an offset ring — the toast surface color varies by

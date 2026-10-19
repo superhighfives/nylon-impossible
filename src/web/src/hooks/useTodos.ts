@@ -363,35 +363,6 @@ export function useDeleteTodo() {
   });
 }
 
-/**
- * Hook to fetch a single todo with its URLs.
- * Only fetches when todoId is provided and enabled.
- */
-export function useTodoWithUrls(todoId: string | null) {
-  const { getToken } = useAuth();
-
-  return useQuery({
-    queryKey: ["todo", todoId],
-    queryFn: async (): Promise<TodoWithUrls> => {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/todos/${todoId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
-
-      return response.json();
-    },
-    enabled: !!todoId,
-    staleTime: 30_000, // Consider fresh for 30 seconds
-  });
-}
-
 interface SmartCreateResponse {
   todos: TodoWithUrls[];
 }

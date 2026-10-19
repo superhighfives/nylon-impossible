@@ -57,15 +57,15 @@ describe("placementForDueDate", () => {
     );
   });
 
-  it("places 8 days out in Sometime", () => {
+  it("places 8 days out in Someday", () => {
     expect(placementForDueDate(new Date("2026-06-23T09:00:00.000Z"), now)).toBe(
-      "sometime",
+      "someday",
     );
   });
 
-  it("places a due date months out in Sometime", () => {
+  it("places a due date months out in Someday", () => {
     expect(placementForDueDate(new Date("2026-12-25T09:00:00.000Z"), now)).toBe(
-      "sometime",
+      "someday",
     );
   });
 

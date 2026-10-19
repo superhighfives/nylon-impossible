@@ -40,8 +40,8 @@ final class TodoViewModel {
 
         // Sort: sticky-first among incomplete (by position asc within each
         // tier), then completed (most recently completed first). "Effective"
-        // completion counts a repeat completed today as done so it sits in
-        // Completed until local midnight. Completing a todo clears sticky, so
+        // completion counts a repeat completed today as done until local
+        // midnight. Completing a todo clears sticky, so
         // only incomplete todos ever participate in the sticky tier.
         return scoped.sorted { a, b in
             let aDone = a.isEffectivelyCompleted
@@ -289,7 +289,7 @@ final class TodoViewModel {
         return list
     }
 
-    /// Rename a custom list. System lists (Today/This Week/Sometime) can't be
+    /// Rename a custom list. System lists (Today/This Week/Someday) can't be
     /// renamed — callers should only offer this for `list.kind == "custom"`.
     @MainActor
     func renameList(_ list: TodoListModel, name: String, apiService: any APIProviding) async throws {

@@ -5,6 +5,10 @@ Standalone admin app for Nylon Impossible. Deployed to its own Cloudflare Worker
 bundle. Auth via Clerk; admin role is `publicMetadata.role === "admin"` on the
 Clerk user.
 
+Deliberately minimal: it lists users (email, todo count, created date) and
+deletes a user (cascading their rows and the Clerk account). There's no plan,
+location or other per-user editing.
+
 ## Local dev
 
 ```sh

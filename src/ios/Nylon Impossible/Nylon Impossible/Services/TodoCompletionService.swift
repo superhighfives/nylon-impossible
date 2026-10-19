@@ -32,8 +32,8 @@ enum TodoCompletionService {
         }
         // Optimistic recurrence advance: completing a repeating todo rolls its
         // dueDate forward to the next future occurrence, stamps completedAt, and
-        // keeps the completion flag clear, so it sits in Completed until local
-        // midnight instead of flashing "done" and disappearing. Mirrors the
+        // keeps the completion flag clear, so it counts as done until local
+        // midnight and then comes back on its own. Mirrors the
         // server's canonical advance in updateTodo / syncTodos.
         if !todo.isCompleted,
            let recurrence = todo.recurrence,

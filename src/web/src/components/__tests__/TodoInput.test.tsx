@@ -23,8 +23,7 @@ import { toast } from "@/lib/toast";
 const LISTS = [
   { id: "today-id", name: "Today", systemKind: "today" },
   { id: "week-id", name: "This Week", systemKind: "thisWeek" },
-  { id: "sometime-id", name: "Sometime", systemKind: "sometime" },
-  { id: "completed-id", name: "Completed", systemKind: "completed" },
+  { id: "someday-id", name: "Someday", systemKind: "someday" },
   { id: "custom-id", name: "Groceries", systemKind: null, position: "a0" },
 ];
 
@@ -255,17 +254,14 @@ describe("TodoInput", () => {
     );
   });
 
-  it("offers system lists as segments, custom lists behind more, never Completed", () => {
+  it("offers system lists as segments, custom lists behind more", () => {
     vi.mocked(useLists).mockReturnValue({
       data: LISTS,
     } as unknown as ReturnType<typeof useLists>);
     stubSmartCreate();
     render(<TodoInput />);
 
-    expect(
-      screen.getByRole("button", { name: "Sometime" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Completed" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Someday" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Groceries" })).toBeNull();
     expect(
       screen.getByRole("button", { name: "More lists" }),

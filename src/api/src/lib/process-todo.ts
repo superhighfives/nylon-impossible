@@ -2,8 +2,8 @@
  * Link processing — attaching the URLs in a todo's text, fetching what's
  * behind them, and naming the todo after what turned up. All deterministic:
  * it's HTTP and string handling, no model involved. Runs for everyone on
- * create, and is what the explicit "Process" action re-runs when a fetch
- * didn't land the first time.
+ * create, and is what a link's "Try again" (POST /todos/:id/process) re-runs
+ * when a fetch didn't land the first time.
  */
 
 import * as Sentry from "@sentry/cloudflare";
@@ -45,7 +45,7 @@ function normalizeUrl(url: string): string {
  * The fetching itself belongs in `fetchTodoLinks`, in the background.
  *
  * `refetch` re-queues links that already have metadata — what an explicit
- * "Process" press means. Without it only links that never landed are retried.
+ * retry means. Without it only links that never landed are retried.
  */
 export async function queueTodoLinks(
   db: Db,
@@ -221,7 +221,7 @@ export async function applyLinkTitle(
  * Fetch queued links, name their todos after what came back, and poke clients.
  *
  * The tail every link-processing path shares — create, sync, enrich, and the
- * explicit Process action — so a link captured from the share sheet ends up
+ * explicit retry — so a link captured from the share sheet ends up
  * with the same title it would have got from anywhere else.
  */
 export async function finishTodoLinks(

@@ -1,1 +1,0 @@
-ALTER TABLE todo_urls ADD COLUMN image TEXT;

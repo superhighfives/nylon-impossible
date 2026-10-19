@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { TodoGrid } from "../TodoGrid";
@@ -14,7 +14,8 @@ vi.mock("@/hooks/useTodos", () => ({
   })),
   // TodoGrid renders the floating composer (TodoInput), which smart-creates.
   useSmartCreate: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
-  // The expanded details panel refreshes link previews and re-runs AI.
+  // The expanded details panel toggles link previews and retries failed
+  // link fetches.
   useUpdateUrlPreview: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
   useProcessTodo: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
@@ -26,14 +27,26 @@ vi.mock("@/hooks/useLists", () => ({
   useDeleteList: vi.fn(),
 }));
 
-// TodoGrid reads the synced hideCompleted preference via useUser and toggles
-// it via useUpdateUser (both call Clerk's useAuth); mock them so the
-// component renders without a ClerkProvider.
+// Some children read the user (Clerk's useAuth underneath); mock it so the
+// board renders without a ClerkProvider.
 vi.mock("@/hooks/useUser", () => ({
   useUser: vi.fn(() => ({ data: undefined })),
   useUpdateUser: vi.fn(() => ({ mutate: vi.fn(), isPending: false })),
 }));
 
+// Completing a todo raises a "Done · Undo" toast; capture it instead of
+// rendering the global toaster.
+vi.mock("@/lib/toast", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/toast")>()),
+  toast: {
+    success: vi.fn(() => "toast-1"),
+    error: vi.fn(),
+    info: vi.fn(),
+    dismiss: vi.fn(),
+  },
+}));
+
+import { COMPLETION_HOLD_MS } from "@/hooks/useCompletionHold";
 import {
   useCreateList,
   useDeleteList,
@@ -46,7 +59,8 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
-import { useUpdateUser, useUser } from "@/hooks/useUser";
+import { useUser } from "@/hooks/useUser";
+import { toast } from "@/lib/toast";
 
 const TODAY_LIST: SerializedList = {
   id: "list-today",
@@ -80,9 +94,9 @@ function makeTodo(overrides?: Partial<TodoWithUrls>): TodoWithUrls {
   };
 }
 
-function stubUser(hideCompleted?: boolean) {
+function stubUser() {
   vi.mocked(useUser).mockReturnValue({
-    data: hideCompleted === undefined ? undefined : { hideCompleted },
+    data: undefined,
     isLoading: false,
   } as unknown as ReturnType<typeof useUser>);
 }
@@ -182,115 +196,13 @@ describe("TodoGrid", () => {
     expect(screen.getAllByLabelText("Has notes")).toHaveLength(1);
   });
 
-  it("shows completed todos when hideCompleted is false", () => {
-    stubUser(false);
+  it("doesn't render completed todos anywhere on the board", () => {
     stubTodos([
       makeTodo({ id: "a", title: "Active thing", completed: false }),
       makeTodo({ id: "b", title: "Done thing", completed: true }),
     ]);
 
     render(<TodoGrid />);
-    expect(screen.getByText("Active thing")).toBeInTheDocument();
-    expect(screen.getByText("Done thing")).toBeInTheDocument();
-  });
-
-  it("hides completed todos when hideCompleted is true", () => {
-    stubUser(true);
-    stubTodos([
-      makeTodo({ id: "a", title: "Active thing", completed: false }),
-      makeTodo({ id: "b", title: "Done thing", completed: true }),
-    ]);
-
-    render(<TodoGrid />);
-    expect(screen.getByText("Active thing")).toBeInTheDocument();
-    // Collapsed rows stay mounted (so the section can animate) but inert.
-    expect(screen.getByText("Done thing").closest("[inert]")).not.toBeNull();
-  });
-
-  it("shows a collapsed completed accordion with a count when hideCompleted is true", () => {
-    stubUser(true);
-    stubTodos([
-      makeTodo({ id: "a", title: "Active thing", completed: false }),
-      makeTodo({ id: "b", title: "Done one", completed: true }),
-      makeTodo({ id: "c", title: "Done two", completed: true }),
-    ]);
-
-    render(<TodoGrid />);
-    const accordion = screen.getByRole("button", { name: /completed/i });
-    expect(accordion).toHaveAttribute("aria-expanded", "false");
-    expect(accordion).toHaveTextContent("2");
-    expect(screen.getByText("Done one").closest("[inert]")).not.toBeNull();
-  });
-
-  it("expands the completed accordion locally when clicked, without syncing the preference", () => {
-    const mutate = vi.fn();
-    vi.mocked(useUpdateUser).mockReturnValue({
-      mutate,
-      isPending: false,
-    } as unknown as ReturnType<typeof useUpdateUser>);
-    stubUser(true);
-    stubTodos([makeTodo({ id: "b", title: "Done thing", completed: true })]);
-
-    render(<TodoGrid />);
-    const accordion = screen.getByRole("button", { name: /completed/i });
-    expect(accordion).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(accordion);
-
-    expect(accordion).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Done thing")).toBeInTheDocument();
-    expect(mutate).not.toHaveBeenCalled();
-  });
-
-  it("aggregates completed todos from every list into a single Completed column", () => {
-    const workList: SerializedList = {
-      ...TODAY_LIST,
-      id: "list-work",
-      name: "Work",
-      kind: "custom",
-      systemKind: null,
-      position: "a1",
-    };
-    stubLists([TODAY_LIST, workList]);
-    stubUser(true);
-    stubTodos([
-      makeTodo({
-        id: "a",
-        listId: "list-today",
-        title: "Today done",
-        completed: true,
-      }),
-      makeTodo({
-        id: "b",
-        listId: "list-work",
-        title: "Work done",
-        completed: true,
-      }),
-    ]);
-
-    render(<TodoGrid />);
-    // One aggregate accordion, not one per list.
-    const accordions = screen.getAllByRole("button", { name: /completed/i });
-    expect(accordions).toHaveLength(1);
-    expect(accordions[0]).toHaveAttribute("aria-expanded", "false");
-
-    fireEvent.click(accordions[0]);
-
-    expect(accordions[0]).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Today done")).toBeInTheDocument();
-    expect(screen.getByText("Work done")).toBeInTheDocument();
-  });
-
-  it("does not flash completed todos while the hideCompleted preference is loading", () => {
-    stubUser(undefined);
-    stubTodos([
-      makeTodo({ id: "a", title: "Active thing", completed: false }),
-      makeTodo({ id: "b", title: "Done thing", completed: true }),
-    ]);
-
-    render(<TodoGrid />);
-    // Incomplete todos render immediately, but the completed section stays out
-    // of the DOM until the preference resolves so it can't flash open.
     expect(screen.getByText("Active thing")).toBeInTheDocument();
     expect(screen.queryByText("Done thing")).not.toBeInTheDocument();
     expect(
@@ -298,14 +210,94 @@ describe("TodoGrid", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders no completed accordion when there are no completed todos", () => {
-    stubUser(false);
-    stubTodos([makeTodo({ id: "a", title: "Active thing", completed: false })]);
+  it("completes after the hold and offers Undo from a Done toast", () => {
+    vi.useFakeTimers();
+    try {
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTodo).mockReturnValue({
+        mutate,
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateTodo>);
+      stubTodos([makeTodo({ position: "a5", sticky: true })]);
 
-    render(<TodoGrid />);
-    expect(
-      screen.queryByRole("button", { name: /completed/i }),
-    ).not.toBeInTheDocument();
+      render(<TodoGrid />);
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: 'Mark "Buy milk" as completed' }),
+      );
+      expect(mutate).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(COMPLETION_HOLD_MS);
+      });
+
+      expect(mutate).toHaveBeenCalledWith({
+        id: "todo-1",
+        input: { completed: true },
+      });
+      expect(toast.success).toHaveBeenCalledTimes(1);
+      const [message, options] = vi.mocked(toast.success).mock.calls[0];
+      expect(message).toBe("Done");
+      expect(options?.actionProps?.children).toBe("Undo");
+
+      // Undo restores the row where it was, pin included.
+      act(() => {
+        options?.actionProps?.onClick?.(
+          {} as Parameters<
+            NonNullable<NonNullable<typeof options.actionProps>["onClick"]>
+          >[0],
+        );
+      });
+      expect(mutate).toHaveBeenLastCalledWith({
+        id: "todo-1",
+        input: { completed: false, position: "a5", sticky: true },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("undoes a completed repeat by restoring its due date and list", () => {
+    vi.useFakeTimers();
+    try {
+      const mutate = vi.fn();
+      vi.mocked(useUpdateTodo).mockReturnValue({
+        mutate,
+        isPending: false,
+      } as unknown as ReturnType<typeof useUpdateTodo>);
+      stubTodos([
+        makeTodo({
+          recurrence: { frequency: "daily" },
+          dueDate: "2026-03-15T00:00:00.000Z",
+        }),
+      ]);
+
+      render(<TodoGrid />);
+      fireEvent.click(
+        screen.getByRole("checkbox", { name: 'Mark "Buy milk" as completed' }),
+      );
+      act(() => {
+        vi.advanceTimersByTime(COMPLETION_HOLD_MS);
+      });
+
+      const [, options] = vi.mocked(toast.success).mock.calls[0];
+      act(() => {
+        options?.actionProps?.onClick?.(
+          {} as Parameters<
+            NonNullable<NonNullable<typeof options.actionProps>["onClick"]>
+          >[0],
+        );
+      });
+      expect(mutate).toHaveBeenLastCalledWith({
+        id: "todo-1",
+        input: {
+          completedAt: null,
+          dueDate: new Date("2026-03-15T00:00:00.000Z"),
+          listId: "list-today",
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("opens a todo's details when the row itself is tapped", () => {

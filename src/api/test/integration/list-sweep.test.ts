@@ -9,7 +9,7 @@ const USER = "user_test_123";
 
 async function getListId(
   userId: string,
-  systemKind: "today" | "thisWeek" | "sometime",
+  systemKind: "today" | "thisWeek" | "someday",
 ) {
   const db = getDb(env.DB);
   const [list] = await db
@@ -123,7 +123,7 @@ describe("runListSweep", () => {
     expect(stored.listId).toBe(todayListId);
   });
 
-  it("demotes a This Week todo to Sometime once it's sat there 7+ days", async () => {
+  it("demotes a This Week todo to Someday once it's sat there 7+ days", async () => {
     await seedUser(USER, "test@example.com", { timezone: "UTC" });
     const thisWeekListId = await getListId(USER, "thisWeek");
     const todoId = "550e8400-e29b-41d4-a716-446655440004";
@@ -138,8 +138,8 @@ describe("runListSweep", () => {
     await runListSweep(db, env, new Date("2026-06-15T00:15:00Z"));
 
     const [stored] = await db.select().from(todos).where(eq(todos.id, todoId));
-    const sometimeListId = await getListId(USER, "sometime");
-    expect(stored.listId).toBe(sometimeListId);
+    const somedayListId = await getListId(USER, "someday");
+    expect(stored.listId).toBe(somedayListId);
   });
 
   it("leaves a This Week todo alone if it hasn't been there 7 days yet", async () => {
@@ -160,13 +160,13 @@ describe("runListSweep", () => {
     expect(stored.listId).toBe(thisWeekListId);
   });
 
-  it("is terminal for Sometime — never moves a Sometime todo anywhere", async () => {
+  it("is terminal for Someday — never moves a Someday todo anywhere", async () => {
     await seedUser(USER, "test@example.com", { timezone: "UTC" });
-    const sometimeListId = await getListId(USER, "sometime");
+    const somedayListId = await getListId(USER, "someday");
     const todoId = "550e8400-e29b-41d4-a716-446655440006";
     const yearAgo = new Date("2025-06-15T00:00:00Z");
     await seedTodo(todoId, USER, {
-      listId: sometimeListId,
+      listId: somedayListId,
       completed: false,
       listEnteredAt: yearAgo,
     });
@@ -175,7 +175,7 @@ describe("runListSweep", () => {
     await runListSweep(db, env, new Date("2026-06-15T00:15:00Z"));
 
     const [stored] = await db.select().from(todos).where(eq(todos.id, todoId));
-    expect(stored.listId).toBe(sometimeListId);
+    expect(stored.listId).toBe(somedayListId);
   });
 
   it("only sweeps users whose local midnight has arrived, independently", async () => {

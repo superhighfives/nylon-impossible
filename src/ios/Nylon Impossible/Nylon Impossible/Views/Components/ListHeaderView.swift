@@ -9,7 +9,7 @@ import SwiftUI
 /// Floating title bar for the currently-selected list — the iOS analogue of
 /// web's per-column title band. For a **custom** list the name doubles as a
 /// menu for renaming, deleting, and reordering; system lists (Today / This
-/// Week / Sometime / Completed) can't be renamed or removed, so they get the
+/// Week / Someday) can't be renamed or removed, so they get the
 /// same capsule with a plain, non-interactive label instead — matching how
 /// web's `ListHeader` renders every column's title the same way regardless
 /// of `kind`. The three time-based lists still fold their name into the
@@ -87,8 +87,7 @@ struct ListHeaderView: View {
 
     /// The plain, non-interactive label system lists get — same capsule,
     /// same typography as a custom list's `title`, minus the menu (rename /
-    /// delete / reorder don't apply to Today, This Week, Sometime, or
-    /// Completed).
+    /// delete / reorder don't apply to Today, This Week, or Someday).
     private var systemTitle: some View {
         Text(list.name)
             .font(.system(size: 15, weight: .semibold))

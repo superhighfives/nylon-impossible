@@ -7,19 +7,14 @@ export type Theme = "light" | "dark" | "system";
 export interface User {
   id: string;
   email: string;
-  plan: "free" | "pro";
-  location: string | null;
   theme: Theme;
-  hideCompleted: boolean;
   timezone: string;
   createdAt: string;
   updatedAt: string;
 }
 
 type UserUpdate = {
-  location?: string | null;
   theme?: Theme;
-  hideCompleted?: boolean;
   timezone?: string;
 };
 
@@ -112,16 +107,10 @@ export function useUpdateUser() {
       const previousUser = queryClient.getQueryData<User>(USER_QUERY_KEY);
 
       if (previousUser) {
-        // Only spread defined values to preserve explicit null for location
+        // Only spread defined values so an omitted field keeps its value.
         const updates: Partial<User> = {};
-        if (newData.location !== undefined) {
-          updates.location = newData.location;
-        }
         if (newData.theme !== undefined) {
           updates.theme = newData.theme;
-        }
-        if (newData.hideCompleted !== undefined) {
-          updates.hideCompleted = newData.hideCompleted;
         }
         if (newData.timezone !== undefined) {
           updates.timezone = newData.timezone;

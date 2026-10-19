@@ -14,7 +14,7 @@ struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
     let parentId: String?  // Parent todo id for subtasks; nil for top-level
-    let listId: String?    // Which list (Today/This Week/Sometime/custom) this todo belongs to
+    let listId: String?    // Which list (Today/This Week/Someday/custom) this todo belongs to
     let title: String
     let notes: String?
     let completed: Bool
@@ -162,45 +162,25 @@ struct SyncConflict: Codable, Sendable {
 struct APIUser: Codable, Sendable {
     let id: String
     let email: String
-    // "free" | "pro". Optional so the client still decodes against an older API
-    // that predates the field; treated as "free" when absent.
-    let plan: String?
-    let location: String?
     // "light" | "dark" | "system". Optional so the client still decodes against
     // an older API that predates the field; treated as "system" when absent.
     let theme: String?
-    // Whether completed todos are hidden from the list. Optional so the client
-    // still decodes against an older API that predates the field; false when absent.
-    let hideCompleted: Bool?
     let createdAt: Date
     let updatedAt: Date
 }
 
 struct UpdateUserRequest: Encodable, Sendable {
-    // Double optional: nil = omit field, .some(nil) = send null, .some(value) = send value
-    let location: String??
-    // Single optional (theme is never nulled): nil = omit, value = send. `var`
-    // with a default keeps it in the memberwise init (a defaulted `let` would be
-    // dropped from it), so existing location call sites still compile.
-    var theme: String? = nil
-    // Single optional (never nulled): nil = omit, value = send. Defaulted `var`
-    // for the same memberwise-init reason as `theme`.
-    var hideCompleted: Bool? = nil
+    // Theme is never nulled: nil = omit, value = send.
+    var theme: String?
 
     enum CodingKeys: String, CodingKey {
-        case location, theme, hideCompleted
+        case theme
     }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        if case .some(let loc) = location {
-            try container.encode(loc, forKey: .location)
-        }
         if let theme {
             try container.encode(theme, forKey: .theme)
-        }
-        if let hideCompleted {
-            try container.encode(hideCompleted, forKey: .hideCompleted)
         }
     }
 }

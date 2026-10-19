@@ -1,18 +1,14 @@
 import { useEffect, useState } from "react";
 import { useToken } from "../App";
-import { type AdminUserListItem, listUsers } from "../api";
+import { type AdminUserListItem, deleteUser, listUsers } from "../api";
 
-interface Props {
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}
-
-export function UsersTable({ selectedId, onSelect }: Props) {
+export function UsersTable() {
   const token = useToken();
   const [users, setUsers] = useState<AdminUserListItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,6 +33,24 @@ export function UsersTable({ selectedId, onSelect }: Props) {
     };
   }, [token, cursor]);
 
+  async function handleDelete(user: AdminUserListItem) {
+    if (!token) return;
+    const confirmed = window.confirm(
+      `Delete ${user.email}? This removes all of their todos and lists, and the Clerk account. This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setDeletingId(user.id);
+    setError(null);
+    try {
+      await deleteUser(token, user.id);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   if (!token) return <div className="text-neutral-500">Loading session…</div>;
 
   return (
@@ -54,37 +68,35 @@ export function UsersTable({ selectedId, onSelect }: Props) {
         <thead className="bg-neutral-50 text-left text-xs uppercase text-neutral-500">
           <tr>
             <th className="px-3 py-2">Email</th>
-            <th className="px-3 py-2">Plan</th>
             <th className="px-3 py-2 text-right">Todos</th>
             <th className="px-3 py-2">Created</th>
+            <th className="px-3 py-2">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr
-              key={u.id}
-              onClick={() => onSelect(u.id)}
-              className={`cursor-pointer border-t border-neutral-100 hover:bg-neutral-50 ${
-                selectedId === u.id ? "bg-blue-50" : ""
-              }`}
-            >
-              <td className="px-3 py-2 font-medium">{u.email}</td>
+            <tr key={u.id} className="border-t border-neutral-100">
               <td className="px-3 py-2">
-                <span
-                  className={`rounded px-2 py-0.5 text-xs font-medium ${
-                    u.plan === "pro"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "bg-neutral-100 text-neutral-700"
-                  }`}
-                >
-                  {u.plan}
-                </span>
+                <div className="font-medium">{u.email}</div>
+                <div className="font-mono text-xs text-neutral-500">{u.id}</div>
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
                 {u.todoCount}
               </td>
               <td className="px-3 py-2 text-neutral-600">
                 {new Date(u.createdAt).toLocaleDateString()}
+              </td>
+              <td className="px-3 py-2 text-right">
+                <button
+                  type="button"
+                  onClick={() => handleDelete(u)}
+                  disabled={deletingId !== null}
+                  className="rounded border border-red-300 bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                >
+                  {deletingId === u.id ? "Deleting…" : "Delete"}
+                </button>
               </td>
             </tr>
           ))}

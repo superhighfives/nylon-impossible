@@ -1,7 +1,7 @@
 -- Marketing screenshot seed data.
 -- Inserts the Clerk development test user and a realistic set of todos into the local D1.
 -- Run from src/api directory:
---   npx wrangler d1 execute nylon-impossible-db --local \
+--   npx wrangler d1 execute DB --local \
 --     --persist-to ../../.wrangler/state \
 --     --file=../../src/marketing/seed.sql
 
@@ -12,7 +12,7 @@ INSERT OR IGNORE INTO lists (id, user_id, name, kind, system_kind, position, cre
 VALUES
   ('mktg_list_today', 'user_3BPJATg8w4djAPJd71AUARo3vJ7', 'Today', 'system', 'today', 'a0', unixepoch(), unixepoch()),
   ('mktg_list_this_week', 'user_3BPJATg8w4djAPJd71AUARo3vJ7', 'This Week', 'system', 'thisWeek', 'a1', unixepoch(), unixepoch()),
-  ('mktg_list_sometime', 'user_3BPJATg8w4djAPJd71AUARo3vJ7', 'Sometime', 'system', 'sometime', 'a2', unixepoch(), unixepoch());
+  ('mktg_list_someday', 'user_3BPJATg8w4djAPJd71AUARo3vJ7', 'Someday', 'system', 'someday', 'a2', unixepoch(), unixepoch());
 
 INSERT OR IGNORE INTO todos (id, user_id, list_id, list_entered_at, title, notes, completed, position, due_date, created_at, updated_at)
 VALUES
@@ -24,7 +24,7 @@ VALUES
    'Book dentist appointment',
    NULL,
    0, 'a1', strftime('%s', '2026-03-19'), unixepoch(), unixepoch()),
-  ('mktg_3', 'user_3BPJATg8w4djAPJd71AUARo3vJ7', 'mktg_list_sometime', unixepoch(),
+  ('mktg_3', 'user_3BPJATg8w4djAPJd71AUARo3vJ7', 'mktg_list_someday', unixepoch(),
    'Read ''Atomic Habits''',
    NULL,
    0, 'a2', NULL, unixepoch(), unixepoch()),

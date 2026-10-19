@@ -56,7 +56,7 @@ message strings at the call site.
 ## Migrations: expand/contract
 
 Deploy (`.github/workflows/web-deploy.yml`) **applies D1 migrations to the
-shared `nylon-impossible-db` before rolling out the workers** — migrate → deploy
+shared D1 database (the `DB` binding) before rolling out the workers** — migrate → deploy
 API → deploy web. Both the `web` and `api` workers bind the
 same database, so during that window the schema is already new while the old
 worker code is still serving.

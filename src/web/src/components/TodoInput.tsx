@@ -26,9 +26,9 @@ export function TodoInput({
   const selectedList = lists?.find((list) => list.id === listId);
 
   // System lists get a segment each; custom lists sit behind the overflow
-  // segment. Completed isn't somewhere you add to.
+  // segment.
   const systemItems = (lists ?? [])
-    .filter((list) => list.systemKind && list.systemKind !== "completed")
+    .filter((list) => list.systemKind)
     .map((list) => ({ value: list.id, label: list.name }));
   const customItems = (lists ?? [])
     .filter((list) => !list.systemKind)

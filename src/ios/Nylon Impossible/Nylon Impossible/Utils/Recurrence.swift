@@ -65,13 +65,13 @@ enum DueDay {
 enum ListPlacement: String {
     case today
     case thisWeek
-    case sometime
+    case someday
 }
 
 enum RecurrenceHelper {
     /// Placement heuristic for a recurring todo's new occurrence: due today or
     /// tomorrow → Today; due within the next 7 days → This Week; further out →
-    /// Sometime. Applied once when a new occurrence is created (initial
+    /// Someday. Applied once when a new occurrence is created (initial
     /// creation of any recurring todo, or a repeat's dueDate advancing on
     /// completion) — the occurrence ages normally afterward. Mirrors
     /// `placementForDueDate` in src/shared/src/recurrence.ts.
@@ -86,7 +86,7 @@ enum RecurrenceHelper {
 
         if daysUntilDue <= 1 { return .today }
         if daysUntilDue <= 7 { return .thisWeek }
-        return .sometime
+        return .someday
     }
 
     /// Compute the next due date for a repeating todo: the first occurrence on

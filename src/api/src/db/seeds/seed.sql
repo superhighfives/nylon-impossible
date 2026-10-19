@@ -1,9 +1,7 @@
 -- Database seed script for local development
--- Run with: wrangler d1 execute nylon-impossible-db --local --persist-to ../../.wrangler/state --file=src/db/seeds/seed.sql
+-- Run with: wrangler d1 execute DB --local --persist-to ../../.wrangler/state --file=src/db/seeds/seed.sql
 
--- Clear existing data (in correct order to respect foreign keys). No
--- separate join table since migration 0023 dropped `todo_lists` in favour of
--- a direct `todos.list_id` NOT NULL column.
+-- Clear existing data (in correct order to respect foreign keys).
 DELETE FROM todo_urls;
 DELETE FROM todos;
 DELETE FROM lists;
@@ -13,12 +11,19 @@ DELETE FROM users;
 INSERT INTO users (id, email, created_at, updated_at)
 VALUES ('user_test_123', 'test@example.com', unixepoch(), unixepoch());
 
--- Insert default lists with fractional indexing positions
+-- The three system lists every account gets (ensure-user.ts provisions these
+-- for real users; seeding the user row directly skips that, so do it here).
+INSERT INTO lists (id, user_id, name, kind, system_kind, position, created_at, updated_at) VALUES
+  ('list_today', 'user_test_123', 'Today', 'system', 'today', 'a0', unixepoch(), unixepoch()),
+  ('list_this_week', 'user_test_123', 'This Week', 'system', 'thisWeek', 'a1', unixepoch(), unixepoch()),
+  ('list_someday', 'user_test_123', 'Someday', 'system', 'someday', 'a2', unixepoch(), unixepoch());
+
+-- Custom lists with fractional indexing positions, after the system lists
 INSERT INTO lists (id, user_id, name, position, created_at, updated_at) VALUES
-  ('list_1', 'user_test_123', 'TODO', 'a0', unixepoch(), unixepoch()),
-  ('list_2', 'user_test_123', 'Shopping', 'a1', unixepoch(), unixepoch()),
-  ('list_3', 'user_test_123', 'Bills', 'a2', unixepoch(), unixepoch()),
-  ('list_4', 'user_test_123', 'Work', 'a3', unixepoch(), unixepoch());
+  ('list_1', 'user_test_123', 'TODO', 'a3', unixepoch(), unixepoch()),
+  ('list_2', 'user_test_123', 'Shopping', 'a4', unixepoch(), unixepoch()),
+  ('list_3', 'user_test_123', 'Bills', 'a5', unixepoch(), unixepoch()),
+  ('list_4', 'user_test_123', 'Work', 'a6', unixepoch(), unixepoch());
 
 -- Insert sample todos, assigned directly to their list via list_id
 INSERT INTO todos (id, user_id, list_id, title, notes, completed, position, created_at, updated_at) VALUES

@@ -70,7 +70,8 @@ A todo app for web and iOS. Fast, simple, and in sync everywhere you are.
 # Install dependencies
 pnpm install
 
-# Apply database migrations locally
+# Apply database migrations locally (a local DB from before the October
+# 2026 migration squash needs `pnpm db:fresh` once instead)
 pnpm db:migrate
 
 # Start web + API dev servers

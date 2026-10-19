@@ -19,8 +19,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "nylon-impossible-db",
-			"database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+			"database_name": "nylon-db",
+			"database_id": "8a5277a7-a021-4281-a643-1511d3b941f8",
 			// Miniflare's local D1 persistence is keyed per-worker (this config's
 			// top-level "name"), not just database_id — so even though this is the
 			// SAME database as src/api/wrangler.jsonc, `wrangler dev`/`vite dev` here
@@ -54,8 +54,8 @@
 		"d1_databases": [
 			{
 				"binding": "DB",
-				"database_name": "nylon-impossible-preview-db",
-				"database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d"
+				"database_name": "nylon-preview-db",
+				"database_id": "52fb439f-042d-4aea-9450-8667524ce6fd"
 			}
 		],
 		"vars": {

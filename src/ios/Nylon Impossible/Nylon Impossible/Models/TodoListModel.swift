@@ -2,7 +2,7 @@
 //  TodoListModel.swift
 //  Nylon Impossible
 //
-//  A list (Today/This Week/Sometime, or a custom list) a todo can belong to.
+//  A list (Today/This Week/Someday, or a custom list) a todo can belong to.
 //  Named `TodoListModel` (not `List`/`TodoList`) to avoid clashing with
 //  SwiftUI's `List` view and this app's own `TodoListView`-style naming.
 //
@@ -11,12 +11,12 @@ import Foundation
 import SwiftData
 
 /// Which built-in bucket a system list represents. Mirrors the server's
-/// `systemKind` enum. `nil` for custom lists.
+/// `systemKind` enum. `nil` for custom lists — and for any raw value this build
+/// doesn't recognise, since `systemKind` decodes through `init(rawValue:)`.
 enum SystemListKind: String, Codable, CaseIterable {
     case today
     case thisWeek
-    case sometime
-    case completed
+    case someday
 }
 
 @Model
@@ -62,27 +62,26 @@ final class TodoListModel {
     /// "What needs to be done **this week**?" — which is how iOS names the
     /// page you're on for the three system lists.
     ///
-    /// `nil` for custom lists (and Completed): only the time-based names read
+    /// `nil` for custom lists: only the time-based names read
     /// as an adverb in that sentence, so everything else keeps the plain copy
     /// and is named by `ListHeaderView` instead.
     var promptPhrase: String? {
         switch systemKind {
         case .today: return "today"
         case .thisWeek: return "this week"
-        case .sometime: return "sometime"
-        case .completed, nil: return nil
+        case .someday: return "someday"
+        case nil: return nil
         }
     }
 
-    /// Fixed display order: Today, This Week, Sometime, then custom lists
+    /// Fixed display order: Today, This Week, Someday, then custom lists
     /// (by `position`, handled separately since this only orders the three
     /// system kinds relative to each other).
     var systemSortIndex: Int {
         switch systemKind {
         case .today: return 0
         case .thisWeek: return 1
-        case .sometime: return 2
-        case .completed: return 3
+        case .someday: return 2
         case nil: return Int.max
         }
     }

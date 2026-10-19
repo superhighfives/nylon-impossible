@@ -14,7 +14,6 @@ import {
   Clock,
   FileText,
   GripVertical,
-  Inbox,
   Link2,
   ListTree,
   Pin,
@@ -28,12 +27,7 @@ import { LinkifiedText } from "@/components/LinkifiedText";
 import { TodoItemExpanded } from "@/components/TodoItemExpanded";
 import { useCompletionHold } from "@/hooks/useCompletionHold";
 import { useHints } from "@/hooks/useHints";
-import {
-  type useCreateTodo,
-  type useDeleteTodo,
-  usePendingTodoIds,
-  type useUpdateTodo,
-} from "@/hooks/useTodos";
+import { usePendingTodoIds, type useUpdateTodo } from "@/hooks/useTodos";
 import {
   formatDate,
   formatDueDate,
@@ -42,6 +36,7 @@ import {
   relativeDueDay,
 } from "@/lib/date";
 import { recurrenceLabel } from "@/lib/recurrence";
+import { toast } from "@/lib/toast";
 import { sortTopLevelTodos } from "@/lib/todoOrder";
 import {
   getFetchedPreviewTitle,
@@ -50,6 +45,9 @@ import {
 } from "@/lib/url-display";
 import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
 import { Button, Checkbox, focusRing, UrlPreviewCard } from "./ui";
+
+/** How long the "Done · Undo" toast stays up after completing a todo. */
+const DONE_TOAST_MS = 5000;
 
 /**
  * Sorted incomplete todos for one list — sticky-first, by
@@ -83,7 +81,7 @@ interface TodoItemProps {
   deletePending: boolean;
   /**
    * Just checked off and briefly held in place so the check and strike-through
-   * register before the row moves to Completed. Visual only — the row keeps
+   * register before the row leaves its list. Visual only — the row keeps
    * its active layout so nothing reflows during the hold.
    */
   isCompleting?: boolean;
@@ -692,15 +690,7 @@ const SORT_TRANSITION = {
 const SORT_TRANSITION_CSS = `transform ${SORT_TRANSITION.duration}ms ${SORT_TRANSITION.easing}`;
 
 function SortableTodoItem(
-  props: TodoItemProps & {
-    isKeyboardDragging: boolean;
-    onUpdateExpanded: (updates: {
-      title?: string;
-      notes?: string | null;
-      dueDate?: Date | null;
-    }) => void;
-    subtaskHandlers: SubtaskHandlers;
-  },
+  props: TodoItemProps & { isKeyboardDragging: boolean },
 ) {
   const {
     attributes,
@@ -870,21 +860,6 @@ export function TodoSkeleton() {
   );
 }
 
-export function EmptyState() {
-  return (
-    <div className="flex flex-col items-center text-center py-16 px-4">
-      <div className="w-12 h-12 rounded-full bg-gray-base flex items-center justify-center text-gray-muted mb-4">
-        <Inbox size={20} aria-hidden="true" />
-      </div>
-      <h2 className="text-sm font-medium text-gray">Nothing to do yet</h2>
-      <p className="text-xs text-gray-muted mt-1 max-w-xs">
-        Add a todo above to get started. Try &ldquo;Buy groceries
-        tomorrow&rdquo; or paste a link.
-      </p>
-    </div>
-  );
-}
-
 export function ErrorState({
   onRetry,
   isRetrying,
@@ -934,8 +909,6 @@ export interface TodoListColumnProps {
   /** Opens the shared (grid-level) delete confirmation for this todo. */
   onRequestDelete: (id: string) => void;
   updateTodo: ReturnType<typeof useUpdateTodo>;
-  deleteTodo: ReturnType<typeof useDeleteTodo>;
-  createTodo: ReturnType<typeof useCreateTodo>;
   timeZone: string;
   /** True while a keyboard-initiated drag is in progress anywhere on the board. */
   isKeyboardDragging: boolean;
@@ -945,8 +918,8 @@ export interface TodoListColumnProps {
 
 /**
  * One list's rows: sticky-tier sort, subtasks, URL previews. Completed todos
- * across every list render in their own aggregate
- * `CompletedColumn` instead of an inline accordion here. Drag-and-drop
+ * leave the list after a short hold, with a "Done · Undo" toast; they aren't
+ * shown anywhere else on the board. Drag-and-drop
  * *within* this list is driven by dnd-kit hooks here (`useSortable` on each row); the
  * shared `DndContext` those hooks attach to — along with cross-list drop
  * handling, the delete-confirm dialog, and the expanded side panel — lives
@@ -960,8 +933,6 @@ export function TodoListColumn({
   onToggleExpand,
   onRequestDelete,
   updateTodo,
-  deleteTodo,
-  createTodo,
   timeZone,
   isKeyboardDragging,
   localIncompleteTodos,
@@ -1010,41 +981,43 @@ export function TodoListColumn({
         input: { completed: false, position: newPosition },
       });
     } else {
-      completing.start(id, () =>
-        updateTodo.mutate({ id, input: { completed: true } }),
-      );
+      completing.start(id, () => {
+        updateTodo.mutate({ id, input: { completed: true } });
+        showDoneToast(todo);
+      });
     }
+  };
+
+  // Done means gone: the row leaves its list, so offer Undo from a toast
+  // instead. Undo restores what completing changed, from the row as it was
+  // before the check — for a repeat, the server rolled the due date forward
+  // (and may have re-placed it) rather than marking it done.
+  const showDoneToast = (todo: TodoWithUrls) => {
+    const isRollingRepeat = !!todo.recurrence && !!todo.dueDate;
+    const undo: UpdateTodoInput = isRollingRepeat
+      ? {
+          completedAt: null,
+          dueDate: todo.dueDate ? new Date(todo.dueDate) : null,
+          listId: todo.listId,
+        }
+      : { completed: false, position: todo.position };
+    if (todo.sticky) undo.sticky = true;
+    const toastId = toast.success("Done", {
+      timeout: DONE_TOAST_MS,
+      actionProps: {
+        children: "Undo",
+        onClick: () => {
+          toast.dismiss(toastId);
+          updateTodo.mutate({ id: todo.id, input: undo });
+        },
+      },
+    });
   };
 
   // Inline row edits (due date) go straight through the optimistic
   // updateTodo mutation — no expanded form, no save step.
   const handleInlineUpdate = (id: string, updates: UpdateTodoInput) => {
     updateTodo.mutate({ id, input: updates });
-  };
-
-  const handleUpdateExpanded =
-    (id: string) =>
-    (updates: {
-      title?: string;
-      notes?: string | null;
-      dueDate?: Date | null;
-      sticky?: boolean;
-    }) => {
-      updateTodo.mutate({ id, input: updates });
-    };
-
-  // Subtask handlers. Toggling a parent cascades to children server-side (and
-  // optimistically in useUpdateTodo); a subtask toggle is a plain flip since a
-  // subtask has no children. Delete/reorder reuse the todo mutations — a
-  // subtask is a full todo. Subtasks have no independent list membership, so
-  // adding one never passes listId — it's implied by the parent (server-side).
-  const subtaskHandlers: SubtaskHandlers = {
-    onAdd: (parentId, title, position) =>
-      createTodo.mutate({ title, parentId, position }),
-    onToggle: (id, completed) =>
-      updateTodo.mutate({ id, input: { completed: !completed } }),
-    onDelete: (id) => deleteTodo.mutate(id),
-    onReorder: (id, position) => updateTodo.mutate({ id, input: { position } }),
   };
 
   // Subtasks live inside their parent's expanded view, not as their own rows.
@@ -1079,8 +1052,6 @@ export function TodoListColumn({
       key={todo.id}
       {...sharedProps(todo)}
       isKeyboardDragging={isKeyboardDragging}
-      onUpdateExpanded={handleUpdateExpanded(todo.id)}
-      subtaskHandlers={subtaskHandlers}
     />
   ));
 
@@ -1095,131 +1066,6 @@ export function TodoListColumn({
       >
         {rows}
       </SortableContext>
-    </div>
-  );
-}
-
-export interface CompletedColumnProps {
-  /** Every completed, top-level todo across every list — already
-   * hidden-filtered and sorted (most recently completed first) by the
-   * caller (TodoGrid, via `sortTopLevelTodos`). */
-  completedTodos: TodoWithUrls[];
-  /** All todos (any list, any completion state) — used to look up subtasks
-   * for a completed row's expanded badges. */
-  allTodos: TodoWithUrls[];
-  expandedId: string | null;
-  onToggleExpand: (id: string) => void;
-  onRequestDelete: (id: string) => void;
-  /** Un-completes a todo, restoring it to the end of its own list's
-   * incomplete order (or rolling back a stamped recurrence) — the same
-   * logic the old per-list accordion used, now computed once at the grid
-   * level since this column spans every list. */
-  onUncomplete: (todo: TodoWithUrls) => void;
-  collapsed: boolean;
-  onToggleCollapsed: () => void;
-  /** True once the synced `hideCompleted` preference has loaded (gates this
-   * column so it doesn't flash open before the collapsed default is known). */
-  known: boolean;
-}
-
-/**
- * Aggregate "Completed" column: every completed todo across every list, in
- * one place, instead of a collapsible section duplicated inside each list's
- * own column. Collapsed by default when the synced `hideCompleted`
- * preference says so; toggling it is local to this session, matching the
- * old per-list accordion's behavior (never synced back to the preference).
- */
-export function CompletedColumn({
-  completedTodos,
-  allTodos,
-  expandedId,
-  onToggleExpand,
-  onRequestDelete,
-  onUncomplete,
-  collapsed,
-  onToggleCollapsed,
-  known,
-}: CompletedColumnProps) {
-  const pending = usePendingTodoIds();
-  const subtasksByParent = new Map<string, TodoWithUrls[]>();
-  for (const t of allTodos) {
-    if (t.parentId) {
-      const siblings = subtasksByParent.get(t.parentId) ?? [];
-      siblings.push(t);
-      subtasksByParent.set(t.parentId, siblings);
-    }
-  }
-
-  // Hold the whole column until the synced `hideCompleted` preference is
-  // known — rendering before then would default to expanded and flash the
-  // completed items open, then collapse once the preference arrives.
-  if (!known || completedTodos.length === 0) return null;
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={onToggleCollapsed}
-        aria-expanded={!collapsed}
-        aria-label={`${collapsed ? "Show" : "Hide"} completed items`}
-        className={`flex min-h-10 w-full items-center gap-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-gray-muted transition-colors hover:text-gray ${focusRing}`}
-      >
-        <ChevronRight
-          size={14}
-          aria-hidden="true"
-          className={`shrink-0 transition-transform ${
-            collapsed ? "" : "rotate-90"
-          }`}
-        />
-        <span>
-          {collapsed
-            ? `View completed (${completedTodos.length} ${
-                completedTodos.length === 1 ? "item" : "items"
-              })`
-            : "Hide completed"}
-        </span>
-      </button>
-      {/* Always mounted so it can animate open and closed; `inert` keeps the
-          collapsed rows out of the tab order and away from screen readers. */}
-      <div
-        inert={collapsed}
-        className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out-strong ${
-          collapsed
-            ? "grid-rows-[0fr] opacity-0"
-            : "grid-rows-[1fr] opacity-100"
-        }`}
-      >
-        <div className="min-h-0 overflow-hidden">
-          {completedTodos.map((todo) => (
-            <div
-              key={todo.id}
-              className={`group rounded-lg py-2 ${
-                expandedId === todo.id ? "bg-gray-base" : ""
-              }`}
-            >
-              <div className="flex items-start gap-1.5">
-                {/* Mobile-only spacer matching the active rows' inline grip
-                      width; on desktop the grip hangs in the margin, so
-                      completed rows are already flush. */}
-                <div className="w-5 shrink-0 sm:hidden" aria-hidden="true" />
-                <div className="flex-1 min-w-0">
-                  <TodoItemContent
-                    todo={todo}
-                    subtasks={subtasksByParent.get(todo.id) ?? []}
-                    isExpanded={expandedId === todo.id}
-                    onToggle={() => onUncomplete(todo)}
-                    onDelete={onRequestDelete}
-                    onToggleExpand={onToggleExpand}
-                    onInlineUpdate={() => {}}
-                    updatePending={pending.updating.has(todo.id)}
-                    deletePending={pending.deleting.has(todo.id)}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }

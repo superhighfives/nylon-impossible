@@ -113,10 +113,11 @@ describe("TodoItemExpanded", () => {
     };
   }
 
-  it("processes links without AI", () => {
+  it("has no standalone Process links button", () => {
     renderExpanded();
-    fireEvent.click(screen.getByRole("button", { name: /process links/i }));
-    expect(processMutate).toHaveBeenCalledWith("todo-1");
+    expect(
+      screen.queryByRole("button", { name: /process links/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("names the failed link and offers a retry that re-processes", () => {

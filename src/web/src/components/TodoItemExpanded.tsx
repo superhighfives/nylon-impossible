@@ -384,9 +384,9 @@ export function TodoItemExpanded({
         />
       )}
 
-      {/* Actions — deterministic work that's always available: pinning, and
-          fetching what's behind the todo's links. Sticky commits on click
-          with no debounce — instantly reversible, like the Repeat select. */}
+      {/* Actions. Sticky commits on click with no debounce — instantly
+          reversible, like the Repeat select. Link titles fetch automatically
+          on create; a failed fetch gets "Try again" under Links below. */}
       <div className="space-y-4">
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-gray-muted">Task</p>
@@ -401,22 +401,7 @@ export function TodoItemExpanded({
               <Pin size={14} className={todo.sticky ? "fill-current" : ""} />
               {todo.sticky ? "Pinned to top" : "Pin to top"}
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              type="button"
-              onClick={() => processTodo.mutate(todo.id)}
-              disabled={processTodo.isPending || linksProcessing}
-              loading={processTodo.isPending}
-              title="Fetch titles and previews for this task's links"
-            >
-              {!processTodo.isPending && <RefreshCw size={14} />}
-              Process links
-            </Button>
           </div>
-          <p className="text-xs text-gray-muted">
-            Fetches each link and titles the task after it.
-          </p>
         </div>
       </div>
 
