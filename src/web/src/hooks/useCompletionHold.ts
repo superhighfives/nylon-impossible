@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/** How long a just-checked row stays put before it moves to Completed. */
+/** How long a just-checked row stays put before it leaves its list. */
 export const COMPLETION_HOLD_MS = 350;
 
 /**

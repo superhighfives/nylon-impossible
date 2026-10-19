@@ -10,7 +10,7 @@ const CONTACT_EMAIL = "hi@charliegleason.com";
 
 function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 5, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 18, 2026">
       <p>
         This is the privacy policy for Nylon Impossible ("the app"). It explains
         what information the app collects, why, and what happens to it. The
@@ -28,11 +28,6 @@ function PrivacyPage() {
           <li>
             <strong>Your todos.</strong> The tasks, notes, due dates, and lists
             you create in the app.
-          </li>
-          <li>
-            <strong>Optional location.</strong> If you add a location in
-            settings, it's stored on your profile but isn't currently used by
-            any feature. You can remove it at any time.
           </li>
         </ul>
       </LegalSection>

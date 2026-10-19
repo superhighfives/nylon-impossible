@@ -476,7 +476,7 @@ export const updateTodo = createServerFn({ method: "POST" })
             ? validated.dueDate
             : existing.dueDate;
         // Completing a repeat doesn't persist as done: roll dueDate forward and
-        // stamp completedAt so the UI keeps it in Completed until local midnight.
+        // stamp completedAt so it reads as done (and can be undone) until local midnight.
         if (becameComplete && recurrence && anchor) {
           const now = new Date();
           const timeZone = yield* Effect.tryPromise({

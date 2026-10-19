@@ -1,5 +1,5 @@
 /**
- * Server functions for lists (Today/This Week/Sometime + custom lists) using
+ * Server functions for lists (Today/This Week/Someday + custom lists) using
  * Effect for type-safe error handling, mirroring src/api/src/handlers/lists.ts
  * for the Worker REST API.
  */

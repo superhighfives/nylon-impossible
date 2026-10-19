@@ -29,7 +29,6 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { splitTodoText } from "@nylon-impossible/shared";
-import { previousDueDate } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import { GripVertical, Pencil, Plus, Trash2, X } from "lucide-react";
 import {
@@ -42,7 +41,6 @@ import {
 } from "react";
 import { EditableSidePanelTitle } from "@/components/EditableSidePanelTitle";
 import {
-  CompletedColumn,
   ErrorState,
   ExpandedSection,
   getIncompleteOrder,
@@ -64,15 +62,9 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
-import { useUser } from "@/hooks/useUser";
 import { insertInTier, positionAt } from "@/lib/dragOrder";
 import { messageFromError, toast } from "@/lib/toast";
-import { sortTopLevelTodos } from "@/lib/todoOrder";
-import type {
-  SerializedList,
-  TodoWithUrls,
-  UpdateTodoInput,
-} from "@/types/database";
+import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { Button, ConfirmDialog, focusRing, Input, SidePanel } from "./ui";
 
 const HORIZONTAL_DRAG_DEAD_ZONE = 12;
@@ -175,7 +167,7 @@ const boardKeyboardCoordinates: KeyboardCoordinateGetter = (
 const SYSTEM_ORDER: Record<string, number> = {
   today: 0,
   thisWeek: 1,
-  sometime: 2,
+  someday: 2,
 };
 
 /*
@@ -233,15 +225,10 @@ function BoardScaffold({
   );
 }
 
-// The Completed list is a real `lists` row (so it has a stable id/position
-// like the other system lists), but it's always rendered last regardless of
-// that position — never interleaved by the position-based sort below — and
-// is rendered separately from this array's map (see TodoGrid), since its
-// contents are a synthesized aggregate, not real todos pointing at its id.
+// System lists first in their fixed Today / This Week / Someday order, then
+// custom lists by position.
 function sortLists(lists: SerializedList[]): SerializedList[] {
-  const completed = lists.find((l) => l.systemKind === "completed");
-  const rest = lists.filter((l) => l.systemKind !== "completed");
-  const sorted = [...rest].sort((a, b) => {
+  return [...lists].sort((a, b) => {
     const aSystem = a.kind === "system";
     const bSystem = b.kind === "system";
     if (aSystem !== bSystem) return aSystem ? -1 : 1;
@@ -253,7 +240,6 @@ function sortLists(lists: SerializedList[]): SerializedList[] {
     }
     return a.position.localeCompare(b.position);
   });
-  return completed ? [...sorted, completed] : sorted;
 }
 
 function NewTodoInline({
@@ -384,7 +370,7 @@ function ListHeader({
   const updateList = useUpdateList();
   const deleteList = useDeleteList();
   // Only custom lists are sortable — the three system lists (Today/This
-  // Week/Sometime) stay fixed first, so this hook is a no-op (no listeners
+  // Week/Someday) stay fixed first, so this hook is a no-op (no listeners
   // attached, isDragging always false) for them.
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useSortable({ id: list.id, disabled: !isDraggable });
@@ -653,7 +639,7 @@ function ColumnScroller({
 
 /**
  * Fetches every list + todo once, groups todos by listId, and renders one
- * `TodoListColumn` per list side by side (Today, This Week, Sometime, then
+ * `TodoListColumn` per list side by side (Today, This Week, Someday, then
  * custom lists in position order). Owns the single `DndContext` that spans
  * every column, so a drag can move a todo between lists as well as reorder
  * within one — each column is its own `SortableContext` inside this shared
@@ -672,7 +658,6 @@ export function TodoGrid() {
   const deleteTodo = useDeleteTodo();
   const createTodo = useCreateTodo();
   const updateList = useUpdateList();
-  const { data: user } = useUser();
   const { timeZone } = useHints();
   useLocalMidnightTick();
 
@@ -695,12 +680,6 @@ export function TodoGrid() {
   const [localOrderByList, setLocalOrderByList] = useState<
     Record<string, TodoWithUrls[] | null>
   >({});
-  // The aggregate Completed column's collapse state — seeded from (but not
-  // synced back to) the shared `hideCompleted` preference, same as the old
-  // per-list accordion's behavior.
-  const [completedColumnCollapsed, setCompletedColumnCollapsed] = useState<
-    boolean | null
-  >(null);
   const boardScrollRef = useRef<HTMLDivElement>(null);
   // Columns scroll vertically in their own container, so a horizontal
   // trackpad/wheel gesture over a column would otherwise be swallowed by
@@ -828,43 +807,6 @@ export function TodoGrid() {
     }) => {
       updateTodo.mutate({ id, input: updates });
     };
-
-  const handleToggleCompletedColumn = () => {
-    setCompletedColumnCollapsed(
-      !(completedColumnCollapsed ?? user?.hideCompleted ?? false),
-    );
-  };
-
-  // Un-completes a todo from the aggregate Completed column, restoring it to
-  // the end of its own list's incomplete order — mirrors the per-list logic
-  // the old inline accordion used (see git history), now computed here since
-  // this column spans every list rather than belonging to one.
-  const handleUncomplete = (todo: TodoWithUrls) => {
-    if (!todo.completed && todo.completedAt) {
-      const input: UpdateTodoInput = { completedAt: null };
-      if (todo.recurrence && todo.dueDate) {
-        input.dueDate = previousDueDate(
-          todo.recurrence,
-          new Date(todo.dueDate),
-        );
-      }
-      updateTodo.mutate({ id: todo.id, input });
-      return;
-    }
-    const sourceListTodos = todosByList.get(todo.listId) ?? [];
-    const sourceOrder =
-      localOrderByList[todo.listId] ??
-      getIncompleteOrder(sourceListTodos, timeZone);
-    const lastPosition =
-      sourceOrder.length > 0
-        ? sourceOrder[sourceOrder.length - 1].position
-        : null;
-    const newPosition = generateKeyBetween(lastPosition ?? null, null);
-    updateTodo.mutate({
-      id: todo.id,
-      input: { completed: false, position: newPosition },
-    });
-  };
 
   // The incomplete order a list shows right now: the mid-drag override if
   // there is one, otherwise derived from the cache.
@@ -1060,8 +1002,6 @@ export function TodoGrid() {
     ? allTodos.filter((t) => t.parentId === expandedTodo.id)
     : [];
 
-  const completedTodos = sortTopLevelTodos(allTodos, timeZone).completed;
-
   const activeTodo = activeId
     ? (allTodos.find((t) => t.id === activeId) ?? null)
     : null;
@@ -1099,80 +1039,50 @@ export function TodoGrid() {
           onDragCancel={handleDragCancel}
         >
           <BoardScaffold scrollRef={boardScrollRef}>
-            {sortedLists
-              .filter((list) => list.systemKind !== "completed")
-              .map((list) => {
-                const listTodos = todosByList.get(list.id) ?? [];
-                const incompleteOrder =
-                  localOrderByList[list.id] ??
-                  getIncompleteOrder(listTodos, timeZone);
-                const isDropZone = crossListTargetId === list.id;
-                return (
-                  <section
-                    key={list.id}
-                    className={`${COLUMN_CLASS} group/column`}
-                  >
-                    <div className={TITLE_BAND_CLASS}>
-                      <ListHeader
-                        list={list}
-                        isDraggable={list.kind === "custom"}
-                        todoCount={todoCountByList.get(list.id) ?? 0}
-                      />
-                    </div>
-                    <NewTodoInline
-                      listId={list.id}
-                      firstPosition={
-                        incompleteOrder.find((t) => !t.sticky)?.position ?? null
-                      }
+            {sortedLists.map((list) => {
+              const listTodos = todosByList.get(list.id) ?? [];
+              const incompleteOrder =
+                localOrderByList[list.id] ??
+                getIncompleteOrder(listTodos, timeZone);
+              const isDropZone = crossListTargetId === list.id;
+              return (
+                <section
+                  key={list.id}
+                  className={`${COLUMN_CLASS} group/column`}
+                >
+                  <div className={TITLE_BAND_CLASS}>
+                    <ListHeader
+                      list={list}
+                      isDraggable={list.kind === "custom"}
+                      todoCount={todoCountByList.get(list.id) ?? 0}
                     />
-                    <ColumnScroller
-                      onWheel={handleColumnWheel}
-                      isDropZone={isDropZone}
-                    >
-                      <TodoListColumn
-                        listId={list.id}
-                        todos={listTodos}
-                        expandedId={expandedId}
-                        onToggleExpand={handleToggleExpand}
-                        onRequestDelete={handleRequestDelete}
-                        updateTodo={updateTodo}
-                        deleteTodo={deleteTodo}
-                        createTodo={createTodo}
-                        timeZone={timeZone}
-                        isKeyboardDragging={isKeyboardDragging}
-                        localIncompleteTodos={localOrderByList[list.id] ?? null}
-                      />
-                    </ColumnScroller>
-                  </section>
-                );
-              })}
+                  </div>
+                  <NewTodoInline
+                    listId={list.id}
+                    firstPosition={
+                      incompleteOrder.find((t) => !t.sticky)?.position ?? null
+                    }
+                  />
+                  <ColumnScroller
+                    onWheel={handleColumnWheel}
+                    isDropZone={isDropZone}
+                  >
+                    <TodoListColumn
+                      listId={list.id}
+                      todos={listTodos}
+                      expandedId={expandedId}
+                      onToggleExpand={handleToggleExpand}
+                      onRequestDelete={handleRequestDelete}
+                      updateTodo={updateTodo}
+                      timeZone={timeZone}
+                      isKeyboardDragging={isKeyboardDragging}
+                      localIncompleteTodos={localOrderByList[list.id] ?? null}
+                    />
+                  </ColumnScroller>
+                </section>
+              );
+            })}
             <NewListColumn />
-            {/* Backed by the real `completed` system list (always sorted
-                last, excluded from the map above and from drag/reorder), but
-                its contents are still every completed todo across every
-                list, synthesized here rather than filtered by listId. */}
-            <section className={`${COLUMN_CLASS} group/column`}>
-              <div className={TITLE_BAND_CLASS}>
-                <h2 className={`${LIST_TITLE_CLASS} text-gray-muted`}>
-                  Completed
-                </h2>
-              </div>
-              <ColumnScroller onWheel={handleColumnWheel}>
-                <CompletedColumn
-                  completedTodos={completedTodos}
-                  allTodos={allTodos}
-                  expandedId={expandedId}
-                  onToggleExpand={handleToggleExpand}
-                  onRequestDelete={handleRequestDelete}
-                  onUncomplete={handleUncomplete}
-                  collapsed={
-                    completedColumnCollapsed ?? user?.hideCompleted ?? false
-                  }
-                  onToggleCollapsed={handleToggleCompletedColumn}
-                  known={!!user}
-                />
-              </ColumnScroller>
-            </section>
           </BoardScaffold>
           <DragOverlay
             modifiers={[pointerDeadZone(isKeyboardDragging)]}

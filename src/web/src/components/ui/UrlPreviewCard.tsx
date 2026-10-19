@@ -106,7 +106,7 @@ export function UrlPreviewCard({ url }: UrlPreviewCardProps) {
           </span>
         )}
         {/* A fetch that never landed used to be indistinguishable from a page
-            with no title — say so instead, so "Process links" reads as the
+            with no title — say so instead, so "Try again" reads as the
             obvious next move rather than a mystery. */}
         {isFailed && (
           <span className="ml-2 text-xs font-normal text-red-muted">

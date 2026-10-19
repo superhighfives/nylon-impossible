@@ -31,7 +31,6 @@
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-base: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-accent: 0 2px 12px rgba(255, 230, 41, 0.25);
 }
 
 html,
@@ -154,10 +153,6 @@ code {
       position: relative;
       border-radius: 1.375rem;
       overflow: hidden;
-    }
-
-    .todo-list-ios-offset {
-      padding-bottom: 8rem;
     }
   }
 }

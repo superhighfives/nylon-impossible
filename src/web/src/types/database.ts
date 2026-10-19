@@ -37,7 +37,7 @@ export interface UpdateTodoInput {
 }
 
 /** Which built-in bucket a system list represents. */
-export type SystemListKind = "today" | "thisWeek" | "sometime" | "completed";
+export type SystemListKind = "today" | "thisWeek" | "someday";
 
 export interface CreateListInput {
   name: string;
@@ -49,7 +49,7 @@ export interface UpdateListInput {
   position?: string;
 }
 
-/** A list (Today/This Week/Sometime, or a custom list) as returned by the server. */
+/** A list (Today/This Week/Someday, or a custom list) as returned by the server. */
 export interface SerializedList {
   id: string;
   userId: string;
