@@ -3,7 +3,9 @@ import { Plus } from "lucide-react";
 import { type Ref, useRef, useState } from "react";
 import { useLists } from "@/hooks/useLists";
 import { useSmartCreate } from "@/hooks/useTodos";
+import { useTypedDate } from "@/hooks/useTypedDate";
 import { messageFromError, toast } from "@/lib/toast";
+import { DueChip } from "./DueChip";
 import { Button, Loader, SegmentedControl } from "./ui";
 
 export function TodoInput({
@@ -36,6 +38,7 @@ export function TodoInput({
     .map((list) => ({ value: list.id, label: list.name }));
 
   const smartCreate = useSmartCreate();
+  const typedDate = useTypedDate(text);
   const trimmed = text.trim();
   const overflowsToNotes = splitTodoText(text).notes !== null;
   // The list picker unfolds below the field while it's in use, and stays put
@@ -54,8 +57,17 @@ export function TodoInput({
     // Clear straight away so the next todo can be typed while this one
     // saves — the row is already on the board optimistically.
     setText("");
+    typedDate.reset();
+    // The composer runs the typed-date parser itself (to show the chip), so
+    // the server is told not to parse again — that keeps a dismissed chip's
+    // words in the title.
     smartCreate.mutate(
-      { text: trimmed, listId },
+      {
+        text: typedDate.text.trim(),
+        listId,
+        parseDate: false,
+        dueDate: typedDate.parsed?.dueDay ?? null,
+      },
       {
         onSuccess: (result) => {
           if (result.todos.length > 1) {
@@ -138,6 +150,14 @@ export function TodoInput({
             {renderTrailing()}
           </div>
         </div>
+        {typedDate.parsed && (
+          <div className="px-2 pb-1">
+            <DueChip
+              dueDay={typedDate.parsed.dueDay}
+              onDismiss={typedDate.dismiss}
+            />
+          </div>
+        )}
         {overflowsToNotes && (
           <p className="px-3 pb-1 text-xs text-gray-muted">
             The rest will be saved to notes.

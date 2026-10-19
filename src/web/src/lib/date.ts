@@ -90,6 +90,22 @@ export function relativeDueDay(
 }
 
 /**
+ * The short label a typed-date chip shows after "Due": "Today", "Tomorrow",
+ * a weekday within the week ("Fri"), otherwise "Oct 30".
+ */
+export function dueChipLabel(
+  date: Date | string,
+  timeZone: string,
+  now: Date,
+): string {
+  const diff = daysBetweenKeys(dayKeyIn(now, timeZone), dueDayKey(date));
+  if (diff === 0) return "Today";
+  if (diff === 1) return "Tomorrow";
+  if (diff > 1 && diff < 7) return formatDueDate(date, { weekday: "short" });
+  return formatDueDate(date, { day: "numeric", month: "short" });
+}
+
+/**
  * A repeating todo isn't persisted as done — completing it rolls dueDate forward
  * and stamps `completedAt`. It should read as completed (and sit in the
  * Completed section) only until the user's local midnight, after which it

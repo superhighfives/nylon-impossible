@@ -370,6 +370,13 @@ interface SmartCreateResponse {
 export interface SmartCreateInput {
   text: string;
   listId?: string;
+  /**
+   * The due day the composer parsed from the text (already stripped from
+   * `text`). When set, or when `parseDate` is false, the server skips its own
+   * typed-date parse so a dismissed "Due Fri ×" chip keeps the words.
+   */
+  dueDate?: Date | null;
+  parseDate?: boolean;
 }
 
 /**
@@ -386,6 +393,8 @@ export function useSmartCreate() {
     mutationFn: async ({
       text,
       listId,
+      dueDate,
+      parseDate,
     }: SmartCreateInput): Promise<SmartCreateResponse> => {
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
@@ -394,7 +403,12 @@ export function useSmartCreate() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(listId ? { text, listId } : { text }),
+        body: JSON.stringify({
+          text,
+          ...(listId && { listId }),
+          ...(parseDate !== undefined && { parseDate }),
+          ...(dueDate && { dueDate: dueDate.toISOString() }),
+        }),
       });
 
       if (!response.ok) {
@@ -404,7 +418,7 @@ export function useSmartCreate() {
 
       return response.json();
     },
-    onMutate: async ({ text, listId }) => {
+    onMutate: async ({ text, listId, dueDate }) => {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
       const previousTodos =
         queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
@@ -434,7 +448,7 @@ export function useSmartCreate() {
         completed: false,
         completedAt: null,
         position: generateKeyBetween(null, minPosition),
-        dueDate: null,
+        dueDate: dueDate?.toISOString() ?? null,
         recurrence: null,
         pinned: false,
         createdAt: new Date().toISOString(),
