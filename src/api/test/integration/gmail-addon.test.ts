@@ -13,7 +13,7 @@ import {
 import { mockGetUserList } from "../__mocks__/clerk-backend";
 import { cleanDb, getTodayListId, seedTodo, seedUser } from "../helpers";
 
-async function getSometimeListId(userId = "user_test_123") {
+async function getSomedayListId(userId = "user_test_123") {
   const db = getDb(env.DB);
   const [list] = await db
     .select({ id: lists.id })
@@ -22,10 +22,10 @@ async function getSometimeListId(userId = "user_test_123") {
       and(
         eq(lists.userId, userId),
         eq(lists.kind, "system"),
-        eq(lists.systemKind, "sometime"),
+        eq(lists.systemKind, "someday"),
       ),
     );
-  if (!list) throw new Error(`No Sometime list seeded for user ${userId}`);
+  if (!list) throw new Error(`No Someday list seeded for user ${userId}`);
   return list.id;
 }
 
@@ -225,15 +225,15 @@ describe("Gmail add-on", () => {
 
     it("groups open todos from every list, not just Today", async () => {
       await linkUser();
-      const sometimeId = await getSometimeListId();
+      const somedayId = await getSomedayListId();
       await seedTodo("66666666-6666-6666-6666-666666666666", "user_test_123", {
         title: "In Today",
         position: "a0",
       });
       await seedTodo("77777777-7777-7777-7777-777777777777", "user_test_123", {
-        title: "In Sometime",
+        title: "In Someday",
         position: "a0",
-        listId: sometimeId,
+        listId: somedayId,
       });
 
       const token = await idToken();
@@ -242,16 +242,16 @@ describe("Gmail add-on", () => {
       const card = body.action.navigations[0].pushCard;
 
       const todaySection = card.sections.find((s: any) => s.header === "Today");
-      const sometimeSection = card.sections.find(
-        (s: any) => s.header === "Sometime",
+      const somedaySection = card.sections.find(
+        (s: any) => s.header === "Someday",
       );
       expect(todaySection.widgets[0].decoratedText.text).toBe("In Today");
-      expect(sometimeSection.widgets[0].decoratedText.text).toBe("In Sometime");
+      expect(somedaySection.widgets[0].decoratedText.text).toBe("In Someday");
 
       // The quick-add dropdown offers every list, defaulting to Today.
       const listInput = card.sections[0].widgets[1].selectionInput;
       expect(listInput.items.map((i: any) => i.text)).toEqual(
-        expect.arrayContaining(["Today", "This Week", "Sometime"]),
+        expect.arrayContaining(["Today", "This Week", "Someday"]),
       );
       const selected = listInput.items.find((i: any) => i.selected);
       expect(selected.text).toBe("Today");
@@ -259,7 +259,7 @@ describe("Gmail add-on", () => {
 
     it("caps each list so a full Today list can't hide the others", async () => {
       await linkUser();
-      const sometimeId = await getSometimeListId();
+      const somedayId = await getSomedayListId();
       for (let i = 0; i < 12; i++) {
         const n = i.toString(16).padStart(2, "0");
         await seedTodo(
@@ -272,9 +272,9 @@ describe("Gmail add-on", () => {
         );
       }
       await seedTodo("88888888-8888-8888-8888-888888888888", "user_test_123", {
-        title: "In Sometime",
+        title: "In Someday",
         position: "a0",
-        listId: sometimeId,
+        listId: somedayId,
       });
 
       const token = await idToken();
@@ -283,13 +283,13 @@ describe("Gmail add-on", () => {
       const card = body.action.navigations[0].pushCard;
 
       const todaySection = card.sections.find((s: any) => s.header === "Today");
-      const sometimeSection = card.sections.find(
-        (s: any) => s.header === "Sometime",
+      const somedaySection = card.sections.find(
+        (s: any) => s.header === "Someday",
       );
       expect(
         todaySection.widgets.filter((w: any) => w.decoratedText),
       ).toHaveLength(5);
-      expect(sometimeSection.widgets[0].decoratedText.text).toBe("In Sometime");
+      expect(somedaySection.widgets[0].decoratedText.text).toBe("In Someday");
     });
   });
 
@@ -349,13 +349,13 @@ describe("Gmail add-on", () => {
 
     it("quick-add places the todo in the selected list", async () => {
       await linkUser();
-      const sometimeId = await getSometimeListId();
+      const somedayId = await getSomedayListId();
       const token = await idToken();
       const res = await post("/gmail-addon/actions/quick-add", token, {
         commonEventObject: {
           formInputs: {
             todoText: { stringInputs: { value: ["Buy stamps"] } },
-            listId: { stringInputs: { value: [sometimeId] } },
+            listId: { stringInputs: { value: [somedayId] } },
           },
         },
       });
@@ -366,19 +366,19 @@ describe("Gmail add-on", () => {
         .select()
         .from(todos)
         .where(eq(todos.userId, "user_test_123"));
-      expect(row.listId).toBe(sometimeId);
+      expect(row.listId).toBe(somedayId);
     });
 
     it("falls back to Today when the selected list isn't the user's own", async () => {
       await linkUser();
       await seedUser("user_other_456", "other@example.com");
-      const otherSometimeId = await getSometimeListId("user_other_456");
+      const otherSomedayId = await getSomedayListId("user_other_456");
       const token = await idToken();
       const res = await post("/gmail-addon/actions/quick-add", token, {
         commonEventObject: {
           formInputs: {
             todoText: { stringInputs: { value: ["Buy stamps"] } },
-            listId: { stringInputs: { value: [otherSometimeId] } },
+            listId: { stringInputs: { value: [otherSomedayId] } },
           },
         },
       });

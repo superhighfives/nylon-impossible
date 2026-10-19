@@ -2,7 +2,6 @@ import { verifyToken } from "@clerk/backend";
 import * as Sentry from "@sentry/cloudflare";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
-import { eq, getDb, users } from "./db";
 import { apiError } from "./errors";
 
 export interface AuthResult {
@@ -60,17 +59,6 @@ export const authMiddleware = createMiddleware<Env>(async (c, next) => {
   c.set("userId", auth.userId);
   c.set("role", auth.role);
   Sentry.setUser({ id: auth.userId });
-
-  // Load user plan
-  const db = getDb(c.env.DB);
-  const user = await db
-    .select({ plan: users.plan })
-    .from(users)
-    .where(eq(users.id, auth.userId))
-    .limit(1)
-    .then((rows) => rows[0]);
-
-  c.set("plan", user?.plan ?? "free");
 
   await next();
 });

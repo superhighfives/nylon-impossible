@@ -31,12 +31,12 @@ export function nextDueDate(
 }
 
 /** Which built-in time-bucket list a due date's distance from `now` maps to. */
-export type ListPlacement = "today" | "thisWeek" | "sometime";
+export type ListPlacement = "today" | "thisWeek" | "someday";
 
 /**
  * Placement heuristic for a recurring todo's new occurrence: due today or
  * tomorrow → Today; due within the next 7 days → This Week; further out →
- * Sometime. Applied once when a new occurrence is created (initial creation
+ * Someday. Applied once when a new occurrence is created (initial creation
  * of any recurring todo, or a repeat's dueDate advancing on completion) — the
  * occurrence ages normally afterward like any manually-placed todo. Never
  * used to move a todo based on an *existing*, unchanged due date reaching
@@ -56,7 +56,7 @@ export function placementForDueDate(
   );
   if (daysUntilDue <= 1) return "today";
   if (daysUntilDue <= 7) return "thisWeek";
-  return "sometime";
+  return "someday";
 }
 
 /**

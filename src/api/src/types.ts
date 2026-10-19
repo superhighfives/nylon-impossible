@@ -36,7 +36,6 @@ export type Env = {
   };
   Variables: {
     userId: string;
-    plan: "free" | "pro";
     role: "admin" | null;
     // Set by verifyGoogleIdToken on the /gmail-addon/* routes.
     googleClaims: GoogleIdTokenClaims;

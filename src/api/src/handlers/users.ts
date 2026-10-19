@@ -7,9 +7,7 @@ import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import type { Env } from "../types";
 
 const updatePreferencesSchema = z.object({
-  location: z.string().max(200).nullable().optional(),
   theme: z.enum(["light", "dark", "system"]).optional(),
-  hideCompleted: z.boolean().optional(),
   timezone: z.string().min(1).max(100).optional(),
 });
 
@@ -28,10 +26,7 @@ export async function getMe(c: Context<Env>) {
     .select({
       id: users.id,
       email: users.email,
-      plan: users.plan,
-      location: users.location,
       theme: users.theme,
-      hideCompleted: users.hideCompleted,
       timezone: users.timezone,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
@@ -48,10 +43,7 @@ export async function getMe(c: Context<Env>) {
   return c.json({
     id: user.id,
     email: user.email,
-    plan: user.plan,
-    location: user.location,
     theme: user.theme,
-    hideCompleted: user.hideCompleted,
     timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
@@ -72,19 +64,11 @@ export async function updateMe(c: Context<Env>) {
   const userId = c.get("userId");
 
   const updates: Partial<{
-    location: string | null;
     theme: "light" | "dark" | "system";
-    hideCompleted: boolean;
     timezone: string;
   }> = {};
-  if (parsed.data.location !== undefined) {
-    updates.location = parsed.data.location;
-  }
   if (parsed.data.theme !== undefined) {
     updates.theme = parsed.data.theme;
-  }
-  if (parsed.data.hideCompleted !== undefined) {
-    updates.hideCompleted = parsed.data.hideCompleted;
   }
   if (parsed.data.timezone !== undefined) {
     updates.timezone = parsed.data.timezone;
@@ -104,10 +88,7 @@ export async function updateMe(c: Context<Env>) {
     .select({
       id: users.id,
       email: users.email,
-      plan: users.plan,
-      location: users.location,
       theme: users.theme,
-      hideCompleted: users.hideCompleted,
       timezone: users.timezone,
       createdAt: users.createdAt,
       updatedAt: users.updatedAt,
@@ -124,10 +105,7 @@ export async function updateMe(c: Context<Env>) {
   return c.json({
     id: user.id,
     email: user.email,
-    plan: user.plan,
-    location: user.location,
     theme: user.theme,
-    hideCompleted: user.hideCompleted,
     timezone: user.timezone,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),

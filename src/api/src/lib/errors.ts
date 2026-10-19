@@ -11,10 +11,6 @@ import type { z } from "zod/v4";
 export const API_ERRORS = {
   unauthorized: { status: 401, message: "Unauthorized" },
   forbidden: { status: 403, message: "Forbidden" },
-  pro_required: {
-    status: 403,
-    message: "This feature requires a Pro plan",
-  },
   invalid_signature: { status: 401, message: "Invalid webhook signature" },
   websocket_upgrade_required: {
     status: 400,

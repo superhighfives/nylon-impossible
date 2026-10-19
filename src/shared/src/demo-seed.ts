@@ -11,7 +11,7 @@ export const DEMO_SEED_EMAILS = new Set([
   "hi@charliegleason.com",
 ]);
 
-export type DemoSeedListKind = "today" | "thisWeek" | "sometime";
+export type DemoSeedListKind = "today" | "thisWeek" | "someday";
 
 // A single attached link. `fetchStatus` defaults to "fetched" when a `title`
 // is given, otherwise "pending" — set it explicitly to seed a failed fetch or
@@ -136,10 +136,10 @@ export const DEMO_SEED_TODOS: DemoSeedTodo[] = [
       },
     ],
   },
-  { list: "sometime", title: "Read 'Atomic Habits'" },
-  { list: "sometime", title: "Plan the autumn hiking trip" },
+  { list: "someday", title: "Read 'Atomic Habits'" },
+  { list: "someday", title: "Plan the autumn hiking trip" },
   {
-    list: "sometime",
+    list: "someday",
     title: "Watch this talk later",
     urls: [{ url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" }],
   },

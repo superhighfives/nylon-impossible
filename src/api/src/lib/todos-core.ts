@@ -4,18 +4,7 @@ import {
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
 import type { Env } from "../types";
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  type getDb,
-  isNull,
-  lists,
-  ne,
-  or,
-  todos,
-} from "./db";
+import { and, asc, desc, eq, type getDb, isNull, lists, todos } from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
 import { getUserTimezone } from "./user-timezone";
@@ -64,7 +53,7 @@ export interface UpdateTodoPatch {
  *
  * Ordered by `lists.position` first — system lists are seeded before any
  * custom list and keep lower positions, so this naturally sorts Today / This
- * Week / Sometime ahead of custom lists in creation/reorder order — then by
+ * Week / Someday ahead of custom lists in creation/reorder order — then by
  * sticky/position within each list, matching the web board's own ordering.
  */
 export async function listOpenTodos(db: Db, userId: string) {
@@ -98,12 +87,7 @@ export async function listListsForUser(db: Db, userId: string) {
   return db
     .select({ id: lists.id, name: lists.name })
     .from(lists)
-    .where(
-      and(
-        eq(lists.userId, userId),
-        or(isNull(lists.systemKind), ne(lists.systemKind, "completed")),
-      ),
-    )
+    .where(eq(lists.userId, userId))
     .orderBy(asc(lists.position));
 }
 

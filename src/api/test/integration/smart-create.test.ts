@@ -20,7 +20,7 @@ async function smartCreate(text: string, listId?: string) {
   });
 }
 
-async function getSometimeListId(userId = "user_test_123") {
+async function getSomedayListId(userId = "user_test_123") {
   const db = getDb(env.DB);
   const [list] = await db
     .select({ id: lists.id })
@@ -29,10 +29,10 @@ async function getSometimeListId(userId = "user_test_123") {
       and(
         eq(lists.userId, userId),
         eq(lists.kind, "system"),
-        eq(lists.systemKind, "sometime"),
+        eq(lists.systemKind, "someday"),
       ),
     );
-  if (!list) throw new Error(`No Sometime list seeded for user ${userId}`);
+  if (!list) throw new Error(`No Someday list seeded for user ${userId}`);
   return list.id;
 }
 
@@ -269,12 +269,12 @@ describe("Smart create endpoint", () => {
     });
 
     it("places the todo in the given list", async () => {
-      const sometimeId = await getSometimeListId();
-      const res = await smartCreate("Someday maybe", sometimeId);
+      const somedayId = await getSomedayListId();
+      const res = await smartCreate("Someday maybe", somedayId);
       expect(res.status).toBe(200);
 
       const body = await res.json<{ todos: any[] }>();
-      expect(body.todos[0].listId).toBe(sometimeId);
+      expect(body.todos[0].listId).toBe(somedayId);
     });
 
     it("returns 404 for a listId that doesn't exist", async () => {
@@ -284,8 +284,8 @@ describe("Smart create endpoint", () => {
 
     it("returns 404 for another user's list", async () => {
       await seedUser("user_other_456", "other@example.com");
-      const otherSometimeId = await getSometimeListId("user_other_456");
-      const res = await smartCreate("Buy milk", otherSometimeId);
+      const otherSomedayId = await getSomedayListId("user_other_456");
+      const res = await smartCreate("Buy milk", otherSomedayId);
       expect(res.status).toBe(404);
     });
   });

@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { and, eq, getDb, lists, todos, todoUrls, users } from "../src/lib/db";
 
 /**
- * Seed the system lists (Today/This Week/Sometime/Completed) for a user,
+ * Seed the system lists (Today/This Week/Someday) for a user,
  * mirroring the provisioning `ensure-user.ts` does at real account creation.
  * Idempotent — safe to call even if the lists already exist.
  */
@@ -11,8 +11,7 @@ export async function seedSystemLists(userId = "user_test_123") {
   const SYSTEM_LISTS = [
     { name: "Today", systemKind: "today" as const },
     { name: "This Week", systemKind: "thisWeek" as const },
-    { name: "Sometime", systemKind: "sometime" as const },
-    { name: "Completed", systemKind: "completed" as const },
+    { name: "Someday", systemKind: "someday" as const },
   ];
   const [existing] = await db
     .select({ id: lists.id })
@@ -49,34 +48,15 @@ export async function getTodayListId(userId = "user_test_123") {
   return list.id;
 }
 
-/** The id of a user's Completed list, seeded by `seedSystemLists`. */
-export async function getCompletedListId(userId = "user_test_123") {
-  const db = getDb(env.DB);
-  const [list] = await db
-    .select({ id: lists.id })
-    .from(lists)
-    .where(
-      and(
-        eq(lists.userId, userId),
-        eq(lists.kind, "system"),
-        eq(lists.systemKind, "completed"),
-      ),
-    );
-  if (!list) throw new Error(`No Completed list seeded for user ${userId}`);
-  return list.id;
-}
-
 export async function seedUser(
   userId = "user_test_123",
   email = "test@example.com",
   overrides: Partial<typeof users.$inferInsert> = {},
 ) {
   const db = getDb(env.DB);
-  // Default test users to the "pro" plan. Tests that explicitly verify the
-  // free-tier gate can pass `{ plan: "free" }`.
   await db
     .insert(users)
-    .values({ id: userId, email, plan: "pro", ...overrides })
+    .values({ id: userId, email, ...overrides })
     .onConflictDoNothing();
   // Real account creation always seeds the system lists (ensure-user.ts) —
   // match that here so todos.listId's NOT NULL FK has somewhere to point.

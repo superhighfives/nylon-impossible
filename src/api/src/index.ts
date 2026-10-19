@@ -2,12 +2,7 @@ import * as Sentry from "@sentry/cloudflare";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
-import {
-  deleteUserAsAdmin,
-  getUser,
-  listUsers,
-  updateUser,
-} from "./handlers/admin";
+import { deleteUserAsAdmin, listUsers } from "./handlers/admin";
 import {
   gmailAddonAddFromMessage,
   gmailAddonQuickAdd,
@@ -147,8 +142,6 @@ app.delete("/users/me", deleteMe);
 
 // Admin endpoints
 app.get("/admin/users", listUsers);
-app.get("/admin/users/:id", getUser);
-app.patch("/admin/users/:id", updateUser);
 app.delete("/admin/users/:id", deleteUserAsAdmin);
 
 // Catch-all for unhandled throws in route handlers. Hono's default onError

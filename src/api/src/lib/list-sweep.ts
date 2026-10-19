@@ -61,10 +61,10 @@ export function localMidnight(timezone: string, now: Date): Date {
  *   24+ hours after it arrived — added 4am Tuesday or 8pm Tuesday, it stays
  *   through Wednesday and moves at the midnight ending Wednesday. Something
  *   added late in the day still gets a full day in Today.
- * - This Week → Sometime: non-completed todos that have sat in This Week
+ * - This Week → Someday: non-completed todos that have sat in This Week
  *   for 7+ days.
  *
- * Sometime is terminal. Never touches completed todos, due dates, or custom
+ * Someday is terminal. Never touches completed todos, due dates, or custom
  * lists. Every list move stamps `listEnteredAt`, so moving a todo back into
  * Today restarts its 24 hours.
  */
@@ -105,11 +105,11 @@ export async function runListSweep(
         ),
       );
 
-    const sometimeListId = await getSystemListId(db, user.id, "sometime");
-    if (sometimeListId) {
+    const somedayListId = await getSystemListId(db, user.id, "someday");
+    if (somedayListId) {
       await db
         .update(todos)
-        .set({ listId: sometimeListId, listEnteredAt: now })
+        .set({ listId: somedayListId, listEnteredAt: now })
         .where(
           and(
             eq(todos.userId, user.id),
