@@ -7,8 +7,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "nylon-impossible-db",
-      "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+      "database_name": "nylon-db",
+      "database_id": "8a5277a7-a021-4281-a643-1511d3b941f8",
       "migrations_dir": "../web/migrations"
     }
   ],

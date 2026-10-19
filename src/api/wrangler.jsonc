@@ -20,18 +20,15 @@
   "d1_databases": [
     {
       "binding": "DB",
-      // TODO(backend-reset): swap for the new database — see scripts/db-reset/README.md.
-      // This and preview_database_id below still point at the pre-reset
-      // databases, whose migration history doesn't match 0000_baseline.sql.
-      "database_name": "nylon-impossible-db",
-      "database_id": "effd712c-bc6e-4536-bddd-735b56502080",
+      "database_name": "nylon-db",
+      "database_id": "8a5277a7-a021-4281-a643-1511d3b941f8",
       "migrations_dir": "./migrations",
       // Previews get their OWN D1 (not prod's) so preview code can't touch real
       // data and preview/dev-instance user rows stay isolated. `preview_database_id`
       // is ignored by `wrangler deploy` (prod uses `database_id`); it exists so CI
       // can run `wrangler d1 migrations apply DB --preview --remote` against this DB, and it
       // matches the `previews` block's binding below.
-      "preview_database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
+      "preview_database_id": "52fb439f-042d-4aea-9450-8667524ce6fd",
     },
   ],
   "durable_objects": {
@@ -97,9 +94,8 @@
     "d1_databases": [
       {
         "binding": "DB",
-        // TODO(backend-reset): swap for the new database — see scripts/db-reset/README.md.
-        "database_name": "nylon-impossible-preview-db",
-        "database_id": "4d45eefe-fe54-4bfa-a7d4-3bc3966ea18d",
+        "database_name": "nylon-preview-db",
+        "database_id": "52fb439f-042d-4aea-9450-8667524ce6fd",
         "migrations_dir": "./migrations",
       },
     ],
