@@ -32,7 +32,7 @@ final class TodoItem {
     // handled explicitly, which avoids self-referential relationship pitfalls
     // and keeps the wire mapping trivial.
     var parentId: UUID?
-    // Which list (Today/This Week/Sometime, or a custom list) this todo
+    // Which list (Today/This Week/Someday, or a custom list) this todo
     // belongs to. Stored as a plain id (not a SwiftData relationship) for the
     // same reasons as `parentId` — explicit grouping, trivial wire mapping.
     // Optional only for migration safety on existing local stores predating
@@ -59,8 +59,8 @@ final class TodoItem {
     var itemNotes: String?  // Optional notes
     var isCompleted: Bool
     // When a repeating todo is "completed" its dueDate rolls forward instead of
-    // persisting as done; this stamps when it was checked so it stays in the
-    // Completed section until local midnight, then derives back to active. Nil
+    // persisting as done; this stamps when it was checked so it counts as done
+    // (and stays off its list) until local midnight, then derives back to active. Nil
     // for todos never completed as a repeat.
     var completedAt: Date?
     var createdAt: Date

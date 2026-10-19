@@ -8,7 +8,7 @@ import SwiftUI
 
 /// Drag-to-reorder sheet for custom lists — the iOS stand-in for web's
 /// draggable list columns, which don't map onto the paged TabView. System
-/// lists (Today / This Week / Sometime) are pinned to their fixed order and
+/// lists (Today / This Week / Someday) are pinned to their fixed order and
 /// never appear here. Each move recomputes the dragged list's fractional
 /// position between its new neighbors via `TodoViewModel.reorderList`.
 struct ReorderListsView: View {

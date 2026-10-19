@@ -108,8 +108,8 @@ struct UrlRowCompact: View {
                     }
 
                     // A fetch that never landed used to look the same as a page
-                    // with no title. Say so, so "Process links" in the edit
-                    // sheet reads as the obvious next move.
+                    // with no title. Say so, so the edit sheet's "Try again"
+                    // reads as the obvious next move.
                     if isFailed {
                         Text("Couldn't fetch")
                             .font(.system(size: 10))

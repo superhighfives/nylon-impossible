@@ -42,7 +42,7 @@ enum TodayDigest {
     /// due date never promotes a todo into Today. So neither half alone
     /// answers "what am I doing today": due dates on their own miss most of
     /// what the user actually planned, and the list on its own drops the
-    /// overdue thing still sitting in Sometime.
+    /// overdue thing still sitting in Someday.
     ///
     /// Unlike `TaskCreationService.fetchAllTodos`, todos with no `userId` are
     /// left out rather than folded in with the signed-in user's: those are

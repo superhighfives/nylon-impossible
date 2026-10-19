@@ -10,7 +10,7 @@ import SwiftUI
 struct AddTaskInputView: View {
     @Binding var text: String
     var canAdd: Bool
-    // The selected list's `promptPhrase` ("today", "this week", "sometime"),
+    // The selected list's `promptPhrase` ("today", "this week", "someday"),
     // folded into the placeholder so the field also says which list you're
     // adding to. nil for custom lists — see TodoListModel.promptPhrase.
     var listPhrase: String?

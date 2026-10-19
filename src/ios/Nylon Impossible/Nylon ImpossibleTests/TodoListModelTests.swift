@@ -12,7 +12,7 @@ struct TodoListModelTests {
     func promptPhraseForSystemLists() {
         #expect(systemList(.today, name: "Today").promptPhrase == "today")
         #expect(systemList(.thisWeek, name: "This Week").promptPhrase == "this week")
-        #expect(systemList(.sometime, name: "Sometime").promptPhrase == "sometime")
+        #expect(systemList(.someday, name: "Someday").promptPhrase == "someday")
     }
 
     @Test("custom lists have no prompt phrase")
@@ -21,8 +21,11 @@ struct TodoListModelTests {
         #expect(list.promptPhrase == nil)
     }
 
-    @Test("Completed has no prompt phrase")
-    func promptPhraseForCompleted() {
-        #expect(systemList(.completed, name: "Completed").promptPhrase == nil)
+    @Test("an unrecognised system kind decodes to nil rather than trapping")
+    func unknownSystemKindIsNil() {
+        let list = TodoListModel(id: "l1", userId: "u1", name: "Completed", kind: "system")
+        list.systemKindRaw = "completed"
+        #expect(list.systemKind == nil)
+        #expect(list.promptPhrase == nil)
     }
 }

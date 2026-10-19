@@ -28,13 +28,6 @@ struct TaskListView: View {
     let allTodos: [TodoItem]
     let orderedLists: [TodoListModel]
     let viewModel: TodoViewModel
-    /// True on the synthesized Completed page. `pageTodos` there is already
-    /// 100% completed items (see `ContentView.sortedTodosList`), so this skips
-    /// the incomplete/completed split and the `hideCompleted`-gated accordion
-    /// below — otherwise the page would nest a "Completed" toggle inside a
-    /// page already titled "Completed", collapsed shut for anyone with
-    /// `hideCompleted` on.
-    let isCompletedList: Bool
     /// Space the floating header needs above the first row — smaller on the
     /// system lists, which show no title band. See `ContentView.headerInset`.
     let topInset: CGFloat
@@ -50,7 +43,6 @@ struct TaskListView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AuthService.self) private var authService
     @Environment(SyncService.self) private var syncService
-    @Environment(UserPreferencesService.self) private var preferencesService
 
     /// A todo's subtasks (active + completed), excluding soft-deleted.
     private func subtasks(of todo: TodoItem) -> [TodoItem] {
@@ -62,40 +54,21 @@ struct TaskListView: View {
         let completed = pageTodos.filter { $0.isEffectivelyCompleted }
 
         return List {
-            if isCompletedList {
-                // The Completed page's `pageTodos` is already all-completed —
-                // render it flat, with no nested accordion and no
-                // `hideCompleted` gate (the page's own title already says
-                // "Completed"; a collapsed toggle underneath it would just
-                // hide the page's entire reason for existing).
+            Section {
+                ForEach(incomplete) { todo in
+                    todoRow(todo)
+                }
+                .onMove(perform: handleMove)
+            }
+
+            // Done means gone: completed todos aren't part of a page. The only
+            // ones that reach here are rows `ListMoveTracker` is still holding
+            // for their exit, so they render once more, inert, then leave.
+            if !completed.isEmpty {
                 Section {
-                    ForEach(pageTodos) { todo in
+                    ForEach(completed) { todo in
                         todoRow(todo)
                             .moveDisabled(true)
-                    }
-                }
-            } else {
-                Section {
-                    ForEach(incomplete) { todo in
-                        todoRow(todo)
-                    }
-                    .onMove(perform: handleMove)
-                }
-
-                // Completed items collapse into a bottom-of-list accordion, matching
-                // web: the toggle (with a count badge) always shows when there are
-                // completed items; `hideCompleted` controls collapsed vs expanded
-                // rather than hiding the section outright.
-                if !completed.isEmpty {
-                    Section {
-                        completedAccordionHeader(count: completed.count)
-
-                        if !preferencesService.hideCompleted {
-                            ForEach(completed) { todo in
-                                todoRow(todo)
-                                    .moveDisabled(true)
-                            }
-                        }
                     }
                 }
             }
@@ -111,54 +84,10 @@ struct TaskListView: View {
         .contentMargins(.bottom, 100, for: .scrollContent)
     }
 
-    @ViewBuilder
-    private func completedAccordionHeader(count: Int) -> some View {
-        Button {
-            // Capture the intended value synchronously so a concurrent sync
-            // flipping `hideCompleted` between tap and task can't invert it.
-            let newValue = !preferencesService.hideCompleted
-            Task {
-                await preferencesService.setHideCompleted(newValue)
-            }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .rotationEffect(.degrees(preferencesService.hideCompleted ? 0 : 90))
-                    .animation(.easeInOut(duration: 0.2), value: preferencesService.hideCompleted)
-
-                Text("Completed")
-                    .font(.system(size: 13, weight: .medium))
-
-                Text("\(count)")
-                    .font(.system(size: 12))
-                    .monospacedDigit()
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.appTint, in: RoundedRectangle(cornerRadius: 6))
-
-                Spacer()
-            }
-            .foregroundStyle(Color.appSubtle)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        // Expose expanded/collapsed state to VoiceOver, mirroring the web
-        // toggle's aria-expanded.
-        .accessibilityLabel("Completed, \(count) \(count == 1 ? "item" : "items")")
-        .accessibilityValue(preferencesService.hideCompleted ? "Collapsed" : "Expanded")
-        .accessibilityHint(preferencesService.hideCompleted ? "Double tap to expand" : "Double tap to collapse")
-        .textCase(nil)
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
-        .listRowInsets(EdgeInsets(top: 16, leading: 4, bottom: 4, trailing: 0))
-        .moveDisabled(true)
-    }
-
     /// The next of the three time-based system lists ("Today" → "This Week"
-    /// → "Sometime") after the one `todo` is currently in — the trailing
-    /// swipe's "move on" shortcut. `nil` on Sometime (nothing further to
-    /// advance to), a custom list, Completed, or if the todo's current list
+    /// → "Someday") after the one `todo` is currently in — the trailing
+    /// swipe's "move on" shortcut. `nil` on Someday (nothing further to
+    /// advance to), a custom list, or if the todo's current list
     /// isn't one of `orderedLists` for some reason.
     private func nextSystemList(after todo: TodoItem) -> TodoListModel? {
         guard let currentKind = orderedLists.first(where: { $0.id == todo.listKey })?.systemKind else {
@@ -167,8 +96,8 @@ struct TaskListView: View {
         let nextKind: SystemListKind
         switch currentKind {
         case .today: nextKind = .thisWeek
-        case .thisWeek: nextKind = .sometime
-        case .sometime, .completed: return nil
+        case .thisWeek: nextKind = .someday
+        case .someday: return nil
         }
         return orderedLists.first { $0.systemKind == nextKind }
     }
@@ -192,7 +121,7 @@ struct TaskListView: View {
             apiService: syncService.apiService,
             urls: todo.urls.map { APITodoUrl(from: $0, todoId: todo.id.uuidString.lowercased()) },
             subtasks: subtasks(of: todo),
-            availableLists: orderedLists.filter { $0.systemKind != .completed },
+            availableLists: orderedLists,
             onToggle: {
                 viewModel.toggleTodo(todo, allTodos: allTodos, lists: orderedLists)
                 syncService.syncAfterAction()

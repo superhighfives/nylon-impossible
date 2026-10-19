@@ -51,9 +51,9 @@ struct TodayDigestTests {
     /// `TodoItem.listKey`. Nothing here depends on the shape beyond it being
     /// an opaque string, but matching it keeps the fixtures honest.
     private static let todayListId = "fb56f07a1c4d4e0b9a2f7c8e5d3b1a09"
-    private static let sometimeListId = "0a1b3d5e8c7f2a9b0e4d4c1a70f65bf0"
+    private static let somedayListId = "0a1b3d5e8c7f2a9b0e4d4c1a70f65bf0"
 
-    /// The two system lists these tests place todos in. Sometime is here as
+    /// The two system lists these tests place todos in. Someday is here as
     /// the "somewhere else" every list-scoped test needs to contrast against.
     private func insertLists(_ context: ModelContext, userId: String = TodayDigestTests.userId) {
         context.insert(TodoListModel(
@@ -61,8 +61,8 @@ struct TodayDigestTests {
             kind: "system", systemKind: .today, position: "a0"
         ))
         context.insert(TodoListModel(
-            id: Self.sometimeListId, userId: userId, name: "Sometime",
-            kind: "system", systemKind: .sometime, position: "a2"
+            id: Self.somedayListId, userId: userId, name: "Someday",
+            kind: "system", systemKind: .someday, position: "a2"
         ))
     }
 
@@ -145,7 +145,7 @@ struct TodayDigestTests {
             context, title: "Due in three weeks",
             dueDate: Self.dueToday.addingTimeInterval(21 * 86_400), listKey: Self.todayListId, position: "a2"
         )
-        insert(context, title: "Parked", dueDate: nil, listKey: Self.sometimeListId, position: "a3")
+        insert(context, title: "Parked", dueDate: nil, listKey: Self.somedayListId, position: "a3")
 
         let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
@@ -163,14 +163,14 @@ struct TodayDigestTests {
         // Reaching a due date never promotes a todo into Today, so the widget
         // has to reach across lists for these or they go unseen all day.
         insert(
-            context, title: "Overdue in Sometime",
-            dueDate: Self.dueToday.addingTimeInterval(-86_400), listKey: Self.sometimeListId
+            context, title: "Overdue in Someday",
+            dueDate: Self.dueToday.addingTimeInterval(-86_400), listKey: Self.somedayListId
         )
         insert(context, title: "On the list", dueDate: nil, listKey: Self.todayListId)
 
         let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
-        #expect(forToday.map(\.title) == ["Overdue in Sometime", "On the list"])
+        #expect(forToday.map(\.title) == ["Overdue in Someday", "On the list"])
     }
 
     @Test("Excludes another user's Today list")

@@ -27,22 +27,12 @@ struct ContentView: View {
     // once it has focus.
     @State private var focusAddTask = false
 
-    /// Lists in the fixed order: Today, This Week, Sometime, then custom
-    /// lists by position, then Completed last. Mirrors web's `TodoGrid`
-    /// ordering, where the synthesized Completed column always renders after
-    /// every real list (including "+ New List").
-    ///
-    /// Completed sorts last unconditionally rather than by
-    /// `systemSortIndex` (which would otherwise place it right after
-    /// Sometime, ahead of custom lists) — it isn't a scope any todo's
-    /// `listId` ever points at, so where it falls among *lists* doesn't
-    /// matter the way it does for Today/This Week/Sometime; only that it
-    /// comes after everything else, like web's.
+    /// Lists in the fixed order: Today, This Week, Someday, then custom
+    /// lists by position. A system list whose kind this build doesn't know
+    /// (e.g. a stale cached row from before a server change, until the next
+    /// sync replaces it) is skipped rather than shown as a blank page.
     private var orderedLists: [TodoListModel] {
-        lists.sorted { a, b in
-            if (a.systemKind == .completed) != (b.systemKind == .completed) {
-                return b.systemKind == .completed
-            }
+        lists.filter { !$0.isSystem || $0.systemKind != nil }.sorted { a, b in
             if a.isSystem != b.isSystem { return a.isSystem }
             if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
             return a.position < b.position
@@ -63,20 +53,16 @@ struct ContentView: View {
     /// so a list's page is top-level todos only. Every list scopes to its own
     /// `listId` and drops completed items (`TodoViewModel.sortedTodos`
     /// handles the scoping/sort, this just strips subtasks and completion).
-    /// Completed is the exception: no todo's `listId` ever points at it — it's
-    /// an aggregate of every completed, top-level todo across every list,
-    /// mirroring web's synthesized `CompletedColumn`.
+    /// Done means gone: a completed todo leaves its list once the row's
+    /// completion hold finishes, and there's no separate Completed page.
     private func sortedTodosList(for list: TodoListModel) -> [TodoItem] {
         let topLevel = todos.filter { $0.parentId == nil }
-        if list.systemKind == .completed {
-            return viewModel.sortedTodos(from: topLevel).filter { $0.isEffectivelyCompleted }
-        }
         return viewModel.sortedTodos(from: topLevel, listId: list.id)
             .filter { !$0.isEffectivelyCompleted }
     }
 
     /// Sleeps until just past the next local midnight, bumps `midnightTick`, and
-    /// repeats — so a completed repeat drops out of Completed on time.
+    /// repeats — so a repeat completed today comes back on time.
     private func scheduleMidnightTicks() async {
         while !Task.isCancelled {
             let now = Date()
@@ -96,7 +82,7 @@ struct ContentView: View {
         ZStack(alignment: .bottom) {
             GradientBackground()
 
-            // Paged-swipe across lists — Today, This Week, Sometime, then
+            // Paged-swipe across lists — Today, This Week, Someday, then
             // custom lists in order. Each page fills the screen and scrolls
             // *behind* the floating header and input bar (liquid glass), so
             // nothing sits in an opaque box. No grid view in v1.
@@ -149,7 +135,7 @@ struct ContentView: View {
                 }
 
                 // Every page gets a title band now — a plain label for the
-                // system lists (Today/This Week/Sometime/Completed), a menu
+                // system lists (Today/This Week/Someday), a menu
                 // for rename/delete/reorder on a custom one. The paged
                 // TabView hides its page dots, so this doubles as the cue for
                 // which list you're on (the time-based three also still fold
@@ -186,35 +172,31 @@ struct ContentView: View {
 
             // Floating input bar — liquid glass, anchored to the bottom and
             // rising with the keyboard (like Discord) since it does not ignore
-            // the keyboard safe area. Hidden on the Completed page: it isn't a
-            // real scope a todo can be created into (see `sortedTodosList`),
-            // and web has no "Add to Completed…" input either.
-            if selectedList?.systemKind != .completed {
-                AddTaskInputView(
-                    text: $viewModel.newTaskText,
-                    canAdd: viewModel.canAddTask,
-                    listPhrase: selectedList?.promptPhrase,
-                    focusRequested: $focusAddTask
-                ) {
-                    let text = viewModel.newTaskText
-                    viewModel.newTaskText = ""
+            // the keyboard safe area.
+            AddTaskInputView(
+                text: $viewModel.newTaskText,
+                canAdd: viewModel.canAddTask,
+                listPhrase: selectedList?.promptPhrase,
+                focusRequested: $focusAddTask
+            ) {
+                let text = viewModel.newTaskText
+                viewModel.newTaskText = ""
 
-                    // Create instantly and locally so the todo appears and persists
-                    // even with no connection; sync runs in the background.
-                    guard TaskCreationService.createSmart(
-                        text: text,
-                        userId: authService.userId,
-                        context: modelContext,
-                        allTodos: todos,
-                        listId: viewModel.selectedListId
-                    ) != nil else { return }
+                // Create instantly and locally so the todo appears and persists
+                // even with no connection; sync runs in the background.
+                guard TaskCreationService.createSmart(
+                    text: text,
+                    userId: authService.userId,
+                    context: modelContext,
+                    allTodos: todos,
+                    listId: viewModel.selectedListId
+                ) != nil else { return }
 
-                    syncService.syncAfterAction()
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 6)
+                syncService.syncAfterAction()
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
         }
         .animation(.easeInOut(duration: 0.3), value: todos.count)
         .refreshable {

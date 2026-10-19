@@ -12,7 +12,7 @@ struct TodoEditSheet: View {
     let apiService: APIService?
     let subtasks: [TodoItem]
     // Every list the user can move this todo into, in the fixed
-    // Today/This Week/Sometime-then-custom order. Empty until lists have
+    // Today/This Week/Someday-then-custom order. Empty until lists have
     // synced at least once.
     let availableLists: [TodoListModel]
     var onSave: (String, String?, Date?, Recurrence?, Bool) -> Void
@@ -26,7 +26,6 @@ struct TodoEditSheet: View {
     // Subtasks never get this (implicitly scoped to their parent's list).
     var onMoveToList: (String) -> Void
 
-    @Environment(UserPreferencesService.self) private var preferencesService
     @State private var title: String
     @State private var notes: String
     @State private var hasDueDate: Bool
@@ -37,7 +36,6 @@ struct TodoEditSheet: View {
     @State private var urls: [APITodoUrl] = []
     @State private var isLoadingUrls: Bool = false
     @State private var isProcessing: Bool = false
-    @State private var processMessage: String?
 
     init(
         todo: TodoItem,
@@ -175,20 +173,13 @@ struct TodoEditSheet: View {
                     )
                 }
 
-                // Link processing — deterministic, no model involved.
-                TaskActionsSection(
-                    isProcessing: isProcessing || hasPendingLinks,
-                    message: processMessage,
-                    onProcess: { Task { await processLinks() } }
-                )
-
                 // Links
                 LinksSection(
                     regularUrls: urls,
                     isLoading: isLoadingUrls && urls.isEmpty,
                     failedCount: failedLinkCount,
                     isRetrying: isProcessing || hasPendingLinks,
-                    onRetry: { Task { await processLinks() } }
+                    onRetry: { Task { await retryLinks() } }
                 )
             }
             .task {
@@ -266,23 +257,16 @@ struct TodoEditSheet: View {
         regularLinks.filter { $0.fetchStatus == .failed }.count
     }
 
-    /// Re-run link processing: attach any URLs in the todo's text, fetch what's
-    /// behind them, and replace a "Check {domain}" placeholder title with what
-    /// turned up. Not an AI action — no model runs — and it doubles as the retry
-    /// for a link whose fetch failed.
-    private func processLinks() async {
+    /// Retry the links whose fetch failed: re-runs the same link processing
+    /// that happens on create (attach URLs in the todo's text, fetch what's
+    /// behind them, replace a "Check {domain}" placeholder title).
+    private func retryLinks() async {
         guard let apiService else { return }
         isProcessing = true
-        processMessage = nil
         defer { isProcessing = false }
         do {
             let links = try await apiService.processTodo(todoId: todo.id.uuidString.lowercased())
-            // Say so rather than leaving the button looking inert when there was
-            // nothing to work with.
-            guard links > 0 else {
-                processMessage = "No links to process."
-                return
-            }
+            guard links > 0 else { return }
             // The links come back `pending`, so this first reload is what puts
             // the spinner on them.
             await loadUrls()
@@ -292,8 +276,7 @@ struct TodoEditSheet: View {
             try? await Task.sleep(for: .seconds(3))
             await loadUrls()
         } catch {
-            print("[Process] Link processing error: \(error)")
-            processMessage = "Couldn't process links."
+            print("[Process] Link retry error: \(error)")
         }
     }
 
@@ -453,7 +436,6 @@ struct UrlRow: View {
         onSave: { _, _, _, _, _ in },
         onCancel: {}
     )
-    .environment(UserPreferencesService(apiService: APIService(authService: AuthService())))
 }
 
 /// A todo's subtasks: reorderable active ones, completed pinned below, and an
@@ -542,38 +524,6 @@ private struct SubtasksSection: View {
         guard !trimmed.isEmpty else { return }
         onAdd(trimmed)
         newSubtaskTitle = ""
-    }
-}
-
-/// Deterministic, always-available actions for a todo. Right now that's link
-/// processing: attach the URLs in the task's text, fetch what's behind them,
-/// and name the task after what turned up.
-///
-/// Deliberately its own section, sitting above the AI one and appearing whether
-/// or not AI is switched on — no model runs here, and it shouldn't have to be
-/// guessed at which of these buttons does.
-private struct TaskActionsSection: View {
-    let isProcessing: Bool
-    let message: String?
-    let onProcess: () -> Void
-
-    var body: some View {
-        Section {
-            Button(action: onProcess) {
-                HStack {
-                    Label("Process links", systemImage: "arrow.clockwise")
-                    if isProcessing {
-                        Spacer()
-                        ProgressView().scaleEffect(0.7)
-                    }
-                }
-            }
-            .disabled(isProcessing)
-        } header: {
-            Text("Task")
-        } footer: {
-            Text(message ?? "Fetches each link and titles the task after it. No AI involved.")
-        }
     }
 }
 

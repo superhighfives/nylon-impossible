@@ -10,46 +10,20 @@ import Foundation
 final class UserPreferencesService {
     private let apiService: APIService
 
-    /// UserDefaults key for the locally-cached `hideCompleted` value. Reverse-DNS
-    /// prefixed to match the app's other persisted keys (e.g. SyncService's
-    /// `com.nylonimpossible.lastSyncedAt`) and avoid collisions.
-    private static let hideCompletedDefaultsKey = "com.nylonimpossible.hideCompleted"
-
-    var plan: String = "free"
-    var location: String? = nil
     /// Appearance preference: "light" | "dark" | "system". Synced across devices.
     var theme: String = "system"
-    /// When true, completed todos are hidden from the list. Synced across devices.
-    ///
-    /// Cached locally in UserDefaults and seeded from that cache so the first
-    /// render at launch already reflects the saved state. `fetchPreferences()`
-    /// runs only after the initial sync, so without this seed the list would
-    /// briefly show the default (expanded) state and then snap to the synced
-    /// value — the visible flash on cold start.
-    var hideCompleted: Bool = UserDefaults.standard.bool(
-        forKey: UserPreferencesService.hideCompletedDefaultsKey
-    ) {
-        didSet {
-            UserDefaults.standard.set(hideCompleted, forKey: Self.hideCompletedDefaultsKey)
-        }
-    }
     var isLoading: Bool = false
     var error: Error?
-
-    /// Whether the user is on the paid plan.
-    var isPro: Bool { plan == "pro" }
 
     init(apiService: APIService) {
         self.apiService = apiService
     }
 
     /// Clears locally-held preference state on sign out so a subsequent sign-in
-    /// with a different account doesn't briefly inherit the previous account's
-    /// cached `hideCompleted` (which would reintroduce the collapse-state flash
-    /// across account switches). `fetchPreferences()` re-populates it for the
-    /// new account. Resetting to `false` also write-throughs to the cache.
+    /// with a different account doesn't inherit the previous account's theme.
+    /// `fetchPreferences()` re-populates it for the new account.
     func resetLocalState() {
-        hideCompleted = false
+        theme = "system"
     }
 
     func fetchPreferences() async {
@@ -58,10 +32,7 @@ final class UserPreferencesService {
 
         do {
             let user = try await apiService.getMe()
-            plan = user.plan ?? "free"
-            location = user.location
             theme = user.theme ?? "system"
-            hideCompleted = user.hideCompleted ?? false
         } catch {
             self.error = error
             print("Failed to fetch user preferences: \(error)")
@@ -76,46 +47,12 @@ final class UserPreferencesService {
         error = nil
 
         do {
-            let user = try await apiService.updateMe(
-                UpdateUserRequest(location: nil, theme: newTheme))
+            let user = try await apiService.updateMe(UpdateUserRequest(theme: newTheme))
             theme = user.theme ?? "system"
         } catch {
             theme = previousTheme
             self.error = error
             print("Failed to update theme: \(error)")
-        }
-    }
-
-    func setHideCompleted(_ newValue: Bool) async {
-        let previousValue = hideCompleted
-        hideCompleted = newValue
-        error = nil
-
-        do {
-            let user = try await apiService.updateMe(
-                UpdateUserRequest(location: nil, hideCompleted: newValue))
-            hideCompleted = user.hideCompleted ?? false
-        } catch {
-            hideCompleted = previousValue
-            self.error = error
-            print("Failed to update hide completed preference: \(error)")
-        }
-    }
-
-    func setLocation(_ text: String) async {
-        let previousLocation = location
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
-        let newLocation: String? = trimmed.isEmpty ? nil : trimmed
-        location = newLocation
-        error = nil
-
-        do {
-            let user = try await apiService.updateMe(UpdateUserRequest(location: .some(newLocation)))
-            location = user.location
-        } catch {
-            location = previousLocation
-            self.error = error
-            print("Failed to update location: \(error)")
         }
     }
 }

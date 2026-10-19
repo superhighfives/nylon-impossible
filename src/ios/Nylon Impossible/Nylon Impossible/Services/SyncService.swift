@@ -113,7 +113,7 @@ final class SyncService {
                 userId: userId
             )
 
-            // Lists (Today/This Week/Sometime + custom) are server-authoritative
+            // Lists (Today/This Week/Someday + custom) are server-authoritative
             // and rarely change — a lightweight fetch-and-upsert alongside the
             // main todo sync, not folded into the sync request/response body.
             await syncLists(apiService: apiService, userId: userId)
