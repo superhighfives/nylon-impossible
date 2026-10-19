@@ -118,7 +118,7 @@ One set of words. Code identifiers follow the UI words where practical.
 
 ## Structure
 
-### Phone (iOS, and mobile web under 768px)
+### Phone (iOS, and web under 1024px)
 
 ```
 ┌────────────────────────────────┐
@@ -170,7 +170,7 @@ One set of words. Code identifiers follow the UI words where practical.
   Because a todo belongs to exactly one list, dropping it into another
   column *moves* it. Dragging "Mix the new EP" from Studio into This Week
   takes it out of Studio.
-- **768–1024px** uses the phone layout, centred, with a max width.
+- **768–1024px** web uses the phone layout, centred, with a max width.
 
 ### Gmail card
 
@@ -321,32 +321,33 @@ waiting in This Week." Tapping the count goes to This Week.
 
 Each phase ships on its own.
 
-### 0. Prototype the phone experience
+### 0. Prototype the phone experience (done)
 
-A clickable HTML prototype (an artifact) of the phone structure, to settle how
-it feels before either codebase changes:
+A clickable HTML prototype (an artifact, linked in the Status line) of the
+phone structure, built to settle how it feels before either codebase changed.
+It covered:
 
-- the switcher and swiping
+- the switcher and swiping between lists
 - the composer with chips and typed dates
 - done-then-gone with Undo
-- swipe actions
 - the detail sheet
 
-Amend this spec with whatever the prototype changes.
+Its findings are folded into this spec. The main one: row swipe actions were
+dropped, because they fight the horizontal paging (see
+[Row](#row)).
 
-### 1. Backend reset
+### 1. Backend reset (shipped in #386)
 
-Start from a clean database and migration history that already reflect the
-model above.
+Started the backend from a clean database and migration history that already
+reflect the model above. Kept here as a record; there's nothing left to do.
 
-- **Squash migrations.** Replace the 31 migrations in `src/api/migrations/`
-  with one `0000_baseline.sql` generated from the cleaned schema. Regenerate
-  drizzle-kit's `meta/` so `pnpm db:generate` works again; it has been stale
-  since `0001`.
+- **Squashed migrations.** The 31 migrations in `src/api/migrations/` were
+  replaced with one `0000_baseline.sql`, and drizzle-kit's `meta/` was
+  regenerated so `pnpm db:generate` works again.
 - **Schema changes folded into the baseline:**
-  - `systemKind` enum becomes `today | thisWeek | someday`.
-  - Drop `users.location`, `users.plan` and `users.hide_completed`.
-- **Remove the code that served the deleted items:**
+  - `systemKind` enum is `today | thisWeek | someday`.
+  - `users.location`, `users.plan` and `users.hide_completed` were dropped.
+- **Removed the code that served the deleted items:**
   - Completed list provisioning.
   - The location and plan handlers in `users.ts` and `admin.ts`.
   - Plan UI in admin. Admin keeps only the users list and delete.
@@ -354,26 +355,23 @@ model above.
   - The `/todos/:id/process` button paths.
   - The dead code listed in the audits: `EmptyState`, `useTodoWithUrls`,
     unused `Tooltip`, the `.todo-list-ios-offset` CSS, unused props.
-- **Create new databases.** Create new D1 databases for production and
-  preview and point both `wrangler.jsonc` files at them. Apply the baseline.
-  Keep the old databases untouched as a backup until the new ones have run
-  cleanly for a while, then delete them.
-- **Your data.** Copy your current todos, lists, subtasks and links across
-  with a one-off export/import script.
+- **New databases.** Production and preview moved to new D1 databases, with
+  the baseline applied. The old databases stay untouched as a backup until
+  the new ones have run cleanly for a while, then get deleted.
+- **Data.** Todos, lists, subtasks and links were copied across with a one-off
+  export/import script (`scripts/db-reset/`).
 - **Deploy notes:**
-  - The current TestFlight build speaks `sometime` and `completed`. With one
-    user, ship the iOS update in the same window and accept a short gap.
-  - Expand/contract doesn't apply to a fresh database, because the old
-    workers keep pointing at the old database until they're replaced.
-  - The Gmail add-on link table starts empty, so reconnect once with the
-    "Connect Nylon" card.
+  - The TestFlight build at the time spoke `sometime` and `completed`, so the
+    iOS update shipped in the same window.
+  - Expand/contract didn't apply to a fresh database, because the old workers
+    kept pointing at the old database until they were replaced.
 
 ### 2. Shared foundations
 
 - The tokens package and its CSS and Swift generators.
 - The date parser with its Swift mirror and shared fixtures.
-- Vocabulary renames in code: Sticky → Pin, Sometime → Someday, Completed →
-  Done.
+- Vocabulary renames in code: Sticky → Pin, Completed → Done. (Sometime →
+  Someday already shipped in #386.)
 - Automatic timezone reporting from both clients.
 
 ### 3. Phone: iOS and mobile web together
