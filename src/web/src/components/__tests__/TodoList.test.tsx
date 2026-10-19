@@ -222,7 +222,7 @@ describe("TodoGrid", () => {
 
       render(<TodoGrid />);
       fireEvent.click(
-        screen.getByRole("checkbox", { name: 'Mark "Buy milk" as completed' }),
+        screen.getByRole("checkbox", { name: 'Mark "Buy milk" done' }),
       );
       expect(mutate).not.toHaveBeenCalled();
 
@@ -273,7 +273,7 @@ describe("TodoGrid", () => {
 
       render(<TodoGrid />);
       fireEvent.click(
-        screen.getByRole("checkbox", { name: 'Mark "Buy milk" as completed' }),
+        screen.getByRole("checkbox", { name: 'Mark "Buy milk" done' }),
       );
       act(() => {
         vi.advanceTimersByTime(COMPLETION_HOLD_MS);

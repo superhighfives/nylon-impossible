@@ -172,7 +172,7 @@ struct TodoItemRow: View {
         return formatter.string(from: date)
     }
 
-    /// "Wed 8 Jul" — completion date for the "Completed: …" line on repeats.
+    /// "Wed 8 Jul" — completion date for the "Done: …" line on repeats.
     private func completedDateText(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.setLocalizedDateFormatFromTemplate("EEE d MMM")
@@ -319,7 +319,7 @@ struct TodoItemRow: View {
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.appTint, in: RoundedRectangle(cornerRadius: 6))
-                        .accessibilityLabel("\(completedSubtaskCount) of \(subtasks.count) subtasks complete")
+                        .accessibilityLabel("\(completedSubtaskCount) of \(subtasks.count) subtasks done")
                     }
 
                     Spacer()
@@ -351,7 +351,7 @@ struct TodoItemRow: View {
                     // Completion date for any completed todo. Repeats stamp
                     // completedAt; normal/legacy todos fall back to updatedAt
                     // (≈ completion time). Matches web.
-                    Text("Completed: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
+                    Text("Done: \(completedDateText(todo.completedAt ?? todo.updatedAt))")
                         .font(.system(size: 12))
                         .foregroundStyle(Color.appSubtle)
 

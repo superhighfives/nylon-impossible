@@ -408,8 +408,8 @@ function TodoItemContent({
             ringOffset="app"
             aria-label={
               isCompleted
-                ? `Mark "${todo.title}" as not completed`
-                : `Mark "${todo.title}" as completed`
+                ? `Mark "${todo.title}" not done`
+                : `Mark "${todo.title}" done`
             }
           />
         </div>
@@ -480,7 +480,7 @@ function TodoItemContent({
                     <span
                       role="img"
                       className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-md bg-gray-base px-1.5 py-0.5 align-middle text-xs tabular-nums text-gray-muted"
-                      aria-label={`${doneSubtasks} of ${subtasks.length} subtasks complete`}
+                      aria-label={`${doneSubtasks} of ${subtasks.length} subtasks done`}
                     >
                       <ListTree size={10} aria-hidden="true" />
                       {doneSubtasks}/{subtasks.length}
@@ -517,7 +517,7 @@ function TodoItemContent({
           </div>
           {isCompleted && (
             <p className="text-xs text-gray-muted mt-0.5">
-              Completed:{" "}
+              Done:{" "}
               {formatDate(todo.completedAt ?? todo.updatedAt, timeZone, {
                 weekday: "short",
                 day: "numeric",

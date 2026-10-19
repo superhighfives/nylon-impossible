@@ -123,7 +123,7 @@ private struct TodayRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Complete \(todo.title)")
+            .accessibilityLabel("Mark \(todo.title) done")
 
             Text(todo.title)
                 .font(.system(size: 13))

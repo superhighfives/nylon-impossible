@@ -51,7 +51,7 @@ function CompletedSubtaskRow({
         onCheckedChange={() => onToggle(subtask.id, true)}
         disabled={disabled}
         variant="subtle"
-        aria-label={`Mark "${subtask.title}" as not completed`}
+        aria-label={`Mark "${subtask.title}" not done`}
       />
       <span className="min-w-0 flex-1 wrap-anywhere text-sm text-gray-muted line-through">
         {subtask.title}
@@ -107,7 +107,7 @@ function ActiveSubtaskRow({
         checked={false}
         onCheckedChange={() => onToggle(subtask.id, false)}
         disabled={disabled}
-        aria-label={`Mark "${subtask.title}" as completed`}
+        aria-label={`Mark "${subtask.title}" done`}
       />
       <span className="min-w-0 flex-1 wrap-anywhere text-sm text-gray">
         {subtask.title}

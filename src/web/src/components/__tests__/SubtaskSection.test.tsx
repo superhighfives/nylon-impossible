@@ -100,7 +100,7 @@ describe("SubtaskSection", () => {
       makeSubtask({ id: "a", title: "Active one", completed: false }),
     ]);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: /mark "Active one" as completed/i }),
+      screen.getByRole("checkbox", { name: /mark "Active one" done/i }),
     );
     expect(onToggle).toHaveBeenCalledWith("a", false);
   });
