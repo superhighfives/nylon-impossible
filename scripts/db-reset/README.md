@@ -141,6 +141,11 @@ The preview database starts empty. Previews provision users on demand through
 
 ### 7. Deploy everything in one window
 
+Don't use the app from the step 2 export until this deploy finishes. Anything
+written to the old database in between isn't copied across. The API deploys
+before web, so an open tab briefly runs the old web bundle against the new
+API. Hard refresh after the deploy.
+
 1. **Merge the branch.** CI's `web-deploy.yml` applies migrations to the new
    database (a no-op, since the baseline is already there), then deploys the
    API, then the web app.
