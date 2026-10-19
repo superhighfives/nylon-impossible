@@ -347,6 +347,25 @@ describe("Gmail add-on", () => {
       expect(rows[0].title).toBe("Buy stamps");
     });
 
+    it("quick-add runs the typed-date parser", async () => {
+      await linkUser();
+      const token = await idToken();
+      await post("/gmail-addon/actions/quick-add", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: ["Buy stamps tomorrow"] } },
+          },
+        },
+      });
+
+      const [row] = await getDb(env.DB)
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(row.title).toBe("Buy stamps");
+      expect(row.dueDate).not.toBeNull();
+    });
+
     it("quick-add places the todo in the selected list", async () => {
       await linkUser();
       const somedayId = await getSomedayListId();

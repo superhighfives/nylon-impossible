@@ -1,3 +1,4 @@
+import { toDueDay } from "@nylon-impossible/shared";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { createSmartTodo } from "../lib/create-todo";
@@ -10,6 +11,11 @@ import type { Env } from "../types";
 const smartCreateSchema = z.object({
   text: z.string().min(1, "Text is required").max(10000, "Text is too long"),
   listId: listIdSchema.optional(),
+  // false when the client already ran the typed-date parser (or the user
+  // dismissed its chip); the server parses by default for Siri/Share input.
+  parseDate: z.boolean().optional(),
+  // Normalized to UTC midnight — due dates are calendar days.
+  dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
 });
 
 // POST /todos/smart — thin wrapper over the shared createSmartTodo core so the
@@ -43,6 +49,8 @@ export async function smartCreate(c: Context<Env>) {
 
   const { todo } = await createSmartTodo(db, c.env, userId, text, {
     listId,
+    parseDate: parsed.data.parseDate,
+    dueDate: parsed.data.dueDate,
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 

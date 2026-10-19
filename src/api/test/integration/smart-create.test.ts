@@ -2,7 +2,8 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, lists, todoUrls } from "../../src/lib/db";
+import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
+import { getDb, lists, todoUrls, users } from "../../src/lib/db";
 import { cleanDb, getTodayListId, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -345,6 +346,80 @@ describe("Smart create endpoint", () => {
       const secondTodo = todosResult.find((t) => t.title === "Second");
 
       expect(secondTodo.position < firstTodo.position).toBe(true);
+    });
+  });
+
+  describe("typed dates", () => {
+    function tomorrowIn(timeZone: string) {
+      const today = dayKeyIn(new Date(), timeZone);
+      const next = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000);
+      return next.toISOString().slice(0, 10);
+    }
+
+    async function create(body: object) {
+      const res = await SELF.fetch("http://localhost/todos/smart", {
+        method: "POST",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      expect(res.status).toBe(200);
+      const json = await res.json<{
+        todos: { title: string; dueDate: string | null }[];
+      }>();
+      return json.todos[0];
+    }
+
+    it("strips the date and sets the due day", async () => {
+      const todo = await create({ text: "Pay rent tomorrow" });
+      expect(todo.title).toBe("Pay rent");
+      expect(todo.dueDate && dueDayKey(todo.dueDate)).toBe(tomorrowIn("UTC"));
+    });
+
+    it("uses the account's timezone for 'tomorrow'", async () => {
+      const zone = "Pacific/Kiritimati";
+      await getDb(env.DB)
+        .update(users)
+        .set({ timezone: zone })
+        .where(eq(users.id, "user_test_123"));
+      const todo = await create({ text: "Pay rent tomorrow" });
+      expect(todo.dueDate && dueDayKey(todo.dueDate)).toBe(tomorrowIn(zone));
+    });
+
+    it("leaves a weekday mid-sentence alone", async () => {
+      const todo = await create({ text: "Call Mum about Sunday lunch" });
+      expect(todo.title).toBe("Call Mum about Sunday lunch");
+      expect(todo.dueDate).toBeNull();
+    });
+
+    it("never empties the title", async () => {
+      const todo = await create({ text: "tomorrow" });
+      expect(todo.title).toBe("tomorrow");
+      expect(todo.dueDate).toBeNull();
+    });
+
+    it("skips parsing when the client already did (parseDate: false)", async () => {
+      const todo = await create({
+        text: "Pay rent tomorrow",
+        parseDate: false,
+      });
+      expect(todo.title).toBe("Pay rent tomorrow");
+      expect(todo.dueDate).toBeNull();
+    });
+
+    it("takes an explicit dueDate as-is", async () => {
+      const todo = await create({
+        text: "Pay rent",
+        parseDate: false,
+        dueDate: "2026-11-02T00:00:00.000Z",
+      });
+      expect(todo.title).toBe("Pay rent");
+      expect(todo.dueDate).toBe("2026-11-02T00:00:00.000Z");
+    });
+
+    it("parses only the title line of multi-line text", async () => {
+      const todo = await create({ text: "Pay rent tomorrow\nfrom savings" });
+      expect(todo.title).toBe("Pay rent");
+      expect(todo.dueDate && dueDayKey(todo.dueDate)).toBe(tomorrowIn("UTC"));
     });
   });
 });
