@@ -30,7 +30,7 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 | `POST` | `/todos/sync` | Sync todos (bulk create/update/delete) | Yes |
 | `PUT` | `/todos/:id` | Update todo | Yes |
 | `DELETE` | `/todos/:id` | Delete todo | Yes |
-| `POST` | `/todos/:id/process` | Re-run link processing (fetch links, title the todo from them) | Yes |
+| `POST` | `/todos/:id/process` | Retry link fetching for a todo (backs a failed link's "Try again") | Yes |
 | `POST` | `/gmail-addon/homepage` | Gmail add-on homepage card | Google ID token |
 | `POST` | `/gmail-addon/contextual` | Gmail add-on message card | Google ID token |
 | `POST` | `/gmail-addon/actions/*` | Gmail add-on card actions | Google ID token |
@@ -109,6 +109,13 @@ In production, set the same values as Workers secrets via `wrangler secret put`.
 ### Database
 
 The API shares the D1 database with the web project. Migrations live in `src/api/migrations/`.
+
+History was squashed in October 2026: `0000_baseline.sql` creates the whole
+schema, and new migrations continue from `0001`. Generate them with
+`pnpm db:generate` (drizzle-kit diffs `src/shared/src/schema.ts` against
+`migrations/meta/`). A local D1 created before the squash still has the old
+migration rows, so reset it once with `pnpm db:fresh`. The one-off move of
+production data onto the baseline lives in `scripts/db-reset/`.
 
 ```bash
 # Apply migrations locally
