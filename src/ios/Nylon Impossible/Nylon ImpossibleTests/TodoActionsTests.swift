@@ -148,8 +148,13 @@ struct TodoActionsTests {
         #expect(rows.isEmpty)
 
         fixture.actions.toasts.expire()
-        #expect(todo.isDeleted)
+        // Committed: soft-deleted for sync (see `committedDeletes` for why
+        // this reads the store rather than `todo.isDeleted`) and still hidden.
+        let deleted = try fixture.context.fetchCount(FetchDescriptor<TodoItem>(predicate: #Predicate { $0.isDeleted }))
+        #expect(deleted == 1)
+        #expect(!todo.isSynced)
         #expect(fixture.actions.pendingDeletes.isEmpty)
+        #expect(fixture.actions.hiddenIds.contains(todo.id))
     }
 
     @Test("Undo on a delete keeps the todo")
@@ -174,7 +179,7 @@ struct TodoActionsTests {
         fixture.actions.delete(first)
         fixture.actions.commitDone(second)
 
-        #expect(first.isDeleted)
+        #expect(fixture.actions.committedDeletes.contains(first.id))
         #expect(fixture.actions.toasts.current?.text == "Done")
     }
 

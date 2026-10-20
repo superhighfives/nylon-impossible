@@ -64,7 +64,7 @@ struct ContentView: View {
     }
 
     func rows(_ list: TodoListModel) -> [TodoItem] {
-        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.pendingDeletes)
+        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.hiddenIds)
     }
 
     var subtasksByParent: [UUID: [TodoItem]] {
@@ -75,7 +75,7 @@ struct ContentView: View {
     var counts: [String: Int] {
         var counts: [String: Int] = [:]
         for todo in todos where todo.parentId == nil && !todo.isDeleted && !todo.isCompleted
-            && !actions.pendingDeletes.contains(todo.id) {
+            && !actions.hiddenIds.contains(todo.id) {
             if let key = todo.listKey?.lowercased() { counts[key, default: 0] += 1 }
         }
         return counts
