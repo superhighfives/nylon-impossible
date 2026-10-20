@@ -7,6 +7,7 @@ on:
       - "src/web/**"
       - "src/api/**"
       - "package.json"
+      - "bun.lock"
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:

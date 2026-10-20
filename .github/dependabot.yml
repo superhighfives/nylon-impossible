@@ -12,3 +12,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # patches/vitest@5.0.3.patch only applies to that exact version, and Bun
+    # skips a non-matching patch silently, so a vitest bump breaks the API
+    # tests. Bump vitest by hand and regenerate the patch with it.
+    ignore:
+      - dependency-name: vitest
