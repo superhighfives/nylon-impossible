@@ -148,21 +148,30 @@ One set of words. Code identifiers follow the UI words where practical.
 ### Wide (web 1024px and up, iPad)
 
 ```
-┌──────────┬─────────────────┬─────────────────┬─────────────────┐
-│ N        │                 │                 │                 │
-│          │ Today           │ This Week       │ Someday         │  titles share a baseline
-│ Lists    │ ─────────────── │ ─────────────── │ ─────────────── │
-│ Groceries│ + Add           │ + Add           │ + Add           │
-│ Studio   │ ☐ …             │ ☐ …             │ ☐ …             │
-│ + New    │                 │                 │                 │
-│          │                 │                 │                 │
-│ Done     │                 │                 │                 │
-│ Settings │                 │                 │                 │
-└──────────┴─────────────────┴─────────────────┴─────────────────┘
+┌────────────┬─────────────────┬─────────────────┬─────────────────┐
+│ N          │                 │                 │                 │
+│ Today     4│ Today           │ This Week       │ Someday         │  titles share a baseline
+│ This Week 6│ ─────────────── │ ─────────────── │ ─────────────── │
+│ Someday  12│ + Add           │ + Add           │ + Add           │
+│            │ ☐ …             │ ☐ …             │ ☐ …             │
+│ Lists      │                 │                 │                 │
+│ Groceries 4│                 │                 │                 │
+│ Studio    3│                 │                 │                 │
+│ + New list │                 │                 │                 │
+│ Done       │                 │                 │                 │
+│ Settings   │                 │                 │                 │
+└────────────┴─────────────────┴─────────────────┴─────────────────┘
 ```
 
 - **The three horizon columns are always visible.** This keeps the current
   board's strongest quality: hairlines and shared-baseline titles.
+- **The sidebar lists every list, in two groups.** Today, This Week and
+  Someday come first, with counts. A small "Lists" heading follows, then your
+  lists and "New list". Under one-list-per-todo the time lists are lists too,
+  so they belong there.
+  - Clicking a time list scrolls to and focuses its column; nothing opens.
+  - Every sidebar entry is a drop target. Dropping a todo on "This Week" moves
+    it without scrolling, the same idea as the phone's switcher titles.
 - **Selecting a collection in the sidebar opens it as a fourth column** on
   the right. One collection column at a time: selecting another swaps it,
   and selecting the open one closes it.
