@@ -117,8 +117,9 @@ class ShareViewController: UIViewController {
             content: content,
             isURL: isURL,
             prefilledTitle: sharedTitle,
-            onSave: { [weak self] title in
-                self?.saveTask(title: title, url: self?.sharedURL)
+            lists: availableLists(),
+            onSave: { [weak self] title, listId, parseDates in
+                self?.saveTask(title: title, url: self?.sharedURL, listId: listId, parseDates: parseDates)
             },
             onCancel: { [weak self] in
                 self?.cancel()
@@ -140,21 +141,39 @@ class ShareViewController: UIViewController {
         hostingController.didMove(toParent: self)
     }
     
-    private func saveTask(title: String, url: String? = nil) {
+    /// The signed-in user, from shared UserDefaults. Spelled out rather than
+    /// via `BackgroundSyncService.userIdKey`: this target doesn't compile that
+    /// service (it doesn't sync — the app picks the todo up on its next
+    /// foreground sync), and pulling it in for one string constant would drag
+    /// Config, KeychainHelper, APIError and the sync wire types along with it.
+    private var currentUserId: String? {
+        UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")?
+            .string(forKey: "currentUserId")
+    }
+
+    /// Today, This Week, Someday, then the user's lists — the same order and
+    /// names as the app's composer chips. Empty before the app's first sync,
+    /// in which case the todo lands in Today server-side.
+    private func availableLists() -> [ShareList] {
+        let context = ModelContext(SharedModelContainer.shared)
+        let all = (try? context.fetch(FetchDescriptor<TodoListModel>())) ?? []
+        let userId = currentUserId
+        return all
+            .filter { ($0.userId == userId || userId == nil) && (!$0.isSystem || $0.systemKind != nil) }
+            .sorted { a, b in
+                if a.isSystem != b.isSystem { return a.isSystem }
+                if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
+                return a.position < b.position
+            }
+            .map { ShareList(id: $0.id, name: $0.name) }
+    }
+
+    private func saveTask(title: String, url: String? = nil, listId: String?, parseDates: Bool) {
         let container = SharedModelContainer.shared
         let context = ModelContext(container)
-        
-        // Get userId from shared UserDefaults. Spelled out rather than via
-        // `BackgroundSyncService.userIdKey`: this target doesn't compile that
-        // service (it doesn't sync — the app picks the todo up on its next
-        // foreground sync), and pulling it in for one string constant would
-        // drag Config, KeychainHelper, APIError and the sync wire types along
-        // with it.
-        let userId = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")?
-            .string(forKey: "currentUserId")
-        
+        let userId = currentUserId
         let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
-        
+
         if let url = url {
             _ = TaskCreationService.createTaskWithURL(
                 title: title,
@@ -162,7 +181,8 @@ class ShareViewController: UIViewController {
                 userId: userId,
                 context: context,
                 allTodos: allTodos,
-                parseDate: true
+                listId: listId,
+                parseDate: parseDates
             )
         } else {
             _ = TaskCreationService.createTask(
@@ -170,7 +190,8 @@ class ShareViewController: UIViewController {
                 userId: userId,
                 context: context,
                 allTodos: allTodos,
-                parseDate: true
+                listId: listId,
+                parseDate: parseDates
             )
         }
 

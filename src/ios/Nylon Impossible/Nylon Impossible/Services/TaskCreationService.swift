@@ -288,6 +288,8 @@ enum TaskCreationService {
         userId: String?,
         context: ModelContext,
         allTodos: [TodoItem],
+        // The share sheet's list picker; nil defaults to Today server-side.
+        listId: String? = nil,
         parseDate: Bool = false
     ) -> TodoItem {
         let todo = createTask(
@@ -295,9 +297,10 @@ enum TaskCreationService {
             userId: userId,
             context: context,
             allTodos: allTodos,
+            listId: listId,
             parseDate: parseDate
         )
-        
+
         // Store URL in pendingUrls — sent explicitly in the sync payload
         // so the server can create the todoUrls record directly without parsing the description
         if !todo.pendingUrls.contains(url) {
