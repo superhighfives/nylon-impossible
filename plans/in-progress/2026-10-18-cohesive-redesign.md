@@ -142,29 +142,39 @@ One set of words. Code identifiers follow the UI words where practical.
 - **Swiping** horizontally moves between Today, This Week and Someday. The
   switcher titles follow your finger.
 - **Lists** (`⋯`) is a page of collections, with the list count and a New
-  List row. Tapping a collection pushes it with the same row and composer.
+  list row. Tapping a collection pushes it with the same row and composer.
 - **Settings and Done history** live under the avatar.
 
 ### Wide (web 1024px and up, iPad)
 
 ```
-┌──────────┬─────────────────┬─────────────────┬─────────────────┐
-│ N        │                 │                 │                 │
-│          │ Today           │ This Week       │ Someday         │  titles share a baseline
-│ Lists    │ ─────────────── │ ─────────────── │ ─────────────── │
-│ Groceries│ + Add           │ + Add           │ + Add           │
-│ Studio   │ ☐ …             │ ☐ …             │ ☐ …             │
-│ + New    │                 │                 │                 │
-│          │                 │                 │                 │
-│ Done     │                 │                 │                 │
-│ Settings │                 │                 │                 │
-└──────────┴─────────────────┴─────────────────┴─────────────────┘
+┌────────────┬─────────────────┬─────────────────┬─────────────────┐
+│ N          │                 │                 │                 │
+│ Today     4│ Today           │ This Week       │ Someday         │  titles share a baseline
+│ This Week 6│ ─────────────── │ ─────────────── │ ─────────────── │
+│ Someday  12│ + Add           │ + Add           │ + Add           │
+│            │ ☐ …             │ ☐ …             │ ☐ …             │
+│ Lists      │                 │                 │                 │
+│ Groceries 4│                 │                 │                 │
+│ Studio    3│                 │                 │                 │
+│ + New list │                 │                 │                 │
+│ Done       │                 │                 │                 │
+│ Settings   │                 │                 │                 │
+└────────────┴─────────────────┴─────────────────┴─────────────────┘
 ```
 
 - **The three horizon columns are always visible.** This keeps the current
   board's strongest quality: hairlines and shared-baseline titles.
-- **Selecting a collection in the sidebar opens it as a fourth column** on
-  the right. One collection column at a time: selecting another swaps it,
+- **The sidebar lists every list, in two groups.** Today, This Week and
+  Someday come first, with counts. A small "Lists" heading follows, then your
+  lists and "New list". Under one-list-per-todo the time lists are lists too,
+  so they belong there.
+  - Clicking a time list scrolls to and focuses its column; nothing opens.
+  - Every list in the sidebar, time lists and your lists, is a drop target.
+    Dropping a todo on "This Week" moves it without scrolling, the same idea
+    as the phone's switcher titles. "New list" and Settings are not.
+- **Selecting one of your lists in the sidebar opens it as a fourth column**
+  on the right. One collection column at a time: selecting another swaps it,
   and selecting the open one closes it.
 - **Dragging works across every visible column**, collections included.
   Because a todo belongs to exactly one list, dropping it into another
