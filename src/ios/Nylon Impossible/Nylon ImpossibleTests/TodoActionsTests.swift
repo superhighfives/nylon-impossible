@@ -295,7 +295,12 @@ struct ToastCenterTests {
         toasts.duration = .milliseconds(20)
         var expired = false
         toasts.show("Deleted", onExpire: { expired = true }, action: {})
-        try await Task.sleep(for: .milliseconds(300))
+        // A loaded simulator can stretch the timeout well past 20ms, so wait
+        // for the expiry instead of guessing how long it takes.
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !expired, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
         #expect(toasts.current == nil)
         #expect(expired)
     }
