@@ -13,6 +13,7 @@ import { useSmartCreate } from "@/hooks/useTodos";
 import { messageFromError, toast } from "@/lib/toast";
 import { draftDueDay, dueChipText, planSubmit, plural } from "./model";
 import { useKeyboardInset } from "./useKeyboardInset";
+import { showActionToast } from "./useTodoActions";
 
 export interface ComposerTarget {
   id: string;
@@ -130,15 +131,7 @@ export function Composer({
         planned.length > 1
           ? `${plural(planned.length, "todo")} added to ${name}`
           : `Added to ${name}`;
-      const id = toast.success(label, {
-        actionProps: {
-          children: "View",
-          onClick: () => {
-            toast.dismiss(id);
-            onView(listId);
-          },
-        },
-      });
+      showActionToast(label, "View", () => onView(listId));
     }
   };
 
@@ -167,30 +160,8 @@ export function Composer({
       className="fixed left-1/2 z-30 w-[min(calc(100%-1.5rem),40.5rem)] -translate-x-1/2 rounded-[1.625rem] border border-[color-mix(in_srgb,var(--n-color-ink)_8%,transparent)] bg-[color-mix(in_srgb,var(--n-color-canvas)_82%,transparent)] shadow-[0_10px_30px_color-mix(in_srgb,black_10%,transparent)] backdrop-blur-[24px] backdrop-saturate-[1.6] transition-[bottom] duration-(--n-duration-fast) ease-n-out"
     >
       {showChips && (
-        <fieldset
-          aria-label="Add to list"
-          className="flex min-w-0 animate-n-fade-in gap-1.5 overflow-x-auto px-2.5 pt-2.5 pb-1.5 [scrollbar-width:none]"
-        >
-          {targets.map((t) => {
-            const selected = t.id === targetId;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={selected}
-                onPointerDown={keepFocus}
-                onMouseDown={keepFocus}
-                onClick={() => setPickedTarget(t.id)}
-                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus-inset transition-colors duration-(--n-duration-fast) ${
-                  selected
-                    ? "border-n-brand bg-n-brand text-n-brand-ink"
-                    : "border-n-hairline bg-transparent text-n-ink-muted"
-                }`}
-              >
-                {t.label}
-              </button>
-            );
-          })}
+        <div className="flex min-w-0 animate-n-fade-in gap-1.5 overflow-x-auto px-2.5 pt-2.5 pb-1.5 [scrollbar-width:none]">
+          {/* The parsed date leads, so it's never scrolled out of view. */}
           {dueDay && hasDraft && (
             <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-n-chip bg-n-fill pr-1 pl-2.5 text-sm font-medium whitespace-nowrap text-n-ink">
               <Calendar size={13} aria-hidden="true" />
@@ -207,7 +178,29 @@ export function Composer({
               </button>
             </span>
           )}
-        </fieldset>
+          <fieldset aria-label="Add to list" className="contents">
+            {targets.map((t) => {
+              const selected = t.id === targetId;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={selected}
+                  onPointerDown={keepFocus}
+                  onMouseDown={keepFocus}
+                  onClick={() => setPickedTarget(t.id)}
+                  className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus-inset transition-colors duration-(--n-duration-fast) ${
+                    selected
+                      ? "border-n-brand bg-n-brand text-n-brand-ink"
+                      : "border-n-hairline bg-transparent text-n-ink-muted"
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </fieldset>
+        </div>
       )}
       {spillsToNotes && (
         <p className="px-[1.125rem] pt-2 text-[0.8125rem] text-n-ink-muted">

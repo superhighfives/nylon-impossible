@@ -10,6 +10,12 @@ import {
   parseTodoDate,
   type Recurrence,
 } from "@nylon-impossible/shared";
+import {
+  getFetchedPreviewTitle,
+  isPlaceholderTitle,
+  placeholderTitleForUrl,
+  stripLinkedUrlsFromTitle,
+} from "@/lib/url-display";
 import type {
   SerializedList,
   SystemListKind,
@@ -90,6 +96,24 @@ const REPEAT_LABELS: Record<Recurrence["frequency"], string> = {
 
 export function repeatLabel(recurrence: Recurrence): string {
   return REPEAT_LABELS[recurrence.frequency];
+}
+
+/**
+ * The title a row shows. A todo captured as a bare link reads as the fetched
+ * page title (or "Check {domain}" until it arrives) instead of the raw URL,
+ * and a URL that's attached as a link isn't repeated inside the title — the
+ * meta line and the detail's link card carry it.
+ */
+export function displayTitle(todo: TodoWithUrls): string {
+  const urls = todo.urls;
+  const only = urls.length === 1 ? urls[0] : undefined;
+  if (only && isPlaceholderTitle(todo.title, only.url)) {
+    return (
+      (only.showPreview ? getFetchedPreviewTitle(only) : null) ??
+      placeholderTitleForUrl(only.url)
+    );
+  }
+  return stripLinkedUrlsFromTitle(todo.title, urls) || todo.title;
 }
 
 /** "visitlisboa.com" from "https://www.visitlisboa.com/tram-28". */

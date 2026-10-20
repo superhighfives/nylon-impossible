@@ -14,7 +14,7 @@ import {
   useRef,
 } from "react";
 import type { TodoWithUrls } from "@/types/database";
-import { type MetaPart, metaSummary, rowMeta } from "./model";
+import { displayTitle, type MetaPart, metaSummary, rowMeta } from "./model";
 
 /** Hold this long without moving to open the context menu. */
 export const LONG_PRESS_MS = 450;
@@ -77,6 +77,7 @@ export const TodoRow = memo(function TodoRow({
   onMenu,
 }: TodoRowProps) {
   const parts = rowMeta(todo, subtasks, now, timeZone);
+  const title = displayTitle(todo);
   const press = useRef<{
     x: number;
     y: number;
@@ -145,7 +146,7 @@ export const TodoRow = memo(function TodoRow({
         <button
           type="button"
           aria-pressed={checked}
-          aria-label={`Mark “${todo.title}” done`}
+          aria-label={`Mark “${title}” done`}
           onClick={() => onCheck(todo)}
           className="n-focus-inset -mr-1.5 -ml-2.5 mt-0.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field"
         >
@@ -191,7 +192,7 @@ export const TodoRow = memo(function TodoRow({
               checked ? "text-n-ink-muted line-through" : "text-n-ink"
             }`}
           >
-            {todo.title}
+            {title}
           </span>
           {parts.length > 0 && (
             <span

@@ -16,6 +16,35 @@ export const UNDO_TOAST_MS = 5000;
 
 type Timer = ReturnType<typeof setTimeout>;
 
+/**
+ * One toast at a time on the phone: a new one replaces whatever's showing,
+ * so its action is always the one on screen. The action closes the toast.
+ */
+export function showActionToast(
+  text: string,
+  label: string,
+  run: () => void,
+  timeout = UNDO_TOAST_MS,
+) {
+  toast.dismiss();
+  const id = toast.success(text, {
+    timeout,
+    actionProps: {
+      children: label,
+      onClick: () => {
+        toast.dismiss(id);
+        run();
+      },
+    },
+  });
+  return id;
+}
+
+/** "Done · Undo", "Moved to This Week · Undo", "Deleted · Undo" … */
+export function showUndoToast(text: string, undo: () => void) {
+  return showActionToast(text, "Undo", undo);
+}
+
 function withId(set: ReadonlySet<string>, id: string, on: boolean) {
   const next = new Set(set);
   if (on) next.add(id);
@@ -144,18 +173,9 @@ export function useTodoActions({
             listId: todo.listId,
           };
           if (todo.pinned) undo.pinned = true;
-          const id = toast.success(
+          showUndoToast(
             `Done · repeats ${dueLabel(next, now, timeZone).text}`,
-            {
-              timeout: UNDO_TOAST_MS,
-              actionProps: {
-                children: "Undo",
-                onClick: () => {
-                  toast.dismiss(id);
-                  update({ id: todo.id, input: undo });
-                },
-              },
-            },
+            () => update({ id: todo.id, input: undo }),
           );
         });
         return;
@@ -172,16 +192,7 @@ export function useTodoActions({
             position: todo.position,
           };
           if (todo.pinned) undo.pinned = true;
-          const id = toast.success("Done", {
-            timeout: UNDO_TOAST_MS,
-            actionProps: {
-              children: "Undo",
-              onClick: () => {
-                toast.dismiss(id);
-                update({ id: todo.id, input: undo });
-              },
-            },
-          });
+          showUndoToast("Done", () => update({ id: todo.id, input: undo }));
         });
       });
     },
@@ -198,16 +209,9 @@ export function useTodoActions({
       });
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
-      const id = toast.success(`Moved to ${listName(listId)}`, {
-        timeout: UNDO_TOAST_MS,
-        actionProps: {
-          children: "Undo",
-          onClick: () => {
-            toast.dismiss(id);
-            update({ id: todo.id, input: from });
-          },
-        },
-      });
+      showUndoToast(`Moved to ${listName(listId)}`, () =>
+        update({ id: todo.id, input: from }),
+      );
     },
     [listName, topPosition, update],
   );
@@ -228,16 +232,9 @@ export function useTodoActions({
           onSettled: () => setHidden((s) => withId(s, todo.id, false)),
         });
       });
-      const id = toast.success("Deleted", {
-        timeout: UNDO_TOAST_MS,
-        actionProps: {
-          children: "Undo",
-          onClick: () => {
-            toast.dismiss(id);
-            cancel(key);
-            setHidden((s) => withId(s, todo.id, false));
-          },
-        },
+      showUndoToast("Deleted", () => {
+        cancel(key);
+        setHidden((s) => withId(s, todo.id, false));
       });
     },
     [cancel, remove, schedule],
@@ -250,16 +247,9 @@ export function useTodoActions({
         id: todo.id,
         input: { completed: false, position: topPosition(todo.listId) },
       });
-      const id = toast.success(`Back in ${listName(todo.listId)}`, {
-        timeout: UNDO_TOAST_MS,
-        actionProps: {
-          children: "Undo",
-          onClick: () => {
-            toast.dismiss(id);
-            update({ id: todo.id, input: { completed: true } });
-          },
-        },
-      });
+      showUndoToast(`Back in ${listName(todo.listId)}`, () =>
+        update({ id: todo.id, input: { completed: true } }),
+      );
     },
     [listName, topPosition, update],
   );

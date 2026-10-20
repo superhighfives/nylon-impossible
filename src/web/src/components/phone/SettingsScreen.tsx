@@ -26,7 +26,7 @@ const ZONES =
 
 const pretty = (zone: string) => zone.replace(/_/g, " ");
 
-const SECTION = "border-b border-n-hairline px-5 py-5";
+const SECTION = "mx-5 border-b border-n-hairline py-5";
 const LABEL = "mb-2 block text-[0.8125rem] font-semibold text-n-ink-muted";
 const HINT = "mt-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted";
 

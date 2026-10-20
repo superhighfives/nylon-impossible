@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import type { TodoWithUrls } from "@/types/database";
 import { Masthead } from "./Masthead";
-import { groupDoneByDay } from "./model";
+import { displayTitle, groupDoneByDay } from "./model";
 import { Screen } from "./Screen";
 
 /**
@@ -42,7 +42,7 @@ export function DoneScreen({
                 <li key={todo.id} className="flex items-start gap-3.5 py-2.5">
                   <button
                     type="button"
-                    aria-label={`Put “${todo.title}” back in ${listName(todo.listId)}`}
+                    aria-label={`Put “${displayTitle(todo)}” back in ${listName(todo.listId)}`}
                     onClick={() => onRestore(todo)}
                     className="-my-2.5 -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field n-focus-inset"
                   >
@@ -52,7 +52,7 @@ export function DoneScreen({
                   </button>
                   <div className="min-w-0 flex-1">
                     <div className="text-[1.0625rem] leading-[1.35] text-n-ink-muted line-through wrap-anywhere">
-                      {todo.title}
+                      {displayTitle(todo)}
                     </div>
                     <div className="mt-[3px] text-[0.8125rem] text-n-ink-muted">
                       {listName(todo.listId)}

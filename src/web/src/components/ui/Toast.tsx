@@ -78,7 +78,7 @@ function PhoneToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
   return (
     <Toast.Root
       toast={toast}
-      className="pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] bg-n-ink py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] text-n-canvas opacity-[calc(1-min(var(--toast-index),1))] shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0"
+      className="pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] bg-n-ink py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] text-n-canvas opacity-[calc(1-min(var(--toast-index),1))] data-limited:pointer-events-none data-limited:opacity-0 shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0"
     >
       <Toast.Content className="flex min-h-9 items-center gap-1.5">
         <Toast.Title className="truncate">{toast.title}</Toast.Title>
@@ -116,7 +116,9 @@ export function Toaster() {
   // just above the composer (it publishes --n-phone-toast-offset).
   const phone = useIsWide() === false;
   return (
-    <Toast.Provider toastManager={toastManager}>
+    // The phone shows one toast at a time: a new "Done · Undo" replaces the
+    // last rather than stacking invisibly behind it.
+    <Toast.Provider toastManager={toastManager} limit={phone ? 1 : 3}>
       <Toast.Viewport
         className={
           phone

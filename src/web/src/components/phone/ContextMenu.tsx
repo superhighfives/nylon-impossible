@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { ArrowRight, Pin, PinOff, Trash2 } from "lucide-react";
 import { type KeyboardEvent, useRef } from "react";
 import type { TodoWithUrls } from "@/types/database";
+import { displayTitle } from "./model";
 
 export interface MenuTarget {
   id: string;
@@ -81,7 +82,7 @@ export function ContextMenu({
             <>
               <div className="mb-2.5 rounded-[0.875rem] bg-n-canvas px-4 py-3.5 shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] dark:bg-n-fill">
                 <Dialog.Title className="line-clamp-3 text-[1.0625rem] leading-[1.35] font-medium">
-                  {current.title}
+                  {displayTitle(current)}
                 </Dialog.Title>
                 <Dialog.Description className="mt-0.5 text-[0.8125rem] text-n-ink-muted">
                   {where}

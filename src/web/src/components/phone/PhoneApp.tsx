@@ -327,10 +327,16 @@ export function PhoneApp() {
   const collection = collectionId
     ? collections.find((l) => l.id === collectionId)
     : undefined;
-  // A collection deleted elsewhere drops back to the index.
+  // A collection deleted elsewhere drops back to the index. Only once it's
+  // been seen: a just-created list isn't in the cache until the refetch.
+  const seenCollection = useRef<string | null>(null);
   useEffect(() => {
-    if (collectionId && lists && !collection) setCollectionId(null);
-  }, [collection, collectionId, lists]);
+    if (collection) seenCollection.current = collection.id;
+    else if (collectionId && seenCollection.current === collectionId) {
+      seenCollection.current = null;
+      setCollectionId(null);
+    }
+  }, [collection, collectionId]);
 
   const addList = () => {
     const name = newList.trim();
