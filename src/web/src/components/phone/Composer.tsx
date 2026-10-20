@@ -1,0 +1,256 @@
+import { splitTodoText } from "@nylon-impossible/shared";
+import { ArrowUp, Calendar, X } from "lucide-react";
+import {
+  type FocusEvent,
+  type Ref,
+  type SyntheticEvent,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { useSmartCreate } from "@/hooks/useTodos";
+import { messageFromError, toast } from "@/lib/toast";
+import { draftDueDay, dueChipText, planSubmit, plural } from "./model";
+import { useKeyboardInset } from "./useKeyboardInset";
+
+export interface ComposerTarget {
+  id: string;
+  label: string;
+}
+
+/** Keeps focus (and the keyboard) in the field when a chip is tapped. */
+const keepFocus = (e: SyntheticEvent) => e.preventDefault();
+
+/** Variable the phone toaster reads to sit just above the composer. */
+export const TOAST_OFFSET_VAR = "--n-phone-toast-offset";
+
+export function Composer({
+  currentListId,
+  targets,
+  timeZone,
+  onView,
+  textareaRef,
+}: {
+  /** The list on screen — the default target. */
+  currentListId: string;
+  /** Today, This Week, Someday, then the user's lists. */
+  targets: ComposerTarget[];
+  timeZone: string;
+  /** "View" on the "Added to …" toast when adding somewhere off-screen. */
+  onView: (listId: string) => void;
+  textareaRef?: Ref<HTMLTextAreaElement>;
+}) {
+  const [draft, setDraft] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [pickedTarget, setPickedTarget] = useState<string | null>(null);
+  const [keepDateWords, setKeepDateWords] = useState(false);
+  const smartCreate = useSmartCreate();
+  const keyboard = useKeyboardInset();
+  const rootRef = useRef<HTMLFormElement>(null);
+  const fieldRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // Paging to another list re-aims the composer at it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on page change only
+  useEffect(() => setPickedTarget(null), [currentListId]);
+
+  const targetId =
+    pickedTarget && targets.some((t) => t.id === pickedTarget)
+      ? pickedTarget
+      : currentListId;
+  const targetLabel = targets.find((t) => t.id === targetId)?.label ?? "Today";
+
+  const now = new Date();
+  const dueDay = keepDateWords ? null : draftDueDay(draft, { now, timeZone });
+  const hasDraft = draft.trim().length > 0;
+  const spillsToNotes = draft
+    .split("\n")
+    .some((line) => splitTodoText(line).notes !== null);
+  const showChips = focused || hasDraft;
+
+  // Publish where the composer's top edge sits so toasts clear it.
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const publish = () => {
+      const fromBottom = window.innerHeight - el.getBoundingClientRect().top;
+      document.documentElement.style.setProperty(
+        TOAST_OFFSET_VAR,
+        `${Math.max(0, Math.round(fromBottom + 10))}px`,
+      );
+    };
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.removeProperty(TOAST_OFFSET_VAR);
+    };
+  });
+
+  const setRefs = (node: HTMLTextAreaElement | null) => {
+    fieldRef.current = node;
+    if (typeof textareaRef === "function") textareaRef(node);
+    else if (textareaRef) textareaRef.current = node;
+  };
+
+  const submit = async () => {
+    const planned = planSubmit(draft, { keepDateWords, now, timeZone });
+    if (planned.length === 0) return;
+    const submitted = draft;
+    const listId = targetId;
+    // Clear straight away so the next one can be typed while this saves.
+    setDraft("");
+    setKeepDateWords(false);
+    fieldRef.current?.focus();
+
+    // Smart-create prepends, so send a pasted list bottom-up to keep its
+    // order on screen.
+    let failed: unknown = null;
+    for (const todo of [...planned].reverse()) {
+      try {
+        await smartCreate.mutateAsync({
+          text: todo.text,
+          listId,
+          parseDate: false,
+          dueDate: todo.dueDay,
+        });
+      } catch (err) {
+        failed = err;
+      }
+    }
+    if (failed) {
+      setDraft((current) => current || submitted);
+      toast.error(messageFromError(failed, "Couldn't add todo"));
+      return;
+    }
+    if (listId !== currentListId) {
+      const name = targets.find((t) => t.id === listId)?.label ?? "list";
+      const label =
+        planned.length > 1
+          ? `${plural(planned.length, "todo")} added to ${name}`
+          : `Added to ${name}`;
+      const id = toast.success(label, {
+        actionProps: {
+          children: "View",
+          onClick: () => {
+            toast.dismiss(id);
+            onView(listId);
+          },
+        },
+      });
+    }
+  };
+
+  const onBlur = (e: FocusEvent<HTMLFormElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setFocused(false);
+    }
+  };
+
+  const bottom =
+    keyboard > 0
+      ? `${keyboard + 8}px`
+      : "calc(1rem + env(safe-area-inset-bottom, 0px))";
+
+  return (
+    <form
+      ref={rootRef}
+      aria-label="Add a todo"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void submit();
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={onBlur}
+      style={{ bottom }}
+      className="fixed left-1/2 z-30 w-[min(calc(100%-1.5rem),40.5rem)] -translate-x-1/2 rounded-[1.625rem] border border-[color-mix(in_srgb,var(--n-color-ink)_8%,transparent)] bg-[color-mix(in_srgb,var(--n-color-canvas)_82%,transparent)] shadow-[0_10px_30px_color-mix(in_srgb,black_10%,transparent)] backdrop-blur-[24px] backdrop-saturate-[1.6] transition-[bottom] duration-(--n-duration-fast) ease-n-out"
+    >
+      {showChips && (
+        <fieldset
+          aria-label="Add to list"
+          className="flex min-w-0 animate-n-fade-in gap-1.5 overflow-x-auto px-2.5 pt-2.5 pb-1.5 [scrollbar-width:none]"
+        >
+          {targets.map((t) => {
+            const selected = t.id === targetId;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={selected}
+                onPointerDown={keepFocus}
+                onMouseDown={keepFocus}
+                onClick={() => setPickedTarget(t.id)}
+                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus-inset transition-colors duration-(--n-duration-fast) ${
+                  selected
+                    ? "border-n-brand bg-n-brand text-n-brand-ink"
+                    : "border-n-hairline bg-transparent text-n-ink-muted"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+          {dueDay && hasDraft && (
+            <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-n-chip bg-n-fill pr-1 pl-2.5 text-sm font-medium whitespace-nowrap text-n-ink">
+              <Calendar size={13} aria-hidden="true" />
+              Due {dueChipText(dueDay, now, timeZone)}
+              <button
+                type="button"
+                aria-label="Don’t treat as a date"
+                onPointerDown={keepFocus}
+                onMouseDown={keepFocus}
+                onClick={() => setKeepDateWords(true)}
+                className="n-hit flex size-7 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-inset"
+              >
+                <X size={12} strokeWidth={2.4} aria-hidden="true" />
+              </button>
+            </span>
+          )}
+        </fieldset>
+      )}
+      {spillsToNotes && (
+        <p className="px-[1.125rem] pt-2 text-[0.8125rem] text-n-ink-muted">
+          The rest will be saved to notes.
+        </p>
+      )}
+      <div className="flex items-end">
+        <textarea
+          ref={setRefs}
+          rows={1}
+          value={draft}
+          aria-label="New todo"
+          placeholder={`Add to ${targetLabel}…`}
+          enterKeyHint="send"
+          onChange={(e) => {
+            setDraft(e.target.value);
+            if (!e.target.value) setKeepDateWords(false);
+          }}
+          onKeyDown={(e) => {
+            if (
+              e.key === "Enter" &&
+              !e.shiftKey &&
+              !e.nativeEvent.isComposing
+            ) {
+              e.preventDefault();
+              void submit();
+            }
+            if (e.key === "Escape") e.currentTarget.blur();
+          }}
+          className="field-sizing-content block max-h-[5.5rem] min-h-[3.125rem] w-full flex-1 resize-none bg-transparent px-[1.125rem] py-3.5 text-[1.0625rem] leading-[1.375rem] text-n-ink outline-none placeholder:text-n-ink-subtle"
+        />
+        {hasDraft && (
+          <button
+            type="submit"
+            aria-label="Add todo"
+            onPointerDown={keepFocus}
+            onMouseDown={keepFocus}
+            className="mr-[7px] mb-[7px] flex size-9 shrink-0 animate-n-fade-in cursor-pointer items-center justify-center rounded-full bg-n-brand text-n-brand-ink n-focus"
+          >
+            <ArrowUp size={18} strokeWidth={2.6} aria-hidden="true" />
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
