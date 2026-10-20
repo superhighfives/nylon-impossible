@@ -67,7 +67,8 @@ function withId(set: ReadonlySet<string>, id: string, on: boolean) {
  * - **Done then gone**: the checkbox fills, the row holds ~400ms, collapses,
  *   then the completion is sent and "Done · Undo" shows for 5s. A repeating
  *   todo's due day rolls forward and the server re-places it by that date, so
- *   the toast says when it's next and, if it left, which list it went to. Checking again during the hold cancels before anything is sent.
+ *   the toast says when it's next and, if it left, which list it went to.
+ *   Checking again during the hold cancels before anything is sent.
  * - **Delete** hides the row at once and only deletes when the Undo toast
  *   expires, so Undo needs no re-create. The delete commits on that schedule
  *   even if a later toast replaces this one (one toast at a time). Undo after
