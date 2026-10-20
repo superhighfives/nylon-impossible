@@ -1,5 +1,6 @@
 import { Toast } from "@base-ui/react/toast";
 import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { useIsWide } from "@/hooks/useIsWide";
 import { type ToastType, toastManager } from "@/lib/toast";
 
 const TYPE_STYLES: Record<
@@ -68,12 +69,38 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
   );
 }
 
-function ToastList() {
+/**
+ * The phone layout's toast (under 1024px): one dark pill centred above the
+ * composer, "Done · Undo" style, with the action as a yellow fill. Only the
+ * newest shows; older ones fade behind it. Token colours only.
+ */
+function PhoneToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
+  return (
+    <Toast.Root
+      toast={toast}
+      className="pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] bg-n-ink py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] text-n-canvas opacity-[calc(1-min(var(--toast-index),1))] shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0"
+    >
+      <Toast.Content className="flex min-h-9 items-center gap-1.5">
+        <Toast.Title className="truncate">{toast.title}</Toast.Title>
+        <Toast.Action className="min-h-9 shrink-0 cursor-pointer rounded-[0.625rem] bg-n-brand px-3 font-bold text-n-brand-ink n-focus" />
+        <Toast.Close
+          aria-label="Dismiss"
+          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[0.625rem] text-n-ink-subtle n-focus"
+        >
+          <X size={14} aria-hidden="true" />
+        </Toast.Close>
+      </Toast.Content>
+    </Toast.Root>
+  );
+}
+
+function ToastList({ phone }: { phone: boolean }) {
   const { toasts } = Toast.useToastManager();
+  const Item = phone ? PhoneToastItem : ToastItem;
   return (
     <>
       {toasts.map((toast) => (
-        <ToastItem key={toast.id} toast={toast} />
+        <Item key={toast.id} toast={toast} />
       ))}
     </>
   );
@@ -85,17 +112,24 @@ function ToastList() {
  * and respects iOS safe-area insets so it doesn't collide with the input pill.
  */
 export function Toaster() {
+  // Under 1024px the app uses the phone layout, whose toasts sit centred
+  // just above the composer (it publishes --n-phone-toast-offset).
+  const phone = useIsWide() === false;
   return (
     <Toast.Provider toastManager={toastManager}>
       <Toast.Viewport
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[100] mx-auto flex w-full max-w-sm flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:pb-4"
+        className={
+          phone
+            ? "pointer-events-none fixed inset-x-0 bottom-[var(--n-phone-toast-offset,calc(1.75rem+env(safe-area-inset-bottom,0px)))] z-[100] h-0"
+            : "pointer-events-none fixed inset-x-0 bottom-0 z-[100] mx-auto flex w-full max-w-sm flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:pb-4"
+        }
         style={
           {
             ["--viewport-padding" as string]: "1rem",
           } as React.CSSProperties
         }
       >
-        <ToastList />
+        <ToastList phone={phone} />
       </Toast.Viewport>
     </Toast.Provider>
   );
