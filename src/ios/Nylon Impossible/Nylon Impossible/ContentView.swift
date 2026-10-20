@@ -64,18 +64,18 @@ struct ContentView: View {
     }
 
     func rows(_ list: TodoListModel) -> [TodoItem] {
-        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.hiddenIds)
+        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.pendingDeletes)
     }
 
     var subtasksByParent: [UUID: [TodoItem]] {
-        Dictionary(grouping: todos.filter { $0.parentId != nil && !$0.isDeleted }) { $0.parentId ?? UUID() }
+        Dictionary(grouping: todos.filter { $0.parentId != nil && !$0.isSoftDeleted }) { $0.parentId ?? UUID() }
     }
 
     /// Open top-level todos per list id (lowercased).
     var counts: [String: Int] {
         var counts: [String: Int] = [:]
-        for todo in todos where todo.parentId == nil && !todo.isDeleted && !todo.isCompleted
-            && !actions.hiddenIds.contains(todo.id) {
+        for todo in todos where todo.parentId == nil && !todo.isSoftDeleted && !todo.isCompleted
+            && !actions.pendingDeletes.contains(todo.id) {
             if let key = todo.listKey?.lowercased() { counts[key, default: 0] += 1 }
         }
         return counts
@@ -90,7 +90,7 @@ struct ContentView: View {
     var showsComposer: Bool { currentListId != nil }
 
     var doneCount: Int {
-        todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isDeleted }.count
+        todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
     }
 
     // MARK: - Identity

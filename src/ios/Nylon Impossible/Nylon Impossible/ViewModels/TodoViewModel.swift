@@ -81,7 +81,7 @@ final class TodoViewModel {
     /// groups, tests) keep working unchanged.
     func sortedTodos(from todos: [TodoItem], listId: String? = nil) -> [TodoItem] {
         // Filter out soft-deleted items, then scope to the given list.
-        let activeTodos = todos.filter { !$0.isDeleted }
+        let activeTodos = todos.filter { !$0.isSoftDeleted }
         let scoped: [TodoItem]
         if let listId {
             scoped = activeTodos.filter { $0.listKey?.lowercased() == listId }
@@ -121,7 +121,7 @@ final class TodoViewModel {
         let key = listId.lowercased()
         return todos
             .filter {
-                $0.parentId == nil && !$0.isDeleted && !$0.isCompleted
+                $0.parentId == nil && !$0.isSoftDeleted && !$0.isCompleted
                     && !hidden.contains($0.id) && $0.listKey?.lowercased() == key
             }
             .sorted { a, b in
@@ -171,7 +171,7 @@ final class TodoViewModel {
         guard todo.listKey != listId else { return }
         let targetIncomplete = allTodos
             .filter {
-                $0.listKey == listId && !$0.isDeleted && !$0.isEffectivelyCompleted
+                $0.listKey == listId && !$0.isSoftDeleted && !$0.isEffectivelyCompleted
                     && $0.parentId == nil
             }
             .sorted { $0.position < $1.position }
@@ -229,7 +229,7 @@ final class TodoViewModel {
         allTodos: [TodoItem]
     ) {
         var active = allTodos
-            .filter { $0.parentId == parent.id && !$0.isDeleted && !$0.isCompleted }
+            .filter { $0.parentId == parent.id && !$0.isSoftDeleted && !$0.isCompleted }
             .sorted { $0.position < $1.position }
 
         active.move(fromOffsets: source, toOffset: destination)
@@ -264,7 +264,7 @@ final class TodoViewModel {
     private func deleteSingleTodo(_ todo: TodoItem, context: ModelContext) {
         // Soft delete for sync - mark as deleted rather than removing
         if todo.userId != nil {
-            todo.isDeleted = true
+            todo.isSoftDeleted = true
             todo.markModified()
         } else {
             // Local-only todo, can hard delete

@@ -72,16 +72,6 @@ final class TodoActions {
     private(set) var fading: Set<UUID> = []
     /// Deleted rows whose toast is still up. Hidden, not yet deleted.
     private(set) var pendingDeletes: Set<UUID> = []
-    /// Deletes committed this session. Hidden explicitly because, on the
-    /// iOS 26 SDK, a saved `TodoItem` reads `isDeleted` back as false: the
-    /// attribute shares its name with SwiftData's own `PersistentModel.isDeleted`,
-    /// which wins once the model is persisted (the store itself holds true —
-    /// predicates see it). Renaming the attribute is the real fix.
-    private(set) var committedDeletes: Set<UUID> = []
-
-    /// Rows a list page leaves out: deletes still showing Undo, and deletes
-    /// already committed.
-    var hiddenIds: Set<UUID> { pendingDeletes.union(committedDeletes) }
 
     @ObservationIgnored var reduceMotion = false
     @ObservationIgnored var holdDuration: Duration = Theme.Phone.doneHold
@@ -114,7 +104,7 @@ final class TodoActions {
     }
 
     func children(of todo: TodoItem) -> [TodoItem] {
-        allTodos().filter { $0.parentId == todo.id && !$0.isDeleted }
+        allTodos().filter { $0.parentId == todo.id && !$0.isSoftDeleted }
     }
 
     func listName(_ listId: String?) -> String {
@@ -259,7 +249,6 @@ final class TodoActions {
 
     private func commitDelete(_ todo: TodoItem) {
         guard let context, pendingDeletes.remove(todo.id) != nil else { return }
-        committedDeletes.insert(todo.id)
         viewModel.deleteTodo(todo, context: context)
         save()
         onMutate()

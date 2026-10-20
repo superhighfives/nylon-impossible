@@ -58,7 +58,7 @@ enum TodayDigest {
     ) -> [TodoItem] {
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate<TodoItem> { todo in
-                !todo.isDeleted && !todo.isCompleted
+                !todo.isSoftDeleted && !todo.isCompleted
             }
         )
 

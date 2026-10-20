@@ -66,7 +66,15 @@ final class TodoItem {
     var createdAt: Date
     var updatedAt: Date           // For sync conflict resolution
     var isSynced: Bool            // Whether this item has been synced to server
-    var isDeleted: Bool           // Soft delete for sync
+    // Soft delete for sync: hidden locally, sent as `deleted: true`, removed
+    // once the server has it.
+    //
+    // Was `isDeleted`, which collides with SwiftData's own
+    // `PersistentModel.isDeleted` (deleted from its context): once a model was
+    // saved, reads returned that instead, so a todo deleted after it was
+    // first saved synced as an ordinary update and never left the server.
+    // `originalName` keeps the existing column, so stores migrate in place.
+    @Attribute(originalName: "isDeleted") var isSoftDeleted: Bool
     var position: String = "a0"   // Fractional index for ordering
     var dueDate: Date?            // Optional due date
     var recurrenceFrequency: String?  // RecurrenceFrequency raw value; nil = non-repeating
@@ -95,7 +103,7 @@ final class TodoItem {
         self.createdAt = Date()
         self.updatedAt = Date()
         self.isSynced = false
-        self.isDeleted = false
+        self.isSoftDeleted = false
         self.dueDate = nil
         self.recurrenceFrequency = nil
         self.pinned = false

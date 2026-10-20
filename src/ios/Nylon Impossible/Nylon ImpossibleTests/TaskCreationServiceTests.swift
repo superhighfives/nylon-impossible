@@ -202,7 +202,7 @@ struct TaskCreationServiceTests {
         
         let active = TodoItem(title: "Active")
         let deleted = TodoItem(title: "Deleted")
-        deleted.isDeleted = true
+        deleted.isSoftDeleted = true
         
         context.insert(active)
         context.insert(deleted)

@@ -168,7 +168,7 @@ final class SyncService {
         do {
             // Find all local-only todos (no userId)
             let descriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.userId == nil && !$0.isDeleted }
+                predicate: #Predicate { $0.userId == nil && !$0.isSoftDeleted }
             )
             let localTodos = try modelContext.fetch(descriptor)
 
@@ -212,25 +212,25 @@ final class SyncService {
         let unsyncedItems = try modelContext.fetch(descriptor)
 
         return unsyncedItems.map { todo in
-            let pendingUrlChanges = todo.isDeleted || todo.pendingUrls.isEmpty
+            let pendingUrlChanges = todo.isSoftDeleted || todo.pendingUrls.isEmpty
                 ? nil
                 : todo.pendingUrls.map { TodoUrlChange(url: $0) }
             return TodoChange(
                 // Normalize UUID to lowercase to match web-generated IDs in D1
                 id: todo.id.uuidString.lowercased(),
                 // Immutable; honoured only on create, but harmless to resend.
-                parentId: todo.isDeleted ? nil : todo.parentId?.uuidString.lowercased(),
-                listId: todo.isDeleted ? nil : todo.listKey?.lowercased(),
-                title: todo.isDeleted ? nil : todo.title,
-                notes: todo.isDeleted ? nil : todo.itemNotes,
-                completed: todo.isDeleted ? nil : todo.isCompleted,
-                position: todo.isDeleted ? nil : todo.position,
-                dueDate: todo.isDeleted ? nil : todo.dueDate,
-                recurrence: todo.isDeleted ? nil : todo.recurrence,
-                completedAt: todo.isDeleted ? nil : todo.completedAt,
+                parentId: todo.isSoftDeleted ? nil : todo.parentId?.uuidString.lowercased(),
+                listId: todo.isSoftDeleted ? nil : todo.listKey?.lowercased(),
+                title: todo.isSoftDeleted ? nil : todo.title,
+                notes: todo.isSoftDeleted ? nil : todo.itemNotes,
+                completed: todo.isSoftDeleted ? nil : todo.isCompleted,
+                position: todo.isSoftDeleted ? nil : todo.position,
+                dueDate: todo.isSoftDeleted ? nil : todo.dueDate,
+                recurrence: todo.isSoftDeleted ? nil : todo.recurrence,
+                completedAt: todo.isSoftDeleted ? nil : todo.completedAt,
                 updatedAt: todo.updatedAt,
-                deleted: todo.isDeleted ? true : nil,
-                pinned: todo.isDeleted ? nil : todo.pinned,
+                deleted: todo.isSoftDeleted ? true : nil,
+                pinned: todo.isSoftDeleted ? nil : todo.pinned,
                 urls: pendingUrlChanges
             )
         }
@@ -261,7 +261,7 @@ final class SyncService {
                 // Skip items that are locally soft-deleted and pending sync.
                 // The local delete intent should be preserved until the server
                 // processes it (which it already has in this sync cycle).
-                if local.isDeleted && !local.isSynced {
+                if local.isSoftDeleted && !local.isSynced {
                     continue
                 }
 
@@ -303,7 +303,7 @@ final class SyncService {
                 todo.createdAt = remote.createdAt
                 todo.updatedAt = remote.updatedAt
                 todo.isSynced = true
-                todo.isDeleted = false
+                todo.isSoftDeleted = false
                 modelContext.insert(todo)
             }
         }
@@ -323,7 +323,7 @@ final class SyncService {
         // Step 3: Remove local synced items that no longer exist on the server
         // (deleted via web or another client)
         let localDescriptor = FetchDescriptor<TodoItem>(
-            predicate: #Predicate { $0.userId == userId && $0.isSynced && !$0.isDeleted }
+            predicate: #Predicate { $0.userId == userId && $0.isSynced && !$0.isSoftDeleted }
         )
         let localSyncedTodos = try modelContext.fetch(localDescriptor)
 
@@ -335,7 +335,7 @@ final class SyncService {
 
         // Step 4: Clean up soft-deleted items that have been synced
         let deleteDescriptor = FetchDescriptor<TodoItem>(
-            predicate: #Predicate { $0.userId == userId && $0.isDeleted && $0.isSynced }
+            predicate: #Predicate { $0.userId == userId && $0.isSoftDeleted && $0.isSynced }
         )
         let toDelete = try modelContext.fetch(deleteDescriptor)
 

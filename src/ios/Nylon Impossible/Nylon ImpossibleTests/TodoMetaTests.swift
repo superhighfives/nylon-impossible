@@ -99,7 +99,7 @@ struct TodoMetaTests {
     func deletedSubtasks() {
         let todo = TodoItem(title: "Parent")
         let gone = TodoItem(title: "Gone")
-        gone.isDeleted = true
+        gone.isSoftDeleted = true
         let kept = TodoItem(title: "Kept")
         #expect(TodoMeta.parts(for: todo, subtasks: [gone, kept]) == [.subtasks(done: 0, total: 1)])
     }

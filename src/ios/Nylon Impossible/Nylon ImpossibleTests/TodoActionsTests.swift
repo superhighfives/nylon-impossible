@@ -16,11 +16,7 @@ struct TodoActionsTests {
     }
 
     private func makeFixture() throws -> Fixture {
-        // On disk, not in memory: an in-memory store reads `isDeleted` back
-        // as false once saved (SwiftData's own `isDeleted` shadows the
-        // attribute there), which the soft-delete checks below would trip on.
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("actions-\(UUID().uuidString).store")
-        let config = ModelConfiguration(url: url)
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(for: TodoItem.self, TodoUrl.self, TodoListModel.self, configurations: config)
         let context = container.mainContext
         let today = TodoListModel(id: "today", userId: "u1", name: "Today", kind: "system", systemKind: .today)
@@ -141,20 +137,16 @@ struct TodoActionsTests {
 
         fixture.actions.delete(todo)
         #expect(fixture.actions.pendingDeletes.contains(todo.id))
-        #expect(!todo.isDeleted)
+        #expect(!todo.isSoftDeleted)
         let rows = fixture.actions.viewModel.pageTodos(
             from: fixture.actions.allTodos(), listId: "thisweek", hidden: fixture.actions.pendingDeletes
         )
         #expect(rows.isEmpty)
 
         fixture.actions.toasts.expire()
-        // Committed: soft-deleted for sync (see `committedDeletes` for why
-        // this reads the store rather than `todo.isDeleted`) and still hidden.
-        let deleted = try fixture.context.fetchCount(FetchDescriptor<TodoItem>(predicate: #Predicate { $0.isDeleted }))
-        #expect(deleted == 1)
+        #expect(todo.isSoftDeleted)
         #expect(!todo.isSynced)
         #expect(fixture.actions.pendingDeletes.isEmpty)
-        #expect(fixture.actions.hiddenIds.contains(todo.id))
     }
 
     @Test("Undo on a delete keeps the todo")
@@ -166,7 +158,7 @@ struct TodoActionsTests {
         fixture.actions.toasts.performAction()
         fixture.actions.toasts.expire()
 
-        #expect(!todo.isDeleted)
+        #expect(!todo.isSoftDeleted)
         #expect(fixture.actions.pendingDeletes.isEmpty)
     }
 
@@ -179,7 +171,7 @@ struct TodoActionsTests {
         fixture.actions.delete(first)
         fixture.actions.commitDone(second)
 
-        #expect(fixture.actions.committedDeletes.contains(first.id))
+        #expect(first.isSoftDeleted)
         #expect(fixture.actions.toasts.current?.text == "Done")
     }
 

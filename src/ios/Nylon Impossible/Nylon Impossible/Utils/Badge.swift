@@ -30,7 +30,7 @@ enum BadgeService {
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate { todo in
                 !todo.isCompleted &&
-                !todo.isDeleted &&
+                !todo.isSoftDeleted &&
                 todo.dueDate != nil &&
                 todo.dueDate! < cutoff
             }

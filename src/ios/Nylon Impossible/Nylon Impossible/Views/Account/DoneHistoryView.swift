@@ -28,7 +28,7 @@ struct DoneHistoryView: View {
         let calendar = Calendar.current
         let cutoff = calendar.date(byAdding: .day, value: -Self.window, to: Date()) ?? .distantPast
         let done = todos
-            .filter { $0.parentId == nil && $0.isCompleted && !$0.isDeleted }
+            .filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }
             .map { (todo: $0, at: $0.completedAt ?? $0.updatedAt) }
             .filter { $0.at >= cutoff }
             .sorted { $0.at > $1.at }

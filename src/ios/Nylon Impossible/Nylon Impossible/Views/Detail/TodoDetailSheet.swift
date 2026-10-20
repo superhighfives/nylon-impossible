@@ -52,7 +52,7 @@ struct TodoDetailSheet: View {
 
     var subtasks: [TodoItem] {
         everyTodo
-            .filter { $0.parentId == todo.id && !$0.isDeleted }
+            .filter { $0.parentId == todo.id && !$0.isSoftDeleted }
             .sorted { a, b in
                 if a.isCompleted != b.isCompleted { return !a.isCompleted }
                 return a.position < b.position

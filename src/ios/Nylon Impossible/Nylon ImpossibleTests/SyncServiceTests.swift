@@ -297,7 +297,7 @@ struct SyncServiceTests {
 
         // Create a soft-deleted, unsynced todo
         let todo = TodoItem(title: "Deleted", userId: "user_test_123", position: "a0")
-        todo.isDeleted = true
+        todo.isSoftDeleted = true
         todo.isSynced = false
         context.insert(todo)
         try context.save()
@@ -406,19 +406,19 @@ struct SyncServiceTests {
     func deletedTodosUrlsAreExcluded() {
         // Mirrors the pendingUrlChanges logic inside gatherLocalChanges.
         // Tested as a pure unit test because SwiftData on iOS 26 faults when
-        // isDeleted = true and a [String] attribute are set together on the same model.
-        func pendingUrlChanges(isDeleted: Bool, pendingUrls: [String]) -> [TodoUrlChange]? {
-            isDeleted || pendingUrls.isEmpty
+        // isSoftDeleted = true and a [String] attribute are set together on the same model.
+        func pendingUrlChanges(isSoftDeleted: Bool, pendingUrls: [String]) -> [TodoUrlChange]? {
+            isSoftDeleted || pendingUrls.isEmpty
                 ? nil
                 : pendingUrls.map { TodoUrlChange(url: $0) }
         }
 
         // Deleted todo with pending URLs → nil (URLs suppressed)
-        #expect(pendingUrlChanges(isDeleted: true, pendingUrls: ["https://example.com"]) == nil)
+        #expect(pendingUrlChanges(isSoftDeleted: true, pendingUrls: ["https://example.com"]) == nil)
         // Non-deleted todo with pending URLs → non-nil
-        #expect(pendingUrlChanges(isDeleted: false, pendingUrls: ["https://example.com"]) != nil)
+        #expect(pendingUrlChanges(isSoftDeleted: false, pendingUrls: ["https://example.com"]) != nil)
         // Non-deleted todo with no pending URLs → nil
-        #expect(pendingUrlChanges(isDeleted: false, pendingUrls: []) == nil)
+        #expect(pendingUrlChanges(isSoftDeleted: false, pendingUrls: []) == nil)
     }
 
     @Test("Persists URL metadata on TodoItem after sync")

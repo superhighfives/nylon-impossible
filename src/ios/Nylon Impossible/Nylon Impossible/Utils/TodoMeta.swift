@@ -153,7 +153,7 @@ enum TodoMeta {
         if let recurrence = todo.recurrence {
             parts.append(.repeats(RepeatLabel.text(recurrence.frequency)))
         }
-        let live = subtasks.filter { !$0.isDeleted }
+        let live = subtasks.filter { !$0.isSoftDeleted }
         if !live.isEmpty {
             parts.append(.subtasks(done: live.filter(\.isCompleted).count, total: live.count))
         }

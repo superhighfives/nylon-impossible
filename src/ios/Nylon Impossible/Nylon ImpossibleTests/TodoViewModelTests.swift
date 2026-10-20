@@ -35,7 +35,7 @@ struct TodoViewModelTests {
     func sortedTodosFiltersDeleted() {
         let active = TodoItem(title: "Active")
         let deleted = TodoItem(title: "Deleted")
-        deleted.isDeleted = true
+        deleted.isSoftDeleted = true
 
         let vm = TodoViewModel()
         let result = vm.sortedTodos(from: [active, deleted])
@@ -182,13 +182,13 @@ struct TodoViewModelTests {
         let todo = TodoItem(title: "Test", userId: "user_123")
 
         // Can't call with real context for soft delete, just test the logic
-        // When userId is set, it should set isDeleted = true
+        // When userId is set, it should set isSoftDeleted = true
         if todo.userId != nil {
-            todo.isDeleted = true
+            todo.isSoftDeleted = true
             todo.markModified()
         }
 
-        #expect(todo.isDeleted == true)
+        #expect(todo.isSoftDeleted == true)
         #expect(todo.isSynced == false)
     }
 }
