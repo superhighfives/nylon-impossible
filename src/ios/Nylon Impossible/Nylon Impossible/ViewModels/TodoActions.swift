@@ -296,7 +296,10 @@ final class TodoActions {
         do {
             try context?.save()
         } catch {
+            // The row already shows the change; say it didn't stick rather
+            // than let it vanish on the next launch without syncing.
             print("[TodoActions] Save failed: \(error)")
+            toasts.show("Couldn’t save that change", action: nil)
         }
     }
 }
