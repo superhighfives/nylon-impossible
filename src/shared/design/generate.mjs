@@ -127,11 +127,10 @@ const SWIFT_WEIGHTS = {
 export function renderSwift(tokens) {
   const out = [];
   out.push(...HEADER_LINES.map((l) => `// ${l}`), "");
-  out.push("import SwiftUI", "import UIKit", "");
+  out.push("import CoreText", "import SwiftUI", "import UIKit", "");
   out.push(
     "/// Design tokens shared with the web app (src/shared/design/tokens.json).",
-    "/// Phase 2 adds these alongside the older `Color.app*` palette in",
-    "/// Color+Hex.swift; Phase 3's rebuilt views move onto them.",
+    "/// Views read colour, type, spacing and motion from here only.",
     "enum Theme {",
   );
 
@@ -166,24 +165,34 @@ export function renderSwift(tokens) {
   const display = tokens.font.display;
   out.push(
     "    enum Fonts {",
-    `        /// PostScript name of the display face. Falls back to the system`,
-    `        /// font when it isn't bundled.`,
-    `        static let displayFontName = "${display.iosPostScriptName}"`,
+    `        /// Family name of the bundled display face (a variable font). Falls`,
+    `        /// back to the system font when it isn't bundled.`,
+    `        static let displayFontFamily = "${display.iosFamilyName}"`,
+    "",
+    "        /// The variable-font attribute and its `wght` axis ('wght' as a",
+    "        /// four-char code). A weight trait alone leaves a variable face at",
+    "        /// its default instance, so the weight is set on the axis instead.",
+    "        static let variationAttribute = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)",
+    "        static let weightAxis = 0x7767_6874",
     "",
     "        struct Style: Sendable {",
     "            let size: CGFloat",
     "            let lineHeight: CGFloat",
     "            let weight: UIFont.Weight",
+    "            /// The same weight on the 100–900 scale, for the variable axis.",
+    "            let variationWeight: CGFloat",
     "            let isDisplay: Bool",
     "            let textStyle: UIFont.TextStyle",
     "",
     "            /// The face at its base size, before Dynamic Type scaling.",
     "            var baseFont: UIFont {",
-    "                if isDisplay, let face = UIFont(name: Fonts.displayFontName, size: size) {",
-    "                    let descriptor = face.fontDescriptor.addingAttributes([",
-    "                        .traits: [UIFontDescriptor.TraitKey.weight: weight]",
+    "                if isDisplay {",
+    "                    let descriptor = UIFontDescriptor(fontAttributes: [",
+    "                        .family: Fonts.displayFontFamily,",
+    "                        Fonts.variationAttribute: [Fonts.weightAxis: variationWeight]",
     "                    ])",
-    "                    return UIFont(descriptor: descriptor, size: size)",
+    "                    let face = UIFont(descriptor: descriptor, size: size)",
+    "                    if face.familyName == Fonts.displayFontFamily { return face }",
     "                }",
     "                return UIFont.systemFont(ofSize: size, weight: weight)",
     "            }",
@@ -202,7 +211,7 @@ export function renderSwift(tokens) {
     out.push(`        enum ${density[0].toUpperCase()}${density.slice(1)} {`);
     for (const [name, t] of entries(styles)) {
       out.push(
-        `            static let ${name} = Style(size: ${t.size}, lineHeight: ${t.lineHeight}, weight: .${SWIFT_WEIGHTS[t.weight]}, isDisplay: ${t.font === "display"}, textStyle: .${t.iosTextStyle})`,
+        `            static let ${name} = Style(size: ${t.size}, lineHeight: ${t.lineHeight}, weight: .${SWIFT_WEIGHTS[t.weight]}, variationWeight: ${t.weight}, isDisplay: ${t.font === "display"}, textStyle: .${t.iosTextStyle})`,
       );
     }
     out.push("        }");
