@@ -266,7 +266,13 @@ struct TodoActionsTests {
         fixture.actions.holdDuration = .milliseconds(20)
 
         fixture.actions.toggleDone(todo)
-        try await Task.sleep(for: .milliseconds(600))
+        // The hold and the Reduce Motion fade are real sleeps, and a loaded
+        // simulator can stretch them well past their nominal length, so wait
+        // for the commit instead of guessing how long it takes.
+        let deadline = ContinuousClock.now + .seconds(5)
+        while !todo.isCompleted, ContinuousClock.now < deadline {
+            try await Task.sleep(for: .milliseconds(20))
+        }
 
         #expect(todo.isCompleted)
         #expect(fixture.actions.holding.isEmpty)
