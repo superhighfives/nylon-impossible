@@ -103,9 +103,9 @@ export const AuthServiceLive = Layer.succeed(
 
       // Check if user is authenticated
       if (!userId) {
-        return yield* Effect.fail(
-          new UnauthorizedError({ message: "User not authenticated" }),
-        );
+        return yield* new UnauthorizedError({
+          message: "User not authenticated",
+        });
       }
 
       // Get full user details from Clerk
