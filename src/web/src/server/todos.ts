@@ -24,6 +24,7 @@ import { getUserTimezone } from "@/lib/user-timezone";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import {
   createTodoSchema,
+  deleteTodoUrlSchema,
   updateTodoSchema,
   updateTodoUrlSchema,
 } from "@/lib/validation";
@@ -675,6 +676,57 @@ export const updateTodoUrlPreview = createServerFn({ method: "POST" })
         yield* Effect.log(
           `Updated URL ${id} showPreview=${showPreview} for user ${user.id}`,
         );
+
+        return { success: true };
+      }),
+    );
+
+    return runEffect(program);
+  });
+
+/**
+ * Remove one link from a todo — the "Remove" item in a link card's menu.
+ * Deletes the `todo_urls` row and bumps the parent so other clients pull the
+ * change on their next sync.
+ */
+export const deleteTodoUrl = createServerFn({ method: "POST" })
+  .validator((id: string) => deleteTodoUrlSchema.parse(id))
+  .handler(async (ctx) => {
+    const id = ctx.data;
+
+    const program = withAuthenticatedUser((user, db) =>
+      Effect.gen(function* () {
+        const existing = yield* Effect.tryPromise({
+          try: () =>
+            db
+              .select({ todoId: todoUrls.todoId, userId: todos.userId })
+              .from(todoUrls)
+              .innerJoin(todos, eq(todoUrls.todoId, todos.id))
+              .where(eq(todoUrls.id, id))
+              .get(),
+          catch: (error) =>
+            new DatabaseError({ operation: "getTodoUrl", cause: error }),
+        });
+
+        if (!existing || existing.userId !== user.id) {
+          return yield* new TodoNotFoundError({ id });
+        }
+
+        yield* Effect.tryPromise({
+          try: () => db.delete(todoUrls).where(eq(todoUrls.id, id)),
+          catch: (error) =>
+            new DatabaseError({ operation: "deleteTodoUrl", cause: error }),
+        });
+
+        yield* Effect.tryPromise({
+          try: () =>
+            db
+              .update(todos)
+              .set({ updatedAt: new Date() })
+              .where(eq(todos.id, existing.todoId)),
+          catch: (error) =>
+            new DatabaseError({ operation: "touchTodoForUrl", cause: error }),
+        });
 
         return { success: true };
       }),

@@ -68,6 +68,8 @@ export const updateTodoUrlSchema = z.object({
   showPreview: z.boolean(),
 });
 
+export const deleteTodoUrlSchema = z.string().min(1);
+
 export const createListSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   position: z.string().optional(),
