@@ -1,5 +1,8 @@
 import { toDueDay } from "@nylon-impossible/shared";
-import { nextDueDate } from "@nylon-impossible/shared/recurrence";
+import {
+  nextDueDate,
+  placementForDueDate,
+} from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDeleteTodo, useUpdateTodo } from "@/hooks/useTodos";
@@ -15,6 +18,12 @@ export const DONE_COLLAPSE_MS = 220;
 export const UNDO_TOAST_MS = 5000;
 
 type Timer = ReturnType<typeof setTimeout>;
+
+const PLACEMENT_NAMES = {
+  today: "Today",
+  thisWeek: "This Week",
+  someday: "Someday",
+} as const;
 
 /**
  * One toast at a time on the phone: a new one replaces whatever's showing,
@@ -57,8 +66,8 @@ function withId(set: ReadonlySet<string>, id: string, on: boolean) {
  *
  * - **Done then gone**: the checkbox fills, the row holds ~400ms, collapses,
  *   then the completion is sent and "Done · Undo" shows for 5s. A repeating
- *   todo doesn't leave — its due day rolls forward and the toast says when it
- *   repeats. Checking again during the hold cancels before anything is sent.
+ *   todo's due day rolls forward and the server re-places it by that date, so
+ *   the toast says when it's next and, if it left, which list it went to. Checking again during the hold cancels before anything is sent.
  * - **Delete** hides the row at once and only deletes when the Undo toast
  *   expires, so Undo needs no re-create. The delete commits on that schedule
  *   even if a later toast replaces this one (one toast at a time). Undo after
@@ -175,8 +184,14 @@ export function useTodoActions({
             listId: todo.listId,
           };
           if (todo.pinned) undo.pinned = true;
+          // The server places the next occurrence by its due date, so the
+          // row may leave this list. Say where it went when it does.
+          const nextList =
+            PLACEMENT_NAMES[placementForDueDate(next, now, timeZone)];
+          const where =
+            nextList === listName(todo.listId) ? "" : `, in ${nextList}`;
           showUndoToast(
-            `Done · repeats ${dueLabel(next, now, timeZone).text}`,
+            `Done · next ${dueLabel(next, now, timeZone).text}${where}`,
             () => update({ id: todo.id, input: undo }),
           );
         });
@@ -198,7 +213,7 @@ export function useTodoActions({
         });
       });
     },
-    [cancel, schedule, timeZone, update],
+    [cancel, listName, schedule, timeZone, update],
   );
 
   const move = useCallback(

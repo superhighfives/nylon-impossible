@@ -87,6 +87,21 @@ describe("useTodoActions", () => {
     });
   });
 
+  it("a repeat that stays in its list leaves the list out of the toast", () => {
+    const todo = makeTodo({
+      listId: "list-week",
+      dueDate: dueIn(0),
+      recurrence: { frequency: "weekly" },
+    });
+    const { result } = setup([todo]);
+    act(() => result.current.complete(todo));
+    act(() => vi.advanceTimersByTime(DONE_HOLD_MS));
+    expect(toast.success).toHaveBeenCalledWith(
+      "Done · next Oct 25",
+      expect.anything(),
+    );
+  });
+
   it("checking again during the hold cancels before anything is sent", () => {
     const todo = makeTodo();
     const { result } = setup([todo]);
@@ -97,7 +112,7 @@ describe("useTodoActions", () => {
     expect(result.current.checked.size).toBe(0);
   });
 
-  it("a repeating todo stays and toasts when it repeats", () => {
+  it("a repeating todo toasts when it's next and which list it went to", () => {
     const todo = makeTodo({
       dueDate: dueIn(0),
       recurrence: { frequency: "weekly" },
@@ -111,7 +126,7 @@ describe("useTodoActions", () => {
       input: { completed: true },
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Done · repeats Oct 25",
+      "Done · next Oct 25, in This Week",
       expect.anything(),
     );
     clickToastAction();
