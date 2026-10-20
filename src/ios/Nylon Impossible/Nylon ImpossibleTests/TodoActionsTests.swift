@@ -271,10 +271,11 @@ struct TodoActionsTests {
         let todo = insert("Maybe", in: fixture.today, fixture)
         fixture.actions.holdDuration = .milliseconds(50)
 
-        fixture.actions.toggleDone(todo)
+        let hold = fixture.actions.toggleDone(todo)
         #expect(fixture.actions.isChecked(todo))
-        fixture.actions.toggleDone(todo)
-        try await Task.sleep(for: .milliseconds(200))
+        #expect(fixture.actions.toggleDone(todo) == nil)
+        // The cancelled hold runs to its end without committing.
+        await hold?.value
 
         #expect(!todo.isCompleted)
         #expect(!fixture.actions.isChecked(todo))
@@ -286,14 +287,14 @@ struct TodoActionsTests {
         let todo = insert("Yes", in: fixture.today, fixture)
         fixture.actions.holdDuration = .milliseconds(20)
 
-        fixture.actions.toggleDone(todo)
-        // The hold and the Reduce Motion fade are real sleeps, and a loaded
-        // simulator can stretch them well past their nominal length, so wait
-        // for the commit instead of guessing how long it takes.
-        let deadline = ContinuousClock.now + .seconds(5)
-        while !todo.isCompleted, ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        // Await the hold itself — its wait, the Reduce Motion fade and the
+        // commit. A wall-clock deadline here failed on CI: Swift Testing runs
+        // every @MainActor test in parallel on the one main actor, so other
+        // tests' bodies can hold it for seconds and the deadline lapsed
+        // before the commit got its turn.
+        let hold = fixture.actions.toggleDone(todo)
+        #expect(hold != nil)
+        await hold?.value
 
         #expect(todo.isCompleted)
         #expect(fixture.actions.holding.isEmpty)
@@ -316,12 +317,9 @@ struct ToastCenterTests {
         toasts.duration = .milliseconds(20)
         var expired = false
         toasts.show("Deleted", onExpire: { expired = true }, action: {})
-        // A loaded simulator can stretch the timeout well past 20ms, so wait
-        // for the expiry instead of guessing how long it takes.
-        let deadline = ContinuousClock.now + .seconds(5)
-        while !expired, ContinuousClock.now < deadline {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        // Await the countdown itself, not a wall-clock deadline: on a crowded
+        // main actor the deadline can lapse before the expiry runs.
+        await toasts.timer?.value
         #expect(toasts.current == nil)
         #expect(expired)
     }

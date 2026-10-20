@@ -24,7 +24,9 @@ final class ToastCenter {
     private(set) var current: Toast?
     @ObservationIgnored private var action: (() -> Void)?
     @ObservationIgnored private var onExpire: (() -> Void)?
-    @ObservationIgnored private var timer: Task<Void, Never>?
+    /// Counts the current toast down to its expiry. Awaiting it waits for
+    /// the timeout itself rather than for a guessed amount of wall time.
+    @ObservationIgnored private(set) var timer: Task<Void, Never>?
     @ObservationIgnored var duration: Duration = Theme.Phone.toastDuration
 
     /// Show a toast. A trailing closure is the action (Undo, View);

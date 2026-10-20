@@ -150,19 +150,26 @@ final class TodoActions {
     // MARK: - Done
 
     /// The checkbox. A second tap during the hold changes your mind.
-    func toggleDone(_ todo: TodoItem) {
+    ///
+    /// Returns the hold — the wait, the fade and the commit — so a caller can
+    /// await the outcome instead of guessing how long it takes; nil when the
+    /// tap cancelled one.
+    @discardableResult
+    func toggleDone(_ todo: TodoItem) -> Task<Void, Never>? {
         if let task = holdTasks.removeValue(forKey: todo.id) {
             task.cancel()
             holding.remove(todo.id)
-            return
+            return nil
         }
         holding.insert(todo.id)
         let hold = holdDuration
-        holdTasks[todo.id] = Task { [weak self] in
+        let task = Task { [weak self] in
             try? await Task.sleep(for: hold)
             guard !Task.isCancelled else { return }
             await self?.finishHold(todo)
         }
+        holdTasks[todo.id] = task
+        return task
     }
 
     private func finishHold(_ todo: TodoItem) async {
