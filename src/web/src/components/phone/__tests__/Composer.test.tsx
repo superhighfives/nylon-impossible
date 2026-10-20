@@ -153,6 +153,21 @@ describe("Composer", () => {
     expect(toast.error).toHaveBeenCalledWith("offline");
   });
 
+  it("hands back only the lines that failed from a pasted list", async () => {
+    mutateAsync.mockImplementation(async ({ text }: { text: string }) => {
+      if (text === "Eggs") throw new Error("offline");
+      return { todos: [] };
+    });
+    const user = userEvent.setup();
+    const { field } = setup();
+    await user.click(field);
+    await user.paste("Milk\nEggs tomorrow\nBread");
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(field).toHaveValue("Eggs tomorrow"));
+    expect(mutateAsync).toHaveBeenCalledTimes(3);
+    expect(toast.error).toHaveBeenCalledWith("2 todos added. offline");
+  });
+
   it("notes when long text will spill into notes", async () => {
     setup();
     fireEvent.change(screen.getByLabelText("New todo"), {

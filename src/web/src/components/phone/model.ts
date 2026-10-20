@@ -191,6 +191,8 @@ export interface PlannedTodo {
   text: string;
   /** The parsed due day, or null. */
   dueDay: Date | null;
+  /** The line as typed, handed back to the composer if it fails to save. */
+  line: string;
 }
 
 /**
@@ -209,14 +211,14 @@ export function planSubmit(
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      if (options.keepDateWords) return { text: line, dueDay: null };
+      if (options.keepDateWords) return { text: line, dueDay: null, line };
       const parsed = parseTodoDate(line, {
         now: options.now,
         timeZone: options.timeZone,
       });
       return parsed.dueDay
-        ? { text: parsed.title, dueDay: parsed.dueDay }
-        : { text: line, dueDay: null };
+        ? { text: parsed.title, dueDay: parsed.dueDay, line }
+        : { text: line, dueDay: null, line };
     });
 }
 

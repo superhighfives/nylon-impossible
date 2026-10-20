@@ -11,7 +11,13 @@ import {
 } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { messageFromError, toast } from "@/lib/toast";
-import { draftDueDay, dueChipText, planSubmit, plural } from "./model";
+import {
+  draftDueDay,
+  dueChipText,
+  type PlannedTodo,
+  planSubmit,
+  plural,
+} from "./model";
 import { useKeyboardInset } from "./useKeyboardInset";
 import { showActionToast } from "./useTodoActions";
 
@@ -98,7 +104,6 @@ export function Composer({
   const submit = async () => {
     const planned = planSubmit(draft, { keepDateWords, now, timeZone });
     if (planned.length === 0) return;
-    const submitted = draft;
     const listId = targetId;
     // Clear straight away so the next one can be typed while this saves.
     setDraft("");
@@ -107,7 +112,10 @@ export function Composer({
 
     // Smart-create prepends, so send a pasted list bottom-up to keep its
     // order on screen.
-    let failed: unknown = null;
+    // A failed line doesn't stop the rest; only the lines that didn't save
+    // go back in the box, so sending again can't duplicate the ones that did.
+    const failed = new Set<PlannedTodo>();
+    let firstError: unknown = null;
     for (const todo of [...planned].reverse()) {
       try {
         await smartCreate.mutateAsync({
@@ -117,12 +125,18 @@ export function Composer({
           dueDate: todo.dueDay,
         });
       } catch (err) {
-        failed = err;
+        failed.add(todo);
+        firstError ??= err;
       }
     }
-    if (failed) {
-      setDraft((current) => current || submitted);
-      toast.error(messageFromError(failed, "Couldn't add todo"));
+    if (failed.size > 0) {
+      const unsaved = planned.filter((todo) => failed.has(todo));
+      setDraft((current) => current || unsaved.map((t) => t.line).join("\n"));
+      const reason = messageFromError(firstError, "Couldn't add todo");
+      const saved = planned.length - failed.size;
+      toast.error(
+        saved > 0 ? `${plural(saved, "todo")} added. ${reason}` : reason,
+      );
       return;
     }
     if (listId !== currentListId) {

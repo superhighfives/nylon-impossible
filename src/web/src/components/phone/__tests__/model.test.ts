@@ -115,12 +115,22 @@ describe("planSubmit", () => {
   it("keeps the words when the chip was dismissed", () => {
     expect(
       planSubmit("Send invoice friday", { ...opts, keepDateWords: true }),
-    ).toEqual([{ text: "Send invoice friday", dueDay: null }]);
+    ).toEqual([
+      {
+        text: "Send invoice friday",
+        dueDay: null,
+        line: "Send invoice friday",
+      },
+    ]);
   });
 
   it("leaves a mid-sentence weekday alone", () => {
     expect(planSubmit("Call Mum about Sunday lunch", opts)).toEqual([
-      { text: "Call Mum about Sunday lunch", dueDay: null },
+      {
+        text: "Call Mum about Sunday lunch",
+        dueDay: null,
+        line: "Call Mum about Sunday lunch",
+      },
     ]);
   });
 
@@ -128,11 +138,14 @@ describe("planSubmit", () => {
     const planned = planSubmit("Milk\n\n  Eggs tomorrow \nBread", opts);
     expect(planned.map((p) => p.text)).toEqual(["Milk", "Eggs", "Bread"]);
     expect(planned[1].dueDay?.toISOString()).toBe(dueIn(1));
+    expect(planned[1].line).toBe("Eggs tomorrow");
   });
 
   it("passes an overlong line through whole for smart-create to split", () => {
     const long = "word ".repeat(150).trim();
-    expect(planSubmit(long, opts)).toEqual([{ text: long, dueDay: null }]);
+    expect(planSubmit(long, opts)).toEqual([
+      { text: long, dueDay: null, line: long },
+    ]);
   });
 
   it("returns nothing for blank input", () => {
