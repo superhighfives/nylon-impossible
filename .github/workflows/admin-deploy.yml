@@ -20,14 +20,16 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
       - uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
-      - run: pnpm install
+      - run: bun install --frozen-lockfile
 
       - name: Lint & typecheck Admin
-        run: pnpm admin:check && pnpm admin:typecheck
+        run: bun run admin:check && bun run admin:typecheck
 
   deploy-production:
     needs: [test]
@@ -40,8 +42,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -49,17 +53,17 @@ jobs:
           node-version: 24.21.0
 
       - name: Install dependencies
-        run: pnpm install
+        run: bun install --frozen-lockfile
 
       - name: Build Admin
-        run: pnpm --filter @nylon-impossible/admin run build
+        run: bun run --cwd src/admin build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_API_BASE_URL: https://api.nylonimpossible.com
 
       - name: Deploy Admin
         working-directory: src/admin
-        run: pnpm exec wrangler deploy
+        run: bunx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

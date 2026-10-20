@@ -24,23 +24,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
       - uses: actions/setup-node@v7
         with:
           node-version: 24.21.0
-      - run: pnpm install
+      - run: bun install --frozen-lockfile
 
       - name: Lint & typecheck API
-        run: pnpm api:check && pnpm api:typecheck
+        run: bun run api:check && bun run api:typecheck
 
       - name: Lint & typecheck Web
-        run: pnpm web:check && pnpm web:typecheck
+        run: bun run web:check && bun run web:typecheck
 
       - name: Test API
-        run: pnpm --filter @nylon-impossible/api test
+        run: bun run --cwd src/api test
 
       - name: Test Web
-        run: pnpm --filter @nylon-impossible/web test
+        run: bun run --cwd src/web test
 
   deploy-production:
     needs: [test]
@@ -54,8 +56,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -63,7 +67,7 @@ jobs:
           node-version: 24.21.0
 
       - name: Install dependencies
-        run: pnpm install
+        run: bun install --frozen-lockfile
 
       - name: Apply D1 migrations
         uses: cloudflare/wrangler-action@v4
@@ -86,7 +90,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
       - name: Build Web
-        run: pnpm --filter @nylon-impossible/web run build
+        run: bun run --cwd src/web build
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.VITE_CLERK_PUBLISHABLE_KEY }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
@@ -96,7 +100,7 @@ jobs:
 
       - name: Deploy Web
         working-directory: src/web
-        run: pnpm exec wrangler deploy --var ENVIRONMENT:production
+        run: bunx wrangler deploy --var ENVIRONMENT:production
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -155,8 +159,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -164,7 +170,7 @@ jobs:
           node-version: 24.21.0
 
       - name: Install dependencies
-        run: pnpm install
+        run: bun install --frozen-lockfile
 
       # Preview name defaults to the git branch, but the Actions checkout is a
       # detached merge ref, so pass it explicitly. Pushing more commits to the
@@ -210,7 +216,7 @@ jobs:
           # workers.dev subdomain). Capture stdout+stderr and treat "no URL" as
           # a distinct, explained failure rather than an opaque exit 1 — that
           # empty-urls case (not any wrangler error) is what broke #305.
-          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json 2>&1)
+          out=$(bunx wrangler preview --name "$PREVIEW_NAME" --json 2>&1)
           rc=$?
           if [ "$rc" -ne 0 ]; then
             echo "wrangler preview (API) exited $rc:"
@@ -243,9 +249,9 @@ jobs:
         working-directory: src/api
         run: |
           set -euo pipefail
-          printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
-          printf '%s' "$CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler preview secret put CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
-          printf '%s' "$CLOUDFLARE_API_TOKEN" | pnpm exec wrangler preview secret put CLOUDFLARE_API_TOKEN --name "$PREVIEW_NAME"
+          printf '%s' "$CLERK_SECRET_KEY" | bunx wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$CLERK_PUBLISHABLE_KEY" | bunx wrangler preview secret put CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$CLOUDFLARE_API_TOKEN" | bunx wrangler preview secret put CLOUDFLARE_API_TOKEN --name "$PREVIEW_NAME"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -259,7 +265,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
 
       - name: Build preview Web
-        run: pnpm --filter @nylon-impossible/web run build
+        run: bun run --cwd src/web build
         env:
           # Dev-instance publishable key (baked into the bundle) — see the note
           # on the "Set preview API secrets" step for why previews avoid prod.
@@ -283,7 +289,7 @@ jobs:
           set -uo pipefail
           # See the API deploy step: distinguish a wrangler failure from a
           # successful preview that returns no Preview URL (empty `urls`).
-          out=$(pnpm exec wrangler preview --name "$PREVIEW_NAME" --json 2>&1)
+          out=$(bunx wrangler preview --name "$PREVIEW_NAME" --json 2>&1)
           rc=$?
           if [ "$rc" -ne 0 ]; then
             echo "wrangler preview (Web) exited $rc:"
@@ -313,8 +319,8 @@ jobs:
         working-directory: src/web
         run: |
           set -euo pipefail
-          printf '%s' "$CLERK_SECRET_KEY" | pnpm exec wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
-          printf '%s' "$VITE_CLERK_PUBLISHABLE_KEY" | pnpm exec wrangler preview secret put VITE_CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$CLERK_SECRET_KEY" | bunx wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
+          printf '%s' "$VITE_CLERK_PUBLISHABLE_KEY" | bunx wrangler preview secret put VITE_CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
