@@ -141,6 +141,32 @@ describe("useTodoActions", () => {
     expect(remove).toHaveBeenCalledWith(todo.id, expect.anything());
   });
 
+  it("Undo after a flushed delete says it's already deleted", () => {
+    const todo = makeTodo();
+    const { result } = setup([todo]);
+    act(() => result.current.destroy(todo));
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    expect(remove).toHaveBeenCalledTimes(1);
+
+    clickToastAction();
+    expect(toast.info).toHaveBeenCalledWith("Already deleted");
+    expect(result.current.hidden.has(todo.id)).toBe(true);
+    expect(remove).toHaveBeenCalledTimes(1);
+  });
+
+  it("a replaced Deleted toast still commits the delete on schedule", () => {
+    const todo = makeTodo();
+    const other = makeTodo({ id: "o", position: "a2" });
+    const { result } = setup([todo, other]);
+    act(() => result.current.destroy(todo));
+    act(() => result.current.move(other, "list-week"));
+    expect(toast.dismiss).toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(UNDO_TOAST_MS));
+    expect(remove).toHaveBeenCalledWith(todo.id, expect.anything());
+  });
+
   it("move goes to the top of the new list with an Undo back", () => {
     const todo = makeTodo({ position: "a5" });
     const other = makeTodo({ id: "w", listId: "list-week", position: "a1" });

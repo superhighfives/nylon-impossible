@@ -60,7 +60,9 @@ function withId(set: ReadonlySet<string>, id: string, on: boolean) {
  *   todo doesn't leave — its due day rolls forward and the toast says when it
  *   repeats. Checking again during the hold cancels before anything is sent.
  * - **Delete** hides the row at once and only deletes when the Undo toast
- *   expires, so Undo needs no re-create.
+ *   expires, so Undo needs no re-create. The delete commits on that schedule
+ *   even if a later toast replaces this one (one toast at a time). Undo after
+ *   the delete was already sent says "Already deleted".
  * - **Move** and **Pin** are instant, with Undo for moves.
  *
  * Pending timers are flushed (committed) on unmount and when the page is
@@ -233,7 +235,13 @@ export function useTodoActions({
         });
       });
       showUndoToast("Deleted", () => {
-        cancel(key);
+        // Hiding the page flushes pending work, so the delete may already be
+        // sent while this toast is still on screen. Say so, rather than
+        // un-hiding a row that's gone.
+        if (!cancel(key)) {
+          toast.info("Already deleted");
+          return;
+        }
         setHidden((s) => withId(s, todo.id, false));
       });
     },
