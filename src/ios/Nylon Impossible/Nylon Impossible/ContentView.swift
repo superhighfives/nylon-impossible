@@ -210,6 +210,9 @@ struct ContentView: View {
         .scrollIndicators(.hidden)
         .scrollDisabled(viewModel.openCollectionId != nil)
         .scrollDismissesKeyboard(.interactively)
+        // The pages keep their size when the keyboard comes up; only the
+        // composer rides it. Resizing them scrolled the masthead away.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.x / max(geometry.containerSize.width, 1)
         } action: { _, progress in

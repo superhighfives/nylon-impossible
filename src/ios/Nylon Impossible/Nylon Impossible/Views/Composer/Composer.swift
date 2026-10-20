@@ -109,14 +109,16 @@ struct Composer: View {
     private var chips: some View {
         ScrollView(.horizontal) {
             HStack(spacing: 6) {
+                // The typed date leads, so it's never scrolled out of sight
+                // behind a long run of lists.
+                if let due = typedDue {
+                    dueChip(due)
+                }
                 ForEach(lists) { list in
                     ChipButton(text: list.name, isOn: list.id == targetId, strong: true) {
                         chosenListId = list.id == currentListId ? nil : list.id
                     }
                     .accessibilityLabel("Add to \(list.name)")
-                }
-                if let due = typedDue {
-                    dueChip(due)
                 }
             }
             .padding(.horizontal, 10)

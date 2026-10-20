@@ -104,13 +104,13 @@ struct ShareSheetView: View {
 
             ScrollView(.horizontal) {
                 HStack(spacing: 6) {
+                    if let due = typedDue { dueChip(due) }
                     ForEach(lists) { list in
                         ChipButton(text: list.name, isOn: list.id == listId, strong: true) {
                             listId = list.id
                         }
                         .accessibilityLabel("Add to \(list.name)")
                     }
-                    if let due = typedDue { dueChip(due) }
                 }
             }
             .scrollIndicators(.hidden)
