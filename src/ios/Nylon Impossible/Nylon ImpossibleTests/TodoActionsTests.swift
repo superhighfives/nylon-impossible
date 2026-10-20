@@ -95,11 +95,32 @@ struct TodoActionsTests {
 
         #expect(!todo.isCompleted)
         #expect(todo.dueDate == DueLabel.inDays(1))
-        #expect(fixture.actions.toasts.current?.text == "Done · repeats Tomorrow")
+        // Due tomorrow still places in Today, the list it was in.
+        #expect(todo.listKey == fixture.today.id)
+        #expect(fixture.actions.toasts.current?.text == "Done · next Tomorrow")
 
         fixture.actions.toasts.performAction()
         #expect(todo.dueDate == dueToday)
         #expect(todo.completedAt == nil)
+    }
+
+    @Test("a repeat placed in another list names it in the toast, and Undo puts it back")
+    func repeatMovesList() throws {
+        let fixture = try makeFixture()
+        let todo = insert("Water the plants", in: fixture.today, fixture)
+        todo.dueDate = DueLabel.inDays(0)
+        todo.recurrence = Recurrence(frequency: .weekly)
+
+        fixture.actions.commitDone(todo)
+
+        // A week out places in This Week.
+        #expect(todo.listKey == fixture.week.id)
+        let label = DueLabel.text(for: DueLabel.inDays(7)).text
+        #expect(fixture.actions.toasts.current?.text == "Done · next \(label), in This Week")
+
+        fixture.actions.toasts.performAction()
+        #expect(todo.listKey == fixture.today.id)
+        #expect(todo.dueDate == DueLabel.inDays(0))
     }
 
     @Test("checking a repeat already done today completes the next occurrence")

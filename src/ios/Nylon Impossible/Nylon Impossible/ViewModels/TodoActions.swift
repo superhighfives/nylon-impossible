@@ -6,7 +6,9 @@
 //  do to a todo, in one place so each gets the same toast and the same Undo.
 //
 //  - Done holds the checked row for ~400ms, then lets it go and toasts
-//    "Done · Undo". A repeat stays and toasts "Done · repeats Fri".
+//    "Done · Undo". A repeat's next occurrence goes where its new due date
+//    puts it (`RecurrenceHelper.placement`) and toasts "Done · next Mon",
+//    adding ", in This Week" when that's a different list.
 //  - Delete hides the row at once but only deletes when its toast goes, so
 //    Undo never has to resurrect something the server already dropped.
 //  - Moves and restores toast with an Undo that puts every field back.
@@ -197,7 +199,11 @@ final class TodoActions {
 
         let text: String
         if !todo.isCompleted, todo.recurrence != nil, let next = todo.dueDate {
-            text = "Done · repeats \(DueLabel.text(for: next).text)"
+            let label = DueLabel.text(for: next).text
+            let moved = todo.listKey?.lowercased() != snapshot.listKey?.lowercased()
+            text = moved
+                ? "Done · next \(label), in \(listName(todo.listKey))"
+                : "Done · next \(label)"
         } else {
             text = "Done"
         }
