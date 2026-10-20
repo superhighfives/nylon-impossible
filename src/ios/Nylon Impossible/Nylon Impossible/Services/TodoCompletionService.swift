@@ -68,7 +68,7 @@ enum TodoCompletionService {
             // own list once re-sorted (`sortedTodos` scopes by `listId`).
             let incompleteTodos = allTodos
                 .filter {
-                    !$0.isDeleted && !$0.isEffectivelyCompleted && $0.parentId == nil
+                    !$0.isSoftDeleted && !$0.isEffectivelyCompleted && $0.parentId == nil
                         && $0.id != todo.id && $0.listKey == todo.listKey
                 }
                 .sorted { $0.position < $1.position }
@@ -84,7 +84,7 @@ enum TodoCompletionService {
         // Checking completes them all; unchecking reopens them. A todo with
         // subtasks never recurs, so only this plain path reaches children.
         let newCompleted = todo.isCompleted
-        for child in allTodos where child.parentId == todo.id && !child.isDeleted {
+        for child in allTodos where child.parentId == todo.id && !child.isSoftDeleted {
             if child.isCompleted != newCompleted {
                 child.isCompleted = newCompleted
                 child.markModified()

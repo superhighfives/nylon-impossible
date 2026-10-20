@@ -21,6 +21,7 @@ import {
 import { processTodo } from "./handlers/process";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
+import { deleteTodoUrl, updateTodoUrl } from "./handlers/todo-urls";
 import {
   createTodo,
   deleteTodo,
@@ -127,6 +128,9 @@ app.put("/todos/:id", updateTodo);
 app.delete("/todos/:id", deleteTodo);
 // Link processing — deterministic, no AI.
 app.post("/todos/:id/process", processTodo);
+// A link's menu: Show as URL, Remove.
+app.patch("/todos/:id/urls/:urlId", updateTodoUrl);
+app.delete("/todos/:id/urls/:urlId", deleteTodoUrl);
 
 // List routes
 app.get("/lists", getLists);

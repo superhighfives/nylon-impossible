@@ -11,7 +11,7 @@ struct TodoItemTests {
         #expect(todo.title == "Test todo")
         #expect(todo.isCompleted == false)
         #expect(todo.isSynced == false)
-        #expect(todo.isDeleted == false)
+        #expect(todo.isSoftDeleted == false)
         #expect(todo.position == "a0")
         #expect(todo.userId == nil)
     }

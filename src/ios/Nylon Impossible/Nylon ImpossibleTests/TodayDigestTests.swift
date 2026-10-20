@@ -89,7 +89,7 @@ struct TodayDigestTests {
         todo.listKey = listKey
         todo.isCompleted = completed
         todo.completedAt = completedAt
-        todo.isDeleted = deleted
+        todo.isSoftDeleted = deleted
         todo.pinned = pinned
         todo.parentId = parentId
         todo.recurrence = recurrence

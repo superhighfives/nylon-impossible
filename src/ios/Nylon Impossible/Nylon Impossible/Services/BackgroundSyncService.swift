@@ -58,23 +58,23 @@ struct BackgroundSyncService {
             )
             let unsyncedItems = try context.fetch(descriptor)
             let changeList = unsyncedItems.map { todo in
-                let pendingUrlChanges = todo.isDeleted || todo.pendingUrls.isEmpty
+                let pendingUrlChanges = todo.isSoftDeleted || todo.pendingUrls.isEmpty
                     ? nil
                     : todo.pendingUrls.map { TodoUrlChange(url: $0) }
                 return TodoChange(
                     id: todo.id.uuidString.lowercased(),
-                    parentId: todo.isDeleted ? nil : todo.parentId?.uuidString.lowercased(),
-                    listId: todo.isDeleted ? nil : todo.listKey?.lowercased(),
-                    title: todo.isDeleted ? nil : todo.title,
-                    notes: todo.isDeleted ? nil : todo.itemNotes,
-                    completed: todo.isDeleted ? nil : todo.isCompleted,
-                    position: todo.isDeleted ? nil : todo.position,
-                    dueDate: todo.isDeleted ? nil : todo.dueDate,
-                    recurrence: todo.isDeleted ? nil : todo.recurrence,
-                    completedAt: todo.isDeleted ? nil : todo.completedAt,
+                    parentId: todo.isSoftDeleted ? nil : todo.parentId?.uuidString.lowercased(),
+                    listId: todo.isSoftDeleted ? nil : todo.listKey?.lowercased(),
+                    title: todo.isSoftDeleted ? nil : todo.title,
+                    notes: todo.isSoftDeleted ? nil : todo.itemNotes,
+                    completed: todo.isSoftDeleted ? nil : todo.isCompleted,
+                    position: todo.isSoftDeleted ? nil : todo.position,
+                    dueDate: todo.isSoftDeleted ? nil : todo.dueDate,
+                    recurrence: todo.isSoftDeleted ? nil : todo.recurrence,
+                    completedAt: todo.isSoftDeleted ? nil : todo.completedAt,
                     updatedAt: todo.updatedAt,
-                    deleted: todo.isDeleted ? true : nil,
-                    pinned: todo.isDeleted ? nil : todo.pinned,
+                    deleted: todo.isSoftDeleted ? true : nil,
+                    pinned: todo.isSoftDeleted ? nil : todo.pinned,
                     urls: pendingUrlChanges
                 )
             }

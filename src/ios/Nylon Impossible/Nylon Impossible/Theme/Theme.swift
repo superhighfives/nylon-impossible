@@ -2,12 +2,12 @@
 // Change tokens.json, then run `bun run tokens`. `bun run tokens:check` fails CI
 // when this file is stale.
 
+import CoreText
 import SwiftUI
 import UIKit
 
 /// Design tokens shared with the web app (src/shared/design/tokens.json).
-/// Phase 2 adds these alongside the older `Color.app*` palette in
-/// Color+Hex.swift; Phase 3's rebuilt views move onto them.
+/// Views read colour, type, spacing and motion from here only.
 enum Theme {
     enum Colors {
         private static func dynamic(light: UInt32, dark: UInt32) -> Color {
@@ -52,24 +52,34 @@ enum Theme {
     }
 
     enum Fonts {
-        /// PostScript name of the display face. Falls back to the system
-        /// font when it isn't bundled.
-        static let displayFontName = "Archivo"
+        /// Family name of the bundled display face (a variable font). Falls
+        /// back to the system font when it isn't bundled.
+        static let displayFontFamily = "Archivo"
+
+        /// The variable-font attribute and its `wght` axis ('wght' as a
+        /// four-char code). A weight trait alone leaves a variable face at
+        /// its default instance, so the weight is set on the axis instead.
+        static let variationAttribute = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        static let weightAxis = 0x7767_6874
 
         struct Style: Sendable {
             let size: CGFloat
             let lineHeight: CGFloat
             let weight: UIFont.Weight
+            /// The same weight on the 100–900 scale, for the variable axis.
+            let variationWeight: CGFloat
             let isDisplay: Bool
             let textStyle: UIFont.TextStyle
 
             /// The face at its base size, before Dynamic Type scaling.
             var baseFont: UIFont {
-                if isDisplay, let face = UIFont(name: Fonts.displayFontName, size: size) {
-                    let descriptor = face.fontDescriptor.addingAttributes([
-                        .traits: [UIFontDescriptor.TraitKey.weight: weight]
+                if isDisplay {
+                    let descriptor = UIFontDescriptor(fontAttributes: [
+                        .family: Fonts.displayFontFamily,
+                        Fonts.variationAttribute: [Fonts.weightAxis: variationWeight]
                     ])
-                    return UIFont(descriptor: descriptor, size: size)
+                    let face = UIFont(descriptor: descriptor, size: size)
+                    if face.familyName == Fonts.displayFontFamily { return face }
                 }
                 return UIFont.systemFont(ofSize: size, weight: weight)
             }
@@ -84,16 +94,16 @@ enum Theme {
         }
 
         enum Phone {
-            static let display = Style(size: 34, lineHeight: 40, weight: .bold, isDisplay: true, textStyle: .largeTitle)
-            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, isDisplay: true, textStyle: .title2)
-            static let body = Style(size: 17, lineHeight: 22, weight: .regular, isDisplay: false, textStyle: .body)
-            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, isDisplay: false, textStyle: .footnote)
+            static let display = Style(size: 34, lineHeight: 40, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle)
+            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2)
+            static let body = Style(size: 17, lineHeight: 22, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .body)
+            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote)
         }
         enum Wide {
-            static let display = Style(size: 40, lineHeight: 46, weight: .bold, isDisplay: true, textStyle: .largeTitle)
-            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, isDisplay: true, textStyle: .title2)
-            static let body = Style(size: 15, lineHeight: 20, weight: .regular, isDisplay: false, textStyle: .subheadline)
-            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, isDisplay: false, textStyle: .footnote)
+            static let display = Style(size: 40, lineHeight: 46, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle)
+            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2)
+            static let body = Style(size: 15, lineHeight: 20, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline)
+            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote)
         }
     }
 

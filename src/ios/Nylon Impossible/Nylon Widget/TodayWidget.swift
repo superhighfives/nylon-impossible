@@ -89,7 +89,7 @@ struct TodayWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: WidgetRefresh.todayKind, provider: TodayProvider()) { entry in
             TodayWidgetView(entry: entry)
-                .containerBackground(Color.appBase, for: .widget)
+                .containerBackground(Theme.Colors.canvas, for: .widget)
         }
         .configurationDisplayName("Today")
         .description("Everything on your Today list, plus anything due or overdue.")

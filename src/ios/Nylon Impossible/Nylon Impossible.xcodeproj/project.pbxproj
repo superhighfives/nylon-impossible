@@ -70,15 +70,19 @@
 				Models/TodoItem.swift,
 				Models/TodoListModel.swift,
 				Models/TodoUrl.swift,
+				"Resources/Fonts/Archivo-Variable.ttf",
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
 				Services/TodayDigest.swift,
+				"Theme/Theme+Phone.swift",
 				Theme/Theme.swift,
 				Utils/Badge.swift,
 				Utils/FractionalIndexing.swift,
 				Utils/Recurrence.swift,
 				Utils/TodoDateParser.swift,
+				Utils/TodoMeta.swift,
 				Utils/WidgetRefresh.swift,
+				Views/Components/Primitives.swift,
 			);
 			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
 		};
@@ -117,7 +121,6 @@
 				Utils/Recurrence.swift,
 				Utils/TodoDateParser.swift,
 				Utils/WidgetRefresh.swift,
-				"Views/Extensions/Color+Hex.swift",
 			);
 			target = DD0000082F5B000000000008 /* Nylon Widget */;
 		};

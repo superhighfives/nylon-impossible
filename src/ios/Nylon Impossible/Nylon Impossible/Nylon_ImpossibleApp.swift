@@ -103,22 +103,35 @@ struct Nylon_ImpossibleApp: App {
     
     var body: some Scene {
         WindowGroup {
-            RootView(syncService: syncService, preferencesService: preferencesService)
-                .environment(Clerk.shared)
-                .environment(authService)
-                .onAppear {
-                    if syncService == nil {
-                        let apiService = APIService(authService: authService)
-                        syncService = SyncService(authService: authService)
-                        preferencesService = UserPreferencesService(apiService: apiService)
-                    }
-                }
-                .task {
-                    // Register app shortcuts on launch
-                    NylonShortcuts.updateAppShortcutParameters()
-                }
+            #if DEBUG
+            if let route = ScreenRoute.launch {
+                // Screenshot runs: sample data, no sign-in, no real store.
+                ScreenRouteRoot(route: route)
+            } else {
+                signedInRoot
+            }
+            #else
+            signedInRoot
+            #endif
         }
-        .modelContainer(SharedModelContainer.shared)
+    }
+
+    private var signedInRoot: some View {
+        RootView(syncService: syncService, preferencesService: preferencesService)
+            .environment(Clerk.shared)
+            .environment(authService)
+            .onAppear {
+                if syncService == nil {
+                    let apiService = APIService(authService: authService)
+                    syncService = SyncService(authService: authService)
+                    preferencesService = UserPreferencesService(apiService: apiService)
+                }
+            }
+            .task {
+                // Register app shortcuts on launch
+                NylonShortcuts.updateAppShortcutParameters()
+            }
+            .modelContainer(SharedModelContainer.shared)
     }
 }
 
@@ -151,7 +164,7 @@ struct RootView: View {
             if clerk.client == nil {
                 // Loading state
                 ZStack {
-                    GradientBackground()
+                    Theme.Colors.canvas.ignoresSafeArea()
                     ProgressView()
                 }
             } else if isSignedIn {
@@ -165,7 +178,7 @@ struct RootView: View {
                         }
                 } else {
                     ZStack {
-                        GradientBackground()
+                        Theme.Colors.canvas.ignoresSafeArea()
                         ProgressView()
                     }
                 }

@@ -2,48 +2,53 @@
 //  ContentView.swift
 //  Nylon Impossible
 //
-//  Created by Charlie Gleason on 1/16/26.
+//  The phone shell. A fixed switcher row (Today · This Week · Someday · Lists
+//  and the avatar) over four pages that page horizontally; each page scrolls
+//  its own masthead and rows. The composer is the only floating element and
+//  rides the keyboard through the bottom safe-area inset, so nothing here
+//  hard-codes an inset.
 //
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Environment(AuthService.self) private var authService
-    @Environment(SyncService.self) private var syncService
-    @Environment(UserPreferencesService.self) private var preferencesService
-    @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
-    @Query(sort: \TodoListModel.position) private var lists: [TodoListModel]
-    @State private var viewModel = TodoViewModel()
-    // Bumped at each local midnight so repeats completed "today" derive back to
-    // active (isEffectivelyCompleted flips) without a refetch. Any @State write
-    // re-runs body, which recomputes the sorted/filtered lists.
-    @State private var midnightTick = 0
-    // Staged by swipe-to-delete; the row only actually deletes once confirmed.
-    @State private var pendingDeleteTodo: TodoItem?
-    // Raised to open the keyboard on the add-task field without a tap — the
-    // Home Screen "New Task" quick action. AddTaskInputView lowers it again
-    // once it has focus.
-    @State private var focusAddTask = false
-    // The add bar's typed-date match the user dismissed with ×, lowercased.
-    // Cleared on submit so the next todo parses afresh.
-    @State private var dismissedDateMatch: String?
+    typealias Page = TodoViewModel.Page
 
-    /// The typed date in the add bar, or an empty result once dismissed.
-    private var typedDate: TodoDateParser.Result {
-        let parsed = TodoDateParser.parse(viewModel.newTaskText)
-        guard parsed.dueDay != nil, parsed.matched?.lowercased() != dismissedDateMatch else {
-            return TodoDateParser.Result(title: viewModel.newTaskText, dueDay: nil, matched: nil)
-        }
-        return parsed
-    }
+    @Environment(\.modelContext) var modelContext
+    @Environment(\.scenePhase) var scenePhase
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @Environment(\.screenRoute) var screenRoute
+    @Environment(AuthService.self) var authService
+    @Environment(SyncService.self) var syncService
+    @Query(sort: \TodoItem.createdAt, order: .reverse) var todos: [TodoItem]
+    @Query(sort: \TodoListModel.position) var lists: [TodoListModel]
 
-    /// Lists in the fixed order: Today, This Week, Someday, then custom
-    /// lists by position. A system list whose kind this build doesn't know
-    /// (e.g. a stale cached row from before a server change, until the next
-    /// sync replaces it) is skipped rather than shown as a blank page.
-    private var orderedLists: [TodoListModel] {
+    @State var actions = TodoActions()
+    @State var pagerPosition: Page? = .today
+    @State var pagerProgress: CGFloat = 0
+    @State var detailTodo: TodoItem?
+    @State var detailDetent: PresentationDetent = .medium
+    @State var showsAccount = false
+    @State var accountPath: [AccountRoute] = []
+    @State var accountDetent: PresentationDetent = .medium
+    @State var chosenListId: String?
+    @State var focusComposer = false
+    @State var renamingList: TodoListModel?
+    @State var renameText = ""
+    @State var deletingList: TodoListModel?
+    // Bumped at each local midnight so dates and repeats done "today" roll
+    // over without a refetch; any @State write re-runs body.
+    @State var midnightTick = 0
+    @State var composerHeight: CGFloat = 0
+
+    var viewModel: TodoViewModel { actions.viewModel }
+
+    // MARK: - Derived
+
+    /// Today, This Week, Someday, then collections by position. A system list
+    /// this build doesn't know is skipped rather than shown blank.
+    var orderedLists: [TodoListModel] {
         lists.filter { !$0.isSystem || $0.systemKind != nil }.sorted { a, b in
             if a.isSystem != b.isSystem { return a.isSystem }
             if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
@@ -51,235 +56,204 @@ struct ContentView: View {
         }
     }
 
-    /// The list currently paged into view, driving the floating list header.
-    private var selectedList: TodoListModel? {
-        orderedLists.first { $0.id == viewModel.selectedListId }
+    var collections: [TodoListModel] { orderedLists.filter { !$0.isSystem } }
+
+    func timeList(_ page: Page) -> TodoListModel? {
+        guard let kind = page.systemKind else { return nil }
+        return orderedLists.first { $0.systemKind == kind }
     }
 
-    /// How much room the floating header needs above a page's content — every
-    /// page now carries a title band under the header pill (see
-    /// `ListHeaderView`), so the inset is uniform.
-    private let headerInset: CGFloat = 118
-
-    /// Subtasks live inside their parent's edit sheet, not as their own rows,
-    /// so a list's page is top-level todos only. Every list scopes to its own
-    /// `listId` and drops completed items (`TodoViewModel.sortedTodos`
-    /// handles the scoping/sort, this just strips subtasks and completion).
-    /// Done means gone: a completed todo leaves its list once the row's
-    /// completion hold finishes, and there's no separate Completed page.
-    private func sortedTodosList(for list: TodoListModel) -> [TodoItem] {
-        let topLevel = todos.filter { $0.parentId == nil }
-        return viewModel.sortedTodos(from: topLevel, listId: list.id)
-            .filter { !$0.isEffectivelyCompleted }
+    func rows(_ list: TodoListModel) -> [TodoItem] {
+        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.pendingDeletes)
     }
 
-    /// Sleeps until just past the next local midnight, bumps `midnightTick`, and
-    /// repeats — so a repeat completed today comes back on time.
-    private func scheduleMidnightTicks() async {
-        while !Task.isCancelled {
-            let now = Date()
-            guard let nextMidnight = Calendar.current.nextDate(
-                after: now,
-                matching: DateComponents(hour: 0, minute: 0, second: 0),
-                matchingPolicy: .nextTime
-            ) else { return }
-            let seconds = nextMidnight.timeIntervalSince(now) + 1
-            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            if Task.isCancelled { return }
-            midnightTick += 1
+    var subtasksByParent: [UUID: [TodoItem]] {
+        Dictionary(grouping: todos.filter { $0.parentId != nil && !$0.isSoftDeleted }) { $0.parentId ?? UUID() }
+    }
+
+    /// Open top-level todos per list id (lowercased).
+    var counts: [String: Int] {
+        var counts: [String: Int] = [:]
+        for todo in todos where todo.parentId == nil && !todo.isSoftDeleted && !todo.isCompleted
+            && !actions.pendingDeletes.contains(todo.id) {
+            if let key = todo.listKey?.lowercased() { counts[key, default: 0] += 1 }
         }
+        return counts
     }
+
+    func count(_ page: Page) -> Int {
+        timeList(page).map { counts[$0.id.lowercased()] ?? 0 } ?? 0
+    }
+
+    var currentListId: String? { viewModel.currentListId(in: orderedLists) }
+
+    var showsComposer: Bool { currentListId != nil }
+
+    var doneCount: Int {
+        todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
+    }
+
+    // MARK: - Identity
+
+    var displayName: String {
+        if screenRoute != nil { return "Charlie Gleason" }
+        return authService.userDisplayName ?? authService.userEmail ?? "Your account"
+    }
+
+    var initials: String {
+        if screenRoute != nil { return "CG" }
+        return authService.userInitials ?? "?"
+    }
+
+    // MARK: - Body
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            GradientBackground()
-
-            // Paged-swipe across lists — Today, This Week, Someday, then
-            // custom lists in order. Each page fills the screen and scrolls
-            // *behind* the floating header and input bar (liquid glass), so
-            // nothing sits in an opaque box. No grid view in v1.
-            TabView(selection: Bindable(viewModel).selectedListId) {
-                ForEach(orderedLists) { list in
-                    ListPageView(
-                        list: list,
-                        pageTodos: sortedTodosList(for: list),
-                        allTodos: todos,
-                        orderedLists: orderedLists,
-                        viewModel: viewModel,
-                        topInset: headerInset,
-                        pendingDeleteTodo: $pendingDeleteTodo
-                    )
-                    .tag(Optional(list.id))
-                }
+        // Read so a midnight tick re-runs body (dates, repeats done today).
+        // swiftlint:disable:next redundant_discardable_let
+        let _ = midnightTick
+        VStack(spacing: 0) {
+            Switcher(
+                current: viewModel.page,
+                progress: pagerProgress,
+                avatarURL: screenRoute == nil ? authService.userImageURL : nil,
+                initials: initials,
+                onSelect: select,
+                onDrop: drop,
+                onAvatar: { showsAccount = true }
+            )
+            if case .error(let message) = syncService.state {
+                SyncErrorLine(message: message) { Task { await syncService.sync() } }
+                    .transition(.opacity)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .padding(.horizontal, 16)
-            .ignoresSafeArea(.keyboard, edges: .bottom)
-            .onAppear {
-                viewModel.selectDefaultListIfNeeded(from: orderedLists)
-            }
-            .onChange(of: orderedLists.map(\.id)) {
-                viewModel.selectDefaultListIfNeeded(from: orderedLists)
-            }
-
-            // Floating header — pinned to the top, overlapping the scrolling
-            // list beneath it. Its glass pill is the only opaque element; the
-            // list shows through around it so it reads as floating, not boxed.
-            VStack(spacing: 0) {
-                // The "+" for a new list sits top-right, level with the pill —
-                // a global action next to the account menu, not something
-                // scoped to the list you happen to be paged onto.
-                HeaderView(
-                    onSignOut: {
-                        Task { await authService.signOut() }
-                    },
-                    syncState: syncService.state
-                ) {
-                    if let apiService = syncService.apiService {
-                        NewListButton(
-                            viewModel: viewModel,
-                            apiService: apiService,
-                            existingLists: orderedLists,
-                            modelContext: modelContext,
-                            onMutate: { syncService.syncAfterAction() }
-                        )
-                    }
-                }
-
-                // Every page gets a title band now — a plain label for the
-                // system lists (Today/This Week/Someday), a menu
-                // for rename/delete/reorder on a custom one. The paged
-                // TabView hides its page dots, so this doubles as the cue for
-                // which list you're on (the time-based three also still fold
-                // their name into the add-todo field's copy).
-                if let selectedList,
-                    let apiService = syncService.apiService {
-                    ListHeaderView(
-                        list: selectedList,
-                        viewModel: viewModel,
-                        apiService: apiService,
-                        existingLists: orderedLists,
-                        modelContext: modelContext,
-                        onMutate: { syncService.syncAfterAction() }
-                    )
-                    .padding(.top, 10)
-                }
-
-                // Sync failures surface here in the main view (with retry)
-                // rather than tucked behind the avatar menu. Transient
-                // connectivity blips never reach `.error` — see SyncService.
-                if case .error(let message) = syncService.state {
-                    SyncErrorBanner(message: message) {
-                        Task { await syncService.sync() }
-                    }
-                    .padding(.top, 12)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-
-                Spacer(minLength: 0)
-            }
-            .animation(.easeInOut(duration: 0.25), value: syncService.state)
-            .padding(.horizontal, 16)
-            .ignoresSafeArea(.keyboard, edges: .bottom)
-
-            // Floating input bar — liquid glass, anchored to the bottom and
-            // rising with the keyboard (like Discord) since it does not ignore
-            // the keyboard safe area.
-            VStack(alignment: .leading, spacing: 6) {
-            // "Due Fri ×" — the date the add bar parsed from what's typed.
-            // Minimal; Phase 3's composer gives it the full chip row.
-            if let dueDay = typedDate.dueDay, let matched = typedDate.matched {
-                DueChipView(dueDay: dueDay) {
-                    dismissedDateMatch = matched.lowercased()
-                }
-                .padding(.leading, 20)
-                .transition(.opacity)
-            }
-
-            AddTaskInputView(
-                text: $viewModel.newTaskText,
-                canAdd: viewModel.canAddTask,
-                listPhrase: selectedList?.promptPhrase,
-                focusRequested: $focusAddTask
-            ) {
-                let text = viewModel.newTaskText
-                let parseDate = typedDate.dueDay != nil
-                viewModel.newTaskText = ""
-                dismissedDateMatch = nil
-
-                // Create instantly and locally so the todo appears and persists
-                // even with no connection; sync runs in the background.
-                guard TaskCreationService.createSmart(
-                    text: text,
-                    userId: authService.userId,
-                    context: modelContext,
-                    allTodos: todos,
-                    listId: viewModel.selectedListId,
-                    parseDate: parseDate
-                ) != nil else { return }
-
-                syncService.syncAfterAction()
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
-            }
-            .animation(.easeInOut(duration: 0.15), value: typedDate.dueDay)
+            pager
+                .environment(\.composerClearance, showsComposer ? composerHeight : 0)
         }
-        .animation(.easeInOut(duration: 0.3), value: todos.count)
-        .refreshable {
-            await syncService.sync()
+        .background(Theme.Colors.canvas.ignoresSafeArea())
+        // The composer floats over the pages rather than insetting them: the
+        // VStack respects the keyboard's safe area, so a bottom overlay rides
+        // the keyboard, and each page pads its last row clear of it.
+        .overlay(alignment: .bottom) { bottomBar }
+        .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: syncService.state)
+        .sheet(item: $detailTodo) { todo in
+            TodoDetailSheet(
+                todo: todo,
+                actions: actions,
+                lists: orderedLists,
+                apiService: syncService.apiService,
+                userId: authService.userId
+            )
+            .presentationDetents([.medium, .large], selection: $detailDetent)
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.Colors.canvas)
         }
-        .task {
-            await scheduleMidnightTicks()
+        .sheet(isPresented: $showsAccount, onDismiss: { accountPath = [] }) {
+            AccountSheet(
+                name: displayName,
+                initials: initials,
+                imageURL: screenRoute == nil ? authService.userImageURL : nil,
+                doneCount: doneCount,
+                actions: actions,
+                lists: orderedLists,
+                onSignOut: signOut,
+                path: $accountPath,
+                detent: $accountDetent
+            )
+            .presentationDetents([.medium, .large], selection: $accountDetent)
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.Colors.canvas)
         }
-        // Quick actions are parked on QuickActionService by the scene delegate
-        // because they can land before this view exists. On appear for one
-        // that was already waiting (launched from the icon, or held while
-        // signed out); on change for one that arrives while the app is on
-        // screen.
-        .onAppear { performPendingQuickAction() }
-        .onChange(of: QuickActionService.shared.pending) { performPendingQuickAction() }
+        .alert("Rename list", isPresented: Binding(get: { renamingList != nil }, set: { if !$0 { renamingList = nil } })) {
+            TextField("List name", text: $renameText)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { commitRename() }
+        }
         .confirmationDialog(
-            "Delete this todo?",
-            isPresented: Binding(
-                get: { pendingDeleteTodo != nil },
-                set: { if !$0 { pendingDeleteTodo = nil } }
-            ),
+            "Delete “\(deletingList?.name ?? "")”?",
+            isPresented: Binding(get: { deletingList != nil }, set: { if !$0 { deletingList = nil } }),
             titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) { confirmPendingDelete() }
-            Button("Cancel", role: .cancel) { pendingDeleteTodo = nil }
+            Button("Delete list and its todos", role: .destructive) { commitDeleteList() }
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This can't be undone.")
+            Text("Todos in this list are deleted too. This can’t be undone.")
+        }
+        .refreshable { await syncService.sync() }
+        .task {
+            actions.configure(context: modelContext) { syncService.syncAfterAction() }
+            applyScreenRoute()
+            await scheduleMidnightTicks()
+        }
+        .onChange(of: reduceMotion, initial: true) { _, reduce in actions.reduceMotion = reduce }
+        .onChange(of: scenePhase) { _, phase in
+            // A delete waiting on its toast commits when you leave.
+            if phase != .active { actions.flush() }
+        }
+        .onAppear { performPendingQuickAction() }
+        .onChange(of: QuickActionService.shared.pending) { performPendingQuickAction() }
+    }
+
+    // MARK: - Pager
+
+    var pager: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: 0) {
+                ForEach(Page.allCases, id: \.self) { page in
+                    pageContent(page)
+                        .containerRelativeFrame([.horizontal, .vertical])
+                        .id(page)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .scrollTargetBehavior(.paging)
+        .scrollPosition(id: $pagerPosition)
+        .scrollIndicators(.hidden)
+        .scrollDisabled(viewModel.openCollectionId != nil)
+        .scrollDismissesKeyboard(.interactively)
+        // The pages keep their size when the keyboard comes up; only the
+        // composer rides it. Resizing them scrolled the masthead away.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            geometry.contentOffset.x / max(geometry.containerSize.width, 1)
+        } action: { _, progress in
+            pagerProgress = progress
+        }
+        .onChange(of: pagerPosition) { _, position in
+            guard let position, position != viewModel.page else { return }
+            viewModel.page = position
+            chosenListId = nil
+        }
+        .onChange(of: viewModel.page) { _, page in
+            chosenListId = nil
+            guard pagerPosition != page else { return }
+            withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.slow)) {
+                pagerPosition = page
+            }
         }
     }
 
-    /// Perform whatever quick action is waiting, if any. The action stays on
-    /// whichever list is showing rather than paging to a fixed one — the list
-    /// header names it, and the task lands where the user is already looking.
-    private func performPendingQuickAction() {
-        guard let action = QuickActionService.shared.take() else { return }
-        switch action {
-        case .newTask:
-            focusAddTask = true
+    // MARK: - Bottom
+
+    var bottomBar: some View {
+        VStack(spacing: 0) {
+            if showsComposer {
+                Composer(
+                    text: Bindable(viewModel).newTaskText,
+                    lists: orderedLists,
+                    currentListId: currentListId,
+                    chosenListId: $chosenListId,
+                    focusRequested: $focusComposer,
+                    onSubmit: add
+                )
+                .transition(.opacity)
+            }
         }
-    }
-
-    private func confirmPendingDelete() {
-        guard let todo = pendingDeleteTodo else { return }
-        withAnimation(.easeInOut(duration: 0.3)) {
-            viewModel.deleteTodo(todo, context: modelContext)
+        .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { composerHeight = $0 }
+        .overlay(alignment: .top) {
+            ToastView(toasts: actions.toasts)
+                .alignmentGuide(.top) { $0[.bottom] + Theme.Space.s3 }
         }
-        syncService.syncAfterAction()
-        pendingDeleteTodo = nil
+        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: showsComposer)
     }
-
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: [TodoItem.self, TodoUrl.self, TodoListModel.self], inMemory: true)
-        .environment(AuthService())
-        .environment(SyncService(authService: AuthService()))
 }

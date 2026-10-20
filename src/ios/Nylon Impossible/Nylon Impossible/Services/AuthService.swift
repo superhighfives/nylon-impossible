@@ -49,6 +49,26 @@ final class AuthService: AuthProviding {
         clerk.user?.primaryEmailAddress?.emailAddress
     }
 
+    /// "Charlie Gleason", for the account sheet. Nil without a name on the
+    /// account.
+    var userDisplayName: String? {
+        let parts = [clerk.user?.firstName, clerk.user?.lastName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: " ")
+    }
+
+    /// "CG", for the avatar when there's no image.
+    var userInitials: String? {
+        let source = userDisplayName ?? userEmail
+        guard let source else { return nil }
+        let letters = source
+            .split(whereSeparator: { $0 == " " || $0 == "." || $0 == "@" })
+            .prefix(2)
+            .compactMap(\.first)
+        return letters.isEmpty ? nil : String(letters).uppercased()
+    }
+
     /// The signed-in user's avatar, mirroring the Clerk `UserButton` shown in
     /// the web header. `nil` when there's no user or no image on the account.
     var userImageURL: URL? {

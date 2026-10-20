@@ -67,7 +67,7 @@ enum TaskCreationService {
         // against another list's items here could land it anywhere once
         // that list is sorted.
         let firstPosition = allTodos
-            .filter { !$0.isDeleted && !$0.isCompleted && $0.parentId == nil && $0.listKey == listId }
+            .filter { !$0.isSoftDeleted && !$0.isCompleted && $0.parentId == nil && $0.listKey == listId }
             .min { $0.position < $1.position }?
             .position
 
@@ -109,7 +109,7 @@ enum TaskCreationService {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let firstPosition = allTodos
-            .filter { $0.parentId == parent.id && !$0.isDeleted && !$0.isCompleted }
+            .filter { $0.parentId == parent.id && !$0.isSoftDeleted && !$0.isCompleted }
             .min { $0.position < $1.position }?
             .position
 
@@ -288,6 +288,8 @@ enum TaskCreationService {
         userId: String?,
         context: ModelContext,
         allTodos: [TodoItem],
+        // The share sheet's list picker; nil defaults to Today server-side.
+        listId: String? = nil,
         parseDate: Bool = false
     ) -> TodoItem {
         let todo = createTask(
@@ -295,9 +297,10 @@ enum TaskCreationService {
             userId: userId,
             context: context,
             allTodos: allTodos,
+            listId: listId,
             parseDate: parseDate
         )
-        
+
         // Store URL in pendingUrls — sent explicitly in the sync payload
         // so the server can create the todoUrls record directly without parsing the description
         if !todo.pendingUrls.contains(url) {
@@ -320,7 +323,7 @@ enum TaskCreationService {
     static func fetchAllTodos(userId: String?, context: ModelContext) -> [TodoItem] {
         let descriptor = FetchDescriptor<TodoItem>(
             predicate: #Predicate<TodoItem> { todo in
-                !todo.isDeleted
+                !todo.isSoftDeleted
             }
         )
 

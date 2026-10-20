@@ -5,55 +5,53 @@
 //  Created by Charlie Gleason on 2/20/26.
 //
 
-import SwiftUI
 import ClerkKit
 import ClerkKitUI
+import SwiftUI
 
 struct SignInView: View {
     @State private var authIsPresented = false
 
     var body: some View {
-        ZStack {
-            GradientBackground()
+        VStack(alignment: .leading, spacing: 0) {
+            Image("Logo")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+                // The mark always sits on yellow, so it keeps its dark form.
+                .environment(\.colorScheme, .light)
+                .frame(width: 44, height: 44)
+                .background(Theme.Colors.brand, in: Circle())
+                .accessibilityHidden(true)
+                .padding(.top, Theme.Space.s12)
 
-            VStack(spacing: 32) {
-                Spacer()
+            Spacer()
 
-                // Logo/Header
-                VStack(spacing: 8) {
-                    Image("Logo")
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 80, height: 80)
+            Text("Nylon")
+                .textStyle(Theme.Fonts.Role.masthead, tracking: Theme.Tracking.masthead)
+                .foregroundStyle(Theme.Colors.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text("Today, This Week, Someday. Todos that age on their own.")
+                .textStyle(Theme.Fonts.Role.body)
+                .foregroundStyle(Theme.Colors.inkMuted)
+                .padding(.top, Theme.Space.s3)
+            Hairline().padding(.vertical, Theme.Space.s6)
 
-                    Text("Nylon Impossible")
-                        .font(.title)
-                        .fontWeight(.bold)
-                        .foregroundStyle(Color.appDefault)
-
-                    Text("Sign in to sync your todos")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.appStrong)
-                }
-
-                Spacer()
-
-                // Sign in button
-                Button {
-                    authIsPresented = true
-                } label: {
-                    Text("Sign In")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.appBrand)
-                        .foregroundStyle(Color.appBrandForeground)
-                        .fontWeight(.semibold)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 48)
+            Button {
+                authIsPresented = true
+            } label: {
+                Text("Sign in")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.brandInk)
+                    .frame(maxWidth: .infinity, minHeight: 52)
+                    .background(Theme.Colors.brand, in: RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous))
             }
+            .buttonStyle(.plain)
+            .padding(.bottom, Theme.Space.s6)
         }
+        .padding(.horizontal, Theme.Phone.gutter)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(Theme.Colors.canvas.ignoresSafeArea())
         .prefetchClerkImages()
         .sheet(isPresented: $authIsPresented) {
             AuthView()

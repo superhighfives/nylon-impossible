@@ -10,7 +10,9 @@ import SwiftUI
 /// A layout that arranges views in a flowing, wrapping manner (like flexbox wrap)
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
-    
+    /// Gap between wrapped lines; the same as `spacing` when nil.
+    var lineSpacing: CGFloat?
+
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let result = calculateLayout(proposal: proposal, subviews: subviews)
         return result.size
@@ -51,7 +53,7 @@ struct FlowLayout: Layout {
             // Check if we need to wrap to next row
             if currentX + size.width > maxWidth && currentX > 0 {
                 currentX = 0
-                currentY += rowHeight + spacing
+                currentY += rowHeight + (lineSpacing ?? spacing)
                 rowHeight = 0
             }
             

@@ -47,16 +47,16 @@ struct TodayWidgetView: View {
     private func header(count: Int?) -> some View {
         HStack(spacing: 6) {
             Text("Today")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.appDefault)
+                .font(Theme.Fonts.Phone.meta.font.weight(.semibold))
+                .foregroundStyle(Theme.Colors.ink)
             if let count, count > 0 {
                 Text("\(count)")
                     .font(.system(size: 12, weight: .semibold))
                     .monospacedDigit()
-                    .foregroundStyle(Color.appBrandForeground)
+                    .foregroundStyle(Theme.Colors.brandInk)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 1)
-                    .background(Color.appBrand, in: Capsule())
+                    .background(Theme.Colors.brand, in: Capsule())
             }
             Spacer(minLength: 0)
         }
@@ -79,7 +79,7 @@ struct TodayWidgetView: View {
             if total > shown.count {
                 Text("+\(total - shown.count) more")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.appSubtle)
+                    .foregroundStyle(Theme.Colors.inkMuted)
                     .padding(.leading, 26)
                     .padding(.top, 2)
             }
@@ -92,10 +92,10 @@ struct TodayWidgetView: View {
             Spacer(minLength: 0)
             Image(systemName: systemImage)
                 .font(.system(size: 18))
-                .foregroundStyle(Color.appSubtle)
+                .foregroundStyle(Theme.Colors.inkMuted)
             Text(text)
                 .font(.system(size: 13))
-                .foregroundStyle(Color.appStrong)
+                .foregroundStyle(Theme.Colors.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -111,12 +111,12 @@ private struct TodayRow: View {
     var body: some View {
         HStack(spacing: 8) {
             Button(intent: CompleteTodoIntent(todoId: todo.id.uuidString)) {
-                // The app's unchecked circle, scaled to a widget row. There's
+                // The app's unchecked box, scaled to a widget row. There's
                 // no checked state to draw — completing a todo takes it off
                 // the list this widget is showing.
-                Circle()
-                    .stroke(Color.appLine, lineWidth: 2)
-                    .frame(width: 16, height: 16)
+                RoundedRectangle(cornerRadius: 4.5, style: .continuous)
+                    .strokeBorder(Theme.Colors.ink, lineWidth: 1.5)
+                    .frame(width: 15, height: 15)
                     // Only the 2pt stroke is visible, so the tap gets the
                     // whole row-height square to land in.
                     .frame(width: 22, height: 22)
@@ -126,8 +126,8 @@ private struct TodayRow: View {
             .accessibilityLabel("Mark \(todo.title) done")
 
             Text(todo.title)
-                .font(.system(size: 13))
-                .foregroundStyle(Color.appDefault)
+                .font(Theme.Fonts.Phone.meta.font.weight(.medium))
+                .foregroundStyle(Theme.Colors.ink)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -148,14 +148,14 @@ private struct TodayRow: View {
     private var trailing: some View {
         HStack(spacing: 4) {
             if todo.isRepeating {
-                Image(systemName: "arrow.triangle.2.circlepath")
+                Image(systemName: Theme.Icon.repeat)
                     .font(.system(size: 9))
-                    .foregroundStyle(Color.appSubtle)
+                    .foregroundStyle(Theme.Colors.inkMuted)
             }
             if todo.isPinned {
-                Image(systemName: "pin.fill")
+                Image(systemName: Theme.Icon.pin)
                     .font(.system(size: 9))
-                    .foregroundStyle(Color.appSubtle)
+                    .foregroundStyle(Theme.Colors.inkMuted)
             }
             if todo.isOverdue(at: now) {
                 Label {
@@ -166,7 +166,7 @@ private struct TodayRow: View {
                     Image(systemName: "exclamationmark.circle.fill")
                 }
                 .font(.system(size: 10))
-                .foregroundStyle(Color.appDanger)
+                .foregroundStyle(Theme.Colors.overdue)
                 .labelStyle(.titleAndIcon)
                 .accessibilityLabel("Overdue")
             }

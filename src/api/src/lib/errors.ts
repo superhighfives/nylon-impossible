@@ -19,6 +19,7 @@ export const API_ERRORS = {
   todo_id_required: { status: 400, message: "Todo ID required" },
   user_id_required: { status: 400, message: "User ID required" },
   todo_not_found: { status: 404, message: "Todo not found" },
+  link_not_found: { status: 404, message: "Link not found" },
   invalid_parent_todo: {
     status: 400,
     message: "parentId must reference one of the user's top-level todos",
