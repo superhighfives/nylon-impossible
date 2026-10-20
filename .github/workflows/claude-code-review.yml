@@ -20,10 +20,14 @@ jobs:
     # reviews the same way. Repo-specific rules go in CLAUDE.md.
     uses: superhighfives/control-room/.github/workflows/review.yml@main
     with:
-      setup_command: pnpm install --frozen-lockfile
+      # The shared workflow sets up one runtime: "bun" installs Bun (latest)
+      # but skips setup-node, so tsc and biome run on the runner's
+      # preinstalled Node. Typecheck and lint don't need Node 24.
+      runtime: bun
+      setup_command: bun install --frozen-lockfile
       verify_commands: |
-        pnpm typecheck
-        pnpm lint
+        bun run typecheck
+        bun run lint
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
       APP_PRIVATE_KEY: ${{ secrets.APP_PRIVATE_KEY }}

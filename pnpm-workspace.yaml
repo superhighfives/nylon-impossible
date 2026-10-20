@@ -1,6 +1,0 @@
-packages:
-  - "src/shared"
-  - "src/web"
-  - "src/api"
-  - "src/admin"
-  - "src/marketing"

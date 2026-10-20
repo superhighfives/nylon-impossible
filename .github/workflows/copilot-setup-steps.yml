@@ -12,8 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v6
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
@@ -21,4 +23,4 @@ jobs:
           node-version: 24.21.0
 
       - name: Install dependencies
-        run: pnpm install
+        run: bun install --frozen-lockfile

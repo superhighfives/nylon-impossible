@@ -4,7 +4,16 @@ updates:
     directory: /
     schedule:
       interval: weekly
-  - package-ecosystem: npm
+  # The npm ecosystem only rewrites package-lock.json / yarn.lock /
+  # pnpm-lock.yaml, so it can't update bun.lock. The bun ecosystem can, but
+  # it does version updates only: Dependabot doesn't raise security-update
+  # PRs for bun yet, so security alerts still need a manual bump.
+  - package-ecosystem: bun
     directory: /
     schedule:
       interval: weekly
+    # patches/vitest@5.0.3.patch only applies to that exact version, and Bun
+    # skips a non-matching patch silently, so a vitest bump breaks the API
+    # tests. Bump vitest by hand and regenerate the patch with it.
+    ignore:
+      - dependency-name: vitest

@@ -6,7 +6,7 @@ Nylon Impossible is a cross-platform todo app with web, API, and iOS clients. It
 
 ## Repository Structure
 
-This is a monorepo managed with pnpm workspaces:
+This is a monorepo managed with Bun workspaces:
 
 | Project | Path | Stack |
 |---------|------|-------|
@@ -78,17 +78,17 @@ This is a monorepo managed with pnpm workspaces:
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Apply D1 migrations locally
-pnpm db:migrate
+bun run db:migrate
 
 # Start web + API dev servers in parallel
-pnpm dev           # web at :3000, API at :8787
+bun run dev           # web at :3000, API at :8787
 
 # Per-project dev
-pnpm web:dev
-pnpm api:dev
+bun run web:dev
+bun run api:dev
 ```
 
 ## Required Before Finishing Any Change
@@ -96,36 +96,36 @@ pnpm api:dev
 Run these commands and fix all reported issues before considering a task complete:
 
 ```bash
-pnpm check        # Biome lint + format check (web + API) - fix with: pnpm format
-pnpm typecheck    # TypeScript type checking (web + API)
-pnpm test         # Vitest tests (web + API)
+bun run check        # Biome lint + format check (web + API) - fix with: bun run format
+bun run typecheck    # TypeScript type checking (web + API)
+bun run test         # Vitest tests (web + API)
 ```
 
 To fix formatting automatically:
 
 ```bash
-pnpm format       # Auto-format all files with Biome
+bun run format       # Auto-format all files with Biome
 ```
 
 ## Code Quality
 
 ```bash
-pnpm lint         # Biome linter (web + API)
-pnpm check        # Biome lint + format check (web + API)
-pnpm typecheck    # TypeScript type checking (web + API)
-pnpm test         # Vitest tests (web + API)
+bun run lint         # Biome linter (web + API)
+bun run check        # Biome lint + format check (web + API)
+bun run typecheck    # TypeScript type checking (web + API)
+bun run test         # Vitest tests (web + API)
 ```
 
 ## Testing
 
 - **API**: unit tests in `src/api/test/unit/` (pure functions); integration tests in `src/api/test/integration/` using `cloudflare:test` SELF against a real D1 instance
 - **Web**: unit tests in `src/web/src/test/` using Vitest
-- Run with: `pnpm api:test` / `pnpm web:test`
+- Run with: `bun run api:test` / `bun run web:test`
 
 ## Deployment
 
 ```bash
-pnpm deploy       # Deploy web + API to Cloudflare Workers
+bun run deploy       # Deploy web + API to Cloudflare Workers
 ```
 
 Deployed URLs:

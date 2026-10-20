@@ -78,16 +78,16 @@ deployment manifest live in [`src/gmail-addon/`](../gmail-addon/README.md).
 ### Prerequisites
 
 - Node.js 24.21.0+
-- pnpm 9+
+- Bun 1.3.10+
 
 ### Development
 
 ```bash
 # Start dev server (from root)
-pnpm api:dev
+bun run api:dev
 
 # Or from this directory
-pnpm dev
+bun run dev
 ```
 
 The API runs at **http://localhost:8787**.
@@ -112,17 +112,17 @@ The API shares the D1 database with the web project. Migrations live in `src/api
 
 History was squashed in October 2026: `0000_baseline.sql` creates the whole
 schema, and new migrations continue from `0001`. Generate them with
-`pnpm db:generate` (drizzle-kit diffs `src/shared/src/schema.ts` against
+`bun run db:generate` (drizzle-kit diffs `src/shared/src/schema.ts` against
 `migrations/meta/`). A local D1 created before the squash still has the old
-migration rows, so reset it once with `pnpm db:fresh`. The one-off move of
+migration rows, so reset it once with `bun run db:fresh`. The one-off move of
 production data onto the baseline lives in `scripts/db-reset/`.
 
 ```bash
 # Apply migrations locally
-pnpm db:migrate
+bun run db:migrate
 
 # Apply to production
-pnpm db:migrate:remote
+bun run db:migrate:remote
 ```
 
 ## Project Structure
@@ -174,19 +174,19 @@ src/api/
 
 | Script | Description |
 |--------|-------------|
-| `pnpm dev` | Start dev server with local D1 |
-| `pnpm test` | Run Vitest tests in Workers runtime |
-| `pnpm typecheck` | Run TypeScript type checking |
-| `pnpm lint` | Run Biome linter |
-| `pnpm format` | Format code with Biome |
-| `pnpm check` | Run Biome lint + format check |
-| `pnpm deploy` | Deploy to Cloudflare Workers |
-| `pnpm cf-typegen` | Generate Cloudflare binding types |
+| `bun run dev` | Start dev server with local D1 |
+| `bun run test` | Run Vitest tests in Workers runtime |
+| `bun run typecheck` | Run TypeScript type checking |
+| `bun run lint` | Run Biome linter |
+| `bun run format` | Format code with Biome |
+| `bun run check` | Run Biome lint + format check |
+| `bun run deploy` | Deploy to Cloudflare Workers |
+| `bun run cf-typegen` | Generate Cloudflare binding types |
 
 ## Deployment
 
 ```bash
-pnpm deploy
+bun run deploy
 ```
 
 Deployed to `https://api.nylonimpossible.com`. Requires `CLERK_SECRET_KEY` and `CLERK_PUBLISHABLE_KEY` set as Workers secrets.

@@ -12,7 +12,7 @@
     "format": "biome format --write --config-path ../..",
     "check": "biome check --config-path ../..",
     "check:fix": "biome check --write --config-path ../..",
-    "deploy": "pnpm build && wrangler deploy"
+    "deploy": "bun run build && wrangler deploy"
   },
   "dependencies": {
     "@clerk/react": "^6.11.1",

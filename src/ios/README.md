@@ -38,9 +38,9 @@ Native iOS client for the Nylon Impossible todo app. Built with SwiftUI and Swif
 
 ```bash
 # From the repo root
-pnpm ios:open       # Open in Xcode
-pnpm ios:simulator  # Open iOS Simulator
-pnpm ios:build      # Build via xcodebuild
+bun run ios:open       # Open in Xcode
+bun run ios:simulator  # Open iOS Simulator
+bun run ios:build      # Build via xcodebuild
 ```
 
 Or open the project directly:
@@ -121,9 +121,9 @@ resetting from there would discard unsynced todos before the app ever ran.
 
 | Script | Description |
 |--------|-------------|
-| `pnpm ios:open` | Open Xcode project |
-| `pnpm ios:build` | Build via xcodebuild |
-| `pnpm ios:simulator` | Open iOS Simulator |
+| `bun run ios:open` | Open Xcode project |
+| `bun run ios:build` | Build via xcodebuild |
+| `bun run ios:simulator` | Open iOS Simulator |
 
 SwiftLint is run from the project directory:
 

@@ -32,39 +32,42 @@ jobs:
               - 'src/api/**'
               - 'src/shared/**'
               - 'package.json'
+              - 'bun.lock'
               - '.github/workflows/web-test.yml'
 
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
         if: steps.changes.outputs.src == 'true'
+        with:
+          bun-version-file: package.json
 
       - uses: actions/setup-node@v7
         if: steps.changes.outputs.src == 'true'
         with:
           node-version: 24.21.0
 
-      - run: pnpm install
+      - run: bun install --frozen-lockfile
         if: steps.changes.outputs.src == 'true'
 
       - name: Lint & typecheck API
         if: steps.changes.outputs.src == 'true'
-        run: pnpm api:check && pnpm api:typecheck
+        run: bun run api:check && bun run api:typecheck
 
       - name: Check generated design tokens
         if: steps.changes.outputs.src == 'true'
-        run: pnpm tokens:check
+        run: bun run tokens:check
 
       - name: Check migration metadata
         if: steps.changes.outputs.src == 'true'
-        run: pnpm --filter @nylon-impossible/api db:check-meta
+        run: bun run --cwd src/api db:check-meta
 
       - name: Lint & typecheck Web
         if: steps.changes.outputs.src == 'true'
-        run: pnpm web:check && pnpm web:typecheck
+        run: bun run web:check && bun run web:typecheck
 
       - name: Test API
         if: steps.changes.outputs.src == 'true'
-        run: pnpm --filter @nylon-impossible/api test
+        run: bun run --cwd src/api test
 
       - name: Test Web
         if: steps.changes.outputs.src == 'true'
-        run: pnpm --filter @nylon-impossible/web test
+        run: bun run --cwd src/web test

@@ -343,7 +343,7 @@ reflect the model above. Kept here as a record; there's nothing left to do.
 
 - **Squashed migrations.** The 31 migrations in `src/api/migrations/` were
   replaced with one `0000_baseline.sql`, and drizzle-kit's `meta/` was
-  regenerated so `pnpm db:generate` works again.
+  regenerated so `bun run db:generate` works again.
 - **Schema changes folded into the baseline:**
   - `systemKind` enum is `today | thisWeek | someday`.
   - `users.location`, `users.plan` and `users.hide_completed` were dropped.

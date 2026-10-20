@@ -319,12 +319,15 @@ async function captureWebScreenshots(): Promise<void> {
   function startDevServer() {
     console.log("  Starting web dev server…");
     const proc = spawn(
-      "pnpm",
-      ["--filter", "@nylon-impossible/web", "dev"],
+      "bun",
+      ["run", "--cwd", "src/web", "dev"],
       {
         cwd: WORKSPACE_ROOT,
         env: { ...process.env },
         stdio: ["ignore", "pipe", "pipe"],
+        // Own process group, so killDevServer can signal vite too — `bun run`
+        // doesn't forward SIGTERM to its child.
+        detached: true,
       }
     );
     // Buffer the server's output (capped) so we can surface it if the server
@@ -340,13 +343,16 @@ async function captureWebScreenshots(): Promise<void> {
   }
 
   async function killDevServer(proc: ReturnType<typeof spawn>) {
-    proc.kill("SIGTERM");
+    const killGroup = (signal: NodeJS.Signals) => {
+      try {
+        if (proc.pid) process.kill(-proc.pid, signal);
+      } catch {
+        /* already dead */
+      }
+    };
+    killGroup("SIGTERM");
     await sleep(500);
-    try {
-      proc.kill("SIGKILL");
-    } catch {
-      /* already dead */
-    }
+    killGroup("SIGKILL");
   }
 
   let server = startDevServer();

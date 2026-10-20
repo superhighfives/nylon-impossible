@@ -5,12 +5,31 @@ This file is the repo-specific part.
 
 ## Layout
 
-pnpm workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
+Bun workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
 `src/marketing`. `@nylon-impossible/shared` is consumed by both `web` and `api`.
 
-`web`, `api`, and `admin` have their own check scripts, so `pnpm typecheck` and
-`pnpm lint` fan out to those three. Per-package variants are prefixed (`pnpm
-api:test`, `pnpm web:typecheck`).
+`web`, `api`, and `admin` have their own check scripts, so `bun run typecheck`
+and `bun run lint` fan out to those three. Per-package variants are prefixed
+(`bun run api:test`, `bun run web:typecheck`).
+
+## Bun
+
+Bun is the package manager and script runner; Node still runs the tools.
+wrangler, vitest (and `@cloudflare/vitest-pool-workers`) and vite execute
+under Node via their shebangs, so don't add `--bun` to them, and keep
+`actions/setup-node` in CI.
+
+- Always `bun run <script>`. `bun test` is Bun's own test runner and ignores
+  the `test` script entirely.
+- A root script that targets one workspace is `bun run --cwd src/x <script>`.
+  The flag has to come **after** `run`: `bun --cwd src/x run <script>` prints
+  the script list and exits 0, so a check written that way passes without
+  running anything.
+- `bunfig.toml` pins the isolated linker, so each package only sees the deps it
+  declares, as it did under pnpm.
+- `patches/vitest@5.0.3.patch` is listed in `patchedDependencies` and keyed to
+  that exact version. If vitest is bumped, regenerate the patch with
+  `bun patch vitest` / `bun patch --commit`, or the API tests stop parsing.
 
 Biome config lives at the root; each workspace invokes it with
 `--config-path ../..`. Don't add a per-workspace `biome.json`.

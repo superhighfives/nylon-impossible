@@ -1,0 +1,5 @@
+[install]
+# Match the strict, pnpm-style layout the repo was built against: each
+# package only sees the deps it declares. bun.lock defaults to this for
+# workspaces too; pinning it keeps a lockfile regeneration from flipping it.
+linker = "isolated"

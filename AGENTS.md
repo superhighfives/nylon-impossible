@@ -28,7 +28,7 @@ nylon-impossible/
 │   ├── in-progress/  # Plans currently being worked on
 │   └── done/         # Completed plans
 ├── scripts/          # Shell scripts (db reset, backup)
-├── package.json      # Root pnpm workspace
+├── package.json      # Root Bun workspace
 └── AGENTS.md         # This file
 ```
 
@@ -36,10 +36,12 @@ Each subproject has its own README. The web project also has `src/web/AGENTS.md`
 
 ## Package Manager
 
-This repo uses **pnpm** with workspaces. Always use `pnpm`, never `npm` or `yarn`.
+This repo uses **Bun** (1.3.10) with workspaces as its package manager and script runner. Always use `bun`, never `pnpm`, `npm` or `yarn`.
+
+Run scripts with `bun run <script>`, not `bun <script>`: `bun test` is Bun's own test runner, not this repo's `test` script. Tools like wrangler, vitest and vite still run on Node, so Node is required too.
 
 ```bash
-pnpm install          # Install all dependencies
+bun install          # Install all dependencies
 ```
 
 Node.js 24.21.0+ is required.
@@ -51,11 +53,11 @@ All commands below are run from the **repo root** unless noted.
 ### Development
 
 ```bash
-pnpm dev              # Start web + API dev servers in parallel
-pnpm web:dev          # Web only (http://localhost:3000)
-pnpm api:dev          # API only (http://localhost:8787)
-pnpm ios:open         # Open Xcode project
-pnpm ios:simulator    # Open iOS Simulator
+bun run dev              # Start web + API dev servers in parallel
+bun run web:dev          # Web only (http://localhost:3000)
+bun run api:dev          # API only (http://localhost:8787)
+bun run ios:open         # Open Xcode project
+bun run ios:simulator    # Open iOS Simulator
 ```
 
 ### Code Quality
@@ -63,40 +65,40 @@ pnpm ios:simulator    # Open iOS Simulator
 **Always run these before committing and verify they pass. CI enforces them and PRs will fail if they don't.**
 
 ```bash
-pnpm lint             # Biome linter (web + API)
-pnpm check            # Biome lint + format check (web + API)
-pnpm typecheck        # TypeScript type checking (web + API)
-pnpm test             # Vitest tests (web + API)
+bun run lint             # Biome linter (web + API)
+bun run check            # Biome lint + format check (web + API)
+bun run typecheck        # TypeScript type checking (web + API)
+bun run test             # Vitest tests (web + API)
 ```
 
 Per-project:
 ```bash
-pnpm web:check && pnpm web:typecheck && pnpm web:test
-pnpm api:check && pnpm api:typecheck && pnpm api:test
+bun run web:check && bun run web:typecheck && bun run web:test
+bun run api:check && bun run api:typecheck && bun run api:test
 ```
 
-> After making any code changes, run `pnpm check` and confirm the output is `No fixes applied` before committing. If it reports errors, fix them first.
+> After making any code changes, run `bun run check` and confirm the output is `No fixes applied` before committing. If it reports errors, fix them first.
 
 ### Database
 
 Migrations live in `src/api/migrations/` and are shared between web and API.
 
 ```bash
-pnpm db:migrate        # Apply migrations locally
-pnpm db:migrate:remote # Apply migrations to production
-pnpm db:generate       # Generate migration from schema changes (Drizzle Kit)
-pnpm db:status         # List migration history
-pnpm db:seed           # Seed local database
-pnpm db:fresh          # Reset + seed local database
-pnpm db:studio         # Open Drizzle Studio
+bun run db:migrate        # Apply migrations locally
+bun run db:migrate:remote # Apply migrations to production
+bun run db:generate       # Generate migration from schema changes (Drizzle Kit)
+bun run db:status         # List migration history
+bun run db:seed           # Seed local database
+bun run db:fresh          # Reset + seed local database
+bun run db:studio         # Open Drizzle Studio
 ```
 
 ### Deployment
 
 ```bash
-pnpm deploy            # Deploy web + API to Cloudflare Workers
-pnpm web:deploy        # Deploy web only
-pnpm api:deploy        # Deploy API only
+bun run deploy            # Deploy web + API to Cloudflare Workers
+bun run web:deploy        # Deploy web only
+bun run api:deploy        # Deploy API only
 ```
 
 ## Architecture
@@ -309,8 +311,8 @@ Variable naming: `--color-{color}-{step}` for light, `--color-{color}dark-{step}
 
 ## Common Gotchas
 
-- **Database migrations** are defined in `src/api/migrations/` but applied via the root `pnpm db:migrate` command. The API owns the schema; web reads from the same D1 binding.
-- **Cloudflare types** (`worker-configuration.d.ts`) are generated — run `pnpm cf-typegen` from within `src/web/` or `src/api/` after changing `wrangler.jsonc`.
+- **Database migrations** are defined in `src/api/migrations/` but applied via the root `bun run db:migrate` command. The API owns the schema; web reads from the same D1 binding.
+- **Cloudflare types** (`worker-configuration.d.ts`) are generated — run `bun run cf-typegen` from within `src/web/` or `src/api/` after changing `wrangler.jsonc`.
 - **Route tree** (`src/web/src/routeTree.gen.ts`) is auto-generated by TanStack Router — do not edit it manually.
 - **WebSocket auth**: the iOS client passes the JWT as a query param (`/ws?token=<jwt>`); the web client also uses this pattern via `useWebSocket.ts`.
 - **Effect**: the web app uses Effect throughout for error handling. Do not bypass Effect's error channels with raw try/catch in server functions.
