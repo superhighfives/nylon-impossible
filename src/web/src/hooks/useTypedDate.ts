@@ -32,14 +32,12 @@ export function useTypedDate(input: string): TypedDate {
   const firstLine = newline === -1 ? trimmed : trimmed.slice(0, newline);
   const rest = newline === -1 ? "" : trimmed.slice(newline);
   const result = parseTodoDate(firstLine, { now: new Date(), timeZone });
+  const dueDay = result.dueDay;
   const key =
-    result.dueDay && result.matched
-      ? `${result.matched.text.toLowerCase()}|${dueDayKey(result.dueDay)}`
+    dueDay && result.matched
+      ? `${result.matched.text.toLowerCase()}|${dueDayKey(dueDay)}`
       : null;
-  const active =
-    result.dueDay && key !== dismissedKey
-      ? (result as ParsedTodoDate & { dueDay: Date })
-      : null;
+  const active = dueDay && key !== dismissedKey ? { ...result, dueDay } : null;
 
   return {
     parsed: active,
