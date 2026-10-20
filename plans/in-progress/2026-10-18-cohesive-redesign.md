@@ -81,8 +81,11 @@ What exists after the redesign. Anything not listed here is deleted.
 - **Done**: `completed` stays in the database.
   - Undo needs it, Gmail ticks need it, and completed todos keep their
     `listId` so they can be restored to the right list.
-  - Completing a repeating todo advances its due date in place, as it does
-    today. The row stays and briefly shows its new date.
+  - Completing a repeating todo advances its due date, and the next occurrence
+    goes where that date puts it: due today or tomorrow → Today, within 7 days
+    → This Week, later → Someday (`placementForDueDate`). Today stays a list of
+    things still to do. The toast says when it's next and, if it left the
+    list, where it went: "Done · next Mon, in This Week". (Decided 2026-10-20.)
 - **Timezone**: every client sends the device timezone automatically.
   - Web detects it with `Intl`. iOS uses `TimeZone.current` and reports it on
     launch and when it changes.
