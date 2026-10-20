@@ -319,8 +319,8 @@ async function captureWebScreenshots(): Promise<void> {
   function startDevServer() {
     console.log("  Starting web dev server…");
     const proc = spawn(
-      "pnpm",
-      ["--filter", "@nylon-impossible/web", "dev"],
+      "bun",
+      ["run", "--cwd", "src/web", "dev"],
       {
         cwd: WORKSPACE_ROOT,
         env: { ...process.env },

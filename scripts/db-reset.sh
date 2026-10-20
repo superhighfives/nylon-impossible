@@ -7,4 +7,4 @@ echo "Removing local D1 database..."
 rm -f "$DB_STATE"/*.sqlite*
 
 echo "Re-applying migrations..."
-pnpm db:migrate
+bun run db:migrate
