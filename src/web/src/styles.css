@@ -35,6 +35,59 @@
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
+/* Design tokens (tokens.css, generated) exposed as Tailwind utilities, so the
+   redesigned components can write `bg-n-canvas text-n-ink border-n-hairline`
+   instead of radix-utilities classes or raw values. `inline` keeps each
+   utility pointing at the token variable, so `.dark` overrides apply live. */
+@theme inline {
+  --color-n-canvas: var(--n-color-canvas);
+  --color-n-surface: var(--n-color-surface);
+  --color-n-fill: var(--n-color-fill);
+  --color-n-hairline: var(--n-color-hairline);
+  --color-n-ink: var(--n-color-ink);
+  --color-n-ink-muted: var(--n-color-ink-muted);
+  --color-n-ink-subtle: var(--n-color-ink-subtle);
+  --color-n-overdue: var(--n-color-overdue);
+  --color-n-destructive: var(--n-color-destructive);
+  --color-n-destructive-fill: var(--n-color-destructive-fill);
+  --color-n-brand: var(--n-color-brand);
+  --color-n-brand-ink: var(--n-color-brand-ink);
+  --font-n-display: var(--n-font-display);
+  --font-n-text: var(--n-font-text);
+  --radius-n-chip: var(--n-radius-chip);
+  --radius-n-field: var(--n-radius-field);
+  --ease-n-out: var(--n-ease-out-strong);
+
+  /* Phone layout motion. Reduced motion stops keyframes outright (see the
+     reset below), leaving the colour and opacity changes. */
+  --animate-n-pop: n-pop 240ms var(--n-ease-out-strong);
+  --animate-n-fade-in: n-fade-in var(--n-duration-fast) ease-out;
+  --animate-n-row-in: n-row-in var(--n-duration-slow) var(--n-ease-out-strong);
+
+  @keyframes n-pop {
+    0% {
+      transform: scale(1);
+    }
+    45% {
+      transform: scale(1.18);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  @keyframes n-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes n-row-in {
+    from {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+  }
+}
+
 html,
 body {
   height: 100%;
@@ -101,6 +154,41 @@ code {
   /* Tooltips moving between adjacent triggers shouldn't re-animate. */
   &[data-instant] {
     transition-duration: 0ms;
+  }
+}
+
+/* Focus ring for the redesigned (token-only) components: a yellow fill ring
+   with a hairline of ink inside it, so it reads on paper-white (where yellow
+   alone is ~1.3:1) as well as on dark. `n-focus-inset` draws it inside the
+   element for controls that sit in an overflow-clipped row. */
+@utility n-focus {
+  outline: none;
+  &:focus-visible {
+    outline: 3px solid var(--n-color-brand);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 1px var(--n-color-ink);
+  }
+}
+
+@utility n-focus-inset {
+  outline: none;
+  &:focus-visible {
+    outline: 3px solid var(--n-color-brand);
+    outline-offset: -3px;
+    box-shadow: inset 0 0 0 4px var(--n-color-ink);
+  }
+}
+
+/* Grows a small control's hit area to at least 44×44 (the spec's minimum
+   target) without changing its look: an invisible ::before, centred, that
+   only extends on the axes where the control is smaller than 44px. */
+@utility n-hit {
+  position: relative;
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: min(0px, calc((100% - 2.75rem) / 2));
+    inset-inline: min(0px, calc((100% - 2.75rem) / 2));
   }
 }
 

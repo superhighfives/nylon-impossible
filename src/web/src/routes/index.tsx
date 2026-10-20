@@ -3,6 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { BoardChrome } from "@/components/BoardChrome";
 import { LandingPage } from "@/components/LandingPage";
+import { LayoutSwitch } from "@/components/phone/LayoutSwitch";
+import { PhoneApp } from "@/components/phone/PhoneApp";
 import { TodoGrid } from "@/components/TodoGrid";
 import {
   useWebSocketConnection,
@@ -33,13 +35,21 @@ function SignedInContent() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  // The board is a fixed full-viewport surface (TodoGrid owns the column
-  // grid and all board-level overlays); BoardChrome floats the logotype, the
+  // Under 1024px the phone layout (Phase 3); at 1024px and up the board, a
+  // fixed full-viewport surface (TodoGrid owns the column grid and all
+  // board-level overlays) with BoardChrome floating the logotype, the
   // quick-add composer, and Settings/account controls above it.
   return (
     <WebSocketSyncContext.Provider value={wsSync}>
-      <BoardChrome composerRef={composerRef} />
-      <TodoGrid />
+      <LayoutSwitch
+        phone={<PhoneApp />}
+        wide={
+          <>
+            <BoardChrome composerRef={composerRef} />
+            <TodoGrid />
+          </>
+        }
+      />
     </WebSocketSyncContext.Provider>
   );
 }

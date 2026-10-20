@@ -18,6 +18,7 @@ import { messageFromError, toast } from "@/lib/toast";
 import {
   createTodo,
   deleteTodo,
+  deleteTodoUrl,
   getTodos,
   updateTodo,
   updateTodoUrlPreview,
@@ -231,6 +232,9 @@ export function useUpdateTodo() {
                 completedAt: input.completedAt?.toISOString() ?? null,
               }),
               ...(input.pinned !== undefined && { pinned: input.pinned }),
+              // A move lands in its new list straight away, rather than
+              // waiting for the refetch (the phone's "Move to …" relies on it).
+              ...(input.listId !== undefined && { listId: input.listId }),
             };
             // Optimistic recurrence advance: if this update marks a recurring
             // todo complete, roll dueDate forward, keep completed = false, and
@@ -531,6 +535,43 @@ export function useProcessTodo() {
     onError: (err) => {
       Sentry.captureException(err, { tags: { mutation: "processTodo" } });
       toast.error(messageFromError(err, "Couldn't process todo"));
+    },
+  });
+}
+
+/** Remove one link from a todo, optimistically dropping it from the cache. */
+export function useDeleteTodoUrl() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+
+  return useMutation({
+    mutationFn: (id: string) => deleteTodoUrl({ data: id }),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+      if (previousTodos) {
+        queryClient.setQueryData<TodoWithUrls[]>(
+          TODOS_QUERY_KEY,
+          previousTodos.map((todo) =>
+            todo.urls.some((url) => url.id === id)
+              ? { ...todo, urls: todo.urls.filter((url) => url.id !== id) }
+              : todo,
+          ),
+        );
+      }
+      return { previousTodos };
+    },
+    onError: (err, _id, context) => {
+      Sentry.captureException(err, { tags: { mutation: "deleteTodoUrl" } });
+      toast.error(messageFromError(err, "Couldn't remove link"));
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
     },
   });
 }
