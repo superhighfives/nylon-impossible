@@ -43,9 +43,22 @@ enum TaskCreationService {
         allTodos: [TodoItem],
         // Which list to create into; nil defaults to Today server-side once
         // this syncs (mirrors the web/API default for an omitted listId).
-        listId: String? = nil
+        listId: String? = nil,
+        // Run the typed-date parser ("Pay rent tomorrow" → "Pay rent", due
+        // tomorrow). On for the add bar, Siri and Share; off where the title
+        // is already final (subtasks, edits).
+        parseDate: Bool = false,
+        now: Date = Date()
     ) -> TodoItem {
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        var dueDate: Date?
+        if parseDate {
+            let parsed = TodoDateParser.parse(trimmedTitle, now: now)
+            if let dueDay = parsed.dueDay {
+                trimmedTitle = parsed.title
+                dueDate = dueDay
+            }
+        }
 
         // Generate position before the first incomplete todo *in the target
         // list* so the new task appears at the top of its own list —
@@ -67,6 +80,7 @@ enum TaskCreationService {
         )
         todo.listKey = listId
         todo.listEnteredAt = Date()
+        todo.dueDate = dueDate
 
         context.insert(todo)
         
@@ -134,7 +148,10 @@ enum TaskCreationService {
         userId: String?,
         context: ModelContext,
         allTodos: [TodoItem],
-        listId: String? = nil
+        listId: String? = nil,
+        // False once the user dismisses the add bar's "Due Fri ×" chip, so
+        // the words stay in the title as typed.
+        parseDate: Bool = true
     ) -> TodoItem? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
@@ -145,7 +162,10 @@ enum TaskCreationService {
             userId: userId,
             context: context,
             allTodos: allTodos,
-            listId: listId
+            listId: listId,
+            // A "Check domain.com" or truncated title isn't what was typed,
+            // so its end isn't the end of the user's words.
+            parseDate: parseDate && parsed.title == trimmed
         )
 
         if !parsed.urls.isEmpty {
@@ -267,13 +287,15 @@ enum TaskCreationService {
         url: String,
         userId: String?,
         context: ModelContext,
-        allTodos: [TodoItem]
+        allTodos: [TodoItem],
+        parseDate: Bool = false
     ) -> TodoItem {
         let todo = createTask(
             title: title,
             userId: userId,
             context: context,
-            allTodos: allTodos
+            allTodos: allTodos,
+            parseDate: parseDate
         )
         
         // Store URL in pendingUrls — sent explicitly in the sync payload

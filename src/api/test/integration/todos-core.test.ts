@@ -114,7 +114,7 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
       expect(result).toBeNull();
     });
 
-    it("applies a title/notes/dueDate/sticky patch", async () => {
+    it("applies a title/notes/dueDate/pinned patch", async () => {
       const id = "aaaaaaaa-2222-2222-2222-222222222222";
       await seedTodo(id, USER, { title: "Original" });
       const dueDate = new Date("2026-09-01T00:00:00.000Z");
@@ -123,13 +123,13 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
         title: "Renamed",
         notes: "Some notes",
         dueDate,
-        sticky: true,
+        pinned: true,
       });
 
       expect(updated?.title).toBe("Renamed");
       expect(updated?.notes).toBe("Some notes");
       expect(updated?.dueDate?.getTime()).toBe(dueDate.getTime());
-      expect(updated?.sticky).toBe(true);
+      expect(updated?.pinned).toBe(true);
     });
 
     it("rolls a recurring todo's dueDate forward instead of completing it", async () => {

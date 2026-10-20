@@ -7,6 +7,11 @@ import { and, asc, eq, getDb, inArray, todos, todoUrls } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
+import {
+  normalizePinned,
+  pinnedRequestFields,
+  pinnedResponseFields,
+} from "../lib/pinned";
 import { InvalidListError, updateTodoCore } from "../lib/todos-core";
 import type { Env } from "../types";
 
@@ -21,21 +26,23 @@ const createTodoSchema = z.object({
   listId: listIdSchema.optional(),
 });
 
-const updateTodoSchema = z.object({
-  title: z.string().min(1).max(TODO_TITLE_MAX).optional(),
-  notes: z.string().nullable().optional(),
-  completed: z.boolean().optional(),
-  position: z.string().optional(),
-  // Normalized to UTC midnight — due dates are calendar days.
-  dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
-  recurrence: recurrenceSchema.nullable().optional(),
-  // Client-set only to undo a completed repeat (cleared to null). Normal
-  // completions are stamped server-side.
-  completedAt: z.coerce.date().nullable().optional(),
-  updatedAt: z.coerce.date().optional(),
-  sticky: z.boolean().optional(),
-  listId: listIdSchema.optional(),
-});
+const updateTodoSchema = z
+  .object({
+    title: z.string().min(1).max(TODO_TITLE_MAX).optional(),
+    notes: z.string().nullable().optional(),
+    completed: z.boolean().optional(),
+    position: z.string().optional(),
+    // Normalized to UTC midnight — due dates are calendar days.
+    dueDate: z.coerce.date().transform(toDueDay).nullable().optional(),
+    recurrence: recurrenceSchema.nullable().optional(),
+    // Client-set only to undo a completed repeat (cleared to null). Normal
+    // completions are stamped server-side.
+    completedAt: z.coerce.date().nullable().optional(),
+    updatedAt: z.coerce.date().optional(),
+    ...pinnedRequestFields,
+    listId: listIdSchema.optional(),
+  })
+  .transform(normalizePinned);
 
 // Serialize a todo with ISO dates
 function serializeTodo(todo: typeof todos.$inferSelect) {
@@ -51,7 +58,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
-    sticky: todo.sticky,
+    ...pinnedResponseFields(todo.pinned),
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };

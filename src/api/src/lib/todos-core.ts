@@ -40,7 +40,7 @@ export interface UpdateTodoPatch {
   // completions are stamped server-side.
   completedAt?: Date | null;
   updatedAt?: Date;
-  sticky?: boolean;
+  pinned?: boolean;
   listId?: string;
 }
 
@@ -54,7 +54,7 @@ export interface UpdateTodoPatch {
  * Ordered by `lists.position` first — system lists are seeded before any
  * custom list and keep lower positions, so this naturally sorts Today / This
  * Week / Someday ahead of custom lists in creation/reorder order — then by
- * sticky/position within each list, matching the web board's own ordering.
+ * pinned/position within each list, matching the web board's own ordering.
  */
 export async function listOpenTodos(db: Db, userId: string) {
   return db
@@ -75,7 +75,7 @@ export async function listOpenTodos(db: Db, userId: string) {
         eq(todos.completed, false),
       ),
     )
-    .orderBy(asc(lists.position), desc(todos.sticky), asc(todos.position));
+    .orderBy(asc(lists.position), desc(todos.pinned), asc(todos.position));
 }
 
 /**
@@ -96,7 +96,7 @@ export async function listListsForUser(db: Db, userId: string) {
  * rules as the REST `updateTodo` handler:
  *   - a recurring todo being completed rolls its dueDate forward instead of
  *     persisting the completion (completed stays false, completedAt stamped),
- *   - completing a sticky todo clears sticky,
+ *   - completing a pinned todo unpins it,
  *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
  * null if the todo doesn't exist or isn't owned by `userId`.
@@ -158,9 +158,8 @@ export async function setTodoCompleted(
     }
   }
 
-  // Completing a sticky todo unsticks it — it sorts as an ordinary completed
-  // todo, not pinned.
-  if (completingRow && existing.sticky) updates.sticky = false;
+  // Completing a pinned todo unpins it — it sorts as an ordinary done todo.
+  if (completingRow && existing.pinned) updates.pinned = false;
 
   await db
     .update(todos)
@@ -185,12 +184,12 @@ export async function setTodoCompleted(
 
 /**
  * Apply a patch to a todo (title/notes/completed/position/dueDate/recurrence/
- * completedAt/sticky), applying the same server-canonical rules the REST
+ * completedAt/pinned), applying the same server-canonical rules the REST
  * `PUT /todos/:id` handler always has:
  *   - a recurring todo being completed for the first time rolls its dueDate
  *     forward instead of persisting the completion,
  *   - recurrence and subtasks are mutually exclusive (server-enforced),
- *   - completing a sticky todo clears sticky,
+ *   - completing a pinned todo unpins it,
  *   - completion cascades to subtasks.
  * Then pokes connected web/iOS clients to sync. Returns the updated row, or
  * null if the todo doesn't exist or isn't owned by `userId` — callers decide
@@ -222,7 +221,7 @@ export async function updateTodoCore(
   // completedAt is caller-set only to undo a completed repeat (null); a normal
   // completion stamps it server-side just below.
   if (patch.completedAt !== undefined) updates.completedAt = patch.completedAt;
-  if (patch.sticky !== undefined) updates.sticky = patch.sticky;
+  if (patch.pinned !== undefined) updates.pinned = patch.pinned;
   if (patch.listId !== undefined && patch.listId !== existing.listId) {
     const ownedListId = await verifyListOwnership(db, userId, patch.listId);
     if (!ownedListId) throw new InvalidListError();
@@ -278,9 +277,8 @@ export async function updateTodoCore(
     }
   }
 
-  // Completing a sticky todo unsticks it — it sorts as an ordinary completed
-  // todo, not pinned.
-  if (completingRow && existing.sticky) updates.sticky = false;
+  // Completing a pinned todo unpins it — it sorts as an ordinary done todo.
+  if (completingRow && existing.pinned) updates.pinned = false;
 
   await db
     .update(todos)

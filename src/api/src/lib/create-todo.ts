@@ -1,12 +1,14 @@
-import { splitTodoText } from "@nylon-impossible/shared";
+import { parseTodoDate, splitTodoText } from "@nylon-impossible/shared";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
+import { pinnedResponseFields } from "./pinned";
 import { finishTodoLinks } from "./process-todo";
 import { cleanUrlString, createFallbackFromUrl } from "./url-helpers";
+import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -24,6 +26,7 @@ export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
+    ...pinnedResponseFields(todo.pinned),
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
   };
@@ -62,6 +65,8 @@ function createInitialTodo(text: string): {
   title: string;
   notes: string | null;
   urls: string[];
+  /** Whether `title` is the input's whole first line, so it can be parsed. */
+  titleIsTyped: boolean;
 } {
   // Check if input is primarily a URL (URL takes up >80% of the text)
   const urlMatch = text.match(URL_REGEX);
@@ -69,7 +74,12 @@ function createInitialTodo(text: string): {
     const cleanedUrl = cleanUrlString(urlMatch[0]);
     const fallback = createFallbackFromUrl(cleanedUrl);
     if (fallback) {
-      return { title: fallback.title, notes: null, urls: [fallback.url] };
+      return {
+        title: fallback.title,
+        notes: null,
+        urls: [fallback.url],
+        titleIsTyped: false,
+      };
     }
   }
 
@@ -86,6 +96,9 @@ function createInitialTodo(text: string): {
     title,
     notes,
     urls: Array.from(new Set(urls)),
+    // A clipped title ("…") or a hostname fallback isn't what was typed, so
+    // its "end" isn't the end of the user's words.
+    titleIsTyped: title === text.trim().split("\n")[0].trim(),
   };
 }
 
@@ -122,6 +135,18 @@ export interface CreateSmartTodoOptions {
    * matching how `updateTodoCore` treats an incoming `listId` patch.
    */
   listId?: string;
+  /**
+   * Run the typed-date parser over the title ("Pay rent tomorrow" → "Pay
+   * rent", due tomorrow) against the user's timezone. Defaults to true so
+   * Siri, Share and Gmail input gets it. Clients that parse locally (to show
+   * the "Due Fri ×" chip) pass false along with their own `dueDate`.
+   */
+  parseDate?: boolean;
+  /**
+   * An explicit due day (already normalized with `toDueDay`). Wins over
+   * anything the parser would find.
+   */
+  dueDate?: Date | null;
   /**
    * Schedule background work (URL metadata fetch). In a Worker request this
    * is `c.executionCtx.waitUntil`. Callers with no execution context can pass
@@ -209,6 +234,25 @@ export async function createSmartTodo(
 
   const initial = createInitialTodo(trimmed);
 
+  // Typed dates. Subtasks have no due date of their own in the UI, so only
+  // top-level todos are parsed.
+  let dueDate: Date | null = options.dueDate ?? null;
+  if (
+    options.dueDate === undefined &&
+    options.parseDate !== false &&
+    !parentId &&
+    initial.titleIsTyped
+  ) {
+    const parsed = parseTodoDate(initial.title, {
+      now: new Date(),
+      timeZone: await getUserTimezone(db, userId),
+    });
+    if (parsed.dueDay) {
+      initial.title = parsed.title;
+      dueDate = parsed.dueDay;
+    }
+  }
+
   // Merge any caller-supplied URLs (e.g. a Gmail thread permalink) with those
   // parsed from the text, keeping order (parsed first) and deduping. extraUrls
   // passes the same http/https gate as parsed URLs — a caller-supplied value is
@@ -253,6 +297,7 @@ export async function createSmartTodo(
     notes: initial.notes,
     completed: false,
     position,
+    dueDate,
     createdAt: now,
     updatedAt: now,
   });

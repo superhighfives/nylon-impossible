@@ -161,14 +161,16 @@ class ShareViewController: UIViewController {
                 url: url,
                 userId: userId,
                 context: context,
-                allTodos: allTodos
+                allTodos: allTodos,
+                parseDate: true
             )
         } else {
             _ = TaskCreationService.createTask(
                 title: title,
                 userId: userId,
                 context: context,
-                allTodos: allTodos
+                allTodos: allTodos,
+                parseDate: true
             )
         }
 

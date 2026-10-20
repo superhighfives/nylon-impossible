@@ -48,6 +48,8 @@ final class MockAPIService: APIProviding {
             id: getMeResponse.id,
             email: getMeResponse.email,
             theme: request.theme ?? getMeResponse.theme,
+            timezone: request.timezone ?? getMeResponse.timezone,
+            timezoneAuto: request.timezoneAuto ?? getMeResponse.timezoneAuto,
             createdAt: getMeResponse.createdAt,
             updatedAt: Date()
         )

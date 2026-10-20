@@ -22,7 +22,7 @@ final class TodoViewModel {
         !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Sort a set of todos the sticky-first way every list page does. When
+    /// Sort a set of todos the pinned-first way every list page does. When
     /// `listId` is given, also scopes to that list first — the single place
     /// list-membership filtering happens, so callers (e.g. `ContentView`'s
     /// per-page todos) don't have to re-derive it themselves. `listId` is
@@ -38,11 +38,11 @@ final class TodoViewModel {
             scoped = activeTodos
         }
 
-        // Sort: sticky-first among incomplete (by position asc within each
+        // Sort: pinned-first among incomplete (by position asc within each
         // tier), then completed (most recently completed first). "Effective"
         // completion counts a repeat completed today as done until local
-        // midnight. Completing a todo clears sticky, so
-        // only incomplete todos ever participate in the sticky tier.
+        // midnight. Completing a todo clears pinned, so
+        // only incomplete todos ever participate in the pinned tier.
         return scoped.sorted { a, b in
             let aDone = a.isEffectivelyCompleted
             let bDone = b.isEffectivelyCompleted
@@ -50,8 +50,8 @@ final class TodoViewModel {
                 return !aDone
             }
             if !aDone {
-                if a.sticky != b.sticky {
-                    return a.sticky
+                if a.pinned != b.pinned {
+                    return a.pinned
                 }
                 return a.position < b.position
             }
@@ -112,7 +112,7 @@ final class TodoViewModel {
         todo.markModified()
     }
 
-    /// - Parameter listId: threaded through the same way `sticky` is — nil
+    /// - Parameter listId: threaded through the same way `pinned` is — nil
     ///   leaves the todo's current list untouched. In practice the edit sheet
     ///   moves a todo via its own picker (`onMoveToList`, fired immediately,
     ///   not bundled into Save) since that's the only cross-list affordance
@@ -124,14 +124,14 @@ final class TodoViewModel {
         notes: String?,
         dueDate: Date?,
         recurrence: Recurrence?,
-        sticky: Bool,
+        pinned: Bool,
         listId: String? = nil
     ) {
         todo.title = title
         todo.itemNotes = notes
         todo.dueDate = dueDate
         todo.recurrence = recurrence
-        todo.sticky = sticky
+        todo.pinned = pinned
         if let listId, listId != todo.listKey {
             todo.listKey = listId
             todo.listEnteredAt = Date()
@@ -165,10 +165,10 @@ final class TodoViewModel {
         TodoCompletionService.toggle(todo, allTodos: allTodos, lists: lists)
     }
 
-    /// Toggle sticky. Non-destructive and instantly reversible, so this is a
+    /// Toggle pinned. Non-destructive and instantly reversible, so this is a
     /// plain flip with no confirm step — mirrors the web pin button.
-    func toggleSticky(_ todo: TodoItem) {
-        todo.sticky.toggle()
+    func togglePinned(_ todo: TodoItem) {
+        todo.pinned.toggle()
         todo.markModified()
     }
 

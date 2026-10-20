@@ -7,7 +7,7 @@ import { lists, todos, todoUrls } from "./schema";
 
 // D1 caps bound parameters at 100 per statement. The demo-todo row here sets
 // 10 fields explicitly; NOT NULL columns left unset (listEnteredAt,
-// needsInput, sticky) may still bind hidden default params, so budget for up
+// needsInput, pinned) may still bind hidden default params, so budget for up
 // to 13 and chunk conservatively.
 const TODO_INSERT_CHUNK_SIZE = 6;
 // The demo-url row sets all non-null-default-only columns explicitly, no

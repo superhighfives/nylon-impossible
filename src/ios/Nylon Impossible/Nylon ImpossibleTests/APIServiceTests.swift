@@ -124,7 +124,7 @@ struct APIServiceTests {
             completedAt: nil,
             updatedAt: Date(timeIntervalSince1970: 1700000000),
             deleted: nil,
-            sticky: nil,
+            pinned: nil,
             urls: nil
         )
 

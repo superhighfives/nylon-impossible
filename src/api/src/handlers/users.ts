@@ -1,3 +1,4 @@
+import { isValidTimeZone } from "@nylon-impossible/shared";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { eq, getDb, users } from "../lib/db";
@@ -8,8 +9,45 @@ import type { Env } from "../types";
 
 const updatePreferencesSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).optional(),
-  timezone: z.string().min(1).max(100).optional(),
+  timezone: z
+    .string()
+    .min(1)
+    .max(100)
+    .refine(isValidTimeZone, "timezone must be an IANA time zone")
+    .optional(),
+  // false once a zone is picked by hand; true hands it back to the device.
+  timezoneAuto: z.boolean().optional(),
 });
+
+const userColumns = {
+  id: users.id,
+  email: users.email,
+  theme: users.theme,
+  timezone: users.timezone,
+  timezoneAuto: users.timezoneAuto,
+  createdAt: users.createdAt,
+  updatedAt: users.updatedAt,
+};
+
+function serializeUser(user: {
+  id: string;
+  email: string;
+  theme: "light" | "dark" | "system";
+  timezone: string;
+  timezoneAuto: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    theme: user.theme,
+    timezone: user.timezone,
+    timezoneAuto: user.timezoneAuto,
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
+  };
+}
 
 // GET /users/me
 export async function getMe(c: Context<Env>) {
@@ -23,14 +61,7 @@ export async function getMe(c: Context<Env>) {
   await ensureUser(c.env, db, userId);
 
   const user = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      theme: users.theme,
-      timezone: users.timezone,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-    })
+    .select(userColumns)
     .from(users)
     .where(eq(users.id, userId))
     .limit(1)
@@ -40,14 +71,7 @@ export async function getMe(c: Context<Env>) {
     return apiError(c, "user_not_found");
   }
 
-  return c.json({
-    id: user.id,
-    email: user.email,
-    theme: user.theme,
-    timezone: user.timezone,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  });
+  return c.json(serializeUser(user));
 }
 
 // PATCH /users/me
@@ -66,12 +90,16 @@ export async function updateMe(c: Context<Env>) {
   const updates: Partial<{
     theme: "light" | "dark" | "system";
     timezone: string;
+    timezoneAuto: boolean;
   }> = {};
   if (parsed.data.theme !== undefined) {
     updates.theme = parsed.data.theme;
   }
   if (parsed.data.timezone !== undefined) {
     updates.timezone = parsed.data.timezone;
+  }
+  if (parsed.data.timezoneAuto !== undefined) {
+    updates.timezoneAuto = parsed.data.timezoneAuto;
   }
 
   if (Object.keys(updates).length === 0) {
@@ -85,14 +113,7 @@ export async function updateMe(c: Context<Env>) {
 
   // Fetch updated user
   const user = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      theme: users.theme,
-      timezone: users.timezone,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-    })
+    .select(userColumns)
     .from(users)
     .where(eq(users.id, userId))
     .limit(1)
@@ -102,14 +123,7 @@ export async function updateMe(c: Context<Env>) {
     return apiError(c, "user_not_found");
   }
 
-  return c.json({
-    id: user.id,
-    email: user.email,
-    theme: user.theme,
-    timezone: user.timezone,
-    createdAt: user.createdAt.toISOString(),
-    updatedAt: user.updatedAt.toISOString(),
-  });
+  return c.json(serializeUser(user));
 }
 
 // DELETE /users/me

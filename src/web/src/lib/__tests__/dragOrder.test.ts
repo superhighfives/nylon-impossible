@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { clampToTier, insertInTier, positionAt } from "../dragOrder";
 
-const row = (id: string, position: string, sticky = false) => ({
+const row = (id: string, position: string, pinned = false) => ({
   id,
   position,
-  sticky,
+  pinned,
 });
 
 // Two pinned rows, then three unpinned.

@@ -76,7 +76,7 @@ describe("TodoInput", () => {
     fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
 
     expect(mutate).toHaveBeenCalledWith(
-      { text: "Buy milk" },
+      { text: "Buy milk", parseDate: false, dueDate: null },
       expect.any(Object),
     );
   });
@@ -92,7 +92,7 @@ describe("TodoInput", () => {
 
     fireEvent.keyDown(textarea, { key: "Enter", shiftKey: false });
     expect(mutate).toHaveBeenCalledWith(
-      { text: "Ship it" },
+      { text: "Ship it", parseDate: false, dueDate: null },
       expect.any(Object),
     );
   });
@@ -226,7 +226,7 @@ describe("TodoInput", () => {
     fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
 
     expect(mutate).toHaveBeenCalledWith(
-      { text: "Buy milk", listId: "today-id" },
+      { text: "Buy milk", listId: "today-id", parseDate: false, dueDate: null },
       expect.any(Object),
     );
   });
@@ -249,7 +249,7 @@ describe("TodoInput", () => {
     fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
 
     expect(mutate).toHaveBeenCalledWith(
-      { text: "Plan trip", listId: "week-id" },
+      { text: "Plan trip", listId: "week-id", parseDate: false, dueDate: null },
       expect.any(Object),
     );
   });
@@ -272,5 +272,51 @@ describe("TodoInput", () => {
     stubSmartCreate();
     render(<TodoInput />);
     expect(screen.queryByLabelText("List to add to")).toBeNull();
+  });
+
+  describe("typed dates", () => {
+    it("shows a Due chip and sends the stripped title with its due day", () => {
+      const mutate = stubSmartCreate();
+      render(<TodoInput />);
+      fireEvent.change(screen.getByLabelText("New todo"), {
+        target: { value: "Pay rent tomorrow" },
+      });
+      expect(screen.getByText(/Due Tomorrow/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
+      const [input] = mutate.mock.calls[0] as unknown as [
+        { text: string; parseDate?: boolean; dueDate?: Date | null },
+      ];
+      expect(input.text).toBe("Pay rent");
+      expect(input.parseDate).toBe(false);
+      expect(input.dueDate).toBeInstanceOf(Date);
+    });
+
+    it("keeps the words as typed once the chip is dismissed", () => {
+      const mutate = stubSmartCreate();
+      render(<TodoInput />);
+      fireEvent.change(screen.getByLabelText("New todo"), {
+        target: { value: "Pay rent tomorrow" },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: /keep "tomorrow" in the title/i }),
+      );
+      expect(screen.queryByText(/Due Tomorrow/)).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: /add todo/i }));
+      expect(mutate).toHaveBeenCalledWith(
+        { text: "Pay rent tomorrow", parseDate: false, dueDate: null },
+        expect.any(Object),
+      );
+    });
+
+    it("leaves a weekday mid-sentence alone", () => {
+      stubSmartCreate();
+      render(<TodoInput />);
+      fireEvent.change(screen.getByLabelText("New todo"), {
+        target: { value: "Call Mum about Sunday lunch" },
+      });
+      expect(screen.queryByText(/^Due /)).toBeNull();
+    });
   });
 });

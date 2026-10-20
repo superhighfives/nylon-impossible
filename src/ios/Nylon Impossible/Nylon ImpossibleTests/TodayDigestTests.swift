@@ -77,7 +77,7 @@ struct TodayDigestTests {
         completed: Bool = false,
         completedAt: Date? = nil,
         deleted: Bool = false,
-        sticky: Bool = false,
+        pinned: Bool = false,
         parentId: UUID? = nil,
         recurrence: Recurrence? = nil
     ) -> TodoItem {
@@ -90,7 +90,7 @@ struct TodayDigestTests {
         todo.isCompleted = completed
         todo.completedAt = completedAt
         todo.isDeleted = deleted
-        todo.sticky = sticky
+        todo.pinned = pinned
         todo.parentId = parentId
         todo.recurrence = recurrence
         return todo
@@ -285,9 +285,9 @@ struct TodayDigestTests {
 
     // MARK: - Order
 
-    @Test("Sticky first, then soonest due, then position")
+    @Test("Pinned first, then soonest due, then position")
     @MainActor
-    func ordersStickyThenDueThenPosition() throws {
+    func ordersPinnedThenDueThenPosition() throws {
         let now = Self.now
         let container = try makeContainer()
         let context = container.mainContext
@@ -296,7 +296,7 @@ struct TodayDigestTests {
         insert(context, title: "Same day, later position", dueDate: dueToday, position: "a2")
         insert(context, title: "Same day, earlier position", dueDate: dueToday, position: "a1")
         insert(context, title: "Overdue", dueDate: dueToday.addingTimeInterval(-86_400), position: "a9")
-        insert(context, title: "Pinned", dueDate: dueToday, position: "a9", sticky: true)
+        insert(context, title: "Pinned", dueDate: dueToday, position: "a9", pinned: true)
 
         let due = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 
@@ -319,7 +319,7 @@ struct TodayDigestTests {
         insert(context, title: "Undated, later position", dueDate: nil, listKey: Self.todayListId, position: "a2")
         insert(context, title: "Undated, earlier position", dueDate: nil, listKey: Self.todayListId, position: "a1")
         insert(context, title: "Overdue", dueDate: Self.dueToday.addingTimeInterval(-86_400), position: "a9")
-        insert(context, title: "Pinned and undated", dueDate: nil, listKey: Self.todayListId, position: "a9", sticky: true)
+        insert(context, title: "Pinned and undated", dueDate: nil, listKey: Self.todayListId, position: "a9", pinned: true)
 
         let forToday = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
 

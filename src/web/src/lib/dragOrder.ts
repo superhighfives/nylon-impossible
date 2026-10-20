@@ -2,13 +2,13 @@ import { generateKeyBetween } from "fractional-indexing";
 
 interface Orderable {
   id: string;
-  sticky: boolean;
+  pinned: boolean;
   position: string;
 }
 
 /**
  * Clamp an insertion index into the dragged row's own tier. A list's
- * incomplete order is pinned (sticky) rows first, then the rest, so a pinned
+ * incomplete order is pinned rows first, then the rest, so a pinned
  * row can only land among the pinned and an unpinned one only after them.
  *
  * `items` is the target list's order *without* the dragged row; `index` is a
@@ -16,13 +16,13 @@ interface Orderable {
  */
 export function clampToTier<T extends Orderable>(
   items: T[],
-  sticky: boolean,
+  pinned: boolean,
   index: number,
 ): number {
-  const stickyCount = items.filter((t) => t.sticky).length;
-  return sticky
-    ? Math.min(Math.max(index, 0), stickyCount)
-    : Math.min(Math.max(index, stickyCount), items.length);
+  const pinnedCount = items.filter((t) => t.pinned).length;
+  return pinned
+    ? Math.min(Math.max(index, 0), pinnedCount)
+    : Math.min(Math.max(index, pinnedCount), items.length);
 }
 
 /**
@@ -34,7 +34,7 @@ export function insertInTier<T extends Orderable>(
   item: T,
   index: number,
 ): T[] {
-  const at = clampToTier(items, item.sticky, index);
+  const at = clampToTier(items, item.pinned, index);
   return [...items.slice(0, at), item, ...items.slice(at)];
 }
 
@@ -50,8 +50,8 @@ export function positionAt<T extends Orderable>(
   const item = items[index];
   const before = items[index - 1];
   const after = items[index + 1];
-  const prev = before && before.sticky === item.sticky ? before : null;
-  const next = after && after.sticky === item.sticky ? after : null;
+  const prev = before && before.pinned === item.pinned ? before : null;
+  const next = after && after.pinned === item.pinned ? after : null;
   // Duplicate or out-of-order neighbours (possible after concurrent edits)
   // would make generateKeyBetween throw; append after `prev` instead.
   if (prev && next && prev.position >= next.position) {

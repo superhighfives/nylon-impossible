@@ -32,12 +32,12 @@ struct TodoChange: Codable, Sendable {
     let completedAt: Date?
     let updatedAt: Date
     let deleted: Bool?
-    let sticky: Bool?
+    let pinned: Bool?
     let urls: [TodoUrlChange]?
 
     enum CodingKeys: String, CodingKey {
         case id, parentId, listId, title, notes, completed, position, dueDate,
-             recurrence, completedAt, updatedAt, deleted, sticky, urls
+             recurrence, completedAt, updatedAt, deleted, pinned, urls
     }
 
     // Custom encode so `completedAt` is sent explicitly — as JSON null when nil —
@@ -62,7 +62,7 @@ struct TodoChange: Codable, Sendable {
         }
         try c.encode(updatedAt, forKey: .updatedAt)
         try c.encodeIfPresent(deleted, forKey: .deleted)
-        try c.encodeIfPresent(sticky, forKey: .sticky)
+        try c.encodeIfPresent(pinned, forKey: .pinned)
         try c.encodeIfPresent(urls, forKey: .urls)
     }
 }

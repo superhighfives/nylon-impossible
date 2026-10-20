@@ -221,6 +221,10 @@ struct RootView: View {
             // than leaving them there until the next reload.
             WidgetRefresh.reload()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
+            guard isSignedIn else { return }
+            Task { await preferencesService?.reportDeviceTimezone() }
+        }
         .onChange(of: scenePhase) { _, newPhase in
             guard isSignedIn, let syncService else { return }
 
@@ -233,6 +237,9 @@ struct RootView: View {
                 // Recompute the badge on foreground so it crosses the day
                 // boundary even without a sync round-trip.
                 BadgeService.refresh(modelContext: modelContext)
+                // Travelling while backgrounded changes the zone without the
+                // app seeing the notification below.
+                Task { await preferencesService?.reportDeviceTimezone() }
             case .background, .inactive:
                 syncService.disconnectWebSocket()
                 // The app's single widget refresh, covering everything that

@@ -26,6 +26,7 @@ import {
   THEME_STORAGE_KEY,
   ThemeSync,
 } from "../components/ThemeSync";
+import { TimezoneSync } from "../components/TimezoneSync";
 import { Toaster } from "../components/ui";
 import { HintsProvider } from "../hooks/useHints";
 import {
@@ -158,6 +159,7 @@ function RootDocument() {
           <ClerkProvider>
             <SentryUserSync />
             <ThemeSync />
+            <TimezoneSync />
             <Sentry.ErrorBoundary
               fallback={({ resetError }) => <ErrorView reset={resetError} />}
             >

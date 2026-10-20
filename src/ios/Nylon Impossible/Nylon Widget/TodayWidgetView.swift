@@ -123,7 +123,7 @@ private struct TodayRow: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Complete \(todo.title)")
+            .accessibilityLabel("Mark \(todo.title) done")
 
             Text(todo.title)
                 .font(.system(size: 13))
@@ -152,7 +152,7 @@ private struct TodayRow: View {
                     .font(.system(size: 9))
                     .foregroundStyle(Color.appSubtle)
             }
-            if todo.isSticky {
+            if todo.isPinned {
                 Image(systemName: "pin.fill")
                     .font(.system(size: 9))
                     .foregroundStyle(Color.appSubtle)

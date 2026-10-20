@@ -4,7 +4,7 @@ import type { TodoWithUrls } from "@/types/database";
 /**
  * Sort a set of top-level todos (subtasks excluded — callers group those by
  * `parentId` separately) the same way every list column on the board does:
- * sticky-first among incomplete (by position within each tier), then
+ * pinned-first among incomplete (by position within each tier), then
  * completed (most recently completed first).
  *
  * Shared by `TodoList` (sorting its own already list-scoped todos for
@@ -32,7 +32,7 @@ export function sortTopLevelTodos(
     const bDone = effectiveCompleted(b);
     if (aDone !== bDone) return aDone ? 1 : -1;
     if (!aDone) {
-      if (a.sticky !== b.sticky) return a.sticky ? -1 : 1;
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       const aPos = a.position ?? "a0";
       const bPos = b.position ?? "a0";
       if (aPos < bPos) return -1;

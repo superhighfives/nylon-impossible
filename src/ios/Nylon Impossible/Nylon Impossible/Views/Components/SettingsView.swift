@@ -39,6 +39,8 @@ struct SettingsView: View {
                     Text("System follows your device's light or dark setting.")
                 }
 
+                timezoneSection
+
                 aboutSection
 
                 #if DEBUG
@@ -65,6 +67,55 @@ struct SettingsView: View {
                 Text("This permanently deletes your account and all of your todos. This cannot be undone.")
             }
         }
+    }
+
+    // MARK: - Timezone
+
+    private static let automaticTag = "automatic"
+
+    // Minimal for now: Automatic plus every zone the system knows. The
+    // redesign rebuilds Settings in its own components later.
+    @ViewBuilder
+    private var timezoneSection: some View {
+        let device = UserPreferencesService.deviceTimeZone
+        let automaticZone = preferencesService.timezoneAuto ? preferencesService.timezone : device
+        Section {
+            Picker("Timezone", selection: Binding(
+                get: {
+                    preferencesService.timezoneAuto ? Self.automaticTag : preferencesService.timezone
+                },
+                set: { newValue in
+                    Task {
+                        if newValue == Self.automaticTag {
+                            await preferencesService.setAutomaticTimezone()
+                        } else {
+                            await preferencesService.setManualTimezone(newValue)
+                        }
+                    }
+                }
+            )) {
+                Text("Automatic (\(Self.label(automaticZone)))").tag(Self.automaticTag)
+                ForEach(Self.zones(including: preferencesService.timezone), id: \.self) { zone in
+                    Text(Self.label(zone)).tag(zone)
+                }
+            }
+            .pickerStyle(.navigationLink)
+        } header: {
+            Text("Timezone")
+        } footer: {
+            Text("Today's todos move to This Week, and This Week's to Someday, at your local midnight.")
+        }
+    }
+
+    private static func label(_ zone: String) -> String {
+        zone.replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// Every known zone, plus the stored one if the system list lacks it (the
+    /// "UTC" default isn't in `knownTimeZoneIdentifiers`).
+    private static func zones(including stored: String) -> [String] {
+        let known = TimeZone.knownTimeZoneIdentifiers
+        return known.contains(stored) ? known : [stored] + known
     }
 
     // MARK: - About

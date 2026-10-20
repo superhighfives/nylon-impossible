@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		EE0000012F6C000000000001 /* todo-date-fixtures.json in Resources */ = {isa = PBXBuildFile; fileRef = EE0000022F6C000000000002 /* todo-date-fixtures.json */; };
 		23ABA4082F593570004D3D1A /* Nylon Share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 23ABA3FE2F593570004D3D1A /* Nylon Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DD00000E2F5B00000000000E /* Nylon Widget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DD0000012F5B000000000001 /* Nylon Widget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A52F493BDB00D8344D /* ClerkKit */; };
@@ -54,6 +55,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		EE0000022F6C000000000002 /* todo-date-fixtures.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = "todo-date-fixtures.json"; path = "../../shared/src/todo-date-fixtures.json"; sourceTree = SOURCE_ROOT; };
 		23ABA3FE2F593570004D3D1A /* Nylon Share.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = "Nylon Share.appex"; sourceTree = BUILT_PRODUCTS_DIR; };
 		23C2980D2F1AD043007315F3 /* Nylon Impossible.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Nylon Impossible.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CC0000012F4A000000000001 /* Nylon ImpossibleTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Nylon ImpossibleTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -71,9 +73,11 @@
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
 				Services/TodayDigest.swift,
+				Theme/Theme.swift,
 				Utils/Badge.swift,
 				Utils/FractionalIndexing.swift,
 				Utils/Recurrence.swift,
+				Utils/TodoDateParser.swift,
 				Utils/WidgetRefresh.swift,
 			);
 			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
@@ -107,9 +111,11 @@
 				Services/TaskCreationService.swift,
 				Services/TodayDigest.swift,
 				Services/TodoCompletionService.swift,
+				Theme/Theme.swift,
 				Utils/FractionalIndexing.swift,
 				Utils/KeychainHelper.swift,
 				Utils/Recurrence.swift,
+				Utils/TodoDateParser.swift,
 				Utils/WidgetRefresh.swift,
 				"Views/Extensions/Color+Hex.swift",
 			);
@@ -192,8 +198,17 @@
 				CC0000022F4A000000000002 /* Nylon ImpossibleTests */,
 				23ABA3FF2F593570004D3D1A /* Nylon Share */,
 				DD0000022F5B000000000002 /* Nylon Widget */,
+				EE0000032F6C000000000003 /* Shared Fixtures */,
 				23C2980E2F1AD043007315F3 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		EE0000032F6C000000000003 /* Shared Fixtures */ = {
+			isa = PBXGroup;
+			children = (
+				EE0000022F6C000000000002 /* todo-date-fixtures.json */,
+			);
+			name = "Shared Fixtures";
 			sourceTree = "<group>";
 		};
 		23C2980E2F1AD043007315F3 /* Products */ = {
@@ -380,6 +395,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EE0000012F6C000000000001 /* todo-date-fixtures.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

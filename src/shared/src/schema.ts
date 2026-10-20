@@ -27,6 +27,12 @@ export const users = sqliteTable(
     // IANA identifier (e.g. "America/New_York"). Drives the aging sweep's
     // per-account "local midnight" calculation.
     timezone: text("timezone").notNull().default("UTC"),
+    // When true, clients keep `timezone` in step with the device zone (web via
+    // `Intl`, iOS via `TimeZone.current`). Picking a zone by hand in Settings
+    // sets it false so a travelling device stops overwriting the choice.
+    timezoneAuto: integer("timezone_auto", { mode: "boolean" })
+      .notNull()
+      .default(true),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
@@ -90,9 +96,11 @@ export const todos = sqliteTable(
       .notNull()
       .default(sql`(unixepoch())`)
       .$onUpdate(() => new Date()),
-    // Sticky todos render above non-sticky ones and are reordered within
-    // their own tier only. Clears back to false when the todo is completed.
-    sticky: integer("sticky", { mode: "boolean" }).notNull().default(false),
+    // Pinned todos render above unpinned ones and are reordered within their
+    // own tier only. Clears back to false when the todo is completed. The
+    // column is still called `sticky` (the old word) — renaming the property
+    // in code avoids a table rebuild for a cosmetic change.
+    pinned: integer("sticky", { mode: "boolean" }).notNull().default(false),
   },
   (table) => [
     index("idx_todos_user_id").on(table.userId),

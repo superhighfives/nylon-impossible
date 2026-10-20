@@ -24,6 +24,11 @@ import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
+import {
+  pinnedRequestFields,
+  pinnedResponseFields,
+  resolvePinned,
+} from "../lib/pinned";
 import { finishTodoLinks } from "../lib/process-todo";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { getUserTimezone } from "../lib/user-timezone";
@@ -55,7 +60,7 @@ const syncRequestSchema = z.object({
       completedAt: z.coerce.date().nullable().optional(),
       updatedAt: z.coerce.date(),
       deleted: z.boolean().optional(),
-      sticky: z.boolean().optional(),
+      ...pinnedRequestFields,
       listId: listIdSchema.optional(),
       urls: z
         .array(z.object({ url: z.string().url().max(2048) }))
@@ -124,7 +129,7 @@ function serializeTodo(
     position: todo.position,
     dueDate: todo.dueDate?.toISOString() ?? null,
     recurrence: todo.recurrence,
-    sticky: todo.sticky,
+    ...pinnedResponseFields(todo.pinned),
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
     urls,
@@ -253,10 +258,9 @@ export async function syncTodos(c: Context<Env>) {
             );
           }
         }
-        // Completing a sticky todo unsticks it, same as the REST update path.
-        let stickyToWrite =
-          change.sticky !== undefined ? change.sticky : existing.sticky;
-        if (completing && stickyToWrite) stickyToWrite = false;
+        // Completing a pinned todo unpins it, same as the REST update path.
+        let pinnedToWrite = resolvePinned(change) ?? existing.pinned;
+        if (completing && pinnedToWrite) pinnedToWrite = false;
         // A client-supplied listId only ever passes a UUID-format check at
         // the request boundary — verify it actually belongs to this user
         // before writing it, or a leaked/guessed list id from another
@@ -282,7 +286,7 @@ export async function syncTodos(c: Context<Env>) {
             position: change.position ?? existing.position,
             dueDate: dueDateToWrite,
             recurrence: nextRecurrence,
-            sticky: stickyToWrite,
+            pinned: pinnedToWrite,
             listId: listIdToWrite,
             listEnteredAt: listChanged
               ? change.updatedAt
@@ -404,7 +408,7 @@ export async function syncTodos(c: Context<Env>) {
           dueDate: change.dueDate ?? null,
           // A subtask never recurs (recurrence is top-level only).
           recurrence: parentId ? null : (change.recurrence ?? null),
-          sticky: change.sticky ?? false,
+          pinned: resolvePinned(change) ?? false,
           createdAt: change.updatedAt,
           updatedAt: change.updatedAt,
         });

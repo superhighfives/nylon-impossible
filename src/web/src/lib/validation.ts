@@ -59,7 +59,7 @@ export const updateTodoSchema = z.object({
   // Only sent to undo a completed repeat (cleared to null). Normal completions
   // are stamped server-side, not by the client.
   completedAt: z.coerce.date().nullable().optional(),
-  sticky: z.boolean().optional(),
+  pinned: z.boolean().optional(),
   listId: listIdSchema.optional(),
 });
 

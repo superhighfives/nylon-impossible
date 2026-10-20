@@ -12,7 +12,7 @@ import SwiftData
 ///
 /// Completion runs through `TodoCompletionService` — the same code path the
 /// app's checkbox uses — so a repeat rolls its due date forward and re-places
-/// itself, a sticky todo unsticks, and subtasks follow their parent, rather
+/// itself, a pinned todo unpins, and subtasks follow their parent, rather
 /// than the widget inventing a simpler rule and quietly disagreeing with the
 /// app.
 ///
@@ -21,8 +21,8 @@ import SwiftData
 /// So an already-completed todo is a no-op here rather than an un-complete —
 /// see `perform()`.
 struct CompleteTodoIntent: AppIntent {
-    static var title: LocalizedStringResource = "Complete Task"
-    static var description = IntentDescription("Complete a task from the Nylon widget")
+    static var title: LocalizedStringResource = "Mark Todo Done"
+    static var description = IntentDescription("Mark a todo done from the Nylon widget")
 
     /// Widget-only: `AddTaskIntent` is the one Nylon offers in Shortcuts and
     /// to Siri. This needs a todo's internal id to do anything, which is not

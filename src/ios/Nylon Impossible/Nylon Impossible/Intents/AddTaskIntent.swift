@@ -40,7 +40,8 @@ struct AddTaskIntent: AppIntent {
             title: task.title,
             userId: userId,
             context: context,
-            allTodos: allTodos
+            allTodos: allTodos,
+            parseDate: true
         )
 
         WidgetRefresh.reload()

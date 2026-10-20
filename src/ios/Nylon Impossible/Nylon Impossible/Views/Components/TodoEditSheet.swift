@@ -31,7 +31,7 @@ struct TodoEditSheet: View {
     @State private var hasDueDate: Bool
     @State private var dueDate: Date
     @State private var recurrenceFrequency: RecurrenceFrequency?
-    @State private var sticky: Bool
+    @State private var pinned: Bool
     @State private var selectedListId: String?
     @State private var urls: [APITodoUrl] = []
     @State private var isLoadingUrls: Bool = false
@@ -69,7 +69,7 @@ struct TodoEditSheet: View {
         // Edited as a local date; stored as UTC midnight of that day (see DueDay).
         _dueDate = State(initialValue: todo.dueDate.map { DueDay.localDate($0) } ?? Date())
         _recurrenceFrequency = State(initialValue: todo.recurrence?.frequency)
-        _sticky = State(initialValue: todo.sticky)
+        _pinned = State(initialValue: todo.pinned)
         _selectedListId = State(initialValue: todo.listKey?.lowercased())
         _urls = State(initialValue: initialUrls)
     }
@@ -108,12 +108,12 @@ struct TodoEditSheet: View {
                     Text("Due Date")
                 }
                 
-                // Sticky — pins the todo above non-sticky ones. Instantly
+                // Pin — keeps the todo above unpinned ones. Instantly
                 // reversible, no confirm needed.
                 Section {
-                    Toggle("Sticky", isOn: $sticky)
+                    Toggle("Pin to top", isOn: $pinned)
                 } footer: {
-                    Text("Pinned todos always show above non-pinned ones.")
+                    Text("Pinned todos always show above the rest.")
                 }
 
                 // List — the only way to move a todo cross-list on iOS (no
@@ -219,7 +219,7 @@ struct TodoEditSheet: View {
             ? recurrenceFrequency.map { Recurrence(frequency: $0) }
             : nil
 
-        onSave(trimmedTitle, notesValue, dueDateValue, recurrenceValue, sticky)
+        onSave(trimmedTitle, notesValue, dueDateValue, recurrenceValue, pinned)
     }
 
     /// "Weekly on Wednesday" — anchor is derived from the due date so the user
@@ -577,7 +577,7 @@ private struct LinksSection: View {
 }
 
 /// List picker for moving a top-level todo between lists. Fires immediately
-/// on change rather than waiting for Save, mirroring the sticky/checkbox
+/// on change rather than waiting for Save, mirroring the pinned/checkbox
 /// toggles' instant-effect feel.
 private struct ListPickerSection: View {
     let availableLists: [TodoListModel]

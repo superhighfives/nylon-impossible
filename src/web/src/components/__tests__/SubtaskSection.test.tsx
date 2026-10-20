@@ -18,7 +18,7 @@ function makeSubtask(overrides: Partial<TodoWithUrls> = {}): TodoWithUrls {
     recurrence: null,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
-    sticky: false,
+    pinned: false,
     urls: [],
     ...overrides,
   };
@@ -100,7 +100,7 @@ describe("SubtaskSection", () => {
       makeSubtask({ id: "a", title: "Active one", completed: false }),
     ]);
     fireEvent.click(
-      screen.getByRole("checkbox", { name: /mark "Active one" as completed/i }),
+      screen.getByRole("checkbox", { name: /mark "Active one" done/i }),
     );
     expect(onToggle).toHaveBeenCalledWith("a", false);
   });

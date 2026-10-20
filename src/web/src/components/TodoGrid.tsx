@@ -62,9 +62,11 @@ import {
   useTodos,
   useUpdateTodo,
 } from "@/hooks/useTodos";
+import { useTypedDate } from "@/hooks/useTypedDate";
 import { insertInTier, positionAt } from "@/lib/dragOrder";
 import { messageFromError, toast } from "@/lib/toast";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
+import { DueChip } from "./DueChip";
 import { Button, ConfirmDialog, focusRing, Input, SidePanel } from "./ui";
 
 const HORIZONTAL_DRAG_DEAD_ZONE = 12;
@@ -249,7 +251,7 @@ function NewTodoInline({
   listId: string;
   /**
    * Position of the list's current top incomplete todo. Quick-adds insert
-   * above it (top of the non-sticky tier), right where this affordance sits —
+   * above it (top of the unpinned tier), right where this affordance sits —
    * so new rows appear next to the control that created them.
    */
   firstPosition: string | null;
@@ -257,6 +259,7 @@ function NewTodoInline({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const createTodo = useCreateTodo();
+  const typedDate = useTypedDate(title);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const overflowsToNotes = splitTodoText(title).notes !== null;
 
@@ -276,11 +279,14 @@ function NewTodoInline({
     }
     // Long pastes (a 2KB URL, a copied paragraph) keep their overflow in
     // notes instead of failing the 500-char title limit.
-    const { title: todoTitle, notes } = splitTodoText(title);
+    const { title: todoTitle, notes } = splitTodoText(typedDate.text);
+    const dueDate = typedDate.parsed?.dueDay ?? null;
+    typedDate.reset();
     createTodo.mutate(
       {
         title: todoTitle,
         notes,
+        dueDate,
         listId,
         position: generateKeyBetween(null, firstPosition),
       },
@@ -345,6 +351,14 @@ function NewTodoInline({
           placeholder="New todo"
           className="field-sizing-content -mx-2 block max-h-48 w-[calc(100%+1rem)] resize-none rounded-md bg-transparent px-2 py-1 text-[15px] font-semibold leading-snug text-gray outline-none wrap-anywhere placeholder:font-normal placeholder:text-gray-muted focus-visible:ring-2 focus-visible:ring-accent-strong [@supports(-webkit-touch-callout:none)]:!text-base"
         />
+        {typedDate.parsed && (
+          <div className="mt-1">
+            <DueChip
+              dueDay={typedDate.parsed.dueDay}
+              onDismiss={typedDate.dismiss}
+            />
+          </div>
+        )}
         {overflowsToNotes && (
           <p className="mt-1 text-xs text-gray-muted">
             The rest will be saved to notes.
@@ -803,7 +817,7 @@ export function TodoGrid() {
       title?: string;
       notes?: string | null;
       dueDate?: Date | null;
-      sticky?: boolean;
+      pinned?: boolean;
     }) => {
       updateTodo.mutate({ id, input: updates });
     };
@@ -1060,7 +1074,7 @@ export function TodoGrid() {
                   <NewTodoInline
                     listId={list.id}
                     firstPosition={
-                      incompleteOrder.find((t) => !t.sticky)?.position ?? null
+                      incompleteOrder.find((t) => !t.pinned)?.position ?? null
                     }
                   />
                   <ColumnScroller

@@ -15,6 +15,7 @@ import {
   DevEnvironmentDetails,
   useDevEnvironment,
 } from "./DevEnvironmentIndicator";
+import { browserTimeZone } from "./TimezoneSync";
 import { Button, LayerCard, Loader, Select } from "./ui";
 
 // Full IANA timezone list from the runtime — avoids hand-maintaining a
@@ -25,6 +26,9 @@ const TIMEZONE_ITEMS = (
     ? Intl.supportedValuesOf("timeZone")
     : ["UTC"]
 ).map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") }));
+
+// Select value for "follow the device". Not a real zone, so it can't collide.
+const AUTOMATIC_TIMEZONE = "automatic";
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
@@ -63,30 +67,40 @@ export function SettingsModal({ origin }: { origin: string }) {
   };
 
   // Like Theme, the timezone saves the moment it's picked — no Save step.
+  // Automatic follows this device (TimezoneSync keeps it current); picking a
+  // zone by hand turns Automatic off so travelling doesn't overwrite it.
   const timezone = user?.timezone ?? "UTC";
-  const detectedTimezone =
-    typeof Intl !== "undefined"
-      ? Intl.DateTimeFormat().resolvedOptions().timeZone
-      : "UTC";
+  const timezoneAuto = user?.timezoneAuto !== false;
+  const detectedTimezone = browserTimeZone() ?? "UTC";
   // V8 leaves "UTC" (and legacy aliases like Asia/Calcutta) out of
   // supportedValuesOf, so keep the saved zone selectable or the Select
   // renders blank for default-UTC accounts.
-  const timezoneItems = TIMEZONE_ITEMS.some((item) => item.value === timezone)
+  const zoneItems = TIMEZONE_ITEMS.some((item) => item.value === timezone)
     ? TIMEZONE_ITEMS
     : [
         { value: timezone, label: timezone.replace(/_/g, " ") },
         ...TIMEZONE_ITEMS,
       ];
+  const timezoneItems = [
+    {
+      value: AUTOMATIC_TIMEZONE,
+      label: `Automatic (${(timezoneAuto ? timezone : detectedTimezone).replace(/_/g, " ")})`,
+    },
+    ...zoneItems,
+  ];
   const saveTimezone = (next: string) => {
-    if (next === timezone) return;
-    updateUser.mutate(
-      { timezone: next },
-      {
-        onError: (err) => {
-          toast.error(messageFromError(err, "Couldn't change timezone"));
-        },
+    const update =
+      next === AUTOMATIC_TIMEZONE
+        ? { timezone: detectedTimezone, timezoneAuto: true }
+        : { timezone: next, timezoneAuto: false };
+    if (update.timezoneAuto === timezoneAuto && update.timezone === timezone) {
+      return;
+    }
+    updateUser.mutate(update, {
+      onError: (err) => {
+        toast.error(messageFromError(err, "Couldn't change timezone"));
       },
-    );
+    });
   };
 
   return (
@@ -184,26 +198,13 @@ export function SettingsModal({ origin }: { origin: string }) {
                   <LayerCard.Primary>
                     <Select
                       items={timezoneItems}
-                      value={timezone}
+                      value={timezoneAuto ? AUTOMATIC_TIMEZONE : timezone}
                       onValueChange={(value) => {
                         if (typeof value === "string") saveTimezone(value);
                       }}
                       disabled={updateUser.isPending}
                       size="sm"
                     />
-                    {/* "UTC" is the account default, not usually a choice — offer
-                        the device's zone instead of silently switching it. */}
-                    {timezone !== detectedTimezone && (
-                      <button
-                        type="button"
-                        onClick={() => saveTimezone(detectedTimezone)}
-                        disabled={updateUser.isPending}
-                        className="self-start rounded-md text-left text-xs font-medium text-accent-muted underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong disabled:opacity-50"
-                      >
-                        Use this device's timezone (
-                        {detectedTimezone.replace(/_/g, " ")})
-                      </button>
-                    )}
                     <p className="text-xs text-gray-muted">
                       Drives when Today's todos age into This Week, and This
                       Week into Someday — always at your local midnight. A todo

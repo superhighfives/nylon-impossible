@@ -35,7 +35,7 @@ interface TodoItemExpandedProps {
     notes?: string | null;
     dueDate?: Date | null;
     recurrence?: Recurrence | null;
-    sticky?: boolean;
+    pinned?: boolean;
   }) => void;
   onDelete: (id: string) => void;
   deletePending: boolean;
@@ -384,7 +384,7 @@ export function TodoItemExpanded({
         />
       )}
 
-      {/* Actions. Sticky commits on click with no debounce — instantly
+      {/* Actions. Pin commits on click with no debounce — instantly
           reversible, like the Repeat select. Link titles fetch automatically
           on create; a failed fetch gets "Try again" under Links below. */}
       <div className="space-y-4">
@@ -395,11 +395,11 @@ export function TodoItemExpanded({
               variant="secondary"
               size="sm"
               type="button"
-              onClick={() => onUpdate({ sticky: !todo.sticky })}
-              aria-pressed={todo.sticky}
+              onClick={() => onUpdate({ pinned: !todo.pinned })}
+              aria-pressed={todo.pinned}
             >
-              <Pin size={14} className={todo.sticky ? "fill-current" : ""} />
-              {todo.sticky ? "Pinned to top" : "Pin to top"}
+              <Pin size={14} className={todo.pinned ? "fill-current" : ""} />
+              {todo.pinned ? "Pinned to top" : "Pin to top"}
             </Button>
           </div>
         </div>
