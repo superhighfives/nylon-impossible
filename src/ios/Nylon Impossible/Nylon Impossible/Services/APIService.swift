@@ -352,6 +352,22 @@ final class APIService: APIProviding {
         return response.links
     }
 
+    // MARK: - Links
+
+    /// Show a link as its fetched preview, or as the bare URL.
+    func updateTodoUrl(todoId: String, urlId: String, showPreview: Bool) async throws {
+        struct UpdateUrlRequest: Encodable { let showPreview: Bool }
+        let _: EmptyResponse = try await patch(
+            path: "/todos/\(todoId)/urls/\(urlId)",
+            body: UpdateUrlRequest(showPreview: showPreview)
+        )
+    }
+
+    /// Remove a link from a todo.
+    func deleteTodoUrl(todoId: String, urlId: String) async throws {
+        let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/urls/\(urlId)")
+    }
+
     // MARK: - User Preferences
 
     func getMe() async throws -> APIUser {

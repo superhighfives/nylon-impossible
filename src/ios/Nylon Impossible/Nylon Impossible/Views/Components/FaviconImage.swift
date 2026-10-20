@@ -7,7 +7,9 @@
 
 import SwiftUI
 
-/// Displays a favicon with cascade fallback: tries the stored URL first, then Google's service.
+/// Displays a favicon with cascade fallback: tries the stored URL first, then
+/// Google's service. Draws nothing until one loads, so whatever sits behind it
+/// (the link card's initial) shows through.
 struct FaviconImage: View {
     let primaryURL: URL?
     let fallbackURL: URL?
@@ -27,14 +29,10 @@ struct FaviconImage: View {
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                     } placeholder: {
-                        Image(systemName: "link")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
+                        Color.clear
                     }
                 default:
-                    Image(systemName: "link")
-                        .font(.system(size: 10))
-                        .foregroundStyle(.secondary)
+                    Color.clear
                 }
             }
         } else {
@@ -43,9 +41,7 @@ struct FaviconImage: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
             } placeholder: {
-                Image(systemName: "link")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
+                Color.clear
             }
         }
     }

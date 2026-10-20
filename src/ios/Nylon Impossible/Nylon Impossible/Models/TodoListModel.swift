@@ -58,22 +58,6 @@ final class TodoListModel {
 
     var isSystem: Bool { kind == "system" }
 
-    /// The phrase this list contributes to the add-todo field's copy —
-    /// "What needs to be done **this week**?" — which is how iOS names the
-    /// page you're on for the three system lists.
-    ///
-    /// `nil` for custom lists: only the time-based names read
-    /// as an adverb in that sentence, so everything else keeps the plain copy
-    /// and is named by `ListHeaderView` instead.
-    var promptPhrase: String? {
-        switch systemKind {
-        case .today: return "today"
-        case .thisWeek: return "this week"
-        case .someday: return "someday"
-        case nil: return nil
-        }
-    }
-
     /// Fixed display order: Today, This Week, Someday, then custom lists
     /// (by `position`, handled separately since this only orders the three
     /// system kinds relative to each other).

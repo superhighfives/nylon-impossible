@@ -177,55 +177,6 @@ struct TodoViewModelTests {
         #expect(doneRepeat.position == "a1")
     }
 
-    @Test("addTodo with SwiftData creates item and clears input")
-    @MainActor
-    func addTodoCreatesItem() throws {
-        let container = try makeContainer()
-        let context = container.mainContext
-
-        let vm = TodoViewModel()
-        vm.newTaskText = "New task"
-        vm.addTodo(context: context, userId: "user_123", allTodos: [])
-
-        #expect(vm.newTaskText == "")
-
-        let descriptor = FetchDescriptor<TodoItem>()
-        let items = try context.fetch(descriptor)
-        #expect(items.count == 1)
-        #expect(items[0].title == "New task")
-        #expect(items[0].userId == "user_123")
-    }
-
-    @Test("addTodo does nothing when text is empty")
-    @MainActor
-    func addTodoEmptyText() throws {
-        let container = try makeContainer()
-        let context = container.mainContext
-
-        let vm = TodoViewModel()
-        vm.newTaskText = "   "
-        vm.addTodo(context: context, userId: nil, allTodos: [])
-
-        let descriptor = FetchDescriptor<TodoItem>()
-        let items = try context.fetch(descriptor)
-        #expect(items.count == 0)
-    }
-
-    @Test("addTodo trims whitespace from title")
-    @MainActor
-    func addTodoTrimsWhitespace() throws {
-        let container = try makeContainer()
-        let context = container.mainContext
-
-        let vm = TodoViewModel()
-        vm.newTaskText = "  Buy milk  "
-        vm.addTodo(context: context, userId: nil, allTodos: [])
-
-        let descriptor = FetchDescriptor<TodoItem>()
-        let items = try context.fetch(descriptor)
-        #expect(items[0].title == "Buy milk")
-    }
-
     @Test("deleteTodo soft-deletes when userId is set")
     func softDelete() {
         let todo = TodoItem(title: "Test", userId: "user_123")

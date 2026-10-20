@@ -11,12 +11,63 @@ import SwiftUI
 
 @Observable
 final class TodoViewModel {
+    /// What the composer holds.
     var newTaskText: String = ""
-    // The currently paged-to list's id. Owned here (not as ContentView
-    // @State) so switching, defaulting, and any CRUD side effects (e.g.
-    // jumping to a newly created list) live in one place. Nil until
-    // `selectDefaultListIfNeeded` runs, once `lists` has loaded.
-    var selectedListId: String?
+    /// The page in view: one of the three time lists, or the Lists index.
+    var page: Page = .today
+    /// The collection pushed over the Lists page, if any.
+    var openCollectionId: String?
+
+    /// The four horizontal pages, in swipe order.
+    enum Page: Hashable, CaseIterable {
+        case today, thisWeek, someday, lists
+
+        var title: String {
+            switch self {
+            case .today: return "Today"
+            case .thisWeek: return "This Week"
+            case .someday: return "Someday"
+            case .lists: return "Lists"
+            }
+        }
+
+        var systemKind: SystemListKind? {
+            switch self {
+            case .today: return .today
+            case .thisWeek: return .thisWeek
+            case .someday: return .someday
+            case .lists: return nil
+            }
+        }
+
+        init?(systemKind: SystemListKind?) {
+            switch systemKind {
+            case .today: self = .today
+            case .thisWeek: self = .thisWeek
+            case .someday: self = .someday
+            case nil: return nil
+            }
+        }
+    }
+
+    /// The list the composer and the current page target: the open
+    /// collection, or the time list in view. Nil on the Lists index.
+    func currentListId(in lists: [TodoListModel]) -> String? {
+        if page == .lists { return openCollectionId }
+        return lists.first { $0.systemKind == page.systemKind }?.id
+    }
+
+    /// Show a list: a time list pages to it, a collection opens over Lists.
+    func show(listId: String, in lists: [TodoListModel]) {
+        guard let list = lists.first(where: { $0.id.lowercased() == listId.lowercased() }) else { return }
+        if let page = Page(systemKind: list.systemKind) {
+            openCollectionId = nil
+            self.page = page
+        } else {
+            self.page = .lists
+            openCollectionId = list.id
+        }
+    }
 
     var canAddTask: Bool {
         !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -61,18 +112,22 @@ final class TodoViewModel {
         }
     }
 
-    func addTodo(context: ModelContext, userId: String?, allTodos: [TodoItem], listId: String? = nil) {
-        guard !newTaskText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-
-        _ = TaskCreationService.createTask(
-            title: newTaskText,
-            userId: userId,
-            context: context,
-            allTodos: allTodos,
-            listId: listId
-        )
-
-        newTaskText = ""
+    /// A list page's rows: its own top-level todos that aren't done, deleted
+    /// or `hidden` (a delete still showing its Undo toast), pinned first, then
+    /// by position. A repeat done today stays in its slot with its next date —
+    /// "the row stays" — rather than sinking the way `sortedTodos` sinks
+    /// effectively-completed todos.
+    func pageTodos(from todos: [TodoItem], listId: String, hidden: Set<UUID> = []) -> [TodoItem] {
+        let key = listId.lowercased()
+        return todos
+            .filter {
+                $0.parentId == nil && !$0.isDeleted && !$0.isCompleted
+                    && !hidden.contains($0.id) && $0.listKey?.lowercased() == key
+            }
+            .sorted { a, b in
+                if a.pinned != b.pinned { return a.pinned }
+                return a.position < b.position
+            }
     }
 
     /// Reorders a dragged todo within its incomplete siblings.
@@ -107,40 +162,8 @@ final class TodoViewModel {
         movedItem.markModified()
     }
 
-    func updateTodoTitle(_ todo: TodoItem, title: String) {
-        todo.title = title
-        todo.markModified()
-    }
-
-    /// - Parameter listId: threaded through the same way `pinned` is — nil
-    ///   leaves the todo's current list untouched. In practice the edit sheet
-    ///   moves a todo via its own picker (`onMoveToList`, fired immediately,
-    ///   not bundled into Save) since that's the only cross-list affordance
-    ///   on iOS, but this still accepts it directly so any other caller can
-    ///   update everything — including list membership — in one call.
-    func updateTodo(
-        _ todo: TodoItem,
-        title: String,
-        notes: String?,
-        dueDate: Date?,
-        recurrence: Recurrence?,
-        pinned: Bool,
-        listId: String? = nil
-    ) {
-        todo.title = title
-        todo.itemNotes = notes
-        todo.dueDate = dueDate
-        todo.recurrence = recurrence
-        todo.pinned = pinned
-        if let listId, listId != todo.listKey {
-            todo.listKey = listId
-            todo.listEnteredAt = Date()
-        }
-        todo.markModified()
-    }
-
-    /// Manual cross-list move — the only way to move a todo on iOS (no
-    /// drag-and-drop grid). Appends to the end of the target list's own
+    /// Cross-list move — the context menu, a drop on a switcher title, or the
+    /// detail sheet's List chip. Appends to the end of the target list's own
     /// incomplete todos, mirroring web's cross-list drag-drop-at-end
     /// behavior (`TodoGrid.handleDragEnd`'s `insertIndex === targetOrder.length`
     /// case), since there's no drop-index equivalent from a picker.
@@ -251,19 +274,6 @@ final class TodoViewModel {
 
     // MARK: - Lists
 
-    /// Default the paged-to list to Today once `lists` has loaded, mirroring
-    /// web's initial view. No-op once a selection exists (including a user's
-    /// own swipe away from Today) so this only ever fires the one time.
-    func selectDefaultListIfNeeded(from lists: [TodoListModel]) {
-        guard selectedListId == nil else { return }
-        selectedListId = lists.first(where: { $0.systemKind == .today })?.id
-    }
-
-    /// Page to a specific list — e.g. jumping to a list just created below.
-    func selectList(_ listId: String?) {
-        selectedListId = listId
-    }
-
     /// Create a custom list on the server, then insert it locally so it's
     /// available immediately without waiting for the next full sync. Lists
     /// have no local-only/offline-optimistic path today (unlike todos) — the
@@ -326,8 +336,8 @@ final class TodoViewModel {
     func deleteList(_ list: TodoListModel, apiService: any APIProviding, context: ModelContext) async throws {
         guard list.kind == "custom" else { return }
         _ = try await apiService.deleteList(id: list.id)
-        if selectedListId == list.id {
-            selectedListId = nil
+        if openCollectionId == list.id {
+            openCollectionId = nil
         }
         context.delete(list)
         try? context.save()
