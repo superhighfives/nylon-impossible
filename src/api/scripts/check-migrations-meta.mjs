@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Guards against migrations/meta/ (drizzle-kit's own snapshot history) drifting
 // out of sync with the real .sql migration files under migrations/. When it
-// drifts, `pnpm db:generate` silently renumbers from wherever meta last left
+// drifts, `bun run db:generate` silently renumbers from wherever meta last left
 // off (e.g. producing a bogus "0002_*" migration when 20 real ones already
 // exist) instead of continuing the sequence. See
 // plans/done/2026-08-06-remove-priority.md for the incident this guards
@@ -43,7 +43,7 @@ if (journal.entries.length !== sqlFiles.length) {
       "the next generated migration from the journal's entry count, so this " +
       "drift causes it to silently generate a colliding/wrong migration number. " +
       "Reconcile the journal (one entry per .sql file, in filename order) before " +
-      "running `pnpm db:generate` again.",
+      "running `bun run db:generate` again.",
   );
 }
 

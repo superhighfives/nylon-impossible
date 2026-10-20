@@ -34,7 +34,7 @@ gitignored. **Don't commit these files: they hold real todo data.**
 ## Before you start
 
 - Run everything from the repo root, on the `backend-reset` branch, after
-  `pnpm install`.
+  `bun install`.
 - `wrangler whoami` must show the account that owns the production database.
   Its Cloudflare name is `too-doo-db` (id `effd712c…`). `nylon-impossible-db`
   is only the label in `wrangler.jsonc`, so address it by the `DB` binding.
@@ -52,7 +52,7 @@ This step is read-only.
 
 ```sh
 mkdir -p .wrangler/backups
-npx wrangler d1 export DB --remote \
+bunx wrangler d1 export DB --remote \
   -c src/api/wrangler.jsonc \
   --output .wrangler/backups/pre-reset-$(date +%Y%m%d).sql
 ```
@@ -76,8 +76,8 @@ user_…` instead of `--email` if your email changed.
 D1 names are unique per account, so the new databases need new names:
 
 ```sh
-npx wrangler d1 create nylon-db
-npx wrangler d1 create nylon-preview-db
+bunx wrangler d1 create nylon-db
+bunx wrangler d1 create nylon-preview-db
 ```
 
 Note the `database_id` printed for each.
@@ -109,8 +109,8 @@ Commit this change on the branch. **Don't merge yet.**
 ### 5. Apply the baseline to both new databases
 
 ```sh
-npx wrangler d1 migrations apply DB --remote -c src/api/wrangler.jsonc
-npx wrangler d1 migrations apply DB --remote --preview -c src/api/wrangler.jsonc
+bunx wrangler d1 migrations apply DB --remote -c src/api/wrangler.jsonc
+bunx wrangler d1 migrations apply DB --remote --preview -c src/api/wrangler.jsonc
 ```
 
 Each should list exactly `0000_baseline.sql`.
@@ -119,7 +119,7 @@ Each should list exactly `0000_baseline.sql`.
 
 ```sh
 node scripts/db-reset/import.mjs        # add --include-gmail-links to keep the add-on link
-npx wrangler d1 execute DB --remote -c src/api/wrangler.jsonc \
+bunx wrangler d1 execute DB --remote -c src/api/wrangler.jsonc \
   --file .wrangler/db-reset/import.sql
 ```
 
@@ -127,13 +127,13 @@ Read every `! warning` line before applying. Then check that the counts
 match the `-- Expect:` line at the top of `import.sql`:
 
 ```sh
-npx wrangler d1 execute DB --remote -c src/api/wrangler.jsonc --command "
+bunx wrangler d1 execute DB --remote -c src/api/wrangler.jsonc --command "
   SELECT (SELECT count(*) FROM users) AS users,
          (SELECT count(*) FROM lists) AS lists,
          (SELECT count(*) FROM todos) AS todos,
          (SELECT count(*) FROM todo_urls) AS links,
          (SELECT group_concat(system_kind) FROM lists WHERE kind = 'system') AS system_lists"
-npx wrangler d1 execute DB --remote -c src/api/wrangler.jsonc --command "PRAGMA foreign_key_check"
+bunx wrangler d1 execute DB --remote -c src/api/wrangler.jsonc --command "PRAGMA foreign_key_check"
 ```
 
 The preview database starts empty. Previews provision users on demand through
@@ -174,7 +174,7 @@ automatically. If it doesn't, use the **Connect Nylon** card once.
 Your local `.wrangler/state` has the old migration history. Reset it once:
 
 ```sh
-pnpm db:fresh
+bun run db:fresh
 ```
 
 ### 10. Later: delete the old databases
@@ -183,8 +183,8 @@ Once the new databases have run cleanly for a while (a couple of weeks),
 delete the old ones, along with the backup files if you no longer want them:
 
 ```sh
-npx wrangler d1 delete too-doo-db
-npx wrangler d1 delete nylon-impossible-preview-db
+bunx wrangler d1 delete too-doo-db
+bunx wrangler d1 delete nylon-impossible-preview-db
 ```
 
 ## Rolling back

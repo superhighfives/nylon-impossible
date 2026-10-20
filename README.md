@@ -68,14 +68,14 @@ A todo app for web and iOS. Fast, simple, and in sync everywhere you are.
 
 ```bash
 # Install dependencies
-pnpm install
+bun install
 
 # Apply database migrations locally (a local DB from before the October
-# 2026 migration squash needs `pnpm db:fresh` once instead)
-pnpm db:migrate
+# 2026 migration squash needs `bun run db:fresh` once instead)
+bun run db:migrate
 
 # Start web + API dev servers
-pnpm dev
+bun run dev
 ```
 
 Web runs at **http://localhost:3000**, API at **http://localhost:8787**.
@@ -83,7 +83,7 @@ Web runs at **http://localhost:3000**, API at **http://localhost:8787**.
 For iOS, open the Xcode project:
 
 ```bash
-pnpm ios:open
+bun run ios:open
 ```
 
 See each package's README for detailed setup:
@@ -243,42 +243,42 @@ base64 -i "Nylon_Impossible_AppStore.mobileprovision" | pbcopy
 
 | Script | Description |
 |--------|-------------|
-| `pnpm dev` | Start web + API dev servers in parallel |
-| `pnpm ios:open` | Open iOS project in Xcode |
-| `pnpm ios:simulator` | Open iOS Simulator |
+| `bun run dev` | Start web + API dev servers in parallel |
+| `bun run ios:open` | Open iOS project in Xcode |
+| `bun run ios:simulator` | Open iOS Simulator |
 
 ### Code Quality
 
 | Script | Description |
 |--------|-------------|
-| `pnpm lint` | Run Biome linter on web + API |
-| `pnpm check` | Run Biome lint + format check on web + API |
-| `pnpm typecheck` | Run TypeScript type checking on web + API |
-| `pnpm test` | Run Vitest tests on web + API |
+| `bun run lint` | Run Biome linter on web + API |
+| `bun run check` | Run Biome lint + format check on web + API |
+| `bun run typecheck` | Run TypeScript type checking on web + API |
+| `bun run test` | Run Vitest tests on web + API |
 
 ### Database
 
 | Script | Description |
 |--------|-------------|
-| `pnpm db:migrate` | Apply D1 migrations locally (web + API) |
-| `pnpm db:migrate:remote` | Apply D1 migrations to production |
-| `pnpm db:fresh` | Reset, migrate, and seed local database |
-| `pnpm db:seed` | Seed local database with test data |
+| `bun run db:migrate` | Apply D1 migrations locally (web + API) |
+| `bun run db:migrate:remote` | Apply D1 migrations to production |
+| `bun run db:fresh` | Reset, migrate, and seed local database |
+| `bun run db:seed` | Seed local database with test data |
 
 ### Deployment
 
 | Script | Description |
 |--------|-------------|
-| `pnpm deploy` | Deploy web + API to Cloudflare Workers |
+| `bun run deploy` | Deploy web + API to Cloudflare Workers |
 
 ### Marketing
 
 | Script | Description |
 |--------|-------------|
-| `pnpm marketing:capture` | Build iOS app, boot simulator, and screenshot web + iOS in light and dark mode |
-| `pnpm marketing:web` | Composite captured PNGs into browser + phone overlays (`src/marketing/output/`) |
-| `pnpm marketing:publish` | Copy output JPGs to superhighfives.com, commit, and push |
-| `pnpm marketing:all` | Run capture → web → publish in sequence |
+| `bun run marketing:capture` | Build iOS app, boot simulator, and screenshot web + iOS in light and dark mode |
+| `bun run marketing:web` | Composite captured PNGs into browser + phone overlays (`src/marketing/output/`) |
+| `bun run marketing:publish` | Copy output JPGs to superhighfives.com, commit, and push |
+| `bun run marketing:all` | Run capture → web → publish in sequence |
 
 `marketing:capture` and `marketing:web` are intentionally separate — once you have good source PNGs you can iterate on the composite layout in [`src/marketing/manifest.json`](src/marketing/manifest.json) and re-run `marketing:web` without rebuilding or relaunching the simulator.
 

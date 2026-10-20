@@ -75,7 +75,7 @@ The application uses TanStack Query's optimistic update pattern for instant UI f
 ### Prerequisites
 
 - Node.js 24.21.0+
-- pnpm 9+
+- Bun 1.3.10+
 - Cloudflare account (for deployment)
 - Clerk account (for authentication)
 
@@ -83,7 +83,7 @@ The application uses TanStack Query's optimistic update pattern for instant UI f
 
 ```bash
 # Install dependencies (from repo root)
-pnpm install
+bun install
 ```
 
 ### Environment Setup
@@ -116,7 +116,7 @@ Update **`wrangler.jsonc`** (for production):
 After configuring `wrangler.jsonc`, generate TypeScript types:
 
 ```bash
-npm run cf-typegen
+bun run cf-typegen
 ```
 
 This creates `worker-configuration.d.ts` with proper types for your D1 database and environment variables.
@@ -126,7 +126,7 @@ This creates `worker-configuration.d.ts` with proper types for your D1 database 
 #### 1. Create D1 Database
 
 ```bash
-npm run db:create
+bun run db:create
 ```
 
 This will output a database ID. Add it to `wrangler.jsonc`:
@@ -147,17 +147,17 @@ This will output a database ID. Add it to `wrangler.jsonc`:
 
 For local development:
 ```bash
-npm run db:migrations:apply
+bun run db:migrations:apply
 ```
 
 For production:
 ```bash
-npm run db:migrations:apply:remote
+bun run db:migrations:apply:remote
 ```
 
 View migration history:
 ```bash
-npm run db:migrations:list
+bun run db:migrations:list
 ```
 
 ### Development
@@ -165,7 +165,7 @@ npm run db:migrations:list
 Start the development server:
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 The application will be available at **http://localhost:3000**
@@ -214,33 +214,33 @@ nylon-impossible-web/
 ## Scripts
 
 ### Development
-- `npm run dev` - Start dev server on port 3000
-- `npm run serve` - Preview production build locally
+- `bun run dev` - Start dev server on port 3000
+- `bun run serve` - Preview production build locally
 
 ### Building
-- `npm run build` - Build for production
-- `npm run cf-typegen` - Generate Cloudflare types
+- `bun run build` - Build for production
+- `bun run cf-typegen` - Generate Cloudflare types
 
 ### Database (Wrangler D1)
-- `npm run db:create` - Create new D1 database
-- `npm run db:migrations:list` - List migration history
-- `npm run db:migrations:apply` - Apply migrations locally
-- `npm run db:migrations:apply:remote` - Apply migrations to production
+- `bun run db:create` - Create new D1 database
+- `bun run db:migrations:list` - List migration history
+- `bun run db:migrations:apply` - Apply migrations locally
+- `bun run db:migrations:apply:remote` - Apply migrations to production
 
 ### Database (Drizzle Kit)
-- `npm run db:generate` - Generate migrations from schema changes
-- `npm run db:studio` - Open Drizzle Studio to browse database
-- `npm run db:push` - Push schema changes directly (dev only)
+- `bun run db:generate` - Generate migrations from schema changes
+- `bun run db:studio` - Open Drizzle Studio to browse database
+- `bun run db:push` - Push schema changes directly (dev only)
 
 ### Code Quality
-- `pnpm lint` - Run Biome linter
-- `pnpm format` - Format code with Biome
-- `pnpm check` - Run Biome lint + format check
-- `pnpm typecheck` - Run TypeScript type checking
-- `pnpm test` - Run Vitest tests
+- `bun run lint` - Run Biome linter
+- `bun run format` - Format code with Biome
+- `bun run check` - Run Biome lint + format check
+- `bun run typecheck` - Run TypeScript type checking
+- `bun run test` - Run Vitest tests
 
 ### Deployment
-- `npm run deploy` - Deploy to Cloudflare Workers
+- `bun run deploy` - Deploy to Cloudflare Workers
 
 ## Deployment
 
@@ -259,13 +259,13 @@ Ensure your production Clerk key is set in `wrangler.jsonc`:
 ### 2. Apply Production Migrations
 
 ```bash
-npm run db:migrations:apply:remote
+bun run db:migrations:apply:remote
 ```
 
 ### 3. Deploy to Cloudflare
 
 ```bash
-npm run deploy
+bun run deploy
 ```
 
 Your app will be deployed to `https://nylon-impossible.your-subdomain.workers.dev`
@@ -373,7 +373,7 @@ CREATE INDEX idx_tags_user_id ON tags(user_id);
 
 Apply the migration:
 ```bash
-npm run db:migrations:apply
+bun run db:migrations:apply
 ```
 
 ## Troubleshooting
@@ -382,7 +382,7 @@ npm run db:migrations:apply
 
 Regenerate Cloudflare types after changing `wrangler.jsonc`:
 ```bash
-npm run cf-typegen
+bun run cf-typegen
 ```
 
 ### Environment Variables Not Loading
@@ -395,12 +395,12 @@ npm run cf-typegen
 
 Check your D1 database exists:
 ```bash
-npx wrangler d1 list
+bunx wrangler d1 list
 ```
 
 View migrations status:
 ```bash
-npm run db:migrations:list
+bun run db:migrations:list
 ```
 
 ### Clerk Authentication Issues

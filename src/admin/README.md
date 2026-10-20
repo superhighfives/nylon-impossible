@@ -14,7 +14,7 @@ location or other per-user editing.
 ```sh
 cp .env.example .env.local
 # fill in VITE_CLERK_PUBLISHABLE_KEY and VITE_API_BASE_URL
-pnpm admin:dev
+bun run admin:dev
 ```
 
 The app runs at http://localhost:3100. Sign in with a Clerk user that has
@@ -23,7 +23,7 @@ The app runs at http://localhost:3100. Sign in with a Clerk user that has
 ## Deploy
 
 ```sh
-pnpm admin:deploy
+bun run admin:deploy
 ```
 
 Static assets are served by `nylon-impossible-admin` Worker via Workers Static
