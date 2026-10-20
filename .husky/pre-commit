@@ -18,12 +18,12 @@ git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR >"$stag
 git -c core.quotePath=false diff --name-only --diff-filter=ACMR >"$unstaged"
 grep -Fxf "$unstaged" "$staged" >"$partial" || true
 
-if ! pnpm check:fix; then
+if ! bun run check:fix; then
   cleanup
   exit 1
 fi
 
-if ! pnpm db:check-meta; then
+if ! bun run db:check-meta; then
   cleanup
   exit 1
 fi
@@ -36,7 +36,7 @@ while IFS= read -r f; do
   # stderr is held back rather than shown: biome warns on stderr for every file
   # type it doesn't handle, which is noise unless the run actually failed.
   if ! git show ":$f" |
-    pnpm exec biome check --write --stdin-file-path "$f" >"$fixed" 2>"$errors"; then
+    bun x biome check --write --stdin-file-path "$f" >"$fixed" 2>"$errors"; then
     cat "$errors" >&2
     echo "pre-commit: biome failed on the staged copy of $f" >&2
     rm -f "$fixed" "$errors"
