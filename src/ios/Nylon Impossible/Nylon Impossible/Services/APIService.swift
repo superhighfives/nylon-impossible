@@ -178,6 +178,8 @@ struct APIUser: Codable, Sendable {
     // a missing `timezoneAuto` means automatic.
     let timezone: String?
     let timezoneAuto: Bool?
+    // What the last overnight sweep moved. Decoded leniently; see LastSweep.swift.
+    let lastSweep: LastSweep?
     let createdAt: Date
     let updatedAt: Date
 
@@ -187,6 +189,7 @@ struct APIUser: Codable, Sendable {
         theme: String?,
         timezone: String? = nil,
         timezoneAuto: Bool? = nil,
+        lastSweep: LastSweep? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -195,6 +198,7 @@ struct APIUser: Codable, Sendable {
         self.theme = theme
         self.timezone = timezone
         self.timezoneAuto = timezoneAuto
+        self.lastSweep = lastSweep
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
