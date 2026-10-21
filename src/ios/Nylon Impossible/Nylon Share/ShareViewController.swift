@@ -175,9 +175,7 @@ class ShareViewController: UIViewController {
     private func save(_ submission: ShareSheetView.Submission) {
         let fallback = sharedURL.map { ShareCapture.fallbackTitle(url: $0, suppliedTitle: sharedTitle) }
         let created = ShareCapture.save(
-            text: submission.text,
-            sharedURL: sharedURL,
-            fallbackTitle: fallback,
+            ShareCapture.Input(text: submission.text, sharedURL: sharedURL, fallbackTitle: fallback),
             listId: submission.listId,
             parseDates: submission.parseDates,
             userId: currentUserId,

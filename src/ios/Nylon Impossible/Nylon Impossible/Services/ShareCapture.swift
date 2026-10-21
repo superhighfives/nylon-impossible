@@ -44,6 +44,15 @@ enum ShareCapture {
         return TaskCreationService.titleFromURL(url)
     }
 
+    /// What was shared, and what was typed over it.
+    struct Input: Equatable {
+        /// The composer's text.
+        let text: String
+        let sharedURL: String?
+        /// The title an untouched link is saved with; see `fallbackTitle(url:suppliedTitle:)`.
+        let fallbackTitle: String?
+    }
+
     /// The todos a share will create, in order.
     static func entries(text: String, sharedURL: String?, fallbackTitle: String?) -> [Entry] {
         let lines = TodoText.entries(fromDraft: text)
@@ -64,9 +73,7 @@ enum ShareCapture {
     @MainActor
     @discardableResult
     static func save(
-        text: String,
-        sharedURL: String?,
-        fallbackTitle: String?,
+        _ input: Input,
         listId: String?,
         parseDates: Bool,
         userId: String?,
@@ -75,7 +82,7 @@ enum ShareCapture {
         var created: [TodoItem] = []
         // Each create lands above the list's first todo, so creating from the
         // last line up leaves them in the order they were typed.
-        for entry in entries(text: text, sharedURL: sharedURL, fallbackTitle: fallbackTitle).reversed() {
+        for entry in entries(text: input.text, sharedURL: input.sharedURL, fallbackTitle: input.fallbackTitle).reversed() {
             let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
             let todo: TodoItem?
             if let url = entry.url {

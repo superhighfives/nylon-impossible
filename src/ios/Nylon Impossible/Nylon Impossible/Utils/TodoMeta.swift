@@ -10,7 +10,7 @@
 import Foundation
 
 /// One piece of a row's meta line, in the order the spec lists them.
-enum MetaPart: Equatable {
+enum MetaPart: Hashable, Sendable {
     case pinned
     case due(String, overdue: Bool)
     case repeats(String)

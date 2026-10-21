@@ -13,7 +13,8 @@
 //  its own; pair it with `-NylonOpenURL nylon://add?list=this-week` to follow
 //  a deep link the way a tapped widget or control would. share and
 //  sharetext draw the share extension's sheet (a link, and three pasted
-//  lines) in the app — simctl's openurl
+//  lines) in the app, and widgets draws the Today widget's real views at
+//  iPhone sizes, small, medium and Lock Screen, from the sample data — simctl's openurl
 //  stops at a system "Open in Nylon?" prompt a script can't answer). On iPad: board,
 //  column (a list open as the fourth column), inspector (the detail panel),
 //  menu (a row selected, ready for a long-press). `-NylonLandscape YES`
@@ -26,7 +27,7 @@ import SwiftUI
 
 enum ScreenRoute: String, CaseIterable {
     case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
-    case share, sharetext
+    case share, sharetext, widgets
     case board, column, inspector, menu
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
@@ -128,6 +129,9 @@ struct ScreenRouteRoot: View {
     private var content: some View {
         switch route {
         case .share, .sharetext: shareSheet
+        case .widgets:
+            WidgetGallery(container: container)
+                .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
         default: app
         }
     }

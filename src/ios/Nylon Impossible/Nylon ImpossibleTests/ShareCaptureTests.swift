@@ -90,8 +90,7 @@ struct ShareCaptureTests {
     func savesLinesInOrder() throws {
         let context = try makeContext()
         let created = ShareCapture.save(
-            text: "Pay rent tomorrow\nCall the bank",
-            sharedURL: nil, fallbackTitle: nil,
+            ShareCapture.Input(text: "Pay rent tomorrow\nCall the bank", sharedURL: nil, fallbackTitle: nil),
             listId: "W-2", parseDates: true, userId: "u", context: context
         )
         #expect(created.map(\.title) == ["Pay rent", "Call the bank"])
@@ -108,8 +107,7 @@ struct ShareCaptureTests {
     func keepsWords() throws {
         let context = try makeContext()
         let created = ShareCapture.save(
-            text: "Pay rent tomorrow",
-            sharedURL: nil, fallbackTitle: nil,
+            ShareCapture.Input(text: "Pay rent tomorrow", sharedURL: nil, fallbackTitle: nil),
             listId: nil, parseDates: false, userId: "u", context: context
         )
         #expect(created.first?.title == "Pay rent tomorrow")
@@ -122,8 +120,7 @@ struct ShareCaptureTests {
         let context = try makeContext()
         // A sharing app's title that happens to end in a date word stays a title.
         let created = ShareCapture.save(
-            text: "",
-            sharedURL: url, fallbackTitle: "What to do in Lisbon on Friday",
+            ShareCapture.Input(text: "", sharedURL: url, fallbackTitle: "What to do in Lisbon on Friday"),
             listId: nil, parseDates: true, userId: "u", context: context
         )
         let todo = try #require(created.first)

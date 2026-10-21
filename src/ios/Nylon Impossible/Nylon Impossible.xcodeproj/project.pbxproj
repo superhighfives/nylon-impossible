@@ -108,6 +108,9 @@
 		DD0000042F5B000000000004 /* Exceptions for "Nylon Impossible" folder in "Nylon Widget" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Intents/CompleteTodoIntent.swift,
+				Intents/OpenComposerIntent.swift,
+				Intents/TodoListEntity.swift,
 				Models/APIList.swift,
 				Models/TodoChange.swift,
 				Models/TodoItem.swift,
@@ -116,16 +119,21 @@
 				Services/APIError.swift,
 				Services/BackgroundSyncService.swift,
 				Services/Config.swift,
+				Services/QuickActionService.swift,
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
 				Services/TodayDigest.swift,
 				Services/TodoCompletionService.swift,
 				Theme/Theme.swift,
 				Utils/FractionalIndexing.swift,
+				Utils/DeepLink.swift,
 				Utils/KeychainHelper.swift,
 				Utils/Recurrence.swift,
 				Utils/TodoDateParser.swift,
+				Utils/TodoMeta.swift,
 				Utils/WidgetRefresh.swift,
+				Views/Widget/TodayWidgetView.swift,
+				Views/Widget/WidgetTodo.swift,
 			);
 			target = DD0000082F5B000000000008 /* Nylon Widget */;
 		};
