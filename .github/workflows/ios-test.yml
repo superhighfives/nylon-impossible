@@ -8,12 +8,14 @@ on:
       # Shared with the iOS tests (typed-date fixtures) and Theme.swift's source.
       - "src/shared/src/todo-date-fixtures.json"
       - "src/shared/design/**"
+      - ".github/workflows/ios-test.yml"
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - "src/ios/**"
       - "src/shared/src/todo-date-fixtures.json"
       - "src/shared/design/**"
+      - ".github/workflows/ios-test.yml"
   workflow_dispatch:
 
 permissions:
