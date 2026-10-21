@@ -269,21 +269,21 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
 
-      // Composer first, then the three time sections in order.
+      // Composer first, then the time sections; Someday collapsed with a count.
       expect(card.sections.map((s: any) => s.header)).toEqual([
         undefined,
         "Today",
         "This Week",
-        "Someday",
+        "Someday · 2",
       ]);
       expect(rowTitles(section(card, "Today"))).toEqual(["In Today"]);
       expect(rowTitles(section(card, "This Week"))).toEqual(["In This Week"]);
 
-      // Someday collapses to a count, with a link to the web app.
-      const someday = section(card, "Someday").widgets[0].decoratedText;
-      expect(someday.text).toBe("2 todos");
-      expect(someday.button.text).toBe("Open Nylon");
-      expect(someday.button.onClick.openLink.url).toMatch(/^https?:\/\//);
+      // Someday is collapsed to its header, with tick rows inside.
+      const someday = section(card, "Someday · 2");
+      expect(someday.collapsible).toBe(true);
+      expect(someday.uncollapsibleWidgetsCount).toBe(0);
+      expect(rowTitles(someday)).toEqual(["In Someday", "In Someday"]);
 
       // Rows tick to done through the toggle action.
       const row = section(card, "Today").widgets[0].decoratedText;
@@ -322,6 +322,60 @@ describe("Gmail add-on", () => {
       ]);
       const selected = listInput.items.filter((i: any) => i.selected);
       expect(selected.map((i: any) => i.text)).toEqual(["Today"]);
+    });
+
+    it("shows each list with open todos as a collapsed section, in order", async () => {
+      await linkUser();
+      const db = getDb(env.DB);
+      await db.insert(lists).values([
+        {
+          id: "list-studio",
+          userId: "user_test_123",
+          name: "Studio",
+          kind: "custom",
+          position: "b1",
+        },
+        {
+          id: "list-groceries",
+          userId: "user_test_123",
+          name: "Groceries",
+          kind: "custom",
+          position: "b0",
+        },
+        {
+          id: "list-empty",
+          userId: "user_test_123",
+          name: "Empty",
+          kind: "custom",
+          position: "b2",
+        },
+      ]);
+      await seedTodo("eeeeeeee-0000-0000-0000-000000000001", "user_test_123", {
+        title: "Parmesan",
+        listId: "list-groceries",
+      });
+      await seedTodo("eeeeeeee-0000-0000-0000-000000000002", "user_test_123", {
+        title: "Mix the EP",
+        listId: "list-studio",
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      expect(card.sections.slice(3).map((s: any) => s.header)).toEqual([
+        "Someday · 0",
+        "Groceries · 1",
+        "Studio · 1",
+      ]);
+      const groceries = section(card, "Groceries · 1");
+      expect(groceries.collapsible).toBe(true);
+      expect(rowTitles(groceries)).toEqual(["Parmesan"]);
+      expect(
+        groceries.widgets[0].decoratedText.switchControl.onChangeAction
+          .function,
+      ).toContain("/gmail-addon/actions/toggle");
     });
 
     it("labels due days the way the apps do", async () => {
@@ -377,7 +431,7 @@ describe("Gmail add-on", () => {
       expect(section(card, "Today").widgets[0].textParagraph.text).toBe(
         "Nothing today. 1 waiting in This Week.",
       );
-      expect(section(card, "Someday").widgets[0].decoratedText.text).toBe(
+      expect(section(card, "Someday · 0").widgets[0].textParagraph.text).toBe(
         "Nothing in Someday.",
       );
     });

@@ -68,6 +68,8 @@ interface Section {
   header?: string;
   widgets: Widget[];
   collapsible?: boolean;
+  /** Widgets still shown while collapsed; 0 leaves just the header. */
+  uncollapsibleWidgetsCount?: number;
 }
 
 export interface Card {
@@ -134,7 +136,7 @@ export const QUICK_ADD_INPUT = "todoText";
 /** Name of the composer list dropdown, referenced by the submit action handlers. */
 export const QUICK_ADD_LIST_INPUT = "listId";
 
-/** Rows shown per time section before the rest collapse to "N more". */
+/** Rows shown per section before the rest collapse to "N more". */
 export const ADDON_SECTION_LIMIT = 8;
 
 export type AddonSystemKind = "today" | "thisWeek" | "someday";
@@ -159,7 +161,7 @@ export interface HomepageCardInput {
   lists: AddonListOption[];
   /** Open top-level todos across every list, pinned first within a list. */
   todos: AddonTodo[];
-  /** The web app, for Someday's link and the "N more" overflow row. */
+  /** The web app, for the "Open Nylon" and "N more" links. */
   webUrl: string;
   now: Date;
   timeZone: string;
@@ -256,102 +258,157 @@ function openNylonButton(webUrl: string, text = "Open Nylon"): Button {
   return { text, onClick: { openLink: { url: webUrl } } };
 }
 
-/** A time section: its rows or a written empty line, plus any overflow. */
-function timeSection(
+/**
+ * Card size budget. Google doesn't publish one hard number for Workspace
+ * add-on cards, but the panel gets slow and long cards are clipped well before
+ * the documented ceilings (100 widgets per card for card-based UIs, and the
+ * response payload limit), so the homepage designs for at most ~60 widgets:
+ *
+ *   composer                        3
+ *   Today + This Week               up to 8 rows + 1 overflow each  = 18
+ *   Someday + your lists            share ADDON_ROW_BUDGET rows, plus one
+ *                                   overflow row per section
+ *   list sections                   at most ADDON_MAX_LIST_SECTIONS, then a
+ *                                   single "N more lists" row
+ *
+ * which tops out at 3 + 18 + 24 + 7 + 1 = 53 widgets.
+ */
+export const ADDON_ROW_BUDGET = 24;
+export const ADDON_MAX_LIST_SECTIONS = 6;
+
+function overflowRow(text: string, webUrl: string): Widget {
+  return { decoratedText: { text, button: openNylonButton(webUrl, "Open") } };
+}
+
+/**
+ * A section of tick rows: up to `limit` rows, a written `empty` line when
+ * there are none, and "N more in <name>" with an Open link for the rest.
+ */
+function todoSection(
   baseUrl: string,
   input: HomepageCardInput,
-  header: string,
+  name: string,
   rows: AddonTodo[],
-  empty: string,
+  opts: { limit: number; empty?: string; collapsed?: boolean },
 ): Section {
-  const shown = rows.slice(0, ADDON_SECTION_LIMIT);
+  const shown = rows.slice(0, Math.max(0, opts.limit));
   const widgets: Widget[] = shown.map((todo) =>
     todoRowWidget(baseUrl, todo, input.now, input.timeZone),
   );
-  if (rows.length === 0) {
-    widgets.push({ textParagraph: { text: empty } });
+  if (rows.length === 0 && opts.empty) {
+    widgets.push({ textParagraph: { text: opts.empty } });
   }
   const hidden = rows.length - shown.length;
   if (hidden > 0) {
-    widgets.push({
-      decoratedText: {
-        text: `${hidden} more in ${header}`,
-        button: openNylonButton(input.webUrl, "Open"),
-      },
-    });
+    widgets.push(overflowRow(`${hidden} more in ${name}`, input.webUrl));
   }
-  return { header, widgets };
+  if (!opts.collapsed) return { header: name, widgets };
+  // Collapsed sections show only "Name · N"; the rows open on demand.
+  return {
+    header: `${name} · ${rows.length}`,
+    collapsible: true,
+    uncollapsibleWidgetsCount: 0,
+    widgets,
+  };
 }
 
 /**
  * Homepage card: the composer (list dropdown defaulting to Today), Today and
- * This Week with tick-to-done, and Someday collapsed to a count with a link to
- * the web app. Your lists are reachable from the dropdown, not shown as rows.
+ * This Week open with tick-to-done, then Someday and each of your lists as
+ * collapsed "Name · N" sections that expand to the same rows. Lists with no
+ * open todos are left out. The web app has no per-list URL yet, so every
+ * Open link goes to the app root.
  */
 export function buildHomepageCard(
   baseUrl: string,
   input: HomepageCardInput,
 ): Card {
-  const rowsIn = (kind: AddonSystemKind) => {
-    const id = input.lists.find((list) => list.systemKind === kind)?.id;
-    return id ? input.todos.filter((todo) => todo.listId === id) : [];
-  };
-  const today = rowsIn("today");
-  const thisWeek = rowsIn("thisWeek");
-  const someday = rowsIn("someday");
+  const rowsFor = (id: string | undefined) =>
+    id ? input.todos.filter((todo) => todo.listId === id) : [];
+  const idFor = (kind: AddonSystemKind) =>
+    input.lists.find((list) => list.systemKind === kind)?.id;
+  const today = rowsFor(idFor("today"));
+  const thisWeek = rowsFor(idFor("thisWeek"));
+  const someday = rowsFor(idFor("someday"));
 
   const todayEmpty =
     thisWeek.length > 0
       ? `Nothing today. ${thisWeek.length} waiting in This Week.`
       : "Nothing today.";
 
-  return {
-    header: { title: "Nylon" },
-    sections: [
-      {
-        widgets: [
-          {
-            textInput: {
-              name: QUICK_ADD_INPUT,
-              label: "Add a todo",
-              hintText: "Try “Call Sam tomorrow”",
-            },
+  const sections: Section[] = [
+    {
+      widgets: [
+        {
+          textInput: {
+            name: QUICK_ADD_INPUT,
+            label: "Add a todo",
+            hintText: "Try “Call Sam tomorrow”",
           },
-          listDropdown(input.lists, defaultAddonListId(input.lists)),
-          {
-            buttonList: {
-              buttons: [
-                {
-                  text: "Add",
-                  onClick: {
-                    action: {
-                      function: actionUrl(baseUrl, ADDON_ACTIONS.quickAdd),
-                    },
+        },
+        listDropdown(input.lists, defaultAddonListId(input.lists)),
+        {
+          buttonList: {
+            buttons: [
+              {
+                text: "Add",
+                onClick: {
+                  action: {
+                    function: actionUrl(baseUrl, ADDON_ACTIONS.quickAdd),
                   },
                 },
-              ],
-            },
+              },
+            ],
           },
-        ],
-      },
-      timeSection(baseUrl, input, "Today", today, todayEmpty),
-      timeSection(baseUrl, input, "This Week", thisWeek, "Nothing this week."),
-      {
-        header: "Someday",
-        widgets: [
-          {
-            decoratedText: {
-              text:
-                someday.length > 0
-                  ? plural(someday.length, "todo")
-                  : "Nothing in Someday.",
-              button: openNylonButton(input.webUrl),
-            },
-          },
-        ],
-      },
-    ],
+        },
+      ],
+    },
+    todoSection(baseUrl, input, "Today", today, {
+      limit: ADDON_SECTION_LIMIT,
+      empty: todayEmpty,
+    }),
+    todoSection(baseUrl, input, "This Week", thisWeek, {
+      limit: ADDON_SECTION_LIMIT,
+      empty: "Nothing this week.",
+    }),
+  ];
+
+  // Someday and your lists draw rows from one shared budget, in order.
+  let budget = ADDON_ROW_BUDGET;
+  const collapsed = (name: string, rows: AddonTodo[]) => {
+    const limit = Math.min(ADDON_SECTION_LIMIT, budget);
+    budget -= Math.min(limit, rows.length);
+    return todoSection(baseUrl, input, name, rows, {
+      limit,
+      empty: `Nothing in ${name}.`,
+      collapsed: true,
+    });
   };
+
+  sections.push(collapsed("Someday", someday));
+
+  const yourLists = orderAddonLists(input.lists)
+    .filter((list) => list.systemKind === null)
+    .map((list) => ({ list, rows: rowsFor(list.id) }))
+    .filter(({ rows }) => rows.length > 0);
+  for (const { list, rows } of yourLists.slice(0, ADDON_MAX_LIST_SECTIONS)) {
+    sections.push(collapsed(escapeCardText(list.name), rows));
+  }
+  const moreLists = yourLists.length - ADDON_MAX_LIST_SECTIONS;
+  if (moreLists > 0) {
+    sections.push({
+      widgets: [
+        {
+          decoratedText: {
+            text: plural(moreLists, "more list"),
+            button: openNylonButton(input.webUrl),
+          },
+        },
+      ],
+    });
+  }
+
+  return { header: { title: "Nylon" }, sections };
 }
 
 /**
