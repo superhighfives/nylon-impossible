@@ -136,6 +136,20 @@ extension View {
         #endif
     }
 
+    /// Draw fields, menus and buttons the way the design does — no bezels —
+    /// on a Mac, where SwiftUI's defaults are bordered text fields and pop-up
+    /// buttons. iOS's defaults already match, so it's a no-op there.
+    func unbezeledControls() -> some View {
+        #if os(macOS)
+        textFieldStyle(.plain)
+            .menuStyle(.button)
+            .menuIndicator(.hidden)
+            .buttonStyle(.plain)
+        #else
+        self
+        #endif
+    }
+
     /// The pointing-hand cursor while the pointer is over this view, on a
     /// Mac. iPadOS draws its own pointer effects, so it's a no-op there.
     func pointingHandCursor() -> some View {

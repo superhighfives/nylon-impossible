@@ -72,6 +72,7 @@ struct WidePanel: View {
                 onClose: onClose
             )
             .id("\(todo.id)-\(showsCalendar)")
+            .unbezeledControls()
         } else if let route {
             PanelChrome(onClose: onClose) {
                 switch route {

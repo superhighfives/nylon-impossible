@@ -93,9 +93,9 @@ src/ios/Nylon Impossible/Nylon Impossible/
 | Target | Product | What it is |
 |--------|---------|------------|
 | `Nylon Impossible` | `.app` | The app |
-| `Nylon Share` | `.appex` | Share sheet extension |
-| `Nylon Widget` | `.appex` | Home Screen widget |
-| `Nylon ImpossibleTests` | `.xctest` | Unit tests |
+| `Nylon Share` | `.appex` | Share sheet extension (iOS and macOS) |
+| `Nylon Widget` | `.appex` | Home Screen and Mac desktop widget |
+| `Nylon ImpossibleTests` | `.xctest` | Unit tests (iOS and macOS) |
 
 All three code targets open the same SwiftData store in the
 `group.com.superhighfives.Nylon-Impossible` App Group (see
@@ -187,6 +187,71 @@ Each embedded extension needs its own App Store provisioning profile, named in
 the Fastfile's `provisioningProfiles` dict, carrying the same App Group and
 Keychain Sharing capabilities as the app. A missing entry fails the export
 step, not the archive.
+
+## Mac
+
+The same targets build a native SwiftUI Mac app (macOS 14+, not Catalyst)
+with the same bundle IDs, so the App Store listing is one Universal Purchase.
+Pick the "My Mac" destination, or:
+
+```bash
+cd "src/ios/Nylon Impossible"
+xcodebuild build -scheme "Nylon Impossible" -destination 'platform=macOS'
+xcodebuild test  -scheme "Nylon Impossible" -destination 'platform=macOS' CODE_SIGNING_ALLOWED=NO
+```
+
+What's Mac-only lives in `Nylon Impossible/Mac/` (each file `#if os(macOS)`);
+the few UIKit/AppKit touch points shared code needs go through
+`Platform/PlatformShims.swift`.
+
+- **Window.** The iPad board in a `NavigationSplitView`: sidebar, columns,
+  the inspector, the focused list as the window title. Menus come from
+  `BoardMenuCommand` (File ▸ New Todo ⌘N / New List ⇧⌘N, View ▸ Today ⌘1 /
+  This Week ⌘2 / Someday ⌘3 / Show Done ⇧⌘D, Todo ▸ the single-key map).
+  ⌘Z reaches the toast's Undo through `ToastUndoBridge`. Text and links
+  dragged in from other apps become todos in that column.
+- **`ContentRoot` owns the queries.** The split view's columns and the
+  inspector are separate view graphs on macOS; a `@Query` read from one of
+  them trapped AttributeGraph ("setting value during update") at launch. Keep
+  `@Query` out of `ContentView` and anything it hands to another column.
+- **Services.** The window, Settings and the menu bar extra share
+  `MacServices.shared`, so the menu bar, hotkey and Dock badge work with the
+  window closed. The WebSocket stays connected while the app runs.
+- **Menu bar and hotkey.** `QuickAddView` is the menu bar extra and the
+  floating panel the global hotkey opens (`GlobalHotKey`, Carbon
+  `RegisterEventHotKey`: sandbox-safe, no permission prompt). Default
+  ⌃⌥Space; both are switchable in Settings.
+- **Dock badge.** `DockBadgeController` shows today's open count (the
+  `TodayDigest` set the widget uses), recomputed on every store save, on
+  `StoreChangeSignal` from the widget and share extension, on activation and
+  at midnight. Unlike iOS, the desktop widget is also reloaded (debounced) on
+  each save: a Mac's widgets are visible while the app is open.
+- **Sign-in.** ClerkKitUI is iOS-only, so `MacSignInView` is an email-code
+  flow on ClerkKit. `KeychainHelper` uses the data protection keychain on
+  macOS so the shared access group applies.
+- **App Group.** `TGHU37N6EX.com.superhighfives.Nylon-Impossible` on macOS —
+  the Team-prefixed form macOS accepts without a provisioning profile entry —
+  and `group.com.superhighfives.Nylon-Impossible` on iOS. Use
+  `AppGroup.identifier`; never spell it out.
+- **Screenshots.** The DEBUG routes run on the Mac binary:
+  `"…/Nylon Impossible.app/Contents/MacOS/Nylon Impossible" -NylonScreen board -NylonDark YES`,
+  plus `menubar`, `settings`, `share`, `widgets` and `menu`.
+
+### Releasing the Mac app
+
+`bundle exec fastlane mac beta` (TestFlight) and `mac release` archive for
+macOS and upload a `.pkg`. In CI they're the `deploy-mac` jobs in
+`ios-deploy.yml` and `ios-release.yml`, which are skipped until the
+repository variable `ENABLE_MAC_RELEASE` is `true`. They need, beyond the
+iOS secrets:
+
+| Secret | What |
+| --- | --- |
+| `MAC_APP_PROFILE_BASE64` | "Nylon Impossible Mac AppStore" profile (`.provisionprofile`) |
+| `MAC_SHARE_EXTENSION_PROFILE_BASE64` | "Nylon Share Mac AppStore" profile |
+| `MAC_WIDGET_EXTENSION_PROFILE_BASE64` | "Nylon Widget Mac AppStore" profile |
+| `MAC_INSTALLER_CERTIFICATE_BASE64` | Mac Installer Distribution certificate (`.p12`) |
+| `MAC_INSTALLER_CERTIFICATE_PASSWORD` | Its password |
 
 ## License
 
