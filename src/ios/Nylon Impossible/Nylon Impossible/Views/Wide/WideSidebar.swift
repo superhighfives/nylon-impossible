@@ -93,6 +93,10 @@ struct WideSidebar: View {
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 10)
+        // Navigation chrome in a fixed 248pt column: it stops growing at
+        // xxxLarge, like the phone's switcher, so names don't break
+        // mid-word. The columns carry each list's name at full size.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .frame(width: Theme.Wide.sidebarWidth)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Theme.Colors.canvas)

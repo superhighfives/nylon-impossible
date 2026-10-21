@@ -26,6 +26,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.screenRoute) var screenRoute
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(AuthService.self) var authService
     @Environment(SyncService.self) var syncService
     @Environment(UserPreferencesService.self) var preferences
@@ -220,12 +221,8 @@ struct ContentView: View {
                 onAvatar: { showsAccount = true }
             )
             if case .error(let message) = syncService.state {
-                SyncErrorLine(
-                    message: message,
-                    onRetry: { Task { await syncService.sync() } },
-                    onDismiss: syncService.dismissError
-                )
-                .transition(.opacity)
+                SyncErrorLine(message: message, onRetry: { Task { await syncService.sync() } }, onDismiss: syncService.dismissError)
+                    .transition(.opacity)
             }
             pager
                 .environment(\.composerClearance, showsComposer ? composerHeight : 0)

@@ -19,6 +19,8 @@ extension Theme {
         static let sidebarWidth: CGFloat = 248
         /// The narrowest a column gets before the board scrolls sideways.
         static let columnMinWidth: CGFloat = 240
+        /// The same at accessibility text sizes.
+        static let columnMinWidthLargeText: CGFloat = 380
         /// Header height above each column's hairline, so every title sits
         /// on the same baseline. Scaled with Dynamic Type where it's used.
         static let columnHeader: CGFloat = 140

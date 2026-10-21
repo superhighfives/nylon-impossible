@@ -82,7 +82,11 @@ extension ContentView {
     var board: some View {
         GeometryReader { geometry in
             let columns = boardColumns
-            let width = max(Theme.Wide.columnMinWidth, geometry.size.width / CGFloat(max(columns.count, 1)))
+            // At accessibility text sizes the columns keep a readable width
+            // and the board scrolls sideways, rather than squeezing three
+            // columns until words break mid-letter.
+            let minimum = dynamicTypeSize.isAccessibilitySize ? Theme.Wide.columnMinWidthLargeText : Theme.Wide.columnMinWidth
+            let width = max(minimum, geometry.size.width / CGFloat(max(columns.count, 1)))
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
                     HStack(spacing: 0) {
