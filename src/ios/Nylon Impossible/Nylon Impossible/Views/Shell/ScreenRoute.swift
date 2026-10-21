@@ -21,7 +21,14 @@
 //  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
+//  States for the quality pass, on either layout: signin (the signed-out
+//  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
+//  Today, two waiting in This Week), syncerror (Today, or the board, under
+//  the sync error line), and perf (500 todos in Today, for scrolling and the
+//  done hold).
+//
 
+import ClerkKit
 import SwiftData
 import SwiftUI
 
@@ -29,6 +36,7 @@ enum ScreenRoute: String, CaseIterable {
     case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
     case share, sharetext, widgets
     case board, column, inspector, menu
+    case signin, loading, empty, syncerror, perf
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
     static var launch: ScreenRoute? {
@@ -99,7 +107,13 @@ struct ScreenRouteRoot: View {
         self.route = route
         let auth = AuthService()
         _authService = State(initialValue: auth)
-        _syncService = State(initialValue: SyncService(authService: auth))
+        let sync = SyncService(authService: auth)
+        if route == .syncerror {
+            sync.showErrorForScreenshot(
+                SyncErrorMessage.text(for: APIError.serverError(503, nil, url: "https://api.nylonimpossible.com/todos/sync"))
+            )
+        }
+        _syncService = State(initialValue: sync)
         let preferences = UserPreferencesService(apiService: APIService(authService: auth))
         preferences.timezone = TimeZone.current.identifier
         if route == .overnight {
@@ -107,7 +121,7 @@ struct ScreenRouteRoot: View {
             OvernightDismissal().clear()
         }
         _preferences = State(initialValue: preferences)
-        container = SampleData.container()
+        container = SampleData.container(for: route)
     }
 
     var body: some View {
@@ -129,6 +143,10 @@ struct ScreenRouteRoot: View {
     private var content: some View {
         switch route {
         case .share, .sharetext: shareSheet
+        case .signin:
+            SignInView()
+                .environment(Clerk.shared)
+                .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
         case .widgets:
             WidgetGallery(container: container)
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
@@ -172,13 +190,63 @@ struct ScreenRouteRoot: View {
 
 /// The prototype's sample todos, dated relative to today.
 enum SampleData {
-    static func container() -> ModelContainer {
+    static func container(for route: ScreenRoute? = nil) -> ModelContainer {
         let schema = Schema([TodoItem.self, TodoUrl.self, TodoListModel.self])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
         // swiftlint:disable:next force_try
         let container = try! ModelContainer(for: schema, configurations: [configuration])
-        seed(container.mainContext)
+        switch route {
+        case .loading: break
+        case .empty: seedEmptyToday(container.mainContext)
+        case .perf: seedMany(container.mainContext)
+        default: seed(container.mainContext)
+        }
         return container
+    }
+
+    private static func lists(_ context: ModelContext) -> (today: TodoListModel, week: TodoListModel, someday: TodoListModel) {
+        let user = "sample-user"
+        let today = TodoListModel(id: "today", userId: user, name: "Today", kind: "system", systemKind: .today)
+        let week = TodoListModel(id: "thisweek", userId: user, name: "This Week", kind: "system", systemKind: .thisWeek)
+        let someday = TodoListModel(id: "someday", userId: user, name: "Someday", kind: "system", systemKind: .someday)
+        [today, week, someday].forEach(context.insert)
+        return (today, week, someday)
+    }
+
+    /// Today empty, two waiting in This Week: the written empty state with
+    /// its link, and Someday's plain one.
+    static func seedEmptyToday(_ context: ModelContext, now: Date = Date()) {
+        let (_, week, _) = lists(context)
+        for (index, title) in ["Send invoice to Pika", "Book dentist appointment"].enumerated() {
+            let item = TodoItem(title: title, userId: "sample-user", position: "a\(index)")
+            item.listKey = week.id
+            item.listEnteredAt = now
+            item.isSynced = true
+            context.insert(item)
+        }
+        try? context.save()
+    }
+
+    /// 500 todos in Today with the meta line's variety (due, repeat, notes,
+    /// pins), for scrolling and the done hold under load.
+    static func seedMany(_ context: ModelContext, count: Int = 500, now: Date = Date()) {
+        let (today, week, someday) = lists(context)
+        let words = ["Review", "Call", "Book", "Plan", "Fix", "Send", "Read", "Water", "Order", "Draft"]
+        let things = ["the sync engine PR", "Mum about lunch", "the dentist", "the Lisbon trip", "the bike brake",
+                      "the invoice to Pika", "Piranesi", "the plants", "vinyl mailers", "the quarterly report"]
+        for index in 0..<count {
+            let title = "\(words[index % words.count]) \(things[(index / words.count) % things.count]) \(index + 1)"
+            let item = TodoItem(title: title, userId: "sample-user", position: String(format: "a%04d", index))
+            item.listKey = [today.id, today.id, today.id, week.id, someday.id][index % 5]
+            item.listEnteredAt = now
+            item.pinned = index < 3
+            item.dueDate = index % 4 == 0 ? DueLabel.inDays(index % 9 - 2, now: now) : nil
+            item.recurrence = item.dueDate != nil && index % 3 == 0 ? Recurrence(frequency: .weekly) : nil
+            item.itemNotes = index % 7 == 0 ? "Notes for \(title)" : nil
+            item.isSynced = true
+            context.insert(item)
+        }
+        try? context.save()
     }
 
     static func seed(_ context: ModelContext, now: Date = Date()) {
