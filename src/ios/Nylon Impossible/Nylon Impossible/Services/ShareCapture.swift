@@ -70,6 +70,8 @@ enum ShareCapture {
     }
 
     /// Create the todos, top first, in `listId` (nil: Today, server-side).
+    /// Throws if the context can't be saved, so the caller doesn't report a
+    /// share as landed when nothing was persisted.
     @MainActor
     @discardableResult
     static func save(
@@ -78,7 +80,7 @@ enum ShareCapture {
         parseDates: Bool,
         userId: String?,
         context: ModelContext
-    ) -> [TodoItem] {
+    ) throws -> [TodoItem] {
         var created: [TodoItem] = []
         // Each create lands above the list's first todo, so creating from the
         // last line up leaves them in the order they were typed.
@@ -109,11 +111,7 @@ enum ShareCapture {
             if let notes = entry.notes { todo.itemNotes = notes }
             created.insert(todo, at: 0)
         }
-        do {
-            try context.save()
-        } catch {
-            print("[ShareCapture] Failed to save: \(error)")
-        }
+        try context.save()
         return created
     }
 }

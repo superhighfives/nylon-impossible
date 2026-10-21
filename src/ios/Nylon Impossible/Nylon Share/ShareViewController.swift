@@ -174,13 +174,21 @@ class ShareViewController: UIViewController {
 
     private func save(_ submission: ShareSheetView.Submission) {
         let fallback = sharedURL.map { ShareCapture.fallbackTitle(url: $0, suppliedTitle: sharedTitle) }
-        let created = ShareCapture.save(
-            ShareCapture.Input(text: submission.text, sharedURL: sharedURL, fallbackTitle: fallback),
-            listId: submission.listId,
-            parseDates: submission.parseDates,
-            userId: currentUserId,
-            context: context
-        )
+        let created: [TodoItem]
+        do {
+            created = try ShareCapture.save(
+                ShareCapture.Input(text: submission.text, sharedURL: sharedURL, fallbackTitle: fallback),
+                listId: submission.listId,
+                parseDates: submission.parseDates,
+                userId: currentUserId,
+                context: context
+            )
+        } catch {
+            // Nothing was persisted, so don't play the success haptic.
+            print("[ShareViewController] Failed to save share: \(error)")
+            completeWithError()
+            return
+        }
         guard !created.isEmpty else { return }
 
         // A todo shared in with a due date can belong on the widget straight

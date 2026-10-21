@@ -89,7 +89,7 @@ struct ShareCaptureTests {
     @MainActor
     func savesLinesInOrder() throws {
         let context = try makeContext()
-        let created = ShareCapture.save(
+        let created = try ShareCapture.save(
             ShareCapture.Input(text: "Pay rent tomorrow\nCall the bank", sharedURL: nil, fallbackTitle: nil),
             listId: "W-2", parseDates: true, userId: "u", context: context
         )
@@ -106,7 +106,7 @@ struct ShareCaptureTests {
     @MainActor
     func keepsWords() throws {
         let context = try makeContext()
-        let created = ShareCapture.save(
+        let created = try ShareCapture.save(
             ShareCapture.Input(text: "Pay rent tomorrow", sharedURL: nil, fallbackTitle: nil),
             listId: nil, parseDates: false, userId: "u", context: context
         )
@@ -119,7 +119,7 @@ struct ShareCaptureTests {
     func savesUntouchedLink() throws {
         let context = try makeContext()
         // A sharing app's title that happens to end in a date word stays a title.
-        let created = ShareCapture.save(
+        let created = try ShareCapture.save(
             ShareCapture.Input(text: "", sharedURL: url, fallbackTitle: "What to do in Lisbon on Friday"),
             listId: nil, parseDates: true, userId: "u", context: context
         )
