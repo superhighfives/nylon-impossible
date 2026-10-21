@@ -191,10 +191,13 @@ extension ContentView {
                         if isWide { openWide(todo) } else { detailTodo = todo }
                     }
                 case .menu:
-                    // A context menu can't be opened from code; this leaves
-                    // the keyboard on a row for a long-press to find.
+                    // Select a row, then open its real context menu.
                     focusedColumnId = timeList(.thisWeek)?.id
                     selectedTodoId = timeList(.thisWeek).flatMap { rows($0).dropFirst(2).first?.id }
+                    #if DEBUG
+                    try? await Task.sleep(for: .milliseconds(1200))
+                    ScreenRouteMenu.present()
+                    #endif
                 case .done where isWide:
                     widePanel = .done
                 case .settings where isWide:

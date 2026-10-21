@@ -108,6 +108,9 @@ struct BoardColumn<Accessory: View>: View {
             onOpen(todo)
         }
         .background(Theme.Colors.canvas.opacity(0.001))
+        #if DEBUG
+        .screenRouteMenuTarget(selectedId == todo.id)
+        #endif
         .contextMenu { TodoContextMenu(todo: todo, lists: lists, actions: actions, style: .wide) }
         .todoDragSource(todo)
         // A 2pt line above the row it would land in front of.

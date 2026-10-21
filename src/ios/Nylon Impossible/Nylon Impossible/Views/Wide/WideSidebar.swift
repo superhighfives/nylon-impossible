@@ -14,7 +14,8 @@ import SwiftUI
 struct WideSidebar: View {
     struct Entry: Identifiable {
         let list: TodoListModel
-        let count: Int
+        /// Open todos in the list.
+        let openTodos: Int
         var id: String { list.id }
     }
 
@@ -104,8 +105,8 @@ struct WideSidebar: View {
                 Text(entry.list.name)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if entry.count > 0 {
-                    Text("\(entry.count)")
+                if entry.openTodos > 0 {
+                    Text("\(entry.openTodos)")
                         .fontWeight(.regular)
                         .foregroundStyle(Theme.Colors.inkMuted)
                         .monospacedDigit()
@@ -130,7 +131,7 @@ struct WideSidebar: View {
         }
         .buttonStyle(SidebarButtonStyle())
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
-        .accessibilityValue(entry.count == 1 ? "1 todo" : "\(entry.count) todos")
+        .accessibilityValue(entry.openTodos == 1 ? "1 todo" : "\(entry.openTodos) todos")
         .accessibilityHint("Drop a todo here to move it")
         .todoDropTarget(isTargeted: Binding(
             get: { targeted == entry.id },
