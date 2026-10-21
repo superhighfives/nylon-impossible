@@ -131,8 +131,11 @@ struct WideSidebar: View {
         }
         .buttonStyle(SidebarButtonStyle())
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
-        .accessibilityValue(entry.openTodos == 1 ? "1 todo" : "\(entry.openTodos) todos")
-        .accessibilityHint("Drop a todo here to move it")
+        // "This Week, 6 todos" — the count is the value, not a second
+        // number read out in the label.
+        .accessibilityLabel(entry.list.name)
+        .accessibilityValue(WideSidebar.countText(entry.openTodos))
+        .accessibilityHint(entry.list.isSystem ? "Shows its column" : (isCurrent ? "Closes its column" : "Opens it as a column"))
         .todoDropTarget(isTargeted: Binding(
             get: { targeted == entry.id },
             set: { isOver in
@@ -143,6 +146,15 @@ struct WideSidebar: View {
                 }
             }
         )) { onDrop(entry.list, $0) }
+    }
+
+    /// A list's open count as VoiceOver reads it.
+    static func countText(_ count: Int) -> String {
+        switch count {
+        case 0: return "No todos"
+        case 1: return "1 todo"
+        default: return "\(count) todos"
+        }
     }
 
     private func plainRow(_ title: String, detail: String? = nil, isCurrent: Bool, action: @escaping () -> Void) -> some View {

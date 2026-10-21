@@ -31,11 +31,20 @@ struct DoneHistoryView: View {
             .filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }
             .map { (todo: $0, at: $0.completedAt ?? $0.updatedAt) }
             .filter { $0.at >= cutoff }
-            .sorted { $0.at > $1.at }
+            .sorted { Self.isOrderedBefore($0, $1) }
         let byDay = Dictionary(grouping: done) { calendar.startOfDay(for: $0.at) }
         return byDay.keys.sorted(by: >).map { day in
             DayGroup(id: day, label: DayLabel.text(day), items: byDay[day]?.map(\.todo) ?? [])
         }
+    }
+
+    /// Newest first. Todos finished at the same moment (a sync, a batch)
+    /// fall back to title, then id, so the order is the same on every run.
+    static func isOrderedBefore(_ a: (todo: TodoItem, at: Date), _ b: (todo: TodoItem, at: Date)) -> Bool {
+        if a.at != b.at { return a.at > b.at }
+        let byTitle = a.todo.title.localizedStandardCompare(b.todo.title)
+        if byTitle != .orderedSame { return byTitle == .orderedAscending }
+        return a.todo.id.uuidString < b.todo.id.uuidString
     }
 
     private func listName(_ todo: TodoItem) -> String {
@@ -99,6 +108,15 @@ struct DoneHistoryView: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 10)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(todo.title)
+        .accessibilityValue("Done, from \(listName(todo))")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint("Puts it back in \(listName(todo))")
+        .accessibilityAction {
+            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+                actions.restoreFromDone(todo)
+            }
+        }
     }
 }

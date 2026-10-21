@@ -44,7 +44,7 @@ struct ListPage<Header: View>: View {
             }
 
             ForEach(rows) { todo in
-                TodoRow(todo: todo, subtasks: subtasks[todo.id] ?? [], actions: actions) {
+                TodoRow(todo: todo, subtasks: subtasks[todo.id] ?? [], actions: actions, lists: lists) {
                     onOpen(todo)
                 }
                 .listRowInsets(EdgeInsets())
