@@ -9,7 +9,7 @@
 //      -NylonScreen detail -NylonDark YES
 //
 //  Screens: today, week, someday, lists, collection, detail, composer, done,
-//  settings. The route skips sign-in and runs on in-memory sample data, so
+//  settings, overnight (Today with the overnight note). The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
 
@@ -17,7 +17,7 @@ import SwiftData
 import SwiftUI
 
 enum ScreenRoute: String, CaseIterable {
-    case today, week, someday, lists, collection, detail, composer, done, settings
+    case today, week, someday, lists, collection, detail, composer, done, settings, overnight
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
     static var launch: ScreenRoute? {
@@ -65,7 +65,13 @@ struct ScreenRouteRoot: View {
         let auth = AuthService()
         _authService = State(initialValue: auth)
         _syncService = State(initialValue: SyncService(authService: auth))
-        _preferences = State(initialValue: UserPreferencesService(apiService: APIService(authService: auth)))
+        let preferences = UserPreferencesService(apiService: APIService(authService: auth))
+        preferences.timezone = TimeZone.current.identifier
+        if route == .overnight {
+            preferences.lastSweep = LastSweep(at: Date(), movedToThisWeek: 2, movedToSomeday: 1)
+            OvernightDismissal().clear()
+        }
+        _preferences = State(initialValue: preferences)
         container = SampleData.container()
     }
 

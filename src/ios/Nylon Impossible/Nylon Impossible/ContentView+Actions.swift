@@ -40,6 +40,7 @@ extension ContentView {
         let text = viewModel.newTaskText
         viewModel.newTaskText = ""
         let created = actions.add(draft: text, to: listId, parseDates: parseDates, userId: authService.userId)
+        noteAdded(created, to: listId)
         guard !created.isEmpty, let listId, listId != currentListId else { return }
         let name = orderedLists.first { $0.id == listId }?.name ?? "List"
         let message = created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)"
@@ -47,6 +48,19 @@ extension ContentView {
         actions.toasts.show(message, actionLabel: "View", action: { [viewModel] in
             viewModel.show(listId: listId, in: lists)
         })
+    }
+
+    /// Put the overnight note away for good.
+    func dismissOvernight() {
+        guard let sweep = preferences.lastSweep else { return }
+        overnightDismissedAt = sweep.atString
+    }
+
+    /// Adding anything to Today retires the overnight note.
+    func noteAdded(_ created: [TodoItem], to listId: String?) {
+        guard !created.isEmpty, overnightText != nil else { return }
+        let today = timeList(.today)?.id.lowercased()
+        if listId == nil || listId?.lowercased() == today { dismissOvernight() }
     }
 
     func createList(_ name: String) async -> Bool {
@@ -148,7 +162,7 @@ extension ContentView {
     func applyScreenRoute() {
         guard let route = screenRoute else { return }
         switch route {
-        case .today: viewModel.page = .today
+        case .today, .overnight: viewModel.page = .today
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday
         case .lists: viewModel.page = .lists

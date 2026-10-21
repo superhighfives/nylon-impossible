@@ -21,6 +21,8 @@ struct ContentView: View {
     @Environment(\.screenRoute) var screenRoute
     @Environment(AuthService.self) var authService
     @Environment(SyncService.self) var syncService
+    @Environment(UserPreferencesService.self) var preferences
+    @AppStorage(OvernightDismissal.key) var overnightDismissedAt: String?
     @Query(sort: \TodoItem.createdAt, order: .reverse) var todos: [TodoItem]
     @Query(sort: \TodoListModel.position) var lists: [TodoListModel]
 
@@ -88,6 +90,15 @@ struct ContentView: View {
     var currentListId: String? { viewModel.currentListId(in: orderedLists) }
 
     var showsComposer: Bool { currentListId != nil }
+
+    /// Today's "2 moved to This Week overnight" line, or nil.
+    var overnightText: String? {
+        OvernightNote.visibleText(
+            preferences.lastSweep,
+            timeZone: OvernightNote.timeZone(named: preferences.timezone),
+            dismissedAt: overnightDismissedAt
+        )
+    }
 
     var doneCount: Int {
         todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
