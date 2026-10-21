@@ -1,11 +1,4 @@
-import {
-  Check,
-  FileText,
-  Link as LinkIcon,
-  ListChecks,
-  Pin,
-  Repeat,
-} from "lucide-react";
+import { Check, FileText, Link2, ListTree, Pin, Repeat } from "lucide-react";
 import {
   type HTMLAttributes,
   type KeyboardEvent,
@@ -26,9 +19,9 @@ const LONG_PRESS_SLOP = 10;
 const META_ICONS = {
   pin: Pin,
   repeat: Repeat,
-  subtasks: ListChecks,
+  subtasks: ListTree,
   notes: FileText,
-  link: LinkIcon,
+  link: Link2,
 } as const;
 
 function MetaItem({ part }: { part: MetaPart }) {
@@ -38,7 +31,15 @@ function MetaItem({ part }: { part: MetaPart }) {
     <span
       className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""}`}
     >
-      {Icon && <Icon size="1em" strokeWidth={2} aria-hidden="true" />}
+      {Icon && (
+        <Icon
+          size="1em"
+          strokeWidth={2}
+          // SF Symbols draws pin.fill; lucide has no filled pin, so fill it.
+          fill={part.kind === "pin" ? "currentColor" : "none"}
+          aria-hidden="true"
+        />
+      )}
       {/* The notes glyph stands alone; its word is for the accessible name. */}
       {part.kind !== "notes" && part.text}
     </span>
@@ -169,7 +170,7 @@ export const TodoRow = memo(function TodoRow({
     >
       <div
         className={`flex min-h-0 items-start overflow-hidden transition-colors duration-(--n-duration-fast) ${
-          wide ? "-mx-2.5 gap-3 rounded-n-field px-2.5" : "gap-3.5 px-5"
+          wide ? "-mx-2.5 gap-3 rounded-n-field px-2.5" : "gap-3 px-5"
         } ${highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"}`}
       >
         <button
@@ -218,7 +219,7 @@ export const TodoRow = memo(function TodoRow({
           onKeyDown={onKeyDown}
           aria-haspopup="dialog"
           aria-description={summary || undefined}
-          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left n-focus-inset [-webkit-touch-callout:none] ${wide ? "-ml-1.5 py-2.5 pr-2 pl-1.5" : "py-3"}`}
+          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left n-focus-inset [-webkit-touch-callout:none] ${wide ? "-ml-1.5 py-2.5 pr-2 pl-1.5" : "py-[0.6875rem]"}`}
         >
           <span
             className={`line-clamp-3 block font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
@@ -232,7 +233,7 @@ export const TodoRow = memo(function TodoRow({
           {parts.length > 0 && (
             <span
               aria-hidden="true"
-              className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted"
+              className={`mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted`}
             >
               {parts.map((part) => (
                 <MetaItem key={part.kind} part={part} />

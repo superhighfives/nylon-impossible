@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
   dayKeyIn,
+  daysBetweenKeys,
   dueDayKey,
   type RecurrenceFrequency,
   TODO_TITLE_MAX,
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   Calendar as CalendarIcon,
   Check,
+  ChevronDown,
   List,
   Loader2,
   MoreHorizontal,
@@ -64,6 +66,13 @@ function stamp(iso: string, now: Date, timeZone: string): string {
   if (key === today) return "today";
   if (key === dayKeyIn(new Date(now.getTime() - DAY_MS), timeZone)) {
     return "yesterday";
+  }
+  // Within the week, the weekday ("Created Thursday"), as on iOS.
+  if (daysBetweenKeys(key, today) <= 6) {
+    return new Date(iso).toLocaleDateString("en-US", {
+      weekday: "long",
+      timeZone,
+    });
   }
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -236,6 +245,7 @@ function DetailBody({
           >
             <List size={14} aria-hidden="true" />
             {listName(todo.listId)}
+            <ChevronDown size={14} aria-hidden="true" className="-mr-0.5" />
           </button>
           <button
             type="button"
@@ -246,6 +256,7 @@ function DetailBody({
           >
             <CalendarIcon size={14} aria-hidden="true" />
             {due ? due.text : "Due"}
+            <ChevronDown size={14} aria-hidden="true" className="-mr-0.5" />
           </button>
           {canRepeat && (
             <button
@@ -256,6 +267,7 @@ function DetailBody({
             >
               <Repeat size={14} aria-hidden="true" />
               {todo.recurrence ? repeatLabel(todo.recurrence) : "Repeat"}
+              <ChevronDown size={14} aria-hidden="true" className="-mr-0.5" />
             </button>
           )}
           <button
@@ -468,7 +480,7 @@ function Subtasks({
                   input: { completed: !s.completed },
                 })
               }
-              className="-ml-3 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-chip n-focus-inset"
+              className="-mr-2.5 -ml-3 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-chip n-focus-inset"
             >
               <span
                 className={`flex size-[18px] items-center justify-center rounded-[5px] border-[1.5px] transition-colors duration-(--n-duration-fast) ${

@@ -1,5 +1,12 @@
 import { useClerk } from "@clerk/tanstack-react-start";
-import { ChevronDown } from "lucide-react";
+import {
+  ArrowUpRight,
+  ChevronDown,
+  type LucideIcon,
+  Monitor,
+  Moon,
+  Sun,
+} from "lucide-react";
 import {
   type Theme,
   useDeleteCurrentUser,
@@ -14,10 +21,11 @@ import { Screen } from "./Screen";
 
 const AUTOMATIC = "automatic";
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: "light", label: "Light" },
-  { value: "dark", label: "Dark" },
-  { value: "system", label: "System" },
+/** In the iOS order, with the tokens' theme glyphs. */
+const THEMES: { value: Theme; label: string; Icon: LucideIcon }[] = [
+  { value: "system", label: "System", Icon: Monitor },
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
 ];
 
 const ZONES =
@@ -85,15 +93,11 @@ export function SettingsScreen({
 
   return (
     <Screen open={open} onClose={onClose} backLabel="Back" title="Settings">
-      <Masthead
-        pushed
-        title="Settings"
-        subline={user?.email ?? "Saved as you change them"}
-      />
+      <Masthead pushed title="Settings" subline="Synced across your devices" />
       <fieldset className={`${SECTION} min-w-0`}>
         <legend className={`${LABEL} float-left w-full`}>Appearance</legend>
-        <div className="clear-both flex gap-1.5">
-          {THEMES.map(({ value, label }) => {
+        <div className="clear-both flex flex-wrap gap-1.5">
+          {THEMES.map(({ value, label, Icon }) => {
             const selected = theme === value;
             return (
               <button
@@ -109,12 +113,13 @@ export function SettingsScreen({
                     );
                   }
                 }}
-                className={`flex min-h-11 flex-1 cursor-pointer items-center justify-center rounded-n-chip border text-[0.9375rem] font-medium n-focus disabled:opacity-50 ${
+                className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-n-chip border px-3.5 text-[0.9375rem] font-medium n-focus disabled:opacity-50 ${
                   selected
                     ? "border-n-brand bg-n-brand text-n-brand-ink"
                     : "border-n-hairline text-n-ink-muted"
                 }`}
               >
+                <Icon size={15} aria-hidden="true" />
                 {label}
               </button>
             );
@@ -156,6 +161,29 @@ export function SettingsScreen({
           Today moves to This Week, and This Week to Someday, at your local
           midnight. A todo gets at least a full day in Today.
         </p>
+      </section>
+
+      <section className={SECTION}>
+        <h2 className={LABEL}>About</h2>
+        {[
+          { href: "/privacy", label: "Privacy Policy" },
+          { href: "/terms", label: "Terms of Service" },
+        ].map((link) => (
+          <a
+            key={link.href}
+            href={link.href}
+            target="_blank"
+            rel="noopener"
+            className="-mx-2 flex min-h-11 items-center justify-between rounded-n-chip px-2 text-base text-n-ink no-underline n-focus"
+          >
+            {link.label}
+            <ArrowUpRight
+              size={16}
+              aria-hidden="true"
+              className="text-n-ink-muted"
+            />
+          </a>
+        ))}
       </section>
 
       <section className={SECTION}>

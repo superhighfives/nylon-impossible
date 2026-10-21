@@ -418,7 +418,7 @@ export function PhoneApp({
                   type="button"
                   aria-describedby={`phone-list-count-${list.id}`}
                   onClick={() => setCollectionId(list.id)}
-                  className="flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-n-hairline px-5 py-4 text-left text-n-ink n-focus-inset"
+                  className="mx-5 flex min-h-11 w-[calc(100%-2.5rem)] cursor-pointer items-center gap-3 border-b border-n-hairline py-3.5 text-left text-n-ink n-focus-inset"
                 >
                   <span className="min-w-0 flex-1 truncate font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
                     {list.name}
@@ -433,7 +433,8 @@ export function PhoneApp({
                     {plural(rowsFor(list.id).length, "todo")}
                   </span>
                   <ChevronRight
-                    size={16}
+                    size={18}
+                    strokeWidth={2.2}
                     aria-hidden="true"
                     className="text-n-ink-muted"
                   />
