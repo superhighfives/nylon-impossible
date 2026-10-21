@@ -8,6 +8,10 @@
 //  the words in the title. Return adds and keeps focus for the next one; a
 //  pasted list adds a todo per line.
 //
+//  The share extension uses this same composer, floating at the foot of its
+//  sheet: `placeholder` shows a shared link's stand-in title, and
+//  `allowsEmptySubmit` lets it be sent as-is.
+//
 //  On the iPad board the same composer is the quiet "+ Add" row at the top of
 //  each column (`style: .inline`): no glass, the chips under the field while
 //  it's focused, and Escape hands the keyboard back to the board.
@@ -33,6 +37,12 @@ struct Composer: View {
     /// Told when the field gains or loses focus, so the board can stand its
     /// single-key shortcuts down while you type.
     var onFocusChange: ((Bool) -> Void)?
+    /// Replaces "Add to Today…" — the share sheet shows the title a shared
+    /// link will get if nothing is typed.
+    var placeholder: String?
+    /// Send with nothing typed (the share sheet, where the placeholder is
+    /// what's saved). The send button then shows from the start.
+    var allowsEmptySubmit = false
 
     @State private var keepWords = false
     @FocusState private var isFocused: Bool
@@ -48,14 +58,19 @@ struct Composer: View {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// The date typed at the end of the first line, unless × kept the words.
+    /// The first date typed among the lines, unless × kept the words. Each
+    /// line is parsed when it's added, so a pasted list whose third line ends
+    /// "friday" still shows the chip — and × keeps the words on every line.
     private var typedDue: Date? {
         guard !keepWords, hasDraft else { return nil }
-        let firstLine = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
-        return TodoDateParser.parse(firstLine).dueDay
+        return text.split(whereSeparator: \.isNewline).lazy
+            .compactMap { TodoDateParser.parse(String($0)).dueDay }
+            .first
     }
 
     private var showsChips: Bool { isFocused || hasDraft }
+
+    private var canSubmit: Bool { hasDraft || allowsEmptySubmit }
 
     var body: some View {
         Group {
@@ -102,7 +117,7 @@ struct Composer: View {
                     .padding(.horizontal, 18)
                     .padding(.vertical, 14)
 
-                if hasDraft {
+                if canSubmit {
                     Button(action: submit) {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 17, weight: .bold))
@@ -158,6 +173,9 @@ struct Composer: View {
     private var prompt: Text {
         if style == .inline, !isFocused {
             return Text("Add").foregroundStyle(Theme.Colors.inkMuted)
+        }
+        if let placeholder {
+            return Text(placeholder).foregroundStyle(Theme.Colors.inkSubtle)
         }
         return Text("Add to \(targetName)…").foregroundStyle(Theme.Colors.inkSubtle)
     }
@@ -219,7 +237,7 @@ struct Composer: View {
     }
 
     private func submit() {
-        guard hasDraft else { return }
+        guard canSubmit else { return }
         onSubmit(targetId, !keepWords)
         keepWords = false
         // Keep focus for rapid entry.

@@ -11,17 +11,22 @@ import SwiftData
 import UniformTypeIdentifiers
 
 class ShareViewController: UIViewController {
-    
+
     private var sharedURL: String?
     private var sharedTitle: String?
 
+    /// One context for the extension's life: the list models handed to the
+    /// composer belong to it, so it has to outlive the fetch.
+    private lazy var context = ModelContext(SharedModelContainer.shared)
+
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        // Process the shared content
+        // The sheet's own colour, light and dark, so nothing flashes system
+        // white while the shared item loads.
+        view.backgroundColor = UIColor(Theme.Colors.canvas)
         processSharedContent()
     }
-    
+
     private func processSharedContent() {
         guard let extensionItems = extensionContext?.inputItems as? [NSExtensionItem] else {
             completeWithError()
@@ -69,22 +74,22 @@ class ShareViewController: UIViewController {
         // No supported content found
         completeWithError()
     }
-    
+
     private func handleURL(provider: NSItemProvider) {
-        provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] item, error in
+        provider.loadItem(forTypeIdentifier: UTType.url.identifier, options: nil) { [weak self] item, _ in
             guard let url = item as? URL else {
                 DispatchQueue.main.async {
                     self?.completeWithError()
                 }
                 return
             }
-            
+
             DispatchQueue.main.async {
                 self?.showShareSheet(with: url.absoluteString, isURL: true)
             }
         }
     }
-    
+
     private func handleURLWithTextTitle(urlProvider: NSItemProvider, textProvider: NSItemProvider) {
         textProvider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, _ in
             let title = (item as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -94,53 +99,54 @@ class ShareViewController: UIViewController {
     }
 
     private func handleText(provider: NSItemProvider) {
-        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, error in
+        provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { [weak self] item, _ in
             guard let text = item as? String else {
                 DispatchQueue.main.async {
                     self?.completeWithError()
                 }
                 return
             }
-            
+
             DispatchQueue.main.async {
                 self?.showShareSheet(with: text, isURL: false)
             }
         }
     }
-    
+
     private func showShareSheet(with content: String, isURL: Bool) {
         if isURL {
             sharedURL = content
         }
 
         let shareView = ShareSheetView(
-            content: content,
-            isURL: isURL,
-            prefilledTitle: sharedTitle,
+            text: isURL ? "" : content,
+            url: sharedURL,
+            suppliedTitle: sharedTitle,
             lists: availableLists(),
-            onSave: { [weak self] title, listId, parseDates in
-                self?.saveTask(title: title, url: self?.sharedURL, listId: listId, parseDates: parseDates)
+            onSave: { [weak self] submission in
+                self?.save(submission)
             },
             onCancel: { [weak self] in
                 self?.cancel()
             }
         )
-        
+
         let hostingController = UIHostingController(rootView: shareView)
+        hostingController.view.backgroundColor = UIColor(Theme.Colors.canvas)
         addChild(hostingController)
         view.addSubview(hostingController.view)
         hostingController.view.translatesAutoresizingMaskIntoConstraints = false
-        
+
         NSLayoutConstraint.activate([
             hostingController.view.topAnchor.constraint(equalTo: view.topAnchor),
             hostingController.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             hostingController.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             hostingController.view.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
-        
+
         hostingController.didMove(toParent: self)
     }
-    
+
     /// The signed-in user, from shared UserDefaults. Spelled out rather than
     /// via `BackgroundSyncService.userIdKey`: this target doesn't compile that
     /// service (it doesn't sync — the app picks the todo up on its next
@@ -154,8 +160,7 @@ class ShareViewController: UIViewController {
     /// Today, This Week, Someday, then the user's lists — the same order and
     /// names as the app's composer chips. Empty before the app's first sync,
     /// in which case the todo lands in Today server-side.
-    private func availableLists() -> [ShareList] {
-        let context = ModelContext(SharedModelContainer.shared)
+    private func availableLists() -> [TodoListModel] {
         let all = (try? context.fetch(FetchDescriptor<TodoListModel>())) ?? []
         let userId = currentUserId
         return all
@@ -165,52 +170,48 @@ class ShareViewController: UIViewController {
                 if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
                 return a.position < b.position
             }
-            .map { ShareList(id: $0.id, name: $0.name) }
     }
 
-    private func saveTask(title: String, url: String? = nil, listId: String?, parseDates: Bool) {
-        let container = SharedModelContainer.shared
-        let context = ModelContext(container)
-        let userId = currentUserId
-        let allTodos = TaskCreationService.fetchAllTodos(userId: userId, context: context)
-
-        if let url = url {
-            _ = TaskCreationService.createTaskWithURL(
-                title: title,
-                url: url,
-                userId: userId,
-                context: context,
-                allTodos: allTodos,
-                listId: listId,
-                parseDate: parseDates
+    private func save(_ submission: ShareSheetView.Submission) {
+        let fallback = sharedURL.map { ShareCapture.fallbackTitle(url: $0, suppliedTitle: sharedTitle) }
+        let created: [TodoItem]
+        do {
+            created = try ShareCapture.save(
+                ShareCapture.Input(text: submission.text, sharedURL: sharedURL, fallbackTitle: fallback),
+                listId: submission.listId,
+                parseDates: submission.parseDates,
+                userId: currentUserId,
+                context: context
             )
-        } else {
-            _ = TaskCreationService.createTask(
-                title: title,
-                userId: userId,
-                context: context,
-                allTodos: allTodos,
-                listId: listId,
-                parseDate: parseDates
-            )
+        } catch {
+            // Nothing was persisted, so don't play the success haptic.
+            print("[ShareViewController] Failed to save share: \(error)")
+            completeWithError()
+            return
         }
+        guard !created.isEmpty else { return }
 
-        // A task shared in with a due date can belong on the widget straight
+        // A todo shared in with a due date can belong on the widget straight
         // away, and nothing else will prompt a reload until the app is opened.
         WidgetRefresh.reload()
 
-        completeWithSuccess()
+        // A light tap to say it landed, then out of the way. The short wait
+        // lets the haptic play before the extension is torn down.
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            self?.completeWithSuccess()
+        }
     }
-    
+
     private func completeWithSuccess() {
         extensionContext?.completeRequest(returningItems: nil, completionHandler: nil)
     }
-    
+
     private func completeWithError() {
         let error = NSError(domain: "com.superhighfives.Nylon-Impossible.NylonShare", code: 0, userInfo: nil)
         extensionContext?.cancelRequest(withError: error)
     }
-    
+
     private func cancel() {
         extensionContext?.cancelRequest(withError: NSError(domain: NSCocoaErrorDomain, code: NSUserCancelledError))
     }

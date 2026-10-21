@@ -12,5 +12,6 @@ import WidgetKit
 struct NylonWidgetBundle: WidgetBundle {
     var body: some Widget {
         TodayWidget()
+        AddTodoControl()
     }
 }

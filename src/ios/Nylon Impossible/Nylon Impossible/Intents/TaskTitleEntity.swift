@@ -7,12 +7,14 @@
 
 import AppIntents
 
-/// Wrapper entity for free-form task titles, enabling inline Siri phrases like "Add buy milk to Nylon"
+/// Wrapper entity for a free-form todo title, enabling inline Siri phrases like
+/// "Add buy milk to Nylon". The type name predates "todo" and stays: saved
+/// Shortcuts refer to it.
 struct TaskTitle: AppEntity {
     var id: String
     var title: String
     
-    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Task"
+    static var typeDisplayRepresentation: TypeDisplayRepresentation = "Todo"
     
     static var defaultQuery = TaskTitleQuery()
     
@@ -26,10 +28,10 @@ struct TaskTitle: AppEntity {
     }
 }
 
-/// Query that accepts any spoken string as a valid task title
+/// Query that accepts any spoken string as a valid todo title
 struct TaskTitleQuery: EntityStringQuery {
     func entities(matching string: String) async throws -> [TaskTitle] {
-        // Accept any free-form text as a valid task title
+        // Accept any free-form text as a valid todo title
         [TaskTitle(title: string)]
     }
     
@@ -39,7 +41,7 @@ struct TaskTitleQuery: EntityStringQuery {
     }
     
     func suggestedEntities() async throws -> [TaskTitle] {
-        // Could return recent tasks here for Siri suggestions
+        // Could return recent todos here for Siri suggestions
         []
     }
 }

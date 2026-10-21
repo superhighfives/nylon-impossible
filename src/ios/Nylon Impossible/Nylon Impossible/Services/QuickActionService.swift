@@ -3,10 +3,14 @@
 //  Nylon Impossible
 //
 //  Home Screen quick actions — the menu you get by long-pressing the app
-//  icon. The items themselves are declared statically under
-//  `UIApplicationShortcutItems` in Nylon-Impossible-Info.plist; this is the
-//  bridge between the UIKit scene callbacks that deliver them
-//  (`AppDelegate.swift`) and the SwiftUI view that acts on them.
+//  icon — and every other way in from outside: `nylon://` URLs, the widget's
+//  "+" and the Control Center control. The quick action items are declared
+//  statically under `UIApplicationShortcutItems` in
+//  Nylon-Impossible-Info.plist. Each entry point turns into a `DeepLink` and
+//  is parked here until the SwiftUI view that acts on it is ready.
+//
+//  Compiled into the widget extension too, for `OpenComposerIntent`; posting
+//  there is harmless, as that intent opens the app and runs in its process.
 //
 
 import Foundation
@@ -17,16 +21,26 @@ import UIKit
 /// must match the `UIApplicationShortcutItemType` strings in the Info.plist —
 /// an item declared there with no case here is simply ignored.
 enum QuickAction: String {
-    /// Open straight into the add-task field with the keyboard up.
+    /// "New todo": open straight into the composer with the keyboard up. The
+    /// type string predates the todo/task vocabulary and stays as it is — it's
+    /// the item's identity, not its copy.
     case newTask = "com.superhighfives.Nylon-Impossible.new-task"
 
     init?(_ shortcutItem: UIApplicationShortcutItem) {
         self.init(rawValue: shortcutItem.type)
     }
+
+    /// The route this action takes — the same one `nylon://add?list=today`
+    /// does, so the quick action, the widget and the control can't drift.
+    var deepLink: DeepLink {
+        switch self {
+        case .newTask: return .add(list: .today)
+        }
+    }
 }
 
-/// Parks the quick action the app was launched with until a view is ready to
-/// perform it.
+/// Parks the route the app was opened with until a view is ready to follow
+/// it.
 ///
 /// An action routinely arrives before anything can act on it: on a cold launch
 /// it lands in `scene(_:willConnectTo:options:)` before the first `body` runs,
@@ -38,17 +52,21 @@ enum QuickAction: String {
 final class QuickActionService {
     static let shared = QuickActionService()
 
-    private(set) var pending: QuickAction?
+    private(set) var pending: DeepLink?
 
     private init() {}
 
-    func post(_ action: QuickAction) {
-        pending = action
+    func post(_ link: DeepLink) {
+        pending = link
     }
 
-    /// Returns the pending action and clears it, so returning to the app later
+    func post(_ action: QuickAction) {
+        post(action.deepLink)
+    }
+
+    /// Returns the pending route and clears it, so returning to the app later
     /// doesn't replay one that's already been handled.
-    func take() -> QuickAction? {
+    func take() -> DeepLink? {
         defer { pending = nil }
         return pending
     }

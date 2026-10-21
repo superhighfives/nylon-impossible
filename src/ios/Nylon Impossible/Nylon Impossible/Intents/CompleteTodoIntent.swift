@@ -1,6 +1,6 @@
 //
 //  CompleteTodoIntent.swift
-//  Nylon Widget
+//  Nylon Impossible
 //
 //  Created by Claude on 8/27/26.
 //
@@ -9,6 +9,10 @@ import AppIntents
 import SwiftData
 
 /// Completes a todo from the widget.
+///
+/// Compiled into the app as well as the widget, because the widget's views
+/// (which name it) are shared with the app's DEBUG screenshot route. It
+/// doesn't open the app, so a tap still runs it in the widget extension.
 ///
 /// Completion runs through `TodoCompletionService` — the same code path the
 /// app's checkbox uses — so a repeat rolls its due date forward and re-places
@@ -24,7 +28,7 @@ struct CompleteTodoIntent: AppIntent {
     static var title: LocalizedStringResource = "Mark Todo Done"
     static var description = IntentDescription("Mark a todo done from the Nylon widget")
 
-    /// Widget-only: `AddTaskIntent` is the one Nylon offers in Shortcuts and
+    /// Not offered in Shortcuts: `AddTaskIntent` is the one Nylon offers there and
     /// to Siri. This needs a todo's internal id to do anything, which is not
     /// something anyone can usefully supply by hand.
     static var isDiscoverable: Bool = false
@@ -33,7 +37,7 @@ struct CompleteTodoIntent: AppIntent {
     /// than the model object because the widget process re-fetches from the
     /// store when the button is tapped — by then the entry it was rendered
     /// from can be hours old.
-    @Parameter(title: "Task ID")
+    @Parameter(title: "Todo ID")
     var todoId: String
 
     init() {}

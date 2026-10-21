@@ -25,6 +25,9 @@ struct Nylon_ImpossibleApp: App {
         Clerk.configure(publishableKey: Config.clerkPublishableKey)
         Self.initSentry()
         registerBackgroundTasks()
+        #if DEBUG
+        if let link = ScreenRoute.launchDeepLink { QuickActionService.shared.post(link) }
+        #endif
     }
 
     private static func initSentry() {
