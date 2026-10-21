@@ -186,8 +186,8 @@ extension ContentView {
     func applyScreenRoute() {
         guard let route = screenRoute else { return }
         switch route {
-        case .today, .overnight, .board: viewModel.page = .today
-        case .link, .share, .sharetext, .widgets: break
+        case .today, .overnight, .board, .loading, .empty, .syncerror, .perf: viewModel.page = .today
+        case .link, .share, .sharetext, .widgets, .signin: break
         case .column:
             openColumnId = collections.first?.id
             focusedColumnId = openColumnId

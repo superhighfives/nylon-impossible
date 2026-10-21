@@ -109,6 +109,53 @@ struct TodoContextMenu: View {
     }
 }
 
+/// What VoiceOver hears for a row and the actions it offers in place of the
+/// checkbox and the long-press menu. Kept apart from the view so the words
+/// and their order can be tested.
+enum TodoRowAccessibility {
+    enum Action: Identifiable, Equatable {
+        case markDone, markNotDone
+        case move(listId: String, name: String)
+        case pin, unpin
+        case delete
+
+        var id: String {
+            switch self {
+            case .move(let listId, _): return "move-\(listId)"
+            default: return name
+            }
+        }
+
+        var name: String {
+            switch self {
+            case .markDone: return "Mark done"
+            case .markNotDone: return "Mark not done"
+            case .move(_, let name): return "Move to \(name)"
+            case .pin: return "Pin to top"
+            case .unpin: return "Unpin"
+            case .delete: return "Delete"
+            }
+        }
+    }
+
+    /// "Pinned, Due Fri, Not done": the meta line, then the checkbox.
+    static func value(parts: [MetaPart], isChecked: Bool) -> String {
+        let meta = TodoMeta.accessibilityText(parts)
+        let state = isChecked ? "Done" : "Not done"
+        return meta.isEmpty ? state : "\(meta), \(state)"
+    }
+
+    /// Mark done first (it's the checkbox), then the menu's order: a move
+    /// to every other list, Pin, Delete.
+    static func actions(for todo: TodoItem, isChecked: Bool, lists: [TodoListModel]) -> [Action] {
+        let here = todo.listKey?.lowercased()
+        let moves = lists
+            .filter { $0.id.lowercased() != here }
+            .map { Action.move(listId: $0.id, name: $0.name) }
+        return [isChecked ? .markNotDone : .markDone] + moves + [todo.pinned ? .unpin : .pin, .delete]
+    }
+}
+
 /// The quick due days, shared by the context menu and the detail's Due chip.
 struct DueMenuItems: View {
     let hasDue: Bool

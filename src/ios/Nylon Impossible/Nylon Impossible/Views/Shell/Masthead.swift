@@ -54,6 +54,8 @@ struct Masthead<Accessory: View>: View {
             Text(subline)
                 .textStyle(Theme.Fonts.Role.subline)
                 .foregroundStyle(Theme.Colors.inkMuted)
+                // Wraps rather than clipping inside a List row's header.
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, Theme.Space.s2)
                 .padding(.bottom, Theme.Space.s5)
                 .padding(.horizontal, Theme.Phone.gutter)

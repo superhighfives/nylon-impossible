@@ -88,19 +88,82 @@ extension Theme {
     }
 }
 
+extension Theme.Motion {
+    /// The curve for a change that moves things — a line appearing and
+    /// pushing rows down, a field growing. Nil under Reduce Motion, which
+    /// keeps opacity changes and drops movement.
+    static func moving(_ duration: TimeInterval = base, reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : easeOutStrong(duration)
+    }
+}
+
 extension Theme.Fonts.Style {
     /// Tracking in points for this style's size.
     func tracking(_ em: CGFloat) -> CGFloat { size * em }
+}
+
+extension Theme.Fonts.Style {
+    /// The face scaled for a given Dynamic Type size rather than the app's
+    /// current one, so a SwiftUI `dynamicTypeSize` (a cap on the switcher, a
+    /// preview, a live change in Settings) reaches it. Cached: building a
+    /// variable-font descriptor in every body pass adds up over a long list.
+    @MainActor
+    func uiFont(for dynamicTypeSize: DynamicTypeSize) -> UIFont {
+        let key = FontCacheKey(style: self, size: dynamicTypeSize)
+        if let cached = FontCache.fonts[key] { return cached }
+        let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
+        let font = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: baseFont, compatibleWith: traits)
+        FontCache.fonts[key] = font
+        return font
+    }
+}
+
+private struct FontCacheKey: Hashable {
+    let size: CGFloat
+    let lineHeight: CGFloat
+    let weight: CGFloat
+    let isDisplay: Bool
+    let textStyle: String
+    let dynamicTypeSize: DynamicTypeSize
+
+    init(style: Theme.Fonts.Style, size: DynamicTypeSize) {
+        self.size = style.size
+        lineHeight = style.lineHeight
+        weight = style.variationWeight
+        isDisplay = style.isDisplay
+        textStyle = style.textStyle.rawValue
+        dynamicTypeSize = size
+    }
+}
+
+@MainActor
+private enum FontCache {
+    static var fonts: [FontCacheKey: UIFont] = [:]
+}
+
+/// Sets a token text style at the environment's Dynamic Type size. Reading
+/// the size here is what makes text re-lay out when it changes, and lets a
+/// `.dynamicTypeSize(...)` cap apply to these fonts like system ones.
+private struct TextStyleModifier: ViewModifier {
+    let style: Theme.Fonts.Style
+    let tracking: CGFloat
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    func body(content: Content) -> some View {
+        let font = style.uiFont(for: dynamicTypeSize)
+        let scale = font.pointSize / style.size
+        return content
+            .font(Font(font))
+            .lineSpacing(max(0, style.lineHeight * scale - font.lineHeight))
+            .tracking(style.tracking(tracking) * scale)
+    }
 }
 
 extension View {
     /// Set a token text style: the scaled font plus the line spacing that
     /// makes up its line height.
     func textStyle(_ style: Theme.Fonts.Style, tracking em: CGFloat = 0) -> some View {
-        let font = style.uiFont
-        return self
-            .font(Font(font))
-            .lineSpacing(max(0, style.lineHeight * (font.pointSize / style.size) - font.lineHeight))
-            .tracking(style.tracking(em) * (font.pointSize / style.size))
+        modifier(TextStyleModifier(style: style, tracking: em))
     }
 }

@@ -14,9 +14,9 @@ struct Switcher: View {
     typealias Page = TodoViewModel.Page
 
     let current: Page
-    /// The pager's position in pages (0 = Today, 1.5 = halfway to Someday),
-    /// so the underline tracks a swipe rather than jumping at the end of it.
-    let progress: CGFloat
+    /// The pager's position, so the underline tracks a swipe rather than
+    /// jumping at the end of it.
+    let progress: PagerProgress
     let avatarURL: URL?
     let initials: String
     let onSelect: (Page) -> Void
@@ -29,14 +29,32 @@ struct Switcher: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.s3) {
-            HStack(spacing: 18) {
-                ForEach(Page.allCases, id: \.self) { page in
-                    title(page)
+            // The titles scroll sideways when they don't fit — a narrow phone,
+            // or large text — and keep the current one in view, so the avatar
+            // is never pushed off screen.
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 18) {
+                        ForEach(Page.allCases, id: \.self) { page in
+                            title(page)
+                                .id(page)
+                        }
+                    }
+                    .coordinateSpace(name: "switcher")
+                    .overlay(alignment: .bottomLeading) { underline }
+                }
+                .scrollIndicators(.hidden)
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                .onChange(of: current, initial: true) { _, page in
+                    proxy.scrollTo(page)
                 }
             }
-            .coordinateSpace(name: "switcher")
-            .overlay(alignment: .bottomLeading) { underline }
             .frame(maxWidth: .infinity, alignment: .leading)
+            // Chrome, like a tab bar: it stops growing at the largest
+            // non-accessibility size, and a long press shows the title in
+            // the Large Content Viewer instead. The masthead below carries
+            // the current list's name at full size.
+            .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
 
             Button(action: onAvatar) {
                 AvatarView(imageURL: avatarURL, initials: initials)
@@ -46,6 +64,9 @@ struct Switcher: View {
             .buttonStyle(.plain)
             .padding(.trailing, -6)
             .accessibilityLabel("Account")
+            .accessibilityShowsLargeContentViewer {
+                Label("Account", systemImage: "person.crop.circle")
+            }
             .accessibilityHint("Done, Settings and sign out")
         }
         .padding(.leading, Theme.Phone.gutter)
@@ -81,17 +102,39 @@ struct Switcher: View {
         } action: { frame in
             frames[page] = frame
         }
+        .accessibilityShowsLargeContentViewer {
+            Text(page.title)
+        }
         .accessibilityAddTraits(isCurrent ? [.isSelected, .isHeader] : [])
         .accessibilityHint(page.systemKind == nil ? "" : "Drop a todo here to move it")
         .modifier(DropTarget(page: page, targeted: $targeted, onDrop: onDrop))
     }
 
-    /// 2pt of brand yellow under the current title, interpolated between the
-    /// two titles either side of the pager's position.
-    @ViewBuilder
     private var underline: some View {
+        SwitcherUnderline(progress: progress, frames: frames)
+    }
+}
+
+/// The pager's position in pages (0 = Today, 1.5 = halfway to Someday). An
+/// object rather than a value so that only the underline, which reads it,
+/// redraws on each frame of a swipe.
+@MainActor
+@Observable
+final class PagerProgress {
+    var value: CGFloat = 0
+}
+
+/// 2pt of brand yellow under the current title, interpolated between the two
+/// titles either side of the pager's position.
+private struct SwitcherUnderline: View {
+    typealias Page = TodoViewModel.Page
+
+    let progress: PagerProgress
+    let frames: [Page: CGRect]
+
+    var body: some View {
         let pages = Page.allCases
-        let clamped = min(max(progress, 0), CGFloat(pages.count - 1))
+        let clamped = min(max(progress.value, 0), CGFloat(pages.count - 1))
         let lower = Int(clamped.rounded(.down))
         let upper = min(lower + 1, pages.count - 1)
         let fraction = clamped - CGFloat(lower)

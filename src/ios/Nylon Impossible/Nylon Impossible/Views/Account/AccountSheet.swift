@@ -55,6 +55,7 @@ struct AccountSheet: View {
             ToastView(toasts: actions.toasts)
                 .padding(.bottom, Theme.Space.s4)
         }
+        .toastMagicTap(actions.toasts)
         .onChange(of: path) { _, newPath in
             withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
                 detent = newPath.isEmpty ? .medium : .large
@@ -67,7 +68,8 @@ struct AccountSheet: View {
             AvatarView(imageURL: imageURL, initials: initials, size: 40)
             VStack(alignment: .leading, spacing: 2) {
                 Text(name)
-                    .font(.system(size: 16, weight: .semibold))
+                    .textStyle(Theme.Fonts.Role.body)
+                    .fontWeight(.semibold)
                     .foregroundStyle(Theme.Colors.ink)
                 Text(preferences.timezoneAuto ? "Timezone set from this device" : "Timezone: \(TimezoneLabel.text(preferences.timezone))")
                     .textStyle(Theme.Fonts.Role.meta)
@@ -88,12 +90,13 @@ struct AccountSheet: View {
         Button(action: action) {
             HStack {
                 Text(title)
-                    .font(.system(size: 16, weight: .medium))
+                    .textStyle(Theme.Fonts.Role.body)
+                    .fontWeight(.medium)
                     .foregroundStyle(Theme.Colors.ink)
                 Spacer()
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 16))
+                        .textStyle(Theme.Fonts.Role.body)
                         .monospacedDigit()
                         .foregroundStyle(Theme.Colors.inkMuted)
                 }

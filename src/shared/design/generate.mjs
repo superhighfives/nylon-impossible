@@ -137,9 +137,21 @@ export function renderSwift(tokens) {
   // Colors
   out.push(
     "    enum Colors {",
-    "        private static func dynamic(light: UInt32, dark: UInt32) -> Color {",
+    "        /// A colour for light and dark mode, with optional Increase",
+    "        /// Contrast variants that take over when that setting is on.",
+    "        private static func dynamic(",
+    "            light: UInt32,",
+    "            dark: UInt32,",
+    "            lightHighContrast: UInt32? = nil,",
+    "            darkHighContrast: UInt32? = nil",
+    "        ) -> Color {",
     "            Color(uiColor: UIColor { traits in",
-    "                rgb(traits.userInterfaceStyle == .dark ? dark : light)",
+    "                let isDark = traits.userInterfaceStyle == .dark",
+    "                if traits.accessibilityContrast == .high,",
+    "                   let high = isDark ? darkHighContrast : lightHighContrast {",
+    "                    return rgb(high)",
+    "                }",
+    "                return rgb(isDark ? dark : light)",
     "            })",
     "        }",
     "",
@@ -155,8 +167,11 @@ export function renderSwift(tokens) {
   );
   for (const [name, c] of entries(tokens.color)) {
     out.push(`        /// ${c.usage} (${c.source})`);
+    const high = c.highContrast
+      ? `, lightHighContrast: ${swiftHex(c.highContrast.light)}, darkHighContrast: ${swiftHex(c.highContrast.dark)}`
+      : "";
     out.push(
-      `        static let ${name} = dynamic(light: ${swiftHex(c.light)}, dark: ${swiftHex(c.dark)})`,
+      `        static let ${name} = dynamic(light: ${swiftHex(c.light)}, dark: ${swiftHex(c.dark)}${high})`,
     );
   }
   out.push("    }", "");

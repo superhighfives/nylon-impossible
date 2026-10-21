@@ -10,9 +10,21 @@ import UIKit
 /// Views read colour, type, spacing and motion from here only.
 enum Theme {
     enum Colors {
-        private static func dynamic(light: UInt32, dark: UInt32) -> Color {
+        /// A colour for light and dark mode, with optional Increase
+        /// Contrast variants that take over when that setting is on.
+        private static func dynamic(
+            light: UInt32,
+            dark: UInt32,
+            lightHighContrast: UInt32? = nil,
+            darkHighContrast: UInt32? = nil
+        ) -> Color {
             Color(uiColor: UIColor { traits in
-                rgb(traits.userInterfaceStyle == .dark ? dark : light)
+                let isDark = traits.userInterfaceStyle == .dark
+                if traits.accessibilityContrast == .high,
+                   let high = isDark ? darkHighContrast : lightHighContrast {
+                    return rgb(high)
+                }
+                return rgb(isDark ? dark : light)
             })
         }
 
@@ -30,19 +42,19 @@ enum Theme {
         /// Raised areas: sheets, the composer (gray-2)
         static let surface = dynamic(light: 0xF9F9F9, dark: 0x191919)
         /// Soft fills: chips, row hover tint (gray-3)
-        static let fill = dynamic(light: 0xF0F0F0, dark: 0x222222)
+        static let fill = dynamic(light: 0xF0F0F0, dark: 0x222222, lightHighContrast: 0xE3E3E3, darkHighContrast: 0x2E2E2E)
         /// Rules between rows and columns (gray-6)
-        static let hairline = dynamic(light: 0xD9D9D9, dark: 0x3A3A3A)
+        static let hairline = dynamic(light: 0xD9D9D9, dark: 0x3A3A3A, lightHighContrast: 0x8D8D8D, darkHighContrast: 0x6E6E6E)
         /// Primary text (gray-12)
-        static let ink = dynamic(light: 0x202020, dark: 0xEEEEEE)
+        static let ink = dynamic(light: 0x202020, dark: 0xEEEEEE, lightHighContrast: 0x000000, darkHighContrast: 0xFFFFFF)
         /// Secondary text, meta line (gray-11)
-        static let inkMuted = dynamic(light: 0x646464, dark: 0xB4B4B4)
+        static let inkMuted = dynamic(light: 0x646464, dark: 0xB4B4B4, lightHighContrast: 0x3F3F3F, darkHighContrast: 0xD4D4D4)
         /// Placeholders, disabled (gray-10)
-        static let inkSubtle = dynamic(light: 0x838383, dark: 0x7B7B7B)
+        static let inkSubtle = dynamic(light: 0x838383, dark: 0x7B7B7B, lightHighContrast: 0x5C5C5C, darkHighContrast: 0xA8A8A8)
         /// Overdue text ("3 days overdue") (red-11)
-        static let overdue = dynamic(light: 0xCE2C31, dark: 0xFF9592)
+        static let overdue = dynamic(light: 0xCE2C31, dark: 0xFF9592, lightHighContrast: 0xA11C21, darkHighContrast: 0xFFB8B5)
         /// Destructive actions (red-9)
-        static let destructive = dynamic(light: 0xE5484D, dark: 0xE5484D)
+        static let destructive = dynamic(light: 0xE5484D, dark: 0xE5484D, lightHighContrast: 0xB4232A, darkHighContrast: 0xFF7B7F)
         /// Background behind destructive content (red-3)
         static let destructiveFill = dynamic(light: 0xFEEBEC, dark: 0x3B1219)
         /// Fill only: done checkbox, send button, focus ring. Never text on white. (yellow-9)

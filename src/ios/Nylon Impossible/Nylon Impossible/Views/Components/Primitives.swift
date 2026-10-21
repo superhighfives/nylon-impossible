@@ -31,15 +31,24 @@ struct Checkbox: View {
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Grows the box with Dynamic Type so it isn't a speck beside an AX5
+    /// title. Capped: past this it only crowds the title.
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
-    private var radius: CGFloat { size * 7 / 24 }
+    /// The drawn box at the current text size.
+    private var drawn: CGFloat { size * min(max(scale, 1), 1.6) }
+
+    private var radius: CGFloat { drawn * 7 / 24 }
 
     @State private var popped = false
 
     var body: some View {
+        // The target stays 10pt clear of the box on each side, which is what
+        // the rows' negative padding assumes, and is never under 44pt.
+        let target = max(Theme.Space.rowMinHeight, drawn + 20)
         Button(action: action) {
             box
-                .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
+                .frame(width: target, height: target)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -59,17 +68,17 @@ struct Checkbox: View {
     private var box: some View {
         ZStack {
             RoundedRectangle(cornerRadius: radius, style: .continuous)
-                .strokeBorder(isChecked ? Color.clear : Theme.Colors.ink, lineWidth: size > 20 ? 1.75 : 1.5)
+                .strokeBorder(isChecked ? Color.clear : Theme.Colors.ink, lineWidth: drawn > 20 ? 1.75 : 1.5)
             RoundedRectangle(cornerRadius: radius, style: .continuous)
                 .fill(isMuted ? Theme.Colors.fill : Theme.Colors.brand)
                 .opacity(isChecked ? 1 : 0)
             Image(systemName: Theme.Icon.done)
-                .font(.system(size: size * 0.55, weight: .heavy))
+                .font(.system(size: drawn * 0.55, weight: .heavy))
                 .foregroundStyle(isMuted ? Theme.Colors.inkMuted : Theme.Colors.brandInk)
                 .opacity(isChecked ? 1 : 0)
                 .scaleEffect(isChecked || reduceMotion ? 1 : 0.4)
         }
-        .frame(width: size, height: size)
+        .frame(width: drawn, height: drawn)
         .scaleEffect(popped ? 1.18 : 1)
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isChecked)
     }
@@ -200,16 +209,35 @@ struct PlainRow<Trailing: View>: View {
     var tint: Color = Theme.Colors.ink
     @ViewBuilder var trailing: () -> Trailing
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     var body: some View {
-        HStack(spacing: Theme.Space.s3) {
-            Text(title)
-                .textStyle(Theme.Fonts.Role.body)
-                .foregroundStyle(tint)
-            Spacer(minLength: Theme.Space.s2)
-            trailing()
+        Group {
+            // At accessibility sizes the detail goes under the title, so
+            // neither breaks mid-word or truncates.
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: Theme.Space.s1) {
+                    titleText
+                    HStack(spacing: Theme.Space.s3) { trailing() }
+                }
+                .padding(.vertical, Theme.Space.s3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                HStack(spacing: Theme.Space.s3) {
+                    titleText
+                    Spacer(minLength: Theme.Space.s2)
+                    trailing()
+                }
+            }
         }
         .frame(minHeight: 52)
         .contentShape(Rectangle())
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .textStyle(Theme.Fonts.Role.body)
+            .foregroundStyle(tint)
     }
 }
 

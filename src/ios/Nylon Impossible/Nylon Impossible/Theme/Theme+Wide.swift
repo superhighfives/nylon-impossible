@@ -19,16 +19,17 @@ extension Theme {
         static let sidebarWidth: CGFloat = 248
         /// The narrowest a column gets before the board scrolls sideways.
         static let columnMinWidth: CGFloat = 240
+        /// The same at accessibility text sizes.
+        static let columnMinWidthLargeText: CGFloat = 380
         /// Header height above each column's hairline, so every title sits
         /// on the same baseline. Scaled with Dynamic Type where it's used.
         static let columnHeader: CGFloat = 140
         /// The trailing panel (detail, Done, Settings).
         static let panelWidth: CGFloat = 400
-        /// The sidebar's row height and corner radius.
-        static let sidebarRow: CGFloat = 36
+        /// The sidebar's row height and corner radius. 44, the touch
+        /// minimum: an iPad is still a touch screen without a pointer.
+        static let sidebarRow: CGFloat = Theme.Space.rowMinHeight
         static let sidebarRadius: CGFloat = 8
-        /// The keyboard focus ring around a row.
-        static let focusRing: CGFloat = 2
     }
 }
 

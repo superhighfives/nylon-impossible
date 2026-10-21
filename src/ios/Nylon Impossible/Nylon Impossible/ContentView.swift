@@ -26,6 +26,7 @@ struct ContentView: View {
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.screenRoute) var screenRoute
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(AuthService.self) var authService
     @Environment(SyncService.self) var syncService
     @Environment(UserPreferencesService.self) var preferences
@@ -35,7 +36,10 @@ struct ContentView: View {
 
     @State var actions = TodoActions()
     @State var pagerPosition: Page? = .today
-    @State var pagerProgress: CGFloat = 0
+    /// Written every frame of a swipe and read only by the switcher's
+    /// underline, so the swipe doesn't re-run this whole body (and refilter
+    /// every list) sixty times a second.
+    @State var pagerProgress = PagerProgress()
     @State var detailTodo: TodoItem?
     @State var detailDetent: PresentationDetent = .medium
     @State var showsAccount = false
@@ -200,6 +204,7 @@ struct ContentView: View {
         .onChange(of: collections.map(\.name)) { NylonShortcuts.updateAppShortcutParameters() }
         .onAppear { performPendingRoute() }
         .onChange(of: QuickActionService.shared.pending) { performPendingRoute() }
+        .toastMagicTap(actions.toasts)
     }
 
     // MARK: - Phone
@@ -216,7 +221,7 @@ struct ContentView: View {
                 onAvatar: { showsAccount = true }
             )
             if case .error(let message) = syncService.state {
-                SyncErrorLine(message: message) { Task { await syncService.sync() } }
+                SyncErrorLine(message: message, onRetry: { Task { await syncService.sync() } }, onDismiss: syncService.dismissError)
                     .transition(.opacity)
             }
             pager
@@ -227,7 +232,7 @@ struct ContentView: View {
         // VStack respects the keyboard's safe area, so a bottom overlay rides
         // the keyboard, and each page pads its last row clear of it.
         .overlay(alignment: .bottom) { bottomBar }
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: syncService.state)
+        .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: syncService.state)
         .sheet(item: $detailTodo) { todo in
             TodoDetailSheet(
                 todo: todo,
@@ -283,7 +288,7 @@ struct ContentView: View {
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.x / max(geometry.containerSize.width, 1)
         } action: { _, progress in
-            pagerProgress = progress
+            pagerProgress.value = progress
         }
         .onChange(of: pagerPosition) { _, position in
             guard let position, position != viewModel.page else { return }

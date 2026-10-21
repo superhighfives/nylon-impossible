@@ -47,6 +47,7 @@ struct Composer: View {
     @State private var keepWords = false
     @FocusState private var isFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private var targetId: String? { chosenListId ?? currentListId }
 
@@ -79,9 +80,11 @@ struct Composer: View {
             case .inline: inline
             }
         }
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: showsChips)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: hasDraft)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: typedDue)
+        // The field grows and the chips push it up: movement, so none of it
+        // animates under Reduce Motion.
+        .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: showsChips)
+        .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: hasDraft)
+        .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: typedDue)
         .onChange(of: text) { _, newValue in
             if newValue.isEmpty { keepWords = false }
         }
@@ -174,30 +177,44 @@ struct Composer: View {
         if style == .inline, !isFocused {
             return Text("Add").foregroundStyle(Theme.Colors.inkMuted)
         }
+        // Muted, not subtle: the placeholder is the composer's only label
+        // and sits on glass over whatever scrolls under it, where the
+        // subtle grey dropped under 4.5:1.
         if let placeholder {
-            return Text(placeholder).foregroundStyle(Theme.Colors.inkSubtle)
+            return Text(placeholder).foregroundStyle(Theme.Colors.inkMuted)
         }
-        return Text("Add to \(targetName)…").foregroundStyle(Theme.Colors.inkSubtle)
+        return Text("Add to \(targetName)…").foregroundStyle(Theme.Colors.inkMuted)
     }
 
+    /// One scrolling row; at accessibility text sizes they wrap instead, so
+    /// no chip is ever cut off at the edge of the field.
+    @ViewBuilder
     private var chips: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 6) {
-                // The typed date leads, so it's never scrolled out of sight
-                // behind a long run of lists.
-                if let due = typedDue {
-                    dueChip(due)
-                }
-                ForEach(lists) { list in
-                    ChipButton(text: list.name, isOn: list.id == targetId, strong: true) {
-                        chosenListId = list.id == currentListId ? nil : list.id
-                    }
-                    .accessibilityLabel("Add to \(list.name)")
-                }
+        if dynamicTypeSize.isAccessibilitySize {
+            FlowLayout(spacing: 6, lineSpacing: 0) { chipItems }
+                .padding(.top, Theme.Space.s1)
+        } else {
+            ScrollView(.horizontal) {
+                HStack(spacing: 6) { chipItems }
             }
+            .scrollIndicators(.hidden)
+            .padding(.top, Theme.Space.s1)
         }
-        .scrollIndicators(.hidden)
-        .padding(.top, Theme.Space.s1)
+    }
+
+    @ViewBuilder
+    private var chipItems: some View {
+        // The typed date leads, so it's never scrolled out of sight behind a
+        // long run of lists.
+        if let due = typedDue {
+            dueChip(due)
+        }
+        ForEach(lists) { list in
+            ChipButton(text: list.name, isOn: list.id == targetId, strong: true) {
+                chosenListId = list.id == currentListId ? nil : list.id
+            }
+            .accessibilityLabel("Add to \(list.name)")
+        }
     }
 
     private func dueChip(_ due: Date) -> some View {
@@ -212,10 +229,14 @@ struct Composer: View {
                 Image(systemName: Theme.Icon.close)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: 28, height: 32)
+                    .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // A 44pt target that lays out as the old 36 × 32, so the chip
+            // keeps its size and the × its place.
+            .padding(.vertical, -6)
+            .padding(.trailing, -8)
             .accessibilityLabel("Don’t treat as a date")
         }
         .textStyle(Theme.Fonts.Role.chip)

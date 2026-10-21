@@ -10,6 +10,7 @@
 
 import Foundation
 import Observation
+import UIKit
 
 @MainActor
 @Observable
@@ -28,6 +29,21 @@ final class ToastCenter {
     /// the timeout itself rather than for a guessed amount of wall time.
     @ObservationIgnored private(set) var timer: Task<Void, Never>?
     @ObservationIgnored var duration: Duration = Theme.Phone.toastDuration
+    /// How long a toast with an action stays up for someone on VoiceOver or
+    /// Switch Control: long enough to hear it and reach Undo (or two-finger
+    /// double-tap it), which five seconds isn't.
+    @ObservationIgnored var assistiveDuration: Duration = .seconds(15)
+    /// Whether an assistive technology that moves focus one element at a
+    /// time is running. A closure so tests can say yes.
+    @ObservationIgnored var usesAssistiveTech: () -> Bool = {
+        UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning
+    }
+
+    /// The timeout for the next toast.
+    func timeout(hasAction: Bool) -> Duration {
+        guard hasAction, usesAssistiveTech() else { return duration }
+        return max(duration, assistiveDuration)
+    }
 
     /// Show a toast. A trailing closure is the action (Undo, View);
     /// `onExpire` runs instead if the toast times out or is replaced.
@@ -42,7 +58,7 @@ final class ToastCenter {
         current = toast
         self.action = action
         self.onExpire = onExpire
-        let duration = duration
+        let duration = timeout(hasAction: action != nil)
         timer = Task { [weak self] in
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }

@@ -35,6 +35,7 @@ struct BoardColumn<Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
 
     @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isTargeted = false
     @State private var targetedRow: UUID?
 
@@ -68,7 +69,7 @@ struct BoardColumn<Accessory: View>: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .background(isTargeted ? Theme.Colors.fill : (isTinted ? Theme.Colors.surface : Theme.Colors.canvas))
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isTargeted)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: overnight?.text)
+        .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.text)
         .todoDropTarget(isTargeted: $isTargeted) { onDrop($0, nil) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
@@ -80,12 +81,15 @@ struct BoardColumn<Accessory: View>: View {
             Text(title)
                 .textStyle(Theme.Fonts.Role.columnTitle, tracking: Theme.Tracking.masthead)
                 .foregroundStyle(Theme.Colors.ink)
-                .lineLimit(1)
+                // Wraps (then shrinks a little) at large sizes in a narrow
+                // column rather than clipping "This Week".
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
                 .accessibilityAddTraits(.isHeader)
             Text(subline)
                 .textStyle(Theme.Fonts.Role.meta)
                 .foregroundStyle(Theme.Colors.inkMuted)
-                .lineLimit(1)
+                .lineLimit(2)
                 .padding(.top, 10)
         }
         .frame(maxWidth: .infinity, minHeight: headerHeight, maxHeight: headerHeight, alignment: .bottomLeading)
@@ -103,7 +107,8 @@ struct BoardColumn<Accessory: View>: View {
             todo: todo,
             subtasks: subtasks[todo.id] ?? [],
             actions: actions,
-            isSelected: selectedId == todo.id
+            isSelected: selectedId == todo.id,
+            lists: lists
         ) {
             onOpen(todo)
         }

@@ -71,12 +71,36 @@ struct ShareSheetView: View {
     }
 
     var body: some View {
+        // Scrolls, so the keyboard and the composer riding it can't push the
+        // title off the top of a short sheet or a large text size.
+        ScrollView {
+            header
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollDismissesKeyboard(.interactively)
+        .background(Theme.Colors.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Composer(
+                text: $text,
+                lists: lists,
+                currentListId: todayId,
+                chosenListId: $chosenListId,
+                focusRequested: $focusRequested,
+                onSubmit: submit,
+                placeholder: linkPlaceholder,
+                allowsEmptySubmit: url != nil
+            )
+        }
+    }
+
+    private var header: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Button("Cancel", action: onCancel)
                     .textStyle(Theme.Fonts.Role.control)
                     .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(minHeight: Theme.Space.rowMinHeight)
+                    .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
+                    .contentShape(Rectangle())
                     .buttonStyle(.plain)
                 Spacer()
             }
@@ -101,23 +125,9 @@ struct ShareSheetView: View {
                 Hairline()
             }
 
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, Theme.Phone.gutter)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Theme.Colors.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            Composer(
-                text: $text,
-                lists: lists,
-                currentListId: todayId,
-                chosenListId: $chosenListId,
-                focusRequested: $focusRequested,
-                onSubmit: submit,
-                placeholder: linkPlaceholder,
-                allowsEmptySubmit: url != nil
-            )
-        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     /// "1 todo" grows to "3 todos" as lines are typed or pasted, so a
@@ -153,7 +163,7 @@ struct ShareSheetView: View {
                 if !hasSuppliedTitle {
                     Text("Leave the title empty and it’s named from the page once Nylon fetches it.")
                         .textStyle(Theme.Fonts.Role.meta)
-                        .foregroundStyle(Theme.Colors.inkSubtle)
+                        .foregroundStyle(Theme.Colors.inkMuted)
                         .padding(.top, Theme.Space.s1)
                         .fixedSize(horizontal: false, vertical: true)
                 }

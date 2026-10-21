@@ -17,6 +17,7 @@ struct SettingsView: View {
     @Environment(AuthService.self) private var authService
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     @State private var confirmsDelete = false
     @State private var isDeleting = false
@@ -27,7 +28,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Masthead(title: "Settings", subline: "Synced across your devices")
                 section("Appearance") { appearance }
-                section("Timezone", footer: "Today’s todos move to This Week, and This Week’s to Someday, at your local midnight.") {
+                section("Timezone", footer: "Today moves to This Week, and This Week to Someday, at your local midnight. A todo gets at least a full day in Today.") {
                     timezone
                 }
                 section("About") { about }
@@ -75,7 +76,8 @@ struct SettingsView: View {
     // MARK: - Appearance
 
     private var appearance: some View {
-        HStack(spacing: Theme.Space.s2) {
+        // Wraps at large text sizes instead of truncating each chip.
+        FlowLayout(spacing: Theme.Space.s2, lineSpacing: 0) {
             themeChip("System", value: "system", icon: Theme.Icon.themeSystem)
             themeChip("Light", value: "light", icon: Theme.Icon.themeLight)
             themeChip("Dark", value: "dark", icon: Theme.Icon.themeDark)
@@ -98,7 +100,7 @@ struct SettingsView: View {
                 Text(TimezoneLabel.text(preferences.timezoneAuto ? UserPreferencesService.deviceTimeZone : preferences.timezone))
                     .textStyle(Theme.Fonts.Role.body)
                     .foregroundStyle(Theme.Colors.inkMuted)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                 Chevron()
             }
         }

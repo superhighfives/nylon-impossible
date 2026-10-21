@@ -20,10 +20,11 @@ struct TodoRow: View {
     let actions: TodoActions
     /// The keyboard's current row on the iPad board.
     var isSelected = false
+    /// Every list in display order, for VoiceOver's Move actions.
+    var lists: [TodoListModel] = []
     let onOpen: () -> Void
 
     @Environment(\.isWideLayout) private var isWide
-    @Environment(\.colorScheme) private var colorScheme
     @State private var isHovering = false
 
     private var gutter: CGFloat { isWide ? Theme.Wide.gutter : Theme.Phone.gutter }
@@ -61,33 +62,47 @@ struct TodoRow: View {
             .buttonStyle(.plain)
             // The row tints itself; the pointer shouldn't also morph.
             .hoverEffectDisabled(isWide)
-            .accessibilityElement(children: .combine)
-            .accessibilityHint("Opens the todo")
         }
         .padding(.vertical, Theme.Space.s3)
         .frame(minHeight: Theme.Space.rowMinHeight)
         .background { highlight }
         .padding(.horizontal, gutter)
         .onHover { isHovering = $0 }
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        // VoiceOver hears one element per row — "title, meta, done or not"
+        // — that opens on double-tap, with the checkbox and the long-press
+        // menu as its actions (swipe up or down): Mark done, each Move,
+        // Pin, Delete.
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(todo.title)
+        .accessibilityValue(TodoRowAccessibility.value(parts: parts, isChecked: checked))
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
+        .accessibilityHint("Opens the todo")
+        .accessibilityAction(.default, onOpen)
+        .accessibilityActions {
+            ForEach(TodoRowAccessibility.actions(for: todo, isChecked: checked, lists: lists)) { action in
+                Button(action.name) { perform(action) }
+            }
+        }
         .opacity(actions.fading.contains(todo.id) ? 0 : 1)
         .sensoryFeedback(.impact(weight: .medium), trigger: checked) { _, isChecked in isChecked }
     }
 
-    /// Hover tints; the keyboard's row also gets the ring (ink in light, the
-    /// accent in dark, as in the wide prototype).
+    private func perform(_ action: TodoRowAccessibility.Action) {
+        switch action {
+        case .markDone, .markNotDone: actions.toggleDone(todo)
+        case .move(let listId, _): actions.move(todo, toList: listId)
+        case .pin, .unpin: actions.togglePin(todo)
+        case .delete: actions.delete(todo)
+        }
+    }
+
+    /// The keyboard's row is tinted with the soft fill, as on wide web;
+    /// hover tints it more lightly. No ring: yellow is kept for focus rings
+    /// on controls, and a row isn't one.
     private var highlight: some View {
-        let shape = RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-        return shape
+        RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
             .fill(Theme.Colors.fill)
-            .overlay {
-                shape.strokeBorder(
-                    colorScheme == .dark ? Theme.Colors.brand : Theme.Colors.ink,
-                    lineWidth: Theme.Wide.focusRing
-                )
-                .opacity(isSelected ? 1 : 0)
-            }
-            .opacity(isSelected || isHovering ? 1 : 0)
+            .opacity(isSelected ? 1 : (isHovering ? 0.6 : 0))
             .padding(.horizontal, -10)
             .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isHovering)
             .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isSelected)

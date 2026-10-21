@@ -93,6 +93,10 @@ struct WideSidebar: View {
         }
         .padding(.vertical, 28)
         .padding(.horizontal, 10)
+        // Navigation chrome in a fixed 248pt column: it stops growing at
+        // xxxLarge, like the phone's switcher, so names don't break
+        // mid-word. The columns carry each list's name at full size.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .frame(width: Theme.Wide.sidebarWidth)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Theme.Colors.canvas)
@@ -103,7 +107,7 @@ struct WideSidebar: View {
         return Button(action: action) {
             HStack {
                 Text(entry.list.name)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if entry.openTodos > 0 {
                     Text("\(entry.openTodos)")
@@ -131,8 +135,11 @@ struct WideSidebar: View {
         }
         .buttonStyle(SidebarButtonStyle())
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
-        .accessibilityValue(entry.openTodos == 1 ? "1 todo" : "\(entry.openTodos) todos")
-        .accessibilityHint("Drop a todo here to move it")
+        // "This Week, 6 todos" — the count is the value, not a second
+        // number read out in the label.
+        .accessibilityLabel(entry.list.name)
+        .accessibilityValue(WideSidebar.countText(entry.openTodos))
+        .accessibilityHint(entry.list.isSystem ? "Shows its column" : (isCurrent ? "Closes its column" : "Opens it as a column"))
         .todoDropTarget(isTargeted: Binding(
             get: { targeted == entry.id },
             set: { isOver in
@@ -143,6 +150,15 @@ struct WideSidebar: View {
                 }
             }
         )) { onDrop(entry.list, $0) }
+    }
+
+    /// A list's open count as VoiceOver reads it.
+    static func countText(_ count: Int) -> String {
+        switch count {
+        case 0: return "No todos"
+        case 1: return "1 todo"
+        default: return "\(count) todos"
+        }
     }
 
     private func plainRow(_ title: String, detail: String? = nil, isCurrent: Bool, action: @escaping () -> Void) -> some View {
@@ -178,10 +194,12 @@ struct WideSidebar: View {
         } label: {
             HStack(spacing: Theme.Space.s2) {
                 AvatarView(imageURL: avatarURL, initials: initials, size: 24)
+                // Ink, not muted: a Menu label is drawn dimmed, which took
+                // muted ink under 4.5:1.
                 Text(name)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .textStyle(Theme.Fonts.Role.meta)
-                    .foregroundStyle(Theme.Colors.inkMuted)
+                    .foregroundStyle(Theme.Colors.ink)
             }
             .padding(.horizontal, 10)
             .frame(minHeight: Theme.Wide.sidebarRow)
