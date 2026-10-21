@@ -59,3 +59,31 @@ export function positionAt<T extends Orderable>(
   }
   return generateKeyBetween(prev?.position ?? null, next?.position ?? null);
 }
+
+/**
+ * Where a todo dropped at slot `index` of a list lands: the slot clamped into
+ * its pinned/unpinned tier, and a fractional position between its new
+ * neighbours. `items` is the list's open order and may include the todo
+ * itself (a reorder within its own list); it's taken out first, so `index`
+ * counts the other rows.
+ */
+export function dropPlacement<T extends Orderable>(
+  items: T[],
+  item: T,
+  index: number,
+): { index: number; position: string } {
+  const others = items.filter((t) => t.id !== item.id);
+  const at = clampToTier(others, item.pinned, index);
+  const next = [...others.slice(0, at), item, ...others.slice(at)];
+  return { index: at, position: positionAt(next, at) };
+}
+
+/**
+ * The slot (0…n) a pointer at `y` points to among rows whose vertical
+ * midpoints are `mids`, top to bottom: before the first row whose middle is
+ * below the pointer.
+ */
+export function slotAt(mids: number[], y: number): number {
+  const i = mids.findIndex((mid) => y < mid);
+  return i === -1 ? mids.length : i;
+}
