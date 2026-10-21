@@ -10,15 +10,19 @@
  * HTTP-endpoint / alternate-runtime model), not Apps Script function names.
  */
 
+import { dueLabel } from "@nylon-impossible/shared";
+
 // ---------------------------------------------------------------------------
 // Card widget types (minimal subset we use)
 // ---------------------------------------------------------------------------
 
+interface CardAction {
+  function: string;
+  parameters?: { key: string; value: string }[];
+}
+
 interface OnClick {
-  action?: {
-    function: string;
-    parameters?: { key: string; value: string }[];
-  };
+  action?: CardAction;
   openLink?: { url: string };
 }
 
@@ -30,6 +34,12 @@ interface Widget {
     bottomLabel?: string;
     wrapText?: boolean;
     button?: Button;
+    switchControl?: {
+      name: string;
+      selected: boolean;
+      controlType: "CHECKBOX" | "SWITCH";
+      onChangeAction: CardAction;
+    };
     onClick?: OnClick;
   };
   textInput?: {
@@ -58,6 +68,8 @@ interface Section {
   header?: string;
   widgets: Widget[];
   collapsible?: boolean;
+  /** Widgets still shown while collapsed; 0 leaves just the header. */
+  uncollapsibleWidgetsCount?: number;
 }
 
 export interface Card {
@@ -111,68 +123,235 @@ function actionUrl(baseUrl: string, path: string): string {
 
 // ---------------------------------------------------------------------------
 // Cards
+//
+// The card format fixes the look, so the add-on matches the apps on structure
+// and words instead: a composer with a list dropdown, then Today and This
+// Week with tick-to-done, then Someday collapsed to a count. Copy follows the
+// redesign spec's Vocabulary (todo, Today / This Week / Someday, Pin, Done).
 // ---------------------------------------------------------------------------
 
-/** Name of the quick-add text input, referenced by the submit action handler. */
+/** Name of the composer text input, referenced by the submit action handlers. */
 export const QUICK_ADD_INPUT = "todoText";
 
-/** Name of the quick-add list dropdown, referenced by the submit action handler. */
+/** Name of the composer list dropdown, referenced by the submit action handlers. */
 export const QUICK_ADD_LIST_INPUT = "listId";
 
-export interface OpenTodoCard {
-  id: string;
-  title: string;
-  listId: string;
-  listName: string;
-}
+/** Rows shown per section before the rest collapse to "N more". */
+export const ADDON_SECTION_LIMIT = 8;
+
+export type AddonSystemKind = "today" | "thisWeek" | "someday";
 
 export interface AddonListOption {
   id: string;
   name: string;
+  systemKind: AddonSystemKind | null;
+}
+
+export interface AddonTodo {
+  id: string;
+  title: string;
+  listId: string;
+  dueDate: Date | null;
+  pinned: boolean;
+  repeats: boolean;
+}
+
+export interface HomepageCardInput {
+  /** Every list the user has, in any order: the dropdown sorts them. */
+  lists: AddonListOption[];
+  /** Open top-level todos across every list, pinned first within a list. */
+  todos: AddonTodo[];
+  /** The web app, for the "Open Nylon" and "N more" links. */
+  webUrl: string;
+  now: Date;
+  timeZone: string;
+}
+
+const TIME_ORDER: AddonSystemKind[] = ["today", "thisWeek", "someday"];
+
+/** Today, This Week, Someday, then your lists in their own order. */
+export function orderAddonLists(lists: AddonListOption[]): AddonListOption[] {
+  const time = TIME_ORDER.flatMap((kind) =>
+    lists.filter((list) => list.systemKind === kind),
+  );
+  return [...time, ...lists.filter((list) => list.systemKind === null)];
+}
+
+/** Card text fields accept a little HTML, so a todo title must be escaped. */
+export function escapeCardText(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 /**
- * Homepage card: a quick-add box (with a list dropdown, defaulting to
- * `defaultListId`) over the user's open top-level todos, each tickable and
- * grouped under a section per list so todos outside Today aren't hidden.
- * `todos` is expected to already be trimmed to a display-friendly count by
- * the caller; `lists` is every list the dropdown and section headers can
- * reference.
+ * The row's meta line, in the apps' words: Pinned, then the due label
+ * ("Today", "Tomorrow", "Fri", "Oct 30", "3 days overdue"), then Repeat.
+ * Undefined when there's nothing to say, so the row stays one line.
+ */
+export function addonTodoMeta(
+  todo: Pick<AddonTodo, "dueDate" | "pinned" | "repeats">,
+  now: Date,
+  timeZone: string,
+): string | undefined {
+  const parts: string[] = [];
+  if (todo.pinned) parts.push("Pinned");
+  if (todo.dueDate) parts.push(dueLabel(todo.dueDate, now, timeZone).text);
+  if (todo.repeats) parts.push("Repeat");
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+/** The Today list's id, falling back to the first list if it's missing. */
+export function defaultAddonListId(lists: AddonListOption[]): string {
+  const today = lists.find((list) => list.systemKind === "today");
+  return today?.id ?? orderAddonLists(lists)[0]?.id ?? "";
+}
+
+/** The composer's list dropdown: every list, with `selectedId` chosen. */
+function listDropdown(lists: AddonListOption[], selectedId: string): Widget {
+  return {
+    selectionInput: {
+      name: QUICK_ADD_LIST_INPUT,
+      label: "List",
+      type: "DROPDOWN",
+      items: orderAddonLists(lists).map((list) => ({
+        text: list.name,
+        value: list.id,
+        selected: list.id === selectedId,
+      })),
+    },
+  };
+}
+
+/** A row: the title, its meta line, and a checkbox that marks it done. */
+function todoRowWidget(
+  baseUrl: string,
+  todo: AddonTodo,
+  now: Date,
+  timeZone: string,
+): Widget {
+  const meta = addonTodoMeta(todo, now, timeZone);
+  return {
+    decoratedText: {
+      text: escapeCardText(todo.title),
+      ...(meta ? { bottomLabel: meta } : {}),
+      wrapText: true,
+      switchControl: {
+        name: `done_${todo.id}`,
+        selected: false,
+        controlType: "CHECKBOX",
+        onChangeAction: {
+          function: actionUrl(baseUrl, ADDON_ACTIONS.toggle),
+          parameters: [{ key: "todoId", value: todo.id }],
+        },
+      },
+    },
+  };
+}
+
+function openNylonButton(webUrl: string, text = "Open Nylon"): Button {
+  return { text, onClick: { openLink: { url: webUrl } } };
+}
+
+/**
+ * Card size budget. Google doesn't publish one hard number for Workspace
+ * add-on cards, but the panel gets slow and long cards are clipped well before
+ * the documented ceilings (100 widgets per card for card-based UIs, and the
+ * response payload limit), so the homepage designs for at most ~60 widgets:
+ *
+ *   composer                        3
+ *   Today + This Week               up to 8 rows + 1 overflow each  = 18
+ *   Someday + your lists            share ADDON_ROW_BUDGET rows, plus one
+ *                                   overflow row per section
+ *   list sections                   at most ADDON_MAX_LIST_SECTIONS, then a
+ *                                   single "N more lists" row
+ *
+ * which tops out at 3 + 18 + 24 + 7 + 1 = 53 widgets.
+ */
+export const ADDON_ROW_BUDGET = 24;
+export const ADDON_MAX_LIST_SECTIONS = 6;
+
+function overflowRow(text: string, webUrl: string): Widget {
+  return { decoratedText: { text, button: openNylonButton(webUrl, "Open") } };
+}
+
+/**
+ * A section of tick rows: up to `limit` rows, a written `empty` line when
+ * there are none, and "N more in <name>" with an Open link for the rest.
+ */
+function todoSection(
+  baseUrl: string,
+  input: HomepageCardInput,
+  name: string,
+  rows: AddonTodo[],
+  opts: { limit: number; empty?: string; collapsed?: boolean },
+): Section {
+  const shown = rows.slice(0, Math.max(0, opts.limit));
+  const widgets: Widget[] = shown.map((todo) =>
+    todoRowWidget(baseUrl, todo, input.now, input.timeZone),
+  );
+  if (rows.length === 0 && opts.empty) {
+    widgets.push({ textParagraph: { text: opts.empty } });
+  }
+  const hidden = rows.length - shown.length;
+  if (hidden > 0) {
+    widgets.push(overflowRow(`${hidden} more in ${name}`, input.webUrl));
+  }
+  if (!opts.collapsed) return { header: name, widgets };
+  // Collapsed sections show only "Name · N"; the rows open on demand.
+  return {
+    header: `${name} · ${rows.length}`,
+    collapsible: true,
+    uncollapsibleWidgetsCount: 0,
+    widgets,
+  };
+}
+
+/**
+ * Homepage card: the composer (list dropdown defaulting to Today), Today and
+ * This Week open with tick-to-done, then Someday and each of your lists as
+ * collapsed "Name · N" sections that expand to the same rows. Lists with no
+ * open todos are left out. The web app has no per-list URL yet, so every
+ * Open link goes to the app root.
  */
 export function buildHomepageCard(
   baseUrl: string,
-  todos: OpenTodoCard[],
-  lists: AddonListOption[],
-  defaultListId: string,
+  input: HomepageCardInput,
 ): Card {
+  const rowsFor = (id: string | undefined) =>
+    id ? input.todos.filter((todo) => todo.listId === id) : [];
+  const idFor = (kind: AddonSystemKind) =>
+    input.lists.find((list) => list.systemKind === kind)?.id;
+  const today = rowsFor(idFor("today"));
+  const thisWeek = rowsFor(idFor("thisWeek"));
+  const someday = rowsFor(idFor("someday"));
+
+  const todayEmpty =
+    thisWeek.length > 0
+      ? `Nothing today. ${thisWeek.length} waiting in This Week.`
+      : "Nothing today.";
+
   const sections: Section[] = [
     {
-      header: "Quick add",
       widgets: [
         {
           textInput: {
             name: QUICK_ADD_INPUT,
             label: "Add a todo",
-            hintText: "e.g. Book dentist appointment",
+            hintText: "Try “Call Sam tomorrow”",
           },
         },
-        {
-          selectionInput: {
-            name: QUICK_ADD_LIST_INPUT,
-            label: "List",
-            type: "DROPDOWN",
-            items: lists.map((list) => ({
-              text: list.name,
-              value: list.id,
-              selected: list.id === defaultListId,
-            })),
-          },
-        },
+        listDropdown(input.lists, defaultAddonListId(input.lists)),
         {
           buttonList: {
             buttons: [
               {
-                text: "Add to Nylon",
+                text: "Add",
                 onClick: {
                   action: {
                     function: actionUrl(baseUrl, ADDON_ACTIONS.quickAdd),
@@ -184,58 +363,63 @@ export function buildHomepageCard(
         },
       ],
     },
+    todoSection(baseUrl, input, "Today", today, {
+      limit: ADDON_SECTION_LIMIT,
+      empty: todayEmpty,
+    }),
+    todoSection(baseUrl, input, "This Week", thisWeek, {
+      limit: ADDON_SECTION_LIMIT,
+      empty: "Nothing this week.",
+    }),
   ];
 
-  if (todos.length > 0) {
-    for (const list of lists) {
-      const inList = todos.filter((todo) => todo.listId === list.id);
-      if (inList.length === 0) continue;
-      sections.push({
-        header: list.name,
-        widgets: inList.map((todo) => todoRowWidget(baseUrl, todo)),
-      });
-    }
-  } else {
+  // Someday and your lists draw rows from one shared budget, in order.
+  let budget = ADDON_ROW_BUDGET;
+  const collapsed = (name: string, rows: AddonTodo[]) => {
+    const limit = Math.min(ADDON_SECTION_LIMIT, budget);
+    budget -= Math.min(limit, rows.length);
+    return todoSection(baseUrl, input, name, rows, {
+      limit,
+      empty: `Nothing in ${name}.`,
+      collapsed: true,
+    });
+  };
+
+  sections.push(collapsed("Someday", someday));
+
+  const yourLists = orderAddonLists(input.lists)
+    .filter((list) => list.systemKind === null)
+    .map((list) => ({ list, rows: rowsFor(list.id) }))
+    .filter(({ rows }) => rows.length > 0);
+  for (const { list, rows } of yourLists.slice(0, ADDON_MAX_LIST_SECTIONS)) {
+    sections.push(collapsed(escapeCardText(list.name), rows));
+  }
+  const moreLists = yourLists.length - ADDON_MAX_LIST_SECTIONS;
+  if (moreLists > 0) {
     sections.push({
       widgets: [
-        { textParagraph: { text: "Nothing open — you're all caught up." } },
+        {
+          decoratedText: {
+            text: plural(moreLists, "more list"),
+            button: openNylonButton(input.webUrl),
+          },
+        },
       ],
     });
   }
 
-  return {
-    header: { title: "Nylon" },
-    sections,
-  };
-}
-
-/** A single open-todo row with a "Done" button that toggles completion. */
-function todoRowWidget(baseUrl: string, todo: OpenTodoCard): Widget {
-  return {
-    decoratedText: {
-      text: todo.title,
-      wrapText: true,
-      button: {
-        text: "Done",
-        onClick: {
-          action: {
-            function: actionUrl(baseUrl, ADDON_ACTIONS.toggle),
-            parameters: [{ key: "todoId", value: todo.id }],
-          },
-        },
-      },
-    },
-  };
+  return { header: { title: "Nylon" }, sections };
 }
 
 /**
- * Contextual card shown with a message open: an "Add to Nylon" card pre-filled
- * from the message subject, with the thread permalink carried through as a
- * hidden parameter so the resulting todo gets the email link attached.
+ * Contextual card shown with a message open: "Add to Nylon", titled from the
+ * subject, with the same list dropdown (default Today). The thread permalink
+ * rides along as a hidden parameter so the todo gets the email as a link.
  */
 export function buildContextualCard(
   baseUrl: string,
   message: { subject: string; permalink: string | null },
+  lists: AddonListOption[],
 ): Card {
   return {
     header: { title: "Add to Nylon" },
@@ -249,12 +433,11 @@ export function buildContextualCard(
               value: message.subject,
             },
           },
+          listDropdown(lists, defaultAddonListId(lists)),
           ...(message.permalink
             ? [
                 {
-                  textParagraph: {
-                    text: "The email link will be attached to this todo.",
-                  },
+                  textParagraph: { text: "The email is attached as a link." },
                 } satisfies Widget,
               ]
             : []),
@@ -262,7 +445,7 @@ export function buildContextualCard(
             buttonList: {
               buttons: [
                 {
-                  text: "Add to Nylon",
+                  text: "Add",
                   onClick: {
                     action: {
                       function: actionUrl(
@@ -303,7 +486,7 @@ export function buildConnectCard(connectUrl: string, refreshUrl: string): Card {
         widgets: [
           {
             textParagraph: {
-              text: "Connect your Nylon account to add and manage todos from Gmail. After connecting in the browser, tap “I've connected” to refresh.",
+              text: "Connect your Nylon account to add todos from Gmail and mark them done. After connecting in the browser, tap “I've connected” to refresh.",
             },
           },
           {

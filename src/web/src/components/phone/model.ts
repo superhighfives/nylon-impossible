@@ -4,9 +4,12 @@
  * so they're cheap to unit test (see `__tests__/model.test.ts`).
  */
 import {
+  type DueLabel,
   dayKeyIn,
   daysBetweenKeys,
-  dueDayKey,
+  daysUntil,
+  dueLabel,
+  formatDueDay as formatDay,
   parseTodoDate,
   type Recurrence,
 } from "@nylon-impossible/shared";
@@ -38,54 +41,8 @@ export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-/** Whole calendar days from today (in `timeZone`) to the due day. */
-export function daysUntil(
-  dueDate: string | Date,
-  now: Date,
-  timeZone: string,
-): number {
-  return daysBetweenKeys(dayKeyIn(now, timeZone), dueDayKey(dueDate));
-}
-
-/** Due days are UTC-midnight calendar days, so format them in UTC. */
-function formatDay(
-  dueDate: string | Date,
-  options: Intl.DateTimeFormatOptions,
-): string {
-  return new Date(dueDate).toLocaleDateString("en-US", {
-    ...options,
-    timeZone: "UTC",
-  });
-}
-
-export interface DueLabel {
-  text: string;
-  overdue: boolean;
-}
-
-/**
- * The row's due label: "Today", "Tomorrow", a weekday within the week
- * ("Fri"), otherwise "Oct 30"; past days read "3 days overdue".
- */
-export function dueLabel(
-  dueDate: string | Date,
-  now: Date,
-  timeZone: string,
-): DueLabel {
-  const diff = daysUntil(dueDate, now, timeZone);
-  if (diff < 0) {
-    const n = -diff;
-    return { text: `${n} ${n === 1 ? "day" : "days"} overdue`, overdue: true };
-  }
-  if (diff === 0) return { text: "Today", overdue: false };
-  if (diff === 1) return { text: "Tomorrow", overdue: false };
-  if (diff < 7)
-    return { text: formatDay(dueDate, { weekday: "short" }), overdue: false };
-  return {
-    text: formatDay(dueDate, { month: "short", day: "numeric" }),
-    overdue: false,
-  };
-}
+// The due label is shared with the Gmail card, so it lives in shared.
+export { type DueLabel, daysUntil, dueLabel };
 
 const REPEAT_LABELS: Record<Recurrence["frequency"], string> = {
   daily: "Daily",

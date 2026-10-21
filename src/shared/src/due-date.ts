@@ -46,3 +46,55 @@ export function daysBetweenKeys(from: string, to: string): number {
     (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS,
   );
 }
+
+/** Whole calendar days from today (in `timeZone`) to the due day. */
+export function daysUntil(
+  dueDate: string | Date,
+  now: Date,
+  timeZone: string,
+): number {
+  return daysBetweenKeys(dayKeyIn(now, timeZone), dueDayKey(dueDate));
+}
+
+/** Due days are UTC-midnight calendar days, so format them in UTC. */
+export function formatDueDay(
+  dueDate: string | Date,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  return new Date(dueDate).toLocaleDateString("en-US", {
+    ...options,
+    timeZone: "UTC",
+  });
+}
+
+export interface DueLabel {
+  text: string;
+  overdue: boolean;
+}
+
+/**
+ * The row's due label: "Today", "Tomorrow", a weekday within the week
+ * ("Fri"), otherwise "Oct 30"; past days read "3 days overdue".
+ */
+export function dueLabel(
+  dueDate: string | Date,
+  now: Date,
+  timeZone: string,
+): DueLabel {
+  const diff = daysUntil(dueDate, now, timeZone);
+  if (diff < 0) {
+    const n = -diff;
+    return { text: `${n} ${n === 1 ? "day" : "days"} overdue`, overdue: true };
+  }
+  if (diff === 0) return { text: "Today", overdue: false };
+  if (diff === 1) return { text: "Tomorrow", overdue: false };
+  if (diff < 7)
+    return {
+      text: formatDueDay(dueDate, { weekday: "short" }),
+      overdue: false,
+    };
+  return {
+    text: formatDueDay(dueDate, { month: "short", day: "numeric" }),
+    overdue: false,
+  };
+}

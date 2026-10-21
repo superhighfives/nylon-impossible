@@ -32,15 +32,7 @@ jobs:
         run: npx playwright install chromium --with-deps
         working-directory: src/marketing
 
-      - name: Apply D1 migrations and seed marketing data
-        run: |
-          npx wrangler d1 migrations apply DB --local \
-            --persist-to ../../.wrangler/state
-          npx wrangler d1 execute DB --local \
-            --persist-to ../../.wrangler/state \
-            --file=../../src/marketing/seed.sql
-        working-directory: src/api
-
+      # generate.ts applies the D1 migrations and seeds the demo data itself.
       - name: Capture web screenshots
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}

@@ -63,6 +63,8 @@ export async function listOpenTodos(db: Db, userId: string) {
       title: todos.title,
       position: todos.position,
       dueDate: todos.dueDate,
+      pinned: todos.pinned,
+      recurrence: todos.recurrence,
       listId: todos.listId,
       listName: lists.name,
     })
@@ -85,7 +87,7 @@ export async function listOpenTodos(db: Db, userId: string) {
  */
 export async function listListsForUser(db: Db, userId: string) {
   return db
-    .select({ id: lists.id, name: lists.name })
+    .select({ id: lists.id, name: lists.name, systemKind: lists.systemKind })
     .from(lists)
     .where(eq(lists.userId, userId))
     .orderBy(asc(lists.position));

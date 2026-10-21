@@ -120,16 +120,15 @@ jobs:
       - name: Restore last good web screenshots
         uses: actions/cache/restore@v6
         with:
-          path: |
-            src/marketing/source/web-light.png
-            src/marketing/source/web-dark.png
-          key: marketing-web-v1-${{ runner.os }}-${{ github.run_id }}
-          restore-keys: marketing-web-v1-${{ runner.os }}-
+          path: src/marketing/source/web-*.png
+          key: marketing-web-v2-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: marketing-web-v2-${{ runner.os }}-
 
       # The iOS screenshots only change when the app does, but building the app
       # and booting a simulator is ~12 of this job's minutes and its least
-      # reliable stretch. Key the cache on the iOS sources (plus the seed data
-      # and layout manifest that decide what's on screen) so a web-only deploy
+      # reliable stretch. Key the cache on the iOS sources (which include the
+      # DEBUG screenshot routes and their sample data) plus the manifest that
+      # lists the shots and devices, so a web-only deploy
       # skips the simulator entirely. An exact hit means "these screenshots are
       # already current" → skip; a prefix-only hit still restores older PNGs, so
       # if the simulator then flakes there's something to fall back to.
@@ -137,11 +136,9 @@ jobs:
         id: ios-cache
         uses: actions/cache/restore@v6
         with:
-          path: |
-            src/marketing/source/ios-light.png
-            src/marketing/source/ios-dark.png
-          key: marketing-ios-v1-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json', 'src/marketing/seed.sql') }}
-          restore-keys: marketing-ios-v1-${{ runner.os }}-
+          path: src/marketing/source/ios-*.png
+          key: marketing-ios-v2-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
+          restore-keys: marketing-ios-v2-${{ runner.os }}-
 
       - name: Decide whether to rebuild iOS screenshots
         id: ios
@@ -180,14 +177,11 @@ jobs:
             xcodebuild -downloadPlatform iOS
           fi
 
-      - name: Apply D1 migrations and seed marketing data
-        run: |
-          npx wrangler d1 migrations apply DB --local \
-            --persist-to ../../.wrangler/state
-          npx wrangler d1 execute DB --local \
-            --persist-to ../../.wrangler/state \
-            --file=../../src/marketing/seed.sql
-        working-directory: src/api
+      # No migrate/seed step here: generate.ts applies the D1 migrations and
+      # writes the demo data (seed.ts) itself, inside the best-effort web
+      # capture, because the seed needs the Clerk id of the capture account.
+      # iOS needs no data or account: it runs the app's DEBUG screenshot
+      # routes over in-memory sample data.
 
       - name: Generate and publish marketing screenshots
         env:
@@ -225,15 +219,16 @@ jobs:
         if: always()
         run: |
           status=src/marketing/source/capture-status.json
-          if [ -f "$status" ] \
-            && [ "$(jq -r '."ios-light" // ""' "$status")" = "fresh" ] \
-            && [ "$(jq -r '."ios-dark" // ""' "$status")" = "fresh" ]; then
+          # Every iOS asset must be fresh: one stale iPad shot cached under
+          # this revision would be skipped (and republished) from then on.
+          if [ -f "$status" ] && jq -e '
+              [to_entries[] | select(.key | startswith("ios-")) | .value]
+              | length > 0 and all(. == "fresh")' "$status" > /dev/null; then
             echo "ios_fresh=1" >> "$GITHUB_OUTPUT"
           fi
           # actions/cache/save errors outright when nothing matches its path, so
           # don't call it at all if the job died before capture wrote anything.
-          if [ -f src/marketing/source/web-light.png ] \
-            && [ -f src/marketing/source/web-dark.png ]; then
+          if ls src/marketing/source/web-*.png > /dev/null 2>&1; then
             echo "web_present=1" >> "$GITHUB_OUTPUT"
           fi
 
@@ -241,19 +236,24 @@ jobs:
         if: always() && steps.captured.outputs.ios_fresh == '1'
         uses: actions/cache/save@v6
         with:
-          path: |
-            src/marketing/source/ios-light.png
-            src/marketing/source/ios-dark.png
-          key: marketing-ios-v1-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json', 'src/marketing/seed.sql') }}
+          path: src/marketing/source/ios-*.png
+          key: marketing-ios-v2-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
 
       - name: Save last good web screenshots
         if: always() && steps.captured.outputs.web_present == '1'
         uses: actions/cache/save@v6
         with:
-          path: |
-            src/marketing/source/web-light.png
-            src/marketing/source/web-dark.png
-          key: marketing-web-v1-${{ runner.os }}-${{ github.run_id }}
+          path: src/marketing/source/web-*.png
+          key: marketing-web-v2-${{ runner.os }}-${{ github.run_id }}
+
+      # Uploading to App Store Connect is manual; this is where the files are.
+      - name: Upload App Store screenshots
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: app-store-screenshots
+          path: src/marketing/output/app-store/
+          if-no-files-found: ignore
 
       # Reaching here means capture failed *and* there was nothing cached to
       # fall back to — the composer-not-found dump is the usual culprit.
