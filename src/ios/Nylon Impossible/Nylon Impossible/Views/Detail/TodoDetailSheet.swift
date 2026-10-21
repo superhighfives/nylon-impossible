@@ -21,6 +21,9 @@ struct TodoDetailSheet: View {
     let lists: [TodoListModel]
     let apiService: APIService?
     let userId: String?
+    /// Set when the detail is the iPad inspector rather than a sheet, so ×
+    /// and Delete close the panel instead of dismissing a presentation.
+    var onClose: (() -> Void)?
 
     @Environment(\.dismiss) var dismiss
     @Environment(\.modelContext) var modelContext
@@ -36,8 +39,18 @@ struct TodoDetailSheet: View {
 
     enum Field { case title, notes, subtask }
 
-    init(todo: TodoItem, actions: TodoActions, lists: [TodoListModel], apiService: APIService?, userId: String?) {
+    init(
+        todo: TodoItem,
+        actions: TodoActions,
+        lists: [TodoListModel],
+        apiService: APIService?,
+        userId: String?,
+        showsCalendar: Bool = false,
+        onClose: (() -> Void)? = nil
+    ) {
         self.todo = todo
+        self.onClose = onClose
+        _showsDatePicker = State(initialValue: showsCalendar)
         self.actions = actions
         self.lists = lists
         self.apiService = apiService
@@ -86,12 +99,16 @@ struct TodoDetailSheet: View {
         .onDisappear(perform: flushEdits)
     }
 
+    func close() {
+        if let onClose { onClose() } else { dismiss() }
+    }
+
     // MARK: - Title
 
     var closeRow: some View {
         HStack {
             Spacer()
-            Button(action: { dismiss() }, label: {
+            Button(action: close, label: {
                 Image(systemName: Theme.Icon.close)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(Theme.Colors.inkMuted)
@@ -177,10 +194,7 @@ struct TodoDetailSheet: View {
     var dueChip: some View {
         let label = todo.dueDate.map { DueLabel.text(for: $0) }
         return Menu {
-            Button("Today") { setDue(DueLabel.inDays(0)) }
-            Button("Tomorrow") { setDue(DueLabel.inDays(1)) }
-            Button("Friday") { setDue(DueLabel.upcoming(weekday: 6)) }
-            Button("Next week") { setDue(DueLabel.upcoming(weekday: 2)) }
+            DueMenuItems(hasDue: false) { setDue($0) }
             Button {
                 withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { showsDatePicker.toggle() }
             } label: {

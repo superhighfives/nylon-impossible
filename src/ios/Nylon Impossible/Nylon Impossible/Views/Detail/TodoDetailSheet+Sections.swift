@@ -103,7 +103,7 @@ extension TodoDetailSheet {
     var footer: some View {
         HStack(spacing: Theme.Space.s2) {
             Button("Delete") {
-                dismiss()
+                close()
                 actions.delete(todo)
             }
             .textStyle(Theme.Fonts.Role.control)
