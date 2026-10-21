@@ -1,9 +1,105 @@
 # Cohesive redesign: one Nylon across web, iOS and Gmail
 
 **Date**: 2026-10-18
-**Status**: In Progress. Phase 1 (backend reset) shipped in #386, Phase 0's
-prototype is at https://claude.ai/artifact/LdsHRNLhPuVqZ9ejvMnysh, and Phase 2
-is next.
+**Status**: Complete (2026-10-21). Phase 0's prototype is at
+https://claude.ai/artifact/LdsHRNLhPuVqZ9ejvMnysh.
+
+## Overview
+
+Nylon was rebuilt on every platform against the one spec below, keeping the
+backend's behaviour and resetting its history. What shipped, by phase:
+
+| Phase | What shipped | PRs |
+| --- | --- | --- |
+| 0. Prototype | A clickable phone prototype that settled paging, the composer, done-then-gone and the detail sheet, and dropped row swipes | (artifact) |
+| Spec | This document, then two amendments: the time lists in the wide sidebar, and repeats placed by their next due date | #387, #390, #400 |
+| 1. Backend reset | One baseline migration with the model below; Completed list, `location`, `plan` and `hide_completed` gone; new D1 databases with the data copied across | #386 |
+| Tooling | pnpm to Bun | #391 |
+| 2. Shared foundations | `tokens.json` generating `tokens.css` and `Theme.swift`; the typed-date parser with a Swift mirror and shared fixtures; Sticky → Pin, Completed → Done; automatic timezone reporting | #388 |
+| 3. Phone | The mobile web phone layout, and the iOS views rewritten (switcher, composer, rows, detail sheet, Done history, Settings, share extension) with Archivo bundled | #397, #398 |
+| 4. Wide | Wide web (sidebar, three columns, a fourth for your list, drag, keyboard map, context menus, overnight note) and the iPad equivalent | #401, #402, #403 |
+| 5. Edges | Siri list parameter, share-extension composer, widget quick-add and an Add todo control; the Gmail card on the spec; the editorial landing page; the new marketing pipeline | #404, #405 |
+| 6. Quality pass | Web and Gmail audit with fixes, per-list URLs (`/today`, `/this-week`, `/someday`, `/lists`, `/list/:id`) used by the Gmail card's links, the axe audit script and the iOS/web parity sheet. iOS was audited in parallel | this PR |
+
+## Key decisions
+
+- **Keep the backend, reset its history.** Sync, recurrence, the midnight
+  sweep and offline iOS worked; only the UI layer and the schema's history
+  were rebuilt.
+- **One source for tokens.** Colour, type, spacing, radii, motion and the
+  lucide → SF Symbol map live in `src/shared/design/tokens.json`;
+  `bun run tokens:check` fails when the generated CSS or Swift is stale.
+- **One parser, two languages.** Typed dates are deterministic and shared
+  through fixtures (`todo-date-fixtures.json`), not AI.
+- **Web URLs name views, not pages.** The board is one pathless `_board`
+  route; `/today`, `/this-week`, `/someday`, `/lists` and `/list/:id` select
+  what it shows without remounting it, and `boardPath`/`boardUrl` live in
+  `@nylon-impossible/shared` so the Gmail card links to the same places.
+- **Parity is checked by picture.** `generate.ts --parity` draws the same
+  screens from the same demo data on iOS (DEBUG `-NylonScreen` routes) and
+  web, side by side; it's uploaded from `marketing.yml` as an artifact and
+  never published.
+
+## Deviations from the spec as first written
+
+- **Row swipes replaced by long-press.** Found in the prototype: a
+  horizontal swipe pages between Today, This Week and Someday, so row swipes
+  would fight it. Long-press (and right-click, the context-menu key and
+  Shift+F10 on web) opens Move / Due / Pin / Delete instead.
+- **Repeats placed by due date** (#400, 2026-10-20). Completing a repeating
+  todo puts the next occurrence where its due date belongs (Today, This Week
+  or Someday via `placementForDueDate`) rather than leaving it in Today, and
+  the toast says where it went.
+- **One list per todo** (2026-10-19). Separate "when" and "which list"
+  fields were considered and declined: the time lists are lists, and moving
+  between any two moves the todo. This is why the wide sidebar lists the
+  time lists too (#390).
+- **Your lists on the Gmail card.** The spec had Today and This Week open
+  and Someday collapsed to a count. The card also shows each of your lists
+  (up to six) as collapsed "Name · N" sections with tick rows, sharing one
+  row budget with Someday, and each "N more in X" now opens X on the web.
+- **Done history kept.** "Done means gone" applies to the lists; finished
+  todos stay in the database and a lightweight Done view (avatar menu on
+  phone, sidebar on wide) lists them by day and restores one to its list.
+- **The Archivo decision.** Archivo Variable is the display face on every
+  platform. Web uses `@fontsource-variable/archivo`. iOS bundles the
+  upstream variable TTF with its OFL (in the app and the share extension),
+  asks for the family and sets weight on the `wght` axis (a weight trait
+  alone leaves a variable face at its default instance), scales it with
+  `UIFontMetrics`, and falls back to the system font if it's missing. It
+  was deferred out of #388 and landed in #398.
+
+## Phase 6 results (web and Gmail)
+
+- axe (WCAG 2.1 A/AA) over 62 screen states, phone and wide, light and
+  dark, including loading, error, offline and signed-out pages: 18 serious
+  violations across 3 rules before, 0 after.
+- No layout shift when completing a todo: rows above move 0px on phone and
+  wide. Escape closes every overlay. No horizontal scroll or clipping at
+  200% zoom or doubled text size. Reduced motion leaves only opacity and
+  colour transitions. No phone touch target under 44px.
+- Contrast: ink-muted is 5.9:1 on canvas (5.2:1 on fill) in light and
+  9.1:1 in dark; ink-subtle (3.8:1 light, 4.5:1 dark) is now used only for
+  icons, never for text or placeholders. Yellow is only a fill under
+  brand-ink (8.7:1).
+- The Gmail card is inside Google's documented limits (100 widgets and
+  100 sections per card; the homepage tops out at 53 widgets), its list
+  dropdown is held to 100 items, and every card is tested against the
+  Vocabulary.
+
+## Open follow-ups
+
+- Work through the iOS-side mismatches from the first parity sheet (listed
+  in this PR's description) and the iOS agent's own audit.
+- Run the parity sheet in CI once and check the artifact; the iOS parity
+  shots ride the existing iOS screenshot cache.
+- Delete the old D1 databases kept as a backup in Phase 1 once the new ones
+  have run cleanly for long enough.
+- `ink-subtle` fails 4.5:1 for text in both themes; it's only used for
+  icons now, but either retire it or darken it in `tokens.json` (which also
+  changes iOS).
+- The phone switcher scrolls sideways at very large text sizes instead of
+  wrapping; acceptable, but worth a look alongside Dynamic Type XL on iOS.
 
 ## Why
 
@@ -330,9 +426,9 @@ waiting in This Week." Tapping the count goes to This Week.
   files hard-codes colour, size or duration. This replaces
   `radix-utilities.css` (651 lines) and `Color+Hex.swift`.
 
-## Phases
+## Phases (as planned)
 
-Each phase ships on its own.
+Each phase shipped on its own; see [Overview](#overview) for the PRs.
 
 ### 0. Prototype the phone experience (done)
 
@@ -425,6 +521,21 @@ Every screen on every platform is checked against this list:
 `marketing.yml`'s capture also produces a **parity sheet**: the same screen
 on iOS and web side by side, so mismatches are visible in review instead of
 discovered later.
+
+## Files
+
+| File | Purpose |
+| --- | --- |
+| `src/shared/design/tokens.json`, `generate.mjs` | Design tokens; generates `src/web/src/styles/tokens.css` and iOS `Theme.swift` |
+| `src/shared/src/todo-date.ts`, `todo-date-fixtures.json` | Typed-date parser and the fixtures its Swift mirror shares |
+| `src/shared/src/board-path.ts` | Per-list web URLs, shared with the Gmail card |
+| `src/web/src/routes/_board*.tsx` | The board route and its view paths |
+| `src/web/src/components/phone/` | Phone layout, and the row, composer, detail, menu, Done and Settings both layouts use |
+| `src/web/src/components/wide/` | Sidebar, columns, drag, keyboard map, shortcuts overlay |
+| `src/api/src/lib/addon-cards.ts` | Gmail card JSON |
+| `src/ios/Nylon Impossible/Nylon Impossible/Views/` | iOS views; `Views/Shell/ScreenRoute.swift` has the DEBUG screenshot routes |
+| `src/marketing/generate.ts`, `manifest.json`, `seed.ts` | Marketing screenshots and the `--parity` sheet |
+| `src/marketing/audit.ts` | The web accessibility and layout audit |
 
 ## Resolved questions (2026-10-18)
 

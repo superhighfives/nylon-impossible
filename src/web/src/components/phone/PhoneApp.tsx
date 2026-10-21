@@ -1,3 +1,4 @@
+import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, ChevronRight, Plus } from "lucide-react";
 import {
@@ -18,11 +19,13 @@ import { DetailSheet } from "./DetailSheet";
 import { DoneScreen } from "./DoneScreen";
 import { BackButton, Masthead } from "./Masthead";
 import {
+  boardViewKey,
   mastheadSubline,
   PAGES,
   type PageKey,
   plural,
   TIME_KINDS,
+  viewForKey,
 } from "./model";
 import { OvernightNote, useOvernightNote } from "./OvernightNote";
 import { SettingsScreen } from "./SettingsScreen";
@@ -31,13 +34,29 @@ import { useBoardData } from "./useBoardData";
 
 const EMPTY: TodoWithUrls[] = [];
 
+/** The pager page a view opens on: a time list, or Lists for any list. */
+function pageForView(view: BoardView | null | undefined): number {
+  if (!view) return 0;
+  if (view.kind === "list") return 3;
+  const index = PAGES.findIndex((p) => p.key === view.kind);
+  return index < 0 ? 0 : index;
+}
+
 /**
  * The phone layout (web under 1024px): the Today · This Week · Someday ·
  * Lists switcher, horizontally paged lists, the keyboard-attached composer,
  * and the detail sheet, context menu, Done history and Settings above them.
  * Data comes from `useBoardData`, shared with the wide layout.
  */
-export function PhoneApp() {
+export function PhoneApp({
+  view = null,
+  onNavigate,
+}: {
+  /** The view the URL names (`/this-week`, `/list/:id`); null is Today. */
+  view?: BoardView | null;
+  /** Keeps the URL in step as you page and open lists. */
+  onNavigate?: (view: BoardView | null) => void;
+} = {}) {
   const { reducedMotion } = useHints();
   const {
     timeZone,
@@ -59,8 +78,10 @@ export function PhoneApp() {
   } = useBoardData();
   const createList = useCreateList();
 
-  const [pageIndex, setPageIndex] = useState(0);
-  const [collectionId, setCollectionId] = useState<string | null>(null);
+  const [pageIndex, setPageIndex] = useState(() => pageForView(view));
+  const [collectionId, setCollectionId] = useState<string | null>(() =>
+    view?.kind === "list" ? view.id : null,
+  );
   const [detailId, setDetailId] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [account, setAccount] = useState(false);
@@ -104,6 +125,13 @@ export function PhoneApp() {
   useLayoutEffect(() => {
     placeIndicator(pageIndex);
   }, [pageIndex, placeIndicator]);
+
+  // Open on the URL's page without animating to it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: first paint only
+  useLayoutEffect(() => {
+    const pager = pagerRef.current;
+    if (pager) pager.scrollLeft = pageIndex * pager.clientWidth;
+  }, []);
 
   useEffect(() => {
     const onResize = () => {
@@ -151,6 +179,45 @@ export function PhoneApp() {
     },
     [goTo, lists],
   );
+
+  // --- URL -----------------------------------------------------------------
+  // The URL and the pager agree on one key ("thisWeek", "list:<id>"). A new
+  // URL (back/forward, a pasted link, or lists loading and resolving a time
+  // list's id) moves the pager; paging or opening a list rewrites the URL.
+
+  const urlKey = boardViewKey(view, lists);
+  const stateKey =
+    page === "lists" ? (collectionId ? `list:${collectionId}` : "lists") : page;
+  const syncedKey = useRef(urlKey);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes
+  useEffect(() => {
+    if (urlKey === syncedKey.current) return;
+    syncedKey.current = urlKey;
+    if (urlKey.startsWith("list:")) {
+      setCollectionId(urlKey.slice(5));
+      goTo(3);
+      return;
+    }
+    // A `/list/<id>` that turned out to be a time list seeded collectionId;
+    // drop it, or the Lists tab would reopen the time list as a collection.
+    const seededKind = lists?.find((l) => l.id === collectionId)?.systemKind;
+    if (urlKey === "lists" || seededKind) setCollectionId(null);
+    goTo(
+      Math.max(
+        0,
+        PAGES.findIndex((p) => p.key === urlKey),
+      ),
+    );
+  }, [urlKey]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the view changes
+  useEffect(() => {
+    if (stateKey === syncedKey.current) return;
+    syncedKey.current = stateKey;
+    const next = viewForKey(stateKey);
+    if (next) onNavigate?.(next);
+  }, [stateKey]);
 
   const onNavKey = (e: KeyboardEvent<HTMLElement>) => {
     const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
@@ -349,21 +416,29 @@ export function PhoneApp() {
           <ul className="pt-1.5">
             {collections.map((list) => (
               <li key={list.id}>
+                {/* Named by the list, the count as its description ("Groceries,
+                    4 todos"), so the name matches what's visible. */}
                 <button
                   type="button"
+                  aria-describedby={`phone-list-count-${list.id}`}
                   onClick={() => setCollectionId(list.id)}
-                  className="flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-n-hairline px-5 py-4 text-left text-n-ink n-focus-inset"
+                  className="mx-5 flex min-h-11 w-[calc(100%-2.5rem)] cursor-pointer items-center gap-3 border-b border-n-hairline py-3.5 text-left text-n-ink n-focus-inset"
                 >
                   <span className="min-w-0 flex-1 truncate font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
                     {list.name}
                   </span>
-                  <span className="text-[0.9375rem] text-n-ink-muted">
-                    <span className="sr-only">, </span>
+                  <span
+                    aria-hidden="true"
+                    className="text-[0.9375rem] text-n-ink-muted tabular-nums"
+                  >
                     {rowsFor(list.id).length}
-                    <span className="sr-only"> todos</span>
+                  </span>
+                  <span id={`phone-list-count-${list.id}`} hidden>
+                    {plural(rowsFor(list.id).length, "todo")}
                   </span>
                   <ChevronRight
-                    size={16}
+                    size={18}
+                    strokeWidth={2.2}
                     aria-hidden="true"
                     className="text-n-ink-muted"
                   />
@@ -385,7 +460,7 @@ export function PhoneApp() {
               }}
               enterKeyHint="done"
               placeholder="New list"
-              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink n-focus placeholder:text-n-ink-subtle"
+              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink n-focus placeholder:text-n-ink-muted"
             />
           </label>
         </>
@@ -411,7 +486,7 @@ export function PhoneApp() {
   };
 
   return (
-    <div className="fixed inset-0 z-10 bg-n-canvas font-n-text text-n-ink antialiased">
+    <div className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 bg-n-canvas font-n-text text-n-ink antialiased">
       <div className="mx-auto flex h-full max-w-[42rem] flex-col">
         <div className="flex h-14 shrink-0 items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pr-4 pl-5">
           <nav
@@ -433,7 +508,7 @@ export function PhoneApp() {
                     if (p.key === "lists" && active) setCollectionId(null);
                     goTo(i);
                   }}
-                  className={`h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
+                  className={`n-hit h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
                     active ? "text-n-ink" : "text-n-ink-muted"
                   }`}
                 >
@@ -467,7 +542,11 @@ export function PhoneApp() {
           ref={pagerRef}
           onScroll={onPagerScroll}
           data-phone-ready={loading ? undefined : ""}
-          className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // Nothing to swipe to while loading, and a scroller with nothing
+          // focusable in it is a dead end for the keyboard.
+          className={`flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            loading ? "overflow-x-hidden" : "overflow-x-auto"
+          }`}
         >
           {PAGES.map((p, i) => (
             <section

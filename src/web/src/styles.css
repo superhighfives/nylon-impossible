@@ -145,6 +145,17 @@ code {
   }
 }
 
+/* The same ring on a container whose field has keyboard focus: the composers
+   and the sidebar's "New list", whose bare text fields draw no outline of
+   their own. */
+@utility n-focus-within {
+  &:has(textarea:focus-visible, input:focus-visible) {
+    outline: 3px solid var(--n-color-brand);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 1px var(--n-color-ink);
+  }
+}
+
 /* Grows a small control's hit area to at least 44×44 (the spec's minimum
    target) without changing its look: an invisible ::before, centred, that
    only extends on the axes where the control is smaller than 44px. */

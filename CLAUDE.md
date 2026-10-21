@@ -147,6 +147,15 @@ same weekday and date.
   App Store set in `output/app-store/` (uploaded as a workflow artifact;
   App Store Connect upload is manual), and WebP shots for the web landing page
   in `output/landing/` (copy into `src/web/public/images/landing/`).
+- `--parity` (never part of `--all`) captures `manifest.parity`'s screens on
+  iOS and web at the same logical size and writes
+  `output/parity/parity-{light,dark}.png`, each screen an "iOS | Web" pair.
+  It uses simulators of its own ("Nylon Parity …"), is uploaded from
+  `marketing.yml` as the `parity-sheet` artifact, and is never published.
+- `audit.ts` runs axe and the layout checks (row movement on done, 44px
+  targets, focus, Escape, 200% zoom, reduced motion) against a running,
+  seeded dev server: `MARKETING_WEB_URL=http://127.0.0.1:<port> npx tsx
+  audit.ts`.
 
 ## Continuous improvement routines
 

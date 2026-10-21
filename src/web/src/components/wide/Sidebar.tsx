@@ -38,7 +38,7 @@ function ListEntry({
       <button
         type="button"
         data-sidebar-list={list.id}
-        aria-label={`${list.name}, ${count} ${count === 1 ? "todo" : "todos"}`}
+        aria-describedby={`sidebar-count-${list.id}`}
         aria-pressed={selected === undefined ? undefined : selected}
         onClick={() => onSelect(list)}
         className={`${ENTRY} ${strong || selected ? "font-semibold" : "font-medium"} ${
@@ -46,10 +46,16 @@ function ListEntry({
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{list.name}</span>
+        {/* The name is what's visible ("Groceries"); the count is read as
+            its description ("4 todos"). */}
         <span
+          aria-hidden="true"
           className={`font-normal tabular-nums ${dropping ? "" : "text-n-ink-muted"}`}
         >
           {count}
+        </span>
+        <span id={`sidebar-count-${list.id}`} hidden>
+          {count} {count === 1 ? "todo" : "todos"}
         </span>
       </button>
     </li>
@@ -128,7 +134,7 @@ export function Sidebar({
             />
           ))}
           <li>
-            <label className="flex h-9 items-center gap-2 rounded-[0.5rem] px-2.5 text-[0.9375rem] text-n-ink-muted focus-within:bg-n-surface">
+            <label className="n-focus-within flex h-9 items-center gap-2 rounded-[0.5rem] px-2.5 text-[0.9375rem] text-n-ink-muted focus-within:bg-n-surface">
               <Plus size={15} aria-hidden="true" className="shrink-0" />
               <span className="sr-only">New list name</span>
               <input
@@ -152,10 +158,16 @@ export function Sidebar({
         </ul>
       </nav>
       <nav aria-label="More" className="mt-auto flex flex-col gap-0.5">
-        <SidebarButton onClick={onDone} label={`Done, ${doneCount}`}>
+        <SidebarButton onClick={onDone} describedBy="sidebar-done-count">
           <span className="flex-1">Done</span>
-          <span className="font-normal text-n-ink-muted tabular-nums">
+          <span
+            aria-hidden="true"
+            className="font-normal text-n-ink-muted tabular-nums"
+          >
             {doneCount}
+          </span>
+          <span id="sidebar-done-count" hidden>
+            {doneCount} {doneCount === 1 ? "todo" : "todos"}
           </span>
         </SidebarButton>
         <SidebarButton onClick={onSettings}>Settings</SidebarButton>
@@ -177,17 +189,17 @@ export function Sidebar({
 
 function SidebarButton({
   onClick,
-  label,
+  describedBy,
   children,
 }: {
   onClick: () => void;
-  label?: string;
+  describedBy?: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
-      aria-label={label}
+      aria-describedby={describedBy}
       onClick={onClick}
       className={`${ENTRY} font-medium`}
     >

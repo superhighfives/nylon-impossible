@@ -10,7 +10,7 @@
  * HTTP-endpoint / alternate-runtime model), not Apps Script function names.
  */
 
-import { dueLabel } from "@nylon-impossible/shared";
+import { type BoardView, boardUrl, dueLabel } from "@nylon-impossible/shared";
 
 // ---------------------------------------------------------------------------
 // Card widget types (minimal subset we use)
@@ -161,7 +161,7 @@ export interface HomepageCardInput {
   lists: AddonListOption[];
   /** Open top-level todos across every list, pinned first within a list. */
   todos: AddonTodo[];
-  /** The web app, for the "Open Nylon" and "N more" links. */
+  /** The web app's base URL; the "Open" links deep-link into its lists. */
   webUrl: string;
   now: Date;
   timeZone: string;
@@ -219,11 +219,13 @@ function listDropdown(lists: AddonListOption[], selectedId: string): Widget {
       name: QUICK_ADD_LIST_INPUT,
       label: "List",
       type: "DROPDOWN",
-      items: orderAddonLists(lists).map((list) => ({
-        text: list.name,
-        value: list.id,
-        selected: list.id === selectedId,
-      })),
+      items: orderAddonLists(lists)
+        .filter((list, i) => i < ADDON_DROPDOWN_LIMIT || list.id === selectedId)
+        .map((list) => ({
+          text: list.name,
+          value: list.id,
+          selected: list.id === selectedId,
+        })),
     },
   };
 }
@@ -276,8 +278,15 @@ function openNylonButton(webUrl: string, text = "Open Nylon"): Button {
 export const ADDON_ROW_BUDGET = 24;
 export const ADDON_MAX_LIST_SECTIONS = 6;
 
-function overflowRow(text: string, webUrl: string): Widget {
-  return { decoratedText: { text, button: openNylonButton(webUrl, "Open") } };
+/**
+ * Google documents 100 widgets and 100 sections per card but no item limit
+ * for a dropdown, so the list dropdown is held to the same 100 rather than
+ * trusting an unbounded number of lists to render.
+ */
+export const ADDON_DROPDOWN_LIMIT = 100;
+
+function overflowRow(text: string, url: string): Widget {
+  return { decoratedText: { text, button: openNylonButton(url, "Open") } };
 }
 
 /**
@@ -288,6 +297,8 @@ function todoSection(
   baseUrl: string,
   input: HomepageCardInput,
   name: string,
+  /** Where "N more in <name>" opens in the web app. */
+  view: BoardView,
   rows: AddonTodo[],
   opts: { limit: number; empty?: string; collapsed?: boolean },
 ): Section {
@@ -300,7 +311,9 @@ function todoSection(
   }
   const hidden = rows.length - shown.length;
   if (hidden > 0) {
-    widgets.push(overflowRow(`${hidden} more in ${name}`, input.webUrl));
+    widgets.push(
+      overflowRow(`${hidden} more in ${name}`, boardUrl(input.webUrl, view)),
+    );
   }
   if (!opts.collapsed) return { header: name, widgets };
   // Collapsed sections show only "Name · N"; the rows open on demand.
@@ -316,8 +329,8 @@ function todoSection(
  * Homepage card: the composer (list dropdown defaulting to Today), Today and
  * This Week open with tick-to-done, then Someday and each of your lists as
  * collapsed "Name · N" sections that expand to the same rows. Lists with no
- * open todos are left out. The web app has no per-list URL yet, so every
- * Open link goes to the app root.
+ * open todos are left out. Each "N more in X" opens X in the web app
+ * (`/this-week`, `/list/:id`), and "N more lists" opens Lists.
  */
 export function buildHomepageCard(
   baseUrl: string,
@@ -363,11 +376,11 @@ export function buildHomepageCard(
         },
       ],
     },
-    todoSection(baseUrl, input, "Today", today, {
+    todoSection(baseUrl, input, "Today", { kind: "today" }, today, {
       limit: ADDON_SECTION_LIMIT,
       empty: todayEmpty,
     }),
-    todoSection(baseUrl, input, "This Week", thisWeek, {
+    todoSection(baseUrl, input, "This Week", { kind: "thisWeek" }, thisWeek, {
       limit: ADDON_SECTION_LIMIT,
       empty: "Nothing this week.",
     }),
@@ -375,24 +388,26 @@ export function buildHomepageCard(
 
   // Someday and your lists draw rows from one shared budget, in order.
   let budget = ADDON_ROW_BUDGET;
-  const collapsed = (name: string, rows: AddonTodo[]) => {
+  const collapsed = (name: string, view: BoardView, rows: AddonTodo[]) => {
     const limit = Math.min(ADDON_SECTION_LIMIT, budget);
     budget -= Math.min(limit, rows.length);
-    return todoSection(baseUrl, input, name, rows, {
+    return todoSection(baseUrl, input, name, view, rows, {
       limit,
       empty: `Nothing in ${name}.`,
       collapsed: true,
     });
   };
 
-  sections.push(collapsed("Someday", someday));
+  sections.push(collapsed("Someday", { kind: "someday" }, someday));
 
   const yourLists = orderAddonLists(input.lists)
     .filter((list) => list.systemKind === null)
     .map((list) => ({ list, rows: rowsFor(list.id) }))
     .filter(({ rows }) => rows.length > 0);
   for (const { list, rows } of yourLists.slice(0, ADDON_MAX_LIST_SECTIONS)) {
-    sections.push(collapsed(escapeCardText(list.name), rows));
+    sections.push(
+      collapsed(escapeCardText(list.name), { kind: "list", id: list.id }, rows),
+    );
   }
   const moreLists = yourLists.length - ADDON_MAX_LIST_SECTIONS;
   if (moreLists > 0) {
@@ -401,7 +416,10 @@ export function buildHomepageCard(
         {
           decoratedText: {
             text: plural(moreLists, "more list"),
-            button: openNylonButton(input.webUrl),
+            button: openNylonButton(
+              boardUrl(input.webUrl, { kind: "lists" }),
+              "Open",
+            ),
           },
         },
       ],
@@ -474,7 +492,7 @@ export function buildContextualCard(
  * "Connect Nylon" card shown when the Google identity isn't linked to any Nylon
  * account. "Connect Nylon" opens the web connect flow (Clerk auth + link) in the
  * browser; since the panel can't refresh itself once linking completes there,
- * "I've connected" re-invokes the add-on so it re-resolves the identity and
+ * "I’ve connected" re-invokes the add-on so it re-resolves the identity and
  * swaps in the homepage card. `refreshUrl` is the absolute URL of the refresh
  * action endpoint.
  */
@@ -486,7 +504,7 @@ export function buildConnectCard(connectUrl: string, refreshUrl: string): Card {
         widgets: [
           {
             textParagraph: {
-              text: "Connect your Nylon account to add todos from Gmail and mark them done. After connecting in the browser, tap “I've connected” to refresh.",
+              text: "Connect your Nylon account to add todos from Gmail and mark them done. After connecting in the browser, tap “I’ve connected” to refresh.",
             },
           },
           {
@@ -497,7 +515,7 @@ export function buildConnectCard(connectUrl: string, refreshUrl: string): Card {
                   onClick: { openLink: { url: connectUrl } },
                 },
                 {
-                  text: "I've connected",
+                  text: "I’ve connected",
                   onClick: { action: { function: refreshUrl } },
                 },
               ],

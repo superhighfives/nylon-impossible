@@ -159,12 +159,13 @@ describe("WideApp", () => {
   it("shows the sidebar with counts and the three time columns", () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
+    // Named by what's visible, with the count read as the description.
     expect(
-      within(nav).getByRole("button", { name: "Today, 2 todos" }),
-    ).toBeInTheDocument();
-    expect(
-      within(nav).getByRole("button", { name: "Groceries, 1 todo" }),
-    ).toHaveAttribute("aria-pressed", "false");
+      within(nav).getByRole("button", { name: "Today" }),
+    ).toHaveAccessibleDescription("2 todos");
+    const groceries = within(nav).getByRole("button", { name: "Groceries" });
+    expect(groceries).toHaveAccessibleDescription("1 todo");
+    expect(groceries).toHaveAttribute("aria-pressed", "false");
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
     ).toEqual(expect.arrayContaining(["Today", "This Week", "Someday"]));
@@ -360,5 +361,46 @@ describe("WideApp", () => {
       expect.objectContaining({ name: "Studio B" }),
       expect.anything(),
     );
+  });
+});
+
+describe("WideApp URLs", () => {
+  beforeEach(() => {
+    todos = [
+      makeTodo({ id: "w1", title: "Send invoice", listId: "list-week" }),
+      makeTodo({ id: "g1", title: "Parmesan", listId: "list-groceries" }),
+    ];
+  });
+
+  it("opens /list/:id as the fourth column and clears the URL on close", async () => {
+    const onNavigate = vi.fn();
+    render(
+      <WideApp
+        view={{ kind: "list", id: "list-groceries" }}
+        onNavigate={onNavigate}
+      />,
+    );
+    expect(column("Groceries")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Close Groceries" }),
+    );
+    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+    expect(onNavigate).toHaveBeenLastCalledWith(null);
+  });
+
+  it("writes /list/:id when a list opens from the sidebar", async () => {
+    const onNavigate = vi.fn();
+    render(<WideApp onNavigate={onNavigate} />);
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    await userEvent.click(within(nav).getByRole("button", { name: /Studio/ }));
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      kind: "list",
+      id: "list-studio",
+    });
+  });
+
+  it("focuses This Week's column for /this-week", () => {
+    render(<WideApp view={{ kind: "thisWeek" }} />);
+    expect(focusedTitle()).toContain("Send invoice");
   });
 });

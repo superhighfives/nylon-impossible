@@ -39,15 +39,15 @@ export function DoneScreen({
             </h2>
             <ul>
               {group.items.map((todo) => (
-                <li key={todo.id} className="flex items-start gap-3.5 py-2.5">
+                <li key={todo.id} className="flex items-start gap-3 py-1.5">
                   <button
                     type="button"
                     aria-label={`Put “${displayTitle(todo)}” back in ${listName(todo.listId)}`}
                     onClick={() => onRestore(todo)}
-                    className="-my-2.5 -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field n-focus-inset"
+                    className="-my-1.5 -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field n-focus-inset"
                   >
                     <span className="flex size-6 items-center justify-center rounded-[7px] bg-n-fill text-n-ink-muted">
-                      <Check size={14} strokeWidth={3} aria-hidden="true" />
+                      <Check size={16} strokeWidth={3} aria-hidden="true" />
                     </span>
                   </button>
                   <div className="min-w-0 flex-1">

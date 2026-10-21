@@ -2,6 +2,7 @@ import { Dialog } from "@base-ui/react/dialog";
 import { Menu } from "@base-ui/react/menu";
 import {
   dayKeyIn,
+  daysBetweenKeys,
   dueDayKey,
   type RecurrenceFrequency,
   TODO_TITLE_MAX,
@@ -11,6 +12,7 @@ import {
   AlertCircle,
   Calendar as CalendarIcon,
   Check,
+  ChevronDown,
   List,
   Loader2,
   MoreHorizontal,
@@ -65,6 +67,13 @@ function stamp(iso: string, now: Date, timeZone: string): string {
   if (key === dayKeyIn(new Date(now.getTime() - DAY_MS), timeZone)) {
     return "yesterday";
   }
+  // Within the week, the weekday ("Created Thursday"), as on iOS.
+  if (daysBetweenKeys(key, today) <= 6) {
+    return new Date(iso).toLocaleDateString("en-US", {
+      weekday: "long",
+      timeZone,
+    });
+  }
   return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
@@ -113,7 +122,7 @@ export function DetailSheet(props: DetailSheetProps) {
         <Dialog.Portal>
           <Dialog.Popup
             data-detail-panel
-            className="fixed top-0 right-0 bottom-0 z-40 flex w-[min(28rem,40vw)] min-w-[22rem] flex-col border-l border-n-hairline bg-n-canvas text-n-ink outline-none transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:translate-x-6 data-starting-style:opacity-0"
+            className="fixed top-[var(--n-offline-inset,0px)] right-0 bottom-0 z-40 flex w-[min(28rem,40vw)] min-w-[22rem] flex-col border-l border-n-hairline bg-n-canvas text-n-ink outline-none transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:translate-x-6 data-starting-style:opacity-0"
           >
             {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
           </Dialog.Popup>
@@ -230,28 +239,24 @@ function DetailBody({
           <button
             type="button"
             aria-expanded={panel === "list"}
+            aria-label={`List: ${listName(todo.listId)}`}
             onClick={() => toggle("list")}
             className={chipClass(true)}
           >
             <List size={14} aria-hidden="true" />
-            <span className="sr-only">List: </span>
             {listName(todo.listId)}
+            <ChevronDown size={14} aria-hidden="true" className="-mr-0.5" />
           </button>
           <button
             type="button"
             aria-expanded={panel === "due"}
+            aria-label={due ? `Due: ${due.text}` : undefined}
             onClick={() => toggle("due")}
             className={`${chipClass(!!due)} ${due?.overdue ? "text-n-overdue" : ""}`}
           >
             <CalendarIcon size={14} aria-hidden="true" />
-            {due ? (
-              <>
-                <span className="sr-only">Due: </span>
-                {due.text}
-              </>
-            ) : (
-              "Due"
-            )}
+            {due ? due.text : "Due"}
+            <ChevronDown size={14} aria-hidden="true" className="-mr-0.5" />
           </button>
           {canRepeat && (
             <button
@@ -262,6 +267,7 @@ function DetailBody({
             >
               <Repeat size={14} aria-hidden="true" />
               {todo.recurrence ? repeatLabel(todo.recurrence) : "Repeat"}
+              <ChevronDown size={14} aria-hidden="true" className="-mr-0.5" />
             </button>
           )}
           <button
@@ -385,7 +391,7 @@ function DetailBody({
             onBlur={notes.flush}
             placeholder="Add notes"
             rows={3}
-            className="field-sizing-content block min-h-[4.5rem] w-full resize-none rounded-n-chip bg-transparent p-0 text-[1.0625rem] leading-[1.45] text-n-ink n-focus placeholder:text-n-ink-subtle"
+            className="field-sizing-content block min-h-[4.5rem] w-full resize-none rounded-n-chip bg-transparent p-0 text-[1.0625rem] leading-[1.45] text-n-ink n-focus placeholder:text-n-ink-muted"
           />
         </label>
 
@@ -474,7 +480,7 @@ function Subtasks({
                   input: { completed: !s.completed },
                 })
               }
-              className="-ml-3 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-chip n-focus-inset"
+              className="-mr-2.5 -ml-3 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-chip n-focus-inset"
             >
               <span
                 className={`flex size-[18px] items-center justify-center rounded-[5px] border-[1.5px] transition-colors duration-(--n-duration-fast) ${
@@ -520,7 +526,7 @@ function Subtasks({
           }}
           enterKeyHint="done"
           placeholder="Add subtask"
-          className="min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-base text-n-ink n-focus placeholder:text-n-ink-subtle"
+          className="min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-base text-n-ink n-focus placeholder:text-n-ink-muted"
         />
       </label>
     </section>

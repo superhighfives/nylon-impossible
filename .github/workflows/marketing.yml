@@ -136,7 +136,9 @@ jobs:
         id: ios-cache
         uses: actions/cache/restore@v6
         with:
-          path: src/marketing/source/ios-*.png
+          path: |
+            src/marketing/source/ios-*.png
+            src/marketing/source/parity/ios-*.png
           key: marketing-ios-v2-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
           restore-keys: marketing-ios-v2-${{ runner.os }}-
 
@@ -197,6 +199,29 @@ jobs:
         run: npx tsx generate.ts --all
         working-directory: src/marketing
 
+      # The parity sheet: the same screens on iOS and web, side by side, for
+      # review. It's never published, and a failure here doesn't fail the
+      # job — a side that didn't capture shows as "not captured" on the sheet.
+      # With the iOS cache hit it reuses the cached iOS parity shots.
+      - name: Generate the parity sheet
+        if: success()
+        continue-on-error: true
+        env:
+          VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
+          CLERK_MARKETING_USER_EMAIL: ${{ secrets.CLERK_DEVELOPMENT_USER_EMAIL }}
+          MARKETING_SKIP_IOS: ${{ steps.ios.outputs.skip }}
+        run: npx tsx generate.ts --parity
+        working-directory: src/marketing
+
+      - name: Upload the parity sheet
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: parity-sheet
+          path: src/marketing/output/parity/
+          if-no-files-found: ignore
+
       - name: Summarise capture
         if: always()
         run: |
@@ -236,7 +261,9 @@ jobs:
         if: always() && steps.captured.outputs.ios_fresh == '1'
         uses: actions/cache/save@v6
         with:
-          path: src/marketing/source/ios-*.png
+          path: |
+            src/marketing/source/ios-*.png
+            src/marketing/source/parity/ios-*.png
           key: marketing-ios-v2-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
 
       - name: Save last good web screenshots

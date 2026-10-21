@@ -4,6 +4,8 @@
  * so they're cheap to unit test (see `__tests__/model.test.ts`).
  */
 import {
+  BOARD_TIME_KINDS,
+  type BoardView,
   type DueLabel,
   dayKeyIn,
   daysBetweenKeys,
@@ -301,6 +303,29 @@ export function splitLists(lists: SerializedList[] | undefined): {
   }
   collections.sort((a, b) => a.position.localeCompare(b.position));
   return { byKind, collections };
+}
+
+/**
+ * A view's identity once lists are known: "today", "thisWeek", "someday",
+ * "lists" or "list:<id>". `/` is Today, and `/list/<id>` of a time list is
+ * that time list, so two URLs for the same place compare equal.
+ */
+export function boardViewKey(
+  view: BoardView | null | undefined,
+  lists: SerializedList[] | undefined,
+): string {
+  if (!view) return "today";
+  if (view.kind !== "list") return view.kind;
+  const kind = lists?.find((l) => l.id === view.id)?.systemKind;
+  return kind ?? `list:${view.id}`;
+}
+
+/** The view for a `boardViewKey`, or null for a key that names no view. */
+export function viewForKey(key: string): BoardView | null {
+  if (key.startsWith("list:")) return { kind: "list", id: key.slice(5) };
+  if (key === "lists") return { kind: "lists" };
+  const kind = BOARD_TIME_KINDS.find((k) => k === key);
+  return kind ? { kind } : null;
 }
 
 const DAY_MS = 86_400_000;

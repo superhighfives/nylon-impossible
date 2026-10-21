@@ -174,7 +174,7 @@ export function LandingPage() {
             <ol className="mt-8 grid gap-8 sm:grid-cols-3 sm:gap-10">
               {horizons.map((horizon, index) => (
                 <li key={horizon.title} className="border-t border-n-ink pt-4">
-                  <p className="text-[0.8125rem] text-n-ink-subtle tabular-nums">
+                  <p className="text-[0.8125rem] text-n-ink-muted tabular-nums">
                     {String(index + 1).padStart(2, "0")}
                   </p>
                   <h3 className="mt-1 font-n-display text-[2.125rem] leading-10 font-bold tracking-[-0.025em]">
