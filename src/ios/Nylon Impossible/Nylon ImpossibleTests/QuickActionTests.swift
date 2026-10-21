@@ -1,10 +1,14 @@
+import Foundation
 import Testing
+#if os(iOS)
 import UIKit
+#endif
 @testable import Nylon_Impossible
 
 @Suite("QuickAction", .serialized)
 @MainActor
 struct QuickActionTests {
+    #if os(iOS)
     private func shortcutItem(type: String) -> UIApplicationShortcutItem {
         UIApplicationShortcutItem(type: type, localizedTitle: "New todo")
     }
@@ -21,6 +25,7 @@ struct QuickActionTests {
     func ignoresUnknown() {
         #expect(QuickAction(shortcutItem(type: "com.example.something-else")) == nil)
     }
+    #endif
 
     // MARK: - Info.plist declarations
 

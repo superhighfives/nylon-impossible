@@ -44,13 +44,15 @@ struct TodayWidgetEntryTests {
     @Test("Carries at most maxRows, but counts them all")
     func capsRows() {
         let now = Date()
-        let todos = (0..<9).map { todo("Todo \($0)", now: now) }
+        // More than the cap on either platform (5 on iOS, 10 on the Mac).
+        let count = TodayEntry.maxRows + 4
+        let todos = (0..<count).map { todo("Todo \($0)", now: now) }
         guard case .todos(let rows, let total) = TodayEntry.make(from: todos, now: now).content else {
             Issue.record("Expected todos")
             return
         }
         #expect(rows.count == TodayEntry.maxRows)
-        #expect(total == 9)
+        #expect(total == count)
     }
 
     @Test("An empty day is an empty list, not signed out")
