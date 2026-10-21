@@ -13,6 +13,9 @@
  *                  write the App Store set and the landing-page images.
  *   --publish      Copy web JPGs to superhighfives.com, commit, and push.
  *   --all          Run capture, web, and publish in sequence.
+ *   --parity       Capture manifest.parity's screens on iOS and web and write
+ *                  output/parity/parity-{light,dark}.png, each screen as an
+ *                  "iOS | Web" pair. For review only: never published.
  *   --skip-ios     Reuse the iOS screenshots already in source/ (no simulator).
  *   --strict       Fail if any asset had to fall back to a previous capture.
  *
@@ -98,6 +101,22 @@ interface Placement {
   width: number;
 }
 
+/** One screen of the parity sheet, the same state on iOS and on web. */
+interface ParityScreen {
+  name: string;
+  device: DeviceKey;
+  /** The iOS DEBUG `-NylonScreen` route. iPad routes are drawn landscape. */
+  ios: string;
+  /** The web path to open. */
+  web: string;
+  /** Then open the detail for the todo with this title. */
+  open?: string;
+  /** Then focus the composer and type this. */
+  type?: string;
+  /** Then open this from the avatar menu (phone). */
+  account?: string;
+}
+
 interface Manifest {
   /**
    * One zone for the whole run — browser, simulators and the seeded user —
@@ -132,6 +151,14 @@ interface Manifest {
       mobile?: boolean;
     }[];
   };
+  /** The iOS-beside-web review sheet; see runParityStep. */
+  parity: {
+    /** Simulators of its own, so it never borrows the marketing ones. */
+    simulators: Record<DeviceKey, string>;
+    /** The web viewport that matches each device's logical size. */
+    web: Record<DeviceKey, { viewport: Size; scale: number; mobile?: boolean }>;
+    screens: ParityScreen[];
+  };
   composite: {
     canvas: Size;
     png?: boolean;
@@ -162,6 +189,8 @@ const runCaptureWeb = flag("--capture-web");
 const runCaptureIOS = flag("--capture-ios");
 const runWeb = flag("--web") || flag("--all");
 const runPublish = flag("--publish") || flag("--all");
+// Never part of --all: the parity sheet is for review, not for publishing.
+const runParity = flag("--parity");
 
 // Capture is best-effort by default (see capturePhase): a flake degrades to the
 // screenshots already in source/ instead of failing the run. --strict turns
@@ -172,14 +201,21 @@ const strictCapture = flag("--strict") || process.env.MARKETING_STRICT === "1";
 const skipIOSCapture =
   flag("--skip-ios") || process.env.MARKETING_SKIP_IOS === "1";
 
-if (!runCapture && !runCaptureWeb && !runCaptureIOS && !runWeb && !runPublish) {
+if (
+  !runCapture &&
+  !runCaptureWeb &&
+  !runCaptureIOS &&
+  !runWeb &&
+  !runPublish &&
+  !runParity
+) {
   console.error(
-    "Error: specify at least one of --capture, --capture-web, --capture-ios, --web, --publish, or --all",
+    "Error: specify at least one of --capture, --capture-web, --capture-ios, --web, --publish, --parity, or --all",
   );
   process.exit(1);
 }
 
-if (runCapture || runCaptureWeb) {
+if (runCapture || runCaptureWeb || runParity) {
   const missing = [
     "VITE_CLERK_PUBLISHABLE_KEY",
     "CLERK_SECRET_KEY",
@@ -187,7 +223,7 @@ if (runCapture || runCaptureWeb) {
   ].filter((k) => !process.env[k]);
   if (missing.length > 0) {
     console.error(
-      `Error: missing env vars for --capture / --capture-web / --all: ${missing.join(", ")}`,
+      `Error: missing env vars for --capture / --capture-web / --parity / --all: ${missing.join(", ")}`,
     );
     process.exit(1);
   }
@@ -445,7 +481,27 @@ function syncLocalD1Storage(): void {
 /** A seeded title that only renders once D1 and the session both work. */
 const READY_TEXT = "Review PR for the sync engine";
 
-async function captureWebScreenshots(): Promise<void> {
+type PlaywrightBrowser = import("playwright").Browser;
+type PlaywrightPage = import("playwright").Page;
+
+interface WebSession {
+  browser: PlaywrightBrowser;
+  /**
+   * Sign `page` in (it must already be at the app), wait until the seeded
+   * todos render, and hide the dev-only devtools launcher. `name` labels the
+   * debug dump if the todos never show.
+   */
+  signIn: (page: PlaywrightPage, name: string) => Promise<void>;
+}
+
+/**
+ * Seed the demo data, boot the web dev server and a signed-in-ready browser,
+ * run `capture`, and tear it all down again. Shared by the marketing shots
+ * and the parity sheet.
+ */
+async function withWebSession(
+  capture: (session: WebSession) => Promise<void>,
+): Promise<void> {
   const emailAddress = process.env.CLERK_MARKETING_USER_EMAIL as string;
 
   await seedDemoData();
@@ -542,6 +598,94 @@ async function captureWebScreenshots(): Promise<void> {
 
     const browser = await chromium.launch();
 
+    const signIn = async (page: PlaywrightPage, name: string) => {
+      // clerk.signIn with emailAddress uses CLERK_SECRET_KEY to create a
+      // ticket internally — no manual token fetch needed.
+      await clerk.signIn({ page, emailAddress });
+
+      // The dev server's first authenticated D1 access may lazily create a
+      // sibling sqlite file the migrate/seed step never touched (see
+      // syncLocalD1Storage) — sync onto it and reload if the seeded todos
+      // don't show up, a few times in case that file takes a beat to
+      // settle, before giving up.
+      let found = false;
+      let lastErr: unknown;
+      for (let attempt = 1; attempt <= 4; attempt++) {
+        try {
+          await page
+            .getByText(READY_TEXT)
+            .first()
+            .waitFor({ state: "attached", timeout: 30_000 });
+          found = true;
+          break;
+        } catch (err) {
+          lastErr = err;
+          console.log(`  [${name}] demo todos not found on attempt ${attempt}/4`);
+          syncLocalD1Storage();
+          await sleep(1000);
+          await page.reload();
+        }
+      }
+      if (!found) {
+        const debugHtml = join(SOURCE_DIR, `debug-${name}.html`);
+        const debugPng = join(SOURCE_DIR, `debug-${name}.png`);
+        writeFileSync(debugHtml, await page.content());
+        // Best-effort: don't let a screenshot failure mask lastErr below.
+        await page
+          .screenshot({ path: debugPng, fullPage: true })
+          .catch((err) => console.log(`  Failed to capture ${debugPng}: ${err}`));
+        console.log(`  Dumped ${debugHtml} and ${debugPng}`);
+        const tail = serverLog.join("").trimEnd();
+        console.log("  Dev server output at time of failure:");
+        console.log(tail ? tail : "  (server produced no output)");
+        throw lastErr;
+      }
+      await hideDevtools(page);
+    };
+
+    try {
+      await capture({ browser, signIn });
+    } finally {
+      await browser.close();
+    }
+  } finally {
+    await killDevServer(server.proc);
+    if (!devVarsExisted) unlinkSync(devVarsPath);
+  }
+}
+
+/**
+ * The dev server mounts the TanStack devtools launcher in the bottom-right
+ * corner. Hide whatever top-level element sits there, unless it's the app.
+ */
+async function hideDevtools(page: PlaywrightPage): Promise<void> {
+  await page.evaluate((ready) => {
+    for (const inset of [24, 32, 40]) {
+      let node = document.elementFromPoint(
+        window.innerWidth - inset,
+        window.innerHeight - inset,
+      ) as HTMLElement | null;
+      while (node?.parentElement && node.parentElement !== document.body) {
+        node = node.parentElement;
+      }
+      if (node && node !== document.body && !node.textContent?.includes(ready)) {
+        node.style.display = "none";
+      }
+    }
+  }, READY_TEXT);
+}
+
+/** Nothing focused, no caret, no hover tint, transitions settled. */
+async function settle(page: PlaywrightPage, keepFocus = false): Promise<void> {
+  if (!keepFocus) {
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+  }
+  await page.mouse.move(0, 0);
+  await sleep(800);
+}
+
+async function captureWebScreenshots(): Promise<void> {
+  await withWebSession(async ({ browser, signIn }) => {
     for (const shot of manifest.web.shots) {
       for (const mode of MODES) {
         const name = webAsset(shot.name, mode);
@@ -555,84 +699,17 @@ async function captureWebScreenshots(): Promise<void> {
           locale: "en-US",
         });
         const page = await context.newPage();
-
         // Navigate first (required before clerk.signIn), then sign in.
-        // clerk.signIn with emailAddress uses CLERK_SECRET_KEY to create a
-        // ticket internally — no manual token fetch needed.
         await page.goto(WEB_URL);
-        await clerk.signIn({ page, emailAddress });
-
-        // The dev server's first authenticated D1 access may lazily create a
-        // sibling sqlite file the migrate/seed step never touched (see
-        // syncLocalD1Storage) — sync onto it and reload if the seeded todos
-        // don't show up, a few times in case that file takes a beat to
-        // settle, before giving up.
-        let found = false;
-        let lastErr: unknown;
-        for (let attempt = 1; attempt <= 4; attempt++) {
-          try {
-            await page
-              .getByText(READY_TEXT)
-              .first()
-              .waitFor({ state: "visible", timeout: 30_000 });
-            found = true;
-            break;
-          } catch (err) {
-            lastErr = err;
-            console.log(`  [${name}] demo todos not found on attempt ${attempt}/4`);
-            syncLocalD1Storage();
-            await sleep(1000);
-            await page.reload();
-          }
-        }
-        if (!found) {
-          const debugHtml = join(SOURCE_DIR, `debug-${name}.html`);
-          const debugPng = join(SOURCE_DIR, `debug-${name}.png`);
-          writeFileSync(debugHtml, await page.content());
-          // Best-effort: don't let a screenshot failure mask lastErr below.
-          await page
-            .screenshot({ path: debugPng, fullPage: true })
-            .catch((err) => console.log(`  Failed to capture ${debugPng}: ${err}`));
-          console.log(`  Dumped ${debugHtml} and ${debugPng}`);
-          const tail = serverLog.join("").trimEnd();
-          console.log("  Dev server output at time of failure:");
-          console.log(tail ? tail : "  (server produced no output)");
-          throw lastErr;
-        }
-
-        // The dev server mounts the TanStack devtools launcher in the
-        // bottom-right corner. Hide whatever top-level element sits there,
-        // unless it's the app itself.
-        await page.evaluate((ready) => {
-          for (const inset of [24, 32, 40]) {
-            let node = document.elementFromPoint(
-              window.innerWidth - inset,
-              window.innerHeight - inset,
-            ) as HTMLElement | null;
-            while (node?.parentElement && node.parentElement !== document.body) {
-              node = node.parentElement;
-            }
-            if (node && node !== document.body && !node.textContent?.includes(ready)) {
-              node.style.display = "none";
-            }
-          }
-        }, READY_TEXT);
-        // Nothing focused, no caret, no hover tint, transitions settled.
-        await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
-        await page.mouse.move(0, 0);
-        await sleep(800);
-
+        await signIn(page, name);
+        await page.getByText(READY_TEXT).first().waitFor({ state: "visible" });
+        await settle(page);
         await page.screenshot({ path: sourcePath(name), fullPage: false });
         console.log(`  → ${name}.png`);
         await context.close();
       }
     }
-
-    await browser.close();
-  } finally {
-    await killDevServer(server.proc);
-    if (!devVarsExisted) unlinkSync(devVarsPath);
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -681,8 +758,11 @@ function simulatorState(udid: string): string {
  * booted: it shuts its device down at the end, and launches the app with
  * screenshot-only arguments.
  */
-function ensureMarketingSimulator(device: DeviceKey): string {
-  const spec = manifest.ios.devices[device];
+function ensureMarketingSimulator(
+  device: DeviceKey,
+  name = manifest.ios.devices[device].simulator,
+): string {
+  const spec = { ...manifest.ios.devices[device], simulator: name };
   const { devices } = simctlJson<{ devices: Record<string, SimDevice[]> }>([
     "devices",
   ]);
@@ -791,6 +871,13 @@ let builtAppPath: string | undefined;
 /** Build the Debug app once; both device classes install the same bundle. */
 function buildIOSApp(udid: string): string {
   if (builtAppPath) return builtAppPath;
+  // A Debug simulator build from an earlier run, to skip xcodebuild.
+  const prebuilt = process.env.MARKETING_APP_PATH;
+  if (prebuilt && existsSync(prebuilt)) {
+    console.log(`  Using the prebuilt app at ${prebuilt}`);
+    builtAppPath = prebuilt;
+    return prebuilt;
+  }
   const { project, scheme } = manifest.ios;
   const derivedDataPath =
     process.env.MARKETING_DERIVED_DATA ??
@@ -849,9 +936,25 @@ async function withSimRetries(
  * an iPad run at landscape size turned a quarter clockwise (iPadOS 26 won't
  * rotate a windowed scene on request), which we turn back here.
  */
-async function captureIOSDevice(device: DeviceKey): Promise<void> {
+type IOSShot = Manifest["ios"]["shots"][number];
+
+async function captureIOSDevice(
+  device: DeviceKey,
+  opts: {
+    /** Another simulator of ours, by name (the parity sheet uses its own). */
+    simulator?: string;
+    shots?: IOSShot[];
+    /** Where a shot's PNG goes; source/<asset>.png by default. */
+    output?: (shot: IOSShot, mode: Mode) => string;
+  } = {},
+): Promise<void> {
+  const shots =
+    opts.shots ?? manifest.ios.shots.filter((s) => s.device === device);
+  const output =
+    opts.output ??
+    ((shot: IOSShot, mode: Mode) => sourcePath(`${iosShotName(shot)}-${mode}`));
   const { bundleId } = manifest.ios;
-  const udid = ensureMarketingSimulator(device);
+  const udid = ensureMarketingSimulator(device, opts.simulator);
   const appPath = buildIOSApp(udid);
 
   await ensureBooted(udid);
@@ -880,7 +983,7 @@ async function captureIOSDevice(device: DeviceKey): Promise<void> {
   // registration, and a freshly booted simulator posts first-run banners
   // ("Ready for Apple Intelligence") that would otherwise land in the first
   // shots. Give both time to clear before capturing anything.
-  const firstShot = manifest.ios.shots.find((s) => s.device === device);
+  const firstShot = shots[0];
   await withSimRetries("launch", udid, () =>
     execFileSync(
       "xcrun",
@@ -891,7 +994,7 @@ async function captureIOSDevice(device: DeviceKey): Promise<void> {
   );
   await sleep(20_000);
 
-  for (const shot of manifest.ios.shots.filter((s) => s.device === device)) {
+  for (const shot of shots) {
     for (const mode of MODES) {
       const name = `${iosShotName(shot)}-${mode}`;
       spawnSync("xcrun", ["simctl", "ui", udid, "appearance", mode], {
@@ -914,7 +1017,8 @@ async function captureIOSDevice(device: DeviceKey): Promise<void> {
       );
       await sleep(4_000);
 
-      const raw = join(SOURCE_DIR, `${name}.raw.png`);
+      const dest = output(shot, mode);
+      const raw = `${dest}.raw.png`;
       let lastErr: unknown;
       for (let attempt = 1; attempt <= 5; attempt++) {
         try {
@@ -936,7 +1040,7 @@ async function captureIOSDevice(device: DeviceKey): Promise<void> {
       await sharp(raw)
         .rotate(shot.landscape ? 270 : 0)
         .png()
-        .toFile(sourcePath(name));
+        .toFile(dest);
       unlinkSync(raw);
       console.log(`  → ${name}.png`);
     }
@@ -1291,6 +1395,267 @@ async function runWebStep(): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Parity sheet
+//
+// The same screen on iOS and on web, side by side, so a mismatch shows up in
+// review instead of being discovered later. Both sides draw the same demo
+// data (seed.ts mirrors the iOS SampleData), in the same zone and theme, at
+// the same logical size: web's viewport is the device's point size. Never
+// published; marketing.yml uploads it as an artifact.
+// ---------------------------------------------------------------------------
+
+const PARITY_SOURCE = join(SOURCE_DIR, "parity");
+const PARITY_DIR = join(OUTPUT_DIR, "parity");
+
+function paritySource(side: "ios" | "web", screen: string, mode: Mode): string {
+  return join(PARITY_SOURCE, `${side}-${screen}-${mode}.png`);
+}
+
+async function captureParityWeb(): Promise<void> {
+  const { screens, web } = manifest.parity;
+  await withWebSession(async ({ browser, signIn }) => {
+    for (const device of Object.keys(web) as DeviceKey[]) {
+      const spec = web[device];
+      const layout = device === "iphone" ? "phone" : "wide";
+      const row = `[data-layout="${layout}"] [data-phone-row] button[aria-haspopup]`;
+      for (const mode of MODES) {
+        const context = await browser.newContext({
+          viewport: spec.viewport,
+          deviceScaleFactor: spec.scale,
+          isMobile: spec.mobile ?? false,
+          hasTouch: spec.mobile ?? false,
+          colorScheme: mode,
+          timezoneId: manifest.timeZone,
+          locale: "en-US",
+        });
+        const page = await context.newPage();
+        await page.goto(WEB_URL);
+        await signIn(page, `parity-${device}-${mode}`);
+        for (const screen of screens.filter((s) => s.device === device)) {
+          const dest = paritySource("web", screen.name, mode);
+          try {
+            await page.goto(`${WEB_URL}${screen.web}`);
+            await page
+              .getByText(READY_TEXT)
+              .first()
+              .waitFor({ state: "attached", timeout: 30_000 });
+            // Hydrated and loaded, not just server-rendered.
+            await page
+              .locator("[data-phone-ready], [data-wide-ready]")
+              .first()
+              .waitFor({ state: "attached", timeout: 30_000 });
+            await sleep(700);
+            // Before any overlay opens: the corner heuristic would take a
+            // sheet or dialog for the devtools launcher.
+            await hideDevtools(page);
+            if (screen.open) {
+              await page.locator(row).filter({ hasText: screen.open }).first().click();
+              await sleep(700);
+            }
+            if (screen.type) {
+              const field = page.getByRole("textbox", { name: "New todo" });
+              await field.click();
+              await field.fill(screen.type);
+              await sleep(500);
+            }
+            if (screen.account) {
+              await page.getByRole("button", { name: "Account" }).click();
+              await page
+                .getByRole("menuitem", { name: screen.account, exact: true })
+                .click();
+              await sleep(700);
+            }
+            // The composer is the one shot that's about focus.
+            await settle(page, !!screen.type);
+            await page.screenshot({ path: dest });
+            console.log(`  → parity/web-${screen.name}-${mode}.png`);
+          } catch (err) {
+            console.log(`  ✘ parity web ${screen.name} (${mode}): ${describeError(err)}`);
+          }
+        }
+        await context.close();
+      }
+    }
+  });
+}
+
+async function captureParityIOS(): Promise<void> {
+  const { screens, simulators } = manifest.parity;
+  let windowOpen = false;
+  for (const device of Object.keys(simulators) as DeviceKey[]) {
+    const mine = screens.filter((s) => s.device === device);
+    if (mine.length === 0) continue;
+    // With --skip-ios, a device whose shots are all cached is reused; one
+    // that's missing any (a first run, an earlier flake) is captured.
+    const cached = mine.every((s) =>
+      MODES.every((mode) => existsSync(paritySource("ios", s.name, mode))),
+    );
+    if (skipIOSCapture && cached) {
+      console.log(`  Reusing cached iOS parity screenshots for ${device}.`);
+      continue;
+    }
+    if (!windowOpen) {
+      await openSimulatorWindow();
+      windowOpen = true;
+    }
+    const byRoute = new Map(mine.map((s) => [s.ios, s.name]));
+    try {
+      await captureIOSDevice(device, {
+        simulator: simulators[device],
+        // iPad is shown at landscape, like the wide web board beside it.
+        shots: mine.map((s) => ({
+          device,
+          screen: s.ios,
+          landscape: device === "ipad",
+        })),
+        output: (shot, mode) =>
+          paritySource("ios", byRoute.get(shot.screen) ?? shot.screen, mode),
+      });
+    } catch (err) {
+      console.log(`  ✘ parity iOS ${device}: ${describeError(err)}`);
+    }
+  }
+}
+
+function escapeXml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+/** One screen's pair: a title, then iOS and web side by side, captioned. */
+async function parityPair(
+  screen: ParityScreen,
+  mode: Mode,
+  width: number,
+): Promise<{ input: Buffer; width: number; height: number }> {
+  const colours = FRAME[mode];
+  const ink = mode === "dark" ? "#eeeeee" : "#202020";
+  const muted = mode === "dark" ? "#b4b4b4" : "#646464";
+  const gap = 24;
+  const header = 76;
+  const images = await Promise.all(
+    (["ios", "web"] as const).map(async (side) => {
+      const path = paritySource(side, screen.name, mode);
+      if (!existsSync(path)) return null;
+      return sharp(path).resize({ width }).png().toBuffer({ resolveWithObject: true });
+    }),
+  );
+  // A missing side keeps the device's shape.
+  const { viewport } = manifest.parity.web[screen.device];
+  const imageH = Math.max(
+    ...images.map((img) => img?.info.height ?? 0),
+    images.every(Boolean)
+      ? 0
+      : Math.round((width * viewport.height) / viewport.width),
+  );
+  const totalW = width * 2 + gap;
+  const totalH = header + imageH;
+  const captions = ["iOS", "Web"]
+    .map(
+      (label, i) =>
+        `<text x="${i * (width + gap)}" y="64" font-family="Helvetica, Arial, sans-serif" font-size="22" fill="${muted}">${label}</text>`,
+    )
+    .join("");
+  const svg = `<svg width="${totalW}" height="${header}" xmlns="http://www.w3.org/2000/svg">
+    <text x="0" y="28" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700" fill="${ink}">${escapeXml(screen.name)}</text>
+    ${captions}
+    <text x="${width + gap / 2}" y="64" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="22" fill="${muted}">|</text>
+  </svg>`;
+  const layers: Composite[] = [
+    { input: await sharp(Buffer.from(svg)).png().toBuffer(), left: 0, top: 0 },
+  ];
+  for (const [i, img] of images.entries()) {
+    const left = i * (width + gap);
+    if (img) {
+      const framed = await frame(img.data, 16, mode);
+      layers.push({ input: framed, left, top: header });
+    } else {
+      const missing = `<svg width="${width}" height="${imageH}" xmlns="http://www.w3.org/2000/svg">
+        <rect x="1" y="1" width="${width - 2}" height="${imageH - 2}" rx="16" fill="${colours.fill}" stroke="${colours.hairline}" stroke-width="2"/>
+        <text x="${width / 2}" y="${imageH / 2}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="24" fill="${muted}">not captured</text>
+      </svg>`;
+      layers.push({
+        input: await sharp(Buffer.from(missing)).png().toBuffer(),
+        left,
+        top: header,
+      });
+    }
+  }
+  const input = await sharp({
+    create: {
+      width: totalW,
+      height: totalH,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite(layers)
+    .png()
+    .toBuffer();
+  return { input, width: totalW, height: totalH };
+}
+
+/** Lay pairs out in rows of `perRow`, phone screens first, then iPad. */
+async function writeParitySheet(mode: Mode): Promise<string> {
+  const { screens } = manifest.parity;
+  const margin = 64;
+  const rowGap = 64;
+  const colGap = 48;
+  const groups: { device: DeviceKey; perRow: number; width: number }[] = [
+    { device: "iphone", perRow: 4, width: 440 },
+    { device: "ipad", perRow: 2, width: 880 },
+  ];
+  const placed: Composite[] = [];
+  let y = margin;
+  let sheetW = 0;
+  for (const group of groups) {
+    const pairs = [];
+    for (const screen of screens.filter((s) => s.device === group.device)) {
+      pairs.push(await parityPair(screen, mode, group.width));
+    }
+    for (let i = 0; i < pairs.length; i += group.perRow) {
+      const row = pairs.slice(i, i + group.perRow);
+      let x = margin;
+      for (const pair of row) {
+        placed.push({ input: pair.input, left: x, top: y });
+        x += pair.width + colGap;
+      }
+      sheetW = Math.max(sheetW, x - colGap + margin);
+      y += Math.max(...row.map((p) => p.height)) + rowGap;
+    }
+  }
+  const sheetH = y - rowGap + margin;
+  mkdirSync(PARITY_DIR, { recursive: true });
+  const dest = join(PARITY_DIR, `parity-${mode}.png`);
+  await sharp({
+    create: {
+      width: sheetW,
+      height: sheetH,
+      channels: 3,
+      background: manifest.composite.backgrounds[mode],
+    },
+  })
+    .composite(placed)
+    .png()
+    .toFile(dest);
+  console.log(`  → ${dest}`);
+  return dest;
+}
+
+async function runParityStep(): Promise<void> {
+  console.log("\n── Parity sheet ─────────────────────────────────");
+  mkdirSync(PARITY_SOURCE, { recursive: true });
+  // Best-effort like the marketing capture: a side that fails shows as "not
+  // captured" on the sheet instead of failing the run.
+  try {
+    await captureParityWeb();
+  } catch (err) {
+    console.error(`  ✘ parity web capture failed: ${describeError(err)}`);
+  }
+  await captureParityIOS();
+  for (const mode of MODES) await writeParitySheet(mode);
+}
+
+// ---------------------------------------------------------------------------
 // Publish
 // ---------------------------------------------------------------------------
 
@@ -1407,6 +1772,7 @@ async function waitForUrl(url: string, timeoutMs: number): Promise<void> {
   }
   if (runWeb) await runWebStep();
   if (runPublish) runPublishStep();
+  if (runParity) await runParityStep();
 
   console.log("\nDone.");
   process.exit(0);
