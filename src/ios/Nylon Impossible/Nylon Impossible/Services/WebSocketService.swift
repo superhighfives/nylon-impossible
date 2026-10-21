@@ -171,7 +171,7 @@ final class WebSocketService {
         ]
         func matches(_ nsError: NSError) -> Bool {
             (nsError.domain == NSURLErrorDomain && transientURLCodes.contains(nsError.code))
-                || (nsError.domain == NSPOSIXErrorDomain && transientPOSIXCodes.contains(Int32(nsError.code)))
+                || (nsError.domain == NSPOSIXErrorDomain && Int32(exactly: nsError.code).map(transientPOSIXCodes.contains) == true)
         }
         let nsError = error as NSError
         return matches(nsError) || nsError.underlyingErrors.contains { matches($0 as NSError) }
