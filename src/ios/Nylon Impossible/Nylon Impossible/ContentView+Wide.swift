@@ -112,9 +112,14 @@ extension ContentView {
         .animation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base), value: openColumnId)
         .overlay(alignment: .top) {
             if case .error(let message) = syncService.state {
-                SyncErrorLine(message: message) { Task { await syncService.sync() } }
-                    .background(Theme.Colors.canvas)
-                    .transition(.opacity)
+                SyncErrorLine(
+                    message: message,
+                    gutter: Theme.Wide.gutter,
+                    onRetry: { Task { await syncService.sync() } },
+                    onDismiss: syncService.dismissError
+                )
+                .background(Theme.Colors.canvas)
+                .transition(.opacity)
             }
         }
         .overlay(alignment: .bottom) {
