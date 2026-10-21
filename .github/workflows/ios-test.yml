@@ -30,6 +30,13 @@ jobs:
       || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: macos-26
     timeout-minutes: 20
+    # The app is universal and lays out differently on iPad (regular width),
+    # so run the suite on both families. fail-fast off so one family's
+    # failure doesn't hide the other's result.
+    strategy:
+      fail-fast: false
+      matrix:
+        family: [iPhone, iPad]
     defaults:
       run:
         working-directory: src/ios/Nylon Impossible
@@ -39,6 +46,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: SwiftLint
+        if: matrix.family == 'iPhone'
         run: |
           brew install swiftlint
           swiftlint
@@ -51,22 +59,24 @@ jobs:
         run: rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData
 
       - name: Run tests
+        env:
+          FAMILY: ${{ matrix.family }}
         run: |
           xcrun simctl list runtimes
           DEVICE=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
           data = json.load(sys.stdin)
-          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and '$FAMILY' in d['name']]
           print(devices[0]['name'] if devices else '')
           ")
           if [ -z "$DEVICE" ]; then
-            echo "No available iPhone simulator found, downloading iOS platform..."
+            echo "No available $FAMILY simulator found, downloading iOS platform..."
             xcodebuild -downloadPlatform iOS
             DEVICE=$(xcrun simctl list devices available -j | python3 -c "
           import json, sys
           data = json.load(sys.stdin)
-          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
-          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and '$FAMILY' in d['name']]
+          print(devices[0]['name'] if devices else ('iPhone 16 Pro' if '$FAMILY' == 'iPhone' else 'iPad Pro 13-inch (M4)'))
             ")
           fi
           echo "Running tests on: $DEVICE"
@@ -147,7 +157,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-test-results
+          name: ios-test-results-${{ matrix.family }}
           path: src/ios/Nylon Impossible/TestResults.xcresult
           retention-days: 7
           if-no-files-found: ignore
