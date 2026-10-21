@@ -9,14 +9,19 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as BoardRouteImport } from './routes/_board'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as BoardIndexRouteImport } from './routes/_board.index'
+import { Route as BoardListsRouteImport } from './routes/_board.lists'
+import { Route as BoardSomedayRouteImport } from './routes/_board.someday'
+import { Route as BoardThisWeekRouteImport } from './routes/_board.this-week'
+import { Route as BoardTodayRouteImport } from './routes/_board.today'
 import { Route as ConnectGmailAddonRouteImport } from './routes/connect/gmail-addon'
+import { Route as BoardListIdRouteImport } from './routes/_board.list.$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const BoardRoute = BoardRouteImport.update({
+  id: '/_board',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -29,41 +34,116 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BoardIndexRoute = BoardIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BoardRoute,
+} as any)
+const BoardListsRoute = BoardListsRouteImport.update({
+  id: '/lists',
+  path: '/lists',
+  getParentRoute: () => BoardRoute,
+} as any)
+const BoardSomedayRoute = BoardSomedayRouteImport.update({
+  id: '/someday',
+  path: '/someday',
+  getParentRoute: () => BoardRoute,
+} as any)
+const BoardThisWeekRoute = BoardThisWeekRouteImport.update({
+  id: '/this-week',
+  path: '/this-week',
+  getParentRoute: () => BoardRoute,
+} as any)
+const BoardTodayRoute = BoardTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => BoardRoute,
+} as any)
 const ConnectGmailAddonRoute = ConnectGmailAddonRouteImport.update({
   id: '/connect/gmail-addon',
   path: '/connect/gmail-addon',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BoardListIdRoute = BoardListIdRouteImport.update({
+  id: '/list/$id',
+  path: '/list/$id',
+  getParentRoute: () => BoardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof BoardIndexRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/lists': typeof BoardListsRoute
+  '/someday': typeof BoardSomedayRoute
+  '/this-week': typeof BoardThisWeekRoute
+  '/today': typeof BoardTodayRoute
   '/connect/gmail-addon': typeof ConnectGmailAddonRoute
+  '/list/$id': typeof BoardListIdRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/lists': typeof BoardListsRoute
+  '/someday': typeof BoardSomedayRoute
+  '/this-week': typeof BoardThisWeekRoute
+  '/today': typeof BoardTodayRoute
   '/connect/gmail-addon': typeof ConnectGmailAddonRoute
+  '/': typeof BoardIndexRoute
+  '/list/$id': typeof BoardListIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_board': typeof BoardRouteWithChildren
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
+  '/_board/lists': typeof BoardListsRoute
+  '/_board/someday': typeof BoardSomedayRoute
+  '/_board/this-week': typeof BoardThisWeekRoute
+  '/_board/today': typeof BoardTodayRoute
   '/connect/gmail-addon': typeof ConnectGmailAddonRoute
+  '/_board/': typeof BoardIndexRoute
+  '/_board/list/$id': typeof BoardListIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/privacy' | '/terms' | '/connect/gmail-addon'
+  fullPaths:
+    | '/'
+    | '/privacy'
+    | '/terms'
+    | '/lists'
+    | '/someday'
+    | '/this-week'
+    | '/today'
+    | '/connect/gmail-addon'
+    | '/list/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/privacy' | '/terms' | '/connect/gmail-addon'
-  id: '__root__' | '/' | '/privacy' | '/terms' | '/connect/gmail-addon'
+  to:
+    | '/privacy'
+    | '/terms'
+    | '/lists'
+    | '/someday'
+    | '/this-week'
+    | '/today'
+    | '/connect/gmail-addon'
+    | '/'
+    | '/list/$id'
+  id:
+    | '__root__'
+    | '/_board'
+    | '/privacy'
+    | '/terms'
+    | '/_board/lists'
+    | '/_board/someday'
+    | '/_board/this-week'
+    | '/_board/today'
+    | '/connect/gmail-addon'
+    | '/_board/'
+    | '/_board/list/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  BoardRoute: typeof BoardRouteWithChildren
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   ConnectGmailAddonRoute: typeof ConnectGmailAddonRoute
@@ -71,11 +151,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_board': {
+      id: '/_board'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof BoardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -92,6 +172,41 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_board/': {
+      id: '/_board/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof BoardIndexRouteImport
+      parentRoute: typeof BoardRoute
+    }
+    '/_board/lists': {
+      id: '/_board/lists'
+      path: '/lists'
+      fullPath: '/lists'
+      preLoaderRoute: typeof BoardListsRouteImport
+      parentRoute: typeof BoardRoute
+    }
+    '/_board/someday': {
+      id: '/_board/someday'
+      path: '/someday'
+      fullPath: '/someday'
+      preLoaderRoute: typeof BoardSomedayRouteImport
+      parentRoute: typeof BoardRoute
+    }
+    '/_board/this-week': {
+      id: '/_board/this-week'
+      path: '/this-week'
+      fullPath: '/this-week'
+      preLoaderRoute: typeof BoardThisWeekRouteImport
+      parentRoute: typeof BoardRoute
+    }
+    '/_board/today': {
+      id: '/_board/today'
+      path: '/today'
+      fullPath: '/today'
+      preLoaderRoute: typeof BoardTodayRouteImport
+      parentRoute: typeof BoardRoute
+    }
     '/connect/gmail-addon': {
       id: '/connect/gmail-addon'
       path: '/connect/gmail-addon'
@@ -99,11 +214,38 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectGmailAddonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_board/list/$id': {
+      id: '/_board/list/$id'
+      path: '/list/$id'
+      fullPath: '/list/$id'
+      preLoaderRoute: typeof BoardListIdRouteImport
+      parentRoute: typeof BoardRoute
+    }
   }
 }
 
+interface BoardRouteChildren {
+  BoardListsRoute: typeof BoardListsRoute
+  BoardSomedayRoute: typeof BoardSomedayRoute
+  BoardThisWeekRoute: typeof BoardThisWeekRoute
+  BoardTodayRoute: typeof BoardTodayRoute
+  BoardIndexRoute: typeof BoardIndexRoute
+  BoardListIdRoute: typeof BoardListIdRoute
+}
+
+const BoardRouteChildren: BoardRouteChildren = {
+  BoardListsRoute: BoardListsRoute,
+  BoardSomedayRoute: BoardSomedayRoute,
+  BoardThisWeekRoute: BoardThisWeekRoute,
+  BoardTodayRoute: BoardTodayRoute,
+  BoardIndexRoute: BoardIndexRoute,
+  BoardListIdRoute: BoardListIdRoute,
+}
+
+const BoardRouteWithChildren = BoardRoute._addFileChildren(BoardRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  BoardRoute: BoardRouteWithChildren,
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   ConnectGmailAddonRoute: ConnectGmailAddonRoute,

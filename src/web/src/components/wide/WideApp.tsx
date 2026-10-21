@@ -9,6 +9,7 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/phone/Composer";
@@ -16,6 +17,7 @@ import { ContextMenu, type MenuView } from "@/components/phone/ContextMenu";
 import { DetailSheet } from "@/components/phone/DetailSheet";
 import { DoneScreen } from "@/components/phone/DoneScreen";
 import {
+  boardViewKey,
   columnSubline,
   displayTitle,
   TIME_KINDS,
@@ -69,10 +71,19 @@ function focusedRow(): HTMLElement | null {
  * are the phone's components at board density, driven by the same
  * `useBoardData`.
  */
-export function WideApp() {
+export function WideApp({
+  view = null,
+  onNavigate,
+}: {
+  /** The view the URL names: `/list/:id` opens that list's column. */
+  view?: BoardView | null;
+  /** Keeps the URL in step as your list's column opens and closes. */
+  onNavigate?: (view: BoardView | null) => void;
+} = {}) {
   const { reducedMotion } = useHints();
   const {
     timeZone,
+    lists,
     todos,
     byKind,
     collections,
@@ -90,7 +101,9 @@ export function WideApp() {
   } = useBoardData();
   const createList = useCreateList();
 
-  const [openListId, setOpenListId] = useState<string | null>(null);
+  const [openListId, setOpenListId] = useState<string | null>(() =>
+    view?.kind === "list" ? view.id : null,
+  );
   const [detailId, setDetailId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [screen, setScreen] = useState<"done" | "settings" | null>(null);
@@ -154,6 +167,42 @@ export function WideApp() {
     }
   });
 
+  // --- URL ------------------------------------------------------------------
+  // `/list/:id` is your list's column; the time lists' URLs focus their
+  // column on arrival. Opening and closing a column rewrites the URL.
+
+  const urlKey = boardViewKey(view, lists);
+  const appliedUrlKey = useRef<string | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes, once lists are in
+  useEffect(() => {
+    if (loading || urlKey === appliedUrlKey.current) return;
+    appliedUrlKey.current = urlKey;
+    if (urlKey.startsWith("list:")) {
+      const id = urlKey.slice(5);
+      if (openListId !== id) setOpenListId(id);
+      pendingFocus.current = id;
+      return;
+    }
+    if (openListId) setOpenListId(null);
+    const kind = TIME_KINDS.find((k) => k === urlKey);
+    const id = kind ? byKind[kind]?.id : undefined;
+    // Only an explicit `/this-week` moves focus; `/` leaves the page alone.
+    if (view && id) focusColumn(id);
+  }, [urlKey, loading]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the column opens or closes
+  useEffect(() => {
+    if (loading) return;
+    if (openListId) {
+      if (urlKey !== `list:${openListId}`) {
+        onNavigate?.({ kind: "list", id: openListId });
+      }
+    } else if (urlKey.startsWith("list:")) {
+      onNavigate?.(null);
+    }
+  }, [openListId, loading]);
+
   /** Before a row leaves its column, hand focus to its neighbour. */
   const focusNeighbour = (row: HTMLElement) => {
     const listId = row.dataset.rowList;
@@ -202,7 +251,7 @@ export function WideApp() {
   };
 
   /** "View" on an "Added to …" toast. */
-  const view = (listId: string) => {
+  const viewList = (listId: string) => {
     if (columnIds.includes(listId)) {
       focusColumn(listId);
       return;
@@ -494,7 +543,7 @@ export function WideApp() {
                     currentListId={list.id}
                     targets={targets}
                     timeZone={timeZone}
-                    onView={view}
+                    onView={viewList}
                     textareaRef={(el) => {
                       if (el) composers.current.set(list.id, el);
                       else composers.current.delete(list.id);

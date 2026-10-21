@@ -1,5 +1,7 @@
+import { boardPath, boardUrl, parseBoardPath } from "@nylon-impossible/shared";
 import { describe, expect, it } from "vitest";
 import {
+  boardViewKey,
   displayTitle,
   dueChipText,
   dueLabel,
@@ -9,8 +11,9 @@ import {
   openRows,
   planSubmit,
   rowMeta,
+  viewForKey,
 } from "../model";
-import { dueIn, makeTodo, makeUrl, NOW, TZ } from "./fixtures";
+import { dueIn, makeList, makeTodo, makeUrl, NOW, TZ } from "./fixtures";
 
 describe("dueLabel", () => {
   it.each([
@@ -218,5 +221,55 @@ describe("mastheadSubline", () => {
       "Through Saturday, October 24 · 1 todo",
     );
     expect(mastheadSubline("lists", 2, NOW, TZ)).toBe("2 lists · never age");
+  });
+});
+
+describe("board URLs", () => {
+  const lists = [
+    makeList("list-today", "Today", "today", "a0"),
+    makeList("list-groceries", "Groceries", null, "a1"),
+  ];
+
+  it("parses the per-list paths", () => {
+    expect(parseBoardPath("/")).toBeNull();
+    expect(parseBoardPath("/this-week")).toEqual({ kind: "thisWeek" });
+    expect(parseBoardPath("/someday/")).toEqual({ kind: "someday" });
+    expect(parseBoardPath("/lists")).toEqual({ kind: "lists" });
+    expect(parseBoardPath("/list/abc%20d")).toEqual({
+      kind: "list",
+      id: "abc d",
+    });
+    expect(parseBoardPath("/privacy")).toBeNull();
+  });
+
+  it("round-trips through boardPath", () => {
+    for (const path of [
+      "/today",
+      "/this-week",
+      "/someday",
+      "/lists",
+      "/list/x",
+    ]) {
+      const view = parseBoardPath(path);
+      expect(view && boardPath(view)).toBe(path);
+    }
+    expect(boardUrl("https://nylon.test/", { kind: "list", id: "x" })).toBe(
+      "https://nylon.test/list/x",
+    );
+  });
+
+  it("keys a time list's id as that time list, and / as Today", () => {
+    expect(boardViewKey(null, lists)).toBe("today");
+    expect(boardViewKey({ kind: "list", id: "list-today" }, lists)).toBe(
+      "today",
+    );
+    expect(boardViewKey({ kind: "list", id: "list-groceries" }, lists)).toBe(
+      "list:list-groceries",
+    );
+    expect(viewForKey("list:list-groceries")).toEqual({
+      kind: "list",
+      id: "list-groceries",
+    });
+    expect(viewForKey("someday")).toEqual({ kind: "someday" });
   });
 });

@@ -1,3 +1,4 @@
+import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, ChevronRight, Plus } from "lucide-react";
 import {
@@ -18,11 +19,13 @@ import { DetailSheet } from "./DetailSheet";
 import { DoneScreen } from "./DoneScreen";
 import { BackButton, Masthead } from "./Masthead";
 import {
+  boardViewKey,
   mastheadSubline,
   PAGES,
   type PageKey,
   plural,
   TIME_KINDS,
+  viewForKey,
 } from "./model";
 import { OvernightNote, useOvernightNote } from "./OvernightNote";
 import { SettingsScreen } from "./SettingsScreen";
@@ -31,13 +34,29 @@ import { useBoardData } from "./useBoardData";
 
 const EMPTY: TodoWithUrls[] = [];
 
+/** The pager page a view opens on: a time list, or Lists for any list. */
+function pageForView(view: BoardView | null | undefined): number {
+  if (!view) return 0;
+  if (view.kind === "list") return 3;
+  const index = PAGES.findIndex((p) => p.key === view.kind);
+  return index < 0 ? 0 : index;
+}
+
 /**
  * The phone layout (web under 1024px): the Today · This Week · Someday ·
  * Lists switcher, horizontally paged lists, the keyboard-attached composer,
  * and the detail sheet, context menu, Done history and Settings above them.
  * Data comes from `useBoardData`, shared with the wide layout.
  */
-export function PhoneApp() {
+export function PhoneApp({
+  view = null,
+  onNavigate,
+}: {
+  /** The view the URL names (`/this-week`, `/list/:id`); null is Today. */
+  view?: BoardView | null;
+  /** Keeps the URL in step as you page and open lists. */
+  onNavigate?: (view: BoardView | null) => void;
+} = {}) {
   const { reducedMotion } = useHints();
   const {
     timeZone,
@@ -59,8 +78,10 @@ export function PhoneApp() {
   } = useBoardData();
   const createList = useCreateList();
 
-  const [pageIndex, setPageIndex] = useState(0);
-  const [collectionId, setCollectionId] = useState<string | null>(null);
+  const [pageIndex, setPageIndex] = useState(() => pageForView(view));
+  const [collectionId, setCollectionId] = useState<string | null>(() =>
+    view?.kind === "list" ? view.id : null,
+  );
   const [detailId, setDetailId] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [account, setAccount] = useState(false);
@@ -104,6 +125,13 @@ export function PhoneApp() {
   useLayoutEffect(() => {
     placeIndicator(pageIndex);
   }, [pageIndex, placeIndicator]);
+
+  // Open on the URL's page without animating to it.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: first paint only
+  useLayoutEffect(() => {
+    const pager = pagerRef.current;
+    if (pager) pager.scrollLeft = pageIndex * pager.clientWidth;
+  }, []);
 
   useEffect(() => {
     const onResize = () => {
@@ -151,6 +179,41 @@ export function PhoneApp() {
     },
     [goTo, lists],
   );
+
+  // --- URL -----------------------------------------------------------------
+  // The URL and the pager agree on one key ("thisWeek", "list:<id>"). A new
+  // URL (back/forward, a pasted link, or lists loading and resolving a time
+  // list's id) moves the pager; paging or opening a list rewrites the URL.
+
+  const urlKey = boardViewKey(view, lists);
+  const stateKey =
+    page === "lists" ? (collectionId ? `list:${collectionId}` : "lists") : page;
+  const syncedKey = useRef(urlKey);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes
+  useEffect(() => {
+    if (urlKey === syncedKey.current) return;
+    syncedKey.current = urlKey;
+    if (urlKey.startsWith("list:")) {
+      setCollectionId(urlKey.slice(5));
+      goTo(3);
+      return;
+    }
+    if (urlKey === "lists") setCollectionId(null);
+    goTo(
+      Math.max(
+        0,
+        PAGES.findIndex((p) => p.key === urlKey),
+      ),
+    );
+  }, [urlKey]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the view changes
+  useEffect(() => {
+    if (stateKey === syncedKey.current) return;
+    syncedKey.current = stateKey;
+    onNavigate?.(viewForKey(stateKey));
+  }, [stateKey]);
 
   const onNavKey = (e: KeyboardEvent<HTMLElement>) => {
     const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;

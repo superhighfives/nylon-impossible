@@ -3,6 +3,7 @@ import {
   type AddonListOption,
   type AddonTodo,
   addonTodoMeta,
+  buildConnectCard,
   buildContextualCard,
   buildHomepageCard,
   escapeCardText,
@@ -152,7 +153,26 @@ describe("buildHomepageCard", () => {
     expect(studio && tickRows(studio)).toHaveLength(8);
     const more = studio?.widgets.at(-1)?.decoratedText;
     expect(more?.text).toBe("3 more in Studio");
-    expect(more?.button?.onClick.openLink?.url).toBe(WEB);
+    expect(more?.button?.onClick.openLink?.url).toBe(`${WEB}/list/studio`);
+  });
+
+  it("deep-links each time list's overflow to its own page", () => {
+    const big = buildHomepageCard(
+      BASE,
+      input([
+        ...rows("today", 9),
+        ...rows("week", 9),
+        ...rows("someday", 9),
+      ]),
+    );
+    const links = big.sections
+      .slice(1, 4)
+      .map((s) => s.widgets.at(-1)?.decoratedText?.button?.onClick.openLink);
+    expect(links.map((l) => l?.url)).toEqual([
+      `${WEB}/today`,
+      `${WEB}/this-week`,
+      `${WEB}/someday`,
+    ]);
   });
 
   it("shares one row budget across Someday and your lists", () => {
@@ -199,7 +219,7 @@ describe("buildHomepageCard", () => {
     expect(listSections).toHaveLength(6);
     const overflow = big.sections.at(-1)?.widgets[0].decoratedText;
     expect(overflow?.text).toBe("3 more lists");
-    expect(overflow?.button?.onClick.openLink?.url).toBe(WEB);
+    expect(overflow?.button?.onClick.openLink?.url).toBe(`${WEB}/lists`);
   });
 
   it("stays well inside Google's card widget limit", () => {
@@ -222,12 +242,37 @@ describe("buildHomepageCard", () => {
     );
     const widgets = worst.sections.reduce((n, s) => n + s.widgets.length, 0);
     expect(widgets).toBeLessThanOrEqual(60);
+    // Google's documented ceilings: 100 widgets, 100 sections per card.
+    expect(worst.sections.length).toBeLessThanOrEqual(100);
   });
 
-  it("uses the Vocabulary, not the old words", () => {
-    const json = JSON.stringify(card);
-    for (const word of [/task/i, /Sometime/, /Completed/, /Sticky/]) {
-      expect(json).not.toMatch(word);
+  it("holds the list dropdown to 100 items, keeping the selected one", () => {
+    const ids = Array.from({ length: 150 }, (_, i) => `l${i}`);
+    const lists: AddonListOption[] = [
+      ...LISTS.filter((l) => l.systemKind),
+      ...ids.map((id) => ({ id, name: id, systemKind: null })),
+    ];
+    const big = buildHomepageCard(BASE, input([], lists));
+    const items = big.sections[0].widgets[1].selectionInput?.items ?? [];
+    expect(items).toHaveLength(100);
+    expect(items[0]).toMatchObject({ text: "Today", selected: true });
+  });
+
+  it("uses the Vocabulary, not the old words, on every card", () => {
+    const cards = [
+      card,
+      buildHomepageCard(BASE, input([])),
+      buildContextualCard(
+        BASE,
+        { subject: "Q3", permalink: "https://mail.google.com/x" },
+        LISTS,
+      ),
+      buildConnectCard("https://web.example.com/connect", `${BASE}/refresh`),
+    ];
+    for (const json of cards.map((c) => JSON.stringify(c))) {
+      for (const word of [/task/i, /Sometime/, /Complet/i, /Sticky/]) {
+        expect(json).not.toMatch(word);
+      }
     }
   });
 });
