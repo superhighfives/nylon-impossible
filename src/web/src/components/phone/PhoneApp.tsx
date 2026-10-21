@@ -5,14 +5,11 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import { useHints } from "@/hooks/useHints";
-import { useCreateList, useLists } from "@/hooks/useLists";
-import { useLocalMidnightTick } from "@/hooks/useLocalMidnightTick";
-import { useTodos } from "@/hooks/useTodos";
+import { useCreateList } from "@/hooks/useLists";
 import type { TodoWithUrls } from "@/types/database";
 import { AccountSheet } from "./AccountSheet";
 import { Composer } from "./Composer";
@@ -22,16 +19,15 @@ import { DoneScreen } from "./DoneScreen";
 import { BackButton, Masthead } from "./Masthead";
 import {
   mastheadSubline,
-  openRows,
   PAGES,
   type PageKey,
   plural,
-  splitLists,
   TIME_KINDS,
 } from "./model";
+import { OvernightNote, useOvernightNote } from "./OvernightNote";
 import { SettingsScreen } from "./SettingsScreen";
 import { TodoRow } from "./TodoRow";
-import { useTodoActions } from "./useTodoActions";
+import { useBoardData } from "./useBoardData";
 
 const EMPTY: TodoWithUrls[] = [];
 
@@ -39,20 +35,28 @@ const EMPTY: TodoWithUrls[] = [];
  * The phone layout (web under 1024px): the Today · This Week · Someday ·
  * Lists switcher, horizontally paged lists, the keyboard-attached composer,
  * and the detail sheet, context menu, Done history and Settings above them.
- * Data comes from the same hooks as the wide board.
+ * Data comes from `useBoardData`, shared with the wide layout.
  */
 export function PhoneApp() {
-  const { timeZone, reducedMotion } = useHints();
-  useLocalMidnightTick();
-  const { data: lists, isLoading: listsLoading } = useLists();
+  const { reducedMotion } = useHints();
   const {
-    data: todosData,
-    isLoading: todosLoading,
+    timeZone,
+    lists,
+    todos,
+    byKind,
+    collections,
+    listName,
+    actions,
+    subtasksOf,
+    rowsFor,
+    targets,
+    doneCount,
+    loading,
+    todosLoading,
     error,
     refetch,
     isFetching,
-  } = useTodos();
-  const todos = todosData ?? EMPTY;
+  } = useBoardData();
   const createList = useCreateList();
 
   const [pageIndex, setPageIndex] = useState(0);
@@ -68,44 +72,14 @@ export function PhoneApp() {
   const indicatorRef = useRef<HTMLSpanElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
-  const { byKind, collections } = useMemo(() => splitLists(lists), [lists]);
-  const listName = useCallback(
-    (id: string) => lists?.find((l) => l.id === id)?.name ?? "List",
-    [lists],
-  );
-  const actions = useTodoActions({ timeZone, listName, allTodos: todos });
   const now = new Date();
-
-  const subtasksByParent = useMemo(() => {
-    const map = new Map<string, TodoWithUrls[]>();
-    for (const t of todos) {
-      if (!t.parentId) continue;
-      const siblings = map.get(t.parentId) ?? [];
-      siblings.push(t);
-      map.set(t.parentId, siblings);
-    }
-    return map;
-  }, [todos]);
-
-  const rowsFor = useCallback(
-    (listId: string | undefined) =>
-      listId ? openRows(todos, listId, actions.hidden) : EMPTY,
-    [todos, actions.hidden],
-  );
+  const overnight = useOvernightNote(todos, byKind.today?.id);
 
   const page = PAGES[pageIndex]?.key ?? "today";
   const currentListId =
     page === "lists"
       ? collectionId
       : (byKind[page as (typeof TIME_KINDS)[number]]?.id ?? null);
-
-  const targets = useMemo(
-    () =>
-      [...TIME_KINDS.map((kind) => byKind[kind]), ...collections]
-        .filter((l) => l !== undefined)
-        .map((l) => ({ id: l.id, label: l.name })),
-    [byKind, collections],
-  );
 
   // --- Paging ---------------------------------------------------------------
 
@@ -224,16 +198,11 @@ export function PhoneApp() {
     ? (todos.find((t) => t.id === detailId && !t.completed) ?? null)
     : null;
   const menuTodo = menuId ? (todos.find((t) => t.id === menuId) ?? null) : null;
-  const doneCount = todos.filter(
-    (t) => t.parentId == null && t.completed,
-  ).length;
 
   // Close the detail if its todo goes away (deleted elsewhere, or done).
   useEffect(() => {
     if (detailId && !todosLoading && !detailTodo) setDetailId(null);
   }, [detailId, detailTodo, todosLoading]);
-
-  const loading = listsLoading || todosLoading;
 
   const renderRows = (listId: string | undefined, emptyFor: PageKey | null) => {
     const rows = rowsFor(listId);
@@ -271,7 +240,7 @@ export function PhoneApp() {
           <TodoRow
             key={todo.id}
             todo={todo}
-            subtasks={subtasksByParent.get(todo.id) ?? EMPTY}
+            subtasks={subtasksOf(todo.id)}
             now={now}
             timeZone={timeZone}
             checked={actions.checked.has(todo.id)}
@@ -429,6 +398,13 @@ export function PhoneApp() {
           title={PAGES.find((p) => p.key === key)?.label}
           subline={mastheadSubline(key, rowsFor(listId).length, now, timeZone)}
         />
+        {key === "today" && overnight.text && (
+          <OvernightNote
+            text={overnight.text}
+            onDismiss={overnight.dismiss}
+            className="mx-5 mt-3"
+          />
+        )}
         {renderRows(listId, key)}
       </>
     );
@@ -529,9 +505,7 @@ export function PhoneApp() {
 
       <DetailSheet
         todo={detailTodo}
-        subtasks={
-          detailTodo ? (subtasksByParent.get(detailTodo.id) ?? EMPTY) : EMPTY
-        }
+        subtasks={detailTodo ? subtasksOf(detailTodo.id) : EMPTY}
         listTargets={targets}
         listName={listName}
         timeZone={timeZone}

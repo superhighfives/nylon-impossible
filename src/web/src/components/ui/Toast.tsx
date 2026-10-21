@@ -1,87 +1,24 @@
 import { Toast } from "@base-ui/react/toast";
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
-import { useIsWide } from "@/hooks/useIsWide";
-import { type ToastType, toastManager } from "@/lib/toast";
-
-const TYPE_STYLES: Record<
-  ToastType,
-  { accent: string; icon: typeof CheckCircle2; iconClass: string }
-> = {
-  success: {
-    accent: "bg-accent-base ring-accent-subtle",
-    icon: CheckCircle2,
-    iconClass: "text-accent-muted",
-  },
-  error: {
-    accent: "bg-red-base ring-red-subtle",
-    icon: AlertCircle,
-    iconClass: "text-red-11 dark:text-reddark-11",
-  },
-  info: {
-    accent: "bg-gray-surface ring-gray-subtle",
-    icon: Info,
-    iconClass: "text-gray-muted",
-  },
-};
-
-function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
-  const type = (toast.type as ToastType) ?? "info";
-  const styles = TYPE_STYLES[type] ?? TYPE_STYLES.info;
-  const Icon = styles.icon;
-
-  return (
-    <Toast.Root
-      toast={toast}
-      className={`group pointer-events-auto absolute right-0 bottom-0 left-auto w-full origin-bottom rounded-xl px-4 py-3 shadow-base ring-1 backdrop-blur-sm ${styles.accent} z-[calc(1000-var(--toast-index))] [--gap:0.75rem] [--peek:0.75rem] [--scale:calc(max(0,1-(var(--toast-index)*0.1)))] [--shrink:calc(1-var(--scale))] [--height:var(--toast-frontmost-height,var(--toast-height))] [--offset-y:calc(var(--toast-offset-y)*-1+calc(var(--toast-index)*var(--gap)*-1)+var(--toast-swipe-movement-y))] h-(--height) data-expanded:h-(--toast-height) transform-[translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--toast-swipe-movement-y)-(var(--toast-index)*var(--peek))-(var(--shrink)*var(--height))))_scale(var(--scale))] data-expanded:transform-[translateX(var(--toast-swipe-movement-x))_translateY(calc(var(--offset-y)))] data-starting-style:transform-[translateY(150%)] [&[data-ending-style]:not([data-limited]):not([data-swipe-direction])]:transform-[translateY(150%)] data-ending-style:opacity-0 data-limited:opacity-0 data-ending-style:data-[swipe-direction=down]:transform-[translateY(calc(var(--toast-swipe-movement-y)+150%))] data-expanded:data-ending-style:data-[swipe-direction=down]:transform-[translateY(calc(var(--toast-swipe-movement-y)+150%))] data-ending-style:data-[swipe-direction=left]:transform-[translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))] data-expanded:data-ending-style:data-[swipe-direction=left]:transform-[translateX(calc(var(--toast-swipe-movement-x)-150%))_translateY(var(--offset-y))] data-ending-style:data-[swipe-direction=right]:transform-[translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))] data-expanded:data-ending-style:data-[swipe-direction=right]:transform-[translateX(calc(var(--toast-swipe-movement-x)+150%))_translateY(var(--offset-y))] data-ending-style:data-[swipe-direction=up]:transform-[translateY(calc(var(--toast-swipe-movement-y)-150%))] data-expanded:data-ending-style:data-[swipe-direction=up]:transform-[translateY(calc(var(--toast-swipe-movement-y)-150%))] after:absolute after:top-full after:left-0 after:h-[calc(var(--gap)+1px)] after:w-full after:content-[''] [transition:transform_0.5s_cubic-bezier(0.22,1,0.36,1),opacity_0.5s,height_0.15s]`}
-    >
-      <Toast.Content className="flex items-start gap-3 overflow-hidden transition-opacity duration-250 data-behind:pointer-events-none data-behind:opacity-0 data-expanded:pointer-events-auto data-expanded:opacity-100">
-        <Icon
-          size={18}
-          className={`mt-0.5 shrink-0 ${styles.iconClass}`}
-          aria-hidden="true"
-        />
-        <div className="min-w-0 flex-1">
-          {toast.title ? (
-            <Toast.Title className="text-sm font-medium leading-snug text-gray">
-              {toast.title}
-            </Toast.Title>
-          ) : null}
-          {toast.description ? (
-            <Toast.Description className="mt-0.5 text-xs leading-relaxed text-gray-muted">
-              {toast.description}
-            </Toast.Description>
-          ) : null}
-        </div>
-        {/* Renders only when the toast was added with `actionProps` (e.g. the
-            "Undo" on "Done"). */}
-        <Toast.Action className="relative shrink-0 rounded-md px-2 py-1 text-sm font-medium text-gray underline-offset-2 before:absolute before:content-[''] before:-inset-1.5 transition-colors hover:bg-gray-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset" />
-        <Toast.Close
-          aria-label="Dismiss"
-          // ring-inset, not an offset ring — the toast surface color varies by
-          // type (accent/red/gray), so there's no single offset color that
-          // would match all three; an inset ring needs none.
-          className="relative shrink-0 rounded-md p-1 before:absolute before:content-[''] before:-inset-2 text-gray-muted transition-colors hover:bg-gray-hover hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-inset"
-        >
-          <X size={14} />
-        </Toast.Close>
-      </Toast.Content>
-    </Toast.Root>
-  );
-}
+import { AlertCircle, X } from "lucide-react";
+import { toastManager } from "@/lib/toast";
 
 /**
- * The phone layout's toast (under 1024px): one dark pill centred above the
- * composer, "Done · Undo" style, with the action as a yellow fill. Only the
- * newest shows; older ones fade behind it. Token colours only.
+ * One dark pill, "Done · Undo" style, with the action as a yellow fill.
+ * Only the newest shows; a new toast replaces the last. Token colours only.
  */
-function PhoneToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
+function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
+  const error = toast.type === "error";
   return (
     <Toast.Root
       toast={toast}
       className="pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] bg-n-ink py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] text-n-canvas opacity-[calc(1-min(var(--toast-index),1))] data-limited:pointer-events-none data-limited:opacity-0 shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0"
     >
       <Toast.Content className="flex min-h-9 items-center gap-1.5">
+        {error && (
+          <AlertCircle size={15} aria-hidden="true" className="shrink-0" />
+        )}
         <Toast.Title className="truncate">{toast.title}</Toast.Title>
+        {/* Renders only when the toast was added with `actionProps`. */}
         <Toast.Action className="min-h-9 shrink-0 cursor-pointer rounded-[0.625rem] bg-n-brand px-3 font-bold text-n-brand-ink n-focus" />
         <Toast.Close
           aria-label="Dismiss"
@@ -94,44 +31,27 @@ function PhoneToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
   );
 }
 
-function ToastList({ phone }: { phone: boolean }) {
+function ToastList() {
   const { toasts } = Toast.useToastManager();
-  const Item = phone ? PhoneToastItem : ToastItem;
   return (
     <>
       {toasts.map((toast) => (
-        <Item key={toast.id} toast={toast} />
+        <ToastItem key={toast.id} toast={toast} />
       ))}
     </>
   );
 }
 
 /**
- * Global toast viewport. Render once near the app root inside a ToastProvider.
- * The viewport is fixed to the bottom-right on desktop, bottom-center on mobile,
- * and respects iOS safe-area insets so it doesn't collide with the input pill.
+ * Global toast viewport, rendered once near the app root. Centred at the
+ * bottom; on the phone layout it sits just above the composer, which
+ * publishes `--n-phone-toast-offset`.
  */
 export function Toaster() {
-  // Under 1024px the app uses the phone layout, whose toasts sit centred
-  // just above the composer (it publishes --n-phone-toast-offset).
-  const phone = useIsWide() === false;
   return (
-    // The phone shows one toast at a time: a new "Done · Undo" replaces the
-    // last rather than stacking invisibly behind it.
-    <Toast.Provider toastManager={toastManager} limit={phone ? 1 : 3}>
-      <Toast.Viewport
-        className={
-          phone
-            ? "pointer-events-none fixed inset-x-0 bottom-[var(--n-phone-toast-offset,calc(1.75rem+env(safe-area-inset-bottom,0px)))] z-[100] h-0"
-            : "pointer-events-none fixed inset-x-0 bottom-0 z-[100] mx-auto flex w-full max-w-sm flex-col px-4 pb-[calc(env(safe-area-inset-bottom,0px)+5rem)] sm:inset-x-auto sm:right-4 sm:bottom-4 sm:pb-4"
-        }
-        style={
-          {
-            ["--viewport-padding" as string]: "1rem",
-          } as React.CSSProperties
-        }
-      >
-        <ToastList phone={phone} />
+    <Toast.Provider toastManager={toastManager} limit={1}>
+      <Toast.Viewport className="pointer-events-none fixed inset-x-0 bottom-[var(--n-phone-toast-offset,calc(1.75rem+env(safe-area-inset-bottom,0px)))] z-[100] h-0">
+        <ToastList />
       </Toast.Viewport>
     </Toast.Provider>
   );

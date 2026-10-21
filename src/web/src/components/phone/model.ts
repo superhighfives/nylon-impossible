@@ -345,3 +345,81 @@ export function splitLists(lists: SerializedList[] | undefined): {
   collections.sort((a, b) => a.position.localeCompare(b.position));
   return { byKind, collections };
 }
+
+const DAY_MS = 86_400_000;
+
+/** Midnight UTC of the day `offset` days from today in `timeZone`. */
+export function dayFromToday(
+  now: Date,
+  timeZone: string,
+  offset: number,
+): Date {
+  const today = new Date(`${dayKeyIn(now, timeZone)}T00:00:00.000Z`);
+  return new Date(today.getTime() + offset * DAY_MS);
+}
+
+/** Days until the next `weekday` (0–6), never 0: today's weekday means next week. */
+export function daysToWeekday(
+  now: Date,
+  timeZone: string,
+  weekday: number,
+): number {
+  const today = dayFromToday(now, timeZone, 0).getUTCDay();
+  const diff = (weekday - today + 7) % 7;
+  return diff === 0 ? 7 : diff;
+}
+
+export interface DueChoice {
+  label: string;
+  day: Date | null;
+}
+
+/**
+ * The quick due choices the detail's Due chip and the context menu's Due…
+ * both offer: Today, Tomorrow, Friday, Next week, No date.
+ */
+export function dueChoices(now: Date, timeZone: string): DueChoice[] {
+  return [
+    { label: "Today", day: dayFromToday(now, timeZone, 0) },
+    { label: "Tomorrow", day: dayFromToday(now, timeZone, 1) },
+    {
+      label: "Friday",
+      day: dayFromToday(now, timeZone, daysToWeekday(now, timeZone, 5)),
+    },
+    {
+      label: "Next week",
+      day: dayFromToday(now, timeZone, daysToWeekday(now, timeZone, 1)),
+    },
+    { label: "No date", day: null },
+  ];
+}
+
+/**
+ * The muted line under a wide column's title. Counts live in the sidebar, so
+ * unlike the phone masthead it's only the horizon: "Sunday, October 18",
+ * "Through Saturday, October 24", "Whenever you’re ready", "List · never
+ * ages".
+ */
+export function columnSubline(
+  kind: SystemListKind | null,
+  now: Date,
+  timeZone: string,
+): string {
+  const fmt = (d: Date) =>
+    d.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      timeZone,
+    });
+  switch (kind) {
+    case "today":
+      return fmt(now);
+    case "thisWeek":
+      return `Through ${fmt(new Date(now.getTime() + 6 * DAY_MS))}`;
+    case "someday":
+      return "Whenever you’re ready";
+    default:
+      return "List · never ages";
+  }
+}

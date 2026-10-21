@@ -278,6 +278,32 @@ export function useTodoActions({
     [listName, topPosition, update],
   );
 
+  /**
+   * Drag-and-drop: put a todo at an exact slot, in its own list or another.
+   * The drop itself is the feedback, so there's no toast.
+   */
+  const place = useCallback(
+    (todo: TodoWithUrls, listId: string, position: string) => {
+      if (todo.listId === listId && todo.position === position) return;
+      update({
+        id: todo.id,
+        input: todo.listId === listId ? { position } : { listId, position },
+      });
+    },
+    [update],
+  );
+
+  /** Due… in the context menu. Clearing the day clears Repeat too. */
+  const setDue = useCallback(
+    (todo: TodoWithUrls, day: Date | null) => {
+      update({
+        id: todo.id,
+        input: day ? { dueDate: day } : { dueDate: null, recurrence: null },
+      });
+    },
+    [update],
+  );
+
   /** Detail-sheet edits: saved the moment they're made. */
   const save = useCallback(
     (id: string, input: UpdateTodoInput) => update({ id, input }),
@@ -290,6 +316,8 @@ export function useTodoActions({
     hidden,
     complete,
     move,
+    place,
+    setDue,
     togglePin,
     destroy,
     restore,

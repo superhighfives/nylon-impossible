@@ -2,89 +2,41 @@ import { Button as BaseButton } from "@base-ui/react/button";
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentProps } from "react";
 
+/**
+ * The few full-width buttons outside the app (landing, error and not-found
+ * pages), on design tokens: `primary` is the brand yellow fill with dark ink,
+ * `outline` a hairline on the canvas.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-lg font-medium transition-[background-color,color,transform] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-n-field font-medium n-focus transition-[background-color,color,transform] duration-(--n-duration-fast) active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
-      // The focus ring's offset is filled with this color, so it needs to
-      // match whatever the button actually sits on — a panel/dialog/card
-      // (gray-surface, the default) or the app background directly (a todo
-      // row's hover pill, hover-revealed row actions). Mismatching the two
-      // paints a visible halo instead of a clean ring.
-      ringOffset: {
-        surface: "focus-visible:ring-offset-gray-surface",
-        app: "focus-visible:ring-offset-gray-app",
-      },
       variant: {
-        primary:
-          "bg-accent-solid hover:bg-accent-solid-hover text-accent-contrast",
-        secondary:
-          "bg-gray-base hover:bg-gray-hover active:bg-gray-active text-gray ring-1 ring-gray-subtle",
-        ghost:
-          "bg-gray-ghost hover:bg-gray-ghost-hover active:bg-gray-ghost-active text-gray",
-        destructive: "bg-red-solid hover:bg-red-solid-hover text-white",
+        primary: "bg-n-brand text-n-brand-ink",
         outline:
-          "bg-gray-ghost hover:bg-gray-ghost-hover active:bg-gray-ghost-active text-gray ring-1 ring-gray",
-        // The Figma design's brand-outline treatment: accent text and hairline
-        // on the page background (Settings, board-level affordances). Text uses
-        // step 11 — step 9 yellow is unreadable on the light page background.
-        accentOutline:
-          "bg-transparent text-accent-muted ring-1 ring-accent-solid hover:bg-accent-base active:bg-accent-hover",
+          "border border-n-hairline bg-transparent text-n-ink pointer-fine:hover:bg-n-surface",
       },
       size: {
-        xs: "h-7 px-2 text-xs",
-        sm: "h-8 px-3 text-sm",
-        base: "h-9 px-4 text-sm",
-        lg: "h-10 px-5 text-base",
-      },
-      shape: {
-        base: "",
-        square: "!px-0 aspect-square",
-        circle: "!px-0 aspect-square rounded-full",
+        base: "h-10 px-4 text-[0.9375rem]",
+        lg: "h-11 px-5 text-base",
       },
     },
     defaultVariants: {
-      variant: "secondary",
+      variant: "outline",
       size: "base",
-      shape: "base",
-      ringOffset: "surface",
     },
   },
 );
 
 export interface ButtonProps
   extends ComponentProps<typeof BaseButton>,
-    VariantProps<typeof buttonVariants> {
-  loading?: boolean;
-}
+    VariantProps<typeof buttonVariants> {}
 
-export function Button({
-  className,
-  variant,
-  size,
-  shape,
-  ringOffset,
-  loading,
-  disabled,
-  children,
-  ...props
-}: ButtonProps) {
+export function Button({ className, variant, size, ...props }: ButtonProps) {
   return (
     <BaseButton
-      className={buttonVariants({
-        variant,
-        size,
-        shape,
-        ringOffset,
-        className,
-      })}
-      disabled={disabled || loading}
+      className={buttonVariants({ variant, size, className })}
       {...props}
-    >
-      {loading ? (
-        <span className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-      ) : null}
-      {children}
-    </BaseButton>
+    />
   );
 }

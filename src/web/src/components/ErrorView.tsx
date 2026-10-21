@@ -24,10 +24,10 @@ export function ErrorView({ reset }: ErrorViewProps) {
         </picture>
       </div>
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-n-display text-[2rem] leading-tight font-bold tracking-[-0.025em] text-n-ink">
           Something went wrong
         </h1>
-        <p className="text-gray-muted leading-relaxed max-w-xs mx-auto">
+        <p className="text-n-ink-muted leading-relaxed max-w-xs mx-auto">
           An unexpected error occurred. Try again, or head back home.
         </p>
       </div>
@@ -36,7 +36,6 @@ export function ErrorView({ reset }: ErrorViewProps) {
           <Button
             variant="primary"
             size="lg"
-            ringOffset="app"
             className="w-full"
             onClick={reset}
           >
@@ -47,7 +46,6 @@ export function ErrorView({ reset }: ErrorViewProps) {
           render={<Link to="/" />}
           variant="outline"
           size="lg"
-          ringOffset="app"
           className="w-full"
         >
           Go home

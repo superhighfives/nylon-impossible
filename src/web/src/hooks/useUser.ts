@@ -4,6 +4,14 @@ import { API_URL } from "@/lib/config";
 
 export type Theme = "light" | "dark" | "system";
 
+/** The last aging sweep that moved anything (`GET /users/me`). */
+export interface LastSweep {
+  /** ISO instant the sweep ran. */
+  at: string;
+  movedToThisWeek: number;
+  movedToSomeday: number;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -11,6 +19,8 @@ export interface User {
   timezone: string;
   // Absent from servers that predate it; treat a missing value as true.
   timezoneAuto?: boolean;
+  // Null until a sweep has moved something; absent from older servers.
+  lastSweep?: LastSweep | null;
   createdAt: string;
   updatedAt: string;
 }

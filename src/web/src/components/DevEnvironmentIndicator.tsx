@@ -32,11 +32,11 @@ export function DevEnvironmentDetails({ origin }: Props) {
   return (
     <>
       <div className="flex gap-2">
-        <span className="text-muted">url</span>
+        <span className="text-n-ink-subtle">url</span>
         <span className="max-w-64 truncate">{env.currentUrl}</span>
       </div>
       <div className="flex gap-2">
-        <span className="text-muted">api</span>
+        <span className="text-n-ink-subtle">api</span>
         <span>{env.apiUrl}</span>
       </div>
     </>

@@ -6,25 +6,8 @@ afterEach(() => {
   cleanup();
 });
 
-// jsdom doesn't implement IntersectionObserver (used by TodoGrid's scroll
-// fades). A no-op stub is enough — tests assert on rendered content, not on
-// fade visibility, which needs a real layout engine to exercise anyway.
-class MockIntersectionObserver implements IntersectionObserver {
-  readonly root = null;
-  readonly rootMargin = "";
-  readonly scrollMargin = "";
-  readonly thresholds: ReadonlyArray<number> = [];
-  observe() {}
-  unobserve() {}
-  disconnect() {}
-  takeRecords(): IntersectionObserverEntry[] {
-    return [];
-  }
-}
-vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
-
-// jsdom doesn't implement ResizeObserver either (used by SegmentedControl to
-// keep its sliding indicator aligned).
+// jsdom doesn't implement ResizeObserver (the phone composer uses it to keep
+// toasts clear of its top edge).
 class MockResizeObserver implements ResizeObserver {
   observe() {}
   unobserve() {}

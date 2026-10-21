@@ -7,6 +7,7 @@ import {
   useUser,
 } from "@/hooks/useUser";
 import { messageFromError, toast } from "@/lib/toast";
+import { useDevEnvironment } from "../DevEnvironmentIndicator";
 import { browserTimeZone } from "../TimezoneSync";
 import { Masthead } from "./Masthead";
 import { Screen } from "./Screen";
@@ -181,6 +182,27 @@ export function SettingsScreen({
           </p>
         </div>
       </section>
+
+      {/* Local dev and preview deploys only; production renders nothing. */}
+      {open && typeof window !== "undefined" && (
+        <Environment origin={window.location.origin} />
+      )}
     </Screen>
+  );
+}
+
+function Environment({ origin }: { origin: string }) {
+  const env = useDevEnvironment(origin);
+  if (!env) return null;
+  return (
+    <section className={SECTION}>
+      <h2 className={LABEL}>Environment</h2>
+      <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs text-n-ink-muted">
+        <dt>url</dt>
+        <dd className="m-0 truncate">{env.currentUrl}</dd>
+        <dt>api</dt>
+        <dd className="m-0 truncate">{env.apiUrl}</dd>
+      </dl>
+    </section>
   );
 }

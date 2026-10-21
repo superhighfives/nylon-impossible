@@ -22,205 +22,42 @@ Search here for real implementations when docs aren't enough.
   - `docs/EFFECT_COMPARISON.md` - Before/after code comparisons
 <!-- effect-solutions:end -->
 
-## UI Components
 
-This project uses custom components built on `@base-ui/react` headless primitives, styled with Tailwind CSS and `class-variance-authority`. All components live in `src/components/ui/`.
+## UI
 
-## Import Components
+The app follows the redesign spec in
+`plans/in-progress/2026-10-18-cohesive-redesign.md`.
 
-Import components from the local `@/components/ui` barrel:
+- **Layouts.** `components/phone/` is the phone layout (under 1024px) and
+  also holds the pieces both layouts share: `TodoRow`, `Composer`,
+  `ContextMenu`, `DetailSheet`, `OvernightNote`, `useTodoActions` and
+  `useBoardData`. `components/wide/` is the wide layout (sidebar, columns,
+  keyboard map) built from those pieces at board density. `LayoutSwitch`
+  picks one without a flash on SSR.
+- **Primitives.** Headless `@base-ui/react` (Dialog, Menu, Toast) styled with
+  Tailwind. `components/ui/` keeps only `Button` (for the landing, error and
+  not-found pages) and the `Toaster`.
 
-```tsx
-import { Button, Input, Checkbox, Field, Loader, Select } from "@/components/ui";
-```
+## Styling: design tokens only
 
-## Available Components
+Colour, type, radius and motion come from the generated tokens
+(`src/styles/tokens.css`, from `src/shared/design/tokens.json`; run
+`bun run tokens` after changing the JSON). `src/styles.css` exposes them as
+Tailwind utilities with an `n-` prefix:
 
-### Button
+| Utility | Use |
+| --- | --- |
+| `bg-n-canvas` | Page background |
+| `bg-n-surface` | Hover tint, the list column, raised fields |
+| `bg-n-fill` | Selected chips, pressed rows |
+| `border-n-hairline` | Rules between things (no cards or shadows) |
+| `text-n-ink`, `text-n-ink-muted`, `text-n-ink-subtle` | Text |
+| `text-n-overdue` | Overdue due days, Delete |
+| `bg-n-brand` + `text-n-brand-ink` | The yellow accent: a fill with dark ink, never text on white |
+| `font-n-display` | Archivo: wordmark, list titles, detail title |
+| `rounded-n-chip`, `rounded-n-field` | Radius 6 and 10 |
+| `duration-(--n-duration-fast)`, `ease-n-out` | Motion |
 
-**Import:** `import { Button } from "@/components/ui";`
-
-**Props:**
-- `variant`: `"primary" | "secondary" | "ghost" | "destructive" | "outline"` [default: `"secondary"`]
-- `size`: `"xs" | "sm" | "base" | "lg"` [default: `"base"`]
-- `shape`: `"base" | "square" | "circle"` [default: `"base"`]
-- `loading`: `boolean` — shows a spinner and disables the button
-
-**Examples:**
-
-```tsx
-<Button variant="primary">Save</Button>
-<Button variant="ghost" size="sm">Cancel</Button>
-<Button variant="destructive" loading={isDeleting}>Delete</Button>
-<Button variant="primary" shape="square" size="sm"><PlusIcon /></Button>
-```
-
----
-
-### Input
-
-**Import:** `import { Input } from "@/components/ui";`
-
-**Props:**
-- `variant`: `"default" | "error"` [default: `"default"`]
-- `inputSize`: `"xs" | "sm" | "base" | "lg"` [default: `"base"`]
-- All standard `<input>` attributes
-
-**Examples:**
-
-```tsx
-<Input placeholder="Enter a value..." />
-<Input variant="error" value={value} onChange={handleChange} />
-```
-
----
-
-### Checkbox
-
-**Import:** `import { Checkbox } from "@/components/ui";`
-
-**Props:**
-- `label`: `string` — optional label rendered next to the checkbox
-- `checked`: `boolean`
-- `indeterminate`: `boolean`
-- All standard `@base-ui/react` Checkbox.Root attributes
-
-**Examples:**
-
-```tsx
-<Checkbox label="Accept terms" checked={accepted} onCheckedChange={setAccepted} />
-<Checkbox indeterminate />
-```
-
----
-
-### Field
-
-**Import:** `import { Field, Textarea } from "@/components/ui";`
-
-**Props (Field):**
-- `label`: `string` — label text above the input
-- `description`: `ReactNode` — helper text below the input
-- `error`: `{ message?: string }` — shows error text (hides description)
-
-**Examples:**
-
-```tsx
-<Field label="Title" description="Enter a short title">
-  <Input />
-</Field>
-<Field label="Notes" error={{ message: "Required" }}>
-  <Textarea />
-</Field>
-```
-
----
-
-### Loader
-
-**Import:** `import { Loader } from "@/components/ui";`
-
-**Props:**
-- `size`: `"sm" | "base" | "lg"` [default: `"base"`]
-
-**Examples:**
-
-```tsx
-<Loader />
-<Loader size="sm" />
-```
-
----
-
-### Select
-
-**Import:** `import { Select } from "@/components/ui";`
-
-**Props:**
-- `items`: `{ value: string; label: string }[]`
-- `placeholder`: `string` [default: `"Select an option"`]
-- `size`: `"xs" | "sm" | "base" | "lg"` [default: `"base"`] — matches `Input.inputSize` heights
-- `className`: `string` — passed to the trigger
-- All standard `@base-ui/react` Select.Root attributes
-
-**Examples:**
-
-```tsx
-<Select
-  size="sm"
-  items={[{ value: "a", label: "Option A" }, { value: "b", label: "Option B" }]}
-  placeholder="Select an option"
-  value={value}
-  onValueChange={setValue}
-/>
-```
-
----
-
-## Styling Guide
-
-Use Radix color scale tokens via Tailwind. Never use raw Tailwind colors like `bg-gray-500` or `text-blue-600`.
-
-Colors are from [`tailwindcss-radix-colors`](https://tailwindcss-radix-colors.mrcai.dev) v2 (imported as `-colors-only.css`). Semantic utilities are in `src/styles/radix-utilities.css`:
-- **gray** — Neutral backgrounds, text, borders
-- **yellow** — Primary accent, brand color (buttons, focus rings, highlights)
-- **red** — Destructive actions, errors
-
-### Quick Reference
-
-| Purpose | Token | Example Use |
-|---------|-------|-------------|
-| **Page background** | `bg-gray-app` | Root layout background |
-| **Card/surface background** | `bg-gray-surface` | Cards, inputs |
-| **Interactive background (normal)** | `bg-gray-base` | Button/element base state |
-| **Interactive background (hover)** | `bg-gray-hover` | Explicit hover state |
-| **Interactive background (active)** | `bg-gray-active` | Explicit active/pressed state |
-| **Primary text** | `text-gray` | Body text |
-| **Secondary text** | `text-gray-muted` | Placeholders, hints |
-| **Border** | `ring-gray-subtle` | Input rings |
-| **Brand/accent** | `bg-yellow-solid` | Primary buttons |
-| **Focus ring** | `ring-yellow-strong` | Focus states |
-| **Error** | `bg-red-solid` | Destructive actions |
-| **Error text** | `text-red-muted` | Error messages |
-
-### Semantic Utilities
-
-Hover/active states are **explicit** — compose them in the component:
-
-#### Backgrounds
-| Utility | Step | Use case |
-|---------|------|----------|
-| `bg-{color}-app` | 1 | App background |
-| `bg-{color}-surface` | 2 | Cards, raised surfaces |
-| `bg-{color}-base` | 3 | Component background (normal) |
-| `bg-{color}-hover` | 4 | Component background (hover) |
-| `bg-{color}-active` | 5 | Component background (active) |
-| `bg-{color}-ghost` | transparent | Ghost base |
-| `bg-{color}-ghost-hover` | 3 | Ghost hover |
-| `bg-{color}-ghost-active` | 4 | Ghost active |
-| `bg-{color}-solid` | 9 | Solid accent |
-| `bg-{color}-solid-hover` | 10 | Solid accent hover |
-
-#### Borders / Dividers / Rings / Underlines
-| Utility | Step | Use case |
-|---------|------|----------|
-| `{type}-{color}-subtle` | 6 | Non-interactive, separators |
-| `{type}-{color}` | 7 | Default interactive |
-| `{type}-{color}-strong` | 8 | Emphasis, focus rings |
-
-Where `{type}` is: `border`, `divide`, `ring`, `underline`
-
-#### Text
-| Utility | Step |
-|---------|------|
-| `text-{color}-placeholder` | 10 |
-| `text-{color}-muted` | 11 |
-| `text-{color}` | 12 |
-
-### Custom Shadows
-
-Custom shadow utilities are defined in `src/styles.css`:
-- `shadow-sm` — Subtle elevation
-- `shadow-base` — Default card shadow
-- `shadow-lg` — Modal/dropdown shadow
-- `shadow-yellow` — Yellow glow effect
+Focus rings use the `n-focus` utility (`n-focus-inset` inside clipped rows),
+and `n-hit` grows a small control's target to 44×44. Dark mode is the `.dark`
+class on `<html>`; tokens switch under it, so components rarely need `dark:`.

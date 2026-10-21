@@ -25,6 +25,9 @@ const userColumns = {
   theme: users.theme,
   timezone: users.timezone,
   timezoneAuto: users.timezoneAuto,
+  lastSweepAt: users.lastSweepAt,
+  lastSweepMovedToThisWeek: users.lastSweepMovedToThisWeek,
+  lastSweepMovedToSomeday: users.lastSweepMovedToSomeday,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 };
@@ -35,6 +38,9 @@ function serializeUser(user: {
   theme: "light" | "dark" | "system";
   timezone: string;
   timezoneAuto: boolean;
+  lastSweepAt: Date | null;
+  lastSweepMovedToThisWeek: number;
+  lastSweepMovedToSomeday: number;
   createdAt: Date;
   updatedAt: Date;
 }) {
@@ -44,6 +50,15 @@ function serializeUser(user: {
     theme: user.theme,
     timezone: user.timezone,
     timezoneAuto: user.timezoneAuto,
+    // The last aging sweep that moved anything, for Today's overnight note.
+    // Null until one has.
+    lastSweep: user.lastSweepAt
+      ? {
+          at: user.lastSweepAt.toISOString(),
+          movedToThisWeek: user.lastSweepMovedToThisWeek,
+          movedToSomeday: user.lastSweepMovedToSomeday,
+        }
+      : null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
   };

@@ -31,7 +31,13 @@ import {
 import { getUrlDisplay } from "@/lib/url-display";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { Calendar } from "./Calendar";
-import { dueLabel, linkDomain, repeatLabel } from "./model";
+import {
+  dayFromToday,
+  dueChoices as dueChoicesFor,
+  dueLabel,
+  linkDomain,
+  repeatLabel,
+} from "./model";
 import { useAutosaveField } from "./useAutosaveField";
 import type { TodoActions } from "./useTodoActions";
 
@@ -51,19 +57,6 @@ const PANEL_CLASS =
 
 const SECTION_LABEL =
   "mb-1.5 block text-[0.8125rem] font-semibold text-n-ink-muted";
-
-/** Midnight UTC of the day `offset` days from today in `timeZone`. */
-function dayFromToday(now: Date, timeZone: string, offset: number): Date {
-  const today = new Date(`${dayKeyIn(now, timeZone)}T00:00:00.000Z`);
-  return new Date(today.getTime() + offset * DAY_MS);
-}
-
-/** Days until the next `weekday` (0–6), never 0: today's weekday means next week. */
-function daysToWeekday(now: Date, timeZone: string, weekday: number): number {
-  const today = dayFromToday(now, timeZone, 0).getUTCDay();
-  const diff = (weekday - today + 7) % 7;
-  return diff === 0 ? 7 : diff;
-}
 
 function stamp(iso: string, now: Date, timeZone: string): string {
   const key = dayKeyIn(new Date(iso), timeZone);
@@ -91,6 +84,12 @@ export interface DetailSheetProps {
   timeZone: string;
   actions: TodoActions;
   onClose: () => void;
+  /**
+   * `sheet` (phone): full height from the bottom, over a dimmed backdrop.
+   * `panel` (wide): a right-hand panel beside the board, which stays live —
+   * clicking another row swaps what it shows.
+   */
+  variant?: "sheet" | "panel";
 }
 
 /**
@@ -100,7 +99,28 @@ export interface DetailSheetProps {
  * closing is the only way to finish.
  */
 export function DetailSheet(props: DetailSheetProps) {
-  const { todo, onClose } = props;
+  const { todo, onClose, variant = "sheet" } = props;
+  if (variant === "panel") {
+    return (
+      <Dialog.Root
+        open={!!todo}
+        modal={false}
+        disablePointerDismissal
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Popup
+            data-detail-panel
+            className="fixed top-0 right-0 bottom-0 z-40 flex w-[min(28rem,40vw)] min-w-[22rem] flex-col border-l border-n-hairline bg-n-canvas text-n-ink outline-none transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:translate-x-6 data-starting-style:opacity-0"
+          >
+            {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
+    );
+  }
   return (
     <Dialog.Root
       open={!!todo}
@@ -127,7 +147,9 @@ function DetailBody({
   timeZone,
   actions,
   onClose,
+  variant = "sheet",
 }: DetailSheetProps & { todo: TodoWithUrls }) {
+  const panelVariant = variant === "panel";
   const [panel, setPanel] = useState<Panel>(null);
   const [picking, setPicking] = useState(false);
   const now = new Date();
@@ -160,28 +182,20 @@ function DetailBody({
     setPicking(false);
   };
 
-  const dueChoices: { label: string; day: Date | null }[] = [
-    { label: "Today", day: dayFromToday(now, timeZone, 0) },
-    { label: "Tomorrow", day: dayFromToday(now, timeZone, 1) },
-    {
-      label: "Friday",
-      day: dayFromToday(now, timeZone, daysToWeekday(now, timeZone, 5)),
-    },
-    {
-      label: "Next week",
-      day: dayFromToday(now, timeZone, daysToWeekday(now, timeZone, 1)),
-    },
-    { label: "No date", day: null },
-  ];
+  const dueChoices = dueChoicesFor(now, timeZone);
 
   return (
     <>
-      <div className="flex shrink-0 items-center justify-between px-3 pt-2">
+      <div
+        className={`flex shrink-0 items-center justify-between px-3 ${panelVariant ? "pt-4" : "pt-2"}`}
+      >
         <span className="w-11" />
-        <span
-          aria-hidden="true"
-          className="h-[5px] w-[38px] rounded-full bg-n-hairline"
-        />
+        {!panelVariant && (
+          <span
+            aria-hidden="true"
+            className="h-[5px] w-[38px] rounded-full bg-n-hairline"
+          />
+        )}
         <Dialog.Close
           aria-label="Close"
           className="flex size-11 cursor-pointer items-center justify-center rounded-full text-n-ink-muted n-focus"
@@ -191,7 +205,9 @@ function DetailBody({
           </span>
         </Dialog.Close>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(3rem+env(safe-area-inset-bottom,0px))] [scrollbar-width:none]">
+      <div
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(3rem+env(safe-area-inset-bottom,0px))] [scrollbar-width:none] ${panelVariant ? "px-7" : "px-5"}`}
+      >
         <Dialog.Title className="sr-only">Todo</Dialog.Title>
         <label className="block">
           <span className="sr-only">Title</span>

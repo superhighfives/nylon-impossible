@@ -1,44 +1,21 @@
 /* biome-ignore-all lint/complexity/noImportantStyles: the reduced-motion reset below must override utility animations/transitions */
 @import "tailwindcss";
-@import "tailwindcss-radix-colors/dist/gray-colors-only.css";
-@import "tailwindcss-radix-colors/dist/yellow-colors-only.css";
-@import "tailwindcss-radix-colors/dist/red-colors-only.css";
-@import "./styles/radix-utilities.css";
 /* Generated from src/shared/design/tokens.json (`bun run tokens`). */
 @import "./styles/tokens.css";
-@import "tw-animate-css";
 @import "@fontsource-variable/archivo";
 
 /* Drive the `dark` variant off the `.dark` class on <html> instead of Tailwind's
    default `@media (prefers-color-scheme: dark)`. The whole theming system is
    class-based: the server renders <html class="light|dark"> from the theme
-   cookie (see getRootData in __root.tsx) and ThemeSync toggles the class at
-   runtime. Without this, every `@variant dark` in radix-utilities.css follows
-   the OS instead of the user's choice, so the light/dark toggle appears to do
-   nothing. `:where()` keeps specificity at zero to match the default variant. */
+   cookie (see getRootData in __root.tsx), ThemeSync toggles the class at
+   runtime, and tokens.css switches to its dark values under the same class.
+   `:where()` keeps specificity at zero to match the default variant. */
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  /* Strong ease-out for UI that enters or moves in response to the user —
-     starts fast so it feels immediate, settles gently. */
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
-
-  /* top-4 (1rem) + pill height (~40px / 2.5rem) + breathing room (1.5rem) = 5rem */
-  --spacing-header-offset: 5rem;
-
-  /* Editorial display face — logotype, list titles, board affordances. Body
-     copy stays on the system stack. */
-  --font-display: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
-
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-base: 0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-}
-
-/* Design tokens (tokens.css, generated) exposed as Tailwind utilities, so the
-   redesigned components can write `bg-n-canvas text-n-ink border-n-hairline`
-   instead of radix-utilities classes or raw values. `inline` keeps each
-   utility pointing at the token variable, so `.dark` overrides apply live. */
+/* Design tokens (tokens.css, generated) exposed as Tailwind utilities, so
+   components write `bg-n-canvas text-n-ink border-n-hairline` instead of raw
+   values. `inline` keeps each utility pointing at the token variable, so
+   `.dark` overrides apply live. */
 @theme inline {
   --color-n-canvas: var(--n-color-canvas);
   --color-n-surface: var(--n-color-surface);
@@ -58,8 +35,8 @@
   --radius-n-field: var(--n-radius-field);
   --ease-n-out: var(--n-ease-out-strong);
 
-  /* Phone layout motion. Reduced motion stops keyframes outright (see the
-     reset below), leaving the colour and opacity changes. */
+  /* Motion. Reduced motion stops keyframes outright (see the reset below),
+     leaving the colour and opacity changes. */
   --animate-n-pop: n-pop 240ms var(--n-ease-out-strong);
   --animate-n-fade-in: n-fade-in var(--n-duration-fast) ease-out;
   --animate-n-row-in: n-row-in var(--n-duration-slow) var(--n-ease-out-strong);
@@ -98,12 +75,11 @@ body {
    value there that shadows the pinned html.light/html.dark below, leaving
    native controls inside the body following the OS instead of the chosen theme.
 
-   The bare `html` rule is the pre-class fallback: native controls (date-picker
-   glyph, dropdowns, scrollbars) follow the OS until the resolved theme class is
-   applied. Without it they default to light and render dark-on-dark (e.g. an
-   invisible calendar icon in the due-date input). The class rules then pin the
-   scheme to the user's explicit choice — <html> always carries one of these
-   classes (SSR sets it from the theme cookie; ThemeSync keeps it live). */
+   The bare `html` rule is the pre-class fallback: native controls (select
+   glyphs, scrollbars) follow the OS until the resolved theme class is applied.
+   The class rules then pin the scheme to the user's explicit choice — <html>
+   always carries one of these classes (SSR sets it from the theme cookie;
+   ThemeSync keeps it live). */
 html {
   color-scheme: light dark;
 }
@@ -116,33 +92,27 @@ html.dark {
   color-scheme: dark;
 }
 
-/* The board is editorial paper-white in light mode (the radix gray-1 tint
-   reads slightly dingy next to the hairline rules); dark keeps the gray
-   scale's app background. */
 body {
-  @apply m-0 text-gray;
-  background-color: #fff;
+  margin: 0;
+  background-color: var(--n-color-canvas);
+  color: var(--n-color-ink);
+  font-family: var(--n-font-text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-html.dark body {
-  background-color: var(--color-graydark-1);
 }
 
 code {
   @apply font-mono;
 }
 
-/* Shared enter/exit for anchored popups (popover, select, menu, tooltip):
-   a quick fade + slight scale that grows from the trigger via Base UI's
-   --transform-origin. Exits are faster than entrances so dismissing feels
-   immediate. */
+/* Shared enter/exit for anchored popups (the link menu): a quick fade + slight
+   scale that grows from the trigger via Base UI's --transform-origin. Exits
+   are faster than entrances so dismissing feels immediate. */
 @utility popup-motion {
   transform-origin: var(--transform-origin);
   transition-property: opacity, scale;
-  transition-duration: 150ms;
-  transition-timing-function: var(--ease-out-strong);
+  transition-duration: var(--n-duration-fast);
+  transition-timing-function: var(--n-ease-out-strong);
   &[data-starting-style],
   &[data-ending-style] {
     opacity: 0;
@@ -151,16 +121,12 @@ code {
   &[data-ending-style] {
     transition-duration: 100ms;
   }
-  /* Tooltips moving between adjacent triggers shouldn't re-animate. */
-  &[data-instant] {
-    transition-duration: 0ms;
-  }
 }
 
-/* Focus ring for the redesigned (token-only) components: a yellow fill ring
-   with a hairline of ink inside it, so it reads on paper-white (where yellow
-   alone is ~1.3:1) as well as on dark. `n-focus-inset` draws it inside the
-   element for controls that sit in an overflow-clipped row. */
+/* Focus ring: a yellow fill ring with a hairline of ink inside it, so it
+   reads on paper-white (where yellow alone is ~1.3:1) as well as on dark.
+   `n-focus-inset` draws it inside the element for controls that sit in an
+   overflow-clipped row. */
 @utility n-focus {
   outline: none;
   &:focus-visible {
@@ -192,26 +158,16 @@ code {
   }
 }
 
-/* Rows that appear after the board has painted (a new todo, one dropped in
-   from another list, one arriving over sync) fade and settle into place. */
-@starting-style {
-  [data-board-ready] [data-todo-row] {
-    opacity: 0;
-    translate: 0 -4px;
-  }
-}
-
 /* Honor a reduced-motion preference. Server-resolved via the epic-web client
    hint and reflected on <html data-reduced-motion="reduce"> (see __root.tsx),
    so it's correct on first paint.
 
    Reduced motion means less movement, not no feedback: transitions are
    narrowed to opacity and colour, so fades, tints and the check-off strike
-   still read, while anything that moves, scales or resizes (popups, the side
-   panel, rows making room during a drag, collapsing sections) snaps straight
-   to its end state. Keyframe animations (spinners, skeleton pulses) are
-   stopped outright. !important is required so this beats transition
-   utilities and dnd-kit's inline transitions. */
+   still read, while anything that moves, scales or resizes (popups, the
+   detail panel, collapsing rows) snaps straight to its end state. Keyframe
+   animations (spinners, the check pop) are stopped outright. !important is
+   required so this beats transition utilities. */
 [data-reduced-motion="reduce"] *,
 [data-reduced-motion="reduce"] *::before,
 [data-reduced-motion="reduce"] *::after {
@@ -221,28 +177,4 @@ code {
     opacity, color, background-color, border-color, outline-color,
     text-decoration-color, fill, stroke !important;
   scroll-behavior: auto !important;
-}
-
-/* iOS: fixed bottom input bar styled like the music app "now playing" pill */
-@media (hover: none) and (pointer: coarse) {
-  @supports (-webkit-touch-callout: none) {
-    .todo-input-wrapper {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      z-index: 50;
-      height: auto;
-      padding: 0.5rem 0.75rem;
-      padding-bottom: calc(0.5rem + env(safe-area-inset-bottom));
-    }
-
-    /* Anchored to the bottom here, so the composer grows upward in flow
-       rather than overlaying downward from a fixed-height slot. */
-    .todo-input-wrapper .todo-input-container {
-      position: relative;
-      border-radius: 1.375rem;
-      overflow: hidden;
-    }
-  }
 }

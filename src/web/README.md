@@ -184,10 +184,10 @@ nylon-impossible-web/
 ├── migrations/              # D1 database migrations
 ├── src/
 │   ├── components/          # React components
-│   │   ├── Header.tsx      # App header with auth
 │   │   ├── LandingPage.tsx # Unauthenticated home
-│   │   ├── TodoInput.tsx   # Create todo form
-│   │   └── TodoList.tsx    # Todo list display
+│   │   ├── phone/          # Phone layout (under 1024px) and the shared
+│   │   │                   # row, composer, menu and detail pieces
+│   │   └── wide/           # Wide layout: sidebar, columns, keyboard map
 │   ├── hooks/              # Custom React hooks
 │   │   └── useTodos.ts     # Todo CRUD operations
 │   ├── integrations/       # Third-party integrations

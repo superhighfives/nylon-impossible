@@ -20,10 +20,10 @@ export function NotFound() {
         </picture>
       </div>
       <div className="space-y-3">
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="font-n-display text-[2rem] leading-tight font-bold tracking-[-0.025em] text-n-ink">
           Page not found
         </h1>
-        <p className="text-gray-muted leading-relaxed max-w-xs mx-auto">
+        <p className="text-n-ink-muted leading-relaxed max-w-xs mx-auto">
           The page you're looking for doesn't exist or has been moved.
         </p>
       </div>
@@ -31,7 +31,6 @@ export function NotFound() {
         render={<Link to="/" />}
         variant="primary"
         size="lg"
-        ringOffset="app"
         className="w-full"
       >
         Go home
