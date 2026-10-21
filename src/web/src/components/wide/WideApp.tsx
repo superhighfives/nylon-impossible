@@ -31,6 +31,7 @@ import { useCreateList } from "@/hooks/useLists";
 import { dropPlacement, slotAt } from "@/lib/dragOrder";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { Column, type DropIndicator } from "./Column";
+import { resolveDrop } from "./drop";
 import { boardKeyAction, isTypingTarget } from "./keys";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
 import { Sidebar } from "./Sidebar";
@@ -371,15 +372,13 @@ export function WideApp() {
     const overId = e.over?.id;
     endDrag();
     if (!todo || typeof overId !== "string") return;
-    if (overId.startsWith("side:")) {
-      actions.move(todo, overId.slice(5));
-      return;
-    }
-    if (overId.startsWith("col:")) {
-      const listId = overId.slice(4);
-      const { index } = slotFor(listId, todo, pointerY(e));
-      const { position } = dropPlacement(rowsFor(listId), todo, index);
-      actions.place(todo, listId, position);
+    const slot = overId.startsWith("col:")
+      ? slotFor(overId.slice(4), todo, pointerY(e)).index
+      : 0;
+    const drop = resolveDrop({ overId, todo, rowsFor, slot });
+    if (drop?.kind === "move") actions.move(todo, drop.listId);
+    else if (drop?.kind === "place") {
+      actions.place(todo, drop.listId, drop.position);
     }
   };
 

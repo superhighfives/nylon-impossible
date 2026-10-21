@@ -38,6 +38,7 @@ function ListEntry({
       <button
         type="button"
         data-sidebar-list={list.id}
+        aria-label={`${list.name}, ${count} ${count === 1 ? "todo" : "todos"}`}
         aria-pressed={selected === undefined ? undefined : selected}
         onClick={() => onSelect(list)}
         className={`${ENTRY} ${strong || selected ? "font-semibold" : "font-medium"} ${
@@ -48,9 +49,7 @@ function ListEntry({
         <span
           className={`font-normal tabular-nums ${dropping ? "" : "text-n-ink-muted"}`}
         >
-          <span className="sr-only">, </span>
           {count}
-          <span className="sr-only"> {count === 1 ? "todo" : "todos"}</span>
         </span>
       </button>
     </li>
@@ -153,10 +152,9 @@ export function Sidebar({
         </ul>
       </nav>
       <nav aria-label="More" className="mt-auto flex flex-col gap-0.5">
-        <SidebarButton onClick={onDone}>
+        <SidebarButton onClick={onDone} label={`Done, ${doneCount}`}>
           <span className="flex-1">Done</span>
           <span className="font-normal text-n-ink-muted tabular-nums">
-            <span className="sr-only">, </span>
             {doneCount}
           </span>
         </SidebarButton>
@@ -179,13 +177,20 @@ export function Sidebar({
 
 function SidebarButton({
   onClick,
+  label,
   children,
 }: {
   onClick: () => void;
+  label?: string;
   children: ReactNode;
 }) {
   return (
-    <button type="button" onClick={onClick} className={`${ENTRY} font-medium`}>
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className={`${ENTRY} font-medium`}
+    >
       {children}
     </button>
   );

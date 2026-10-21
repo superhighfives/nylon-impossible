@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { clampToTier, insertInTier, positionAt } from "../dragOrder";
+import {
+  clampToTier,
+  dropPlacement,
+  insertInTier,
+  positionAt,
+  slotAt,
+} from "../dragOrder";
 
 const row = (id: string, position: string, pinned = false) => ({
   id,
@@ -66,5 +72,36 @@ describe("positionAt", () => {
   it("doesn't throw on duplicate neighbour positions", () => {
     const items = [row("a", "a1"), row("x", "zz"), row("b", "a1")];
     expect(() => positionAt(items, 1)).not.toThrow();
+  });
+});
+
+describe("slotAt", () => {
+  it("points before the first row whose middle is below the pointer", () => {
+    const mids = [10, 30, 50];
+    expect(slotAt(mids, 0)).toBe(0);
+    expect(slotAt(mids, 20)).toBe(1);
+    expect(slotAt(mids, 49)).toBe(2);
+    expect(slotAt(mids, 99)).toBe(3);
+    expect(slotAt([], 5)).toBe(0);
+  });
+});
+
+describe("dropPlacement", () => {
+  const list = [row("p", "a0", true), row("a", "a1"), row("b", "a2")];
+
+  it("lands between its new neighbours", () => {
+    const { index, position } = dropPlacement(list, row("x", "a9"), 2);
+    expect(index).toBe(2);
+    expect(position > "a1" && position < "a2").toBe(true);
+  });
+
+  it("keeps an unpinned todo below the pinned ones", () => {
+    expect(dropPlacement(list, row("x", "a9"), 0).index).toBe(1);
+  });
+
+  it("counts slots without the todo itself when reordering", () => {
+    const { index, position } = dropPlacement(list, list[1], 2);
+    expect(index).toBe(2);
+    expect(position > "a2").toBe(true);
   });
 });

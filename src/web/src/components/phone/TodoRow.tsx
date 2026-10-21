@@ -218,7 +218,7 @@ export const TodoRow = memo(function TodoRow({
           onKeyDown={onKeyDown}
           aria-haspopup="dialog"
           aria-description={summary || undefined}
-          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left n-focus-inset [-webkit-touch-callout:none] ${wide ? "py-2.5" : "py-3"}`}
+          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left n-focus-inset [-webkit-touch-callout:none] ${wide ? "-ml-1.5 py-2.5 pr-2 pl-1.5" : "py-3"}`}
         >
           <span
             className={`line-clamp-3 block font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
