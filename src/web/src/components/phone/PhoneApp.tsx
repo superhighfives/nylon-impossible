@@ -199,7 +199,10 @@ export function PhoneApp({
       goTo(3);
       return;
     }
-    if (urlKey === "lists") setCollectionId(null);
+    // A `/list/<id>` that turned out to be a time list seeded collectionId;
+    // drop it, or the Lists tab would reopen the time list as a collection.
+    const seededKind = lists?.find((l) => l.id === collectionId)?.systemKind;
+    if (urlKey === "lists" || seededKind) setCollectionId(null);
     goTo(
       Math.max(
         0,
@@ -212,7 +215,8 @@ export function PhoneApp({
   useEffect(() => {
     if (stateKey === syncedKey.current) return;
     syncedKey.current = stateKey;
-    onNavigate?.(viewForKey(stateKey));
+    const next = viewForKey(stateKey);
+    if (next) onNavigate?.(next);
   }, [stateKey]);
 
   const onNavKey = (e: KeyboardEvent<HTMLElement>) => {

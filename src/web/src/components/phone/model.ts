@@ -4,6 +4,7 @@
  * so they're cheap to unit test (see `__tests__/model.test.ts`).
  */
 import {
+  BOARD_TIME_KINDS,
   type BoardView,
   type DueLabel,
   dayKeyIn,
@@ -319,10 +320,12 @@ export function boardViewKey(
   return kind ?? `list:${view.id}`;
 }
 
-/** The view for a `boardViewKey`. */
-export function viewForKey(key: string): BoardView {
+/** The view for a `boardViewKey`, or null for a key that names no view. */
+export function viewForKey(key: string): BoardView | null {
   if (key.startsWith("list:")) return { kind: "list", id: key.slice(5) };
-  return { kind: key as Exclude<BoardView["kind"], "list"> } as BoardView;
+  if (key === "lists") return { kind: "lists" };
+  const kind = BOARD_TIME_KINDS.find((k) => k === key);
+  return kind ? { kind } : null;
 }
 
 const DAY_MS = 86_400_000;

@@ -11,7 +11,9 @@
  *   /                              the board, starting at Today
  */
 
-export type BoardTimeKind = "today" | "thisWeek" | "someday";
+export const BOARD_TIME_KINDS = ["today", "thisWeek", "someday"] as const;
+
+export type BoardTimeKind = (typeof BOARD_TIME_KINDS)[number];
 
 export type BoardView =
   | { kind: BoardTimeKind }
@@ -39,8 +41,8 @@ export function boardPath(view: BoardView): string {
 /** The view a pathname names, or null for "/" and anything else. */
 export function parseBoardPath(pathname: string): BoardView | null {
   const path = pathname.replace(/\/+$/, "") || "/";
-  for (const [kind, p] of Object.entries(BOARD_TIME_PATHS)) {
-    if (path === p) return { kind: kind as BoardTimeKind };
+  for (const kind of BOARD_TIME_KINDS) {
+    if (path === BOARD_TIME_PATHS[kind]) return { kind };
   }
   if (path === "/lists") return { kind: "lists" };
   const match = /^\/list\/([^/]+)$/.exec(path);

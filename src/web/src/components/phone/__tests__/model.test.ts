@@ -271,5 +271,7 @@ describe("board URLs", () => {
       id: "list-groceries",
     });
     expect(viewForKey("someday")).toEqual({ kind: "someday" });
+    expect(viewForKey("lists")).toEqual({ kind: "lists" });
+    expect(viewForKey("tomorrow")).toBeNull();
   });
 });

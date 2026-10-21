@@ -1494,6 +1494,12 @@ async function captureParityIOS(): Promise<void> {
       console.log(`  Reusing cached iOS parity screenshots for ${device}.`);
       continue;
     }
+    // Drop whatever the cache restored before capturing: a shot this run
+    // fails to take must show as "not captured", not as an older revision's
+    // screen that would then be saved under this revision's cache key.
+    for (const s of mine) {
+      for (const mode of MODES) rmSync(paritySource("ios", s.name, mode), { force: true });
+    }
     if (!windowOpen) {
       await openSimulatorWindow();
       windowOpen = true;
