@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
 import { buildContextualCard } from "../../lib/addon-cards";
 import { getDb } from "../../lib/db";
+import { listListsForUser } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import {
   cardResponse,
@@ -21,8 +22,11 @@ export async function gmailAddonContextual(c: Context<Env>) {
     return connectResponse(c, claims);
   }
 
-  const event = await readAddonEvent(c);
+  const [event, lists] = await Promise.all([
+    readAddonEvent(c),
+    listListsForUser(db, resolved.userId),
+  ]);
   const message = extractMessageContext(event);
-  const card = buildContextualCard(requestBaseUrl(c), message);
+  const card = buildContextualCard(requestBaseUrl(c), message, lists);
   return cardResponse(c, card);
 }

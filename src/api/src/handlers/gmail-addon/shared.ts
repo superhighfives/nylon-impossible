@@ -64,6 +64,11 @@ export function requestBaseUrl(c: Context<Env>): string {
   return new URL(c.req.url).origin;
 }
 
+/** The web app's base URL, for "Open Nylon" links and the connect flow. */
+export function webBaseUrl(c: Context<Env>): string {
+  return c.env.WEB_BASE_URL ?? DEFAULT_WEB_BASE_URL;
+}
+
 /** Read a form text input value from the event, trimmed. */
 export function readFormInput(
   event: AddonEvent,
@@ -127,7 +132,7 @@ export async function buildConnectUrl(
   c: Context<Env>,
   claims: GoogleIdTokenClaims,
 ): Promise<string> {
-  const base = c.env.WEB_BASE_URL ?? DEFAULT_WEB_BASE_URL;
+  const base = webBaseUrl(c);
   const secret = c.env.GMAIL_ADDON_STATE_SECRET;
   if (!secret) {
     Sentry.captureMessage(

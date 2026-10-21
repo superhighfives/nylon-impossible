@@ -13,7 +13,10 @@ import {
 import { mockGetUserList } from "../__mocks__/clerk-backend";
 import { cleanDb, getTodayListId, seedTodo, seedUser } from "../helpers";
 
-async function getSomedayListId(userId = "user_test_123") {
+async function getTimeListId(
+  kind: "thisWeek" | "someday",
+  userId = "user_test_123",
+) {
   const db = getDb(env.DB);
   const [list] = await db
     .select({ id: lists.id })
@@ -22,12 +25,30 @@ async function getSomedayListId(userId = "user_test_123") {
       and(
         eq(lists.userId, userId),
         eq(lists.kind, "system"),
-        eq(lists.systemKind, "someday"),
+        eq(lists.systemKind, kind),
       ),
     );
-  if (!list) throw new Error(`No Someday list seeded for user ${userId}`);
+  if (!list) throw new Error(`No ${kind} list seeded for user ${userId}`);
   return list.id;
 }
+
+const getSomedayListId = (userId?: string) => getTimeListId("someday", userId);
+
+/** Midnight UTC `days` from now: the canonical stored form of a due day. */
+function dueIn(days: number): Date {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d;
+}
+
+const section = (card: any, header: string) =>
+  card.sections.find((s: any) => s.header === header);
+
+const rowTitles = (s: any) =>
+  s.widgets
+    .filter((w: any) => w.decoratedText?.switchControl)
+    .map((w: any) => w.decoratedText.text);
 
 const AUDIENCE = "https://api.nylonimpossible.com/gmail-addon";
 const ISSUER = "https://accounts.google.com";
@@ -219,21 +240,72 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
       const openSection = card.sections.find((s: any) => s.header === "Today");
-      const titles = openSection.widgets.map((w: any) => w.decoratedText.text);
-      expect(titles).toEqual(["Still open"]);
+      expect(rowTitles(openSection)).toEqual(["Still open"]);
     });
 
-    it("groups open todos from every list, not just Today", async () => {
+    it("shows Today and This Week as rows and Someday as a count", async () => {
       await linkUser();
+      const thisWeekId = await getTimeListId("thisWeek");
       const somedayId = await getSomedayListId();
       await seedTodo("66666666-6666-6666-6666-666666666666", "user_test_123", {
         title: "In Today",
         position: "a0",
       });
-      await seedTodo("77777777-7777-7777-7777-777777777777", "user_test_123", {
-        title: "In Someday",
+      await seedTodo("99999999-9999-9999-9999-999999999999", "user_test_123", {
+        title: "In This Week",
         position: "a0",
-        listId: somedayId,
+        listId: thisWeekId,
+      });
+      for (const id of ["77777777", "77777778"]) {
+        await seedTodo(`${id}-7777-7777-7777-777777777777`, "user_test_123", {
+          title: "In Someday",
+          position: "a0",
+          listId: somedayId,
+        });
+      }
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      // Composer first, then the three time sections in order.
+      expect(card.sections.map((s: any) => s.header)).toEqual([
+        undefined,
+        "Today",
+        "This Week",
+        "Someday",
+      ]);
+      expect(rowTitles(section(card, "Today"))).toEqual(["In Today"]);
+      expect(rowTitles(section(card, "This Week"))).toEqual(["In This Week"]);
+
+      // Someday collapses to a count, with a link to the web app.
+      const someday = section(card, "Someday").widgets[0].decoratedText;
+      expect(someday.text).toBe("2 todos");
+      expect(someday.button.text).toBe("Open Nylon");
+      expect(someday.button.onClick.openLink.url).toMatch(/^https?:\/\//);
+
+      // Rows tick to done through the toggle action.
+      const row = section(card, "Today").widgets[0].decoratedText;
+      expect(row.switchControl.controlType).toBe("CHECKBOX");
+      expect(row.switchControl.onChangeAction.function).toContain(
+        "/gmail-addon/actions/toggle",
+      );
+      expect(row.switchControl.onChangeAction.parameters).toEqual([
+        { key: "todoId", value: "66666666-6666-6666-6666-666666666666" },
+      ]);
+    });
+
+    it("orders the composer dropdown Today, This Week, Someday, then lists", async () => {
+      await linkUser();
+      const db = getDb(env.DB);
+      // A list created before the time lists' positions still sorts after them.
+      await db.insert(lists).values({
+        id: "list-groceries",
+        userId: "user_test_123",
+        name: "Groceries",
+        kind: "custom",
+        position: "0",
       });
 
       const token = await idToken();
@@ -241,25 +313,92 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
 
-      const todaySection = card.sections.find((s: any) => s.header === "Today");
-      const somedaySection = card.sections.find(
-        (s: any) => s.header === "Someday",
-      );
-      expect(todaySection.widgets[0].decoratedText.text).toBe("In Today");
-      expect(somedaySection.widgets[0].decoratedText.text).toBe("In Someday");
-
-      // The quick-add dropdown offers every list, defaulting to Today.
       const listInput = card.sections[0].widgets[1].selectionInput;
-      expect(listInput.items.map((i: any) => i.text)).toEqual(
-        expect.arrayContaining(["Today", "This Week", "Someday"]),
-      );
-      const selected = listInput.items.find((i: any) => i.selected);
-      expect(selected.text).toBe("Today");
+      expect(listInput.items.map((i: any) => i.text)).toEqual([
+        "Today",
+        "This Week",
+        "Someday",
+        "Groceries",
+      ]);
+      const selected = listInput.items.filter((i: any) => i.selected);
+      expect(selected.map((i: any) => i.text)).toEqual(["Today"]);
     });
 
-    it("caps each list so a full Today list can't hide the others", async () => {
+    it("labels due days the way the apps do", async () => {
       await linkUser();
-      const somedayId = await getSomedayListId();
+      const rows: [string, Date | null, boolean][] = [
+        ["Overdue", dueIn(-3), false],
+        ["Due today", dueIn(0), false],
+        ["Due tomorrow", dueIn(1), false],
+        ["Pinned, no due", null, true],
+      ];
+      for (const [i, [title, dueDate, pinned]] of rows.entries()) {
+        await seedTodo(
+          `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb${i}`,
+          "user_test_123",
+          { title, dueDate, pinned, position: `a${i}` },
+        );
+      }
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      const labels = Object.fromEntries(
+        section(card, "Today")
+          .widgets.filter((w: any) => w.decoratedText?.switchControl)
+          .map((w: any) => [
+            w.decoratedText.text,
+            w.decoratedText.bottomLabel ?? null,
+          ]),
+      );
+      expect(labels).toEqual({
+        Overdue: "3 days overdue",
+        "Due today": "Today",
+        "Due tomorrow": "Tomorrow",
+        "Pinned, no due": "Pinned",
+      });
+    });
+
+    it("writes the empty lines instead of leaving sections blank", async () => {
+      await linkUser();
+      const thisWeekId = await getTimeListId("thisWeek");
+      await seedTodo("cccccccc-cccc-cccc-cccc-cccccccccccc", "user_test_123", {
+        title: "Later",
+        listId: thisWeekId,
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      expect(section(card, "Today").widgets[0].textParagraph.text).toBe(
+        "Nothing today. 1 waiting in This Week.",
+      );
+      expect(section(card, "Someday").widgets[0].decoratedText.text).toBe(
+        "Nothing in Someday.",
+      );
+    });
+
+    it("escapes a title so it can't inject card markup", async () => {
+      await linkUser();
+      await seedTodo("dddddddd-dddd-dddd-dddd-dddddddddddd", "user_test_123", {
+        title: "<b>Bold</b> & co",
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+      expect(rowTitles(section(card, "Today"))).toEqual([
+        "&lt;b&gt;Bold&lt;/b&gt; &amp; co",
+      ]);
+    });
+
+    it("caps a long Today and links to the rest", async () => {
+      await linkUser();
       for (let i = 0; i < 12; i++) {
         const n = i.toString(16).padStart(2, "0");
         await seedTodo(
@@ -271,25 +410,17 @@ describe("Gmail add-on", () => {
           },
         );
       }
-      await seedTodo("88888888-8888-8888-8888-888888888888", "user_test_123", {
-        title: "In Someday",
-        position: "a0",
-        listId: somedayId,
-      });
 
       const token = await idToken();
       const res = await post("/gmail-addon/homepage", token);
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
 
-      const todaySection = card.sections.find((s: any) => s.header === "Today");
-      const somedaySection = card.sections.find(
-        (s: any) => s.header === "Someday",
-      );
-      expect(
-        todaySection.widgets.filter((w: any) => w.decoratedText),
-      ).toHaveLength(5);
-      expect(somedaySection.widgets[0].decoratedText.text).toBe("In Someday");
+      const today = section(card, "Today");
+      expect(rowTitles(today)).toHaveLength(8);
+      const more = today.widgets.at(-1).decoratedText;
+      expect(more.text).toBe("4 more in Today");
+      expect(more.button.onClick.openLink.url).toMatch(/^https?:\/\//);
     });
   });
 
@@ -309,6 +440,12 @@ describe("Gmail add-on", () => {
       const card = body.action.navigations[0].pushCard;
       expect(card.header.title).toBe("Add to Nylon");
       expect(card.sections[0].widgets[0].textInput.value).toBe("Reply to Sam");
+      // The same list dropdown as the composer, defaulting to Today.
+      const listInput = card.sections[0].widgets[1].selectionInput;
+      expect(listInput.items.find((i: any) => i.selected).text).toBe("Today");
+      expect(card.sections[0].widgets[2].textParagraph.text).toBe(
+        "The email is attached as a link.",
+      );
       const button = card.sections[0].widgets.at(-1).buttonList.buttons[0];
       expect(button.onClick.action.parameters).toEqual([
         {
@@ -335,7 +472,7 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       // Action responses update the card and flash a toast.
       expect(body.renderActions.action.notification.text).toBe(
-        "Added to Nylon",
+        "Added to Today",
       );
 
       const db = getDb(env.DB);
@@ -350,13 +487,17 @@ describe("Gmail add-on", () => {
     it("quick-add runs the typed-date parser", async () => {
       await linkUser();
       const token = await idToken();
-      await post("/gmail-addon/actions/quick-add", token, {
+      const res = await post("/gmail-addon/actions/quick-add", token, {
         commonEventObject: {
           formInputs: {
             todoText: { stringInputs: { value: ["Buy stamps tomorrow"] } },
           },
         },
       });
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe(
+        "Added to Today · due Tomorrow",
+      );
 
       const [row] = await getDb(env.DB)
         .select()
@@ -535,11 +676,57 @@ describe("Gmail add-on", () => {
       });
       expect(res.status).toBe(200);
       const body = await res.json<any>();
-      expect(body.renderActions.action.notification.text).toBe("Marked done");
+      expect(body.renderActions.action.notification.text).toBe("Done");
 
       const db = getDb(env.DB);
       const [todo] = await db.select().from(todos).where(eq(todos.id, todoId));
       expect(todo.completed).toBe(true);
+    });
+
+    it("add-from-message runs the typed-date parser and keeps mid-title words", async () => {
+      await linkUser();
+      const thisWeekId = await getTimeListId("thisWeek");
+      const token = await idToken();
+      for (const text of ["Reply to Sam tomorrow", "Ask about Sunday lunch"]) {
+        await post("/gmail-addon/actions/add-from-message", token, {
+          commonEventObject: {
+            formInputs: {
+              todoText: { stringInputs: { value: [text] } },
+              listId: { stringInputs: { value: [thisWeekId] } },
+            },
+          },
+        });
+      }
+
+      const rows = await getDb(env.DB)
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      const byTitle = Object.fromEntries(rows.map((r) => [r.title, r]));
+      expect(byTitle["Reply to Sam"].dueDate).not.toBeNull();
+      // A weekday only counts at the end, so this stays a title.
+      expect(byTitle["Ask about Sunday lunch"].dueDate).toBeNull();
+      // The dropdown's list is honoured, as on the homepage composer.
+      expect(rows.every((r) => r.listId === thisWeekId)).toBe(true);
+    });
+
+    it("toggle on a repeat says when it's next", async () => {
+      await linkUser();
+      const todoId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+      await seedTodo(todoId, "user_test_123", {
+        title: "Water plants",
+        dueDate: dueIn(0),
+        recurrence: { frequency: "daily" },
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/toggle", token, {
+        commonEventObject: { parameters: { todoId } },
+      });
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe(
+        "Done · next Tomorrow",
+      );
     });
 
     it("refresh re-shows the connect card when still unlinked", async () => {

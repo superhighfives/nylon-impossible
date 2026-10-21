@@ -1,7 +1,8 @@
 # Nylon Gmail / Workspace Add-on
 
 A Google Workspace Add-on that puts Nylon in Gmail's right-hand side panel:
-quick-add, a list of open top-level todos you can tick, and an "Add to Nylon"
+a composer with a list dropdown, Today and This Week with tick-to-done, Someday
+collapsed to a count, and an "Add to Nylon"
 card that turns the open message into a todo through the existing
 smart-create path.
 
@@ -15,7 +16,7 @@ There is no Apps Script project. All the code lives in `src/api`:
 | Contextual card (message open) | `POST /gmail-addon/contextual` |
 | Quick-add submit | `POST /gmail-addon/actions/quick-add` |
 | Add-from-message submit | `POST /gmail-addon/actions/add-from-message` |
-| Tick-to-complete | `POST /gmail-addon/actions/toggle` |
+| Tick-to-done | `POST /gmail-addon/actions/toggle` |
 | Refresh after connecting | `POST /gmail-addon/actions/refresh` |
 
 Each request carries a Google-signed ID token in `Authorization: Bearer` and is
