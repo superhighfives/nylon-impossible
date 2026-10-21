@@ -78,10 +78,7 @@ final class WebSocketService {
 
             receiveLoop()
         } catch {
-            SentrySDK.capture(error: error) { scope in
-                scope.setTag(value: "websocket", key: "area")
-                scope.setTag(value: "connect", key: "event")
-            }
+            Self.report(error, event: "connect")
             print("[WebSocket] Connect error: \(error)")
             scheduleReconnect()
         }
@@ -116,10 +113,7 @@ final class WebSocketService {
                         self.isConnected = false
                         return
                     }
-                    SentrySDK.capture(error: error) { scope in
-                        scope.setTag(value: "websocket", key: "area")
-                        scope.setTag(value: "receive", key: "event")
-                    }
+                    Self.report(error, event: "receive")
                     print("[WebSocket] Receive error: \(error)")
                     self.handleDisconnect()
                 }
@@ -156,6 +150,45 @@ final class WebSocketService {
                 return underlyingNSError.domain == NSPOSIXErrorDomain
                     && underlyingNSError.code == ECANCELED
             }
+    }
+
+    /// Network conditions the socket meets in normal use: the connection
+    /// dropping (-1005), no network or a timeout, and the POSIX aborts and
+    /// resets the OS reports after sleep or a network switch. The service
+    /// reconnects on its own, so these are breadcrumbs, not Sentry errors.
+    nonisolated static func isTransientNetworkDrop(_ error: Error) -> Bool {
+        let transientURLCodes: Set<Int> = [
+            NSURLErrorNetworkConnectionLost,
+            NSURLErrorNotConnectedToInternet,
+            NSURLErrorTimedOut,
+            NSURLErrorCannotConnectToHost,
+            NSURLErrorCannotFindHost,
+            NSURLErrorDNSLookupFailed,
+            NSURLErrorDataNotAllowed
+        ]
+        let transientPOSIXCodes: Set<Int32> = [
+            ECONNABORTED, ECONNRESET, ENOTCONN, ETIMEDOUT, ENETDOWN, ENETUNREACH, ENETRESET, EPIPE
+        ]
+        func matches(_ nsError: NSError) -> Bool {
+            (nsError.domain == NSURLErrorDomain && transientURLCodes.contains(nsError.code))
+                || (nsError.domain == NSPOSIXErrorDomain && transientPOSIXCodes.contains(Int32(nsError.code)))
+        }
+        let nsError = error as NSError
+        return matches(nsError) || nsError.underlyingErrors.contains { matches($0 as NSError) }
+    }
+
+    /// Send a real failure to Sentry; leave a breadcrumb for a transient drop.
+    nonisolated private static func report(_ error: Error, event: String) {
+        guard !isTransientNetworkDrop(error) else {
+            let crumb = Breadcrumb(level: .info, category: "websocket")
+            crumb.message = "\(event): \((error as NSError).domain) \((error as NSError).code)"
+            SentrySDK.addBreadcrumb(crumb)
+            return
+        }
+        SentrySDK.capture(error: error) { scope in
+            scope.setTag(value: "websocket", key: "area")
+            scope.setTag(value: event, key: "event")
+        }
     }
 
     private func handleDisconnect() {
