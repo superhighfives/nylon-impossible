@@ -12,7 +12,9 @@
 //
 
 import SwiftUI
+#if os(iOS)
 import UIKit
+#endif
 
 extension Theme.Fonts {
     /// Roles on the phone layout, named for what they set.
@@ -108,11 +110,16 @@ extension Theme.Fonts.Style {
     /// preview, a live change in Settings) reaches it. Cached: building a
     /// variable-font descriptor in every body pass adds up over a long list.
     @MainActor
-    func uiFont(for dynamicTypeSize: DynamicTypeSize) -> UIFont {
+    func uiFont(for dynamicTypeSize: DynamicTypeSize) -> PlatformFont {
         let key = FontCacheKey(style: self, size: dynamicTypeSize)
         if let cached = FontCache.fonts[key] { return cached }
+        #if os(macOS)
+        // No Dynamic Type on the Mac: the token size is the size.
+        let font = baseFont
+        #else
         let traits = UITraitCollection(preferredContentSizeCategory: UIContentSizeCategory(dynamicTypeSize))
         let font = UIFontMetrics(forTextStyle: textStyle).scaledFont(for: baseFont, compatibleWith: traits)
+        #endif
         FontCache.fonts[key] = font
         return font
     }
@@ -138,7 +145,7 @@ private struct FontCacheKey: Hashable {
 
 @MainActor
 private enum FontCache {
-    static var fonts: [FontCacheKey: UIFont] = [:]
+    static var fonts: [FontCacheKey: PlatformFont] = [:]
 }
 
 /// Sets a token text style at the environment's Dynamic Type size. Reading
@@ -155,7 +162,7 @@ private struct TextStyleModifier: ViewModifier {
         let scale = font.pointSize / style.size
         return content
             .font(Font(font))
-            .lineSpacing(max(0, style.lineHeight * scale - font.lineHeight))
+            .lineSpacing(max(0, style.lineHeight * scale - font.nylonLineHeight))
             .tracking(style.tracking(tracking) * scale)
     }
 }

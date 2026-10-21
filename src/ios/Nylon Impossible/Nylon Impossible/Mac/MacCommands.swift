@@ -1,0 +1,76 @@
+//
+//  MacCommands.swift
+//  Nylon Impossible
+//
+//  The Mac menu bar. File: New Todo ⌘N and New List ⇧⌘N (in place of New
+//  Window). View: Today ⌘1, This Week ⌘2, Someday ⌘3, Show Done ⇧⌘D, and
+//  the sidebar toggle. Todo: the board's single-key map as menu items —
+//  their keys are only bound while no text field is focused — plus Move to.
+//  Edit keeps the system's items; ⌘Z reaches the toast's Undo through the
+//  window's undo manager (see `ToastUndoBridge`). Help opens the site.
+//
+//  Titles, keys and routing come from `BoardMenuCommand`.
+//
+
+#if os(macOS)
+import SwiftUI
+
+struct MacCommands: Commands {
+    @FocusedValue(\.board) private var board
+
+    var body: some Commands {
+        CommandGroup(replacing: .newItem) {
+            item(.newTodo)
+            item(.newList)
+        }
+
+        SidebarCommands()
+        InspectorCommands()
+        CommandGroup(before: .sidebar) {
+            ForEach(BoardMenuCommand.viewMenu, id: \.self) { item($0) }
+            item(.showDone)
+            Divider()
+        }
+
+        CommandMenu("Todo") {
+            ForEach(Array(BoardMenuCommand.todoMenu.enumerated()), id: \.offset) { _, command in
+                if let command {
+                    item(command)
+                } else {
+                    Divider()
+                }
+            }
+            Divider()
+            Menu("Move to") {
+                ForEach(BoardMenuCommand.moveMenu, id: \.self) { item($0) }
+                if let collections = board?.collections, !collections.isEmpty {
+                    Divider()
+                    ForEach(collections, id: \.id) { list in
+                        Button(list.name) { board?.handle(.moveToList(list.id)) }
+                            .disabled(!BoardMenuCommand.moveToList(list.id).isEnabled(in: board))
+                    }
+                }
+            }
+            .disabled(board?.hasSelection != true)
+        }
+
+        CommandGroup(replacing: .help) {
+            Link("Nylon Help", destination: URL(string: "https://nylonimpossible.com")!)
+        }
+    }
+
+    /// A menu item for `command`. Single-key shortcuts are only attached while
+    /// the board has the keyboard; the item itself stays, so the menu
+    /// doesn't change shape as you type.
+    @ViewBuilder
+    private func item(_ command: BoardMenuCommand) -> some View {
+        let button = Button(command.title) { board?.handle(command) }
+            .disabled(!command.isEnabled(in: board))
+        if let shortcut = command.shortcut, !command.isSingleKey || board?.keysEnabled == true {
+            button.keyboardShortcut(shortcut.key, modifiers: shortcut.modifiers)
+        } else {
+            button
+        }
+    }
+}
+#endif

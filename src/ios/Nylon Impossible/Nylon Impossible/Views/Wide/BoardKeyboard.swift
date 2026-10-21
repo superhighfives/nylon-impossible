@@ -97,7 +97,25 @@ enum BoardNavigator {
 struct BoardCommandHandler {
     /// False while a text field has focus: only ⌘N stays listed then.
     let keysEnabled: Bool
+    /// A row is selected, so the Todo menu's row commands can run.
+    var hasSelection = false
+    /// Your lists, for Todo ▸ Move to.
+    var collections: [(id: String, name: String)] = []
+    /// The focused list's name, for the Mac window title.
+    var focusedListName: String?
     let perform: (BoardKey) -> Void
+    /// Commands that aren't single keys (New List, View ▸ Today, …).
+    var run: (BoardMenuCommand) -> Void = { _ in }
+
+    /// Route a menu command: a board key goes through `perform`, so the menu
+    /// and the keyboard share one path; everything else through `run`.
+    func handle(_ command: BoardMenuCommand) {
+        if case .key(let key) = command {
+            perform(key)
+        } else {
+            run(command)
+        }
+    }
 }
 
 extension FocusedValues {

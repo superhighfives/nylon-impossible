@@ -6,6 +6,8 @@
 	<array>
 		<string>Archivo-Variable.ttf</string>
 	</array>
+	<key>ATSApplicationFontsPath</key>
+	<string>.</string>
 	<key>NSExtension</key>
 	<dict>
 		<key>NSExtensionAttributes</key>

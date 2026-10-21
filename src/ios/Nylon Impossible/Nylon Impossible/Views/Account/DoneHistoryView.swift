@@ -81,8 +81,7 @@ struct DoneHistoryView: View {
             .padding(.bottom, Theme.Space.s16)
         }
         .background(Theme.Colors.canvas)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Theme.Colors.canvas, for: .navigationBar)
+        .inlineNavigationBar()
     }
 
     private func row(_ todo: TodoItem) -> some View {

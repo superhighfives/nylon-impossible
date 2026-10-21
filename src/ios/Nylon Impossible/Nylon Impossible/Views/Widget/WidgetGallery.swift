@@ -22,6 +22,34 @@ struct WidgetGallery: View {
     }
 
     var body: some View {
+        #if os(macOS)
+        mac
+        #else
+        phone
+        #endif
+    }
+
+    #if os(macOS)
+    /// The desktop and Notification Center sizes on a Mac: small and medium
+    /// side by side, large below, each with the system's content margins.
+    private var mac: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Theme.Space.s4) {
+                label("Small · Medium · Large (Mac desktop)")
+                HStack(alignment: .top, spacing: Theme.Space.s4) {
+                    home(.systemSmall, width: 170, height: 170)
+                    home(.systemSmall, entry: TodayEntry(date: .now, content: .todos([], total: 0)), width: 170, height: 170)
+                    home(.systemMedium, width: 364, height: 170)
+                }
+                home(.systemLarge, width: 364, height: 382)
+            }
+            .padding(Theme.Space.s6)
+        }
+        .background(Theme.Colors.fill.ignoresSafeArea())
+    }
+    #endif
+
+    private var phone: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Theme.Space.s4) {
                 label("Small · Medium")
@@ -31,6 +59,7 @@ struct WidgetGallery: View {
                 }
                 home(.systemMedium, width: 364)
 
+                #if os(iOS)
                 label("Lock Screen")
                 VStack(alignment: .leading, spacing: Theme.Space.s3) {
                     TodayWidgetView(entry: entry, family: .accessoryInline)
@@ -50,6 +79,7 @@ struct WidgetGallery: View {
                     LinearGradient(colors: [Color(white: 0.28), Color(white: 0.12)], startPoint: .top, endPoint: .bottom),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous)
                 )
+                #endif
             }
             .padding(Theme.Space.s4)
         }
@@ -64,10 +94,10 @@ struct WidgetGallery: View {
 
     /// A Home Screen widget at its iPhone size: the system's 16pt content
     /// margins and corner radius around the widget's own view.
-    private func home(_ family: WidgetFamily, entry: TodayEntry? = nil, width: CGFloat) -> some View {
+    private func home(_ family: WidgetFamily, entry: TodayEntry? = nil, width: CGFloat, height: CGFloat = 170) -> some View {
         TodayWidgetView(entry: entry ?? self.entry, family: family)
             .padding(16)
-            .frame(width: width, height: 170)
+            .frame(width: width, height: height)
             .background(Theme.Colors.canvas, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
     }
 }

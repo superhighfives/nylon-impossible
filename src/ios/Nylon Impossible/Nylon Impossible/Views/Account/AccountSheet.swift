@@ -41,7 +41,7 @@ struct AccountSheet: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .background(Theme.Colors.canvas)
-            .toolbar(.hidden, for: .navigationBar)
+            .hidesNavigationBar()
             .navigationDestination(for: AccountRoute.self) { route in
                 switch route {
                 case .done:

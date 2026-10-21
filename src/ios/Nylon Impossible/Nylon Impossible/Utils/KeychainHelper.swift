@@ -29,16 +29,28 @@ enum KeychainHelper {
     /// require a runtime-expanded team ID prefix.
     private static let service = "com.superhighfives.Nylon-Impossible.shared"
 
-    static func save(key: String, data: Data) throws {
-        let searchQuery: [String: Any] = [
+    /// The base query for one item. On macOS it opts into the data protection
+    /// keychain — the iOS-style one, where `keychain-access-groups` applies —
+    /// rather than the legacy file keychain, which ignores the access group
+    /// and so wouldn't share the token with the widget.
+    static func baseQuery(key: String) -> [String: Any] {
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
+            kSecAttrAccount as String: key
         ]
+        #if os(macOS)
+        query[kSecUseDataProtectionKeychain as String] = true
+        #endif
+        return query
+    }
+
+    static func save(key: String, data: Data) throws {
+        let searchQuery = baseQuery(key: key)
 
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
         ]
 
         // Try updating an existing item first (atomic — old value preserved on failure)
@@ -58,13 +70,9 @@ enum KeychainHelper {
     }
 
     static func load(key: String) -> Data? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
+        var query = baseQuery(key: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
 
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
@@ -73,11 +81,7 @@ enum KeychainHelper {
     }
 
     static func delete(key: String) {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-        ]
+        let query = baseQuery(key: key)
 
         SecItemDelete(query as CFDictionary)
     }

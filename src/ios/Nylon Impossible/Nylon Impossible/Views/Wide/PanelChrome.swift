@@ -46,3 +46,39 @@ struct PanelChrome<Content: View>: View {
             .background(Theme.Colors.canvas)
     }
 }
+
+/// What the board's trailing panel shows: a todo's detail, or Done or
+/// Settings. Takes plain values so it never reads the board's queries from
+/// the inspector's own view graph (see `ContentView.boardWithPanel`).
+struct WidePanel: View {
+    let todo: TodoItem?
+    let route: AccountRoute?
+    let lists: [TodoListModel]
+    let actions: TodoActions
+    let apiService: APIService?
+    let userId: String?
+    let showsCalendar: Bool
+    let onClose: () -> Void
+
+    var body: some View {
+        if let todo {
+            TodoDetailSheet(
+                todo: todo,
+                actions: actions,
+                lists: lists,
+                apiService: apiService,
+                userId: userId,
+                showsCalendar: showsCalendar,
+                onClose: onClose
+            )
+            .id("\(todo.id)-\(showsCalendar)")
+        } else if let route {
+            PanelChrome(onClose: onClose) {
+                switch route {
+                case .done: DoneHistoryView(actions: actions, lists: lists)
+                case .settings: SettingsView()
+                }
+            }
+        }
+    }
+}

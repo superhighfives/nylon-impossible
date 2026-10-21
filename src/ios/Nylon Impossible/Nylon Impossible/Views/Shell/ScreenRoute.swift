@@ -21,6 +21,14 @@
 //  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
+//  On a Mac the same routes run against the board window:
+//
+//    "Nylon Impossible.app/Contents/MacOS/Nylon Impossible" -NylonScreen board
+//
+//  `settings` draws the Settings window's view, `menubar` the menu bar
+//  extra's quick-add, `share` the share extension at its Mac sheet size, and
+//  `widgets` the desktop sizes. `menu` right-clicks the selected row.
+//
 //  States for the quality pass, on either layout: signin (the signed-out
 //  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
 //  Today, two waiting in This Week), syncerror (Today, or the board, under
@@ -37,6 +45,8 @@ enum ScreenRoute: String, CaseIterable {
     case share, sharetext, widgets
     case board, column, inspector, menu
     case signin, loading, empty, syncerror, perf
+    /// macOS: the menu bar extra's quick-add, drawn in the window.
+    case menubar
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
     static var launch: ScreenRoute? {
@@ -133,7 +143,9 @@ struct ScreenRouteRoot: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
             }
             .ignoresSafeArea()
+            #if os(iOS)
             .statusBarHidden()
+            #endif
         } else {
             content
         }
@@ -150,6 +162,29 @@ struct ScreenRouteRoot: View {
         case .widgets:
             WidgetGallery(container: container)
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
+        #if os(macOS)
+        case .settings:
+            MacSettingsView()
+                .environment(preferences)
+                .environment(syncService)
+                .environment(authService)
+                .environment(MacServices.shared.settings)
+                .environment(\.screenRoute, route)
+                .modelContainer(container)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(Color(nsColor: .windowBackgroundColor))
+                .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
+        case .menubar:
+            QuickAddView(presentation: .menuBar)
+                .environment(authService)
+                .environment(syncService)
+                .environment(\.screenRoute, route)
+                .modelContainer(container)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(Theme.Colors.fill)
+                .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
+        #endif
         default: app
         }
     }
@@ -174,11 +209,17 @@ struct ScreenRouteRoot: View {
                 )
             }
         }
+        #if os(macOS)
+        // The extension's sheet size on a Mac (`ShareViewController`).
+        .frame(width: 460, height: 380)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.Colors.fill)
+        #endif
         .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
     }
 
     private var app: some View {
-        ContentView()
+        ContentRoot()
             .environment(authService)
             .environment(syncService)
             .environment(preferences)

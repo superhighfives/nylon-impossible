@@ -13,7 +13,7 @@ import SwiftData
 /// conflicts with the main app process. Full bidirectional sync happens the next time the main
 /// app is foregrounded and SyncService.sync() runs.
 struct BackgroundSyncService {
-    static let appGroupSuiteName = "group.com.superhighfives.Nylon-Impossible"
+    static let appGroupSuiteName = AppGroup.identifier
     /// Shared-defaults key for the signed-in Clerk user. Read by every target
     /// that touches the store without Clerk: the share extension, the Siri
     /// intent, the widget, and this service.

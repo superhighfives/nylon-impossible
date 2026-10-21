@@ -11,7 +11,7 @@
 		23ABA4082F593570004D3D1A /* Nylon Share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 23ABA3FE2F593570004D3D1A /* Nylon Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DD00000E2F5B00000000000E /* Nylon Widget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DD0000012F5B000000000001 /* Nylon Widget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A52F493BDB00D8344D /* ClerkKit */; };
-		23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A72F493BDB00D8344D /* ClerkKitUI */; };
+		23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, ); productRef = 23E768A72F493BDB00D8344D /* ClerkKitUI */; };
 		AA0000012FA800000000SE01 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000022FA800000000SE02 /* Sentry */; };
 /* End PBXBuildFile section */
 
@@ -78,6 +78,9 @@
 				Models/TodoItem.swift,
 				Models/TodoListModel.swift,
 				Models/TodoUrl.swift,
+				Platform/AppGroup.swift,
+				Platform/PlatformShims.swift,
+				Platform/StoreChangeSignal.swift,
 				"Resources/Fonts/Archivo-Variable.ttf",
 				Services/ShareCapture.swift,
 				Services/SharedModelContainer.swift,
@@ -125,6 +128,8 @@
 				Models/TodoItem.swift,
 				Models/TodoListModel.swift,
 				Models/TodoUrl.swift,
+				Platform/AppGroup.swift,
+				Platform/StoreChangeSignal.swift,
 				Services/APIError.swift,
 				Services/BackgroundSyncService.swift,
 				Services/Config.swift,
@@ -134,8 +139,8 @@
 				Services/TodayDigest.swift,
 				Services/TodoCompletionService.swift,
 				Theme/Theme.swift,
-				Utils/FractionalIndexing.swift,
 				Utils/DeepLink.swift,
+				Utils/FractionalIndexing.swift,
 				Utils/KeychainHelper.swift,
 				Utils/Recurrence.swift,
 				Utils/TodoDateParser.swift,
@@ -580,6 +585,18 @@
 		23ABA40B2F593570004D3D1A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Share/Nylon Share-macOS.entitlements";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				CODE_SIGN_ENTITLEMENTS = "Nylon Share/Nylon Share.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -609,6 +626,18 @@
 		23ABA40C2F593570004D3D1A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Share/Nylon Share-macOS.entitlements";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				CODE_SIGN_ENTITLEMENTS = "Nylon Share/Nylon Share.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -757,6 +786,19 @@
 		23C298192F1AD044007315F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Impossible/Nylon Impossible-macOS.entitlements";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© Charlie Gleason";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Nylon Impossible/Nylon Impossible.entitlements";
@@ -791,6 +833,19 @@
 		23C2981A2F1AD044007315F3 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Impossible/Nylon Impossible-macOS.entitlements";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "© Charlie Gleason";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Nylon Impossible/Nylon Impossible.entitlements";
@@ -825,6 +880,18 @@
 		DD0000092F5B000000000009 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Widget/Nylon Widget-macOS.entitlements";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				CODE_SIGN_ENTITLEMENTS = "Nylon Widget/Nylon Widget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -854,6 +921,12 @@
 		CC0000092F4A000000000009 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -876,6 +949,18 @@
 		DD00000A2F5B00000000000A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Widget/Nylon Widget-macOS.entitlements";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
 				CODE_SIGN_ENTITLEMENTS = "Nylon Widget/Nylon Widget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -905,6 +990,12 @@
 		CC00000A2F4A00000000000A /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = auto;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

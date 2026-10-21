@@ -31,12 +31,16 @@ struct TodayWidgetView: View {
     private var resolvedFamily: WidgetFamily { family ?? environmentFamily }
 
     var body: some View {
+        #if os(iOS)
         switch resolvedFamily {
         case .accessoryCircular: TodayCircularView(entry: entry)
         case .accessoryRectangular: TodayRectangularView(entry: entry)
         case .accessoryInline: TodayInlineView(entry: entry)
         default: home
         }
+        #else
+        home
+        #endif
     }
 
     // MARK: - Home Screen
@@ -215,6 +219,7 @@ struct WidgetMetaLine: View {
 
 // MARK: - Lock Screen
 
+#if os(iOS)
 /// The day's count in a ring, the way the system's own circular complications
 /// read. Tapping it opens the app.
 private struct TodayCircularView: View {
@@ -295,3 +300,4 @@ private struct TodayInlineView: View {
         }
     }
 }
+#endif

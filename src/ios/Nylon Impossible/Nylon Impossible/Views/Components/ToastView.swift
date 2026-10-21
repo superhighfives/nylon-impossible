@@ -75,8 +75,14 @@ extension View {
     /// The Magic Tap (VoiceOver's two-finger double-tap) runs the toast's
     /// action — Undo, View — wherever focus is. Attach it at a screen's root.
     func toastMagicTap(_ toasts: ToastCenter) -> some View {
+        #if os(iOS)
         accessibilityAction(.magicTap) {
             if toasts.current?.actionLabel != nil { toasts.performAction() }
         }
+        #else
+        // VoiceOver on the Mac has no Magic Tap; ⌘Z reaches Undo instead
+        // (`ToastUndoBridge`).
+        self
+        #endif
     }
 }

@@ -42,8 +42,7 @@ struct SettingsView: View {
             .padding(.bottom, Theme.Space.s16)
         }
         .background(Theme.Colors.canvas)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(Theme.Colors.canvas, for: .navigationBar)
+        .inlineNavigationBar()
         .alert("Delete your account?", isPresented: $confirmsDelete) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) { Task { await performDelete() } }
@@ -227,8 +226,8 @@ struct TimezonePickerView: View {
             .padding(.bottom, Theme.Space.s16)
         }
         .background(Theme.Colors.canvas)
-        .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search")
-        .navigationBarTitleDisplayMode(.inline)
+        .alwaysSearchable(text: $query, prompt: "Search")
+        .inlineNavigationBar(background: false)
     }
 
     private func choice(_ title: String, detail: String? = nil, isOn: Bool, action: @escaping () -> Void) -> some View {

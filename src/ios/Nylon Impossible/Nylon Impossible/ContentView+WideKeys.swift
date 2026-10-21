@@ -66,6 +66,39 @@ extension ContentView {
         }
     }
 
+    /// A menu command that isn't one of the board's single keys: File ▸ New
+    /// List, View ▸ Today / This Week / Someday / Show Done, the details
+    /// toggle, and Todo ▸ Move to ▸ one of your lists.
+    func run(_ command: BoardMenuCommand) {
+        switch command {
+        case .key(let key):
+            perform(key)
+        case .newTodo:
+            perform(.new)
+        case .newList:
+            newListName = ""
+            showsNewList = true
+        case .showList(let kind):
+            guard let list = orderedLists.first(where: { $0.systemKind == kind }) else { return }
+            focusColumn(list.id)
+        case .showDone:
+            showPanel(.done)
+        case .toggleInspector:
+            if detailTodo != nil || widePanel != nil {
+                closePanel()
+            } else if let id = selectedTodoId, let todo = todos.first(where: { $0.id == id }) {
+                openWide(todo)
+            }
+        case .moveToList(let listId):
+            guard let column = focusedColumn,
+                  let id = selectedTodoId,
+                  let todo = todos.first(where: { $0.id == id }),
+                  todo.listKey?.lowercased() != listId.lowercased() else { return }
+            selectedTodoId = BoardNavigator.neighbor(of: id, in: rows(column).map(\.id))
+            actions.move(todo, toList: listId)
+        }
+    }
+
     // MARK: - Size-class changes
 
     /// Carry what's open across a switch between the board and the phone

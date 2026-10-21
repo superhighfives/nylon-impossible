@@ -92,6 +92,9 @@ struct CompleteTodoIntent: AppIntent {
         }
 
         WidgetRefresh.reload()
+        // A running Mac app refreshes its Dock badge and syncs; see
+        // `StoreChangeSignal`.
+        StoreChangeSignal.post()
 
         // Push it now, the way the Siri intent does. Failing here is normal —
         // no credentials, an expired token, no signal — and costs nothing: the

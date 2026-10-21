@@ -76,19 +76,35 @@ enum TodayDigest {
         // are awkward (see `fetchAllTodos`), and `isEffectivelyCompleted` —
         // which keeps a repeat completed today out of the list until local
         // midnight — is a computed property a predicate can't reach at all.
+        let ordered = select(
+            todos,
+            todayListId: todayListId(userId: userId, context: context),
+            userId: userId,
+            now: now
+        )
+        guard let limit else { return ordered }
+        return Array(ordered.prefix(limit))
+    }
+
+    /// The digest over todos already in hand — the Mac's menu bar list, which
+    /// takes them from a live `@Query` so it redraws as they change. Same rule
+    /// and order as `fetch`.
+    static func select(
+        _ todos: [TodoItem],
+        todayListId: String?,
+        userId: String?,
+        now: Date = Date()
+    ) -> [TodoItem] {
         let cutoff = dueByEndOfTodayCutoff(now: now)
-        let todayList = todayListId(userId: userId, context: context)
+        let todayList = todayListId?.lowercased()
         let forToday = todos.filter { todo in
             guard todo.userId == userId, todo.parentId == nil else { return false }
-            guard !todo.isEffectivelyCompleted else { return false }
+            guard !todo.isSoftDeleted, !todo.isEffectivelyCompleted else { return false }
             if let todayList, todo.listKey?.lowercased() == todayList { return true }
             guard let dueDate = todo.dueDate else { return false }
             return dueDate < cutoff
         }
-
-        let ordered = sorted(forToday)
-        guard let limit else { return ordered }
-        return Array(ordered.prefix(limit))
+        return sorted(forToday)
     }
 
     /// The id of the user's Today list, lowercased to match the way `listKey`
