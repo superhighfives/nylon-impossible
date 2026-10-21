@@ -150,6 +150,7 @@ extension TodoDetailSheet {
         .fontWeight(.medium)
         .foregroundStyle(Theme.Colors.destructive)
         .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
+        .contentShape(Rectangle())
         .padding(.leading, -Theme.Space.s2)
         .padding(.horizontal, Theme.Space.s2)
         .buttonStyle(.plain)

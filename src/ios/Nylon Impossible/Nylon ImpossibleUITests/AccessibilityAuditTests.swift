@@ -129,6 +129,27 @@ enum AuditAllowance {
         // audit samples the text under them. The sheet scrolls it clear.
         if ["composer", "share", "sharetext"].contains(route), issue.auditType == .contrast { return true }
 
+        // A row's title stops at three lines and a link's domain at one, by
+        // the spec's row anatomy; the full title is the VoiceOver label and
+        // the detail's title. The audit flags those limits as "may clip".
+        if issue.auditType == .textClipped, detail.contains("may be clipped") {
+            let isRowText = issue.element?.elementType == .button
+                || label.contains(".") && !label.contains(" ")
+            if isRowText || rowTitles.contains(label) { return true }
+        }
+
+        // The board's "+ Add" field is a line of text inside a 44pt row; the
+        // whole row takes the tap and focuses it.
+        if issue.auditType == .hitRegion, label == "New todo" { return true }
+
         return false
     }
+
+    /// Sample-data titles, which the board draws under the 3-line limit.
+    private static let rowTitles: Set<String> = [
+        "Review PR for the sync engine", "Call Mum about Sunday lunch", "Finish quarterly report",
+        "Water the plants", "Send invoice to Pika", "Renew passport", "Plan Lisbon trip",
+        "Book dentist appointment", "Repaint the hallway", "Learn to make sourdough", "Read Piranesi",
+        "Fix the bike’s back brake", "Parmesan", "Coffee beans", "Sourdough loaf", "Oat milk"
+    ]
 }

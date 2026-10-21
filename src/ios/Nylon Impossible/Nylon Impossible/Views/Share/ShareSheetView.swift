@@ -99,7 +99,8 @@ struct ShareSheetView: View {
                 Button("Cancel", action: onCancel)
                     .textStyle(Theme.Fonts.Role.control)
                     .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(minHeight: Theme.Space.rowMinHeight)
+                    .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
+                    .contentShape(Rectangle())
                     .buttonStyle(.plain)
                 Spacer()
             }

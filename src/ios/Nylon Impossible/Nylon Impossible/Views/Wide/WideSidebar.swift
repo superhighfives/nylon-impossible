@@ -103,7 +103,7 @@ struct WideSidebar: View {
         return Button(action: action) {
             HStack {
                 Text(entry.list.name)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if entry.openTodos > 0 {
                     Text("\(entry.openTodos)")
@@ -190,10 +190,12 @@ struct WideSidebar: View {
         } label: {
             HStack(spacing: Theme.Space.s2) {
                 AvatarView(imageURL: avatarURL, initials: initials, size: 24)
+                // Ink, not muted: a Menu label is drawn dimmed, which took
+                // muted ink under 4.5:1.
                 Text(name)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .textStyle(Theme.Fonts.Role.meta)
-                    .foregroundStyle(Theme.Colors.inkMuted)
+                    .foregroundStyle(Theme.Colors.ink)
             }
             .padding(.horizontal, 10)
             .frame(minHeight: Theme.Wide.sidebarRow)

@@ -81,12 +81,15 @@ struct BoardColumn<Accessory: View>: View {
             Text(title)
                 .textStyle(Theme.Fonts.Role.columnTitle, tracking: Theme.Tracking.masthead)
                 .foregroundStyle(Theme.Colors.ink)
-                .lineLimit(1)
+                // Wraps (then shrinks a little) at large sizes in a narrow
+                // column rather than clipping "This Week".
+                .lineLimit(2)
+                .minimumScaleFactor(0.7)
                 .accessibilityAddTraits(.isHeader)
             Text(subline)
                 .textStyle(Theme.Fonts.Role.meta)
                 .foregroundStyle(Theme.Colors.inkMuted)
-                .lineLimit(1)
+                .lineLimit(2)
                 .padding(.top, 10)
         }
         .frame(maxWidth: .infinity, minHeight: headerHeight, maxHeight: headerHeight, alignment: .bottomLeading)
