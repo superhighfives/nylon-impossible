@@ -41,7 +41,8 @@ struct SignInView: View {
                 authIsPresented = true
             } label: {
                 Text("Sign in")
-                    .font(.system(size: 17, weight: .semibold))
+                    .textStyle(Theme.Fonts.Role.body)
+                    .fontWeight(.semibold)
                     .foregroundStyle(Theme.Colors.brandInk)
                     .frame(maxWidth: .infinity, minHeight: 52)
                     .background(Theme.Colors.brand, in: RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous))

@@ -24,11 +24,10 @@ extension Theme {
         static let columnHeader: CGFloat = 140
         /// The trailing panel (detail, Done, Settings).
         static let panelWidth: CGFloat = 400
-        /// The sidebar's row height and corner radius.
-        static let sidebarRow: CGFloat = 36
+        /// The sidebar's row height and corner radius. 44, the touch
+        /// minimum: an iPad is still a touch screen without a pointer.
+        static let sidebarRow: CGFloat = Theme.Space.rowMinHeight
         static let sidebarRadius: CGFloat = 8
-        /// The keyboard focus ring around a row.
-        static let focusRing: CGFloat = 2
     }
 }
 

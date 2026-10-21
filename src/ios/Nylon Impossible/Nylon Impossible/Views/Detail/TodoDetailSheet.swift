@@ -267,7 +267,7 @@ struct TodoDetailSheet: View {
     var notesField: some View {
         VStack(alignment: .leading, spacing: 6) {
             SectionLabel(text: "Notes")
-            TextField("Add notes", text: $notes, axis: .vertical)
+            TextField("Add notes", text: $notes, prompt: Text("Add notes").foregroundStyle(Theme.Colors.inkMuted), axis: .vertical)
                 .textStyle(Theme.Fonts.Role.body)
                 .foregroundStyle(Theme.Colors.ink)
                 .lineLimit(3...)

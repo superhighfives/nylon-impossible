@@ -85,6 +85,7 @@
 				Utils/TodoMeta.swift,
 				Utils/TodoText.swift,
 				Utils/WidgetRefresh.swift,
+				Views/Components/FlowLayout.swift,
 				Views/Components/Primitives.swift,
 				Views/Composer/Composer.swift,
 				Views/Share/ShareSheetView.swift,

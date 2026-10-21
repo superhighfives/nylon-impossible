@@ -74,7 +74,8 @@ struct ListsIndexPage: View {
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(Theme.Colors.inkMuted)
                 .accessibilityHidden(true)
-            TextField("New list", text: $newName)
+            // The prompt in muted ink: the system placeholder grey is under 4.5:1.
+            TextField("New list", text: $newName, prompt: Text("New list").foregroundStyle(Theme.Colors.inkMuted))
                 .textStyle(Theme.Fonts.Role.listName, tracking: Theme.Tracking.title)
                 .foregroundStyle(Theme.Colors.ink)
                 .focused($isNaming)

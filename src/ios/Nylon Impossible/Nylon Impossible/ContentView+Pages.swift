@@ -30,7 +30,7 @@ extension ContentView {
                                 .transition(.opacity)
                         }
                     }
-                    .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: overnightText)
+                    .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnightText)
                 }
             } else {
                 loading(page.title)

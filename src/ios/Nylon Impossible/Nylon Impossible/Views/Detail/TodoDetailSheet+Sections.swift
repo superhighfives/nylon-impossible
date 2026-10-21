@@ -41,12 +41,24 @@ extension TodoDetailSheet {
                 .contentShape(Rectangle())
                 .contextMenu {
                     Button(role: .destructive) {
-                        actions.viewModel.deleteTodo(subtask, context: modelContext)
-                        actions.edited()
+                        deleteSubtask(subtask)
                     } label: {
                         Label("Delete", systemImage: Theme.Icon.delete)
                     }
                 }
+                // One element per subtask: its title, whether it's done, and
+                // a double-tap that ticks it. Delete is an action rather
+                // than a long-press only.
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(subtask.title)
+                .accessibilityValue(subtask.isCompleted ? "Done" : "Not done")
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint(subtask.isCompleted ? "Marks it not done" : "Marks it done")
+                .accessibilityAction {
+                    actions.viewModel.toggleSubtask(subtask)
+                    actions.edited()
+                }
+                .accessibilityAction(named: "Delete") { deleteSubtask(subtask) }
             }
             HStack(spacing: Theme.Space.s3) {
                 Image(systemName: Theme.Icon.add)
@@ -54,7 +66,7 @@ extension TodoDetailSheet {
                     .foregroundStyle(Theme.Colors.inkMuted)
                     .frame(width: Theme.Phone.subtaskCheckbox)
                     .accessibilityHidden(true)
-                TextField("Add subtask", text: $newSubtask)
+                TextField("Add subtask", text: $newSubtask, prompt: Text("Add subtask").foregroundStyle(Theme.Colors.inkMuted))
                     .textStyle(Theme.Fonts.Role.subtask)
                     .foregroundStyle(Theme.Colors.ink)
                     .focused($focus, equals: .subtask)
@@ -64,6 +76,11 @@ extension TodoDetailSheet {
             }
             .frame(minHeight: Theme.Space.rowMinHeight)
         }
+    }
+
+    func deleteSubtask(_ subtask: TodoItem) {
+        actions.viewModel.deleteTodo(subtask, context: modelContext)
+        actions.edited()
     }
 
     func addSubtask() {
@@ -100,35 +117,50 @@ extension TodoDetailSheet {
 
     // MARK: - Footer
 
+    /// Delete and Share, then the dates; at large text sizes the dates drop
+    /// to their own line rather than shrinking past legibility.
     var footer: some View {
-        HStack(spacing: Theme.Space.s2) {
-            Button("Delete") {
-                close()
-                actions.delete(todo)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Theme.Space.s2) {
+                footerButtons
+                Spacer(minLength: Theme.Space.s2)
+                footerDates.lineLimit(1)
             }
-            .textStyle(Theme.Fonts.Role.control)
-            .fontWeight(.medium)
-            .foregroundStyle(Theme.Colors.destructive)
-            .frame(minHeight: Theme.Space.rowMinHeight)
-            .padding(.leading, -Theme.Space.s2)
-            .padding(.horizontal, Theme.Space.s2)
-            .buttonStyle(.plain)
-
-            ShareLink(item: shareText(for: todo, urls: urls)) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
+            VStack(alignment: .leading, spacing: Theme.Space.s1) {
+                HStack(spacing: Theme.Space.s2) { footerButtons }
+                footerDates
             }
-            .accessibilityLabel("Share")
-
-            Spacer(minLength: Theme.Space.s2)
-
-            Text(DayLabel.footer(created: todo.createdAt, edited: todo.updatedAt))
-                .textStyle(Theme.Fonts.Role.meta)
-                .foregroundStyle(Theme.Colors.inkMuted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
         }
+    }
+
+    var footerDates: some View {
+        Text(DayLabel.footer(created: todo.createdAt, edited: todo.updatedAt))
+            .textStyle(Theme.Fonts.Role.meta)
+            .foregroundStyle(Theme.Colors.inkMuted)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    var footerButtons: some View {
+        Button("Delete") {
+            close()
+            actions.delete(todo)
+        }
+        .textStyle(Theme.Fonts.Role.control)
+        .fontWeight(.medium)
+        .foregroundStyle(Theme.Colors.destructive)
+        .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
+        .padding(.leading, -Theme.Space.s2)
+        .padding(.horizontal, Theme.Space.s2)
+        .buttonStyle(.plain)
+        .accessibilityLabel("Delete todo")
+
+        ShareLink(item: shareText(for: todo, urls: urls)) {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Theme.Colors.inkMuted)
+                .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
+        }
+        .accessibilityLabel("Share")
     }
 }

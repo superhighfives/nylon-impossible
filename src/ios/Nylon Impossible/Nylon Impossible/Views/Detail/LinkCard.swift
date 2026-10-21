@@ -15,6 +15,8 @@ struct LinkCard: View {
     let onRetry: () -> Void
     let onRemove: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
     /// A pending fetch untouched this long has almost certainly been lost.
     private static let stalePending: TimeInterval = 30
 
@@ -75,9 +77,10 @@ struct LinkCard: View {
             tile
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 15, weight: .medium))
+                    .textStyle(Theme.Fonts.Role.control)
+                    .fontWeight(.medium)
                     .foregroundStyle(Theme.Colors.ink)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
                     .truncationMode(url.showsPreview ? .tail : .middle)
                 Text(subtitle)
                     .textStyle(Theme.Fonts.Role.meta)

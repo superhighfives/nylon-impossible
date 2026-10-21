@@ -35,6 +35,7 @@ struct BoardColumn<Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
 
     @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isTargeted = false
     @State private var targetedRow: UUID?
 
@@ -68,7 +69,7 @@ struct BoardColumn<Accessory: View>: View {
         .frame(maxHeight: .infinity, alignment: .top)
         .background(isTargeted ? Theme.Colors.fill : (isTinted ? Theme.Colors.surface : Theme.Colors.canvas))
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isTargeted)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: overnight?.text)
+        .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.text)
         .todoDropTarget(isTargeted: $isTargeted) { onDrop($0, nil) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
@@ -103,7 +104,8 @@ struct BoardColumn<Accessory: View>: View {
             todo: todo,
             subtasks: subtasks[todo.id] ?? [],
             actions: actions,
-            isSelected: selectedId == todo.id
+            isSelected: selectedId == todo.id,
+            lists: lists
         ) {
             onOpen(todo)
         }
