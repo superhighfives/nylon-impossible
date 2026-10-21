@@ -132,19 +132,32 @@ extension ContentView {
         Task { await authService.signOut() }
     }
 
-    /// The Home Screen "New Task" quick action: focus the composer on the
-    /// list in view (Today, from the Lists index).
-    func performPendingQuickAction() {
-        guard let action = QuickActionService.shared.take() else { return }
-        switch action {
-        case .newTask:
-            if isWide {
-                if let id = (focusedColumn ?? timeList(.today))?.id { requestComposer(id) }
-                return
-            }
-            if currentListId == nil { viewModel.page = .today }
-            focusComposer = true
+    /// Follow a route from outside — `nylon://add?list=…`, the "New todo"
+    /// quick action, the widget's "+" or the Control Center control: the
+    /// named list, with the composer focused. Anything covering the composer
+    /// (the detail sheet, the account sheet) is put away first.
+    func performPendingRoute() {
+        guard let link = QuickActionService.shared.take() else { return }
+        switch link {
+        case .add(let target):
+            openComposer(DeepLinkDestination.resolve(target, lists: orderedLists))
         }
+    }
+
+    func openComposer(_ destination: DeepLinkDestination) {
+        detailTodo = nil
+        showsAccount = false
+        if isWide {
+            if let collectionId = destination.collectionId { openColumnId = collectionId }
+            // Before the first sync there are no lists, so no column to focus;
+            // the board's Today column is the closest thing.
+            if let id = destination.listId ?? timeList(.today)?.id { requestComposer(id) }
+            return
+        }
+        chosenListId = nil
+        viewModel.openCollectionId = destination.collectionId
+        viewModel.page = destination.page
+        focusComposer = true
     }
 
     func scheduleMidnightTicks() async {
@@ -167,6 +180,7 @@ extension ContentView {
         guard let route = screenRoute else { return }
         switch route {
         case .today, .overnight, .board: viewModel.page = .today
+        case .link: break
         case .column:
             openColumnId = collections.first?.id
             focusedColumnId = openColumnId

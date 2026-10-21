@@ -194,8 +194,8 @@ struct ContentView: View {
             if phase != .active { actions.flush() }
         }
         .onChange(of: isWide, initial: true) { _, wide in carryAcross(toWide: wide) }
-        .onAppear { performPendingQuickAction() }
-        .onChange(of: QuickActionService.shared.pending) { performPendingQuickAction() }
+        .onAppear { performPendingRoute() }
+        .onChange(of: QuickActionService.shared.pending) { performPendingRoute() }
     }
 
     // MARK: - Phone

@@ -6,7 +6,7 @@ import UIKit
 @MainActor
 struct QuickActionTests {
     private func shortcutItem(type: String) -> UIApplicationShortcutItem {
-        UIApplicationShortcutItem(type: type, localizedTitle: "New Task")
+        UIApplicationShortcutItem(type: type, localizedTitle: "New todo")
     }
 
     // MARK: - Mapping shortcut items
@@ -43,14 +43,14 @@ struct QuickActionTests {
         }
     }
 
-    @Test("Declares a New Task shortcut item")
+    @Test("Declares a New todo shortcut item")
     func declaresNewTask() {
         let declared = Bundle.main.object(forInfoDictionaryKey: "UIApplicationShortcutItems")
             as? [[String: Any]] ?? []
         let newTask = declared.first {
             $0["UIApplicationShortcutItemType"] as? String == QuickAction.newTask.rawValue
         }
-        #expect(newTask?["UIApplicationShortcutItemTitle"] as? String == "New Task")
+        #expect(newTask?["UIApplicationShortcutItemTitle"] as? String == "New todo")
     }
 
     // MARK: - Handing off to the UI
@@ -59,10 +59,24 @@ struct QuickActionTests {
     func takeConsumesOnce() {
         let service = QuickActionService.shared
         service.post(.newTask)
-        #expect(service.pending == .newTask)
-        #expect(service.take() == .newTask)
+        #expect(service.pending == .add(list: .today))
+        #expect(service.take() == .add(list: .today))
         // Cleared, so returning to the app later doesn't replay it.
         #expect(service.pending == nil)
+        #expect(service.take() == nil)
+    }
+
+    @Test("The quick action takes the same route as nylon://add?list=today")
+    func quickActionMatchesDeepLink() throws {
+        let url = try #require(URL(string: "nylon://add?list=today"))
+        #expect(QuickAction.newTask.deepLink == DeepLink(url: url))
+    }
+
+    @Test("A posted deep link waits for take()")
+    func postsDeepLink() {
+        let service = QuickActionService.shared
+        service.post(.add(list: .thisWeek))
+        #expect(service.take() == .add(list: .thisWeek))
         #expect(service.take() == nil)
     }
 

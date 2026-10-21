@@ -5,7 +5,9 @@
 //  SwiftUI's `App` has no hook for Home Screen quick actions, so the app keeps
 //  a minimal UIKit delegate pair purely to receive them. The app delegate
 //  exists only to install `QuickActionSceneDelegate`, which is where the two
-//  delivery paths — cold launch and resume — actually land.
+//  delivery paths — cold launch and resume — actually land. `nylon://` URLs
+//  arrive on the same two paths, so they're received here too and parked
+//  the same way.
 //
 
 import UIKit
@@ -41,8 +43,15 @@ final class QuickActionSceneDelegate: UIResponder, UIWindowSceneDelegate {
         willConnectTo session: UISceneSession,
         options connectionOptions: UIScene.ConnectionOptions
     ) {
-        guard let shortcutItem = connectionOptions.shortcutItem else { return }
-        _ = post(shortcutItem)
+        if let shortcutItem = connectionOptions.shortcutItem {
+            _ = post(shortcutItem)
+        }
+        post(connectionOptions.urlContexts)
+    }
+
+    /// A `nylon://` URL opened while the app was running.
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        post(URLContexts)
     }
 
     /// The app was already running: the action arrives here instead.
@@ -52,6 +61,16 @@ final class QuickActionSceneDelegate: UIResponder, UIWindowSceneDelegate {
         completionHandler: @escaping (Bool) -> Void
     ) {
         completionHandler(post(shortcutItem))
+    }
+
+    /// Anything that isn't a `nylon://` link — Clerk's sign-in callback — is
+    /// left alone.
+    private func post(_ contexts: Set<UIOpenURLContext>) {
+        for context in contexts {
+            if let link = DeepLink(url: context.url) {
+                QuickActionService.shared.post(link)
+            }
+        }
     }
 
     /// - Returns: whether the item was one the app recognises.

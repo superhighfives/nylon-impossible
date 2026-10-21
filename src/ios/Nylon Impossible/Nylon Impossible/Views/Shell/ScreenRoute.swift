@@ -9,7 +9,10 @@
 //      -NylonScreen detail -NylonDark YES
 //
 //  Screens: today, week, someday, lists, collection, detail, composer, done,
-//  settings, overnight (Today with the overnight note). On iPad: board,
+//  settings, overnight (Today with the overnight note), link (no state of
+//  its own; pair it with `-NylonOpenURL nylon://add?list=this-week` to follow
+//  a deep link the way a tapped widget or control would — simctl's openurl
+//  stops at a system "Open in Nylon?" prompt a script can't answer). On iPad: board,
 //  column (a list open as the fourth column), inspector (the detail panel),
 //  menu (a row selected, ready for a long-press). `-NylonLandscape YES`
 //  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
@@ -20,7 +23,7 @@ import SwiftData
 import SwiftUI
 
 enum ScreenRoute: String, CaseIterable {
-    case today, week, someday, lists, collection, detail, composer, done, settings, overnight
+    case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
     case board, column, inspector, menu
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
@@ -41,6 +44,18 @@ enum ScreenRoute: String, CaseIterable {
         UserDefaults.standard.bool(forKey: "NylonLandscape")
         #else
         false
+        #endif
+    }
+
+    /// `-NylonOpenURL <url>`: a deep link to follow on launch, through the
+    /// same `DeepLink` parsing the scene delegate uses.
+    static var launchDeepLink: DeepLink? {
+        #if DEBUG
+        UserDefaults.standard.string(forKey: "NylonOpenURL")
+            .flatMap(URL.init(string:))
+            .flatMap(DeepLink.init(url:))
+        #else
+        nil
         #endif
     }
 

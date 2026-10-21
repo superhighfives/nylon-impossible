@@ -17,7 +17,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSSiriUsageDescription</key>
-	<string>Siri helps you add tasks to Nylon with your voice.</string>
+	<string>Siri helps you add todos to Nylon with your voice.</string>
 	<key>INAlternativeAppNames</key>
 	<array>
 		<dict>
@@ -38,6 +38,16 @@
 				<string>clerk.nylonimpossible.com</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.superhighfives.Nylon-Impossible</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nylon</string>
+			</array>
+		</dict>
 	</array>
 	<key>UIAppFonts</key>
 	<array>
@@ -49,7 +59,7 @@
 			<key>UIApplicationShortcutItemType</key>
 			<string>com.superhighfives.Nylon-Impossible.new-task</string>
 			<key>UIApplicationShortcutItemTitle</key>
-			<string>New Task</string>
+			<string>New todo</string>
 			<key>UIApplicationShortcutItemIconSymbolName</key>
 			<string>plus.circle</string>
 		</dict>
