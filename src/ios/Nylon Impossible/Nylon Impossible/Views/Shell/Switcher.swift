@@ -9,7 +9,6 @@
 //
 
 import SwiftUI
-import UniformTypeIdentifiers
 
 struct Switcher: View {
     typealias Page = TodoViewModel.Page
@@ -120,8 +119,7 @@ private struct DropTarget: ViewModifier {
         if page.systemKind == nil {
             content
         } else {
-            content.onDrop(
-                of: [UTType.plainText],
+            content.todoDropTarget(
                 isTargeted: Binding(
                     get: { targeted == page },
                     set: { isOver in
@@ -132,13 +130,8 @@ private struct DropTarget: ViewModifier {
                         }
                     }
                 )
-            ) { providers in
-                guard let provider = providers.first else { return false }
-                _ = provider.loadObject(ofClass: NSString.self) { object, _ in
-                    guard let text = object as? String, let id = UUID(uuidString: text) else { return }
-                    Task { @MainActor in onDrop(page, id) }
-                }
-                return true
+            ) { id in
+                onDrop(page, id)
             }
         }
     }

@@ -50,7 +50,7 @@ struct ListPage<Header: View>: View {
                 .listRowInsets(EdgeInsets())
                 .listRowSeparator(.hidden)
                 .listRowBackground(Theme.Colors.canvas)
-                .contextMenu { menu(for: todo) }
+                .contextMenu { TodoContextMenu(todo: todo, lists: lists, actions: actions) }
                 .itemProvider { NSItemProvider(object: todo.id.uuidString as NSString) }
             }
             .onMove { source, destination in
@@ -65,47 +65,6 @@ struct ListPage<Header: View>: View {
         .environment(\.defaultMinListRowHeight, 0)
         .contentMargins(.top, Theme.Space.s2, for: .scrollContent)
         .contentMargins(.bottom, Theme.Space.s6 + composerClearance, for: .scrollContent)
-    }
-
-    @ViewBuilder
-    private func menu(for todo: TodoItem) -> some View {
-        let here = todo.listKey?.lowercased()
-        let others = lists.filter { $0.id.lowercased() != here }
-        let timeLists = others.filter(\.isSystem)
-        let collections = others.filter { !$0.isSystem }
-
-        Section {
-            ForEach(timeLists) { target in
-                Button {
-                    actions.move(todo, toList: target.id)
-                } label: {
-                    Label("Move to \(target.name)", systemImage: "arrow.right")
-                }
-            }
-        }
-        if !collections.isEmpty {
-            Section {
-                ForEach(collections) { target in
-                    Button {
-                        actions.move(todo, toList: target.id)
-                    } label: {
-                        Label("Move to \(target.name)", systemImage: "list.bullet")
-                    }
-                }
-            }
-        }
-        Section {
-            Button {
-                actions.togglePin(todo)
-            } label: {
-                Label(todo.pinned ? "Unpin" : "Pin to top", systemImage: todo.pinned ? "pin.slash" : "pin")
-            }
-            Button(role: .destructive) {
-                actions.delete(todo)
-            } label: {
-                Label("Delete", systemImage: Theme.Icon.delete)
-            }
-        }
     }
 }
 

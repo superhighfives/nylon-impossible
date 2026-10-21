@@ -7,6 +7,10 @@
 //  the long-press menu `ListPage` attaches, and tapping the row opens the
 //  detail sheet. There are no swipe actions: a horizontal swipe pages lists.
 //
+//  On the iPad board the same row takes the wide type scale, tints under the
+//  pointer (no controls appear), and draws the keyboard focus ring when it's
+//  the selected row.
+//
 
 import SwiftUI
 
@@ -14,7 +18,15 @@ struct TodoRow: View {
     let todo: TodoItem
     let subtasks: [TodoItem]
     let actions: TodoActions
+    /// The keyboard's current row on the iPad board.
+    var isSelected = false
     let onOpen: () -> Void
+
+    @Environment(\.isWideLayout) private var isWide
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var isHovering = false
+
+    private var gutter: CGFloat { isWide ? Theme.Wide.gutter : Theme.Phone.gutter }
 
     var body: some View {
         let checked = actions.isChecked(todo)
@@ -33,7 +45,7 @@ struct TodoRow: View {
             Button(action: onOpen) {
                 VStack(alignment: .leading, spacing: Theme.Space.s1) {
                     Text(todo.title)
-                        .textStyle(Theme.Fonts.Role.rowTitle, tracking: -0.005)
+                        .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: -0.005)
                         .foregroundStyle(checked ? Theme.Colors.inkMuted : Theme.Colors.ink)
                         .strikethrough(checked, color: Theme.Colors.inkMuted)
                         .lineLimit(3)
@@ -47,14 +59,39 @@ struct TodoRow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            // The row tints itself; the pointer shouldn't also morph.
+            .hoverEffectDisabled(isWide)
             .accessibilityElement(children: .combine)
             .accessibilityHint("Opens the todo")
         }
-        .padding(.horizontal, Theme.Phone.gutter)
         .padding(.vertical, Theme.Space.s3)
         .frame(minHeight: Theme.Space.rowMinHeight)
+        .background { highlight }
+        .padding(.horizontal, gutter)
+        .onHover { isHovering = $0 }
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .opacity(actions.fading.contains(todo.id) ? 0 : 1)
         .sensoryFeedback(.impact(weight: .medium), trigger: checked) { _, isChecked in isChecked }
+    }
+
+    /// Hover tints; the keyboard's row also gets the ring (ink in light, the
+    /// accent in dark, as in the wide prototype).
+    private var highlight: some View {
+        let shape = RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+        return shape
+            .fill(Theme.Colors.fill)
+            .overlay {
+                shape.strokeBorder(
+                    colorScheme == .dark ? Theme.Colors.brand : Theme.Colors.ink,
+                    lineWidth: Theme.Wide.focusRing
+                )
+                .opacity(isSelected ? 1 : 0)
+            }
+            .opacity(isSelected || isHovering ? 1 : 0)
+            .padding(.horizontal, -10)
+            .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isHovering)
+            .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isSelected)
+            .accessibilityHidden(true)
     }
 }
 

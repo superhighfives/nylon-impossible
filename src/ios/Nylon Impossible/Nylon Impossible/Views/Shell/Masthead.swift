@@ -77,6 +77,8 @@ struct EmptyLine: View {
     let text: String
     var link: (text: String, action: () -> Void)?
 
+    @Environment(\.isWideLayout) private var isWide
+
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s2) {
             Text(text)
@@ -98,7 +100,7 @@ struct EmptyLine: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, Theme.Phone.gutter)
+        .padding(.horizontal, isWide ? Theme.Wide.gutter : Theme.Phone.gutter)
         .padding(.vertical, Theme.Space.s6)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -118,6 +120,16 @@ enum MastheadCopy {
     static func thisWeek(count: Int, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String {
         let end = calendar.date(byAdding: .day, value: 6, to: now) ?? now
         return "Through \(longDate(end, locale: locale)) · \(todos(count))"
+    }
+
+    /// The wide columns' sublines, which leave the count to the sidebar.
+    static func columnSubline(_ kind: SystemListKind?, now: Date = Date(), calendar: Calendar = .current, locale: Locale = .current) -> String {
+        switch kind {
+        case .today: return longDate(now, locale: locale)
+        case .thisWeek: return "Through \(longDate(calendar.date(byAdding: .day, value: 6, to: now) ?? now, locale: locale))"
+        case .someday: return "Whenever you’re ready"
+        default: return "List · never ages"
+        }
     }
 
     static func someday(count: Int) -> String {

@@ -40,6 +40,7 @@ extension ContentView {
         let text = viewModel.newTaskText
         viewModel.newTaskText = ""
         let created = actions.add(draft: text, to: listId, parseDates: parseDates, userId: authService.userId)
+        noteAdded(created, to: listId)
         guard !created.isEmpty, let listId, listId != currentListId else { return }
         let name = orderedLists.first { $0.id == listId }?.name ?? "List"
         let message = created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)"
@@ -47,6 +48,19 @@ extension ContentView {
         actions.toasts.show(message, actionLabel: "View", action: { [viewModel] in
             viewModel.show(listId: listId, in: lists)
         })
+    }
+
+    /// Put the overnight note away for good.
+    func dismissOvernight() {
+        guard let sweep = preferences.lastSweep else { return }
+        overnightDismissedAt = sweep.atString
+    }
+
+    /// Adding anything to Today retires the overnight note.
+    func noteAdded(_ created: [TodoItem], to listId: String?) {
+        guard !created.isEmpty, overnightText != nil else { return }
+        let today = timeList(.today)?.id.lowercased()
+        if listId == nil || listId?.lowercased() == today { dismissOvernight() }
     }
 
     func createList(_ name: String) async -> Bool {
@@ -124,6 +138,10 @@ extension ContentView {
         guard let action = QuickActionService.shared.take() else { return }
         switch action {
         case .newTask:
+            if isWide {
+                if let id = (focusedColumn ?? timeList(.today))?.id { requestComposer(id) }
+                return
+            }
             if currentListId == nil { viewModel.page = .today }
             focusComposer = true
         }
@@ -148,7 +166,10 @@ extension ContentView {
     func applyScreenRoute() {
         guard let route = screenRoute else { return }
         switch route {
-        case .today: viewModel.page = .today
+        case .today, .overnight, .board: viewModel.page = .today
+        case .column:
+            openColumnId = collections.first?.id
+            focusedColumnId = openColumnId
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday
         case .lists: viewModel.page = .lists
@@ -159,16 +180,28 @@ extension ContentView {
             viewModel.page = .thisWeek
             viewModel.newTaskText = "Call the dentist friday"
             focusComposer = true
-        case .detail, .done, .settings:
+        case .detail, .done, .settings, .inspector, .menu:
             Task {
                 try? await Task.sleep(for: .milliseconds(400))
                 switch route {
-                case .detail:
+                case .detail, .inspector:
                     viewModel.page = .thisWeek
                     if let todo = todos.first(where: { !(subtasksByParent[$0.id] ?? []).isEmpty }) {
                         detailDetent = .large
-                        detailTodo = todo
+                        if isWide { openWide(todo) } else { detailTodo = todo }
                     }
+                case .menu:
+                    // Select a row, then open its real context menu.
+                    focusedColumnId = timeList(.thisWeek)?.id
+                    selectedTodoId = timeList(.thisWeek).flatMap { rows($0).dropFirst(2).first?.id }
+                    #if DEBUG
+                    try? await Task.sleep(for: .milliseconds(1200))
+                    ScreenRouteMenu.present()
+                    #endif
+                case .done where isWide:
+                    widePanel = .done
+                case .settings where isWide:
+                    widePanel = .settings
                 case .done:
                     accountDetent = .large
                     accountPath = [.done]

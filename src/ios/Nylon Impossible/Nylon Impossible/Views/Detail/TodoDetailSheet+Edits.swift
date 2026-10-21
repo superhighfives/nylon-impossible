@@ -13,11 +13,7 @@ extension TodoDetailSheet {
     // MARK: - Edits
 
     func setDue(_ date: Date?) {
-        todo.dueDate = date
-        // A repeat is anchored on its due day, so clearing the day ends it.
-        if date == nil { todo.recurrence = nil }
-        todo.markModified()
-        actions.edited()
+        actions.setDue(todo, date)
     }
 
     func setRepeat(_ frequency: RecurrenceFrequency?) {

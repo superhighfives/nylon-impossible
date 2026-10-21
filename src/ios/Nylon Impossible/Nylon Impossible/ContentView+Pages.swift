@@ -23,7 +23,14 @@ extension ContentView {
                     empty: empty(for: page),
                     onOpen: open
                 ) {
-                    Masthead(title: page.title, subline: subline(page, count: rows.count))
+                    VStack(spacing: 0) {
+                        Masthead(title: page.title, subline: subline(page, count: rows.count))
+                        if page == .today, let overnightText {
+                            OvernightLine(text: overnightText, onDismiss: dismissOvernight)
+                                .transition(.opacity)
+                        }
+                    }
+                    .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: overnightText)
                 }
             } else {
                 loading(page.title)

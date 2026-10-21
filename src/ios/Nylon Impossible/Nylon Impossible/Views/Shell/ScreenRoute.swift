@@ -9,7 +9,10 @@
 //      -NylonScreen detail -NylonDark YES
 //
 //  Screens: today, week, someday, lists, collection, detail, composer, done,
-//  settings. The route skips sign-in and runs on in-memory sample data, so
+//  settings, overnight (Today with the overnight note). On iPad: board,
+//  column (a list open as the fourth column), inspector (the detail panel),
+//  menu (a row selected, ready for a long-press). `-NylonLandscape YES`
+//  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
 
@@ -17,7 +20,8 @@ import SwiftData
 import SwiftUI
 
 enum ScreenRoute: String, CaseIterable {
-    case today, week, someday, lists, collection, detail, composer, done, settings
+    case today, week, someday, lists, collection, detail, composer, done, settings, overnight
+    case board, column, inspector, menu
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
     static var launch: ScreenRoute? {
@@ -25,6 +29,18 @@ enum ScreenRoute: String, CaseIterable {
         UserDefaults.standard.string(forKey: "NylonScreen").flatMap(ScreenRoute.init(rawValue:))
         #else
         nil
+        #endif
+    }
+
+    /// `-NylonLandscape YES` draws the app at landscape size, turned a
+    /// quarter, for an iPad screenshot. A windowed iPadOS 26 scene refuses
+    /// programmatic rotation and simctl can't turn the device, so the capture
+    /// script rotates the PNG back. Screenshot runs only.
+    static var drawsLandscape: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "NylonLandscape")
+        #else
+        false
         #endif
     }
 
@@ -65,11 +81,32 @@ struct ScreenRouteRoot: View {
         let auth = AuthService()
         _authService = State(initialValue: auth)
         _syncService = State(initialValue: SyncService(authService: auth))
-        _preferences = State(initialValue: UserPreferencesService(apiService: APIService(authService: auth)))
+        let preferences = UserPreferencesService(apiService: APIService(authService: auth))
+        preferences.timezone = TimeZone.current.identifier
+        if route == .overnight {
+            preferences.lastSweep = LastSweep(at: Date(), movedToThisWeek: 2, movedToSomeday: 1)
+            OvernightDismissal().clear()
+        }
+        _preferences = State(initialValue: preferences)
         container = SampleData.container()
     }
 
     var body: some View {
+        if ScreenRoute.drawsLandscape {
+            GeometryReader { geometry in
+                content
+                    .frame(width: geometry.size.height, height: geometry.size.width)
+                    .rotationEffect(.degrees(90))
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            }
+            .ignoresSafeArea()
+            .statusBarHidden()
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
         ContentView()
             .environment(authService)
             .environment(syncService)

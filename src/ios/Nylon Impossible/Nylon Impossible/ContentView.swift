@@ -8,6 +8,11 @@
 //  rides the keyboard through the bottom safe-area inset, so nothing here
 //  hard-codes an inset.
 //
+//  On iPad at regular width the same state drives the wide board instead
+//  (ContentView+Wide.swift): sidebar, columns and a trailing panel. Split
+//  view or Stage Manager narrowing the window to compact falls back to this
+//  phone layout, carrying an open detail, Done or Settings across.
+//
 
 import SwiftData
 import SwiftUI
@@ -19,8 +24,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.screenRoute) var screenRoute
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(AuthService.self) var authService
     @Environment(SyncService.self) var syncService
+    @Environment(UserPreferencesService.self) var preferences
+    @AppStorage(OvernightDismissal.key) var overnightDismissedAt: String?
     @Query(sort: \TodoItem.createdAt, order: .reverse) var todos: [TodoItem]
     @Query(sort: \TodoListModel.position) var lists: [TodoListModel]
 
@@ -42,7 +50,35 @@ struct ContentView: View {
     @State var midnightTick = 0
     @State var composerHeight: CGFloat = 0
 
+    // MARK: Wide (iPad) state
+    /// The collection open as the board's fourth column.
+    @State var openColumnId: String?
+    /// Done or Settings in the trailing panel.
+    @State var widePanel: AccountRoute?
+    /// The keyboard's row, and the column it's in.
+    @State var selectedTodoId: UUID?
+    @State var focusedColumnId: String?
+    /// Each column's composer: its draft, a chip picked over the default, a
+    /// focus request, and which one is being typed in.
+    @State var drafts: [String: String] = [:]
+    @State var chosenTargets: [String: String] = [:]
+    @State var composerFocusRequest: String?
+    @State var editingColumnId: String?
+    /// Raised to scroll the board to a column.
+    @State var scrollColumnId: String?
+    @State var showsDueCalendar = false
+    @State var showsNewList = false
+    @State var newListName = ""
+    @State var lastKey: (key: BoardKey, at: Date)?
+    @FocusState var boardFocused: Bool
+
     var viewModel: TodoViewModel { actions.viewModel }
+
+    /// The board, not the phone layout: an iPad window at regular width. An
+    /// iPhone in landscape can be regular too, but keeps the phone layout.
+    var isWide: Bool {
+        horizontalSizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad
+    }
 
     // MARK: - Derived
 
@@ -89,6 +125,15 @@ struct ContentView: View {
 
     var showsComposer: Bool { currentListId != nil }
 
+    /// Today's "2 moved to This Week overnight" line, or nil.
+    var overnightText: String? {
+        OvernightNote.visibleText(
+            preferences.lastSweep,
+            timeZone: OvernightNote.timeZone(named: preferences.timezone),
+            dismissedAt: overnightDismissedAt
+        )
+    }
+
     var doneCount: Int {
         todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
     }
@@ -111,6 +156,51 @@ struct ContentView: View {
         // Read so a midnight tick re-runs body (dates, repeats done today).
         // swiftlint:disable:next redundant_discardable_let
         let _ = midnightTick
+        Group {
+            if isWide {
+                wideBody
+            } else {
+                phoneBody
+            }
+        }
+        .alert("Rename list", isPresented: Binding(get: { renamingList != nil }, set: { if !$0 { renamingList = nil } })) {
+            TextField("List name", text: $renameText)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { commitRename() }
+        }
+        .confirmationDialog(
+            "Delete “\(deletingList?.name ?? "")”?",
+            isPresented: Binding(get: { deletingList != nil }, set: { if !$0 { deletingList = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete list and its todos", role: .destructive) { commitDeleteList() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Todos in this list are deleted too. This can’t be undone.")
+        }
+        .alert("New list", isPresented: $showsNewList) {
+            TextField("List name", text: $newListName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") { commitNewList() }
+        }
+        .task {
+            actions.configure(context: modelContext) { syncService.syncAfterAction() }
+            applyScreenRoute()
+            await scheduleMidnightTicks()
+        }
+        .onChange(of: reduceMotion, initial: true) { _, reduce in actions.reduceMotion = reduce }
+        .onChange(of: scenePhase) { _, phase in
+            // A delete waiting on its toast commits when you leave.
+            if phase != .active { actions.flush() }
+        }
+        .onChange(of: isWide, initial: true) { _, wide in carryAcross(toWide: wide) }
+        .onAppear { performPendingQuickAction() }
+        .onChange(of: QuickActionService.shared.pending) { performPendingQuickAction() }
+    }
+
+    // MARK: - Phone
+
+    var phoneBody: some View {
         VStack(spacing: 0) {
             Switcher(
                 current: viewModel.page,
@@ -162,34 +252,7 @@ struct ContentView: View {
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.canvas)
         }
-        .alert("Rename list", isPresented: Binding(get: { renamingList != nil }, set: { if !$0 { renamingList = nil } })) {
-            TextField("List name", text: $renameText)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") { commitRename() }
-        }
-        .confirmationDialog(
-            "Delete “\(deletingList?.name ?? "")”?",
-            isPresented: Binding(get: { deletingList != nil }, set: { if !$0 { deletingList = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Delete list and its todos", role: .destructive) { commitDeleteList() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Todos in this list are deleted too. This can’t be undone.")
-        }
         .refreshable { await syncService.sync() }
-        .task {
-            actions.configure(context: modelContext) { syncService.syncAfterAction() }
-            applyScreenRoute()
-            await scheduleMidnightTicks()
-        }
-        .onChange(of: reduceMotion, initial: true) { _, reduce in actions.reduceMotion = reduce }
-        .onChange(of: scenePhase) { _, phase in
-            // A delete waiting on its toast commits when you leave.
-            if phase != .active { actions.flush() }
-        }
-        .onAppear { performPendingQuickAction() }
-        .onChange(of: QuickActionService.shared.pending) { performPendingQuickAction() }
     }
 
     // MARK: - Pager

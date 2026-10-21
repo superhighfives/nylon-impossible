@@ -114,6 +114,8 @@ struct Nylon_ImpossibleApp: App {
             signedInRoot
             #endif
         }
+        // The iPad board's keys, for the shortcut overlay and menu bar.
+        .commands { BoardCommands() }
     }
 
     private var signedInRoot: some View {
@@ -253,6 +255,9 @@ struct RootView: View {
                 // Travelling while backgrounded changes the zone without the
                 // app seeing the notification below.
                 Task { await preferencesService?.reportDeviceTimezone() }
+                // The sweep runs at local midnight, usually while the app is
+                // backgrounded; this is when the morning note can appear.
+                Task { await preferencesService?.refreshLastSweep() }
             case .background, .inactive:
                 syncService.disconnectWebSocket()
                 // The app's single widget refresh, covering everything that

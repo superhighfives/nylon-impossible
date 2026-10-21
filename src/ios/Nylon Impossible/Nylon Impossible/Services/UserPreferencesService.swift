@@ -17,6 +17,9 @@ final class UserPreferencesService {
     /// When true the app keeps `timezone` in step with the device. Picking a
     /// zone by hand in Settings turns it off.
     var timezoneAuto: Bool = true
+    /// What the last overnight sweep moved, for Today's note. Only
+    /// `GET /users/me` carries it, so only a fetch changes it.
+    var lastSweep: LastSweep?
     var isLoading: Bool = false
     var error: Error?
 
@@ -39,6 +42,7 @@ final class UserPreferencesService {
         theme = "system"
         timezone = "UTC"
         timezoneAuto = true
+        lastSweep = nil
         hasLoaded = false
     }
 
@@ -49,6 +53,7 @@ final class UserPreferencesService {
         do {
             let user = try await apiService.getMe()
             apply(user)
+            lastSweep = user.lastSweep
             hasLoaded = true
         } catch {
             self.error = error
@@ -59,6 +64,18 @@ final class UserPreferencesService {
 
         // Launch is one of the moments the device zone is reported.
         await reportDeviceTimezone()
+    }
+
+    /// Pick up a sweep that ran while the app was in the background. Called on
+    /// return to the foreground; launch is covered by `fetchPreferences()`.
+    /// Silent on failure — the note just doesn't appear.
+    func refreshLastSweep() async {
+        guard hasLoaded else { return }
+        do {
+            lastSweep = try await apiService.getMe().lastSweep
+        } catch {
+            print("Failed to refresh the overnight sweep: \(error)")
+        }
     }
 
     func setTheme(_ newTheme: String) async {

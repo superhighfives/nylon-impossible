@@ -298,6 +298,15 @@ final class TodoActions {
         onMutate()
     }
 
+    /// Set or clear the due day. A repeat is anchored on its due day, so
+    /// clearing the day ends it.
+    func setDue(_ todo: TodoItem, _ date: Date?) {
+        todo.dueDate = date
+        if date == nil { todo.recurrence = nil }
+        todo.markModified()
+        edited()
+    }
+
     /// After an in-place edit (title, notes, due, repeat). Saves locally now;
     /// the hook decides how eagerly to sync.
     func edited() {

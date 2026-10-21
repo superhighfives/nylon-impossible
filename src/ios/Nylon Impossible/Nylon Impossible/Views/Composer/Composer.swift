@@ -8,10 +8,16 @@
 //  the words in the title. Return adds and keeps focus for the next one; a
 //  pasted list adds a todo per line.
 //
+//  On the iPad board the same composer is the quiet "+ Add" row at the top of
+//  each column (`style: .inline`): no glass, the chips under the field while
+//  it's focused, and Escape hands the keyboard back to the board.
+//
 
 import SwiftUI
 
 struct Composer: View {
+    enum Style { case floating, inline }
+
     @Binding var text: String
     /// Every list, in display order, for the target chips.
     let lists: [TodoListModel]
@@ -23,6 +29,10 @@ struct Composer: View {
     @Binding var focusRequested: Bool
     /// Add what's typed to `listId`; `parseDates` is false once × was tapped.
     let onSubmit: (_ listId: String?, _ parseDates: Bool) -> Void
+    var style: Style = .floating
+    /// Told when the field gains or loses focus, so the board can stand its
+    /// single-key shortcuts down while you type.
+    var onFocusChange: ((Bool) -> Void)?
 
     @State private var keepWords = false
     @FocusState private var isFocused: Bool
@@ -48,22 +58,49 @@ struct Composer: View {
     private var showsChips: Bool { isFocused || hasDraft }
 
     var body: some View {
+        Group {
+            switch style {
+            case .floating: floating
+            case .inline: inline
+            }
+        }
+        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: showsChips)
+        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: hasDraft)
+        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: typedDue)
+        .onChange(of: text) { _, newValue in
+            if newValue.isEmpty { keepWords = false }
+        }
+        .onChange(of: isFocused) { _, focused in onFocusChange?(focused) }
+        .onAppear(perform: takeFocusIfRequested)
+        .onChange(of: focusRequested) { takeFocusIfRequested() }
+    }
+
+    private var field: some View {
+        TextField("New todo", text: $text, prompt: prompt, axis: .vertical)
+            .textStyle(style == .inline ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body)
+            .foregroundStyle(Theme.Colors.ink)
+            .lineLimit(1...4)
+            .focused($isFocused)
+            .submitLabel(.return)
+            .onChange(of: text, handleReturn)
+            .onKeyPress(.escape) {
+                isFocused = false
+                return .handled
+            }
+            .accessibilityLabel("New todo")
+    }
+
+    private var floating: some View {
         VStack(alignment: .leading, spacing: 0) {
             if showsChips {
                 chips
+                    .padding(.horizontal, 10)
                     .transition(.opacity)
             }
             HStack(alignment: .bottom, spacing: 0) {
-                TextField("New todo", text: $text, prompt: prompt, axis: .vertical)
-                    .textStyle(Theme.Fonts.Role.body)
-                    .foregroundStyle(Theme.Colors.ink)
-                    .lineLimit(1...4)
-                    .focused($isFocused)
-                    .submitLabel(.return)
+                field
                     .padding(.horizontal, 18)
                     .padding(.vertical, 14)
-                    .onChange(of: text, handleReturn)
-                    .accessibilityLabel("New todo")
 
                 if hasDraft {
                     Button(action: submit) {
@@ -92,18 +129,37 @@ struct Composer: View {
         .onTapGesture { isFocused = true }
         .padding(.horizontal, Theme.Space.s3)
         .padding(.bottom, Theme.Space.s2)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: showsChips)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: hasDraft)
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: typedDue)
-        .onChange(of: text) { _, newValue in
-            if newValue.isEmpty { keepWords = false }
+    }
+
+    /// "+ Add": the field's own placeholder is the row, so tapping it (or
+    /// pressing n) focuses in place.
+    private var inline: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: Theme.Space.s3) {
+                Image(systemName: Theme.Icon.add)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Theme.Colors.inkMuted)
+                    .frame(width: Theme.Phone.checkbox)
+                    .accessibilityHidden(true)
+                field
+            }
+            .padding(.vertical, Theme.Space.s3)
+            .frame(minHeight: Theme.Space.rowMinHeight)
+            .contentShape(Rectangle())
+            .onTapGesture { isFocused = true }
+            if showsChips {
+                chips
+                    .padding(.bottom, Theme.Space.s1)
+                    .transition(.opacity)
+            }
         }
-        .onAppear(perform: takeFocusIfRequested)
-        .onChange(of: focusRequested) { takeFocusIfRequested() }
     }
 
     private var prompt: Text {
-        Text("Add to \(targetName)…").foregroundStyle(Theme.Colors.inkSubtle)
+        if style == .inline, !isFocused {
+            return Text("Add").foregroundStyle(Theme.Colors.inkMuted)
+        }
+        return Text("Add to \(targetName)…").foregroundStyle(Theme.Colors.inkSubtle)
     }
 
     private var chips: some View {
@@ -121,7 +177,6 @@ struct Composer: View {
                     .accessibilityLabel("Add to \(list.name)")
                 }
             }
-            .padding(.horizontal, 10)
         }
         .scrollIndicators(.hidden)
         .padding(.top, Theme.Space.s1)
