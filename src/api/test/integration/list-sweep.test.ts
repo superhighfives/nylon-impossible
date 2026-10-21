@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, lists, todos } from "../../src/lib/db";
+import { getDb, lists, todos, users } from "../../src/lib/db";
 import { runListSweep } from "../../src/lib/list-sweep";
 import { cleanDb, seedTodo, seedUser } from "../helpers";
 
@@ -214,5 +214,124 @@ describe("runListSweep", () => {
 
     expect(utcStored.listId).toBe(utcTodayList);
     expect(tokyoStored.listId).toBe(await getListId("user_tokyo", "thisWeek"));
+  });
+
+  describe("overnight record", () => {
+    const sweptAt = new Date("2026-06-15T00:15:00Z");
+
+    async function record(userId = USER) {
+      const [row] = await getDb(env.DB)
+        .select({
+          at: users.lastSweepAt,
+          toThisWeek: users.lastSweepMovedToThisWeek,
+          toSomeday: users.lastSweepMovedToSomeday,
+        })
+        .from(users)
+        .where(eq(users.id, userId));
+      return row;
+    }
+
+    it("records when it ran and how many it moved each way", async () => {
+      await seedUser(USER, "test@example.com", { timezone: "UTC" });
+      const todayListId = await getListId(USER, "today");
+      const thisWeekListId = await getListId(USER, "thisWeek");
+      const old = new Date("2026-06-01T00:00:00Z");
+      await seedTodo("550e8400-e29b-41d4-a716-446655440101", USER, {
+        listId: todayListId,
+        listEnteredAt: old,
+      });
+      await seedTodo("550e8400-e29b-41d4-a716-446655440102", USER, {
+        listId: todayListId,
+        listEnteredAt: old,
+      });
+      await seedTodo("550e8400-e29b-41d4-a716-446655440103", USER, {
+        listId: thisWeekListId,
+        listEnteredAt: old,
+      });
+
+      await runListSweep(getDb(env.DB), env, sweptAt);
+
+      // The two that just arrived in This Week aren't also counted as
+      // moving on to Someday.
+      expect(await record()).toEqual({
+        at: sweptAt,
+        toThisWeek: 2,
+        toSomeday: 1,
+      });
+    });
+
+    it("keeps the previous record when nothing moved", async () => {
+      const earlier = new Date("2026-06-10T00:05:00Z");
+      await seedUser(USER, "test@example.com", {
+        timezone: "UTC",
+        lastSweepAt: earlier,
+        lastSweepMovedToThisWeek: 3,
+        lastSweepMovedToSomeday: 0,
+      });
+      const todayListId = await getListId(USER, "today");
+      // Arrived too recently to move.
+      await seedTodo("550e8400-e29b-41d4-a716-446655440104", USER, {
+        listId: todayListId,
+        listEnteredAt: new Date("2026-06-14T20:00:00Z"),
+      });
+
+      await runListSweep(getDb(env.DB), env, sweptAt);
+
+      expect(await record()).toEqual({
+        at: earlier,
+        toThisWeek: 3,
+        toSomeday: 0,
+      });
+    });
+
+    it("leaves a user who has never had anything move with no record", async () => {
+      await seedUser(USER, "test@example.com", { timezone: "UTC" });
+      await runListSweep(getDb(env.DB), env, sweptAt);
+      expect(await record()).toEqual({ at: null, toThisWeek: 0, toSomeday: 0 });
+    });
+
+    it("only records for the users it swept", async () => {
+      await seedUser("user_utc", "utc@example.com", { timezone: "UTC" });
+      await seedUser("user_tokyo", "tokyo@example.com", {
+        timezone: "Asia/Tokyo",
+      });
+      const old = new Date("2026-06-01T00:00:00Z");
+      await seedTodo("550e8400-e29b-41d4-a716-446655440106", "user_utc", {
+        listId: await getListId("user_utc", "today"),
+        listEnteredAt: old,
+      });
+      await seedTodo("550e8400-e29b-41d4-a716-446655440107", "user_tokyo", {
+        listId: await getListId("user_tokyo", "today"),
+        listEnteredAt: old,
+      });
+
+      await runListSweep(getDb(env.DB), env, sweptAt);
+
+      expect((await record("user_utc")).toThisWeek).toBe(1);
+      expect(await record("user_tokyo")).toEqual({
+        at: null,
+        toThisWeek: 0,
+        toSomeday: 0,
+      });
+    });
+
+    it("bumps updatedAt on moved todos so delta sync sees them", async () => {
+      await seedUser(USER, "test@example.com", { timezone: "UTC" });
+      const todayListId = await getListId(USER, "today");
+      const todoId = "550e8400-e29b-41d4-a716-446655440105";
+      await seedTodo(todoId, USER, {
+        listId: todayListId,
+        listEnteredAt: new Date("2026-06-01T00:00:00Z"),
+        updatedAt: new Date("2026-06-01T00:00:00Z"),
+      });
+
+      await runListSweep(getDb(env.DB), env, sweptAt);
+
+      const [stored] = await getDb(env.DB)
+        .select({ updatedAt: todos.updatedAt })
+        .from(todos)
+        .where(eq(todos.id, todoId));
+      expect(stored.updatedAt).toEqual(sweptAt);
+    });
   });
 });

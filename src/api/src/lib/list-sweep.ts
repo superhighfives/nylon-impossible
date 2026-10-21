@@ -66,7 +66,10 @@ export function localMidnight(timezone: string, now: Date): Date {
  *
  * Someday is terminal. Never touches completed todos, due dates, or custom
  * lists. Every list move stamps `listEnteredAt`, so moving a todo back into
- * Today restarts its 24 hours.
+ * Today restarts its 24 hours, and `updatedAt`, so delta sync sees it.
+ *
+ * When anything moved, the user's `last_sweep_*` columns record when and how
+ * many went each way, for Today's overnight note (`GET /users/me`).
  */
 export async function runListSweep(
   db: Db,
@@ -93,9 +96,11 @@ export async function runListSweep(
       localMidnight(user.timezone, now).getTime() - DAY_MS,
     );
 
-    await db
+    // `updatedAt` moves with the list so delta sync (`updatedAt > since`)
+    // picks the move up on every client.
+    const toThisWeek = await db
       .update(todos)
-      .set({ listId: thisWeekListId, listEnteredAt: now })
+      .set({ listId: thisWeekListId, listEnteredAt: now, updatedAt: now })
       .where(
         and(
           eq(todos.userId, user.id),
@@ -103,13 +108,15 @@ export async function runListSweep(
           eq(todos.completed, false),
           lte(todos.listEnteredAt, todayCutoff),
         ),
-      );
+      )
+      .returning({ id: todos.id });
 
+    let movedToSomeday = 0;
     const somedayListId = await getSystemListId(db, user.id, "someday");
     if (somedayListId) {
-      await db
+      const toSomeday = await db
         .update(todos)
-        .set({ listId: somedayListId, listEnteredAt: now })
+        .set({ listId: somedayListId, listEnteredAt: now, updatedAt: now })
         .where(
           and(
             eq(todos.userId, user.id),
@@ -117,7 +124,25 @@ export async function runListSweep(
             eq(todos.completed, false),
             lt(todos.listEnteredAt, weekAgo),
           ),
-        );
+        )
+        .returning({ id: todos.id });
+      movedToSomeday = toSomeday.length;
+    }
+
+    // Today's overnight note reads these. A sweep that moved nothing keeps
+    // the previous record, so the note always describes the last real move.
+    // The Today → This Week rows are swept first, so a todo can't be counted
+    // twice in one run (it entered This Week `now`, well inside the week).
+    const movedToThisWeek = toThisWeek.length;
+    if (movedToThisWeek > 0 || movedToSomeday > 0) {
+      await db
+        .update(users)
+        .set({
+          lastSweepAt: now,
+          lastSweepMovedToThisWeek: movedToThisWeek,
+          lastSweepMovedToSomeday: movedToSomeday,
+        })
+        .where(eq(users.id, user.id));
     }
 
     // Best-effort — a user due for the sweep may have had nothing to demote,

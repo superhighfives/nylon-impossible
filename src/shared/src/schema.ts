@@ -33,6 +33,17 @@ export const users = sqliteTable(
     timezoneAuto: integer("timezone_auto", { mode: "boolean" })
       .notNull()
       .default(true),
+    // The most recent aging sweep that moved anything for this user, and how
+    // many todos it moved each way. Clients show it as Today's overnight note
+    // ("2 moved to This Week overnight"). A sweep that moves nothing leaves
+    // these alone, so the note always describes the last real move.
+    lastSweepAt: integer("last_sweep_at", { mode: "timestamp" }),
+    lastSweepMovedToThisWeek: integer("last_sweep_moved_to_this_week")
+      .notNull()
+      .default(0),
+    lastSweepMovedToSomeday: integer("last_sweep_moved_to_someday")
+      .notNull()
+      .default(0),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
