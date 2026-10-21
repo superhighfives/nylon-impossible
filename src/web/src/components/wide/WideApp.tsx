@@ -512,7 +512,7 @@ export function WideApp() {
         </main>
         <DragOverlay dropAnimation={null}>
           {dragging ? (
-            <div className="flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-canvas px-3 py-2.5 shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)]">
+            <div className="flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5">
               <span
                 aria-hidden="true"
                 className="mt-px size-[1.375rem] shrink-0 rounded-[6px] border-[1.75px] border-n-ink"

@@ -351,16 +351,15 @@ export function PhoneApp() {
               <li key={list.id}>
                 <button
                   type="button"
+                  aria-label={`${list.name}, ${plural(rowsFor(list.id).length, "todo")}`}
                   onClick={() => setCollectionId(list.id)}
                   className="flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-n-hairline px-5 py-4 text-left text-n-ink n-focus-inset"
                 >
                   <span className="min-w-0 flex-1 truncate font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
                     {list.name}
                   </span>
-                  <span className="text-[0.9375rem] text-n-ink-muted">
-                    <span className="sr-only">, </span>
+                  <span className="text-[0.9375rem] text-n-ink-muted tabular-nums">
                     {rowsFor(list.id).length}
-                    <span className="sr-only"> todos</span>
                   </span>
                   <ChevronRight
                     size={16}

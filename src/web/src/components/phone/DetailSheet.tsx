@@ -230,28 +230,22 @@ function DetailBody({
           <button
             type="button"
             aria-expanded={panel === "list"}
+            aria-label={`List: ${listName(todo.listId)}`}
             onClick={() => toggle("list")}
             className={chipClass(true)}
           >
             <List size={14} aria-hidden="true" />
-            <span className="sr-only">List: </span>
             {listName(todo.listId)}
           </button>
           <button
             type="button"
             aria-expanded={panel === "due"}
+            aria-label={due ? `Due: ${due.text}` : undefined}
             onClick={() => toggle("due")}
             className={`${chipClass(!!due)} ${due?.overdue ? "text-n-overdue" : ""}`}
           >
             <CalendarIcon size={14} aria-hidden="true" />
-            {due ? (
-              <>
-                <span className="sr-only">Due: </span>
-                {due.text}
-              </>
-            ) : (
-              "Due"
-            )}
+            {due ? due.text : "Due"}
           </button>
           {canRepeat && (
             <button
