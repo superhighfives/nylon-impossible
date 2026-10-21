@@ -128,7 +128,10 @@ a reused one would pin stale screenshots to a revision they don't belong to.
 To regenerate by hand, dispatch the workflow with `force_ios` (it also runs
 `strict` by default, so a fallback fails rather than passing quietly).
 
-What gets captured is listed in `src/marketing/manifest.json`:
+What gets captured is listed in `src/marketing/manifest.json`. Its one
+`timeZone` pins the browser (`timezoneId`), the simulators
+(`SIMCTL_CHILD_TZ` on launch) and the seeded user, so every shot shows the
+same weekday and date.
 
 - **Web** signs in with Clerk's testing helpers and shoots desktop (1440×900)
   and phone (390×844) in light and dark. `generate.ts` applies the local D1

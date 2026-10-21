@@ -1,4 +1,5 @@
 {
+  "timeZone": "America/Los_Angeles",
   "ios": {
     "scheme": "Nylon Impossible",
     "project": "src/ios/Nylon Impossible/Nylon Impossible.xcodeproj",
@@ -32,7 +33,6 @@
   },
   "web": {
     "port": 3000,
-    "timezone": "UTC",
     "shots": [
       { "name": "desktop", "viewport": { "width": 1440, "height": 900 }, "scale": 2 },
       { "name": "phone", "viewport": { "width": 390, "height": 844 }, "scale": 3, "mobile": true }

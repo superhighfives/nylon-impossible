@@ -99,6 +99,11 @@ interface Placement {
 }
 
 interface Manifest {
+  /**
+   * One zone for the whole run — browser, simulators and the seeded user —
+   * so every shot shows the same weekday and date.
+   */
+  timeZone: string;
   ios: {
     scheme: string;
     project: string;
@@ -120,7 +125,6 @@ interface Manifest {
   };
   web: {
     port: number;
-    timezone: string;
     shots: {
       name: string;
       viewport: Size;
@@ -382,7 +386,7 @@ async function seedDemoData(): Promise<void> {
   const sqlPath = join(SOURCE_DIR, "seed.sql");
   writeFileSync(
     sqlPath,
-    buildSeedSql({ userId, email, timeZone: manifest.web.timezone }),
+    buildSeedSql({ userId, email, timeZone: manifest.timeZone }),
   );
   for (const config of D1_CONFIGS) {
     const common = ["--local", "--persist-to", D1_STATE, "-c", config];
@@ -547,7 +551,7 @@ async function captureWebScreenshots(): Promise<void> {
           isMobile: shot.mobile ?? false,
           hasTouch: shot.mobile ?? false,
           colorScheme: mode,
-          timezoneId: manifest.web.timezone,
+          timezoneId: manifest.timeZone,
           locale: "en-US",
         });
         const page = await context.newPage();
@@ -775,6 +779,13 @@ async function openSimulatorWindow(): Promise<void> {
   await sleep(2000); // settle time for the window server connection
 }
 
+/**
+ * `SIMCTL_CHILD_*` variables reach the launched app's environment, so TZ
+ * pins TimeZone.current (the sample data's due days and the masthead date)
+ * to the run's zone instead of the host's.
+ */
+const SIM_LAUNCH_ENV = { ...process.env, SIMCTL_CHILD_TZ: manifest.timeZone };
+
 let builtAppPath: string | undefined;
 
 /** Build the Debug app once; both device classes install the same bundle. */
@@ -875,7 +886,7 @@ async function captureIOSDevice(device: DeviceKey): Promise<void> {
       "xcrun",
       ["simctl", "launch", "--terminate-running-process", udid, bundleId,
         "-NylonScreen", firstShot?.screen ?? "today"],
-      { stdio: "pipe", timeout: 120_000 },
+      { stdio: "pipe", timeout: 120_000, env: SIM_LAUNCH_ENV },
     ),
   );
   await sleep(20_000);
@@ -898,7 +909,7 @@ async function captureIOSDevice(device: DeviceKey): Promise<void> {
         execFileSync(
           "xcrun",
           ["simctl", "launch", "--terminate-running-process", udid, bundleId, ...launchArgs],
-          { stdio: "pipe", timeout: 120_000 },
+          { stdio: "pipe", timeout: 120_000, env: SIM_LAUNCH_ENV },
         ),
       );
       await sleep(4_000);

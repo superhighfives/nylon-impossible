@@ -134,12 +134,15 @@ export function buildSeedSql(opts: {
 }): string {
   const now = opts.now ?? new Date();
   const nowS = Math.floor(now.getTime() / 1000);
-  const today = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-  const todayMidnight = Math.floor(today / 1000);
+  // "Today" is the calendar day in the run's zone, stored as that day's UTC
+  // midnight like every due day.
+  const todayKey = now.toLocaleDateString("en-CA", {
+    timeZone: opts.timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayMidnight = Math.floor(Date.parse(`${todayKey}T00:00:00Z`) / 1000);
   const createdS = nowS - 6 * DAY_S;
   const id = (suffix: string) => `mktg_${suffix}`;
   const user = sql(opts.userId);
