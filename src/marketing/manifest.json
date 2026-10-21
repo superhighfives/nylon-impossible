@@ -3,20 +3,55 @@
     "scheme": "Nylon Impossible",
     "project": "src/ios/Nylon Impossible/Nylon Impossible.xcodeproj",
     "bundleId": "com.superhighfives.Nylon-Impossible",
-    "device": "iPhone 16 Pro"
+    "devices": {
+      "iphone": {
+        "simulator": "Nylon Marketing iPhone 6.9",
+        "types": ["iPhone 17 Pro Max", "iPhone 16 Pro Max"],
+        "appStore": "iphone-6.9",
+        "size": { "width": 1320, "height": 2868 }
+      },
+      "ipad": {
+        "simulator": "Nylon Marketing iPad 13",
+        "types": ["iPad Pro 13-inch (M5)", "iPad Pro 13-inch (M4)"],
+        "appStore": "ipad-13",
+        "size": { "width": 2064, "height": 2752 }
+      }
+    },
+    "shots": [
+      { "device": "iphone", "screen": "today" },
+      { "device": "iphone", "screen": "week" },
+      { "device": "iphone", "screen": "detail" },
+      { "device": "iphone", "screen": "composer" },
+      { "device": "iphone", "screen": "lists" },
+      { "device": "ipad", "screen": "board" },
+      { "device": "ipad", "screen": "inspector" },
+      { "device": "ipad", "screen": "board", "landscape": true },
+      { "device": "ipad", "screen": "column", "landscape": true },
+      { "device": "ipad", "screen": "inspector", "landscape": true }
+    ]
   },
   "web": {
-    "url": "http://localhost:3000",
-    "viewport": { "width": 880, "height": 600 }
+    "port": 3000,
+    "timezone": "UTC",
+    "shots": [
+      { "name": "desktop", "viewport": { "width": 1440, "height": 900 }, "scale": 2 },
+      { "name": "phone", "viewport": { "width": 390, "height": 844 }, "scale": 3, "mobile": true }
+    ]
   },
   "composite": {
     "canvas": { "width": 2200, "height": 1500 },
-    "browser": { "left": 60, "top": 60 },
-    "phone":   { "left": 1580, "top": 220, "width": 550 },
     "png": true,
     "backgrounds": {
       "light": { "r": 255, "g": 255, "b": 255 },
       "dark":  { "r": 9,  "g": 9,  "b": 11  }
+    },
+    "browser": {
+      "web": { "shot": "web-desktop", "left": 60, "top": 60, "width": 1760 },
+      "phone": { "shot": "ios-iphone-today", "left": 1580, "top": 220, "width": 550 }
+    },
+    "ipad": {
+      "tablet": { "shot": "ios-ipad-board-landscape", "left": 60, "top": 110, "width": 1700 },
+      "phone": { "shot": "ios-iphone-today", "left": 1640, "top": 330, "width": 500 }
     }
   }
 }
