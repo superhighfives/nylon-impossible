@@ -38,7 +38,7 @@ function MetaItem({ part }: { part: MetaPart }) {
     <span
       className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""}`}
     >
-      {Icon && <Icon size={13} strokeWidth={2} aria-hidden="true" />}
+      {Icon && <Icon size="1em" strokeWidth={2} aria-hidden="true" />}
       {/* The notes glyph stands alone; its word is for the accessible name. */}
       {part.kind !== "notes" && part.text}
     </span>

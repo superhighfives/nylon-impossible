@@ -251,7 +251,7 @@ export function Composer({
         }}
         onFocus={() => setFocused(true)}
         onBlur={onBlur}
-        className={`-mx-2.5 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
+        className={`n-focus-within -mx-2.5 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
           showChips ? "bg-n-surface" : "pointer-fine:hover:bg-n-surface"
         }`}
       >
@@ -304,7 +304,7 @@ export function Composer({
       onFocus={() => setFocused(true)}
       onBlur={onBlur}
       style={{ bottom }}
-      className="fixed left-1/2 z-30 w-[min(calc(100%-1.5rem),40.5rem)] -translate-x-1/2 rounded-[1.625rem] border border-[color-mix(in_srgb,var(--n-color-ink)_8%,transparent)] bg-[color-mix(in_srgb,var(--n-color-canvas)_82%,transparent)] shadow-[0_10px_30px_color-mix(in_srgb,black_10%,transparent)] backdrop-blur-[24px] backdrop-saturate-[1.6] transition-[bottom] duration-(--n-duration-fast) ease-n-out"
+      className="pointer-fine:n-focus-within fixed left-1/2 z-30 w-[min(calc(100%-1.5rem),40.5rem)] -translate-x-1/2 rounded-[1.625rem] border border-[color-mix(in_srgb,var(--n-color-ink)_8%,transparent)] bg-[color-mix(in_srgb,var(--n-color-canvas)_82%,transparent)] shadow-[0_10px_30px_color-mix(in_srgb,black_10%,transparent)] backdrop-blur-[24px] backdrop-saturate-[1.6] transition-[bottom] duration-(--n-duration-fast) ease-n-out"
     >
       {chips}
       {spill}
@@ -321,7 +321,7 @@ export function Composer({
             if (!e.target.value) setKeepDateWords(false);
           }}
           onKeyDown={onFieldKeyDown}
-          className="field-sizing-content block max-h-[5.5rem] min-h-[3.125rem] w-full flex-1 resize-none bg-transparent px-[1.125rem] py-3.5 text-[1.0625rem] leading-[1.375rem] text-n-ink outline-none placeholder:text-n-ink-subtle"
+          className="field-sizing-content block max-h-[5.5rem] min-h-[3.125rem] w-full flex-1 resize-none bg-transparent px-[1.125rem] py-3.5 text-[1.0625rem] leading-[1.375rem] text-n-ink outline-none placeholder:text-n-ink-muted"
         />
         {hasDraft && (
           <button

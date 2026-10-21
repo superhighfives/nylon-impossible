@@ -477,7 +477,7 @@ export function WideApp({
   return (
     <div
       data-wide-ready={loading ? undefined : ""}
-      className="fixed inset-0 z-10 flex bg-n-canvas font-n-text text-n-ink antialiased"
+      className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas font-n-text text-n-ink antialiased"
     >
       <DndContext
         sensors={sensors}

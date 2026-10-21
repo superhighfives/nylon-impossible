@@ -412,17 +412,25 @@ export function PhoneApp({
           <ul className="pt-1.5">
             {collections.map((list) => (
               <li key={list.id}>
+                {/* Named by the list, the count as its description ("Groceries,
+                    4 todos"), so the name matches what's visible. */}
                 <button
                   type="button"
-                  aria-label={`${list.name}, ${plural(rowsFor(list.id).length, "todo")}`}
+                  aria-describedby={`phone-list-count-${list.id}`}
                   onClick={() => setCollectionId(list.id)}
                   className="flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-n-hairline px-5 py-4 text-left text-n-ink n-focus-inset"
                 >
                   <span className="min-w-0 flex-1 truncate font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
                     {list.name}
                   </span>
-                  <span className="text-[0.9375rem] text-n-ink-muted tabular-nums">
+                  <span
+                    aria-hidden="true"
+                    className="text-[0.9375rem] text-n-ink-muted tabular-nums"
+                  >
                     {rowsFor(list.id).length}
+                  </span>
+                  <span id={`phone-list-count-${list.id}`} hidden>
+                    {plural(rowsFor(list.id).length, "todo")}
                   </span>
                   <ChevronRight
                     size={16}
@@ -447,7 +455,7 @@ export function PhoneApp({
               }}
               enterKeyHint="done"
               placeholder="New list"
-              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink n-focus placeholder:text-n-ink-subtle"
+              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink n-focus placeholder:text-n-ink-muted"
             />
           </label>
         </>
@@ -473,7 +481,7 @@ export function PhoneApp({
   };
 
   return (
-    <div className="fixed inset-0 z-10 bg-n-canvas font-n-text text-n-ink antialiased">
+    <div className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 bg-n-canvas font-n-text text-n-ink antialiased">
       <div className="mx-auto flex h-full max-w-[42rem] flex-col">
         <div className="flex h-14 shrink-0 items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pr-4 pl-5">
           <nav
@@ -495,7 +503,7 @@ export function PhoneApp({
                     if (p.key === "lists" && active) setCollectionId(null);
                     goTo(i);
                   }}
-                  className={`h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
+                  className={`n-hit h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
                     active ? "text-n-ink" : "text-n-ink-muted"
                   }`}
                 >
@@ -529,7 +537,11 @@ export function PhoneApp({
           ref={pagerRef}
           onScroll={onPagerScroll}
           data-phone-ready={loading ? undefined : ""}
-          className="flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // Nothing to swipe to while loading, and a scroller with nothing
+          // focusable in it is a dead end for the keyboard.
+          className={`flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+            loading ? "overflow-x-hidden" : "overflow-x-auto"
+          }`}
         >
           {PAGES.map((p, i) => (
             <section

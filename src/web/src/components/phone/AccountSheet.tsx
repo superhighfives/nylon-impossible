@@ -90,11 +90,18 @@ export function AccountSheet({
               type="button"
               role="menuitem"
               onClick={onDone}
+              aria-describedby="account-done-count"
               className={ITEM}
             >
               Done
-              <span className="ml-auto font-normal text-n-ink-muted">
+              <span
+                aria-hidden="true"
+                className="ml-auto font-normal text-n-ink-muted tabular-nums"
+              >
                 {doneCount}
+              </span>
+              <span id="account-done-count" hidden>
+                {doneCount} {doneCount === 1 ? "todo" : "todos"}
               </span>
             </button>
             <button

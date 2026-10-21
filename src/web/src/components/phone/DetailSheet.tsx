@@ -113,7 +113,7 @@ export function DetailSheet(props: DetailSheetProps) {
         <Dialog.Portal>
           <Dialog.Popup
             data-detail-panel
-            className="fixed top-0 right-0 bottom-0 z-40 flex w-[min(28rem,40vw)] min-w-[22rem] flex-col border-l border-n-hairline bg-n-canvas text-n-ink outline-none transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:translate-x-6 data-starting-style:opacity-0"
+            className="fixed top-[var(--n-offline-inset,0px)] right-0 bottom-0 z-40 flex w-[min(28rem,40vw)] min-w-[22rem] flex-col border-l border-n-hairline bg-n-canvas text-n-ink outline-none transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:translate-x-6 data-starting-style:opacity-0"
           >
             {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
           </Dialog.Popup>
@@ -379,7 +379,7 @@ function DetailBody({
             onBlur={notes.flush}
             placeholder="Add notes"
             rows={3}
-            className="field-sizing-content block min-h-[4.5rem] w-full resize-none rounded-n-chip bg-transparent p-0 text-[1.0625rem] leading-[1.45] text-n-ink n-focus placeholder:text-n-ink-subtle"
+            className="field-sizing-content block min-h-[4.5rem] w-full resize-none rounded-n-chip bg-transparent p-0 text-[1.0625rem] leading-[1.45] text-n-ink n-focus placeholder:text-n-ink-muted"
           />
         </label>
 
@@ -514,7 +514,7 @@ function Subtasks({
           }}
           enterKeyHint="done"
           placeholder="Add subtask"
-          className="min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-base text-n-ink n-focus placeholder:text-n-ink-subtle"
+          className="min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-base text-n-ink n-focus placeholder:text-n-ink-muted"
         />
       </label>
     </section>

@@ -66,7 +66,7 @@ export function Calendar({
             // biome-ignore lint/suspicious/noArrayIndexKey: fixed weekday order
             key={i}
             aria-hidden="true"
-            className="flex h-8 items-center justify-center text-[0.6875rem] font-medium text-n-ink-subtle"
+            className="flex h-8 items-center justify-center text-[0.6875rem] font-medium text-n-ink-muted"
           >
             {d}
           </div>

@@ -159,12 +159,13 @@ describe("WideApp", () => {
   it("shows the sidebar with counts and the three time columns", () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
+    // Named by what's visible, with the count read as the description.
     expect(
-      within(nav).getByRole("button", { name: "Today, 2 todos" }),
-    ).toBeInTheDocument();
-    expect(
-      within(nav).getByRole("button", { name: "Groceries, 1 todo" }),
-    ).toHaveAttribute("aria-pressed", "false");
+      within(nav).getByRole("button", { name: "Today" }),
+    ).toHaveAccessibleDescription("2 todos");
+    const groceries = within(nav).getByRole("button", { name: "Groceries" });
+    expect(groceries).toHaveAccessibleDescription("1 todo");
+    expect(groceries).toHaveAttribute("aria-pressed", "false");
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
     ).toEqual(expect.arrayContaining(["Today", "This Week", "Someday"]));
