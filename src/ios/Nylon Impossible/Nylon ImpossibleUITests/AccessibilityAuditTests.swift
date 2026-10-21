@@ -1,0 +1,134 @@
+//
+//  AccessibilityAuditTests.swift
+//  Nylon ImpossibleUITests
+//
+//  Xcode's accessibility audit over every screen route, at the default text
+//  size and at AX5, in light and dark. An issue fails the test unless it's
+//  one of the few `AuditAllowance`s below, each with its reason.
+//
+
+import XCTest
+
+final class AccessibilityAuditTests: NylonUITestCase {
+    static let ax5 = "UICTContentSizeCategoryAccessibilityXXXL"
+
+    /// Screens both layouts share. iPad draws the board for the time lists.
+    var routes: [(route: String, ready: String)] {
+        if let only = ProcessInfo.processInfo.environment["NYLON_AUDIT_ROUTES"] {
+            let wanted = Set(only.split(separator: ",").map(String.init))
+            return allRoutes.filter { wanted.contains($0.route) }
+        }
+        return allRoutes
+    }
+
+    private var allRoutes: [(route: String, ready: String)] {
+        var routes: [(String, String)] = [
+            ("today", "Review PR for the sync engine"),
+            ("week", "Plan Lisbon trip"),
+            ("someday", "Read Piranesi"),
+            ("detail", "Notes"),
+            ("composer", "New todo"),
+            ("done", "Email the landlord"),
+            ("settings", "Appearance"),
+            ("overnight", "Dismiss"),
+            ("empty", "Nothing today."),
+            ("loading", "Getting your lists…"),
+            ("syncerror", "Retry sync"),
+            ("signin", "Sign in"),
+            ("share", "Add to Nylon"),
+            ("sharetext", "Add to Nylon")
+        ]
+        if isPad {
+            routes += [("column", "Parmesan"), ("inspector", "Notes")]
+        } else {
+            routes += [("lists", "Groceries"), ("collection", "Parmesan")]
+        }
+        return routes
+    }
+
+    func testAuditDefaultSizeLight() throws {
+        try auditAll(dark: false, contentSize: nil)
+    }
+
+    func testAuditDefaultSizeDark() throws {
+        try auditAll(dark: true, contentSize: nil)
+    }
+
+    func testAuditAX5() throws {
+        try auditAll(dark: false, contentSize: Self.ax5)
+    }
+
+    private func auditAll(dark: Bool, contentSize: String?) throws {
+        var failures: [String] = []
+        for (route, ready) in routes {
+            launch(route, dark: dark, contentSize: contentSize)
+            let marker = app.descendants(matching: .any)[ready].firstMatch
+            guard marker.waitForExistence(timeout: 8) else {
+                failures.append("\(route): never showed “\(ready)”")
+                continue
+            }
+            // Let the route's own delayed presentation (sheets, panels) land.
+            sleep(1)
+            do {
+                try app.performAccessibilityAudit(for: .all) { issue in
+                    if AuditAllowance.allows(issue, route: route) { return true }
+                    let element = issue.element.map { "\($0.elementType.rawValue) “\($0.label)” \($0.frame)" } ?? "–"
+                    failures.append(
+                        "\(route): \(issue.auditType.rawValue) — \(issue.compactDescription) — \(element) — \(issue.detailedDescription)"
+                    )
+                    return true
+                }
+            } catch {
+                failures.append("\(route): audit threw \(error)")
+            }
+            app.terminate()
+        }
+        if !failures.isEmpty {
+            XCTFail("\(failures.count) accessibility issue(s):\n" + failures.joined(separator: "\n"))
+        }
+    }
+}
+
+/// Audit findings that are known and accepted, each with why.
+enum AuditAllowance {
+    static func allows(_ issue: XCUIAccessibilityAuditIssue, route: String) -> Bool {
+        let label = issue.element?.label ?? ""
+        let detail = issue.detailedDescription
+
+        // The system keyboard's QuickType suggestions (composer, share).
+        if detail.contains("TUIPredictionViewCell") { return true }
+
+        // The switcher's titles stop growing at xxxLarge on purpose, like a
+        // tab bar, and show in the Large Content Viewer on long press; the
+        // masthead under them carries the list's name at full size.
+        if issue.auditType == .dynamicType, ["Today", "This Week", "Someday", "Lists"].contains(label),
+           detail.contains("partially") || issue.compactDescription.contains("partially") {
+            return true
+        }
+
+        // The avatar's initials are decorative, drawn in a fixed 30pt circle
+        // (ink on gray-3, 14:1); the button around them is labelled
+        // "Account" and shows in the Large Content Viewer. The audit samples
+        // the 44pt frame around the circle for contrast.
+        if label.count <= 3, label == label.uppercased(), !label.isEmpty,
+           issue.auditType == .dynamicType || issue.auditType == .contrast {
+            return true
+        }
+
+        // Contrast samples the audit can't tie to an element, on screens
+        // with the floating glass composer: text scrolled under the glass.
+        // The composer's own placeholder and text use ink and muted ink.
+        if issue.auditType == .contrast, issue.element == nil {
+            return true
+        }
+
+        // The composer route draws the page under the focused composer and
+        // keyboard; the masthead behind the glass isn't meant to be read.
+        // The share sheet opens with its composer focused, so the keyboard
+        // and the glass composer sit over the lower half of the sheet; the
+        // audit samples the text under them. The sheet scrolls it clear.
+        if ["composer", "share", "sharetext"].contains(route), issue.auditType == .contrast { return true }
+
+        return false
+    }
+}
