@@ -138,6 +138,10 @@ extension ContentView {
         guard let action = QuickActionService.shared.take() else { return }
         switch action {
         case .newTask:
+            if isWide {
+                if let id = (focusedColumn ?? timeList(.today))?.id { requestComposer(id) }
+                return
+            }
             if currentListId == nil { viewModel.page = .today }
             focusComposer = true
         }
@@ -162,7 +166,10 @@ extension ContentView {
     func applyScreenRoute() {
         guard let route = screenRoute else { return }
         switch route {
-        case .today, .overnight: viewModel.page = .today
+        case .today, .overnight, .board: viewModel.page = .today
+        case .column:
+            openColumnId = collections.first?.id
+            focusedColumnId = openColumnId
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday
         case .lists: viewModel.page = .lists
@@ -173,16 +180,25 @@ extension ContentView {
             viewModel.page = .thisWeek
             viewModel.newTaskText = "Call the dentist friday"
             focusComposer = true
-        case .detail, .done, .settings:
+        case .detail, .done, .settings, .inspector, .menu:
             Task {
                 try? await Task.sleep(for: .milliseconds(400))
                 switch route {
-                case .detail:
+                case .detail, .inspector:
                     viewModel.page = .thisWeek
                     if let todo = todos.first(where: { !(subtasksByParent[$0.id] ?? []).isEmpty }) {
                         detailDetent = .large
-                        detailTodo = todo
+                        if isWide { openWide(todo) } else { detailTodo = todo }
                     }
+                case .menu:
+                    // A context menu can't be opened from code; this leaves
+                    // the keyboard on a row for a long-press to find.
+                    focusedColumnId = timeList(.thisWeek)?.id
+                    selectedTodoId = timeList(.thisWeek).flatMap { rows($0).dropFirst(2).first?.id }
+                case .done where isWide:
+                    widePanel = .done
+                case .settings where isWide:
+                    widePanel = .settings
                 case .done:
                     accountDetent = .large
                     accountPath = [.done]

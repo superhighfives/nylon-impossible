@@ -114,6 +114,8 @@ struct Nylon_ImpossibleApp: App {
             signedInRoot
             #endif
         }
+        // The iPad board's keys, for the shortcut overlay and menu bar.
+        .commands { BoardCommands() }
     }
 
     private var signedInRoot: some View {
