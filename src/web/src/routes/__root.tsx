@@ -1,4 +1,4 @@
-import { ClerkProvider, Show, useUser } from "@clerk/tanstack-react-start";
+import { ClerkProvider, useUser } from "@clerk/tanstack-react-start";
 import { TanStackDevtools } from "@tanstack/react-devtools";
 import type { QueryClient } from "@tanstack/react-query";
 import {
@@ -9,18 +9,12 @@ import {
 } from "@tanstack/react-router";
 import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { createServerFn } from "@tanstack/react-start";
-import {
-  getCookie,
-  getRequest,
-  getRequestUrl,
-} from "@tanstack/react-start/server";
+import { getCookie, getRequest } from "@tanstack/react-start/server";
 import { useEffect } from "react";
 import { ClientHintCheck } from "../components/ClientHintCheck";
 import { ErrorView } from "../components/ErrorView";
-import Header from "../components/Header";
 import { NotFound } from "../components/NotFound";
 import OfflineBanner from "../components/OfflineBanner";
-import { SettingsModal } from "../components/SettingsModal";
 import {
   THEME_COLOR,
   THEME_STORAGE_KEY,
@@ -33,7 +27,6 @@ import {
   OnlineStatusContext,
   useOnlineStatusValue,
 } from "../hooks/useOnlineStatus";
-import { SettingsContext, useSettingsValue } from "../hooks/useSettings";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { getHints } from "../lib/client-hints";
 import { initSentry, Sentry } from "../lib/sentry";
@@ -58,7 +51,6 @@ const getRootData = createServerFn({ method: "GET" }).handler(() => {
   const colorScheme: "light" | "dark" =
     pref === "light" || pref === "dark" ? pref : hints.colorScheme;
   return {
-    origin: getRequestUrl().origin,
     hints: { ...hints, colorScheme },
   };
 });
@@ -89,7 +81,7 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         // Browser chrome renders this directly — it can only ever follow the
-        // OS's prefers-color-scheme, unlike the in-app logo (BoardChrome.tsx),
+        // OS's prefers-color-scheme, unlike the landing page's logo,
         // which swaps files based on the app's own explicit theme. Keep the
         // OS-driven dark-mode CSS isolated to this dedicated file so it can't
         // leak into the app-theme-driven favicon.svg/favicon-dark.svg pair.
@@ -131,9 +123,8 @@ function SentryUserSync() {
 }
 
 function RootDocument() {
-  const { origin, hints } = Route.useLoaderData();
+  const { hints } = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
-  const settings = useSettingsValue();
 
   return (
     <html
@@ -152,9 +143,9 @@ function RootDocument() {
           }
         />
       </head>
-      {/* Background comes from styles.css (paper-white light / graydark-1
-          dark) so the editorial board and static pages share one canvas. */}
-      <body className="min-h-full text-gray antialiased">
+      {/* Background and ink come from tokens.css via styles.css, so the app
+          and the static pages share one canvas. */}
+      <body className="min-h-full antialiased">
         <HintsProvider hints={hints}>
           <ClerkProvider>
             <SentryUserSync />
@@ -164,17 +155,9 @@ function RootDocument() {
               fallback={({ resetError }) => <ErrorView reset={resetError} />}
             >
               <OnlineStatusContext.Provider value={onlineStatus}>
-                <SettingsContext.Provider value={settings}>
-                  <OfflineBanner />
-                  <Header />
-                  <div className="pt-header-offset">
-                    <Outlet />
-                  </div>
-                  <Show when="signed-in">
-                    <SettingsModal origin={origin} />
-                  </Show>
-                  <Toaster />
-                </SettingsContext.Provider>
+                <OfflineBanner />
+                <Outlet />
+                <Toaster />
               </OnlineStatusContext.Provider>
             </Sentry.ErrorBoundary>
             <TanStackDevtools

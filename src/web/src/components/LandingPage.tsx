@@ -45,62 +45,52 @@ export function LandingPage() {
           </picture>
         </div>
         <div className="space-y-3">
-          <h1 className="text-2xl font-semibold tracking-tight">
+          <h1 className="font-n-display text-[2rem] leading-tight font-bold tracking-[-0.025em] text-n-ink">
             Nylon Impossible
           </h1>
-          <p className="text-gray-muted leading-relaxed max-w-xs mx-auto">
+          <p className="text-n-ink-muted leading-relaxed max-w-xs mx-auto">
             A fast todo app for web and iOS. Capture anything, and keep it in
             sync everywhere.
           </p>
         </div>
         <div className="flex flex-col gap-3 text-sm">
           <SignInButton mode="modal">
-            <Button
-              variant="primary"
-              size="lg"
-              ringOffset="app"
-              className="w-full"
-            >
+            <Button variant="primary" size="lg" className="w-full">
               Sign in
             </Button>
           </SignInButton>
           <SignUpButton mode="modal">
-            <Button
-              variant="outline"
-              size="lg"
-              ringOffset="app"
-              className="w-full"
-            >
+            <Button variant="outline" size="lg" className="w-full">
               Create account
             </Button>
           </SignUpButton>
         </div>
       </div>
 
-      <hr className="border-gray-subtle" />
+      <hr className="border-n-hairline" />
 
       <ul className="grid gap-4">
         {features.map((feature) => (
           <li
             key={feature.title}
-            className="rounded-xl border border-gray-subtle bg-gray-app/70 backdrop-blur-sm p-4 space-y-1"
+            className="rounded-n-field border border-n-hairline p-4 space-y-1"
           >
             <p className="text-sm font-medium">{feature.title}</p>
-            <p className="text-sm text-gray-muted">{feature.description}</p>
+            <p className="text-sm text-n-ink-muted">{feature.description}</p>
           </li>
         ))}
       </ul>
 
-      <footer className="flex justify-center gap-4 text-xs text-gray-muted">
+      <footer className="flex justify-center gap-4 text-xs text-n-ink-muted">
         <Link
           to="/privacy"
-          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+          className="rounded-sm transition-colors pointer-fine:hover:text-n-ink n-focus"
         >
           Privacy
         </Link>
         <Link
           to="/terms"
-          className="rounded-sm transition-colors hover:text-gray focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+          className="rounded-sm transition-colors pointer-fine:hover:text-n-ink n-focus"
         >
           Terms
         </Link>

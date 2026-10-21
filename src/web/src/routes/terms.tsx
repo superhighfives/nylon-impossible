@@ -92,7 +92,7 @@ function TermsPage() {
           Questions about these terms? Email{" "}
           <a
             href={`mailto:${CONTACT_EMAIL}`}
-            className="rounded-sm text-gray underline hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+            className="rounded-sm text-n-ink underline hover:no-underline n-focus"
           >
             {CONTACT_EMAIL}
           </a>

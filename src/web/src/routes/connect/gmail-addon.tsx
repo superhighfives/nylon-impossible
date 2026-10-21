@@ -14,7 +14,7 @@ export const Route = createFileRoute("/connect/gmail-addon")({
 function Panel({ children }: { children: React.ReactNode }) {
   return (
     <div className="container max-w-md mx-auto py-16 px-4">
-      <div className="rounded-2xl border border-gray-subtle bg-gray-1 dark:bg-graydark-2 p-6 space-y-3 text-center">
+      <div className="rounded-n-field border border-n-hairline bg-n-surface p-6 space-y-3 text-center">
         <img
           src="/logo192.png"
           alt="Nylon Impossible"
@@ -33,14 +33,16 @@ function ConnectGmailAddonPage() {
     <>
       <Show when="signed-out">
         <Panel>
-          <h1 className="text-lg font-semibold">Connect Nylon to Gmail</h1>
-          <p className="text-gray-dim text-sm">
+          <h1 className="font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
+            Connect Nylon to Gmail
+          </h1>
+          <p className="text-n-ink-muted text-sm">
             Sign in to your Nylon account to finish connecting the Gmail add-on.
           </p>
           <SignInButton mode="modal">
             <button
               type="button"
-              className="inline-flex items-center justify-center rounded-full bg-gray-12 text-gray-1 px-4 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-strong focus-visible:ring-offset-2 focus-visible:ring-offset-gray-app"
+              className="inline-flex items-center justify-center rounded-n-field bg-n-brand text-n-brand-ink px-4 py-2 text-sm font-medium n-focus"
             >
               Sign in
             </button>
@@ -87,8 +89,10 @@ function ConnectRunner({ state }: { state: string }) {
   if (status === "missing") {
     return (
       <Panel>
-        <h1 className="text-lg font-semibold">Nothing to connect</h1>
-        <p className="text-gray-dim text-sm">
+        <h1 className="font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
+          Nothing to connect
+        </h1>
+        <p className="text-n-ink-muted text-sm">
           Open the Nylon panel in Gmail and tap “Connect Nylon” to start.
         </p>
       </Panel>
@@ -98,8 +102,10 @@ function ConnectRunner({ state }: { state: string }) {
   if (status === "connecting") {
     return (
       <Panel>
-        <h1 className="text-lg font-semibold">Connecting…</h1>
-        <p className="text-gray-dim text-sm">Linking your Gmail add-on.</p>
+        <h1 className="font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
+          Connecting…
+        </h1>
+        <p className="text-n-ink-muted text-sm">Linking your Gmail add-on.</p>
       </Panel>
     );
   }
@@ -107,8 +113,10 @@ function ConnectRunner({ state }: { state: string }) {
   if (status === "error") {
     return (
       <Panel>
-        <h1 className="text-lg font-semibold">Couldn’t connect</h1>
-        <p className="text-gray-dim text-sm">
+        <h1 className="font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
+          Couldn’t connect
+        </h1>
+        <p className="text-n-ink-muted text-sm">
           {message ?? "Something went wrong. Reopen the panel in Gmail."}
         </p>
       </Panel>
@@ -117,8 +125,10 @@ function ConnectRunner({ state }: { state: string }) {
 
   return (
     <Panel>
-      <h1 className="text-lg font-semibold">Connected</h1>
-      <p className="text-gray-dim text-sm">
+      <h1 className="font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
+        Connected
+      </h1>
+      <p className="text-n-ink-muted text-sm">
         Your Gmail add-on is linked to Nylon. Head back to Gmail and reopen the
         panel to start adding todos.
       </p>
