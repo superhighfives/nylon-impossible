@@ -71,18 +71,23 @@
 				Models/TodoListModel.swift,
 				Models/TodoUrl.swift,
 				"Resources/Fonts/Archivo-Variable.ttf",
+				Services/ShareCapture.swift,
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
 				Services/TodayDigest.swift,
 				"Theme/Theme+Phone.swift",
+				"Theme/Theme+Wide.swift",
 				Theme/Theme.swift,
 				Utils/Badge.swift,
 				Utils/FractionalIndexing.swift,
 				Utils/Recurrence.swift,
 				Utils/TodoDateParser.swift,
 				Utils/TodoMeta.swift,
+				Utils/TodoText.swift,
 				Utils/WidgetRefresh.swift,
 				Views/Components/Primitives.swift,
+				Views/Composer/Composer.swift,
+				Views/Share/ShareSheetView.swift,
 			);
 			target = 23ABA3FD2F593570004D3D1A /* Nylon Share */;
 		};

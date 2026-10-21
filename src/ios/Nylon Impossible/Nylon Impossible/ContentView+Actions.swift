@@ -180,7 +180,7 @@ extension ContentView {
         guard let route = screenRoute else { return }
         switch route {
         case .today, .overnight, .board: viewModel.page = .today
-        case .link: break
+        case .link, .share, .sharetext: break
         case .column:
             openColumnId = collections.first?.id
             focusedColumnId = openColumnId
