@@ -169,6 +169,93 @@ jobs:
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
 
+  # The Mac App Store build (Universal Purchase, same bundle IDs). Off until
+  # the owner has created the Mac profiles and installer certificate and set
+  # the repository variable ENABLE_MAC_RELEASE to "true" — see "Mac" in
+  # src/ios/README.md. Independent of the iOS deploy job: it never blocks or
+  # changes the iOS release.
+  deploy-mac:
+    needs: [test]
+    if: ${{ vars.ENABLE_MAC_RELEASE == 'true' }}
+    runs-on: macos-26
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/ios/Nylon Impossible
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Mac certificates and provisioning profiles
+        env:
+          DEVELOPMENT_CERTIFICATE_BASE64: ${{ secrets.DEVELOPMENT_CERTIFICATE_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.DISTRIBUTION_CERTIFICATE_BASE64 }}
+          DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          MAC_INSTALLER_CERTIFICATE_BASE64: ${{ secrets.MAC_INSTALLER_CERTIFICATE_BASE64 }}
+          MAC_INSTALLER_CERTIFICATE_PASSWORD: ${{ secrets.MAC_INSTALLER_CERTIFICATE_PASSWORD }}
+          MAC_APP_PROFILE_BASE64: ${{ secrets.MAC_APP_PROFILE_BASE64 }}
+          MAC_SHARE_EXTENSION_PROFILE_BASE64: ${{ secrets.MAC_SHARE_EXTENSION_PROFILE_BASE64 }}
+          MAC_WIDGET_EXTENSION_PROFILE_BASE64: ${{ secrets.MAC_WIDGET_EXTENSION_PROFILE_BASE64 }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/mac-signing.keychain-db
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Apple Development and Apple Distribution cover macOS as well as
+          # iOS; the installer certificate signs the .pkg.
+          echo "$DEVELOPMENT_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/development.p12
+          echo "$DISTRIBUTION_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/distribution.p12
+          echo "$MAC_INSTALLER_CERTIFICATE_BASE64" | base64 --decode > $RUNNER_TEMP/installer.p12
+          security import $RUNNER_TEMP/development.p12 -P "$DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/distribution.p12 -P "$DISTRIBUTION_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/installer.p12 -P "$MAC_INSTALLER_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security find-identity -v $KEYCHAIN_PATH
+
+          # Mac profiles are .provisionprofile files; Xcode 16+ reads them
+          # from UserData, older tools from MobileDevice.
+          for dir in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles" "$HOME/Library/MobileDevice/Provisioning Profiles"; do
+            mkdir -p "$dir"
+          done
+          for var in MAC_APP_PROFILE_BASE64 MAC_SHARE_EXTENSION_PROFILE_BASE64 MAC_WIDGET_EXTENSION_PROFILE_BASE64; do
+            FILE=$RUNNER_TEMP/$var.provisionprofile
+            echo "${!var}" | base64 --decode > $FILE
+            UUID=$(grep -a -o '[0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}' $FILE | head -1)
+            echo "Installing $var as $UUID"
+            cp $FILE "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles/$UUID.provisionprofile"
+            cp $FILE "$HOME/Library/MobileDevice/Provisioning Profiles/$UUID.provisionprofile"
+          done
+
+      - name: Cache SPM packages
+        uses: actions/cache@v6
+        with:
+          path: ${{ runner.temp }}/spm-cache
+          key: spm-${{ hashFiles('**/Package.resolved') }}
+          restore-keys: spm-
+
+      - name: Build and upload the Mac app
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
+          API_BASE_URL: https://api.nylonimpossible.com
+          SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
+        run: bundle exec fastlane mac release --verbose
+
+      - name: Clean up keychain
+        if: always()
+        run: |
+          security delete-keychain $RUNNER_TEMP/mac-signing.keychain-db || true
+
   # Regenerate marketing screenshots after an App Store release, so the iOS
   # shots on superhighfives.com/nylon reflect the released build.
   screenshots:

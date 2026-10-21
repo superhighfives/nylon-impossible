@@ -33,12 +33,13 @@ jobs:
     runs-on: macos-26
     timeout-minutes: 20
     # The app is universal and lays out differently on iPad (regular width),
-    # so run the suite on both families. fail-fast off so one family's
-    # failure doesn't hide the other's result.
+    # so run the suite on both families — and on the Mac, which builds the
+    # same targets for macOS. fail-fast off so one family's failure doesn't
+    # hide the others' results.
     strategy:
       fail-fast: false
       matrix:
-        family: [iPhone, iPad]
+        family: [iPhone, iPad, macOS]
     defaults:
       run:
         working-directory: src/ios/Nylon Impossible
@@ -61,6 +62,7 @@ jobs:
         run: rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData
 
       - name: Run tests
+        if: matrix.family != 'macOS'
         env:
           FAMILY: ${{ matrix.family }}
         run: |
@@ -87,6 +89,22 @@ jobs:
             -scheme "Nylon Impossible" \
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -resultBundlePath TestResults \
+            -quiet
+
+      # The macOS destination of the same scheme: build the app, both
+      # extensions and the unit tests for the Mac, and run them hosted in the
+      # Mac app. Unsigned — CI has no Mac development profile, and the unit
+      # tests don't touch the App Group or the shared Keychain item.
+      - name: Run macOS tests
+        if: matrix.family == 'macOS'
+        run: |
+          sw_vers
+          xcodebuild test \
+            -project "Nylon Impossible.xcodeproj" \
+            -scheme "Nylon Impossible" \
+            -destination "platform=macOS" \
+            -resultBundlePath TestResults \
+            CODE_SIGNING_ALLOWED=NO \
             -quiet
 
       # `-quiet` keeps a passing run readable, but it also swallows the reason a
