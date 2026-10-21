@@ -148,10 +148,17 @@ extension ContentView {
         detailTodo = nil
         showsAccount = false
         if isWide {
-            if let collectionId = destination.collectionId { openColumnId = collectionId }
             // Before the first sync there are no lists, so no column to focus;
             // the board's Today column is the closest thing.
-            if let id = destination.listId ?? timeList(.today)?.id { requestComposer(id) }
+            guard let id = destination.listId ?? timeList(.today)?.id else { return }
+            if let collectionId = destination.collectionId, openColumnId != collectionId {
+                // A column that's only now opening isn't in the board yet, so
+                // scrolling to it this update finds nothing. Ask next turn.
+                openColumnId = collectionId
+                Task { @MainActor in requestComposer(id) }
+            } else {
+                requestComposer(id)
+            }
             return
         }
         chosenListId = nil
