@@ -26,7 +26,7 @@ Search here for real implementations when docs aren't enough.
 ## UI
 
 The app follows the redesign spec in
-`plans/in-progress/2026-10-18-cohesive-redesign.md`.
+`plans/done/2026-10-18-cohesive-redesign.md`.
 
 - **Layouts.** `components/phone/` is the phone layout (under 1024px) and
   also holds the pieces both layouts share: `TodoRow`, `Composer`,
