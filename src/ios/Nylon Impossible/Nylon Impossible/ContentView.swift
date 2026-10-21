@@ -14,6 +14,7 @@
 //  phone layout, carrying an open detail, Done or Settings across.
 //
 
+import AppIntents
 import SwiftData
 import SwiftUI
 
@@ -194,6 +195,9 @@ struct ContentView: View {
             if phase != .active { actions.flush() }
         }
         .onChange(of: isWide, initial: true) { _, wide in carryAcross(toWide: wide) }
+        // Siri matches "Add … to {list} in Nylon" against the list names it
+        // was last given, so a new or renamed list has to be re-registered.
+        .onChange(of: collections.map(\.name)) { NylonShortcuts.updateAppShortcutParameters() }
         .onAppear { performPendingRoute() }
         .onChange(of: QuickActionService.shared.pending) { performPendingRoute() }
     }
