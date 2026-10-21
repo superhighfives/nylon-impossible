@@ -4,7 +4,21 @@
 
 import CoreText
 import SwiftUI
+#if os(macOS)
+import AppKit
+
+/// The platform's colour and font types, so the tokens below read the same
+/// on iOS and macOS. Only Theme and its extensions should need these.
+typealias PlatformColor = NSColor
+typealias PlatformFont = NSFont
+typealias PlatformFontDescriptor = NSFontDescriptor
+#else
 import UIKit
+
+typealias PlatformColor = UIColor
+typealias PlatformFont = UIFont
+typealias PlatformFontDescriptor = UIFontDescriptor
+#endif
 
 /// Design tokens shared with the web app (src/shared/design/tokens.json).
 /// Views read colour, type, spacing and motion from here only.
@@ -18,18 +32,31 @@ enum Theme {
             lightHighContrast: UInt32? = nil,
             darkHighContrast: UInt32? = nil
         ) -> Color {
-            Color(uiColor: UIColor { traits in
-                let isDark = traits.userInterfaceStyle == .dark
-                if traits.accessibilityContrast == .high,
-                   let high = isDark ? darkHighContrast : lightHighContrast {
+            func resolve(isDark: Bool, isHighContrast: Bool) -> PlatformColor {
+                if isHighContrast, let high = isDark ? darkHighContrast : lightHighContrast {
                     return rgb(high)
                 }
                 return rgb(isDark ? dark : light)
+            }
+            #if os(macOS)
+            return Color(nsColor: NSColor(name: nil) { appearance in
+                let match = appearance.bestMatch(from: [
+                    .aqua, .darkAqua, .accessibilityHighContrastAqua, .accessibilityHighContrastDarkAqua
+                ])
+                return resolve(
+                    isDark: match == .darkAqua || match == .accessibilityHighContrastDarkAqua,
+                    isHighContrast: match == .accessibilityHighContrastAqua || match == .accessibilityHighContrastDarkAqua
+                )
             })
+            #else
+            return Color(uiColor: UIColor { traits in
+                resolve(isDark: traits.userInterfaceStyle == .dark, isHighContrast: traits.accessibilityContrast == .high)
+            })
+            #endif
         }
 
-        private static func rgb(_ hex: UInt32) -> UIColor {
-            UIColor(
+        private static func rgb(_ hex: UInt32) -> PlatformColor {
+            PlatformColor(
                 red: CGFloat((hex >> 16) & 0xFF) / 255,
                 green: CGFloat((hex >> 8) & 0xFF) / 255,
                 blue: CGFloat(hex & 0xFF) / 255,
@@ -71,35 +98,40 @@ enum Theme {
         /// The variable-font attribute and its `wght` axis ('wght' as a
         /// four-char code). A weight trait alone leaves a variable face at
         /// its default instance, so the weight is set on the axis instead.
-        static let variationAttribute = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        static let variationAttribute = PlatformFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
         static let weightAxis = 0x7767_6874
 
         struct Style: Sendable {
             let size: CGFloat
             let lineHeight: CGFloat
-            let weight: UIFont.Weight
+            let weight: PlatformFont.Weight
             /// The same weight on the 100–900 scale, for the variable axis.
             let variationWeight: CGFloat
             let isDisplay: Bool
-            let textStyle: UIFont.TextStyle
+            let textStyle: PlatformFont.TextStyle
 
             /// The face at its base size, before Dynamic Type scaling.
-            var baseFont: UIFont {
+            var baseFont: PlatformFont {
                 if isDisplay {
-                    let descriptor = UIFontDescriptor(fontAttributes: [
+                    let descriptor = PlatformFontDescriptor(fontAttributes: [
                         .family: Fonts.displayFontFamily,
                         Fonts.variationAttribute: [Fonts.weightAxis: variationWeight]
                     ])
-                    let face = UIFont(descriptor: descriptor, size: size)
-                    if face.familyName == Fonts.displayFontFamily { return face }
+                    let face: PlatformFont? = PlatformFont(descriptor: descriptor, size: size)
+                    if let face, face.familyName == Fonts.displayFontFamily { return face }
                 }
-                return UIFont.systemFont(ofSize: size, weight: weight)
+                return PlatformFont.systemFont(ofSize: size, weight: weight)
             }
 
             /// Scaled with Dynamic Type through `UIFontMetrics`, so each size
-            /// follows its matching text style.
-            var uiFont: UIFont {
+            /// follows its matching text style. macOS has no Dynamic Type, so
+            /// there it's the base face.
+            var uiFont: PlatformFont {
+                #if os(macOS)
+                baseFont
+                #else
                 UIFontMetrics(forTextStyle: textStyle).scaledFont(for: baseFont)
+                #endif
             }
 
             var font: Font { Font(uiFont) }
