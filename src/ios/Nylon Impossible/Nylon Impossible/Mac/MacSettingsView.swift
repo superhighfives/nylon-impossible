@@ -257,6 +257,8 @@ struct MacAccountSettings: View {
         defer { isDeleting = false }
         do {
             try await api.deleteMe()
+            // The account is already gone on the server, so a failed local
+            // wipe isn't worth surfacing or retrying: sign out regardless.
             try? modelContext.delete(model: TodoItem.self)
             try? modelContext.delete(model: TodoUrl.self)
             try? modelContext.delete(model: TodoListModel.self)
