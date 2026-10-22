@@ -13,6 +13,14 @@
 
 import SwiftUI
 
+/// What every board column reads from the whole store, worked out once per
+/// update of the board.
+struct BoardDerived {
+    let counts: [String: Int]
+    let subtasks: [UUID: [TodoItem]]
+    let lists: [TodoListModel]
+}
+
 extension ContentView {
     // MARK: - Derived
 
@@ -29,13 +37,13 @@ extension ContentView {
         boardColumns.first { $0.id == focusedColumnId } ?? boardColumns.first
     }
 
-    var sidebarTimeLists: [WideSidebar.Entry] {
+    func sidebarTimeLists(counts: [String: Int]) -> [WideSidebar.Entry] {
         [Page.today, .thisWeek, .someday].compactMap(timeList).map {
             WideSidebar.Entry(list: $0, openTodos: counts[$0.id.lowercased()] ?? 0)
         }
     }
 
-    var sidebarCollections: [WideSidebar.Entry] {
+    func sidebarCollections(counts: [String: Int]) -> [WideSidebar.Entry] {
         collections.map { WideSidebar.Entry(list: $0, openTodos: counts[$0.id.lowercased()] ?? 0) }
     }
 
@@ -72,9 +80,10 @@ extension ContentView {
     }
 
     var sidebar: some View {
-        WideSidebar(
-            timeLists: sidebarTimeLists,
-            collections: sidebarCollections,
+        let counts = counts
+        return WideSidebar(
+            timeLists: sidebarTimeLists(counts: counts),
+            collections: sidebarCollections(counts: counts),
             openColumnId: openColumnId,
             panel: detailTodo == nil ? widePanel : nil,
             doneCount: doneCount,
@@ -105,36 +114,43 @@ extension ContentView {
     }
 
     var board: some View {
-        GeometryReader { geometry in
-            let columns = boardColumns
-            // At accessibility text sizes the columns keep a readable width
-            // and the board scrolls sideways, rather than squeezing three
-            // columns until words break mid-letter.
-            let minimum = dynamicTypeSize.isAccessibilitySize ? Theme.Wide.columnMinWidthLargeText : Theme.Wide.columnMinWidth
-            let width = max(minimum, geometry.size.width / CGFloat(max(columns.count, 1)))
-            ScrollViewReader { proxy in
-                ScrollView(.horizontal) {
-                    HStack(spacing: 0) {
-                        ForEach(Array(columns.enumerated()), id: \.element.id) { index, list in
-                            HStack(spacing: 0) {
-                                if index > 0 { VerticalHairline() }
-                                column(list)
-                            }
-                            .frame(width: width, height: geometry.size.height)
-                            .id(list.id)
-                            .transition(.opacity.combined(with: .move(edge: .trailing)))
+        let columns = boardColumns
+        // Every column reads these; work them out once per update rather than
+        // once per column (each is a pass over every todo in the store).
+        let derived = BoardDerived(counts: counts, subtasks: subtasksByParent, lists: orderedLists)
+        // At accessibility text sizes the columns keep a readable width
+        // and the board scrolls sideways, rather than squeezing three
+        // columns until words break mid-letter.
+        let minimum = dynamicTypeSize.isAccessibilitySize ? Theme.Wide.columnMinWidthLargeText : Theme.Wide.columnMinWidth
+        let count = CGFloat(max(columns.count, 1))
+        return ScrollViewReader { proxy in
+            ScrollView(.horizontal) {
+                HStack(spacing: 0) {
+                    ForEach(Array(columns.enumerated()), id: \.element.id) { index, list in
+                        HStack(spacing: 0) {
+                            if index > 0 { VerticalHairline() }
+                            column(list, derived: derived)
                         }
+                        // Sized in layout, not in body: resizing the window or
+                        // collapsing the sidebar animates the width every
+                        // frame, and a GeometryReader here rebuilt every
+                        // column (and rescanned the store) on each of them.
+                        .containerRelativeFrame([.horizontal, .vertical]) { length, axis in
+                            axis == .horizontal ? max(minimum, length / count) : length
+                        }
+                        .id(list.id)
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
                 }
-                .scrollIndicators(.hidden)
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-                .onChange(of: scrollColumnId) { _, id in
-                    guard let id else { return }
-                    withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.slow)) {
-                        proxy.scrollTo(id)
-                    }
-                    scrollColumnId = nil
+            }
+            .scrollIndicators(.hidden)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .onChange(of: scrollColumnId) { _, id in
+                guard let id else { return }
+                withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.slow)) {
+                    proxy.scrollTo(id)
                 }
+                scrollColumnId = nil
             }
         }
         .environment(\.isWideLayout, true)
@@ -169,7 +185,7 @@ extension ContentView {
     }
 
     @ViewBuilder
-    func column(_ list: TodoListModel) -> some View {
+    func column(_ list: TodoListModel, derived: BoardDerived) -> some View {
         let rows = rows(list)
         let composer = columnComposer(list)
         if let kind = list.systemKind {
@@ -178,12 +194,12 @@ extension ContentView {
                 title: list.name,
                 subline: MastheadCopy.columnSubline(kind),
                 rows: rows,
-                subtasks: subtasksByParent,
-                lists: orderedLists,
+                subtasks: derived.subtasks,
+                lists: derived.lists,
                 actions: actions,
                 selectedId: selectedTodoId,
                 overnight: kind == .today ? overnightText.map { ($0, dismissOvernight) } : nil,
-                empty: wideEmpty(kind),
+                empty: wideEmpty(kind, counts: derived.counts),
                 composer: composer,
                 onOpen: openWide,
                 onDrop: { id, row in dropWide(id, on: row, into: list) },
@@ -195,8 +211,8 @@ extension ContentView {
                 title: list.name,
                 subline: MastheadCopy.columnSubline(nil),
                 rows: rows,
-                subtasks: subtasksByParent,
-                lists: orderedLists,
+                subtasks: derived.subtasks,
+                lists: derived.lists,
                 actions: actions,
                 selectedId: selectedTodoId,
                 isTinted: true,
@@ -266,7 +282,8 @@ extension ContentView {
         .accessibilityLabel("List options")
     }
 
-    func wideEmpty(_ kind: SystemListKind) -> (text: String, link: (text: String, action: () -> Void)?) {
+    func wideEmpty(_ kind: SystemListKind, counts: [String: Int]) -> (text: String, link: (text: String, action: () -> Void)?) {
+        func count(_ page: Page) -> Int { timeList(page).map { counts[$0.id.lowercased()] ?? 0 } ?? 0 }
         switch kind {
         case .today:
             let waiting = count(.thisWeek)

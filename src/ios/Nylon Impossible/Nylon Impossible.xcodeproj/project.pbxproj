@@ -1080,7 +1080,7 @@
 			repositoryURL = "https://github.com/clerk/clerk-ios";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.1;
+				minimumVersion = 1.6.1;
 			};
 		};
 		AA0000032FA800000000SE03 /* XCRemoteSwiftPackageReference "sentry-cocoa" */ = {

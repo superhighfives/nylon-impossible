@@ -207,7 +207,8 @@ extension ContentView {
                 switch route {
                 case .detail, .inspector:
                     viewModel.page = .thisWeek
-                    if let todo = todos.first(where: { !(subtasksByParent[$0.id] ?? []).isEmpty }) {
+                    let subtasks = subtasksByParent
+                    if let todo = todos.first(where: { !(subtasks[$0.id] ?? []).isEmpty }) {
                         detailDetent = .large
                         if isWide { openWide(todo) } else { detailTodo = todo }
                     }

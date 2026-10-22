@@ -82,7 +82,9 @@ struct QuickAddView: View {
     }
 
     private var content: some View {
+        let today = today
         let shown = Array(today.prefix(Self.rowLimit))
+        let subtasks = subtasksByParent
         return VStack(alignment: .leading, spacing: 0) {
             header(count: today.count)
             Composer(
@@ -109,7 +111,7 @@ struct QuickAddView: View {
                     ForEach(shown) { todo in
                         TodoRow(
                             todo: todo,
-                            subtasks: subtasksByParent[todo.id] ?? [],
+                            subtasks: subtasks[todo.id] ?? [],
                             actions: actions,
                             lists: orderedLists
                         ) {
