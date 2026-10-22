@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { deleteUserAsAdmin, listUsers } from "./handlers/admin";
+import { submitFeedback } from "./handlers/feedback";
 import {
   gmailAddonAddFromMessage,
   gmailAddonQuickAdd,
@@ -103,6 +104,7 @@ app.use("/users/*", authMiddleware);
 
 // Admin routes (auth + admin role required)
 app.use("/admin/*", authMiddleware, requireAdmin);
+app.use("/feedback", authMiddleware, requireAdmin);
 
 // Clerk webhooks (Svix signature is the auth — NOT wrapped in authMiddleware)
 app.post("/webhooks/clerk", clerkWebhook);
@@ -147,6 +149,9 @@ app.delete("/users/me", deleteMe);
 // Admin endpoints
 app.get("/admin/users", listUsers);
 app.delete("/admin/users/:id", deleteUserAsAdmin);
+
+// In-app feedback → issue in the private inbox repo
+app.post("/feedback", submitFeedback);
 
 // Catch-all for unhandled throws in route handlers. Hono's default onError
 // swallows these into a bare 500 that never reaches Sentry (withSentry only

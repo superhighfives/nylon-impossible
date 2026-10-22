@@ -77,6 +77,21 @@ final class MockAPIService: APIProviding {
         return processTodoLinkCount
     }
 
+    var submitFeedbackResult = FeedbackResult(
+        issueNumber: 1,
+        issueUrl: URL(string: "https://github.com/superhighfives/nylon-feedback/issues/1")!
+    )
+    var submitFeedbackError: Error?
+    var lastFeedbackRequest: FeedbackRequest?
+
+    func submitFeedback(_ request: FeedbackRequest) async throws -> FeedbackResult {
+        lastFeedbackRequest = request
+        if let error = submitFeedbackError {
+            throw error
+        }
+        return submitFeedbackResult
+    }
+
     var listsToReturn: [APIList] = []
     var listListsError: Error?
 

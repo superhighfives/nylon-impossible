@@ -22,6 +22,7 @@ final class MacServices {
     let authService: AuthService
     let syncService: SyncService
     let preferencesService: UserPreferencesService
+    let feedbackService: FeedbackService
     let settings: MacSettings
     @ObservationIgnored private(set) var hotKey: GlobalHotKey?
     @ObservationIgnored let dockBadge: DockBadgeController
@@ -35,7 +36,9 @@ final class MacServices {
         let auth = AuthService()
         authService = auth
         syncService = SyncService(authService: auth)
-        preferencesService = UserPreferencesService(apiService: APIService(authService: auth))
+        let apiService = APIService(authService: auth)
+        preferencesService = UserPreferencesService(apiService: apiService)
+        feedbackService = FeedbackService(apiService: apiService)
         settings = MacSettings()
         dockBadge = DockBadgeController()
     }

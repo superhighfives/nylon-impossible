@@ -21,6 +21,8 @@ export interface User {
   timezoneAuto?: boolean;
   // Null until a sweep has moved something; absent from older servers.
   lastSweep?: LastSweep | null;
+  // Admins see the feedback button. Absent from older servers.
+  isAdmin?: boolean;
   createdAt: string;
   updatedAt: string;
 }

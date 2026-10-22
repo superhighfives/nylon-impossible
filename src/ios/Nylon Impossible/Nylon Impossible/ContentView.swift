@@ -45,6 +45,8 @@ struct ContentView: View {
     @Environment(AuthService.self) var authService
     @Environment(SyncService.self) var syncService
     @Environment(UserPreferencesService.self) var preferences
+    /// Nil in DEBUG screenshot routes, which run without services.
+    @Environment(FeedbackService.self) var feedback: FeedbackService?
     @AppStorage(OvernightDismissal.key) var overnightDismissedAt: String?
     /// From `ContentRoot`'s queries, as plain values; see there for why.
     let todos: [TodoItem]
@@ -61,6 +63,9 @@ struct ContentView: View {
     @State var showsAccount = false
     @State var accountPath: [AccountRoute] = []
     @State var accountDetent: PresentationDetent = .medium
+    /// Send feedback was tapped in the account sheet: open the feedback
+    /// sheet once that one has gone.
+    @State var feedbackAfterAccount = false
     @State var chosenListId: String?
     @State var focusComposer = false
     @State var renamingList: TodoListModel?
@@ -171,6 +176,7 @@ struct ContentView: View {
         .onAppear { performPendingRoute() }
         .onChange(of: QuickActionService.shared.pending) { performPendingRoute() }
         .toastMagicTap(actions.toasts)
+        .feedbackPresentation(feedback, isEnabled: showsFeedback, screen: feedbackScreen, toasts: actions.toasts)
     }
 
     // MARK: - Phone
@@ -212,7 +218,13 @@ struct ContentView: View {
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.canvas)
         }
-        .sheet(isPresented: $showsAccount, onDismiss: { accountPath = [] }) {
+        .sheet(isPresented: $showsAccount, onDismiss: {
+            accountPath = []
+            if feedbackAfterAccount {
+                feedbackAfterAccount = false
+                feedback?.present()
+            }
+        }) {
             AccountSheet(
                 name: displayName,
                 initials: initials,
@@ -221,6 +233,10 @@ struct ContentView: View {
                 actions: actions,
                 lists: orderedLists,
                 onSignOut: signOut,
+                onFeedback: showsFeedback ? {
+                    feedbackAfterAccount = true
+                    showsAccount = false
+                } : nil,
                 path: $accountPath,
                 detent: $accountDetent
             )
@@ -355,6 +371,23 @@ extension ContentView {
 
     var doneCount: Int {
         todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
+    }
+
+    // MARK: - Feedback
+
+    /// The feedback button is for admins, and never in a screenshot run.
+    var showsFeedback: Bool { feedback != nil && preferences.isAdmin && screenRoute == nil }
+
+    /// Where feedback was flagged from, for the issue: "Today",
+    /// "board › Groceries › detail".
+    var feedbackScreen: String {
+        var parts = [isWide ? "board" : viewModel.page.title]
+        let openId = isWide ? openColumnId : viewModel.openCollectionId
+        if let openId, let list = lists.first(where: { $0.id == openId }) { parts.append(list.name) }
+        if detailTodo != nil { parts.append("detail") }
+        if isWide, let widePanel { parts.append(widePanel == .done ? "done" : "settings") }
+        if showsAccount { parts.append(accountPath.last.map { $0 == .done ? "done" : "settings" } ?? "account") }
+        return parts.joined(separator: " › ")
     }
 
     // MARK: - Identity

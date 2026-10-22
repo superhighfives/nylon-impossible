@@ -20,6 +20,9 @@ final class UserPreferencesService {
     /// What the last overnight sweep moved, for Today's note. Only
     /// `GET /users/me` carries it, so only a fetch changes it.
     var lastSweep: LastSweep?
+    /// Whether the account has the admin role, which shows the feedback
+    /// button. Only `GET /users/me` carries it.
+    var isAdmin = false
     var isLoading: Bool = false
     var error: Error?
 
@@ -43,6 +46,7 @@ final class UserPreferencesService {
         timezone = "UTC"
         timezoneAuto = true
         lastSweep = nil
+        isAdmin = false
         hasLoaded = false
     }
 
@@ -54,6 +58,7 @@ final class UserPreferencesService {
             let user = try await apiService.getMe()
             apply(user)
             lastSweep = user.lastSweep
+            isAdmin = user.isAdmin ?? false
             hasLoaded = true
         } catch {
             self.error = error

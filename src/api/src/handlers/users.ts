@@ -32,18 +32,21 @@ const userColumns = {
   updatedAt: users.updatedAt,
 };
 
-function serializeUser(user: {
-  id: string;
-  email: string;
-  theme: "light" | "dark" | "system";
-  timezone: string;
-  timezoneAuto: boolean;
-  lastSweepAt: Date | null;
-  lastSweepMovedToThisWeek: number;
-  lastSweepMovedToSomeday: number;
-  createdAt: Date;
-  updatedAt: Date;
-}) {
+function serializeUser(
+  user: {
+    id: string;
+    email: string;
+    theme: "light" | "dark" | "system";
+    timezone: string;
+    timezoneAuto: boolean;
+    lastSweepAt: Date | null;
+    lastSweepMovedToThisWeek: number;
+    lastSweepMovedToSomeday: number;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+  role: "admin" | null,
+) {
   return {
     id: user.id,
     email: user.email,
@@ -61,6 +64,9 @@ function serializeUser(user: {
       : null,
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
+    // From the token's role claim, not the users table. Clients use it to show
+    // admin-only tools such as in-app feedback.
+    isAdmin: role === "admin",
   };
 }
 
@@ -86,7 +92,7 @@ export async function getMe(c: Context<Env>) {
     return apiError(c, "user_not_found");
   }
 
-  return c.json(serializeUser(user));
+  return c.json(serializeUser(user, c.get("role")));
 }
 
 // PATCH /users/me
@@ -138,7 +144,7 @@ export async function updateMe(c: Context<Env>) {
     return apiError(c, "user_not_found");
   }
 
-  return c.json(serializeUser(user));
+  return c.json(serializeUser(user, c.get("role")));
 }
 
 // DELETE /users/me

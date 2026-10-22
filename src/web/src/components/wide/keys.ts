@@ -10,6 +10,7 @@ export type BoardKeyAction =
   | { type: "due" }
   | { type: "delete" }
   | { type: "new" }
+  | { type: "feedback" }
   | { type: "shortcuts" };
 
 const KINDS: Record<string, SystemListKind> = {
@@ -54,6 +55,8 @@ export function boardKeyAction(e: {
       return { type: "delete" };
     case "n":
       return { type: "new" };
+    case "f":
+      return { type: "feedback" };
     case "?":
       return { type: "shortcuts" };
     default: {
@@ -89,3 +92,6 @@ export const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["n"], label: "New todo in this column" },
   { keys: ["?"], label: "Show shortcuts" },
 ];
+
+/** Admins also get this row (see `FeedbackDialog`). */
+export const FEEDBACK_SHORTCUT = { keys: ["f"], label: "Send feedback" };

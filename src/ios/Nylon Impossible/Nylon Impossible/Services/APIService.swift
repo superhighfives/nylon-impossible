@@ -180,6 +180,9 @@ struct APIUser: Codable, Sendable {
     let timezoneAuto: Bool?
     // What the last overnight sweep moved. Decoded leniently; see LastSweep.swift.
     let lastSweep: LastSweep?
+    // Whether the account has the admin role, which shows the feedback
+    // button. Optional for an older API; absent means no.
+    let isAdmin: Bool?
     let createdAt: Date
     let updatedAt: Date
 
@@ -190,6 +193,7 @@ struct APIUser: Codable, Sendable {
         timezone: String? = nil,
         timezoneAuto: Bool? = nil,
         lastSweep: LastSweep? = nil,
+        isAdmin: Bool? = nil,
         createdAt: Date,
         updatedAt: Date
     ) {
@@ -199,6 +203,7 @@ struct APIUser: Codable, Sendable {
         self.timezone = timezone
         self.timezoneAuto = timezoneAuto
         self.lastSweep = lastSweep
+        self.isAdmin = isAdmin
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -231,6 +236,7 @@ protocol APIProviding: Sendable {
     func updateMe(_ request: UpdateUserRequest) async throws -> APIUser
     func deleteMe() async throws
     func processTodo(todoId: String) async throws -> Int
+    func submitFeedback(_ request: FeedbackRequest) async throws -> FeedbackResult
 
     // MARK: - Lists
     func listLists() async throws -> [APIList]
@@ -387,6 +393,14 @@ final class APIService: APIProviding {
     /// only needs to sign out and clear local data afterward.
     func deleteMe() async throws {
         let _: EmptyResponse = try await delete(path: "/users/me")
+    }
+
+    // MARK: - Feedback
+
+    /// File an issue in the private feedback repo. Admin only; the server
+    /// answers 403 to anyone else.
+    func submitFeedback(_ request: FeedbackRequest) async throws -> FeedbackResult {
+        try await post(path: "/feedback", body: request)
     }
 
     // MARK: - Lists

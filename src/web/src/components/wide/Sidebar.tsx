@@ -64,8 +64,8 @@ function ListEntry({
 
 /**
  * The wide sidebar: the wordmark; Today, This Week and Someday with counts;
- * a "Lists" heading, your lists and an inline "New list"; then Done and
- * Settings. Every list is a drop target.
+ * a "Lists" heading, your lists and an inline "New list"; then Done,
+ * Settings and (for admins) Send feedback. Every list is a drop target.
  */
 export function Sidebar({
   timeLists,
@@ -79,6 +79,7 @@ export function Sidebar({
   onDone,
   onSettings,
   onShortcuts,
+  onFeedback,
 }: {
   timeLists: SerializedList[];
   collections: SerializedList[];
@@ -91,6 +92,8 @@ export function Sidebar({
   onDone: () => void;
   onSettings: () => void;
   onShortcuts: () => void;
+  /** Shown only when set — the caller passes it for admins. */
+  onFeedback?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const add = () => {
@@ -171,6 +174,17 @@ export function Sidebar({
           </span>
         </SidebarButton>
         <SidebarButton onClick={onSettings}>Settings</SidebarButton>
+        {onFeedback && (
+          <SidebarButton onClick={onFeedback} keyShortcut="f">
+            <span className="flex-1">Send feedback</span>
+            <span
+              aria-hidden="true"
+              className="font-n-text text-xs font-normal text-n-ink-muted"
+            >
+              f
+            </span>
+          </SidebarButton>
+        )}
         <button
           type="button"
           onClick={onShortcuts}
@@ -190,16 +204,19 @@ export function Sidebar({
 function SidebarButton({
   onClick,
   describedBy,
+  keyShortcut,
   children,
 }: {
   onClick: () => void;
   describedBy?: string;
+  keyShortcut?: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
       aria-describedby={describedBy}
+      aria-keyshortcuts={keyShortcut}
       onClick={onClick}
       className={`${ENTRY} font-medium`}
     >

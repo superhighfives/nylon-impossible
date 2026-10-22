@@ -28,6 +28,7 @@ struct Nylon_ImpossibleApp: App {
     @State private var authService = AuthService()
     @State private var syncService: SyncService?
     @State private var preferencesService: UserPreferencesService?
+    @State private var feedbackService: FeedbackService?
     
     init() {
         Clerk.configure(publishableKey: Config.clerkPublishableKey, options: Self.clerkOptions)
@@ -155,12 +156,14 @@ struct Nylon_ImpossibleApp: App {
             #endif
         }
         // The iPad board's keys, for the shortcut overlay and menu bar.
-        .commands { BoardCommands() }
+        .commands {
+            BoardCommands(feedback: feedbackService, showsFeedback: preferencesService?.isAdmin == true)
+        }
         #endif
     }
 
     private var signedInRoot: some View {
-        RootView(syncService: syncService, preferencesService: preferencesService)
+        RootView(syncService: syncService, preferencesService: preferencesService, feedbackService: feedbackService)
             .environment(Clerk.shared)
             .environment(authService)
             .onAppear {
@@ -168,6 +171,7 @@ struct Nylon_ImpossibleApp: App {
                     let apiService = APIService(authService: authService)
                     syncService = SyncService(authService: authService)
                     preferencesService = UserPreferencesService(apiService: apiService)
+                    feedbackService = FeedbackService(apiService: apiService)
                 }
             }
             .task {
@@ -185,6 +189,8 @@ struct RootView: View {
     @Environment(AuthService.self) private var authService
     var syncService: SyncService?
     var preferencesService: UserPreferencesService?
+    /// The admin-only feedback inbox; nil until the services exist.
+    var feedbackService: FeedbackService?
 
     @State private var hasTriggeredInitialSync = false
     
@@ -215,6 +221,7 @@ struct RootView: View {
                     ContentRoot()
                         .environment(syncService)
                         .environment(preferencesService)
+                        .environment(feedbackService)
                         .onAppear {
                             syncService.setModelContext(modelContext)
                             triggerInitialSync()

@@ -65,7 +65,7 @@ struct LastSweep: Codable, Equatable, Sendable {
 
 extension APIUser {
     enum CodingKeys: String, CodingKey {
-        case id, email, theme, timezone, timezoneAuto, lastSweep, createdAt, updatedAt
+        case id, email, theme, timezone, timezoneAuto, lastSweep, isAdmin, createdAt, updatedAt
     }
 
     /// Written out so `lastSweep` can never fail the whole user: an older
@@ -80,6 +80,7 @@ extension APIUser {
             timezone: try container.decodeIfPresent(String.self, forKey: .timezone),
             timezoneAuto: try container.decodeIfPresent(Bool.self, forKey: .timezoneAuto),
             lastSweep: (try? container.decodeIfPresent(LastSweep.self, forKey: .lastSweep)) ?? nil,
+            isAdmin: (try? container.decodeIfPresent(Bool.self, forKey: .isAdmin)) ?? nil,
             createdAt: try container.decode(Date.self, forKey: .createdAt),
             updatedAt: try container.decode(Date.self, forKey: .updatedAt)
         )

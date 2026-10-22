@@ -92,7 +92,15 @@ extension ContentView {
                 guard let todo = todos.first(where: { $0.id == id }) else { return }
                 actions.move(todo, toList: list.id)
             },
-            onSignOut: signOut
+            onSignOut: signOut,
+            onFeedback: showsFeedback ? {
+                #if os(macOS)
+                // The menu is its own window, so the board is unobstructed.
+                feedback?.presentWithSnapshot()
+                #else
+                feedback?.present()
+                #endif
+            } : nil
         )
     }
 
