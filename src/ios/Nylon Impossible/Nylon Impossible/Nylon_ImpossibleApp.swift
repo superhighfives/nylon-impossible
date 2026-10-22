@@ -63,9 +63,7 @@ struct Nylon_ImpossibleApp: App {
     /// need to.
     static var clerkOptions: Clerk.Options {
         #if os(macOS) && DEBUG
-        let isolated = ScreenRoute.launch != nil || !isSignedByTeam
-        let service = isolated ? "\(clerkDebugKeychainService).\(UUID().uuidString)" : clerkDebugKeychainService
-        return Clerk.Options(keychainConfig: .init(service: service))
+        return Clerk.Options(keychainConfig: .init(service: clerkLaunchKeychainService))
         #else
         return Clerk.Options()
         #endif
@@ -74,6 +72,13 @@ struct Nylon_ImpossibleApp: App {
     static let clerkDebugKeychainService = "com.superhighfives.Nylon-Impossible.debug"
 
     #if os(macOS) && DEBUG
+    /// Worked out once per launch, so a second read of `clerkOptions` gets the
+    /// same service rather than a fresh, empty one.
+    private static let clerkLaunchKeychainService: String = {
+        let isolated = ScreenRoute.launch != nil || !isSignedByTeam
+        return isolated ? "\(clerkDebugKeychainService).\(UUID().uuidString)" : clerkDebugKeychainService
+    }()
+
     /// Whether this build carries a team's signature (Xcode's development
     /// signing) rather than an ad-hoc one (`CODE_SIGNING_ALLOWED=NO`, as CI and
     /// command-line builds use). The App Group container can't tell them apart:
