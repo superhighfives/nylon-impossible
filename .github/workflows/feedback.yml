@@ -4,9 +4,9 @@ name: Feedback
 # Claude try a fix: a draft PR when the fix is clear, a comment with questions
 # when it isn't. Follow-ups go through claude.yml (`@claude` on the issue).
 #
-# Only issues the repo owner opened with the `feedback` label run — /feedback
-# files them with the owner's token, and the issue body becomes the prompt, so
-# nobody else gets to write one.
+# Only the repo owner can drive it: the issue must be theirs (/feedback files
+# with their token) and so must the event — opening it, or dispatching a rerun.
+# The issue body becomes the prompt, so nobody else gets to write one.
 
 on:
   issues:
@@ -32,9 +32,11 @@ permissions:
 jobs:
   route:
     if: >-
-      github.event_name == 'workflow_dispatch' || (
-        github.event.issue.user.login == github.repository_owner &&
-        contains(github.event.issue.labels.*.name, 'feedback')
+      github.actor == github.repository_owner && (
+        github.event_name == 'workflow_dispatch' || (
+          github.event.issue.user.login == github.repository_owner &&
+          contains(github.event.issue.labels.*.name, 'feedback')
+        )
       )
     runs-on: ubuntu-latest
     outputs:
@@ -51,7 +53,7 @@ jobs:
             -q 'select(.author.login == "${{ github.repository_owner }}") | [.labels[].name] | join(",")')
           case ",$labels," in
             *,feedback,*) ;;
-            *) echo "#$NUMBER isn't owner-filed feedback" >&2; exit 1 ;;
+            *) echo "#$NUMBER isn't feedback filed by the repo owner" >&2; exit 1 ;;
           esac
           case ",$labels," in
             *,platform:ios,*|*,platform:ipados,*|*,platform:mac,*) runner=macos-26 ;;
@@ -98,7 +100,7 @@ jobs:
             --allowedTools Read,Edit,Write,Glob,Grep,Bash(bun run *),Bash(bunx biome *),Bash(git *),Bash(gh issue *),Bash(gh pr *),Bash(xcodebuild *),Bash(xcrun *),Bash(swiftlint *),Bash(ls *)
           prompt: |
             You're triaging in-app feedback issue #${{ needs.route.outputs.number }}
-            in ${{ github.repository }}, filed by the owner from one of the apps.
+            in ${{ github.repository }}, filed by the repo owner from one of the apps.
 
             1. Read it: `gh issue view ${{ needs.route.outputs.number }}`. Screenshot
                links point at `https://github.com/${{ github.repository }}/blob/feedback-assets/<path>?raw=true`;
@@ -114,7 +116,7 @@ jobs:
                - run the checks for what you touched (`bun run typecheck`,
                  `bun run lint`, `bun run web:test` / `bun run api:test`; on
                  macOS, the xcodebuild test commands in .github/workflows/ios-test.yml);
-               - push and open a **draft** PR with `gh pr create --draft`,
+               - push and open a **draft** PR with `gh pr create --draft --label feedback`,
                  body ending "Fixes #${{ needs.route.outputs.number }}". Don't
                  embed the screenshots in the PR;
                - comment on the issue with the PR link and one line on the fix.
