@@ -31,6 +31,9 @@ struct MacSignInView: View {
     @Environment(Clerk.self) private var clerk
     @State private var working: OAuthProvider?
     @State private var message: String?
+    /// The sign-in in flight. Cancelling it closes Clerk's browser session, so
+    /// Cancel (or the sheet going away) never leaves one waiting.
+    @State private var signInTask: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s4) {
@@ -61,6 +64,13 @@ struct MacSignInView: View {
                 }
             }
 
+            if let provider = working {
+                Text("Finish signing in with \(provider.name) in the browser window. It closes on its own when you’re done.")
+                    .textStyle(Theme.Fonts.Role.meta)
+                    .foregroundStyle(Theme.Colors.inkMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             if let message {
                 Text(message)
                     .textStyle(Theme.Fonts.Role.meta)
@@ -70,20 +80,27 @@ struct MacSignInView: View {
 
             HStack {
                 Spacer()
-                Button("Cancel", role: .cancel, action: onDone)
-                    .keyboardShortcut(.cancelAction)
+                Button("Cancel", role: .cancel) {
+                    signInTask?.cancel()
+                    onDone()
+                }
+                .keyboardShortcut(.cancelAction)
             }
         }
         .padding(Theme.Space.s6)
         .frame(width: 380)
+        .onDisappear { signInTask?.cancel() }
     }
 
     private func signIn(with provider: OAuthProvider) {
         guard working == nil else { return }
         working = provider
         message = nil
-        Task {
-            defer { working = nil }
+        signInTask = Task {
+            defer {
+                working = nil
+                signInTask = nil
+            }
             do {
                 let result = try await clerk.auth.signInWithOAuth(provider: provider)
                 if Self.isComplete(result) {
