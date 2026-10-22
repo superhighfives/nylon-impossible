@@ -13,6 +13,9 @@ import AppIntents
 import BackgroundTasks
 #endif
 import Sentry
+#if os(macOS)
+import Security
+#endif
 
 @main
 struct Nylon_ImpossibleApp: App {
@@ -49,15 +52,44 @@ struct Nylon_ImpossibleApp: App {
     /// password prompt on every launch, which "Always Allow" doesn't clear.
     /// Debug builds on the Mac therefore keep Clerk's items under their own
     /// service name. Release builds use Clerk's default (the bundle ID).
+    ///
+    /// The same trap catches Debug builds that aren't signed by Xcode: an
+    /// unsigned (ad-hoc) build reading the items a development-signed build
+    /// wrote prompts for the login password, and each ad-hoc build is a new
+    /// signature, so it prompts every time. Those builds, and screenshot
+    /// routes (`-NylonScreen`, which run without an account), get a service
+    /// of their own for each launch: there's nothing there to read, so nothing
+    /// to prompt for. They can't stay signed in across launches, and don't
+    /// need to.
     static var clerkOptions: Clerk.Options {
         #if os(macOS) && DEBUG
-        return Clerk.Options(keychainConfig: .init(service: clerkDebugKeychainService))
+        let isolated = ScreenRoute.launch != nil || !isSignedByTeam
+        let service = isolated ? "\(clerkDebugKeychainService).\(UUID().uuidString)" : clerkDebugKeychainService
+        return Clerk.Options(keychainConfig: .init(service: service))
         #else
         return Clerk.Options()
         #endif
     }
 
     static let clerkDebugKeychainService = "com.superhighfives.Nylon-Impossible.debug"
+
+    #if os(macOS) && DEBUG
+    /// Whether this build carries a team's signature (Xcode's development
+    /// signing) rather than an ad-hoc one (`CODE_SIGNING_ALLOWED=NO`, as CI and
+    /// command-line builds use). The App Group container can't tell them apart:
+    /// an unsigned, unsandboxed build still gets one.
+    static var isSignedByTeam: Bool {
+        var code: SecCode?
+        var staticCode: SecStaticCode?
+        var info: CFDictionary?
+        guard SecCodeCopySelf([], &code) == errSecSuccess, let code,
+              SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess, let staticCode,
+              SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation), &info) == errSecSuccess,
+              let info = info as? [String: Any]
+        else { return false }
+        return info[kSecCodeInfoTeamIdentifier as String] as? String == AppGroup.teamIdentifier
+    }
+    #endif
 
     private static func initSentry() {
         guard let dsn = Config.sentryDSN else { return }
