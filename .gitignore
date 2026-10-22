@@ -72,3 +72,5 @@ src/ios/**/vendor/bundle
 # Claude
 .claude/settings.json
 .claude/settings.*.json
+# Xcode coverage output
+*.profraw
