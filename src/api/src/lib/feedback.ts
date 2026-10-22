@@ -30,7 +30,9 @@ const imageSchema = z
       .string()
       .min(1)
       .max(MAX_BASE64_LENGTH, "Each image must be 5 MB or smaller")
-      .regex(BASE64, "Image data must be base64"),
+      .regex(BASE64, "Image data must be base64")
+      // GitHub rejects unpadded base64, which would otherwise surface as a 502.
+      .refine((data) => data.length % 4 === 0, "Image data must be base64"),
   })
   .refine((image) => matchesMagic(image.data, image.contentType), {
     message: "Image data doesn't match its content type",

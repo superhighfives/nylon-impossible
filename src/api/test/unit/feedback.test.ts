@@ -57,6 +57,15 @@ describe("feedbackSchema", () => {
     }
   });
 
+  it("rejects base64 whose length isn't a multiple of four", () => {
+    const result = feedbackSchema.safeParse({
+      description: "x",
+      images: [{ contentType: "image/png", data: PNG.replace(/=+$/, "") }],
+      context: { platform: "web" },
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects an image over 5 MB before decoding it", () => {
     const result = feedbackSchema.safeParse({
       description: "x",
