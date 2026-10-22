@@ -15,6 +15,7 @@
 //
 
 #if os(macOS)
+import AuthenticationServices
 import ClerkKit
 import SwiftUI
 
@@ -94,11 +95,9 @@ struct MacSignInView: View {
                 // Closing the sign-in sheet isn't an error worth showing.
             } catch let error as ClerkAPIError {
                 message = error.longMessage ?? error.message ?? "That didn’t work. Try again."
+            } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+                // The user closed the web sign-in sheet.
             } catch {
-                if (error as NSError).domain == "com.apple.AuthenticationServices.WebAuthenticationSession",
-                   (error as NSError).code == 1 {
-                    return // The user cancelled the web sign-in sheet.
-                }
                 message = "Couldn’t sign in. Check your connection and try again."
             }
         }

@@ -13,6 +13,7 @@
 #if os(macOS)
 import AppKit
 import Carbon.HIToolbox
+import ClerkKit
 import Foundation
 import SwiftData
 import Testing
@@ -160,8 +161,20 @@ struct MacSignInTests {
     /// so the Mac must offer exactly those, matching web and iOS.
     @Test("The Mac offers the providers production Clerk enables")
     func providersMatchProduction() {
-        #expect(MacSignInView.providers.map { "\($0.provider)" } == ["google", "github"])
+        #expect(MacSignInView.providers.map(\.provider) == [.google, .github])
         #expect(MacSignInView.providers.map(\.label) == ["Continue with Google", "Continue with GitHub"])
+    }
+
+    @Test("Only a complete sign-in or sign-up counts as signed in")
+    func completion() {
+        var signIn = SignIn.mock
+        var signUp = SignUp.mock
+        #expect(!MacSignInView.isComplete(.signIn(signIn)))
+        #expect(!MacSignInView.isComplete(.signUp(signUp)))
+        signIn.status = .complete
+        signUp.status = .complete
+        #expect(MacSignInView.isComplete(.signIn(signIn)))
+        #expect(MacSignInView.isComplete(.signUp(signUp)))
     }
 }
 
