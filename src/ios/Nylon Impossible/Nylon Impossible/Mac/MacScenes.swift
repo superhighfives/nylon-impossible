@@ -74,7 +74,11 @@ struct MacBoardWindow: View {
     }
 
     private var root: some View {
-        RootView(syncService: services.syncService, preferencesService: services.preferencesService)
+        RootView(
+            syncService: services.syncService,
+            preferencesService: services.preferencesService,
+            feedbackService: services.feedbackService
+        )
             .environment(Clerk.shared)
             .environment(services.authService)
             .modelContainer(services.container)

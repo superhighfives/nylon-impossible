@@ -35,6 +35,8 @@ struct WideSidebar: View {
     let onPanel: (AccountRoute) -> Void
     let onDrop: (TodoListModel, UUID) -> Void
     let onSignOut: () -> Void
+    /// Send Feedback… in the account menu; nil hides it (not an admin).
+    var onFeedback: (() -> Void)?
 
     @State private var targeted: String?
 
@@ -196,6 +198,9 @@ struct WideSidebar: View {
 
     private var account: some View {
         Menu {
+            if let onFeedback {
+                Button("Send Feedback…", systemImage: "exclamationmark.bubble", action: onFeedback)
+            }
             Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", action: onSignOut)
         } label: {
             HStack(spacing: Theme.Space.s2) {

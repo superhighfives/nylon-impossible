@@ -1,15 +1,19 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
-import { SHORTCUTS } from "./keys";
+import { FEEDBACK_SHORTCUT, SHORTCUTS } from "./keys";
 
 /** `?`: the wide board's keyboard map, small and centred. */
 export function ShortcutsOverlay({
   open,
   onClose,
+  feedback = false,
 }: {
   open: boolean;
   onClose: () => void;
+  /** List `f` too: the account can send feedback. */
+  feedback?: boolean;
 }) {
+  const rows = feedback ? [...SHORTCUTS, FEEDBACK_SHORTCUT] : SHORTCUTS;
   return (
     <Dialog.Root
       open={open}
@@ -35,7 +39,7 @@ export function ShortcutsOverlay({
             Shortcuts work when focus isn’t in a text field.
           </Dialog.Description>
           <dl className="m-0 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2 text-[0.9375rem]">
-            {SHORTCUTS.map((s) => (
+            {rows.map((s) => (
               <div key={s.label} className="contents">
                 <dt className="flex gap-1">
                   {s.keys.map((k) => (

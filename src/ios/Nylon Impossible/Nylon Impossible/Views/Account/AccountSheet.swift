@@ -2,7 +2,8 @@
 //  AccountSheet.swift
 //  Nylon Impossible
 //
-//  What the avatar opens: who you are, then Done, Settings and Sign out.
+//  What the avatar opens: who you are, then Done, Settings and Sign out —
+//  and, for an admin, Send feedback.
 //  Done and Settings push inside the sheet, which grows to full height for
 //  them.
 //
@@ -22,6 +23,8 @@ struct AccountSheet: View {
     let actions: TodoActions
     let lists: [TodoListModel]
     let onSignOut: () -> Void
+    /// Opens the feedback sheet; nil hides the row (not an admin).
+    var onFeedback: (() -> Void)?
 
     @Binding var path: [AccountRoute]
     @Binding var detent: PresentationDetent
@@ -34,6 +37,9 @@ struct AccountSheet: View {
                     identity
                     row("Done", detail: "\(doneCount)") { path.append(.done) }
                     row("Settings") { path.append(.settings) }
+                    if let onFeedback {
+                        row("Send feedback", showsChevron: false, action: onFeedback)
+                    }
                     row("Sign out", showsChevron: false, action: onSignOut)
                 }
                 .padding(.horizontal, Theme.Space.s4)

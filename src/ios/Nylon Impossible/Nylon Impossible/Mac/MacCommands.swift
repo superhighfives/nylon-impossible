@@ -7,7 +7,8 @@
 //  the sidebar toggle. Todo: the board's single-key map as menu items —
 //  their keys are only bound while no text field is focused — plus Move to.
 //  Edit keeps the system's items; ⌘Z reaches the toast's Undo through the
-//  window's undo manager (see `ToastUndoBridge`). Help opens the site.
+//  window's undo manager (see `ToastUndoBridge`). Help opens the site and,
+//  for an admin, Send Feedback… ⇧⌘F (see FeedbackPresentation.swift).
 //
 //  Titles, keys and routing come from `BoardMenuCommand`.
 //
@@ -56,6 +57,15 @@ struct MacCommands: Commands {
 
         CommandGroup(replacing: .help) {
             Link("Nylon Help", destination: URL(string: "https://nylonimpossible.com")!)
+            // Admin only: files an issue in the private feedback repo.
+            if MacServices.shared.preferencesService.isAdmin {
+                Divider()
+                Button("Send Feedback…") {
+                    MacServices.shared.showMainWindow()
+                    MacServices.shared.feedbackService.presentWithSnapshot()
+                }
+                .keyboardShortcut(FeedbackService.shortcut.key, modifiers: FeedbackService.shortcut.modifiers)
+            }
         }
     }
 

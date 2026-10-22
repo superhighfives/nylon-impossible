@@ -22,6 +22,7 @@ describe("boardKeyAction", () => {
     ["Backspace", { type: "delete" }],
     ["Delete", { type: "delete" }],
     ["n", { type: "new" }],
+    ["f", { type: "feedback" }],
     ["?", { type: "shortcuts" }],
   ])("%s", (key, action) => {
     expect(boardKeyAction({ key })).toEqual(action);

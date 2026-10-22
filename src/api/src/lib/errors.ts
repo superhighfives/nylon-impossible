@@ -39,6 +39,14 @@ export const API_ERRORS = {
   text_required: { status: 400, message: "Text is required" },
   no_valid_fields: { status: 400, message: "No valid fields to update" },
   validation_failed: { status: 400, message: "Request validation failed" },
+  feedback_unavailable: {
+    status: 503,
+    message: "Feedback isn't set up on this server",
+  },
+  feedback_failed: {
+    status: 502,
+    message: "Couldn't file that feedback. Try again.",
+  },
   internal_error: { status: 500, message: "Something went wrong. Try again." },
 } as const satisfies Record<string, { status: number; message: string }>;
 

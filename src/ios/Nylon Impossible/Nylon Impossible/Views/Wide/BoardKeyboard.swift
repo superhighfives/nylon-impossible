@@ -125,8 +125,17 @@ extension FocusedValues {
 /// The "Todo" menu: the board's keys, for the shortcut overlay and menu bar.
 struct BoardCommands: Commands {
     @FocusedValue(\.board) private var board
+    /// Send Feedback… in the Help menu, for an admin.
+    var feedback: FeedbackService?
+    var showsFeedback = false
 
     var body: some Commands {
+        CommandGroup(after: .help) {
+            if showsFeedback, let feedback {
+                Button("Send Feedback…") { feedback.presentWithSnapshot() }
+                    .keyboardShortcut(FeedbackService.shortcut.key, modifiers: FeedbackService.shortcut.modifiers)
+            }
+        }
         CommandMenu("Todo") {
             Button("New Todo") { board?.perform(.new) }
                 .keyboardShortcut("n", modifiers: .command)

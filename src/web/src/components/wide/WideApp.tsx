@@ -32,6 +32,7 @@ import { useHints } from "@/hooks/useHints";
 import { useCreateList } from "@/hooks/useLists";
 import { dropPlacement, slotAt } from "@/lib/dragOrder";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
+import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import { Column, type DropIndicator } from "./Column";
 import { resolveDrop } from "./drop";
 import { boardKeyAction, isTypingTarget } from "./keys";
@@ -108,6 +109,8 @@ export function WideApp({
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [screen, setScreen] = useState<"done" | "settings" | null>(null);
   const [shortcuts, setShortcuts] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  const canSendFeedback = useCanSendFeedback();
   const [activeColumn, setActiveColumn] = useState<string | null>(null);
   const [dragging, setDragging] = useState<TodoWithUrls | null>(null);
   const [indicator, setIndicator] = useState<DropIndicator | null>(null);
@@ -272,8 +275,14 @@ export function WideApp({
         setShortcuts((s) => !s);
         return;
       }
-      // Screens and the shortcuts overlay are modal; leave their keys alone.
-      if (screen || shortcuts) return;
+      // Screens and the overlays are modal; leave their keys alone.
+      if (screen || shortcuts || feedback) return;
+      if (action.type === "feedback") {
+        if (!canSendFeedback) return;
+        e.preventDefault();
+        setFeedback(true);
+        return;
+      }
 
       const row = focusedRow();
       const listId = row?.dataset.rowList ?? currentColumn;
@@ -500,6 +509,7 @@ export function WideApp({
           onDone={() => setScreen("done")}
           onSettings={() => setScreen("settings")}
           onShortcuts={() => setShortcuts(true)}
+          onFeedback={canSendFeedback ? () => setFeedback(true) : undefined}
         />
         <main
           aria-label="Board"
@@ -610,7 +620,18 @@ export function WideApp({
         }}
       />
 
-      <ShortcutsOverlay open={shortcuts} onClose={() => setShortcuts(false)} />
+      <ShortcutsOverlay
+        open={shortcuts}
+        onClose={() => setShortcuts(false)}
+        feedback={canSendFeedback}
+      />
+      {canSendFeedback && (
+        <FeedbackDialog
+          open={feedback}
+          onClose={() => setFeedback(false)}
+          variant="centered"
+        />
+      )}
 
       <DoneScreen
         open={screen === "done"}

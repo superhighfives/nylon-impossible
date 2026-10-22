@@ -34,7 +34,8 @@ const ITEM =
   "mt-1.5 flex h-[3.25rem] w-full cursor-pointer items-center rounded-[0.875rem] bg-n-surface px-3.5 text-left text-base font-medium text-n-ink n-focus-inset dark:bg-n-fill";
 
 /**
- * The avatar menu: Done history, Settings and Sign out, as a bottom sheet.
+ * The avatar menu: Done history, Settings, Send feedback (admins only) and
+ * Sign out, as a bottom sheet.
  */
 export function AccountSheet({
   open,
@@ -43,6 +44,7 @@ export function AccountSheet({
   onDone,
   onOpen,
   onSettings,
+  onFeedback,
 }: {
   open: boolean;
   onOpen: () => void;
@@ -50,6 +52,8 @@ export function AccountSheet({
   doneCount: number;
   onDone: () => void;
   onSettings: () => void;
+  /** Shown only when set — the caller passes it for admins. */
+  onFeedback?: () => void;
 }) {
   const { user } = useClerkUser();
   const { signOut } = useClerk();
@@ -112,6 +116,16 @@ export function AccountSheet({
             >
               Settings
             </button>
+            {onFeedback && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={onFeedback}
+                className={ITEM}
+              >
+                Send feedback
+              </button>
+            )}
             <button
               type="button"
               role="menuitem"

@@ -29,7 +29,9 @@
   "vars": {
     "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon",
     "WEB_BASE_URL": "https://www.nylonimpossible.com",
-    "GMAIL_ADDON_STATE_SECRET": "test-addon-state-secret"
+    "GMAIL_ADDON_STATE_SECRET": "test-addon-state-secret",
+    "FEEDBACK_REPO": "superhighfives/nylon-feedback-test",
+    "GITHUB_FEEDBACK_TOKEN": "test-feedback-token"
   },
   "observability": {
     "enabled": true

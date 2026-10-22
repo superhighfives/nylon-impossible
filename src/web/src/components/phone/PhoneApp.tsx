@@ -12,6 +12,7 @@ import {
 import { useHints } from "@/hooks/useHints";
 import { useCreateList } from "@/hooks/useLists";
 import type { TodoWithUrls } from "@/types/database";
+import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import { AccountSheet } from "./AccountSheet";
 import { Composer } from "./Composer";
 import { ContextMenu } from "./ContextMenu";
@@ -85,6 +86,8 @@ export function PhoneApp({
   const [detailId, setDetailId] = useState<string | null>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [account, setAccount] = useState(false);
+  const [feedback, setFeedback] = useState(false);
+  const canSendFeedback = useCanSendFeedback();
   const [screen, setScreen] = useState<"done" | "settings" | null>(null);
   const [newList, setNewList] = useState("");
 
@@ -535,6 +538,14 @@ export function PhoneApp({
               setAccount(false);
               setScreen("settings");
             }}
+            onFeedback={
+              canSendFeedback
+                ? () => {
+                    setAccount(false);
+                    setFeedback(true);
+                  }
+                : undefined
+            }
           />
         </div>
 
@@ -604,6 +615,13 @@ export function PhoneApp({
         open={screen === "settings"}
         onClose={() => setScreen(null)}
       />
+      {canSendFeedback && (
+        <FeedbackDialog
+          open={feedback}
+          onClose={() => setFeedback(false)}
+          variant="sheet"
+        />
+      )}
     </div>
   );
 }

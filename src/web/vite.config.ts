@@ -10,6 +10,17 @@ const config = defineConfig({
   build: {
     sourcemap: "hidden",
   },
+  // The commit feedback reports. CI builds have GITHUB_SHA; an explicit
+  // VITE_COMMIT_SHA (read by Vite itself) wins.
+  ...(process.env.GITHUB_SHA && !process.env.VITE_COMMIT_SHA
+    ? {
+        define: {
+          'import.meta.env.VITE_COMMIT_SHA': JSON.stringify(
+            process.env.GITHUB_SHA.slice(0, 7),
+          ),
+        },
+      }
+    : {}),
   plugins: [
     devtools(),
     cloudflare({
