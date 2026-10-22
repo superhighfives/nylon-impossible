@@ -2,6 +2,13 @@ import { z } from "zod/v4";
 
 /** Images are committed as-is, so this caps what lands in the inbox repo. */
 export const MAX_FEEDBACK_IMAGES = 4;
+/**
+ * Label that sets the feedback workflow on an issue. Filed with it only when
+ * the reporter is an admin; on anyone else's, the repo owner adds it by hand.
+ */
+export const AUTO_FIX_LABEL = "auto-fix";
+/** Orphan branch screenshots are committed to; created once, by hand. */
+export const FEEDBACK_ASSETS_BRANCH = "feedback-assets";
 export const MAX_FEEDBACK_IMAGE_BYTES = 5 * 1024 * 1024;
 // Base64 is 4 chars per 3 bytes; the string check runs before decoding.
 const MAX_BASE64_LENGTH = Math.ceil(MAX_FEEDBACK_IMAGE_BYTES / 3) * 4;
@@ -145,10 +152,10 @@ export interface FiledFeedback {
 }
 
 /**
- * Commit each screenshot to the inbox repo, then open the issue that embeds
- * them. The repo is private, so `blob/…?raw=true` links render for anyone who
- * can see it and for no one else. Uploads run one at a time: parallel commits
- * to the same branch race and 409.
+ * Commit each screenshot to the assets branch, then open the issue that
+ * embeds them. The branch is an orphan that's never merged, so screenshots
+ * stay out of `main`'s history, and no workflow runs on a push to it. Uploads
+ * run one at a time: parallel commits to the same branch race and 409.
  */
 export async function fileFeedback(
   input: FeedbackInput,
@@ -156,6 +163,8 @@ export async function fileFeedback(
     repo: string;
     token: string;
     userId: string;
+    /** Add AUTO_FIX_LABEL so the feedback workflow picks the issue up. */
+    autoFix: boolean;
     now?: Date;
     id?: () => string;
     fetch?: typeof fetch;
@@ -183,13 +192,14 @@ export async function fileFeedback(
       body: JSON.stringify({
         message: `Add feedback screenshot (${input.context.platform})`,
         content: image.data,
+        branch: FEEDBACK_ASSETS_BRANCH,
       }),
     });
     if (!res.ok) {
       throw new GitHubFeedbackError("upload", res.status, await res.text());
     }
     imageUrls.push(
-      `https://github.com/${opts.repo}/blob/main/${path}?raw=true`,
+      `https://github.com/${opts.repo}/blob/${FEEDBACK_ASSETS_BRANCH}/${path}?raw=true`,
     );
   }
 
@@ -199,7 +209,11 @@ export async function fileFeedback(
     body: JSON.stringify({
       title: feedbackTitle(input),
       body: feedbackBody(input, imageUrls, opts.userId),
-      labels: ["feedback", `platform:${input.context.platform}`],
+      labels: [
+        "feedback",
+        `platform:${input.context.platform}`,
+        ...(opts.autoFix ? [AUTO_FIX_LABEL] : []),
+      ],
     }),
   });
   if (!res.ok) {

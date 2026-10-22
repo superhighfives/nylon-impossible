@@ -36,7 +36,7 @@ const POPUP = {
 
 /**
  * "Send feedback": a sentence and up to four screenshots, filed as an issue
- * in the private inbox. Images come in by paste (⌘V anywhere while it's
+ * in the public repo. Images come in by paste (⌘V anywhere while it's
  * open), drag and drop, or the picker. Admins only — renders nothing for
  * everyone else.
  */
@@ -191,7 +191,8 @@ export function FeedbackDialog({
           </div>
           <Dialog.Description className="mt-0 mb-3 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
             Paste, drop or add screenshots. The page, theme and window size are
-            attached for you.
+            attached for you. This files a public GitHub issue, screenshots
+            included.
           </Dialog.Description>
           <label className="block">
             <span className="sr-only">What’s wrong?</span>

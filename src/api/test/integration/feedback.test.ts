@@ -78,9 +78,12 @@ describe("POST /feedback", () => {
       issueNumber: 12,
       issueUrl: "https://github.com/superhighfives/nylon-feedback-test/issues/12",
     });
-    expect(fetchSpy.mock.calls[0][0]).toBe(
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
       "https://api.github.com/repos/superhighfives/nylon-feedback-test/issues",
     );
+    // An admin's report goes straight to the fix workflow.
+    expect(JSON.parse(String(init?.body)).labels).toContain("auto-fix");
   });
 
   it("answers feedback_failed when GitHub rejects the issue", async () => {

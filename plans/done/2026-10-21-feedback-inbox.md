@@ -10,16 +10,18 @@ done — and an issue appears somewhere it can be triaged.
 
 ## Decisions
 
-- **Private inbox repo.** `superhighfives/nylon-impossible` is public, and a
-  screenshot of a real board shows real todos. Feedback goes to the private
-  [`superhighfives/nylon-feedback`](https://github.com/superhighfives/nylon-feedback)
-  repo instead; anything worth doing publicly gets moved over by hand.
-- **Images live in that repo.** The GitHub API has no upload endpoint for
-  issue attachments, so the worker commits each image to
-  `screenshots/YYYY/MM/<uuid>.<ext>` with the Contents API and embeds it as
-  `https://github.com/<repo>/blob/main/<path>?raw=true`. That renders inline
-  for anyone who can see the private repo and for no one else — no R2 bucket,
-  no public URLs.
+- **Issues land in this repo, publicly.** The first cut (#412) filed to a
+  private `nylon-feedback` repo, so screenshots of real todos stayed private.
+  That moved here in the follow-up: the fix-it workflow needs this repo's access and
+  CI, and macOS runners are free on a public repo but billed at 10× on a
+  private one. The trade is that **every screenshot is public** — both
+  dialogs say so, and capturing with care is on the person filing.
+- **Images live on an orphan branch.** The GitHub API has no upload endpoint
+  for issue attachments, so the worker commits each image to
+  `screenshots/YYYY/MM/<uuid>.<ext>` on `feedback-assets` (never merged; no
+  workflow runs on a push to it) and embeds it as
+  `https://github.com/<repo>/blob/feedback-assets/<path>?raw=true`. No R2
+  bucket.
 - **Admin only.** `POST /feedback` sits behind `authMiddleware` +
   `requireAdmin`. `GET /users/me` gains `isAdmin` so every client decides
   whether to show the button from one place.
@@ -64,11 +66,11 @@ done — and an issue appears somewhere it can be triaged.
 Config:
 
 - `FEEDBACK_REPO` — plain var in `wrangler.jsonc` (top level and `previews`):
-  `superhighfives/nylon-feedback`.
+  `superhighfives/nylon-impossible`.
 - `GITHUB_FEEDBACK_TOKEN` — secret (`wrangler secret put`). A **fine-grained
-  PAT scoped to `nylon-feedback` only**, with Contents: read/write, Issues:
-  read/write, Metadata: read. That's the "Nylon can read the private repo"
-  permission — and nothing else. Previews don't get it, so feedback from a
+  PAT scoped to `nylon-impossible` only**, with Contents: read/write, Issues:
+  read/write, Metadata: read. `main`'s branch protection still stops it
+  pushing there. Previews don't get it, so feedback from a
   preview answers `feedback_unavailable`.
 
 ## Clients
@@ -113,12 +115,35 @@ description.
 - A "Nylon Feedback" share-extension target. It would need its own bundle ID
   and provisioning profiles on both platforms; the in-app screenshot pill and
   the Photos picker cover the same ground.
-- Routines that triage the inbox.
+- Labels/branch setup is one-off and manual: the `feedback` and
+  `platform:*` labels and the `feedback-assets` branch were created by hand.
 
 ## Acceptance
 
 - Non-admins get 403 from `/feedback` and never see the button.
-- An admin filing from each platform gets an issue in `nylon-feedback` with
+- An admin filing from each platform gets an issue here with
   the right labels, inline screenshots and a filled context table.
 - `bun run typecheck`, `bun run lint`, `bun run api:test`, web tests and the
   iOS + macOS builds pass.
+
+## Fixing from feedback
+
+`.github/workflows/feedback.yml` runs when **`auto-fix`** is applied to a
+`feedback` issue **by the repo owner** (or by `workflow_dispatch` with an
+issue number). The API files an admin's report with `auto-fix` already on, so
+those start straight away; a report from anyone else (once capture opens up)
+waits until the owner reads it and adds the label. The issue body is the
+prompt, so the label is the owner's sign-off on it.
+
+GitHub can't restrict a single label, but only people with triage access or
+more can label issues at all — on this repo, just the owner — and the
+workflow checks the event's sender too, so a future collaborator adding the
+label doesn't start a run.
+
+A route job picks the runner from the `platform:*` label — `macos-26` for
+iOS/iPadOS/Mac, `ubuntu-latest` otherwise — then Claude reads the issue and
+the screenshots (checked out from `feedback-assets` into a git-excluded
+`.feedback-assets/`), and either opens a **draft** PR on
+`feedback/<number>` (labelled `feedback`) that `Fixes #<number>`, or comments
+with what it found and its questions. Replies go through `claude.yml`
+(`@claude`), which also answers only the owner on feedback issues and PRs.

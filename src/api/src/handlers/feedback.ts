@@ -8,7 +8,7 @@ import {
 } from "../lib/feedback";
 import type { Env } from "../types";
 
-// POST /feedback — admin only. Files an issue in the private inbox repo.
+// POST /feedback — admin only. Files an issue in FEEDBACK_REPO.
 export async function submitFeedback(c: Context<Env>) {
   const token = c.env.GITHUB_FEEDBACK_TOKEN;
   const repo = c.env.FEEDBACK_REPO;
@@ -28,6 +28,9 @@ export async function submitFeedback(c: Context<Env>) {
       repo,
       token,
       userId: c.get("userId"),
+      // Only admins' reports go straight to the fix workflow. The route is
+      // admin-only today; this keeps the rule if it ever opens up.
+      autoFix: c.get("role") === "admin",
     });
     return c.json(filed, 201);
   } catch (error) {

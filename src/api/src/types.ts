@@ -33,11 +33,11 @@ export type Env = {
     // state (prevents binding an attacker's Gmail identity to a victim's
     // account). Set via `wrangler secret put`, so it's absent from wrangler.jsonc.
     GMAIL_ADDON_STATE_SECRET?: string;
-    // "owner/name" of the private repo that in-app feedback is filed to. Public,
-    // set in wrangler.jsonc.
+    // "owner/name" of the repo in-app feedback is filed to. Public, set in
+    // wrangler.jsonc.
     FEEDBACK_REPO?: string;
     // Fine-grained PAT scoped to FEEDBACK_REPO only (Contents + Issues
-    // read/write). Set via `wrangler secret put`; /feedback answers
+    // read/write; main's branch protection still applies). Set via `wrangler secret put`; /feedback answers
     // feedback_unavailable without it.
     GITHUB_FEEDBACK_TOKEN?: string;
   };

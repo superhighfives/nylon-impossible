@@ -3,11 +3,11 @@
 //  Nylon Impossible
 //
 //  The admin-only feedback inbox: a description and up to four screenshots,
-//  sent to `POST /feedback`, which files an issue in the private
-//  nylon-feedback repo. The service holds the draft between the moment
+//  sent to `POST /feedback`, which files a public issue in
+//  nylon-impossible. The service holds the draft between the moment
 //  something is flagged (a screenshot, Help ▸ Send Feedback…) and sending it,
 //  and builds the context every issue carries so the only typing is the
-//  description. See plans/in-progress/2026-10-21-feedback-inbox.md.
+//  description. See plans/done/2026-10-21-feedback-inbox.md.
 //
 
 import Foundation

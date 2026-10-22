@@ -111,6 +111,7 @@ describe("fileFeedback", () => {
     repo: "o/r",
     token: "t",
     userId: "user_1",
+    autoFix: true,
     now: new Date("2026-10-21T12:00:00Z"),
     id: () => "abc",
   };
@@ -141,15 +142,27 @@ describe("fileFeedback", () => {
     );
     expect(upload.method).toBe("PUT");
     expect(upload.headers.Authorization).toBe("Bearer t");
-    expect(JSON.parse(upload.body).content).toBe(PNG);
+    expect(JSON.parse(upload.body)).toMatchObject({
+      content: PNG,
+      branch: "feedback-assets",
+    });
 
     const [issueUrl, issue] = fetch.mock.calls[1];
     expect(issueUrl).toBe("https://api.github.com/repos/o/r/issues");
     const payload = JSON.parse(issue.body);
-    expect(payload.labels).toEqual(["feedback", "platform:ios"]);
+    expect(payload.labels).toEqual(["feedback", "platform:ios", "auto-fix"]);
     expect(payload.body).toContain(
-      "https://github.com/o/r/blob/main/screenshots/2026/10/abc.png?raw=true",
+      "https://github.com/o/r/blob/feedback-assets/screenshots/2026/10/abc.png?raw=true",
     );
+  });
+
+  it("leaves auto-fix off when asked to", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(
+      Response.json({ number: 8, html_url: "u" }, { status: 201 }),
+    );
+    await fileFeedback(input(), { ...opts, autoFix: false, fetch });
+    const payload = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(payload.labels).toEqual(["feedback", "platform:ios"]);
   });
 
   it("stops before opening an issue when an upload fails", async () => {
