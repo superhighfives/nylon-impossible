@@ -30,7 +30,7 @@ struct Nylon_ImpossibleApp: App {
     @State private var preferencesService: UserPreferencesService?
     
     init() {
-        Clerk.configure(publishableKey: Config.clerkPublishableKey)
+        Clerk.configure(publishableKey: Config.clerkPublishableKey, options: Self.clerkOptions)
         Self.initSentry()
         #if os(iOS)
         registerBackgroundTasks()
@@ -39,6 +39,24 @@ struct Nylon_ImpossibleApp: App {
         if let link = ScreenRoute.launchDeepLink { QuickActionService.shared.post(link) }
         #endif
     }
+
+    /// ClerkKit's keychain doesn't use the data-protection keychain, so on
+    /// macOS its items live in the login keychain with an access list tied to
+    /// the code signature of whichever build wrote them. A Debug or test build
+    /// (unsigned, or development-signed) writing under the release service
+    /// name leaves items the TestFlight/App Store build can't read without a
+    /// password prompt on every launch, which "Always Allow" doesn't clear.
+    /// Debug builds on the Mac therefore keep Clerk's items under their own
+    /// service name. Release builds use Clerk's default (the bundle ID).
+    static var clerkOptions: Clerk.Options {
+        #if os(macOS) && DEBUG
+        return Clerk.Options(keychainConfig: .init(service: clerkDebugKeychainService))
+        #else
+        return Clerk.Options()
+        #endif
+    }
+
+    static let clerkDebugKeychainService = "com.superhighfives.Nylon-Impossible.debug"
 
     private static func initSentry() {
         guard let dsn = Config.sentryDSN else { return }
