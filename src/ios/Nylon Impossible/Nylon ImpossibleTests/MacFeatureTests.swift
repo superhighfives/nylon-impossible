@@ -4,7 +4,7 @@
 //
 //  The Mac's own pieces, as logic: the quick-add hotkey (key codes,
 //  modifiers, what Settings shows, what's refused, how it's stored), the Dock
-//  badge's count and label, the sign-in email check, and the widget's large
+//  badge's count and label, the sign-in providers, and the widget's large
 //  family on the desktop. The Carbon registration itself isn't exercised —
 //  claiming a system-wide hotkey from a test run would steal it from whatever
 //  the machine running the tests is doing.
@@ -156,14 +156,12 @@ struct DockBadgeTests {
 
 @Suite("Mac sign-in")
 struct MacSignInTests {
-    @Test("Only something shaped like an email asks Clerk for a code")
-    func emailShape() {
-        #expect(MacSignInView.looksLikeEmail("charlie@example.com"))
-        #expect(MacSignInView.looksLikeEmail("  charlie@example.co.uk "))
-        #expect(!MacSignInView.looksLikeEmail("charlie"))
-        #expect(!MacSignInView.looksLikeEmail("@example.com"))
-        #expect(!MacSignInView.looksLikeEmail("charlie@localhost"))
-        #expect(!MacSignInView.looksLikeEmail("char lie@example.com"))
+    /// Production Clerk enables only Google and GitHub (email codes are off),
+    /// so the Mac must offer exactly those, matching web and iOS.
+    @Test("The Mac offers the providers production Clerk enables")
+    func providersMatchProduction() {
+        #expect(MacSignInView.providers.map { "\($0.provider)" } == ["google", "github"])
+        #expect(MacSignInView.providers.map(\.label) == ["Continue with Google", "Continue with GitHub"])
     }
 }
 
