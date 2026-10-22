@@ -128,12 +128,22 @@ description.
 
 ## Fixing from feedback
 
-`.github/workflows/feedback.yml` runs on every issue the repo owner opens
-with the `feedback` label (or by `workflow_dispatch` with an issue number).
+`.github/workflows/feedback.yml` runs when **`auto-fix`** is applied to a
+`feedback` issue **by the repo owner** (or by `workflow_dispatch` with an
+issue number). The API files an admin's report with `auto-fix` already on, so
+those start straight away; a report from anyone else (once capture opens up)
+waits until the owner reads it and adds the label. The issue body is the
+prompt, so the label is the owner's sign-off on it.
+
+GitHub can't restrict a single label, but only people with triage access or
+more can label issues at all — on this repo, just the owner — and the
+workflow checks the event's sender too, so a future collaborator adding the
+label doesn't start a run.
+
 A route job picks the runner from the `platform:*` label — `macos-26` for
 iOS/iPadOS/Mac, `ubuntu-latest` otherwise — then Claude reads the issue and
 the screenshots (checked out from `feedback-assets` into a git-excluded
 `.feedback-assets/`), and either opens a **draft** PR on
-`feedback/<number>` that `Fixes #<number>`, or comments with what it found
-and its questions. Replies go through the existing `claude.yml` (`@claude`).
-Owner-only, because the issue body is the prompt.
+`feedback/<number>` (labelled `feedback`) that `Fixes #<number>`, or comments
+with what it found and its questions. Replies go through `claude.yml`
+(`@claude`), which also answers only the owner on feedback issues and PRs.

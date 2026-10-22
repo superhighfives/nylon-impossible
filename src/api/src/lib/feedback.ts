@@ -2,6 +2,11 @@ import { z } from "zod/v4";
 
 /** Images are committed as-is, so this caps what lands in the inbox repo. */
 export const MAX_FEEDBACK_IMAGES = 4;
+/**
+ * Label that sets the feedback workflow on an issue. Filed with it only when
+ * the reporter is an admin; on anyone else's, the repo owner adds it by hand.
+ */
+export const AUTO_FIX_LABEL = "auto-fix";
 /** Orphan branch screenshots are committed to; created once, by hand. */
 export const FEEDBACK_ASSETS_BRANCH = "feedback-assets";
 export const MAX_FEEDBACK_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -158,6 +163,8 @@ export async function fileFeedback(
     repo: string;
     token: string;
     userId: string;
+    /** Add AUTO_FIX_LABEL so the feedback workflow picks the issue up. */
+    autoFix: boolean;
     now?: Date;
     id?: () => string;
     fetch?: typeof fetch;
@@ -202,7 +209,11 @@ export async function fileFeedback(
     body: JSON.stringify({
       title: feedbackTitle(input),
       body: feedbackBody(input, imageUrls, opts.userId),
-      labels: ["feedback", `platform:${input.context.platform}`],
+      labels: [
+        "feedback",
+        `platform:${input.context.platform}`,
+        ...(opts.autoFix ? [AUTO_FIX_LABEL] : []),
+      ],
     }),
   });
   if (!res.ok) {

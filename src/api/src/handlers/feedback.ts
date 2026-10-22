@@ -28,6 +28,9 @@ export async function submitFeedback(c: Context<Env>) {
       repo,
       token,
       userId: c.get("userId"),
+      // Only admins' reports go straight to the fix workflow. The route is
+      // admin-only today; this keeps the rule if it ever opens up.
+      autoFix: c.get("role") === "admin",
     });
     return c.json(filed, 201);
   } catch (error) {

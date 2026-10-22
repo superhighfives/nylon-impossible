@@ -4,17 +4,23 @@ name: Feedback
 # Claude try a fix: a draft PR when the fix is clear, a comment with questions
 # when it isn't. Follow-ups go through claude.yml (`@claude` on the issue).
 #
-# Only the repo owner can drive it: the issue must be theirs (/feedback files
-# with their token) and so must the event — opening it, or dispatching a rerun.
-# The issue body becomes the prompt, so nobody else gets to write one.
+# It runs when `auto-fix` is applied to a `feedback` issue, and only when the
+# repo owner applied it. /feedback files an admin's report with the label
+# already on (an issue created with labels fires `labeled` too, sent by the
+# owner's token); on anyone else's, the owner adds it after reading. The issue
+# body becomes the prompt, so the label is the owner's sign-off on it.
+#
+# GitHub can't limit who applies a particular label, but on any repo only
+# people with triage access or more can label issues at all — and the sender
+# check below holds even if a collaborator is added later.
 
 on:
   issues:
-    types: [opened]
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue:
-        description: "Feedback issue number to (re)run"
+        description: "Feedback issue number to rerun (it must already have auto-fix)"
         required: true
         type: number
 
@@ -32,11 +38,9 @@ permissions:
 jobs:
   route:
     if: >-
-      github.actor == github.repository_owner && (
-        github.event_name == 'workflow_dispatch' || (
-          github.event.issue.user.login == github.repository_owner &&
-          contains(github.event.issue.labels.*.name, 'feedback')
-        )
+      github.event.sender.login == github.repository_owner && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event.label.name == 'auto-fix'
       )
     runs-on: ubuntu-latest
     outputs:
@@ -53,7 +57,11 @@ jobs:
             -q 'select(.author.login == "${{ github.repository_owner }}") | [.labels[].name] | join(",")')
           case ",$labels," in
             *,feedback,*) ;;
-            *) echo "#$NUMBER isn't feedback filed by the repo owner" >&2; exit 1 ;;
+            *) echo "#$NUMBER isn't feedback filed through the API" >&2; exit 1 ;;
+          esac
+          case ",$labels," in
+            *,auto-fix,*) ;;
+            *) echo "#$NUMBER doesn't have auto-fix" >&2; exit 1 ;;
           esac
           case ",$labels," in
             *,platform:ios,*|*,platform:ipados,*|*,platform:mac,*) runner=macos-26 ;;

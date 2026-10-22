@@ -194,6 +194,6 @@ Issues labelled `feedback` + `platform:*` are filed by the apps' admin-only
 **Send feedback** (`POST /feedback`), with the owner's token. Their
 screenshots are committed to the orphan **`feedback-assets`** branch — never
 merge it, rebase it onto `main`, or delete it, or every old issue loses its
-images. `feedback.yml` has Claude open a draft fix PR (or ask questions) for
-each one; it runs only for owner-opened issues because the body is the
-prompt. Spec: `plans/done/2026-10-21-feedback-inbox.md`.
+images. `feedback.yml` has Claude open a draft fix PR (or ask questions) when
+the repo owner applies `auto-fix` — the API does that for admins' reports —
+because the issue body is the prompt. Spec: `plans/done/2026-10-21-feedback-inbox.md`.
