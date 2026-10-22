@@ -251,6 +251,27 @@ jobs:
           SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
         run: bundle exec fastlane mac release --verbose
 
+      - name: Upload Mac dSYMs to Sentry
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_IOS_PROJECT }}
+        if: ${{ env.SENTRY_AUTH_TOKEN != '' }}
+        run: |
+          brew install getsentry/tools/sentry-cli
+          ARCHIVE_PATH=""
+          for SEARCH_DIR in "${TMPDIR:-/tmp}" /tmp; do
+            if [ -d "$SEARCH_DIR" ]; then
+              ARCHIVE_PATH=$(find "$SEARCH_DIR" -maxdepth 1 -name "NylonImpossible-mac.xcarchive" 2>/dev/null | head -1)
+              [ -n "$ARCHIVE_PATH" ] && break
+            fi
+          done
+          if [ -n "$ARCHIVE_PATH" ]; then
+            sentry-cli debug-files upload --include-sources "$ARCHIVE_PATH/dSYMs"
+          else
+            echo "::warning::No Mac xcarchive found; skipping dSYM upload"
+          fi
+
       - name: Clean up keychain
         if: always()
         run: |
