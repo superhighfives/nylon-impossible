@@ -141,14 +141,17 @@ describe("fileFeedback", () => {
     );
     expect(upload.method).toBe("PUT");
     expect(upload.headers.Authorization).toBe("Bearer t");
-    expect(JSON.parse(upload.body).content).toBe(PNG);
+    expect(JSON.parse(upload.body)).toMatchObject({
+      content: PNG,
+      branch: "feedback-assets",
+    });
 
     const [issueUrl, issue] = fetch.mock.calls[1];
     expect(issueUrl).toBe("https://api.github.com/repos/o/r/issues");
     const payload = JSON.parse(issue.body);
     expect(payload.labels).toEqual(["feedback", "platform:ios"]);
     expect(payload.body).toContain(
-      "https://github.com/o/r/blob/main/screenshots/2026/10/abc.png?raw=true",
+      "https://github.com/o/r/blob/feedback-assets/screenshots/2026/10/abc.png?raw=true",
     );
   });
 

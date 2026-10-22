@@ -187,3 +187,13 @@ If any of these starts producing bad output, disable it from claude.ai (or ask
 Claude to do so via the `schedule`/`RemoteTrigger` tooling) rather than
 reverse-engineering it from PR history — the routine definition, not this
 file, is authoritative for the exact prompt and trigger config.
+
+## Feedback issues
+
+Issues labelled `feedback` + `platform:*` are filed by the apps' admin-only
+**Send feedback** (`POST /feedback`), with the owner's token. Their
+screenshots are committed to the orphan **`feedback-assets`** branch — never
+merge it, rebase it onto `main`, or delete it, or every old issue loses its
+images. `feedback.yml` has Claude open a draft fix PR (or ask questions) for
+each one; it runs only for owner-opened issues because the body is the
+prompt. Spec: `plans/done/2026-10-21-feedback-inbox.md`.

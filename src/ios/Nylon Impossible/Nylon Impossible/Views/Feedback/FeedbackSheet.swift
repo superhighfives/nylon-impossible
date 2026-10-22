@@ -261,7 +261,7 @@ struct FeedbackSheet: View {
             context.colorScheme,
             context.viewport,
         ].compactMap { $0 }.filter { !$0.isEmpty }
-        return Text("Sent with: \(parts.joined(separator: " · ")). Files an issue in the private nylon-feedback repo.")
+        return Text("Sent with: \(parts.joined(separator: " · ")). Files a public GitHub issue, screenshots included.")
             .textStyle(Theme.Fonts.Role.meta)
             .foregroundStyle(Theme.Colors.inkMuted)
             .fixedSize(horizontal: false, vertical: true)

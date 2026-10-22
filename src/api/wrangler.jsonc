@@ -60,9 +60,10 @@
     // GMAIL_ADDON_STATE_SECRET is a secret — set via `wrangler secret put`.
     "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
     "WEB_BASE_URL": "https://www.nylonimpossible.com",
-    // Private repo in-app feedback is filed to. GITHUB_FEEDBACK_TOKEN (a
-    // fine-grained PAT scoped to this repo) is a secret — `wrangler secret put`.
-    "FEEDBACK_REPO": "superhighfives/nylon-feedback",
+    // Repo in-app feedback is filed to (screenshots go to its feedback-assets
+    // branch). GITHUB_FEEDBACK_TOKEN (a fine-grained PAT scoped to this repo) is
+    // a secret — `wrangler secret put`.
+    "FEEDBACK_REPO": "superhighfives/nylon-impossible",
   },
   "observability": {
     "enabled": true,
@@ -93,7 +94,7 @@
       "ENVIRONMENT": "preview",
       "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
       "WEB_BASE_URL": "https://www.nylonimpossible.com",
-      "FEEDBACK_REPO": "superhighfives/nylon-feedback",
+      "FEEDBACK_REPO": "superhighfives/nylon-impossible",
     },
     "d1_databases": [
       {
