@@ -135,9 +135,15 @@ extension ContentView {
                         // collapsing the sidebar animates the width every
                         // frame, and a GeometryReader here rebuilt every
                         // column (and rescanned the store) on each of them.
-                        .containerRelativeFrame([.horizontal, .vertical]) { length, axis in
-                            axis == .horizontal ? max(minimum, length / count) : length
+                        // Width only: a horizontal scroll view takes its
+                        // height from its content, so sizing the height from
+                        // the container too is a cycle, and inside the Mac's
+                        // split view it never settles (AppKit throws after
+                        // too many constraint passes, at launch).
+                        .containerRelativeFrame(.horizontal) { length, _ in
+                            max(minimum, length / count)
                         }
+                        .frame(maxHeight: .infinity)
                         .id(list.id)
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
