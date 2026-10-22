@@ -64,7 +64,18 @@ struct TodayWidget: Widget {
         }
         .configurationDisplayName("Today")
         .description("Everything on your Today list, plus anything due or overdue. Tap + for a new todo.")
-        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+        .supportedFamilies(Self.families)
+    }
+
+    /// Small, medium and the Lock Screen on iOS; small, medium and large on
+    /// the Mac desktop and in Notification Center (a Mac has no Lock Screen
+    /// widgets).
+    static var families: [WidgetFamily] {
+        #if os(macOS)
+        [.systemSmall, .systemMedium, .systemLarge]
+        #else
+        [.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline]
+        #endif
     }
 }
 
@@ -85,8 +96,16 @@ struct TodayWidget: Widget {
     TodayEntry(date: .now, content: .todos([], total: 0))
 }
 
+#if os(iOS)
 #Preview("Lock Screen", as: .accessoryRectangular) {
     TodayWidget()
 } timeline: {
     TodayEntry(date: .now, content: .todos(WidgetTodo.placeholders, total: 5))
 }
+#else
+#Preview("Large", as: .systemLarge) {
+    TodayWidget()
+} timeline: {
+    TodayEntry(date: .now, content: .todos(WidgetTodo.placeholders, total: 9))
+}
+#endif

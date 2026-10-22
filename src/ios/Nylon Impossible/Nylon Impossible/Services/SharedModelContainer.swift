@@ -17,9 +17,7 @@ enum SharedModelContainer {
         // the App Group container. Without that container there's no agreed
         // location to write to; run from memory rather than trap on a `!`, the
         // same trade as the fallbacks below.
-        guard let appGroupURL = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: "group.com.superhighfives.Nylon-Impossible"
-        ) else {
+        guard let appGroupURL = AppGroup.containerURL else {
             SentrySDK.capture(message: "App Group container unavailable") { scope in
                 scope.setTag(value: "SharedModelContainer.appGroup", key: "area")
                 scope.setLevel(.error)

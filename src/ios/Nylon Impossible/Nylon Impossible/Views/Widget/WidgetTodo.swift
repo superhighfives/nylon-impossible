@@ -42,8 +42,13 @@ struct TodayEntry: TimelineEntry, Sendable {
 
     /// The most any family renders. The provider carries this many and each
     /// family takes what fits, so a resized widget doesn't need a new
-    /// timeline.
+    /// timeline. The Mac offers the large family, which fits about twice as
+    /// many rows as medium.
+    #if os(macOS)
+    static let maxRows = 10
+    #else
     static let maxRows = 5
+    #endif
 
     /// The entry for `todos` — already `TodayDigest`'s set, in its order.
     /// Subtasks aren't fetched for the widget, so its meta line never shows

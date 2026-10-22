@@ -6,9 +6,13 @@
 //
 
 import ClerkKit
+#if os(iOS)
 import ClerkKitUI
+#endif
 import SwiftUI
 
+/// The signed-out screen. On iOS "Sign in" opens Clerk's `AuthView`; ClerkKitUI
+/// doesn't exist on macOS, so there it opens `MacSignInView`.
 struct SignInView: View {
     @State private var authIsPresented = false
 
@@ -51,12 +55,21 @@ struct SignInView: View {
             .padding(.bottom, Theme.Space.s6)
         }
         .padding(.horizontal, Theme.Phone.gutter)
+        #if os(macOS)
+        .frame(maxWidth: 420)
+        #endif
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(Theme.Colors.canvas.ignoresSafeArea())
+        #if os(iOS)
         .prefetchClerkImages()
         .sheet(isPresented: $authIsPresented) {
             AuthView()
         }
+        #else
+        .sheet(isPresented: $authIsPresented) {
+            MacSignInView { authIsPresented = false }
+        }
+        #endif
     }
 }
 

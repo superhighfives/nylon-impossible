@@ -61,7 +61,17 @@ describe("design token generator", () => {
   it("scales iOS fonts through UIFontMetrics with a system fallback", () => {
     const swift = renderSwift(tokens);
     expect(swift).toContain("UIFontMetrics(forTextStyle: textStyle)");
-    expect(swift).toContain("UIFont.systemFont(ofSize: size, weight: weight)");
+    expect(swift).toContain(
+      "PlatformFont.systemFont(ofSize: size, weight: weight)",
+    );
+    expect(swift).toContain("typealias PlatformFont = UIFont");
     expect(swift).toContain("UIColor { traits in");
+  });
+
+  it("builds the same theme for macOS from AppKit types", () => {
+    const swift = renderSwift(tokens);
+    expect(swift).toContain("#if os(macOS)");
+    expect(swift).toContain("typealias PlatformFont = NSFont");
+    expect(swift).toContain("NSColor(name: nil) { appearance in");
   });
 });

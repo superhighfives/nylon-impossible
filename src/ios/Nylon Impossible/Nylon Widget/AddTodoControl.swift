@@ -7,6 +7,7 @@
 //  through the same route as the widget's "+" and `nylon://add?list=today`.
 //
 
+#if os(iOS)
 import AppIntents
 import SwiftUI
 import WidgetKit
@@ -24,3 +25,4 @@ struct AddTodoControl: ControlWidget {
         .description("Open Nylon ready to type a new todo.")
     }
 }
+#endif

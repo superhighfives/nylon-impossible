@@ -52,6 +52,7 @@ struct Checkbox: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .pointingHandCursor()
         .accessibilityLabel(label)
         .accessibilityAddTraits(isChecked ? .isSelected : [])
         .onChange(of: isChecked) { _, checked in
@@ -152,6 +153,7 @@ struct ChipButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .pointingHandCursor()
         .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }

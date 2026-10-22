@@ -18,6 +18,21 @@ import AppIntents
 import SwiftData
 import SwiftUI
 
+/// Owns the store's queries and hands their results to `ContentView` as
+/// plain arrays. On macOS the board's sidebar, columns and inspector are
+/// separate hosting views with their own view graphs; a `@Query` read from
+/// one of those graphs refreshes inside the wrong graph's update and trips
+/// AttributeGraph's "setting value during update" trap. Reading the results
+/// here, once, keeps every query update in this view's own graph.
+struct ContentRoot: View {
+    @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
+    @Query(sort: \TodoListModel.position) private var lists: [TodoListModel]
+
+    var body: some View {
+        ContentView(todos: todos, lists: lists)
+    }
+}
+
 struct ContentView: View {
     typealias Page = TodoViewModel.Page
 
@@ -31,8 +46,9 @@ struct ContentView: View {
     @Environment(SyncService.self) var syncService
     @Environment(UserPreferencesService.self) var preferences
     @AppStorage(OvernightDismissal.key) var overnightDismissedAt: String?
-    @Query(sort: \TodoItem.createdAt, order: .reverse) var todos: [TodoItem]
-    @Query(sort: \TodoListModel.position) var lists: [TodoListModel]
+    /// From `ContentRoot`'s queries, as plain values; see there for why.
+    let todos: [TodoItem]
+    let lists: [TodoListModel]
 
     @State var actions = TodoActions()
     @State var pagerPosition: Page? = .today
@@ -77,82 +93,28 @@ struct ContentView: View {
     @State var lastKey: (key: BoardKey, at: Date)?
     @FocusState var boardFocused: Bool
 
+    // MARK: Mac state
+    @State var sidebarVisibility: NavigationSplitViewVisibility = .all
+    /// The toast's Undo on Edit ▸ Undo (⌘Z).
+    @State var undoBridge = ToastUndoBridge()
+    @Environment(\.undoManager) var undoManager
+    #if os(macOS)
+    @Environment(\.openSettings) var openSettings
+    #endif
+
     var viewModel: TodoViewModel { actions.viewModel }
 
-    /// The board, not the phone layout: an iPad window at regular width. An
-    /// iPhone in landscape can be regular too, but keeps the phone layout.
+    /// The board, not the phone layout: an iPad window at regular width, or
+    /// any Mac window. An iPhone in landscape can be regular too, but keeps
+    /// the phone layout; a narrow Mac window keeps the board too (the sidebar
+    /// collapses and the columns scroll), since the phone's pager and sheets
+    /// aren't Mac idioms.
     var isWide: Bool {
-        horizontalSizeClass == .regular && UIDevice.current.userInterfaceIdiom == .pad
-    }
-
-    // MARK: - Derived
-
-    /// Today, This Week, Someday, then collections by position. A system list
-    /// this build doesn't know is skipped rather than shown blank.
-    var orderedLists: [TodoListModel] {
-        lists.filter { !$0.isSystem || $0.systemKind != nil }.sorted { a, b in
-            if a.isSystem != b.isSystem { return a.isSystem }
-            if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
-            return a.position < b.position
-        }
-    }
-
-    var collections: [TodoListModel] { orderedLists.filter { !$0.isSystem } }
-
-    func timeList(_ page: Page) -> TodoListModel? {
-        guard let kind = page.systemKind else { return nil }
-        return orderedLists.first { $0.systemKind == kind }
-    }
-
-    func rows(_ list: TodoListModel) -> [TodoItem] {
-        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.pendingDeletes)
-    }
-
-    var subtasksByParent: [UUID: [TodoItem]] {
-        Dictionary(grouping: todos.filter { $0.parentId != nil && !$0.isSoftDeleted }) { $0.parentId ?? UUID() }
-    }
-
-    /// Open top-level todos per list id (lowercased).
-    var counts: [String: Int] {
-        var counts: [String: Int] = [:]
-        for todo in todos where todo.parentId == nil && !todo.isSoftDeleted && !todo.isCompleted
-            && !actions.pendingDeletes.contains(todo.id) {
-            if let key = todo.listKey?.lowercased() { counts[key, default: 0] += 1 }
-        }
-        return counts
-    }
-
-    func count(_ page: Page) -> Int {
-        timeList(page).map { counts[$0.id.lowercased()] ?? 0 } ?? 0
-    }
-
-    var currentListId: String? { viewModel.currentListId(in: orderedLists) }
-
-    var showsComposer: Bool { currentListId != nil }
-
-    /// Today's "2 moved to This Week overnight" line, or nil.
-    var overnightText: String? {
-        OvernightNote.visibleText(
-            preferences.lastSweep,
-            timeZone: OvernightNote.timeZone(named: preferences.timezone),
-            dismissedAt: overnightDismissedAt
-        )
-    }
-
-    var doneCount: Int {
-        todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
-    }
-
-    // MARK: - Identity
-
-    var displayName: String {
-        if screenRoute != nil { return "Charlie Gleason" }
-        return authService.userDisplayName ?? authService.userEmail ?? "Your account"
-    }
-
-    var initials: String {
-        if screenRoute != nil { return "CG" }
-        return authService.userInitials ?? "?"
+        #if os(macOS)
+        return true
+        #else
+        return horizontalSizeClass == .regular && DeviceIdiom.current == .pad
+        #endif
     }
 
     // MARK: - Body
@@ -162,11 +124,15 @@ struct ContentView: View {
         // swiftlint:disable:next redundant_discardable_let
         let _ = midnightTick
         Group {
+            #if os(macOS)
+            wideBody
+            #else
             if isWide {
                 wideBody
             } else {
                 phoneBody
             }
+            #endif
         }
         .alert("Rename list", isPresented: Binding(get: { renamingList != nil }, set: { if !$0 { renamingList = nil } })) {
             TextField("List name", text: $renameText)
@@ -209,6 +175,7 @@ struct ContentView: View {
 
     // MARK: - Phone
 
+    #if os(iOS)
     var phoneBody: some View {
         VStack(spacing: 0) {
             Switcher(
@@ -327,5 +294,78 @@ struct ContentView: View {
                 .alignmentGuide(.top) { $0[.bottom] + Theme.Space.s3 }
         }
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: showsComposer)
+    }
+    #endif
+}
+
+extension ContentView {
+    // MARK: - Derived
+
+    /// Today, This Week, Someday, then collections by position. A system list
+    /// this build doesn't know is skipped rather than shown blank.
+    var orderedLists: [TodoListModel] {
+        lists.filter { !$0.isSystem || $0.systemKind != nil }.sorted { a, b in
+            if a.isSystem != b.isSystem { return a.isSystem }
+            if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
+            return a.position < b.position
+        }
+    }
+
+    var collections: [TodoListModel] { orderedLists.filter { !$0.isSystem } }
+
+    func timeList(_ page: Page) -> TodoListModel? {
+        guard let kind = page.systemKind else { return nil }
+        return orderedLists.first { $0.systemKind == kind }
+    }
+
+    func rows(_ list: TodoListModel) -> [TodoItem] {
+        viewModel.pageTodos(from: todos, listId: list.id, hidden: actions.pendingDeletes)
+    }
+
+    var subtasksByParent: [UUID: [TodoItem]] {
+        Dictionary(grouping: todos.filter { $0.parentId != nil && !$0.isSoftDeleted }) { $0.parentId ?? UUID() }
+    }
+
+    /// Open top-level todos per list id (lowercased).
+    var counts: [String: Int] {
+        var counts: [String: Int] = [:]
+        for todo in todos where todo.parentId == nil && !todo.isSoftDeleted && !todo.isCompleted
+            && !actions.pendingDeletes.contains(todo.id) {
+            if let key = todo.listKey?.lowercased() { counts[key, default: 0] += 1 }
+        }
+        return counts
+    }
+
+    func count(_ page: Page) -> Int {
+        timeList(page).map { counts[$0.id.lowercased()] ?? 0 } ?? 0
+    }
+
+    var currentListId: String? { viewModel.currentListId(in: orderedLists) }
+
+    var showsComposer: Bool { currentListId != nil }
+
+    /// Today's "2 moved to This Week overnight" line, or nil.
+    var overnightText: String? {
+        OvernightNote.visibleText(
+            preferences.lastSweep,
+            timeZone: OvernightNote.timeZone(named: preferences.timezone),
+            dismissedAt: overnightDismissedAt
+        )
+    }
+
+    var doneCount: Int {
+        todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
+    }
+
+    // MARK: - Identity
+
+    var displayName: String {
+        if screenRoute != nil { return "Charlie Gleason" }
+        return authService.userDisplayName ?? authService.userEmail ?? "Your account"
+    }
+
+    var initials: String {
+        if screenRoute != nil { return "CG" }
+        return authService.userInitials ?? "?"
     }
 }

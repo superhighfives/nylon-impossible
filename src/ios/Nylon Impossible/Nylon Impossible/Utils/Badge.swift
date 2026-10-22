@@ -18,11 +18,18 @@ enum BadgeService {
     /// the app icon. Silently no-ops on failure — badges are best-effort, not
     /// load-bearing for app function.
     static func refresh(modelContext: ModelContext) {
+        #if os(macOS)
+        // The Mac's Dock badge is `DockBadgeController`'s: a different count
+        // (today's open todos), kept current by store saves rather than by
+        // these call sites.
+        return
+        #else
         let count = computeCount(modelContext: modelContext)
         // setBadgeCount replaces the iOS 17–deprecated
         // applicationIconBadgeNumber; it requires no user permission prompt
         // for the launcher badge specifically.
         UNUserNotificationCenter.current().setBadgeCount(count) { _ in }
+        #endif
     }
 
     static func computeCount(modelContext: ModelContext) -> Int {

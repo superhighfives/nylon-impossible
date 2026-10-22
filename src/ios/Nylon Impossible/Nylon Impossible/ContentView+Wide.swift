@@ -44,39 +44,56 @@ extension ContentView {
     // MARK: - Layout
 
     var wideBody: some View {
+        #if os(macOS)
+        // A Mac window: the sidebar in a split view (so it has the system's
+        // toggle, ⌃⌘S and a resizable divider), the focused list as the
+        // window title, and a toolbar.
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Wide.sidebarWidth, max: 320)
+        } detail: {
+            boardWithPanel
+        }
+        .navigationTitle(focusedColumn?.name ?? "Nylon")
+        .navigationSubtitle(windowSubtitle)
+        .toolbar { macToolbar }
+        .background(Theme.Colors.canvas.ignoresSafeArea())
+        .focusedSceneValue(\.board, commandHandler)
+        .onChange(of: actions.toasts.current) { undoBridge.sync(actions.toasts, undoManager: undoManager) }
+        #else
         HStack(spacing: 0) {
-            WideSidebar(
-                timeLists: sidebarTimeLists,
-                collections: sidebarCollections,
-                openColumnId: openColumnId,
-                panel: detailTodo == nil ? widePanel : nil,
-                doneCount: doneCount,
-                name: displayName,
-                initials: initials,
-                avatarURL: screenRoute == nil ? authService.userImageURL : nil,
-                onTimeList: { focusColumn($0.id) },
-                onCollection: toggleColumn,
-                onNewList: {
-                    newListName = ""
-                    showsNewList = true
-                },
-                onPanel: showPanel,
-                onDrop: { list, id in
-                    guard let todo = todos.first(where: { $0.id == id }) else { return }
-                    actions.move(todo, toList: list.id)
-                },
-                onSignOut: signOut
-            )
+            sidebar
             VerticalHairline()
-            board
-                .inspector(isPresented: panelBinding) {
-                    panel
-                        .overlay(alignment: .leading) { VerticalHairline() }
-                        .inspectorColumnWidth(min: 340, ideal: Theme.Wide.panelWidth, max: 520)
-                }
+            boardWithPanel
         }
         .background(Theme.Colors.canvas.ignoresSafeArea())
-        .focusedSceneValue(\.board, BoardCommandHandler(keysEnabled: keyboardEnabled) { perform($0) })
+        .focusedSceneValue(\.board, commandHandler)
+        #endif
+    }
+
+    var sidebar: some View {
+        WideSidebar(
+            timeLists: sidebarTimeLists,
+            collections: sidebarCollections,
+            openColumnId: openColumnId,
+            panel: detailTodo == nil ? widePanel : nil,
+            doneCount: doneCount,
+            name: displayName,
+            initials: initials,
+            avatarURL: screenRoute == nil ? authService.userImageURL : nil,
+            onTimeList: { focusColumn($0.id) },
+            onCollection: toggleColumn,
+            onNewList: {
+                newListName = ""
+                showsNewList = true
+            },
+            onPanel: showPanel,
+            onDrop: { list, id in
+                guard let todo = todos.first(where: { $0.id == id }) else { return }
+                actions.move(todo, toList: list.id)
+            },
+            onSignOut: signOut
+        )
     }
 
     var board: some View {
@@ -161,7 +178,8 @@ extension ContentView {
                 empty: wideEmpty(kind),
                 composer: composer,
                 onOpen: openWide,
-                onDrop: { id, row in dropWide(id, on: row, into: list) }
+                onDrop: { id, row in dropWide(id, on: row, into: list) },
+                onExternalDrop: { addDropped($0, to: list) }
             )
         } else {
             BoardColumn(
@@ -178,7 +196,8 @@ extension ContentView {
                 empty: ("Nothing here yet.", nil),
                 composer: composer,
                 onOpen: openWide,
-                onDrop: { id, row in dropWide(id, on: row, into: list) }
+                onDrop: { id, row in dropWide(id, on: row, into: list) },
+                onExternalDrop: { addDropped($0, to: list) }
             ) {
                 collectionMenu(list)
             }
@@ -256,37 +275,14 @@ extension ContentView {
 
     // MARK: - Panel
 
-    var panelBinding: Binding<Bool> {
-        Binding(
-            get: { detailTodo != nil || widePanel != nil },
-            set: { if !$0 { closePanel() } }
-        )
-    }
-
-    @ViewBuilder
-    var panel: some View {
-        if let todo = detailTodo {
-            TodoDetailSheet(
-                todo: todo,
-                actions: actions,
-                lists: orderedLists,
-                apiService: syncService.apiService,
-                userId: authService.userId,
-                showsCalendar: showsDueCalendar,
-                onClose: closePanel
-            )
-            .id("\(todo.id)-\(showsDueCalendar)")
-        } else if let widePanel {
-            PanelChrome(onClose: closePanel) {
-                switch widePanel {
-                case .done: DoneHistoryView(actions: actions, lists: orderedLists)
-                case .settings: SettingsView()
-                }
-            }
-        }
-    }
-
     func showPanel(_ route: AccountRoute) {
+        #if os(macOS)
+        // A Mac has a Settings window (⌘,); the sidebar's Settings opens it.
+        if route == .settings, screenRoute == nil {
+            openSettings()
+            return
+        }
+        #endif
         detailTodo = nil
         widePanel = widePanel == route ? nil : route
     }

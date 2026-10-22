@@ -98,7 +98,7 @@ final class AuthService: AuthProviding {
     
     /// Persist userId to shared UserDefaults for Siri and Share Extension access
     func persistUserIdToSharedDefaults() {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+        let sharedDefaults = AppGroup.defaults
         sharedDefaults?.set(userId, forKey: BackgroundSyncService.userIdKey)
     }
 
@@ -126,7 +126,7 @@ final class AuthService: AuthProviding {
     /// UserDefaults entries. No-op if the token is already in the Keychain or missing
     /// from UserDefaults.
     func migrateAuthTokenFromUserDefaultsToKeychain() {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+        let sharedDefaults = AppGroup.defaults
 
         // Skip if Keychain already has a token
         guard KeychainHelper.loadString(forKey: BackgroundSyncService.authTokenKey) == nil else { return }
@@ -155,7 +155,7 @@ final class AuthService: AuthProviding {
     /// `signOut()`, so without that second call the shared defaults keep naming
     /// the last account for every target that can't ask Clerk directly.
     func clearSharedSessionState() {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.superhighfives.Nylon-Impossible")
+        let sharedDefaults = AppGroup.defaults
         sharedDefaults?.removeObject(forKey: BackgroundSyncService.userIdKey)
         // Clear legacy UserDefaults token entries (pre-Keychain migration)
         sharedDefaults?.removeObject(forKey: BackgroundSyncService.authTokenKey)

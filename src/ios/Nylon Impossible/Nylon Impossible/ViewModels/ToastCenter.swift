@@ -10,7 +10,6 @@
 
 import Foundation
 import Observation
-import UIKit
 
 @MainActor
 @Observable
@@ -36,7 +35,7 @@ final class ToastCenter {
     /// Whether an assistive technology that moves focus one element at a
     /// time is running. A closure so tests can say yes.
     @ObservationIgnored var usesAssistiveTech: () -> Bool = {
-        UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning
+        AssistiveTechnology.isRunning
     }
 
     /// The timeout for the next toast.

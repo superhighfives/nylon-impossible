@@ -95,6 +95,8 @@ struct Composer: View {
 
     private var field: some View {
         TextField("New todo", text: $text, prompt: prompt, axis: .vertical)
+            // No bezel on the Mac either: the row and the pill are the field.
+            .textFieldStyle(.plain)
             .textStyle(style == .inline ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body)
             .foregroundStyle(Theme.Colors.ink)
             .lineLimit(1...4)
@@ -138,7 +140,7 @@ struct Composer: View {
                 }
             }
         }
-        .glassEffect(.regular, in: .rect(cornerRadius: Theme.Phone.composerRadius))
+        .nylonGlass(cornerRadius: Theme.Phone.composerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Phone.composerRadius, style: .continuous)
                 .strokeBorder(Theme.Colors.hairline.opacity(0.6), lineWidth: 0.5)

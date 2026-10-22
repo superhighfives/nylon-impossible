@@ -9,7 +9,7 @@
 //  selector, and it's compiled out of release builds.
 //
 
-#if DEBUG
+#if DEBUG && os(iOS)
 import SwiftUI
 import UIKit
 

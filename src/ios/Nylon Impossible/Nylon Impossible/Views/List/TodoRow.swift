@@ -61,7 +61,7 @@ struct TodoRow: View {
             }
             .buttonStyle(.plain)
             // The row tints itself; the pointer shouldn't also morph.
-            .hoverEffectDisabled(isWide)
+            .pointerHoverEffectDisabled(isWide)
         }
         .padding(.vertical, Theme.Space.s3)
         .frame(minHeight: Theme.Space.rowMinHeight)

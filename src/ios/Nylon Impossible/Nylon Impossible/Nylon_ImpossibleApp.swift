@@ -9,14 +9,22 @@ import SwiftUI
 import SwiftData
 import ClerkKit
 import AppIntents
+#if os(iOS)
 import BackgroundTasks
+#endif
 import Sentry
 
 @main
 struct Nylon_ImpossibleApp: App {
+    #if os(iOS)
     // Only here to receive Home Screen quick actions — SwiftUI's App has no
     // hook for them. See AppDelegate.swift.
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #else
+    // The Dock badge, the global hotkey and reopening the window from the
+    // Dock. See Mac/MacAppDelegate.swift.
+    @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
+    #endif
     @State private var authService = AuthService()
     @State private var syncService: SyncService?
     @State private var preferencesService: UserPreferencesService?
@@ -24,7 +32,9 @@ struct Nylon_ImpossibleApp: App {
     init() {
         Clerk.configure(publishableKey: Config.clerkPublishableKey)
         Self.initSentry()
+        #if os(iOS)
         registerBackgroundTasks()
+        #endif
         #if DEBUG
         if let link = ScreenRoute.launchDeepLink { QuickActionService.shared.post(link) }
         #endif
@@ -38,12 +48,16 @@ struct Nylon_ImpossibleApp: App {
             options.environment = Config.sentryEnvironment
             options.tracesSampleRate = 0.1
             options.enableAutoPerformanceTracing = true
-            // Privacy: don't attach screenshots or view hierarchy
+            #if os(iOS)
+            // Privacy: don't attach screenshots or view hierarchy. (Sentry
+            // never captures either on macOS.)
             options.attachScreenshot = false
             options.attachViewHierarchy = false
+            #endif
         }
     }
 
+    #if os(iOS)
     private func registerBackgroundTasks() {
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: BackgroundSyncService.backgroundSyncTaskIdentifier,
@@ -103,8 +117,13 @@ struct Nylon_ImpossibleApp: App {
             print("[BGTask] Failed to schedule background sync: \(error)")
         }
     }
-    
+    #endif
+
     var body: some Scene {
+        #if os(macOS)
+        // The board window, Settings and the menu bar extra; see Mac/MacScenes.swift.
+        MacScenes()
+        #else
         WindowGroup {
             #if DEBUG
             if let route = ScreenRoute.launch {
@@ -119,6 +138,7 @@ struct Nylon_ImpossibleApp: App {
         }
         // The iPad board's keys, for the shortcut overlay and menu bar.
         .commands { BoardCommands() }
+        #endif
     }
 
     private var signedInRoot: some View {
@@ -174,7 +194,7 @@ struct RootView: View {
                 }
             } else if isSignedIn {
                 if let syncService, let preferencesService {
-                    ContentView()
+                    ContentRoot()
                         .environment(syncService)
                         .environment(preferencesService)
                         .onAppear {
@@ -262,7 +282,12 @@ struct RootView: View {
                 // backgrounded; this is when the morning note can appear.
                 Task { await preferencesService?.refreshLastSweep() }
             case .background, .inactive:
+                #if os(iOS)
+                // A Mac app keeps its socket while it runs — the menu bar
+                // extra, the Dock badge and the desktop widget all show live
+                // data with no window focused — so only iOS lets go here.
                 syncService.disconnectWebSocket()
+                #endif
                 // The app's single widget refresh, covering everything that
                 // happened while it was open: edits made here, and anything a
                 // sync pulled in from the web or another device. Leaving is
@@ -300,6 +325,7 @@ struct RootView: View {
 
 // MARK: - Private Helpers
 
+#if os(iOS)
 /// Ensures BGTask.setTaskCompleted(success:) is called exactly once, even if both the
 /// worker task and the expiration handler fire concurrently.
 private final class BGTaskCompletionGuard: @unchecked Sendable {
@@ -319,3 +345,4 @@ private final class BGTaskCompletionGuard: @unchecked Sendable {
         }
     }
 }
+#endif

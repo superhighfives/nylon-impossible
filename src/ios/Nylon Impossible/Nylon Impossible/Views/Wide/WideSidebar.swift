@@ -97,7 +97,12 @@ struct WideSidebar: View {
         // xxxLarge, like the phone's switcher, so names don't break
         // mid-word. The columns carry each list's name at full size.
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
+        #if os(macOS)
+        // The split view sets the width, and lets it be dragged.
+        .frame(maxWidth: .infinity)
+        #else
         .frame(width: Theme.Wide.sidebarWidth)
+        #endif
         .frame(maxHeight: .infinity, alignment: .top)
         .background(Theme.Colors.canvas)
     }
@@ -134,6 +139,7 @@ struct WideSidebar: View {
             .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isTargeted)
         }
         .buttonStyle(SidebarButtonStyle())
+        .pointingHandCursor()
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
         // "This Week, 6 todos" — the count is the value, not a second
         // number read out in the label.
@@ -205,6 +211,13 @@ struct WideSidebar: View {
             .frame(minHeight: Theme.Wide.sidebarRow)
             .contentShape(Rectangle())
         }
+        #if os(macOS)
+        // Keep the avatar-and-name label; the Mac's default menu button
+        // would draw it as a bezelled pop-up.
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        #endif
         .accessibilityLabel("Account, \(name)")
     }
 }

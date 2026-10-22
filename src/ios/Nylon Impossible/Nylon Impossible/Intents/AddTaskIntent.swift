@@ -6,7 +6,9 @@
 //
 
 import AppIntents
+#if os(iOS)
 import BackgroundTasks
+#endif
 import SwiftData
 
 /// "Add todo" for Siri, Shortcuts and Spotlight.
@@ -110,7 +112,12 @@ struct AddTaskIntent: AppIntent {
         return "Added to \(listName) · \(DueLabel.chip(for: dueDate, now: now))"
     }
 
+    /// iOS retries from a background task. A Mac has none; the intent runs
+    /// in the app's process there, and the signal has it sync now.
     private func scheduleBackgroundSync() {
+        #if os(macOS)
+        StoreChangeSignal.post()
+        #else
         let request = BGAppRefreshTaskRequest(identifier: BackgroundSyncService.backgroundSyncTaskIdentifier)
         request.earliestBeginDate = nil
         do {
@@ -118,5 +125,6 @@ struct AddTaskIntent: AppIntent {
         } catch {
             print("[AddTaskIntent] Failed to schedule BGAppRefreshTask: \(error)")
         }
+        #endif
     }
 }

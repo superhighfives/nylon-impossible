@@ -32,6 +32,8 @@ struct BoardColumn<Accessory: View>: View {
     let onOpen: (TodoItem) -> Void
     /// A dropped todo, and the row it landed on (nil: the column itself).
     let onDrop: (UUID, TodoItem?) -> Void
+    /// Text or a link dragged in from another app, to add here.
+    var onExternalDrop: ((String) -> Void)?
     @ViewBuilder var accessory: () -> Accessory
 
     @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader
@@ -70,7 +72,7 @@ struct BoardColumn<Accessory: View>: View {
         .background(isTargeted ? Theme.Colors.fill : (isTinted ? Theme.Colors.surface : Theme.Colors.canvas))
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isTargeted)
         .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.text)
-        .todoDropTarget(isTargeted: $isTargeted) { onDrop($0, nil) }
+        .todoDropTarget(isTargeted: $isTargeted, onExternal: onExternalDrop) { onDrop($0, nil) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }
@@ -156,12 +158,13 @@ extension BoardColumn where Accessory == EmptyView {
         empty: (text: String, link: (text: String, action: () -> Void)?),
         composer: Composer,
         onOpen: @escaping (TodoItem) -> Void,
-        onDrop: @escaping (UUID, TodoItem?) -> Void
+        onDrop: @escaping (UUID, TodoItem?) -> Void,
+        onExternalDrop: ((String) -> Void)? = nil
     ) {
         self.init(
             list: list, title: title, subline: subline, rows: rows, subtasks: subtasks, lists: lists,
             actions: actions, selectedId: selectedId, isTinted: false, overnight: overnight, empty: empty,
-            composer: composer, onOpen: onOpen, onDrop: onDrop
+            composer: composer, onOpen: onOpen, onDrop: onDrop, onExternalDrop: onExternalDrop
         ) { EmptyView() }
     }
 }

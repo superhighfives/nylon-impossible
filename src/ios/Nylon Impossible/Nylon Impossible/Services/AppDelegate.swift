@@ -10,6 +10,7 @@
 //  the same way.
 //
 
+#if os(iOS)
 import UIKit
 
 @MainActor
@@ -80,3 +81,4 @@ final class QuickActionSceneDelegate: UIResponder, UIWindowSceneDelegate {
         return true
     }
 }
+#endif
