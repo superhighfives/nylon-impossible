@@ -244,7 +244,6 @@ struct ContentView: View {
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.canvas)
         }
-        .refreshable { await syncService.sync() }
     }
 
     // MARK: - Pager
