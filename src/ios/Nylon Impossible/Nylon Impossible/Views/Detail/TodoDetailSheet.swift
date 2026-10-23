@@ -79,7 +79,7 @@ struct TodoDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                closeRow
+                topInset
                 titleField
                 chips
                 if showsDatePicker { datePicker }
@@ -105,23 +105,16 @@ struct TodoDetailSheet: View {
 
     // MARK: - Title
 
-    var closeRow: some View {
-        HStack {
-            Spacer()
-            Button(action: close, label: {
-                Image(systemName: Theme.Icon.close)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: 30, height: 30)
-                    .background(Theme.Colors.fill, in: Circle())
-                    .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
-                    .contentShape(Circle())
-            })
-            .buttonStyle(.plain)
-            .padding(.trailing, -10)
-            .accessibilityLabel("Close")
+    /// The sheet has its grabber and swipe-down to dismiss. Only the inspector
+    /// panel draws its own ×, so it just keeps clear of where that sits.
+    @ViewBuilder var topInset: some View {
+        if onClose != nil {
+            Color.clear
+                .frame(height: Theme.Space.rowMinHeight)
+                .padding(.top, Theme.Space.s3)
+        } else {
+            Color.clear.frame(height: Theme.Space.s4)
         }
-        .padding(.top, Theme.Space.s3)
     }
 
     var titleField: some View {

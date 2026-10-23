@@ -216,6 +216,8 @@ struct ContentView: View {
             )
             .presentationDetents([.medium, .large], selection: $detailDetent)
             .presentationDragIndicator(.visible)
+            // Drags resize or dismiss the sheet before they scroll its content.
+            .presentationContentInteraction(.resizes)
             .presentationBackground(Theme.Colors.canvas)
         }
         .sheet(isPresented: $showsAccount, onDismiss: {
