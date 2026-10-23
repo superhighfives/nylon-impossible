@@ -54,6 +54,8 @@ struct ContentView: View {
 
     @State var actions = TodoActions()
     @State var pagerPosition: Page? = .today
+    /// True while a finger is paging sideways; the lists hold still meanwhile.
+    @State var pagerDragging = false
     /// Written every frame of a swipe and read only by the switcher's
     /// underline, so the swipe doesn't re-run this whole body (and refilter
     /// every list) sixty times a second.
@@ -255,6 +257,10 @@ struct ContentView: View {
                 ForEach(Page.allCases, id: \.self) { page in
                     pageContent(page)
                         .containerRelativeFrame([.horizontal, .vertical])
+                        // Sideways or down, not both: once the pager takes the
+                        // drag, the list under it stops following (and stops
+                        // pulling to refresh).
+                        .scrollDisabled(pagerDragging)
                         .id(page)
                 }
             }
@@ -268,6 +274,10 @@ struct ContentView: View {
         // The pages keep their size when the keyboard comes up; only the
         // composer rides it. Resizing them scrolled the masthead away.
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onScrollPhaseChange { _, phase in
+            let dragging = phase == .interacting
+            if dragging != pagerDragging { pagerDragging = dragging }
+        }
         .onScrollGeometryChange(for: CGFloat.self) { geometry in
             geometry.contentOffset.x / max(geometry.containerSize.width, 1)
         } action: { _, progress in
