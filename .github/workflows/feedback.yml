@@ -223,10 +223,13 @@ jobs:
             # The API commits reports here too, so take theirs and retry
             # rather than force anything. Only ever adds files.
             remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            pushed=
             for _ in 1 2 3; do
-              git push -q "$remote" HEAD:refs/heads/feedback-assets && break
+              git push -q "$remote" HEAD:refs/heads/feedback-assets && pushed=1 && break
               git pull -q --rebase "$remote" feedback-assets
             done
+            # Don't link images that never made it to the branch.
+            [ -n "$pushed" ] || { echo "Couldn't push to feedback-assets."; exit 1; }
             cd ..
           fi
           section=$(cd src/marketing && npx tsx fix-shots.ts report \

@@ -111,13 +111,34 @@ function required(name: string): string {
  */
 function readPlan(path: string): Plan {
   const raw = JSON.parse(readFileSync(path, "utf8")) as Plan;
-  if (typeof raw.skip === "string" && raw.skip.trim()) return { skip: raw.skip.trim() };
-  const shots = (raw.shots ?? []).slice(0, MAX_SHOTS).filter((shot) => {
-    const ok = DEVICES.includes(shot.device) && /^[a-z]{2,20}$/.test(shot.screen ?? "");
-    if (!ok) console.log(`  Ignoring an invalid shot: ${JSON.stringify(shot)}`);
-    return ok;
-  });
+  if (typeof raw?.skip === "string" && raw.skip.trim()) return { skip: plainText(raw.skip) };
+  const candidates: Shot[] = Array.isArray(raw?.shots) ? raw.shots : [];
+  const shots = candidates
+    .filter((shot) => {
+      const ok =
+        typeof shot === "object" &&
+        shot !== null &&
+        DEVICES.includes(shot.device) &&
+        typeof shot.screen === "string" &&
+        /^[a-z]{2,20}$/.test(shot.screen);
+      if (!ok) console.log(`  Ignoring an invalid shot: ${JSON.stringify(shot)}`);
+      return ok;
+    })
+    .slice(0, MAX_SHOTS)
+    .map((shot) => ({ ...shot, note: typeof shot.note === "string" ? plainText(shot.note) : undefined }));
   return { shots };
+}
+
+/**
+ * Model text bound for a public PR body: one line, no table breaks, HTML or
+ * links, and @mentions broken with a zero-width space so nobody gets pinged.
+ */
+function plainText(text: string): string {
+  return text
+    .replace(/[|\n<>[\]]/g, " ")
+    .replace(/@/g, "@\u200b")
+    .trim()
+    .slice(0, 200);
 }
 
 function shotName(shot: Shot, index: number): string {
@@ -397,7 +418,7 @@ function report(): void {
       };
       const label = [
         `**${DEVICE_LABEL[shot.device]}** · \`${shot.screen}\` · ${shot.dark ? "dark" : "light"}`,
-        shot.note?.replace(/[|\n<>]/g, " ").slice(0, 200),
+        shot.note,
       ]
         .filter(Boolean)
         .join("<br>");
