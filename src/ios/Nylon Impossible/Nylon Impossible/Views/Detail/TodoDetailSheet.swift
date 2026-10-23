@@ -79,7 +79,9 @@ struct TodoDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                closeRow
+                // The sheet is dismissed by its drag indicator or a swipe down;
+                // only the inspector, which has neither, needs a ×.
+                if onClose != nil { closeRow } else { Color.clear.frame(height: Theme.Space.s4) }
                 titleField
                 chips
                 if showsDatePicker { datePicker }
