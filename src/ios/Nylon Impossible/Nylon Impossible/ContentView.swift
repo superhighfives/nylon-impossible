@@ -58,6 +58,8 @@ struct ContentView: View {
     /// underline, so the swipe doesn't re-run this whole body (and refilter
     /// every list) sixty times a second.
     @State var pagerProgress = PagerProgress()
+    /// Lets the pager and the lists inside it take turns on a diagonal drag.
+    @State var scrollAxisLock = ScrollAxisLock()
     @State var detailTodo: TodoItem?
     @State var detailDetent: PresentationDetent = .medium
     @State var showsAccount = false
@@ -263,7 +265,8 @@ struct ContentView: View {
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: $pagerPosition)
         .scrollIndicators(.hidden)
-        .scrollDisabled(viewModel.openCollectionId != nil)
+        .scrollAxisLocked(.horizontal, disabled: viewModel.openCollectionId != nil)
+        .environment(\.scrollAxisLock, scrollAxisLock)
         .scrollDismissesKeyboard(.interactively)
         // The pages keep their size when the keyboard comes up; only the
         // composer rides it. Resizing them scrolled the masthead away.

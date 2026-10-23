@@ -61,6 +61,7 @@ struct ListPage<Header: View>: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .scrollIndicators(.hidden)
+        .scrollAxisLocked(.vertical)
         .scrollDismissesKeyboard(.interactively)
         .environment(\.defaultMinListRowHeight, 0)
         .contentMargins(.top, Theme.Space.s2, for: .scrollContent)
