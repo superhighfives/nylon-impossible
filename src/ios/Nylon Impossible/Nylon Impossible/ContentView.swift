@@ -215,6 +215,7 @@ struct ContentView: View {
                 userId: authService.userId
             )
             .presentationDetents([.medium, .large], selection: $detailDetent)
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.canvas)
         }
