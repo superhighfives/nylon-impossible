@@ -73,7 +73,8 @@ jobs:
   fix:
     needs: route
     runs-on: ${{ needs.route.outputs.runner }}
-    timeout-minutes: 45
+    # Claude's own checks plus two Debug builds for the before/after shots.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
         with:
@@ -87,6 +88,7 @@ jobs:
           git fetch origin feedback-assets
           git worktree add .feedback-assets origin/feedback-assets
           echo ".feedback-assets/" >> .git/info/exclude
+          echo ".fix-shots/" >> .git/info/exclude
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -135,10 +137,111 @@ jobs:
                  macOS, the xcodebuild test commands in .github/workflows/ios-test.yml);
                - push and open a **draft** PR with `gh pr create --draft --label feedback`,
                  body ending "Fixes #${{ needs.route.outputs.number }}". Don't
-                 embed the screenshots in the PR;
+                 embed the report's screenshots in the PR;
+               - on iOS, iPadOS or Mac, write `.fix-shots/plan.json` saying what a
+                 later step should screenshot on `main` and on your branch, so
+                 the PR shows before and after. Shots are DEBUG screen routes
+                 on sample data (`-NylonScreen <route>`; the routes, and which
+                 run on iPad and Mac, are listed at the top of
+                 `src/ios/Nylon Impossible/Nylon Impossible/Views/Shell/ScreenRoute.swift`).
+                 Pick the route(s) where the change is visible, in the report's
+                 appearance — at most 4:
+                 `{"shots": [{"device": "iphone"|"ipad"|"mac", "screen": "<route>", "dark": true|false, "landscape": false, "note": "<what to look at>"}]}`.
+                 If a still image can't show the fix (a gesture, timing, sync,
+                 data that isn't in the sample), write `{"skip": "<one line why>"}`
+                 instead. Don't capture anything yourself;
                - comment on the issue with the PR link and one line on the fix.
             4. If it's ambiguous, a design call, or bigger than one PR: don't
                change code. Comment on the issue with what you found (files,
                likely cause) and the specific questions you need answered; the
                owner replies with `@claude`.
             Never merge, never push to main, never close the issue.
+
+      # Before/after shots for the PR, from the plan Claude left in
+      # .fix-shots/plan.json. Best-effort like the marketing captures: a
+      # failed build or a flaky simulator leaves "not captured" cells (or no
+      # section at all), never a red run — the fix is the point, not this.
+      # Apple platforms only; a web fix runs on Linux and writes no plan.
+      - name: Capture before and after
+        id: shots
+        if: needs.route.outputs.runner != 'ubuntu-latest'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.route.outputs.number }}
+        run: |
+          if [ ! -f .fix-shots/plan.json ]; then
+            echo "Claude left no plan, so there's nothing to capture."
+            exit 0
+          fi
+          branch="feedback/$NUMBER"
+          pr=$(gh pr list --head "$branch" --state open --json number -q '.[0].number')
+          if [ -z "$pr" ]; then
+            echo "No open PR for $branch; nothing to show the shots on."
+            exit 0
+          fi
+          git fetch origin main "$branch"
+          before=$(git rev-parse origin/main)
+          after=$(git rev-parse "origin/$branch")
+          # Claude's working tree is on the branch; -f drops anything it left
+          # uncommitted. .fix-shots and .feedback-assets are excluded.
+          plan="$PWD/.fix-shots/plan.json"
+          out="$PWD/.fix-shots/out"
+          for side in before after; do
+            sha=$before; [ "$side" = after ] && sha=$after
+            git -c advice.detachedHead=false checkout -f --detach "$sha"
+            (cd src/marketing && npx tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$out") || true
+          done
+          {
+            echo "pr=$pr"
+            echo "before=$before"
+            echo "after=$after"
+          } >> "$GITHUB_OUTPUT"
+
+      # The images go on feedback-assets next to the reports' screenshots —
+      # a new directory per fix commit, nothing rewritten — and the PR body
+      # gets a Before | After table between markers, replaced on a rerun.
+      - name: Post before and after
+        if: steps.shots.outputs.pr != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.route.outputs.number }}
+          PR: ${{ steps.shots.outputs.pr }}
+          BEFORE: ${{ steps.shots.outputs.before }}
+          AFTER: ${{ steps.shots.outputs.after }}
+        run: |
+          dir="fixes/$NUMBER/${AFTER:0:12}"
+          if ls .fix-shots/out/*.png >/dev/null 2>&1; then
+            mkdir -p ".feedback-assets/$dir"
+            cp .fix-shots/out/*.png ".feedback-assets/$dir/"
+            cd .feedback-assets
+            git add "$dir"
+            git -c user.name="github-actions[bot]" \
+                -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                commit -q -m "Before/after for #$PR (feedback #$NUMBER)"
+            # The API commits reports here too, so take theirs and retry
+            # rather than force anything. Only ever adds files.
+            remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+            pushed=
+            for _ in 1 2 3; do
+              git push -q "$remote" HEAD:refs/heads/feedback-assets && pushed=1 && break
+              git pull -q --rebase "$remote" feedback-assets
+            done
+            # Don't link images that never made it to the branch.
+            [ -n "$pushed" ] || { echo "Couldn't push to feedback-assets."; exit 1; }
+            cd ..
+          fi
+          section=$(cd src/marketing && npx tsx fix-shots.ts report \
+            --plan ../../.fix-shots/plan.json --out ../../.fix-shots/out \
+            --base "https://github.com/$GITHUB_REPOSITORY/blob/feedback-assets/$dir" \
+            --before-sha "$BEFORE" --after-sha "$AFTER")
+          gh pr view "$PR" --json body -q .body > .fix-shots/body.md
+          # Drop a section from an earlier run, then append the new one.
+          python3 - "$section" <<'PYEOF'
+          import re, sys
+          path = ".fix-shots/body.md"
+          body = re.sub(r"\n*<!-- fix-shots:start -->.*?<!-- fix-shots:end -->", "", open(path).read(), flags=re.S)
+          open(path, "w").write(f"{body.rstrip()}\n\n<!-- fix-shots:start -->\n{sys.argv[1]}\n<!-- fix-shots:end -->\n")
+          PYEOF
+          gh pr edit "$PR" --body-file .fix-shots/body.md
