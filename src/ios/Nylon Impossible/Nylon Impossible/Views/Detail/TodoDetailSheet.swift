@@ -79,7 +79,8 @@ struct TodoDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                closeRow
+                // The sheet closes by swiping down; only the inspector needs ×.
+                if onClose != nil { closeRow } else { Spacer().frame(height: Theme.Space.s6) }
                 titleField
                 chips
                 if showsDatePicker { datePicker }
