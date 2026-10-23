@@ -101,6 +101,7 @@ jobs:
       - run: bun install --frozen-lockfile
 
       - name: Run Claude Code
+        id: claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -156,6 +157,22 @@ jobs:
                likely cause) and the specific questions you need answered; the
                owner replies with `@claude`.
             Never merge, never push to main, never close the issue.
+
+      # The action hides Claude's output, so a run that ends without a PR or
+      # a comment says nothing about why. Print what it was refused (to see
+      # whether the allowlist is missing something) and its final message.
+      # The prompt only reads the issue body, which is public already.
+      - name: Summarise Claude's run
+        if: always() && steps.claude.outputs.execution_file != ''
+        env:
+          LOG: ${{ steps.claude.outputs.execution_file }}
+        run: |
+          [ -f "$LOG" ] || exit 0
+          jq -r 'if type == "array" then .[] else . end | select(.type == "result") | .permission_denials[]?
+            | "::warning title=Denied \(.tool_name)::\(.tool_input.command // .tool_input.file_path // (.tool_input | tostring) | .[0:300])"' "$LOG" || true
+          echo "::group::Claude's final message"
+          jq -r 'if type == "array" then .[] else . end | select(.type == "result") | .result // empty' "$LOG" || true
+          echo "::endgroup::"
 
       # Before/after shots for the PR, from the plan Claude left in
       # .fix-shots/plan.json. Best-effort like the marketing captures: a
