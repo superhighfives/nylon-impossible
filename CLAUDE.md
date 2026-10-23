@@ -197,3 +197,12 @@ merge it, rebase it onto `main`, or delete it, or every old issue loses its
 images. `feedback.yml` has Claude open a draft fix PR (or ask questions) when
 the repo owner applies `auto-fix` — the API does that for admins' reports —
 because the issue body is the prompt. Spec: `plans/done/2026-10-21-feedback-inbox.md`.
+
+On Apple platforms the fix PR also gets a **Before | After** table: Claude
+writes `.fix-shots/plan.json` (which `-NylonScreen` routes show the change,
+or why a still can't), and `src/marketing/fix-shots.ts` captures them on
+`main` and the branch after Claude finishes. The images go to
+`feedback-assets` under `fixes/<issue>/<sha>/`; the table sits between
+`<!-- fix-shots:start/end -->` markers in the PR body. It's best-effort, like the
+marketing captures — never make it fail the run. The simulator helpers it
+shares with `generate.ts` live in `src/marketing/simulator.ts`.
