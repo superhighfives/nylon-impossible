@@ -104,8 +104,12 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           additional_permissions: |
             actions: read
+          # claude_args is split like a shell command line, so the list must be
+          # quoted: unquoted, `Bash(bun run *)` becomes "Bash(bun", "run", "*)"
+          # and every Bash call is denied — Claude gives up on turn 2 and the
+          # job still reports success.
           claude_args: |
-            --allowedTools Read,Edit,Write,Glob,Grep,Bash(bun run *),Bash(bunx biome *),Bash(git *),Bash(gh issue *),Bash(gh pr *),Bash(xcodebuild *),Bash(xcrun *),Bash(swiftlint *),Bash(ls *)
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(bun run *),Bash(bunx biome *),Bash(git *),Bash(gh issue *),Bash(gh pr *),Bash(xcodebuild *),Bash(xcrun *),Bash(swiftlint *),Bash(ls *)"
           prompt: |
             You're triaging in-app feedback issue #${{ needs.route.outputs.number }}
             in ${{ github.repository }}, filed by the repo owner from one of the apps.
