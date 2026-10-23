@@ -47,6 +47,9 @@ extension ContentView {
         collections.map { WideSidebar.Entry(list: $0, openTodos: counts[$0.id.lowercased()] ?? 0) }
     }
 
+    /// The board's smallest height in a Mac window: a masthead and a few rows.
+    static let boardMinHeight: CGFloat = 320
+
     var keyboardEnabled: Bool { boardFocused && editingColumnId == nil }
 
     // MARK: - Layout
@@ -61,6 +64,17 @@ extension ContentView {
                 .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Wide.sidebarWidth, max: 320)
         } detail: {
             boardWithPanel
+                // A fixed minimum, so the split view never asks the board's
+                // content for one. Left to SwiftUI, the detail's minimum size
+                // came from the columns and rows; collapsing or showing the
+                // sidebar resized the board, which moved that minimum, which
+                // re-ran the split view's layout. macOS 27 settles; on macOS 26
+                // it looped until AppKit threw ("more Update Constraints in
+                // Window passes than there are views in the window").
+                .frame(
+                    minWidth: Theme.Wide.columnMinWidth, maxWidth: .infinity,
+                    minHeight: Self.boardMinHeight, maxHeight: .infinity
+                )
         }
         .navigationTitle(focusedColumn?.name ?? "Nylon")
         .navigationSubtitle(windowSubtitle)
