@@ -107,9 +107,12 @@ jobs:
           # claude_args is split like a shell command line, so the list must be
           # quoted: unquoted, `Bash(bun run *)` becomes "Bash(bun", "run", "*)"
           # and every Bash call is denied — Claude gives up on turn 2 and the
-          # job still reports success.
+          # job still reports success. Deny rules win over the broad git/gh
+          # allows: the issue body is the prompt, so it mustn't be able to talk
+          # Claude into rewriting history or merging.
           claude_args: |
             --allowedTools "Read,Edit,Write,Glob,Grep,Bash(bun run *),Bash(bunx biome *),Bash(git *),Bash(gh issue *),Bash(gh pr *),Bash(xcodebuild *),Bash(xcrun *),Bash(swiftlint *),Bash(ls *)"
+            --disallowedTools "Bash(git push *--force*),Bash(git push -f*),Bash(git push * -f*),Bash(git reset --hard*),Bash(gh pr merge*)"
           prompt: |
             You're triaging in-app feedback issue #${{ needs.route.outputs.number }}
             in ${{ github.repository }}, filed by the repo owner from one of the apps.
