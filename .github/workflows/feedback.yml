@@ -187,6 +187,24 @@ jobs:
           # uncommitted. .fix-shots and .feedback-assets are excluded.
           plan="$PWD/.fix-shots/plan.json"
           out="$PWD/.fix-shots/out"
+          # As in marketing.yml: on a fresh runner the first simctl call
+          # starts CoreSimulator and can take minutes — far past fix-shots'
+          # 30s simctl timeouts — and the image may lack the iOS platform.
+          # So make that first call here, untimed, and fetch the platform if
+          # no iPhone or iPad simulator is available. Neither may end the
+          # step: a Mac shot in the same plan should still be captured.
+          if grep -qE '"(iphone|ipad)"' "$plan"; then
+            available=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices'].values()
+          print(sum(1 for devs in devices for d in devs
+                    if d.get('isAvailable') and ('iPhone' in d['name'] or 'iPad' in d['name'])))
+          ") || available=
+            if [ "$available" = 0 ]; then
+              echo "No available iPhone or iPad simulator, downloading the iOS platform…"
+              xcodebuild -downloadPlatform iOS || echo "::warning::Couldn't download the iOS platform."
+            fi
+          fi
           for side in before after; do
             sha=$before; [ "$side" = after ] && sha=$after
             git -c advice.detachedHead=false checkout -f --detach "$sha"
