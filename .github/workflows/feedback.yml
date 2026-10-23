@@ -168,10 +168,18 @@ jobs:
           LOG: ${{ steps.claude.outputs.execution_file }}
         run: |
           [ -f "$LOG" ] || exit 0
+          # Commands are often multi-line (heredocs, PR bodies), so escape
+          # them as workflow-command data to keep each warning on one line.
           jq -r 'if type == "array" then .[] else . end | select(.type == "result") | .permission_denials[]?
-            | "::warning title=Denied \(.tool_name)::\(.tool_input.command // .tool_input.file_path // (.tool_input | tostring) | .[0:300])"' "$LOG" || true
+            | (.tool_input.command // .tool_input.file_path // (.tool_input | tostring) | .[0:300]
+               | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A")) as $what
+            | "::warning title=Denied \(.tool_name)::\($what)"' "$LOG" || true
+          # Claude's message is free text: stop it being read as commands.
+          token=$(uuidgen)
           echo "::group::Claude's final message"
+          echo "::stop-commands::$token"
           jq -r 'if type == "array" then .[] else . end | select(.type == "result") | .result // empty' "$LOG" || true
+          echo "::$token::"
           echo "::endgroup::"
 
       # Before/after shots for the PR, from the plan Claude left in
