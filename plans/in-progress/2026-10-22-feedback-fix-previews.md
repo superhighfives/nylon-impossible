@@ -73,8 +73,12 @@ Getting the loop working at all came first:
 
 ## Still to verify
 
-- [ ] A run on #418 with #435 in place fills both cells
-      (run 39908823680).
+- [ ] A run on #418 with #435 in place fills both cells. The first try
+      (run 39908823680) never reached capture: Claude wrote a plan but
+      ended after 36 turns without pushing, opening a PR or commenting,
+      with 7 permission denials. The action hides its output, so #436
+      prints the denials and Claude's final message. Next: merge #436,
+      re-run #418, and widen the allowlist if a needed command was refused.
 - [ ] Mac capture on a GitHub macOS runner. `screencapture` of another
       app's window may need Screen Recording permission, which the runner
       may not grant. If it doesn't, Mac cells stay _not captured_ and we
