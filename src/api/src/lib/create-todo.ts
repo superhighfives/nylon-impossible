@@ -68,9 +68,10 @@ function createInitialTodo(text: string): {
   /** Whether `title` is the input's whole first line, so it can be parsed. */
   titleIsTyped: boolean;
 } {
-  // Check if input is primarily a URL (URL takes up >80% of the text)
+  // A bare link (nothing but the URL, bar stray punctuation) is named after its
+  // domain. Any words alongside it are the user's title, however long the URL.
   const urlMatch = text.match(URL_REGEX);
-  if (urlMatch && urlMatch[0].length > text.length * 0.8) {
+  if (urlMatch && !/[\p{L}\p{N}]/u.test(text.replace(urlMatch[0], ""))) {
     const cleanedUrl = cleanUrlString(urlMatch[0]);
     const fallback = createFallbackFromUrl(cleanedUrl);
     if (fallback) {

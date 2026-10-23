@@ -169,13 +169,16 @@ enum TaskCreationService {
     /// Parse raw input into an initial title and any URLs, mirroring the
     /// server's `createInitialTodo` (smart-create.ts) so an optimistic local
     /// todo matches what the server would have produced. URL-dominant input
-    /// (a URL taking up >80% of the text) becomes "Check domain.com"; otherwise
+    /// (nothing but a URL) becomes "Check domain.com"; otherwise
     /// the title is the truncated text with any URLs extracted alongside.
     static func parseSmartInput(_ text: String) -> (title: String, urls: [String]) {
         let matches = urlMatches(in: text)
 
+        // Only a bare link (no words alongside it) is named after its domain;
+        // words next to a long URL are the user's title.
         if let first = matches.first,
-           Double(first.count) > Double(text.count) * 0.8,
+           text.replacingOccurrences(of: first, with: "")
+               .rangeOfCharacter(from: .alphanumerics) == nil,
            let fallback = fallbackFromURL(first) {
             return (fallback.title, [fallback.url])
         }
