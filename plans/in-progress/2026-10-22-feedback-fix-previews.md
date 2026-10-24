@@ -60,8 +60,8 @@ Getting the loop working at all came first:
   scripts share them.
 - `feedback.yml`:
   - The prompt asks for the plan on Apple platforms.
-  - "Capture before and after" checks out `main` and then the branch, running
-    the capture on each.
+  - "Capture before and after" checks out the branch and then `main`,
+    running the capture on each (the order is from #439).
   - "Post before and after" commits the images and rewrites the PR body.
   - The job timeout is now 75 minutes.
 - **#435**: an untimed first `simctl` call, plus `xcodebuild -downloadPlatform
@@ -70,6 +70,15 @@ Getting the loop working at all came first:
   fresh runner the first `simctl list` starts CoreSimulator, and that took
   longer than the script's 30-second timeout. `marketing.yml` already had the
   same warm-up step.
+- **#436**: a step after Claude prints each refused tool call as a warning,
+  plus Claude's final message. The action hides Claude's output otherwise.
+- **#439**: the capture step gets a 50-minute budget. The next #418 run had
+  Claude open #438 in three minutes, then spent 73 minutes capturing, hit the
+  75-minute job timeout and lost the post step and its log. The PR lookup is
+  now its own step, so a capture that runs out of time still posts a table.
+  The fix branch is captured first, and `fix-shots.ts` builds while the
+  simulator boots. The longer-term fix, a Mac that stays warm, is
+  `plans/backlog/2026-10-23-self-hosted-mac-capture-runner.md`.
 
 ## Still to verify
 
@@ -79,6 +88,8 @@ Getting the loop working at all came first:
       with 7 permission denials. The action hides its output, so #436
       prints the denials and Claude's final message. Next: merge #436,
       re-run #418, and widen the allowlist if a needed command was refused.
+      The second try (run 40011135639) had no denials and opened #438, but
+      the capture timed out (see #439 above). Next: re-run #418 with #439.
 - [ ] Mac capture on a GitHub macOS runner. `screencapture` of another
       app's window may need Screen Recording permission, which the runner
       may not grant. If it doesn't, Mac cells stay _not captured_ and we
