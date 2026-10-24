@@ -296,10 +296,21 @@ jobs:
               xcodebuild -downloadPlatform iOS || echo "::warning::Couldn't download the iOS platform."
             fi
           fi
+          # Videos are UI-test runs turned into GIFs. The runner image may
+          # not have ffmpeg; without it, video cells are "not captured".
+          if grep -q '"videos"' "$plan" && ! command -v ffmpeg >/dev/null; then
+            brew install ffmpeg || echo "::warning::Couldn't install ffmpeg for the videos."
+          fi
           for side in after before; do
             sha=$BEFORE; [ "$side" = after ] && sha=$AFTER
             rm -rf src/ios
             git checkout "$sha" -- src/ios
+            # The video's UI test is usually new with the fix, so the before
+            # side runs main's app with the branch's UI tests. Failing there
+            # is expected: that recording shows the bug.
+            if [ "$side" = before ]; then
+              git checkout "$AFTER" -- "src/ios/Nylon Impossible/Nylon ImpossibleUITests"
+            fi
             (cd src/marketing && npx tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$out") || true
           done
 
@@ -317,9 +328,11 @@ jobs:
           AFTER: ${{ steps.target.outputs.after }}
         run: |
           dir="fixes/$NUMBER/${AFTER:0:12}"
-          if ls .fix-shots/out/*.png >/dev/null 2>&1; then
+          shopt -s nullglob
+          images=(.fix-shots/out/*.png .fix-shots/out/*.gif)
+          if [ ${#images[@]} -gt 0 ]; then
             mkdir -p ".feedback-assets/$dir"
-            cp .fix-shots/out/*.png ".feedback-assets/$dir/"
+            cp "${images[@]}" ".feedback-assets/$dir/"
             cd .feedback-assets
             git add "$dir"
             git -c user.name="github-actions[bot]" \
