@@ -15,8 +15,8 @@
  *                 "note": "The close button sits clear of the grabber" }] }
  *   { "skip": "Gesture fix: a still image looks the same before and after." }
  *
- * The workflow runs `capture` on main (`--as before`) and on the fix branch
- * (`--as after`) — same derived data, so the second build is incremental —
+ * The workflow runs `capture` on the fix branch (`--as after`) and on main
+ * (`--as before`) — same derived data, so the second build is incremental —
  * then commits the PNGs to feedback-assets and puts `report`'s Markdown in
  * the PR body. Capture is best-effort per shot: a failure is recorded in
  * <dir>/status-<as>.json and shown in the report, never thrown.
@@ -25,7 +25,7 @@
  * ends up in the (public) images.
  */
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -150,8 +150,9 @@ function shotName(shot: Shot, index: number): string {
 // Build
 // ---------------------------------------------------------------------------
 
-function xcodebuild(destination: string, derivedData: string, extra: string[] = []): void {
-  execFileSync(
+/** Async so a build can run while the simulator boots: neither needs the other. */
+function xcodebuild(destination: string, derivedData: string, extra: string[] = []): Promise<void> {
+  const child = spawn(
     "xcodebuild",
     [
       "build",
@@ -165,6 +166,12 @@ function xcodebuild(destination: string, derivedData: string, extra: string[] = 
     ],
     { stdio: "inherit" },
   );
+  return new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("exit", (code, signal) =>
+      code === 0 ? resolve() : reject(new Error(`xcodebuild exited with ${signal ?? code}`)),
+    );
+  });
 }
 
 function builtApp(derivedData: string, products: string): string {
@@ -186,10 +193,17 @@ async function captureSimulator(
 ): Promise<void> {
   const { bundleId } = manifest.ios;
   const udid = ensureSimulator(SIMULATOR_NAME[device], manifest.ios.devices[device].types);
-  await ensureBooted(udid);
 
-  console.log(`  Building for the ${DEVICE_LABEL[device]} simulator…`);
-  xcodebuild(`platform=iOS Simulator,id=${udid}`, DERIVED_DATA.ios);
+  // A cold boot on a CI runner can take longer than the build, so overlap them.
+  console.log(`  Building for the ${DEVICE_LABEL[device]} simulator while it boots…`);
+  const build = xcodebuild(`platform=iOS Simulator,id=${udid}`, DERIVED_DATA.ios);
+  // Don't leave a rejection unhandled while the boot blocks; it's rethrown below.
+  build.catch(() => {});
+  try {
+    await ensureBooted(udid);
+  } finally {
+    await build;
+  }
   const app = builtApp(DERIVED_DATA.ios, "Debug-iphonesimulator");
 
   spawnSync(
@@ -295,7 +309,7 @@ function quitMacApp(app: string): void {
 async function captureMac(shots: { shot: Shot; dest: string }[], status: Status): Promise<void> {
   console.log("  Building for the Mac…");
   // Unsigned, as in ios-test.yml: CI has no Mac development profile.
-  xcodebuild("platform=macOS", DERIVED_DATA.mac, ["CODE_SIGNING_ALLOWED=NO"]);
+  await xcodebuild("platform=macOS", DERIVED_DATA.mac, ["CODE_SIGNING_ALLOWED=NO"]);
   const app = builtApp(DERIVED_DATA.mac, "Debug");
   const windowIdScript = join(DERIVED_DATA.mac, "window-id.swift");
   writeFileSync(windowIdScript, WINDOW_ID_SWIFT);
