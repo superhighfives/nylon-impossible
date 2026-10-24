@@ -19,9 +19,9 @@ fresh iOS run, a single iPhone pass took about 26 minutes:
 
 That's why:
 
-- the feedback fix screenshots (`plans/in-progress/2026-10-22-feedback-fix-previews.md`)
-  ran into the 75-minute job timeout on #418 (run 40011135639). #439 caps the
-  capture step at 50 minutes so the job survives, but doesn't make it faster;
+- the feedback fix screenshots (`plans/done/2026-10-22-feedback-fix-previews.md`)
+  take ~25 minutes for a single iPhone shot, most of it a cold build and
+  simulator, and the capture step now needs a 70-minute limit (#445);
 - `marketing.yml`'s iOS phase takes 25–44 minutes, and the parity sheet 42;
 - most of the capture flakiness CLAUDE.md describes is a cold CoreSimulator
   timing out.
@@ -29,10 +29,6 @@ That's why:
 A Mac that stays up keeps all of that warm: the platform installed, our
 simulators created and booted, DerivedData from the last build. A capture
 should then take a few minutes. The candidate is a cloud M1 Mac mini (1 TB).
-
-It would probably also answer the open Mac-capture question: `screencapture`
-of another app's window needs Screen Recording permission, which we can grant
-once on our own machine and can't on a hosted runner.
 
 ## Approach
 
@@ -46,10 +42,12 @@ job in two:
 1. **`fix`** (hosted, as now): Claude makes the fix and opens the PR, and the
    "Find the fix PR" step (from #439) outputs the PR number and the two
    commits. Upload `.fix-shots/plan.json` as an artifact.
-2. **`shots`** (self-hosted, `needs: fix`): download the plan, check out the
-   after then before commits, run `fix-shots.ts capture`, then do the existing
-   "Post before and after" work. Everything it runs is from our own commits
-   plus a plan that `readPlan` already validates.
+2. **`shots`** (self-hosted, `needs: fix`): what a `capture_only` run already
+   does (#442), on the mini: recover the plan, find the PR, capture, post.
+   The capture scripts come from the workflow's own commit and each side only
+   swaps in `src/ios` (#444), so nothing from the fix branch runs outside the
+   app build. The plan is already saved in the PR body, so it needs no
+   artifact.
 
 `marketing.yml` moves as a whole: it runs on `workflow_run` after a deploy of
 `main`, so it only ever runs code that's already merged.
@@ -75,7 +73,8 @@ workflow to `runs-on: self-hosted`. Before registering the runner:
   setup on a cloud mini is over VNC.
 - Xcode pinned to the version the hosted image uses, with the iOS platform
   installed, so builds match what `ios-test.yml` checks.
-- Screen Recording permission for the runner's process (for Mac captures).
+- Screen Recording permission for the runner's process, only if Mac
+  captures need it there. Hosted runners don't (run 40073497820).
 - The "Nylon Fix …" and "Nylon Marketing …" simulators left created and
   booted between runs. The scripts already use simulators of their own by
   name, so nothing else on the machine collides with them.
@@ -96,16 +95,14 @@ workflow to `runs-on: self-hosted`. Before registering the runner:
 - [ ] Rent or provision the mini; check its RAM (see open questions).
 - [ ] Fork PR approval setting, then register the runner with a `nylon-mac`
       label as a LaunchAgent in a logged-in session.
-- [ ] Install Xcode and the iOS platform; grant Screen Recording.
-- [ ] Split `feedback.yml` into `fix` (hosted) and `shots` (`nylon-mac`), with
-      the plan passed as an artifact.
+- [ ] Install Xcode and the iOS platform.
+- [ ] Split `feedback.yml` into `fix` (hosted) and `shots` (`nylon-mac`).
 - [ ] Make the fix-shots and marketing steps safe to rerun in a persistent
       workspace; move DerivedData off `/tmp`.
 - [ ] Move `marketing.yml`'s job to `nylon-mac`.
 - [ ] Re-run #418 and a marketing run, and compare times with the hosted
       runs above.
-- [ ] Try a Mac capture, which settles the Screen Recording question in the
-      fix-previews plan.
+- [ ] Check a Mac capture still works there (Screen Recording).
 
 ## Open questions
 
