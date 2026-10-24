@@ -30,8 +30,32 @@ final class UserPreferencesService {
     /// never runs against defaults and overwrites a manual choice.
     private var hasLoaded = false
 
-    init(apiService: any APIProviding) {
+    /// Where the zone and last sweep are kept between launches, or nil to keep
+    /// them in memory only. Without them Today's overnight line can't be drawn
+    /// until `GET /users/me` answers, so it fades in above the list and pushes
+    /// the rows down a beat after launch.
+    private let cache: UserDefaults?
+    static let cachedSweepKey = "preferences.lastSweep"
+    static let cachedTimezoneKey = "preferences.timezone"
+
+    init(apiService: any APIProviding, cache: UserDefaults? = nil) {
         self.apiService = apiService
+        self.cache = cache
+        if let cache {
+            timezone = cache.string(forKey: Self.cachedTimezoneKey) ?? timezone
+            lastSweep = cache.data(forKey: Self.cachedSweepKey)
+                .flatMap { try? JSONDecoder().decode(LastSweep.self, from: $0) }
+        }
+    }
+
+    private func persist() {
+        guard let cache else { return }
+        cache.set(timezone, forKey: Self.cachedTimezoneKey)
+        if let lastSweep, let data = try? JSONEncoder().encode(lastSweep) {
+            cache.set(data, forKey: Self.cachedSweepKey)
+        } else {
+            cache.removeObject(forKey: Self.cachedSweepKey)
+        }
     }
 
     /// The device's current zone. `autoupdatingCurrent` follows a change made
@@ -48,6 +72,7 @@ final class UserPreferencesService {
         lastSweep = nil
         isAdmin = false
         hasLoaded = false
+        persist()
     }
 
     func fetchPreferences() async {
@@ -60,6 +85,7 @@ final class UserPreferencesService {
             lastSweep = user.lastSweep
             isAdmin = user.isAdmin ?? false
             hasLoaded = true
+            persist()
         } catch {
             self.error = error
             print("Failed to fetch user preferences: \(error)")
@@ -78,6 +104,7 @@ final class UserPreferencesService {
         guard hasLoaded else { return }
         do {
             lastSweep = try await apiService.getMe().lastSweep
+            persist()
         } catch {
             print("Failed to refresh the overnight sweep: \(error)")
         }
@@ -164,5 +191,6 @@ final class UserPreferencesService {
         theme = user.theme ?? "system"
         timezone = user.timezone ?? "UTC"
         timezoneAuto = user.timezoneAuto ?? true
+        persist()
     }
 }

@@ -207,7 +207,7 @@ struct Nylon_ImpossibleApp: App {
                 if syncService == nil {
                     let apiService = APIService(authService: authService)
                     syncService = SyncService(authService: authService)
-                    preferencesService = UserPreferencesService(apiService: apiService)
+                    preferencesService = UserPreferencesService(apiService: apiService, cache: .standard)
                     feedbackService = FeedbackService(apiService: apiService)
                 }
             }
