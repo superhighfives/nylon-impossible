@@ -90,6 +90,12 @@ Getting the loop working at all came first:
       re-run #418, and widen the allowlist if a needed command was refused.
       The second try (run 40011135639) had no denials and opened #438, but
       the capture timed out (see #439 above). Next: re-run #418 with #439.
+      With #439 the third try (#440) finished in 7 minutes but captured
+      nothing: `ensureSimulator`'s 30s `simctl list` timed out (#441). A
+      capture-only rerun (#442, run 40057233704) then filled the before
+      cell, the first real shot. The after cell failed because
+      `ensureBooted` shut the simulator down whenever its state read timed
+      out, discarding three boots in a row. That's the next PR.
 - [ ] Mac capture on a GitHub macOS runner. `screencapture` of another
       app's window may need Screen Recording permission, which the runner
       may not grant. If it doesn't, Mac cells stay _not captured_ and we
