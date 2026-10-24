@@ -268,8 +268,13 @@ jobs:
           BEFORE: ${{ steps.target.outputs.before }}
           AFTER: ${{ steps.target.outputs.after }}
         run: |
-          # Claude's working tree is on the branch; -f drops anything it left
-          # uncommitted. .fix-shots and .feedback-assets are excluded.
+          # The capture scripts come from this workflow's commit, and each
+          # side swaps in only the app (src/ios). Checking out a whole side
+          # ran the branch's copy of fix-shots: older than main's fixes (run
+          # 40063401971), and with the post step after it holding a token
+          # that can write to the repo. -f drops anything Claude left
+          # uncommitted; .fix-shots and .feedback-assets are excluded.
+          git -c advice.detachedHead=false checkout -f --detach "$GITHUB_SHA"
           plan="$PWD/.fix-shots/plan.json"
           out="$PWD/.fix-shots/out"
           # As in marketing.yml: on a fresh runner the first simctl call
@@ -292,7 +297,8 @@ jobs:
           fi
           for side in after before; do
             sha=$BEFORE; [ "$side" = after ] && sha=$AFTER
-            git -c advice.detachedHead=false checkout -f --detach "$sha"
+            rm -rf src/ios
+            git checkout "$sha" -- src/ios
             (cd src/marketing && npx tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$out") || true
           done
 
