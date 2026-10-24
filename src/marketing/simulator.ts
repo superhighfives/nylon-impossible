@@ -14,10 +14,10 @@ export interface SimDevice {
   isAvailable?: boolean;
 }
 
-export function simctlJson<T>(args: string[]): T {
+export function simctlJson<T>(args: string[], timeout = 30_000): T {
   const raw = execFileSync("xcrun", ["simctl", "list", ...args, "-j"], {
     encoding: "utf8",
-    timeout: 30_000,
+    timeout,
   });
   return JSON.parse(raw) as T;
 }
@@ -43,17 +43,25 @@ export function simulatorState(udid: string): string {
   }
 }
 
+const SETUP_TIMEOUT = 180_000;
+
 /**
  * A simulator of ours by name, created on first use (from the first of
  * `types` this Xcode has, on the newest iOS runtime) and reused by later
  * runs. Captures never borrow a simulator someone already has booted: they
  * shut their device down at the end, and launch the app with
  * screenshot-only arguments.
+ *
+ * Its lookups get a longer timeout than `simulatorState`'s: nothing retries
+ * them, so one that times out costs every shot on the device. On a hosted
+ * runner, even after the workflow's warm-up, `simctl list` has taken over 30s
+ * (feedback run 40046607203).
  */
 export function ensureSimulator(name: string, types: string[]): string {
-  const { devices } = simctlJson<{ devices: Record<string, SimDevice[]> }>([
-    "devices",
-  ]);
+  const { devices } = simctlJson<{ devices: Record<string, SimDevice[]> }>(
+    ["devices"],
+    SETUP_TIMEOUT,
+  );
   const existing = Object.values(devices)
     .flat()
     .find((d) => d.name === name && d.isAvailable !== false);
@@ -66,7 +74,7 @@ export function ensureSimulator(name: string, types: string[]): string {
       version: string;
       isAvailable: boolean;
     }[];
-  }>(["runtimes"]);
+  }>(["runtimes"], SETUP_TIMEOUT);
   const runtime = runtimes
     .filter((r) => r.isAvailable && (r.platform ?? "iOS") === "iOS" && r.identifier.includes("iOS"))
     .sort((a, b) => a.version.localeCompare(b.version, undefined, { numeric: true }))
@@ -75,7 +83,7 @@ export function ensureSimulator(name: string, types: string[]): string {
 
   const { devicetypes } = simctlJson<{
     devicetypes: { name: string; identifier: string }[];
-  }>(["devicetypes"]);
+  }>(["devicetypes"], SETUP_TIMEOUT);
   const type = types
     .map((t) => devicetypes.find((d) => d.name === t))
     .find(Boolean);
