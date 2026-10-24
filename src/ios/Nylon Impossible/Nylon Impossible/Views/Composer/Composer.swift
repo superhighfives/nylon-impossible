@@ -196,10 +196,16 @@ struct Composer: View {
             FlowLayout(spacing: 6, lineSpacing: 0) { chipItems }
                 .padding(.top, Theme.Space.s1)
         } else {
-            ScrollView(.horizontal) {
-                HStack(spacing: 6) { chipItems }
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal) {
+                    HStack(spacing: 6) { chipItems }
+                }
+                .scrollIndicators(.hidden)
+                // The selected list can sit past the edge; bring it into view
+                // when the row appears and when the target changes.
+                .onAppear { scrollToTarget(proxy) }
+                .onChange(of: targetId) { scrollToTarget(proxy) }
             }
-            .scrollIndicators(.hidden)
             .padding(.top, Theme.Space.s1)
         }
     }
@@ -216,6 +222,14 @@ struct Composer: View {
                 chosenListId = list.id == currentListId ? nil : list.id
             }
             .accessibilityLabel("Add to \(list.name)")
+            .id(list.id)
+        }
+    }
+
+    private func scrollToTarget(_ proxy: ScrollViewProxy) {
+        guard let targetId else { return }
+        withAnimation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion)) {
+            proxy.scrollTo(targetId, anchor: .center)
         }
     }
 
