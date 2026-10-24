@@ -105,16 +105,31 @@ export function ensureSimulator(name: string, types: string[]): string {
  * to Shutdown, so lean on `simctl bootstatus -b` (which boots if needed and
  * blocks until the device reports booted), verify the state, and retry the
  * whole cycle a few times before giving up loudly.
+ *
+ * Only a state we actually read gets the device shut down and restarted. On a
+ * loaded runner the state lookup itself times out ("unknown"), and treating
+ * that as a failed boot threw away boots that were nearly done: feedback run
+ * 40057233704 lost three in a row that way. So an unknown state after a
+ * successful bootstatus counts as booted, and after a timed-out one the next
+ * attempt carries on with the same boot.
  */
 export async function ensureBooted(udid: string): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
-    spawnSync("xcrun", ["simctl", "bootstatus", udid, "-b"], {
+    const boot = spawnSync("xcrun", ["simctl", "bootstatus", udid, "-b"], {
       stdio: "pipe",
       timeout: 120_000,
     });
     const state = simulatorState(udid);
     console.log(`  Simulator state: ${state}`);
     if (state === "Booted") return;
+    if (state === "unknown") {
+      if (boot.status === 0) {
+        console.log("  bootstatus reported booted; going with that.");
+        return;
+      }
+      console.log(`  boot attempt ${attempt} is still going, waiting on it…`);
+      continue;
+    }
     console.log(`  boot attempt ${attempt} did not reach Booted, retrying…`);
     // Reset to a known state before the next attempt so bootstatus starts clean.
     spawnSync("xcrun", ["simctl", "shutdown", udid], {
