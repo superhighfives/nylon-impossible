@@ -110,8 +110,9 @@ export function ensureSimulator(name: string, types: string[]): string {
  * loaded runner the state lookup itself times out ("unknown"), and treating
  * that as a failed boot threw away boots that were nearly done: feedback run
  * 40057233704 lost three in a row that way. So an unknown state after a
- * successful bootstatus counts as booted, and after a timed-out one the next
- * attempt carries on with the same boot.
+ * successful bootstatus counts as booted, after a timed-out one the next
+ * attempt carries on with the same boot, and after a failed one it waits
+ * a moment and tries again.
  */
 export async function ensureBooted(udid: string): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -127,7 +128,16 @@ export async function ensureBooted(udid: string): Promise<void> {
         console.log("  bootstatus reported booted; going with that.");
         return;
       }
-      console.log(`  boot attempt ${attempt} is still going, waiting on it…`);
+      if (boot.error) {
+        console.log(`  boot attempt ${attempt} is still going, waiting on it…`);
+        continue;
+      }
+      // bootstatus failed fast rather than timing out; pause so the retries
+      // don't spin, but leave the device alone since its state is unknown.
+      console.log(
+        `  bootstatus exited ${boot.status} on attempt ${attempt}, retrying…`,
+      );
+      await sleep(5000);
       continue;
     }
     console.log(`  boot attempt ${attempt} did not reach Booted, retrying…`);
