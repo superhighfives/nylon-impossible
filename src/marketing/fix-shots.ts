@@ -18,7 +18,8 @@
  * The workflow runs `capture` on the fix branch (`--as after`) and on main
  * (`--as before`) — same derived data, so the second build is incremental —
  * then commits the PNGs to feedback-assets and puts `report`'s Markdown in
- * the PR body. Capture is best-effort per shot: a failure is recorded in
+ * the PR body, with the plan in a hidden comment so a capture-only rerun can
+ * reuse it. Capture is best-effort per shot: a failure is recorded in
  * <dir>/status-<as>.json and shown in the report, never thrown.
  *
  * Routes run on in-memory sample data with no account, so nothing personal
@@ -125,7 +126,15 @@ function readPlan(path: string): Plan {
       return ok;
     })
     .slice(0, MAX_SHOTS)
-    .map((shot) => ({ ...shot, note: typeof shot.note === "string" ? plainText(shot.note) : undefined }));
+    // Known fields only: the plan is saved into the public PR body, so nothing
+    // the model adds besides these may pass through.
+    .map((shot) => ({
+      device: shot.device,
+      screen: shot.screen,
+      dark: shot.dark === true,
+      landscape: shot.landscape === true,
+      note: typeof shot.note === "string" ? plainText(shot.note) : undefined,
+    }));
   return { shots };
 }
 
@@ -136,7 +145,8 @@ function readPlan(path: string): Plan {
 function plainText(text: string): string {
   return text
     .replace(/[|\n<>[\]]/g, " ")
-    .replace(/@/g, "@\u200b")
+    // Idempotent: a plan read back from the PR body has been through this.
+    .replace(/@(?!\u200b)/g, "@\u200b")
     .trim()
     .slice(0, 200);
 }
@@ -439,6 +449,10 @@ function report(): void {
       lines.push(`| ${label} | ${cell("before")} | ${cell("after")} |`);
     });
   }
+  // The validated plan, for a capture-only rerun (feedback.yml reads it back).
+  // Escaping < and > keeps it valid JSON that can't close the comment early.
+  const saved = JSON.stringify(plan).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+  lines.push("", `<!-- fix-shots:plan ${saved} -->`);
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 
