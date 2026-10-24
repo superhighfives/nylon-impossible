@@ -18,7 +18,8 @@
  * The workflow runs `capture` on the fix branch (`--as after`) and on main
  * (`--as before`) — same derived data, so the second build is incremental —
  * then commits the PNGs to feedback-assets and puts `report`'s Markdown in
- * the PR body. Capture is best-effort per shot: a failure is recorded in
+ * the PR body, with the plan in a hidden comment so a capture-only rerun can
+ * reuse it. Capture is best-effort per shot: a failure is recorded in
  * <dir>/status-<as>.json and shown in the report, never thrown.
  *
  * Routes run on in-memory sample data with no account, so nothing personal
@@ -136,7 +137,8 @@ function readPlan(path: string): Plan {
 function plainText(text: string): string {
   return text
     .replace(/[|\n<>[\]]/g, " ")
-    .replace(/@/g, "@\u200b")
+    // Idempotent: a plan read back from the PR body has been through this.
+    .replace(/@(?!\u200b)/g, "@\u200b")
     .trim()
     .slice(0, 200);
 }
@@ -439,6 +441,9 @@ function report(): void {
       lines.push(`| ${label} | ${cell("before")} | ${cell("after")} |`);
     });
   }
+  // The validated plan, for a capture-only rerun (feedback.yml reads it back).
+  // Notes have had `<` and `>` stripped, so it can't close the comment early.
+  lines.push("", `<!-- fix-shots:plan ${JSON.stringify(plan)} -->`);
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 

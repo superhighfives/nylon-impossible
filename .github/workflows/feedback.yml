@@ -23,6 +23,14 @@ on:
         description: "Feedback issue number to rerun (it must already have auto-fix)"
         required: true
         type: number
+      capture_only:
+        description: "Skip Claude and redo the before/after shots on the open fix PR"
+        type: boolean
+        default: false
+      plan:
+        description: "Capture only: the shot plan JSON, if the PR body doesn't have one saved"
+        type: string
+        default: ""
 
 concurrency:
   group: feedback-${{ github.event.issue.number || inputs.issue }}
@@ -102,6 +110,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
+        if: ${{ !inputs.capture_only }}
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -181,6 +190,33 @@ jobs:
           jq -r 'if type == "array" then .[] else . end | select(.type == "result") | .result // empty' "$LOG" || true
           echo "::$token::"
           echo "::endgroup::"
+
+      # A capture-only run has no Claude to write the plan, so take the one
+      # an earlier run saved in the PR body (`report` puts it there), or the
+      # dispatch input. fix-shots validates it either way.
+      - name: Recover the plan
+        if: inputs.capture_only && needs.route.outputs.runner != 'ubuntu-latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.route.outputs.number }}
+          PLAN: ${{ inputs.plan }}
+        run: |
+          mkdir -p .fix-shots
+          if [ -n "$PLAN" ]; then
+            printf '%s\n' "$PLAN" > .fix-shots/plan.json
+          else
+            gh pr list --head "feedback/$NUMBER" --state open --json body -q '.[0].body' \
+              | python3 -c "
+          import re, sys
+          m = re.search(r'<!-- fix-shots:plan (.*?) -->', sys.stdin.read(), re.S)
+          if m: open('.fix-shots/plan.json', 'w').write(m.group(1))
+          "
+          fi
+          if [ -f .fix-shots/plan.json ]; then
+            cat .fix-shots/plan.json
+          else
+            echo "::warning::No saved plan on the feedback/$NUMBER PR; pass one as the plan input."
+          fi
 
       # Before/after shots for the PR, from the plan Claude left in
       # .fix-shots/plan.json. Best-effort like the marketing captures: a
