@@ -73,7 +73,7 @@ jobs:
   fix:
     needs: route
     runs-on: ${{ needs.route.outputs.runner }}
-    # Claude's own checks plus two Debug builds for the before/after shots.
+    # Claude's own checks, plus up to 50 minutes of before/after shots.
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v7
@@ -187,8 +187,11 @@ jobs:
       # failed build or a flaky simulator leaves "not captured" cells (or no
       # section at all), never a red run — the fix is the point, not this.
       # Apple platforms only; a web fix runs on Linux and writes no plan.
-      - name: Capture before and after
-        id: shots
+      #
+      # Finding the PR is its own step so a capture that runs out of time
+      # still leaves the post step a PR to put "not captured" cells on.
+      - name: Find the fix PR
+        id: target
         if: needs.route.outputs.runner != 'ubuntu-latest'
         continue-on-error: true
         env:
@@ -206,8 +209,25 @@ jobs:
             exit 0
           fi
           git fetch origin main "$branch"
-          before=$(git rev-parse origin/main)
-          after=$(git rev-parse "origin/$branch")
+          {
+            echo "pr=$pr"
+            echo "before=$(git rev-parse origin/main)"
+            echo "after=$(git rev-parse "origin/$branch")"
+          } >> "$GITHUB_OUTPUT"
+
+      # A cold simulator boot alone has taken 15+ minutes on these runners.
+      # The limit is what keeps a slow capture from running into the job's
+      # timeout, which cancels the post step and discards this step's log.
+      # The fix branch goes first: if time runs out, "after" is the side
+      # worth having.
+      - name: Capture before and after
+        if: steps.target.outputs.pr != ''
+        continue-on-error: true
+        timeout-minutes: 50
+        env:
+          BEFORE: ${{ steps.target.outputs.before }}
+          AFTER: ${{ steps.target.outputs.after }}
+        run: |
           # Claude's working tree is on the branch; -f drops anything it left
           # uncommitted. .fix-shots and .feedback-assets are excluded.
           plan="$PWD/.fix-shots/plan.json"
@@ -230,29 +250,24 @@ jobs:
               xcodebuild -downloadPlatform iOS || echo "::warning::Couldn't download the iOS platform."
             fi
           fi
-          for side in before after; do
-            sha=$before; [ "$side" = after ] && sha=$after
+          for side in after before; do
+            sha=$BEFORE; [ "$side" = after ] && sha=$AFTER
             git -c advice.detachedHead=false checkout -f --detach "$sha"
             (cd src/marketing && npx tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$out") || true
           done
-          {
-            echo "pr=$pr"
-            echo "before=$before"
-            echo "after=$after"
-          } >> "$GITHUB_OUTPUT"
 
       # The images go on feedback-assets next to the reports' screenshots —
       # a new directory per fix commit, nothing rewritten — and the PR body
       # gets a Before | After table between markers, replaced on a rerun.
       - name: Post before and after
-        if: steps.shots.outputs.pr != ''
+        if: steps.target.outputs.pr != ''
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ needs.route.outputs.number }}
-          PR: ${{ steps.shots.outputs.pr }}
-          BEFORE: ${{ steps.shots.outputs.before }}
-          AFTER: ${{ steps.shots.outputs.after }}
+          PR: ${{ steps.target.outputs.pr }}
+          BEFORE: ${{ steps.target.outputs.before }}
+          AFTER: ${{ steps.target.outputs.after }}
         run: |
           dir="fixes/$NUMBER/${AFTER:0:12}"
           if ls .fix-shots/out/*.png >/dev/null 2>&1; then
