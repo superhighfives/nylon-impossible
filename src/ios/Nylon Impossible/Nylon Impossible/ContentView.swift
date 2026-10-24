@@ -215,6 +215,9 @@ struct ContentView: View {
                 userId: authService.userId
             )
             .presentationDetents([.medium, .large], selection: $detailDetent)
+            // Dragging the content resizes the sheet first, rather than
+            // scrolling the detail underneath it.
+            .presentationContentInteraction(.resizes)
             .presentationDragIndicator(.visible)
             .presentationBackground(Theme.Colors.canvas)
         }
