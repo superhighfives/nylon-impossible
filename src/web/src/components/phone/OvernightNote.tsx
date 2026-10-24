@@ -66,7 +66,9 @@ export function OvernightNote({
       className={`flex animate-n-fade-in items-center gap-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted ${className}`}
     >
       <Moon size={13} aria-hidden="true" className="shrink-0" />
-      <p className="m-0 min-w-0 flex-1">{text}</p>
+      <p className="m-0 min-w-0 flex-1 truncate" title={text}>
+        {text}
+      </p>
       <button
         type="button"
         aria-label="Dismiss overnight note"
