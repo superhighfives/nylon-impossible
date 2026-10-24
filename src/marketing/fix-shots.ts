@@ -126,7 +126,15 @@ function readPlan(path: string): Plan {
       return ok;
     })
     .slice(0, MAX_SHOTS)
-    .map((shot) => ({ ...shot, note: typeof shot.note === "string" ? plainText(shot.note) : undefined }));
+    // Known fields only: the plan is saved into the public PR body, so nothing
+    // the model adds besides these may pass through.
+    .map((shot) => ({
+      device: shot.device,
+      screen: shot.screen,
+      dark: shot.dark === true,
+      landscape: shot.landscape === true,
+      note: typeof shot.note === "string" ? plainText(shot.note) : undefined,
+    }));
   return { shots };
 }
 
@@ -442,8 +450,9 @@ function report(): void {
     });
   }
   // The validated plan, for a capture-only rerun (feedback.yml reads it back).
-  // Notes have had `<` and `>` stripped, so it can't close the comment early.
-  lines.push("", `<!-- fix-shots:plan ${JSON.stringify(plan)} -->`);
+  // Escaping < and > keeps it valid JSON that can't close the comment early.
+  const saved = JSON.stringify(plan).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
+  lines.push("", `<!-- fix-shots:plan ${saved} -->`);
   process.stdout.write(`${lines.join("\n")}\n`);
 }
 

@@ -191,6 +191,10 @@ jobs:
           echo "::$token::"
           echo "::endgroup::"
 
+      - name: Nothing to capture
+        if: inputs.capture_only && needs.route.outputs.runner == 'ubuntu-latest'
+        run: echo "::warning::#${{ needs.route.outputs.number }} isn't an Apple-platform issue, so there are no shots to capture."
+
       # A capture-only run has no Claude to write the plan, so take the one
       # an earlier run saved in the PR body (`report` puts it there), or the
       # dispatch input. fix-shots validates it either way.
