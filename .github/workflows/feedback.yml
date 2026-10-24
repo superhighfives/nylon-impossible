@@ -81,8 +81,8 @@ jobs:
   fix:
     needs: route
     runs-on: ${{ needs.route.outputs.runner }}
-    # Claude's own checks, plus up to 50 minutes of before/after shots.
-    timeout-minutes: 75
+    # Claude's own checks, plus up to 70 minutes of before/after shots.
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v7
         with:
@@ -255,7 +255,8 @@ jobs:
             echo "after=$(git rev-parse "origin/$branch")"
           } >> "$GITHUB_OUTPUT"
 
-      # A cold simulator boot alone has taken 15+ minutes on these runners.
+      # On these runners a cold build has taken 20–30 minutes and a cold boot
+      # 15+, and the first side pays for both.
       # The limit is what keeps a slow capture from running into the job's
       # timeout, which cancels the post step and discards this step's log.
       # The fix branch goes first: if time runs out, "after" is the side
@@ -263,7 +264,7 @@ jobs:
       - name: Capture before and after
         if: steps.target.outputs.pr != ''
         continue-on-error: true
-        timeout-minutes: 50
+        timeout-minutes: 70
         env:
           BEFORE: ${{ steps.target.outputs.before }}
           AFTER: ${{ steps.target.outputs.after }}

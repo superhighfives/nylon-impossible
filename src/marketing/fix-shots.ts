@@ -160,7 +160,6 @@ function shotName(shot: Shot, index: number): string {
 // Build
 // ---------------------------------------------------------------------------
 
-/** Async so a build can run while the simulator boots: neither needs the other. */
 function xcodebuild(destination: string, derivedData: string, extra: string[] = []): Promise<void> {
   const child = spawn(
     "xcodebuild",
@@ -204,16 +203,13 @@ async function captureSimulator(
   const { bundleId } = manifest.ios;
   const udid = ensureSimulator(SIMULATOR_NAME[device], manifest.ios.devices[device].types);
 
-  // A cold boot on a CI runner can take longer than the build, so overlap them.
-  console.log(`  Building for the ${DEVICE_LABEL[device]} simulator while it boots…`);
-  const build = xcodebuild(`platform=iOS Simulator,id=${udid}`, DERIVED_DATA.ios);
-  // Don't leave a rejection unhandled while the boot blocks; it's rethrown below.
-  build.catch(() => {});
-  try {
-    await ensureBooted(udid);
-  } finally {
-    await build;
-  }
+  // Build, then boot. Overlapping them looked free, but a cold build swamps
+  // CoreSimulator: in feedback run 40067524940 every state read timed out for
+  // the whole 30-minute build, so the boot was given up on although it had
+  // worked (the next side found the device already Booted).
+  console.log(`  Building for the ${DEVICE_LABEL[device]} simulator…`);
+  await xcodebuild(`platform=iOS Simulator,id=${udid}`, DERIVED_DATA.ios);
+  await ensureBooted(udid);
   const app = builtApp(DERIVED_DATA.ios, "Debug-iphonesimulator");
 
   spawnSync(
