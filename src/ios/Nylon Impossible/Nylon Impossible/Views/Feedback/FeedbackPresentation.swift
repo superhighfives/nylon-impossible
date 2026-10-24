@@ -167,7 +167,7 @@ private final class FeedbackHostingController: UIHostingController<FeedbackSheet
     }
 }
 
-/// "Send as feedback", for five seconds after a screenshot. A UIKit button
+/// "Send as feedback", for ten seconds after a screenshot. A UIKit button
 /// on the key window itself, so it sits over any sheet that's up.
 @MainActor
 enum FeedbackPill {
@@ -217,7 +217,7 @@ enum FeedbackPill {
         }
         UIAccessibility.post(notification: .announcement, argument: "Screenshot taken. Send as feedback?")
 
-        let visibleFor: Duration = AssistiveTechnology.isRunning ? .seconds(15) : .seconds(5)
+        let visibleFor: Duration = AssistiveTechnology.isRunning ? .seconds(20) : .seconds(10)
         dismissal = Task {
             try? await Task.sleep(for: visibleFor)
             guard !Task.isCancelled else { return }
