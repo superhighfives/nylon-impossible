@@ -21,7 +21,10 @@ final class PullToRefreshUITests: NylonUITestCase {
         let field = app.textViews["New todo"].exists ? app.textViews["New todo"] : app.textFields["New todo"]
         waitFor(field)
         field.tap()
-        waitFor(app.keyboards.firstMatch)
+        // The chip row shows once the field has focus. The keyboard is only
+        // for the picture, and a fresh simulator can take a while to bring
+        // it up the first time, so don't fail on it.
+        _ = app.keyboards.firstMatch.waitForExistence(timeout: 15)
 
         // The marker is for fix-shots, which trims its recording to start
         // here. Flushed, or a piped stdout holds it until the test ends.
