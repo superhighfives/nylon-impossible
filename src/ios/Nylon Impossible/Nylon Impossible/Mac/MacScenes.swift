@@ -2,9 +2,10 @@
 //  MacScenes.swift
 //  Nylon Impossible
 //
-//  The Mac app's scenes: the board window, Settings (⌘,) and the menu bar
-//  extra. All three read their services from `MacServices`, so the menu bar
-//  and Settings work with the window closed.
+//  The Mac app's scenes: the board window and Settings (⌘,). The menu bar
+//  icon isn't a scene (see `MenuBarController`). All of them read their
+//  services from `MacServices`, so the menu bar and Settings work with the
+//  window closed.
 //
 
 #if os(macOS)
@@ -22,8 +23,6 @@ struct MacScenes: Scene {
         window.identifier?.rawValue.hasPrefix(boardWindowId) == true
     }
 
-    @Bindable private var settings = MacServices.shared.settings
-
     var body: some Scene {
         WindowGroup("Nylon", id: Self.boardWindowId) {
             MacBoardWindow()
@@ -36,13 +35,6 @@ struct MacScenes: Scene {
         Settings {
             MacSettingsRoot()
         }
-
-        MenuBarExtra(isInserted: $settings.showsMenuBarIcon) {
-            MacMenuBarRoot()
-        } label: {
-            Label("Nylon", image: "MenuBarIcon")
-        }
-        .menuBarExtraStyle(.window)
     }
 }
 
@@ -102,19 +94,18 @@ struct MacSettingsRoot: View {
     }
 }
 
-/// The menu bar extra's window.
+/// The menu bar icon's panel (see `MenuBarController`).
 struct MacMenuBarRoot: View {
-    @Environment(\.openWindow) private var openWindow
+    var onDismiss: () -> Void
     private let services = MacServices.shared
 
     var body: some View {
-        QuickAddView(presentation: .menuBar)
+        QuickAddView(presentation: .menuBar, onDismiss: onDismiss)
             .environment(services.authService)
             .environment(services.syncService)
             .environment(Clerk.shared)
             .modelContainer(services.container)
             .preferredColorScheme(MacAppearance.colorScheme(for: services.preferencesService.theme))
-            .onAppear { services.openWindow = services.openWindow ?? openWindow }
     }
 }
 
