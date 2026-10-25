@@ -412,7 +412,7 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
   const window =
     markerAt === undefined
       ? ["-sseof", "-10"]
-      : ["-ss", Math.max(0, (markerAt - startedAt) / 1000 - 1.5).toFixed(2), "-t", "7"];
+      : ["-ss", Math.max(0, (markerAt - startedAt) / 1000 - 0.5).toFixed(2), "-t", "7"];
   if (markerAt === undefined) console.log("  No gesture marker in the test output; using the last 10s.");
   execFileSync(
     "ffmpeg",
