@@ -373,12 +373,13 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
   const recorder = spawn("xcrun", ["simctl", "io", udid, "recordVideo", "--codec=h264", "--force", raw], {
     stdio: ["ignore", "ignore", "pipe"],
   });
-  const startedAt = await new Promise<number>((resolve) => {
-    const fallback = setTimeout(() => resolve(Date.now()), 30_000);
+  // Wait for the recorder to start before the test does.
+  await new Promise<void>((resolve) => {
+    const fallback = setTimeout(resolve, 30_000);
     recorder.stderr.on("data", (chunk: Buffer) => {
       if (chunk.toString().includes("Recording started")) {
         clearTimeout(fallback);
-        resolve(Date.now());
+        resolve();
       }
     });
   });
@@ -398,6 +399,7 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
   // Before the fix the test is expected to fail; the recording is the point.
   console.log(`  The test ${code === 0 ? "passed" : `exited with ${code}`} (${as}).`);
 
+  const stoppedAt = Date.now();
   recorder.kill("SIGINT");
   await new Promise<void>((resolve) => {
     const fallback = setTimeout(resolve, 30_000);
@@ -408,21 +410,33 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
   });
   if (!existsSync(raw)) throw new Error("recordVideo wrote no file");
 
-  // From just before the marker, or the last 10 seconds if it never showed.
-  const window =
-    markerAt === undefined
-      ? ["-sseof", "-10"]
-      : ["-ss", Math.max(0, (markerAt - startedAt) / 1000 - 0.5).toFixed(2), "-t", "7"];
-  if (markerAt === undefined) console.log("  No gesture marker in the test output; using the last 10s.");
-  execFileSync(
-    "ffmpeg",
-    [
-      "-y", "-loglevel", "error", ...window, "-i", raw,
-      "-vf", "fps=12,scale=300:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
-      "-loop", "0", dest,
-    ],
-    { stdio: "inherit", timeout: 120_000 },
-  );
+  // From just before the marker, measured back from the end: recordVideo
+  // only writes frames when the screen changes, so its timeline needn't
+  // match the clock from "Recording started" (run 40152231313 asked for
+  // 316s into a shorter file). Without a marker, or if that cut fails, the
+  // last 10 seconds.
+  const toGif = (window: string[]) =>
+    execFileSync(
+      "ffmpeg",
+      [
+        "-y", "-loglevel", "error", ...window, "-i", raw,
+        "-vf", "fps=12,scale=300:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
+        "-loop", "0", dest,
+      ],
+      { stdio: "inherit", timeout: 120_000 },
+    );
+  const lastTen = ["-sseof", "-10"];
+  if (markerAt === undefined) {
+    console.log("  No gesture marker in the test output; using the last 10s.");
+    toGif(lastTen);
+  } else {
+    try {
+      toGif(["-sseof", (-((stoppedAt - markerAt) / 1000 + 0.5)).toFixed(2), "-t", "9"]);
+    } catch (err) {
+      console.log(`  Trimming to the marker failed (${describeError(err)}); using the last 10s.`);
+      toGif(lastTen);
+    }
+  }
   status[basename(dest)] = { ok: true };
   console.log(`  → ${dest}`);
 }
