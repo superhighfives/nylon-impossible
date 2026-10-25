@@ -26,10 +26,12 @@ final class PullToRefreshUITests: NylonUITestCase {
         // it up the first time, so don't fail on it.
         _ = app.keyboards.firstMatch.waitForExistence(timeout: 15)
 
-        // The marker is for fix-shots, which trims its recording to start
-        // here. Flushed, or a piped stdout holds it until the test ends.
+        // The marker is for fix-shots, which starts recording when it sees
+        // it; the pause gives the recorder time to start. Flushed, or a
+        // piped stdout holds it until the test ends.
         print("FIX-SHOTS-GESTURE")
         fflush(stdout)
+        sleep(3)
 
         // A slow pull down on the chip row (just above the field), held past
         // where a refresh would trigger.
