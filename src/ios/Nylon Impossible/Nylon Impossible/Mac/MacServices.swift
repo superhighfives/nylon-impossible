@@ -27,6 +27,7 @@ final class MacServices {
     @ObservationIgnored private(set) var hotKey: GlobalHotKey?
     @ObservationIgnored let dockBadge: DockBadgeController
     @ObservationIgnored private(set) lazy var quickAddPanel = QuickAddPanelController(services: self)
+    @ObservationIgnored private(set) lazy var menuBar = MenuBarController(services: self)
 
     @ObservationIgnored private var hasStarted = false
 
@@ -43,14 +44,15 @@ final class MacServices {
         dockBadge = DockBadgeController()
     }
 
-    /// Everything that runs whether or not a window is open: the hotkey, the
-    /// Dock badge and the store's save observer. Called once, at launch.
+    /// Everything that runs whether or not a window is open: the menu bar
+    /// icon, the hotkey, the Dock badge and the store's save observer. Called
+    /// once, at launch.
     func start() {
         guard !hasStarted else { return }
         hasStarted = true
         #if DEBUG
         // Screenshot runs use sample data in memory; leave the real store,
-        // the badge and the hotkey alone.
+        // the menu bar, the badge and the hotkey alone.
         guard ScreenRoute.launch == nil else { return }
         #endif
         syncService.setModelContext(container.mainContext)
@@ -61,6 +63,7 @@ final class MacServices {
             guard let self, self.authService.isSignedIn else { return }
             Task { await self.syncService.sync() }
         }
+        menuBar.start()
         applyHotKey()
         followRoutes()
     }

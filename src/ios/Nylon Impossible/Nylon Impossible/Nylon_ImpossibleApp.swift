@@ -177,7 +177,8 @@ struct Nylon_ImpossibleApp: App {
 
     var body: some Scene {
         #if os(macOS)
-        // The board window, Settings and the menu bar extra; see Mac/MacScenes.swift.
+        // The board window and Settings; see Mac/MacScenes.swift. The menu bar
+        // icon is `MenuBarController`, started with `MacServices`.
         MacScenes()
         #else
         WindowGroup {

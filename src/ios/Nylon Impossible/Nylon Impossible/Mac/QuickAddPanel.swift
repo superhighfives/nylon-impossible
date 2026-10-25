@@ -3,10 +3,10 @@
 //  Nylon Impossible
 //
 //  The floating quick-add the global hotkey opens over whatever app is in
-//  front. `MenuBarExtra` has no API to open itself, so the hotkey shows this
-//  panel instead: the same `QuickAddView`, in a non-activating panel that
-//  takes the keyboard without bringing Nylon's windows forward — the way
-//  Spotlight does. It closes on Escape or when it loses focus.
+//  front: `QuickAddView` in a non-activating panel that takes the keyboard
+//  without bringing Nylon's windows forward — the way Spotlight does. It
+//  closes on Escape or when it loses focus. The menu bar icon opens the same
+//  kind of panel under itself (`MenuBarController`).
 //
 
 #if os(macOS)
@@ -55,27 +55,7 @@ final class QuickAddPanelController: NSObject, NSWindowDelegate {
             .environment(services.syncService)
             .environment(Clerk.shared)
             .modelContainer(services.container)
-        let hosting = NSHostingView(rootView: root)
-        hosting.sizingOptions = [.preferredContentSize]
-
-        let panel = QuickAddPanel(
-            contentRect: NSRect(x: 0, y: 0, width: QuickAddView.width, height: 320),
-            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
-            backing: .buffered,
-            defer: true
-        )
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
-        panel.isMovableByWindowBackground = true
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.hidesOnDeactivate = false
-        panel.isReleasedWhenClosed = false
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
-        panel.standardWindowButton(.closeButton)?.isHidden = true
-        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
-        panel.standardWindowButton(.zoomButton)?.isHidden = true
-        panel.contentView = hosting
+        let panel = QuickAddPanel.make(content: NSHostingView(rootView: root))
         panel.delegate = self
         panel.setAccessibilityTitle("Quick add")
         return panel
@@ -97,6 +77,31 @@ final class QuickAddPanelController: NSObject, NSWindowDelegate {
 
 /// A panel that can take the keyboard without activating the app.
 final class QuickAddPanel: NSPanel {
+    /// A floating, borderless-looking panel sized to `content`, shared by the
+    /// hotkey and the menu bar icon.
+    static func make(content hosting: NSHostingView<some View>) -> QuickAddPanel {
+        hosting.sizingOptions = [.preferredContentSize]
+        let panel = QuickAddPanel(
+            contentRect: NSRect(x: 0, y: 0, width: QuickAddView.width, height: 320),
+            styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],
+            backing: .buffered,
+            defer: true
+        )
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isMovableByWindowBackground = true
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.contentView = hosting
+        return panel
+    }
+
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 
