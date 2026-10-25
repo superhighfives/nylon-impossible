@@ -324,7 +324,8 @@ async function captureSimulator(
 
 const UI_TEST_SCHEME = "Nylon Impossible UI Tests";
 const UI_TEST_TARGET = "Nylon ImpossibleUITests";
-// Printed by the test just before the gesture; the GIF starts there.
+// Printed by the test a few seconds before the gesture: recording starts
+// when it appears, so the test waits for the recorder before it moves.
 const GESTURE_MARKER = "FIX-SHOTS-GESTURE";
 
 /** Run a command, echoing its output, and resolve with its exit code. */
@@ -353,6 +354,49 @@ function runStreaming(
   });
 }
 
+interface Recording {
+  process: ReturnType<typeof spawn>;
+  /** Resolves true once recordVideo reports it has started, false after 3 minutes. */
+  started: Promise<boolean>;
+}
+
+function startRecording(udid: string, path: string): Recording {
+  const recorder = spawn("xcrun", ["simctl", "io", udid, "recordVideo", "--codec=h264", "--force", path], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  recorder.stderr?.on("data", (chunk: Buffer) => process.stdout.write(`  [recordVideo] ${chunk}`));
+  const started = new Promise<boolean>((resolve) => {
+    const fallback = setTimeout(() => resolve(false), 180_000);
+    recorder.stderr?.on("data", (chunk: Buffer) => {
+      if (chunk.toString().includes("Recording started")) {
+        clearTimeout(fallback);
+        resolve(true);
+      }
+    });
+    recorder.on("exit", () => {
+      clearTimeout(fallback);
+      resolve(false);
+    });
+  });
+  return { process: recorder, started };
+}
+
+/** SIGINT makes recordVideo finish the file; until it exits, ffmpeg can't open it. */
+async function stopRecording({ process: recorder }: Recording): Promise<string> {
+  if (recorder.exitCode !== null || recorder.signalCode !== null) {
+    return `had already exited with ${recorder.signalCode ?? recorder.exitCode}`;
+  }
+  const exited = new Promise<string>((resolve) => {
+    const fallback = setTimeout(() => resolve("was still running after 60s"), 60_000);
+    recorder.on("exit", (code, signal) => {
+      clearTimeout(fallback);
+      resolve(`exited with ${signal ?? code}`);
+    });
+  });
+  recorder.kill("SIGINT");
+  return exited;
+}
+
 async function captureVideo(video: Video, dest: string, as: string, status: Status): Promise<void> {
   const udid = ensureSimulator(SIMULATOR_NAME[video.device], manifest.ios.devices[video.device].types);
   const common = [
@@ -369,79 +413,46 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
   if (built !== 0) throw new Error(`build-for-testing exited with ${built}`);
   await ensureBooted(udid);
 
-  const raw = join(DERIVED_DATA.ios, `${basename(dest, ".gif")}.mp4`);
-  const recorder = spawn("xcrun", ["simctl", "io", udid, "recordVideo", "--codec=h264", "--force", raw], {
-    stdio: ["ignore", "ignore", "pipe"],
-  });
-  // Echo what the recorder says, and wait for it to start before the test
-  // does.
-  recorder.stderr.on("data", (chunk: Buffer) => process.stdout.write(`  [recordVideo] ${chunk}`));
-  await new Promise<void>((resolve) => {
-    const fallback = setTimeout(resolve, 30_000);
-    recorder.stderr.on("data", (chunk: Buffer) => {
-      if (chunk.toString().includes("Recording started")) {
-        clearTimeout(fallback);
-        resolve();
-      }
-    });
-  });
+  // Warm the recorder up with a throwaway recording. The first recordVideo
+  // on a fresh simulator took ~2 minutes to start; later ones start at once.
+  const warmup = startRecording(udid, join(DERIVED_DATA.ios, "warmup.mp4"));
+  console.log(`  Warming up the recorder: ${(await warmup.started) ? "started" : "didn't start in 3 minutes"}.`);
+  await stopRecording(warmup);
 
-  console.log(`  Recording ${video.test}…`);
-  let markerAt: number | undefined;
+  // Record only around the gesture: start when the test prints its marker
+  // (it then waits a few seconds before the pull), stop when it ends.
+  // Cutting a gesture out of a whole-test recording didn't work: the file's
+  // timeline doesn't follow the clock, so cuts landed before the gesture or
+  // after the app had quit (runs 40152231313 and 40172370419).
+  const raw = join(DERIVED_DATA.ios, `${basename(dest, ".gif")}.mp4`);
+  let recording: Recording | undefined;
+  console.log(`  Running ${video.test}…`);
   const code = await runStreaming(
     "xcodebuild",
     ["test-without-building", ...common, `-only-testing:${UI_TEST_TARGET}/${video.test}`],
     {
       onLine: (line) => {
-        if (markerAt === undefined && line.includes(GESTURE_MARKER)) markerAt = Date.now();
+        if (recording === undefined && line.includes(GESTURE_MARKER)) recording = startRecording(udid, raw);
       },
-      timeout: 10 * 60_000,
+      timeout: 15 * 60_000,
     },
   );
   // Before the fix the test is expected to fail; the recording is the point.
   console.log(`  The test ${code === 0 ? "passed" : `exited with ${code}`} (${as}).`);
+  if (!recording) throw new Error("the test never printed its gesture marker");
+  const exit = await stopRecording(recording);
+  if (!existsSync(raw)) throw new Error(`recordVideo wrote no file (${exit})`);
+  console.log(`  recordVideo ${exit}; ${Math.round(statSync(raw).size / 1024)} KB.`);
 
-  const stoppedAt = Date.now();
-  recorder.kill("SIGINT");
-  // SIGINT makes recordVideo finish the file; until it exits the file has
-  // no index and ffmpeg can't open it.
-  const recorderExit = await new Promise<string>((resolve) => {
-    const fallback = setTimeout(() => resolve("still running after 60s"), 60_000);
-    recorder.on("exit", (code, signal) => {
-      clearTimeout(fallback);
-      resolve(`exited with ${signal ?? code}`);
-    });
-  });
-  if (!existsSync(raw)) throw new Error(`recordVideo wrote no file (${recorderExit})`);
-  console.log(`  recordVideo ${recorderExit}; ${Math.round(statSync(raw).size / 1024)} KB.`);
-
-  // From just before the marker, measured back from the end: recordVideo
-  // only writes frames when the screen changes, so its timeline needn't
-  // match the clock from "Recording started" (run 40152231313 asked for
-  // 316s into a shorter file). Without a marker, or if that cut fails, the
-  // last 10 seconds.
-  const toGif = (window: string[]) =>
-    execFileSync(
-      "ffmpeg",
-      [
-        "-y", "-loglevel", "error", ...window, "-i", raw,
-        "-vf", "fps=12,scale=300:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
-        "-loop", "0", dest,
-      ],
-      { stdio: "inherit", timeout: 120_000 },
-    );
-  const lastTen = ["-sseof", "-10"];
-  if (markerAt === undefined) {
-    console.log("  No gesture marker in the test output; using the last 10s.");
-    toGif(lastTen);
-  } else {
-    try {
-      toGif(["-sseof", (-((stoppedAt - markerAt) / 1000 + 0.5)).toFixed(2), "-t", "9"]);
-    } catch (err) {
-      console.log(`  Trimming to the marker failed (${describeError(err)}); using the last 10s.`);
-      toGif(lastTen);
-    }
-  }
+  execFileSync(
+    "ffmpeg",
+    [
+      "-y", "-loglevel", "error", "-t", "9", "-i", raw,
+      "-vf", "fps=12,scale=300:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
+      "-loop", "0", dest,
+    ],
+    { stdio: "inherit", timeout: 120_000 },
+  );
   status[basename(dest)] = { ok: true };
   console.log(`  → ${dest}`);
 }
