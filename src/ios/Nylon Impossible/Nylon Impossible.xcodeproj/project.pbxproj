@@ -11,6 +11,7 @@
 		23ABA4082F593570004D3D1A /* Nylon Share.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 23ABA3FE2F593570004D3D1A /* Nylon Share.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		DD00000E2F5B00000000000E /* Nylon Widget.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = DD0000012F5B000000000001 /* Nylon Widget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		23E768A62F493BDB00D8344D /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = 23E768A52F493BDB00D8344D /* ClerkKit */; };
+		DD0000102F5B000000000010 /* ClerkKit in Frameworks */ = {isa = PBXBuildFile; productRef = DD0000112F5B000000000011 /* ClerkKit */; };
 		23E768A82F493BDB00D8344D /* ClerkKitUI in Frameworks */ = {isa = PBXBuildFile; platformFilters = (ios, ); productRef = 23E768A72F493BDB00D8344D /* ClerkKitUI */; };
 		AA0000012FA800000000SE01 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000022FA800000000SE02 /* Sentry */; };
 /* End PBXBuildFile section */
@@ -134,6 +135,7 @@
 				Services/BackgroundSyncService.swift,
 				Services/Config.swift,
 				Services/QuickActionService.swift,
+				Services/SharedClerk.swift,
 				Services/SharedModelContainer.swift,
 				Services/TaskCreationService.swift,
 				Services/TodayDigest.swift,
@@ -220,6 +222,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DD0000102F5B000000000010 /* ClerkKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -329,6 +332,7 @@
 			);
 			name = "Nylon Widget";
 			packageProductDependencies = (
+				DD0000112F5B000000000011 /* ClerkKit */,
 			);
 			productName = "Nylon Widget";
 			productReference = DD0000012F5B000000000001 /* Nylon Widget.appex */;
@@ -1094,6 +1098,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		DD0000112F5B000000000011 /* ClerkKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */;
+			productName = ClerkKit;
+		};
 		23E768A52F493BDB00D8344D /* ClerkKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 23E768A42F493BDB00D8344D /* XCRemoteSwiftPackageReference "clerk-ios" */;
