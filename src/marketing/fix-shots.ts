@@ -27,7 +27,7 @@
  */
 
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -373,7 +373,9 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
   const recorder = spawn("xcrun", ["simctl", "io", udid, "recordVideo", "--codec=h264", "--force", raw], {
     stdio: ["ignore", "ignore", "pipe"],
   });
-  // Wait for the recorder to start before the test does.
+  // Echo what the recorder says, and wait for it to start before the test
+  // does.
+  recorder.stderr.on("data", (chunk: Buffer) => process.stdout.write(`  [recordVideo] ${chunk}`));
   await new Promise<void>((resolve) => {
     const fallback = setTimeout(resolve, 30_000);
     recorder.stderr.on("data", (chunk: Buffer) => {
@@ -401,14 +403,17 @@ async function captureVideo(video: Video, dest: string, as: string, status: Stat
 
   const stoppedAt = Date.now();
   recorder.kill("SIGINT");
-  await new Promise<void>((resolve) => {
-    const fallback = setTimeout(resolve, 30_000);
-    recorder.on("exit", () => {
+  // SIGINT makes recordVideo finish the file; until it exits the file has
+  // no index and ffmpeg can't open it.
+  const recorderExit = await new Promise<string>((resolve) => {
+    const fallback = setTimeout(() => resolve("still running after 60s"), 60_000);
+    recorder.on("exit", (code, signal) => {
       clearTimeout(fallback);
-      resolve();
+      resolve(`exited with ${signal ?? code}`);
     });
   });
-  if (!existsSync(raw)) throw new Error("recordVideo wrote no file");
+  if (!existsSync(raw)) throw new Error(`recordVideo wrote no file (${recorderExit})`);
+  console.log(`  recordVideo ${recorderExit}; ${Math.round(statSync(raw).size / 1024)} KB.`);
 
   // From just before the marker, measured back from the end: recordVideo
   // only writes frames when the screen changes, so its timeline needn't
