@@ -83,7 +83,7 @@ final class MacServices {
         }
     }
 
-    /// Captured from the first scene that appears, so the menu bar, the
+    /// Captured when the board window appears, so the menu bar panel, the
     /// hotkey panel and a `nylon://` link can bring the board back after its
     /// window was closed.
     @ObservationIgnored var openWindow: OpenWindowAction?
