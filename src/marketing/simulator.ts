@@ -52,8 +52,9 @@ const SETUP_TIMEOUT = 180_000;
  * shut their device down at the end, and launch the app with
  * screenshot-only arguments.
  *
- * Its lookups get a longer timeout than `simulatorState`'s: nothing retries
- * them, so one that times out costs every shot on the device. On a hosted
+ * Its lookups and the create get a longer timeout than `simulatorState`'s:
+ * nothing retries them, so one that times out costs every shot on the
+ * device. `simctl create` timed out at 60s in feedback run 40150015575. On a hosted
  * runner, even after the workflow's warm-up, `simctl list` has taken over 30s
  * (feedback run 40046607203).
  */
@@ -95,7 +96,7 @@ export function ensureSimulator(name: string, types: string[]): string {
   return execFileSync(
     "xcrun",
     ["simctl", "create", name, type.identifier, runtime.identifier],
-    { encoding: "utf8", timeout: 60_000 },
+    { encoding: "utf8", timeout: SETUP_TIMEOUT },
   ).trim();
 }
 
