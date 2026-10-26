@@ -8,7 +8,8 @@
 import Foundation
 import SwiftData
 
-/// Lightweight, dependency-free sync service usable from App Intent extensions and BGTask contexts.
+/// Lightweight sync service usable from App Intent extensions and BGTask contexts. It gets its
+/// token from `SharedClerk`, which mints one in whichever process it runs in.
 /// Performs one-way upload of unsynced items — does not apply remote changes to avoid write
 /// conflicts with the main app process. Full bidirectional sync happens the next time the main
 /// app is foregrounded and SyncService.sync() runs.
@@ -23,22 +24,49 @@ struct BackgroundSyncService {
     static let backgroundSyncTaskIdentifier = "com.nylonimpossible.backgroundsync"
 
     private let apiBaseURL: URL
-    private let authToken: String
     private let userId: String
 
-    /// Returns nil if credentials are missing or expired.
-    /// Reads the JWT from the Keychain and the userId from shared UserDefaults.
+    /// Returns nil when no one is signed in. Reads the userId from shared
+    /// UserDefaults; the token is fetched when there's something to upload.
     init?(sharedDefaults: UserDefaults) {
-        guard
-            let token = KeychainHelper.loadString(forKey: BackgroundSyncService.authTokenKey),
-            let userId = sharedDefaults.string(forKey: BackgroundSyncService.userIdKey),
-            let expiry = KeychainHelper.loadDate(forKey: BackgroundSyncService.authTokenExpiryKey),
-            expiry > Date()
-        else { return nil }
+        guard let userId = sharedDefaults.string(forKey: BackgroundSyncService.userIdKey) else { return nil }
 
         self.apiBaseURL = Config.apiBaseURL
-        self.authToken = token
         self.userId = userId
+    }
+
+    /// A token for this upload: one minted now, or failing that the one the
+    /// app last saved, if it hasn't expired. The saved one is only a fallback
+    /// (the Mac widget, or Clerk failing to load), since a Clerk session
+    /// token lasts 60 seconds.
+    @MainActor
+    static func currentToken(now: Date = Date()) async -> String? {
+        if let fresh = await SharedClerk.freshToken() {
+            return fresh
+        }
+        guard
+            let token = KeychainHelper.loadString(forKey: authTokenKey),
+            let expiry = KeychainHelper.loadDate(forKey: authTokenExpiryKey),
+            expiry > now
+        else { return nil }
+        return token
+    }
+
+    /// When a JWT stops being accepted: its `exp` claim, less a margin for
+    /// the request to arrive and for clock drift. Nil when it can't be read.
+    static func expiry(ofJWT token: String, margin: TimeInterval = 10) -> Date? {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var payload = parts[1]
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard
+            let data = Data(base64Encoded: payload),
+            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let exp = object["exp"] as? TimeInterval
+        else { return nil }
+        return Date(timeIntervalSince1970: exp - margin)
     }
 
     /// Upload all unsynced items for the current user to the server.
@@ -84,8 +112,12 @@ struct BackgroundSyncService {
 
         guard !changes.isEmpty else { return }
 
-        // 2. POST to /todos/sync — runs off the main actor
         let url = apiBaseURL.appendingPathComponent("todos/sync")
+        guard let authToken = await Self.currentToken() else {
+            throw APIError.unauthorized(url: url.absoluteString)
+        }
+
+        // 2. POST to /todos/sync — runs off the main actor
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
@@ -98,9 +130,14 @@ struct BackgroundSyncService {
 
         let (_, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            throw APIError.invalidResponse(url: request.url?.absoluteString ?? "unknown")
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.invalidResponse(url: url.absoluteString)
+        }
+        if httpResponse.statusCode == 401 {
+            throw APIError.unauthorized(url: url.absoluteString)
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse(url: url.absoluteString)
         }
 
         // 3. Mark items as synced on the main actor

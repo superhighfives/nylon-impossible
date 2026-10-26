@@ -102,15 +102,19 @@ final class AuthService: AuthProviding {
         sharedDefaults?.set(userId, forKey: BackgroundSyncService.userIdKey)
     }
 
-    /// Persist a fresh Clerk JWT (with ~50-minute expiry) to the Keychain so
-    /// BackgroundSyncService can authenticate from an App Intent extension or BGTask.
+    /// Persist a fresh Clerk JWT and its real expiry to the Keychain, as the
+    /// fallback `BackgroundSyncService` uses when it can't mint a token of its
+    /// own. Clerk session tokens last 60 seconds, so this rarely outlives the
+    /// moment the app was last open; the expiry comes from the token's `exp`
+    /// so a stale one is never sent.
     /// Only writes when a token is successfully fetched to avoid an incoherent state
     /// (e.g. a nil token paired with a future expiry date).
     func persistAuthTokenToKeychain() async {
         do {
             let token = try await getToken()
+            guard let expiry = BackgroundSyncService.expiry(ofJWT: token) else { throw AuthError.tokenFailed }
             try KeychainHelper.saveString(token, forKey: BackgroundSyncService.authTokenKey)
-            try KeychainHelper.saveDate(Date().addingTimeInterval(50 * 60), forKey: BackgroundSyncService.authTokenExpiryKey)
+            try KeychainHelper.saveDate(expiry, forKey: BackgroundSyncService.authTokenExpiryKey)
         } catch {
             // Leave any existing token/expiry intact — a stale-but-valid token is
             // better than writing a nil token with a fresh expiry.

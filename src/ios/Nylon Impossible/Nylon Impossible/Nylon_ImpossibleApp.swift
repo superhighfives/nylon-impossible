@@ -34,7 +34,7 @@ struct Nylon_ImpossibleApp: App {
     @State private var feedbackService: FeedbackService?
     
     init() {
-        Clerk.configure(publishableKey: Config.clerkPublishableKey, options: Self.clerkOptions)
+        SharedClerk.configure(options: Self.clerkOptions)
         Self.initSentry()
         #if os(iOS)
         registerBackgroundTasks()
@@ -61,9 +61,16 @@ struct Nylon_ImpossibleApp: App {
     /// of their own for each launch: there's nothing there to read, so nothing
     /// to prompt for. They can't stay signed in across launches, and don't
     /// need to.
+    ///
+    /// On iOS the session goes in the keychain access group the widget
+    /// shares, so the widget's checkbox can mint its own token (see
+    /// `SharedClerk`). The Mac's intents run in the app, so it has no
+    /// need to, and moving its items would mean a move between keychains.
     static var clerkOptions: Clerk.Options {
         #if os(macOS) && DEBUG
         return Clerk.Options(keychainConfig: .init(service: clerkLaunchKeychainService))
+        #elseif os(iOS)
+        return Clerk.Options(keychainConfig: SharedClerk.keychainConfig)
         #else
         return Clerk.Options()
         #endif
@@ -332,8 +339,8 @@ struct RootView: View {
             switch newPhase {
             case .active:
                 syncService.connectWebSocket()
-                // Refresh the stored auth token so BackgroundSyncService has a valid
-                // credential for the next ~50 minutes
+                // Refresh the stored auth token: BackgroundSyncService's fallback
+                // when it can't mint one (see SharedClerk)
                 Task { await authService.persistAuthTokenToKeychain() }
                 // Recompute the badge on foreground so it crosses the day
                 // boundary even without a sync round-trip.
