@@ -32,8 +32,17 @@ on:
         type: string
         default: ""
 
+# An issue filed with labels fires one `labeled` event per label, all at once.
+# A group holds only one pending run, so if the runs for `feedback` and
+# `platform:*` share the `auto-fix` run's group, whichever queues last
+# replaces the pending `auto-fix` run and it's cancelled before it starts
+# (#473). Those other runs skip every job anyway, so give them a throwaway
+# group of their own.
 concurrency:
-  group: feedback-${{ github.event.issue.number || inputs.issue }}
+  group: >-
+    feedback-${{ github.event.issue.number || inputs.issue }}${{
+      (github.event_name == 'workflow_dispatch' || github.event.label.name == 'auto-fix')
+      && '' || format('-ignored-{0}', github.run_id) }}
   cancel-in-progress: false
 
 permissions:
