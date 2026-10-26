@@ -240,4 +240,36 @@ struct OvernightPreferencesTests {
         preferences.resetLocalState()
         #expect(preferences.lastSweep == nil)
     }
+
+    @Test("A cached sweep and zone are there at launch, before the fetch")
+    func cachedAtLaunch() async throws {
+        let suite = "OvernightPreferencesTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let api = MockAPIService()
+        api.getMeResponse = APIUser(
+            id: "u", email: "a@b.c", theme: "system", timezone: "America/Los_Angeles", timezoneAuto: false,
+            lastSweep: sweep, createdAt: Date(), updatedAt: Date()
+        )
+        await UserPreferencesService(apiService: api, cache: defaults).fetchPreferences()
+
+        let relaunched = UserPreferencesService(apiService: api, cache: defaults)
+        #expect(relaunched.lastSweep?.atString == sweep.atString)
+        #expect(relaunched.lastSweep?.movedToThisWeek == 2)
+        #expect(relaunched.timezone == "America/Los_Angeles")
+
+        relaunched.resetLocalState()
+        #expect(UserPreferencesService(apiService: api, cache: defaults).lastSweep == nil)
+    }
+
+    @Test("A cached sweep that no longer decodes is ignored")
+    func undecodableCache() throws {
+        let suite = "OvernightPreferencesTests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        defaults.set(Data("not a sweep".utf8), forKey: UserPreferencesService.cachedSweepKey)
+        #expect(UserPreferencesService(apiService: MockAPIService(), cache: defaults).lastSweep == nil)
+    }
 }

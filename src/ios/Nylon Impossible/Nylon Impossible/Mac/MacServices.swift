@@ -38,7 +38,7 @@ final class MacServices {
         authService = auth
         syncService = SyncService(authService: auth)
         let apiService = APIService(authService: auth)
-        preferencesService = UserPreferencesService(apiService: apiService)
+        preferencesService = UserPreferencesService(apiService: apiService, cache: .standard)
         feedbackService = FeedbackService(apiService: apiService)
         settings = MacSettings()
         dockBadge = DockBadgeController()
