@@ -61,6 +61,9 @@ extension ContentView {
         // window title, and a toolbar.
         NavigationSplitView(columnVisibility: $sidebarVisibility) {
             sidebar
+                // The sidebar shares the board's canvas, so the split view's
+                // own divider doesn't show; draw the iPad's hairline instead.
+                .overlay(alignment: .trailing) { VerticalHairline() }
                 .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Wide.sidebarWidth, max: 320)
         } detail: {
             boardWithPanel

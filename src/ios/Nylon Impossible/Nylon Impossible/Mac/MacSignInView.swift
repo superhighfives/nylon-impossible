@@ -21,14 +21,19 @@ import SwiftUI
 
 struct MacSignInView: View {
     /// The providers enabled on the Clerk instance, in the order web shows them.
-    static let providers: [(provider: OAuthProvider, label: String)] = [
-        (.google, "Continue with Google"),
-        (.github, "Continue with GitHub")
+    static let providers: [(provider: OAuthProvider, key: String, label: String, logo: String)] = [
+        (.google, "google", "Continue with Google", "ProviderLogoGoogle"),
+        (.github, "github", "Continue with GitHub", "ProviderLogoGitHub")
     ]
+
+    /// The provider this Mac last signed in with, so its button can say so
+    /// after a sign-out. Per-Mac, like `MacSettings`.
+    static let lastProviderKey = "mac.lastSignInProvider"
 
     let onDone: () -> Void
 
     @Environment(Clerk.self) private var clerk
+    @AppStorage(MacSignInView.lastProviderKey) private var lastProvider: String?
     @State private var working: OAuthProvider?
     @State private var message: String?
     /// The sign-in in flight. Cancelling it closes Clerk's browser session, so
@@ -45,22 +50,32 @@ struct MacSignInView: View {
                 .foregroundStyle(Theme.Colors.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(spacing: Theme.Space.s2) {
+            VStack(spacing: Theme.Space.s3) {
                 ForEach(Self.providers, id: \.provider) { entry in
                     Button {
-                        signIn(with: entry.provider)
+                        signIn(with: entry.provider, key: entry.key)
                     } label: {
-                        HStack {
+                        HStack(spacing: Theme.Space.s2) {
+                            // Google's mark keeps its colors; GitHub's is a
+                            // template, so it follows the label in either mode.
+                            Image(entry.logo)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 20, height: 20)
+                                .accessibilityHidden(true)
                             Text(entry.label)
                             Spacer()
                             if working == entry.provider {
                                 ProgressView().controlSize(.small)
+                            } else if lastProvider == entry.key {
+                                lastUsedBadge
                             }
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .controlSize(.large)
+                    .controlSize(.extraLarge)
                     .disabled(working != nil)
+                    .accessibilityHint(lastProvider == entry.key ? "You used this last time." : "")
                 }
             }
 
@@ -92,7 +107,17 @@ struct MacSignInView: View {
         .onDisappear { signInTask?.cancel() }
     }
 
-    private func signIn(with provider: OAuthProvider) {
+    private var lastUsedBadge: some View {
+        Text("Last used")
+            .textStyle(Theme.Fonts.Role.meta)
+            .foregroundStyle(Theme.Colors.inkMuted)
+            .padding(.horizontal, Theme.Space.s2)
+            .padding(.vertical, 2)
+            .background(Capsule().strokeBorder(Theme.Colors.hairline))
+            .accessibilityHidden(true)
+    }
+
+    private func signIn(with provider: OAuthProvider, key: String) {
         guard working == nil else { return }
         working = provider
         message = nil
@@ -104,6 +129,7 @@ struct MacSignInView: View {
             do {
                 let result = try await clerk.auth.signInWithOAuth(provider: provider)
                 if Self.isComplete(result) {
+                    lastProvider = key
                     onDone()
                 } else {
                     message = "This account needs another step. Sign in on nylonimpossible.com first, then try again here."
