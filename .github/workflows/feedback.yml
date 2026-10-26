@@ -41,8 +41,8 @@ on:
 concurrency:
   group: >-
     feedback-${{ github.event.issue.number || inputs.issue }}${{
-      (github.event_name == 'workflow_dispatch' || github.event.label.name == 'auto-fix')
-      && '' || format('-ignored-{0}', github.run_id) }}
+      (github.event_name != 'workflow_dispatch' && github.event.label.name != 'auto-fix')
+      && format('-ignored-{0}', github.run_id) || '' }}
   cancel-in-progress: false
 
 permissions:
