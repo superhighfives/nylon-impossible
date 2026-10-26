@@ -317,6 +317,10 @@ struct RootView: View {
         .onChange(of: clerk.client != nil && !isSignedIn, initial: true) { _, isSignedOut in
             guard isSignedOut else { return }
             authService.clearSharedSessionState()
+            // The cached sweep and zone outlive the process, and on the Mac
+            // sign-out can happen from Settings with no board window (so no
+            // `isSignedIn` change above) — drop them here too.
+            preferencesService?.resetLocalState()
             // Take the signed-out user's todos off the Home Screen now, rather
             // than leaving them there until the next reload.
             WidgetRefresh.reload()
