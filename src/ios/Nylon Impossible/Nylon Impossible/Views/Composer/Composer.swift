@@ -103,6 +103,10 @@ struct Composer: View {
             .focused($isFocused)
             .submitLabel(.return)
             .onChange(of: text, handleReturn)
+            // On the Mac a vertical field's Return fires onSubmit instead of
+            // inserting a newline, so handleReturn never sees it. On iOS this
+            // doesn't fire and handleReturn still does the work.
+            .onSubmit(submit)
             .onKeyPress(.escape) {
                 isFocused = false
                 return .handled
