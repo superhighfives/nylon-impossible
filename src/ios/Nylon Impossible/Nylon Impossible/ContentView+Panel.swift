@@ -9,6 +9,11 @@
 
 import SwiftUI
 
+private struct PanelTodoState: Equatable {
+    let id: UUID?
+    let done: Bool
+}
+
 extension ContentView {
     // MARK: - Panel
 
@@ -39,6 +44,12 @@ extension ContentView {
                 )
                 .overlay(alignment: .leading) { VerticalHairline() }
                 .inspectorColumnWidth(min: 340, ideal: Theme.Wide.panelWidth, max: 520)
+            }
+            // Checking off the todo the panel is showing puts the panel away,
+            // as the row leaving the board would. Opening one that's already
+            // done (Show Done) changes the id too, so it stays.
+            .onChange(of: PanelTodoState(id: todo?.id, done: todo?.isEffectivelyCompleted ?? false)) { old, new in
+                if new.done, !old.done, old.id == new.id { closePanel() }
             }
     }
 
