@@ -165,6 +165,11 @@ extension ContentView {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
                 }
+                // On macOS the inspector closing doesn't re-resolve the
+                // columns' container-relative width, so they stay as narrow
+                // as they were beside the panel until the window is resized.
+                // A new identity per panel state makes them measure again.
+                .id(panelBinding.wrappedValue)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
