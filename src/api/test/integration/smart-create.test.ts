@@ -209,7 +209,7 @@ describe("Smart create endpoint", () => {
     });
 
     it("preserves text when URL is only part of input", async () => {
-      // When URL is less than 80% of text, treat as regular input
+      // Words around the URL mean it isn't a bare link, so keep the full text
       const res = await smartCreate(
         "Check out this link https://example.com for more info",
       );
