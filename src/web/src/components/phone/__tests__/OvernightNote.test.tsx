@@ -101,9 +101,10 @@ describe("OvernightNote", () => {
         onDismiss={onDismiss}
       />,
     );
-    expect(
-      screen.getByText("2 moved to This Week overnight"),
-    ).toBeInTheDocument();
+    const line = screen.getByText("2 moved to This Week overnight");
+    expect(line).toBeInTheDocument();
+    // Truncated to one line, with the full text on hover.
+    expect(line).toHaveAttribute("title", "2 moved to This Week overnight");
     await userEvent.click(
       screen.getByRole("button", { name: "Dismiss overnight note" }),
     );
