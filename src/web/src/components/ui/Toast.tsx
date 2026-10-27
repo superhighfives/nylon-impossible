@@ -3,7 +3,8 @@ import { AlertCircle, X } from "lucide-react";
 import { toastManager } from "@/lib/toast";
 
 /**
- * One dark pill, "Done · Undo" style, with the action as a yellow fill.
+ * One dark pill, "Done · Undo" style, with the action as an outlined
+ * button in the same colour as the text.
  * Only the newest shows; a new toast replaces the last. Token colours only.
  */
 function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
@@ -19,7 +20,7 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
         )}
         <Toast.Title className="truncate">{toast.title}</Toast.Title>
         {/* Renders only when the toast was added with `actionProps`. */}
-        <Toast.Action className="min-h-9 shrink-0 cursor-pointer rounded-[0.625rem] bg-n-brand px-3 font-bold text-n-brand-ink n-focus" />
+        <Toast.Action className="min-h-9 shrink-0 cursor-pointer rounded-[0.625rem] border border-current px-3 font-bold n-focus" />
         <Toast.Close
           aria-label="Dismiss"
           className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[0.625rem] text-n-ink-subtle n-focus"
