@@ -307,6 +307,10 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # A review round's actor is the review bot, and the action refuses
+          # non-human actors unless they're listed. `route` already pins that
+          # trigger to this bot, so only it gets through.
+          allowed_bots: control-room-review
           additional_permissions: |
             actions: read
           # claude_args is split like a shell command line, so the list must be
