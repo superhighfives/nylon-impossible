@@ -61,6 +61,8 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' &&
         github.event.sender.login == github.repository_owner) ||
+      (github.event_name == 'workflow_dispatch' && inputs.capture_only &&
+        github.event.sender.login == 'github-actions[bot]') ||
       (github.event_name == 'issues' &&
         github.event.sender.login == github.repository_owner &&
         github.event.label.name == 'auto-fix') ||
@@ -292,6 +294,13 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Note the branch head
+        id: head
+        if: needs.route.outputs.mode == 'review' && !inputs.capture_only
+        env:
+          NUMBER: ${{ needs.route.outputs.number }}
+        run: echo "sha=$(git rev-parse "origin/feedback/$NUMBER")" >> "$GITHUB_OUTPUT"
+
       - name: Run Claude Code
         id: claude
         if: ${{ !inputs.capture_only && steps.recheck.outputs.stale != 'true' }}
@@ -380,6 +389,20 @@ jobs:
           echo "::$token::"
           echo "::endgroup::"
 
+      # A review round that changed the app makes the PR's shots stale, so
+      # it retakes them from the saved plan, the same way capture_only does.
+      - name: Did the round change the app
+        id: moved
+        if: steps.head.outputs.sha != '' && needs.route.outputs.runner != 'ubuntu-latest'
+        env:
+          NUMBER: ${{ needs.route.outputs.number }}
+          BEFORE: ${{ steps.head.outputs.sha }}
+        run: |
+          git fetch -q origin "feedback/$NUMBER"
+          if git diff --name-only "$BEFORE" "origin/feedback/$NUMBER" -- src/ios | grep -q .; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Nothing to capture
         if: inputs.capture_only && needs.route.outputs.runner == 'ubuntu-latest'
         run: echo "::warning::#${{ needs.route.outputs.number }} isn't an Apple-platform issue, so there are no shots to capture."
@@ -388,7 +411,7 @@ jobs:
       # an earlier run saved in the PR body (`report` puts it there), or the
       # dispatch input. fix-shots validates it either way.
       - name: Recover the plan
-        if: inputs.capture_only && needs.route.outputs.runner != 'ubuntu-latest'
+        if: (inputs.capture_only || steps.moved.outputs.app == 'true') && needs.route.outputs.runner != 'ubuntu-latest'
         env:
           GH_TOKEN: ${{ github.token }}
           NUMBER: ${{ needs.route.outputs.number }}

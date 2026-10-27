@@ -225,3 +225,5 @@ or why a still can't), and `src/marketing/fix-shots.ts` captures them on
 `<!-- fix-shots:start/end -->` markers in the PR body. It's best-effort, like the
 marketing captures — never make it fail the run. The simulator helpers it
 shares with `generate.ts` live in `src/marketing/simulator.ts`.
+Follow-up commits (via `@claude` or a review round) that touch `src/ios`
+retake the shots from the plan saved in the PR body.

@@ -39,12 +39,25 @@ jobs:
       pull-requests: write
       issues: write
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      # read: Claude reads CI results on PRs. write: retaking fix shots.
+      actions: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+
+      # A feedback fix PR's Before | After table shows the commit it was
+      # captured on, so note where the branch is before Claude moves it.
+      - name: Note the fix PR's head
+        id: head
+        if: github.event.issue.pull_request || github.event.pull_request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.issue.number || github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json headRefName,headRefOid \
+            -q '"branch=\(.headRefName)\nsha=\(.headRefOid)"' >> "$GITHUB_OUTPUT"
 
       - name: Run Claude Code
         id: claude
@@ -64,3 +77,24 @@ jobs:
           # or https://code.claude.com/docs/en/cli-reference for available options
           # claude_args: '--allowed-tools Bash(gh pr *)'
 
+      # If Claude changed the Apple app on a feedback fix PR, the shots are
+      # out of date: have feedback.yml retake them from the plan saved in the
+      # PR body. This job runs on Linux and can't capture them itself.
+      - name: Retake the fix shots
+        if: always() && startsWith(steps.head.outputs.branch, 'feedback/')
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.issue.number || github.event.pull_request.number }}
+          BRANCH: ${{ steps.head.outputs.branch }}
+          BEFORE: ${{ steps.head.outputs.sha }}
+        run: |
+          after=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)
+          [ "$after" != "$BEFORE" ] || { echo "No new commits on $BRANCH."; exit 0; }
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$after" -q '.files[].filename')
+          printf '%s\n' "$changed" | grep -q '^src/ios/' || { echo "No app changes, so the shots still hold."; exit 0; }
+          gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json body -q .body | grep -q '<!-- fix-shots:plan' \
+            || { echo "#$PR has no saved shot plan."; exit 0; }
+          gh workflow run feedback.yml -R "$GITHUB_REPOSITORY" --ref main \
+            -f issue="${BRANCH#feedback/}" -f capture_only=true
+          echo "Retaking the shots for #$PR."
