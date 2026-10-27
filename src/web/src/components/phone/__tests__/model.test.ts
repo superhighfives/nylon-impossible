@@ -66,10 +66,24 @@ describe("rowMeta", () => {
       overdue: true,
     });
     expect(parts).toContainEqual({ kind: "subtasks", text: "1/2" });
-    expect(parts).toContainEqual({ kind: "link", text: "visitlisboa.com" });
+    expect(parts).toContainEqual({
+      kind: "link",
+      text: "visitlisboa.com",
+      fetching: false,
+    });
     expect(metaSummary(parts)).toBe(
       "Pinned, 4 days overdue, Repeats weekly, 1/2 subtasks, Has notes, Link to visitlisboa.com",
     );
+  });
+
+  it("flags the link as fetching while its metadata is pending", () => {
+    const url = makeUrl({ fetchStatus: "pending", title: null });
+    const parts = rowMeta(makeTodo({ urls: [url] }), [], NOW, TZ);
+    expect(parts).toContainEqual({
+      kind: "link",
+      text: "visitlisboa.com",
+      fetching: true,
+    });
   });
 
   it("ignores whitespace-only notes", () => {

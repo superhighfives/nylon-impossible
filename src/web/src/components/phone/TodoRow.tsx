@@ -1,4 +1,12 @@
-import { Check, FileText, Link2, ListTree, Pin, Repeat } from "lucide-react";
+import {
+  Check,
+  FileText,
+  Link2,
+  ListTree,
+  Loader2,
+  Pin,
+  Repeat,
+} from "lucide-react";
 import {
   type HTMLAttributes,
   type KeyboardEvent,
@@ -31,14 +39,23 @@ function MetaItem({ part }: { part: MetaPart }) {
     <span
       className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""}`}
     >
-      {Icon && (
-        <Icon
+      {part.kind === "link" && part.fetching ? (
+        <Loader2
           size="1em"
           strokeWidth={2}
-          // SF Symbols draws pin.fill; lucide has no filled pin, so fill it.
-          fill={part.kind === "pin" ? "currentColor" : "none"}
+          className="animate-spin motion-reduce:animate-none"
           aria-hidden="true"
         />
+      ) : (
+        Icon && (
+          <Icon
+            size="1em"
+            strokeWidth={2}
+            // SF Symbols draws pin.fill; lucide has no filled pin, so fill it.
+            fill={part.kind === "pin" ? "currentColor" : "none"}
+            aria-hidden="true"
+          />
+        )
       )}
       {/* The notes glyph stands alone; its word is for the accessible name. */}
       {part.kind !== "notes" && part.text}
