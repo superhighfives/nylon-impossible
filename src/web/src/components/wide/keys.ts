@@ -10,6 +10,7 @@ export type BoardKeyAction =
   | { type: "due" }
   | { type: "delete" }
   | { type: "new" }
+  | { type: "undo" }
   | { type: "feedback" }
   | { type: "shortcuts" };
 
@@ -55,6 +56,8 @@ export function boardKeyAction(e: {
       return { type: "delete" };
     case "n":
       return { type: "new" };
+    case "z":
+      return { type: "undo" };
     case "f":
       return { type: "feedback" };
     case "?":
@@ -90,6 +93,7 @@ export const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["d"], label: "Due…" },
   { keys: ["⌫"], label: "Delete" },
   { keys: ["n"], label: "New todo in this column" },
+  { keys: ["z"], label: "Undo" },
   { keys: ["?"], label: "Show shortcuts" },
 ];
 

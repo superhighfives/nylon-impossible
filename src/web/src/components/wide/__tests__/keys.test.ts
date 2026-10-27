@@ -22,6 +22,7 @@ describe("boardKeyAction", () => {
     ["Backspace", { type: "delete" }],
     ["Delete", { type: "delete" }],
     ["n", { type: "new" }],
+    ["z", { type: "undo" }],
     ["f", { type: "feedback" }],
     ["?", { type: "shortcuts" }],
   ])("%s", (key, action) => {
