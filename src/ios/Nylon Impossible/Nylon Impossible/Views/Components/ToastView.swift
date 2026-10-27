@@ -63,6 +63,10 @@ struct ToastView: View {
         if let label = toast.actionLabel {
             Button(label) { toasts.performAction() }
                 .fontWeight(.bold)
+                // The action never wraps mid-word (on the Mac it split "Un/do"
+                // when the pill was narrow); `ViewThatFits` stacks instead.
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.leading, stacked ? 0 : Theme.Space.s3)
                 .padding(.trailing, Theme.Space.s3)
                 .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
