@@ -332,6 +332,14 @@ struct TaskCreationServiceTests {
         #expect(parsed.urls == ["https://example.com/post"])
     }
 
+    @Test("parseSmartInput: words next to a long URL stay the title")
+    func parseSmartInputKeepsWordsBesideLongUrl() {
+        let text = "let's build this https://x.com/solomonmithra99/status/1980000000000000000"
+        let parsed = TaskCreationService.parseSmartInput(text)
+        #expect(parsed.title == text)
+        #expect(parsed.urls == ["https://x.com/solomonmithra99/status/1980000000000000000"])
+    }
+
     @Test("parseSmartInput: trailing punctuation is stripped from extracted URLs")
     func parseSmartInputStripsTrailingPunctuation() {
         let parsed = TaskCreationService.parseSmartInput("Check out https://example.com/page.")

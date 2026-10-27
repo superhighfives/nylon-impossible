@@ -199,8 +199,17 @@ describe("Smart create endpoint", () => {
       expect(body.todos[0].title).toBe("Check api.example.com");
     });
 
+    it("keeps typed words next to a URL that makes up most of the input", async () => {
+      const url = "https://x.com/solomonmithra99/status/1980000000000000000";
+      const res = await smartCreate(`let's build this ${url}`);
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].title).toBe(`let's build this ${url}`);
+    });
+
     it("preserves text when URL is only part of input", async () => {
-      // When URL is less than 80% of text, treat as regular input
+      // Words around the URL mean it isn't a bare link, so keep the full text
       const res = await smartCreate(
         "Check out this link https://example.com for more info",
       );
