@@ -84,7 +84,7 @@ struct TodoDetailSheet: View {
                 if onClose != nil {
                     closeRow
                 } else {
-                    Spacer().frame(height: Theme.Space.s6)
+                    Spacer().frame(height: Theme.Space.s10)
                 }
                 titleField
                 chips
