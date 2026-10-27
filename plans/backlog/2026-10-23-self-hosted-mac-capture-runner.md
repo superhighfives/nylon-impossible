@@ -24,7 +24,11 @@ That's why:
   simulator, and the capture step now needs a 70-minute limit (#445);
 - `marketing.yml`'s iOS phase takes 25–44 minutes, and the parity sheet 42;
 - most of the capture flakiness CLAUDE.md describes is a cold CoreSimulator
-  timing out.
+  timing out;
+- video of interactions on fix PRs (`2026-10-24-feedback-fix-videos.md`)
+  is parked until this exists: seven hosted runs never got both sides,
+  losing them to slow creates, boots, first keyboards and `recordVideo`
+  start-up.
 
 A Mac that stays up keeps all of that warm: the platform installed, our
 simulators created and booted, DerivedData from the last build. A capture
@@ -103,6 +107,8 @@ workflow to `runs-on: self-hosted`. Before registering the runner:
 - [ ] Re-run #418 and a marketing run, and compare times with the hosted
       runs above.
 - [ ] Check a Mac capture still works there (Screen Recording).
+- [ ] Try the video prototype there (`fix-shots-video`, issue 416); see
+      the video plan's "To finish it on the self-hosted Mac".
 
 ## Open questions
 
