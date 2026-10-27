@@ -121,11 +121,10 @@ What carries forward:
   during the gesture, assembled into a GIF. Lower frame rate, but no
   recorder at all.
 
-## Worth landing on `main` now
+## Landed on `main` separately
 
-Two commits on `fix-shots-video` fix problems that stills hit too:
-
-- In 9a21363, `readPlan`'s "Ignoring an invalid …" warnings go to stderr.
-  In `report`, stdout becomes the public PR body, so on `main` a rejected
-  shot's raw JSON would be pasted into it.
-- 9bb7b13, the `simctl create` timeout.
+Two fixes from `fix-shots-video` that stills needed too went in with #482:
+`readPlan`'s "Ignoring an invalid …" warnings go to stderr (in `report`,
+stdout is the public PR body), and `simctl create` gets the 3-minute setup
+timeout. Rebasing the branch will drop 9bb7b13, and the stderr change in
+9a21363 will conflict trivially.

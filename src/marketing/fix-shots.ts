@@ -122,7 +122,8 @@ function readPlan(path: string): Plan {
         DEVICES.includes(shot.device) &&
         typeof shot.screen === "string" &&
         /^[a-z]{2,20}$/.test(shot.screen);
-      if (!ok) console.log(`  Ignoring an invalid shot: ${JSON.stringify(shot)}`);
+      // stderr: in `report`, stdout becomes the public PR body.
+      if (!ok) console.error(`  Ignoring an invalid shot: ${JSON.stringify(shot)}`);
       return ok;
     })
     .slice(0, MAX_SHOTS)
