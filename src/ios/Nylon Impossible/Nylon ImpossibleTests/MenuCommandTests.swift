@@ -64,7 +64,7 @@ struct MenuCommandTests {
         for command in BoardMenuCommand.todoMenu.compactMap({ $0 }) + BoardMenuCommand.moveMenu {
             #expect(command.isSingleKey, "\(command.title) should be a single key")
         }
-        for command in [BoardMenuCommand.newTodo, .newList, .showDone, .toggleInspector] + BoardMenuCommand.viewMenu {
+        for command in [BoardMenuCommand.newTodo, .newList, .showDone] + BoardMenuCommand.viewMenu {
             #expect(!command.isSingleKey, "\(command.title) has a modifier")
         }
     }

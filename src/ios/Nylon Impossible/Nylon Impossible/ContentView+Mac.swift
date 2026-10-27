@@ -37,14 +37,6 @@ extension ContentView {
                 Label("Done", systemImage: Theme.Icon.doneCircle)
             }
             .help("Show Done (⇧⌘D)")
-
-            Button {
-                run(.toggleInspector)
-            } label: {
-                Label("Details", systemImage: "sidebar.trailing")
-            }
-            .help("Show or hide the details (⌥⌘I)")
-            .disabled(detailTodo == nil && widePanel == nil && selectedTodoId == nil)
         }
     }
 }
