@@ -200,11 +200,30 @@ jobs:
           git worktree add .feedback-assets origin/feedback-assets
           printf '%s\n' .feedback-assets/ .fix-shots/ .feedback-context/ >> .git/info/exclude
 
+      # An owner reply that lands while the first run is still working routes
+      # as `answer` (no PR yet), then waits behind that run in the concurrency
+      # group. If that run opened the PR meanwhile, this one would try to
+      # create the same branch and PR again, so it stops like the route does.
+      - name: Check the fix PR is still missing
+        id: recheck
+        if: needs.route.outputs.mode == 'answer'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUMBER: ${{ needs.route.outputs.number }}
+        run: |
+          pr=$(gh pr list -R "$GITHUB_REPOSITORY" --head "feedback/$NUMBER" --state open --json number -q '.[0].number')
+          if [ -n "$pr" ]; then
+            echo "::notice::#$NUMBER got fix PR #$pr while this waited; reply there instead."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # What a follow-up round works from, filtered by author here so Claude
       # never reads a comment from anyone else: the owner's and Claude's own
       # comments on the issue, or the review that started the round.
       - name: Gather the conversation
-        if: needs.route.outputs.mode == 'answer' || needs.route.outputs.mode == 'review'
+        if: >-
+          steps.recheck.outputs.stale != 'true' &&
+          (needs.route.outputs.mode == 'answer' || needs.route.outputs.mode == 'review')
         env:
           GH_TOKEN: ${{ github.token }}
           MODE: ${{ needs.route.outputs.mode }}
@@ -275,7 +294,7 @@ jobs:
 
       - name: Run Claude Code
         id: claude
-        if: ${{ !inputs.capture_only }}
+        if: ${{ !inputs.capture_only && steps.recheck.outputs.stale != 'true' }}
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
