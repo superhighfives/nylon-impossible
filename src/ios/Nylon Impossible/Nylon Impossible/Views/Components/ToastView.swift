@@ -16,15 +16,22 @@ struct ToastView: View {
     let toasts: ToastCenter
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack {
             if let toast = toasts.current {
-                // At large text sizes the message wraps and the action drops
-                // underneath, rather than either one truncating.
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: Theme.Space.s1) { content(toast, stacked: false) }
-                    VStack(alignment: .leading, spacing: 0) { content(toast, stacked: true) }
+                // The action sits beside the message, which wraps if it must.
+                // Only at accessibility text sizes does it drop underneath.
+                // (A ViewThatFits here could pick the stacked layout for a
+                // short "Done · Undo", leaving it two lines tall over the
+                // composer.)
+                Group {
+                    if dynamicTypeSize.isAccessibilitySize {
+                        VStack(alignment: .leading, spacing: 0) { content(toast, stacked: true) }
+                    } else {
+                        HStack(spacing: Theme.Space.s1) { content(toast, stacked: false) }
+                    }
                 }
                 .textStyle(Theme.Fonts.Role.control)
                 .fontWeight(.regular)
@@ -50,6 +57,7 @@ struct ToastView: View {
     private func content(_ toast: ToastCenter.Toast, stacked: Bool) -> some View {
         Text(toast.text)
             .fixedSize(horizontal: false, vertical: true)
+            .layoutPriority(1)
             .padding(.top, Theme.Space.s3)
             .padding(.bottom, stacked && toast.actionLabel != nil ? 0 : Theme.Space.s3)
         if let label = toast.actionLabel {
