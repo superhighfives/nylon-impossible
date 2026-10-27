@@ -70,10 +70,8 @@ struct ContentView: View {
     @State var feedbackAfterAccount = false
     @State var chosenListId: String?
     @State var focusComposer = false
-    /// Whether the phone composer has focus, and when rows last left the
-    /// page under it, so a sync that moves rows can't drop the keyboard.
-    @State var composerFocused = false
-    @State var rowsLeftAt: Date?
+    /// Keeps a sync that moves rows off the page from dropping the keyboard.
+    @State var composerFocus = ComposerFocusGuard()
     @State var renamingList: TodoListModel?
     @State var renameText = ""
     @State var deletingList: TodoListModel?
@@ -215,8 +213,8 @@ struct ContentView: View {
         // the keyboard, and each page pads its last row clear of it.
         .overlay(alignment: .bottom) { bottomBar }
         .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: syncService.state)
-        .onChange(of: pageRowIDs) { old, new in
-            if composerFocused, !Set(old).isSubset(of: new) { rowsLeftAt = Date() }
+        .onChange(of: pageRows) { old, new in
+            composerFocus.rowsChanged(from: old, to: new, at: Date())
         }
         .sheet(item: $detailTodo) { todo in
             TodoDetailSheet(
@@ -383,16 +381,12 @@ extension ContentView {
 
     var showsComposer: Bool { currentListId != nil }
 
-    var pageRowIDs: [UUID] { timeList(viewModel.page).map { rows($0).map(\.id) } ?? [] }
+    var pageRows: ComposerFocusGuard.PageRows {
+        .init(page: viewModel.page, ids: timeList(viewModel.page).map { rows($0).map(\.id) } ?? [])
+    }
 
-    /// The overnight sweep (or any sync) moving rows off the page re-lays out
-    /// the list, which can resign the keyboard mid-typing. Focus that drops
-    /// right after rows leave isn't the user's doing, so take it back.
     func composerFocusChanged(_ focused: Bool) {
-        let droppedByRows = !focused && composerFocused
-            && rowsLeftAt.map { Date().timeIntervalSince($0) < 1 } == true
-        composerFocused = focused
-        if droppedByRows { focusComposer = true }
+        if composerFocus.focusChanged(focused, at: Date()) { focusComposer = true }
     }
 
     /// Today's "2 moved to This Week overnight" line, or nil.
