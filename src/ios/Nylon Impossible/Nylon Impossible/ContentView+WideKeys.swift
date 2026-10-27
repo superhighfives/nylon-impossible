@@ -83,12 +83,6 @@ extension ContentView {
             focusColumn(list.id)
         case .showDone:
             showPanel(.done)
-        case .toggleInspector:
-            if detailTodo != nil || widePanel != nil {
-                closePanel()
-            } else if let id = selectedTodoId, let todo = todos.first(where: { $0.id == id }) {
-                openWide(todo)
-            }
         case .moveToList(let listId):
             guard let column = focusedColumn,
                   let id = selectedTodoId,

@@ -16,7 +16,6 @@ enum BoardMenuCommand: Hashable {
     /// View ▸ Today / This Week / Someday: show and focus that column.
     case showList(SystemListKind)
     case showDone
-    case toggleInspector
     /// A key from the board's single-key map, as a menu item.
     case key(BoardKey)
     /// Todo ▸ Move to ▸ one of your lists, by id.
@@ -33,7 +32,6 @@ enum BoardMenuCommand: Hashable {
         case .newList: return "New List"
         case .showList(let kind): return kind.title
         case .showDone: return "Show Done"
-        case .toggleInspector: return "Show Details"
         case .moveToList: return "Move"
         case .key(let key):
             switch key {
@@ -60,7 +58,6 @@ enum BoardMenuCommand: Hashable {
         case .showList(.thisWeek): return Shortcut(key: "2", modifiers: .command)
         case .showList(.someday): return Shortcut(key: "3", modifiers: .command)
         case .showDone: return Shortcut(key: "d", modifiers: [.command, .shift])
-        case .toggleInspector: return Shortcut(key: "i", modifiers: [.command, .option])
         case .moveToList: return nil
         case .key(let key): return key.menuShortcut.map { Shortcut(key: $0, modifiers: []) }
         }
