@@ -83,6 +83,9 @@ struct ContentView: View {
     @State var openColumnId: String?
     /// Done or Settings in the trailing panel.
     @State var widePanel: AccountRoute?
+    /// Bumped each time the Mac panel closes, so the board's columns measure
+    /// their width again (see `board`).
+    @State var panelCloses = 0
     /// The keyboard's row, and the column it's in.
     @State var selectedTodoId: UUID?
     @State var focusedColumnId: String?

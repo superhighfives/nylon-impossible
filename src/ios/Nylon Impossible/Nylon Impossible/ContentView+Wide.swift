@@ -165,9 +165,21 @@ extension ContentView {
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
                 }
+                // On macOS the inspector closing doesn't re-resolve the
+                // columns' container-relative width, so they stay as narrow
+                // as they were beside the panel until the window is resized.
+                // A new identity on each close makes them measure again;
+                // only the close, so opening a todo keeps the columns'
+                // scroll and drag state.
+                .id(panelCloses)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .onChange(of: panelBinding.wrappedValue) { _, shown in
+                #if os(macOS)
+                if !shown { panelCloses += 1 }
+                #endif
+            }
             .onChange(of: scrollColumnId) { _, id in
                 guard let id else { return }
                 withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.slow)) {
