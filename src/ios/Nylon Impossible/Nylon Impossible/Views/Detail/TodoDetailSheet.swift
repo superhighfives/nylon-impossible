@@ -79,7 +79,13 @@ struct TodoDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                closeRow
+                // The sheet closes with the drag indicator or a swipe down; only
+                // the iPad inspector, which has no such gesture, keeps ×.
+                if onClose != nil {
+                    closeRow
+                } else {
+                    Spacer().frame(height: Theme.Space.s10)
+                }
                 titleField
                 chips
                 if showsDatePicker { datePicker }
