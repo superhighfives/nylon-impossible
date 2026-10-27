@@ -198,6 +198,25 @@ images. `feedback.yml` has Claude open a draft fix PR (or ask questions) when
 the repo owner applies `auto-fix` — the API does that for admins' reports —
 because the issue body is the prompt. Spec: `plans/done/2026-10-21-feedback-inbox.md`.
 
+It then works in rounds, like pastor but in CI:
+
+- **answer:** while there's no fix PR yet, the owner's reply on the issue
+  (no `@claude`) reruns the fix with that reply. Claude only sees comments
+  by the owner and itself; the workflow filters them before the run, since
+  anyone can comment on a public issue.
+- **review:** a `control-room-review` review that isn't all-green on a
+  `feedback/*` PR starts a round on that branch. Claude's push gets a fresh
+  review, so it loops. `fix-round:N` counts the rounds, and after 3 the
+  workflow adds `needs-decision` and stops.
+
+`needs-decision` on the issue or the PR stops every round. Claude adds it
+when a finding is the owner's call; removing it re-arms the next round.
+
+**Pastor on `feedback/*` PRs:** `feedback.yml` owns `control-room-review`
+findings there, so don't fix them; it would duplicate the round's commits.
+Watch CI, handle the owner's own comments and decisions, and send the
+ready-to-merge notice.
+
 On Apple platforms the fix PR also gets a **Before | After** table: Claude
 writes `.fix-shots/plan.json` (which `-NylonScreen` routes show the change,
 or why a still can't), and `src/marketing/fix-shots.ts` captures them on
