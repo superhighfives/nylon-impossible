@@ -28,6 +28,7 @@ import {
 } from "@/components/phone/OvernightNote";
 import { SettingsScreen } from "@/components/phone/SettingsScreen";
 import { useBoardData } from "@/components/phone/useBoardData";
+import { runToastUndo } from "@/components/phone/useTodoActions";
 import { useHints } from "@/hooks/useHints";
 import { useCreateList } from "@/hooks/useLists";
 import { dropPlacement, slotAt } from "@/lib/dragOrder";
@@ -277,6 +278,10 @@ export function WideApp({
       }
       // Screens and the overlays are modal; leave their keys alone.
       if (screen || shortcuts || feedback) return;
+      if (action.type === "undo") {
+        if (runToastUndo()) e.preventDefault();
+        return;
+      }
       if (action.type === "feedback") {
         if (!canSendFeedback) return;
         e.preventDefault();

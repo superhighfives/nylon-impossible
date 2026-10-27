@@ -25,6 +25,19 @@ const PLACEMENT_NAMES = {
   someday: "Someday",
 } as const;
 
+/** The on-screen toast's action, so the `z` key can press it. */
+let current: { id: string; run: () => void } | null = null;
+
+/** Press the Undo on screen, if there is one. Returns whether it did. */
+export function runToastUndo() {
+  if (!current) return false;
+  const { id, run } = current;
+  current = null;
+  toast.dismiss(id);
+  run();
+  return true;
+}
+
 /**
  * One toast at a time on the phone: a new one replaces whatever's showing,
  * so its action is always the one on screen. The action closes the toast.
@@ -38,6 +51,9 @@ export function showActionToast(
   toast.dismiss();
   const id = toast.success(text, {
     timeout,
+    onClose: () => {
+      if (current?.id === id) current = null;
+    },
     actionProps: {
       children: label,
       onClick: () => {
@@ -46,6 +62,7 @@ export function showActionToast(
       },
     },
   });
+  if (label === "Undo") current = { id, run };
   return id;
 }
 
