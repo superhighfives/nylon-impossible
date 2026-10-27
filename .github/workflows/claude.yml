@@ -82,6 +82,7 @@ jobs:
       # PR body. This job runs on Linux and can't capture them itself.
       - name: Retake the fix shots
         if: always() && startsWith(steps.head.outputs.branch, 'feedback/')
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.issue.number || github.event.pull_request.number }}
@@ -90,7 +91,7 @@ jobs:
         run: |
           after=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json headRefOid -q .headRefOid)
           [ "$after" != "$BEFORE" ] || { echo "No new commits on $BRANCH."; exit 0; }
-          changed=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$after" -q '.files[].filename')
+          changed=$(gh api --paginate "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$after" -q '.files[].filename')
           printf '%s\n' "$changed" | grep -q '^src/ios/' || { echo "No app changes, so the shots still hold."; exit 0; }
           gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json body -q .body | grep -q '<!-- fix-shots:plan' \
             || { echo "#$PR has no saved shot plan."; exit 0; }
