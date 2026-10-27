@@ -3,11 +3,16 @@
 //  Nylon Impossible
 //
 //  A link in the detail sheet: favicon tile, title and domain, and a menu
-//  with Show as URL, Retry and Remove. Titles fetch on their own; Retry
+//  with Copy URL, Show as URL, Retry and Remove. Titles fetch on their own; Retry
 //  re-runs the same processing for a fetch that didn't land.
 //
 
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 struct LinkCard: View {
     let url: APITodoUrl
@@ -121,8 +126,20 @@ struct LinkCard: View {
         .accessibilityHidden(true)
     }
 
+    private func copyURL() {
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(url.url, forType: .string)
+        #else
+        UIPasteboard.general.string = url.url
+        #endif
+    }
+
     private var menu: some View {
         Menu {
+            Button(action: copyURL) {
+                Label("Copy URL", systemImage: "doc.on.doc")
+            }
             Button(action: onToggleShowPreview) {
                 Label(
                     url.showsPreview ? "Show as URL" : "Show preview",
