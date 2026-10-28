@@ -341,35 +341,234 @@ describe("WideApp", () => {
     });
   });
 
-  it("right-click opens the context menu with your lists and Due…", async () => {
+  it("right-click opens the registry's commands with their keys", async () => {
     render(<WideApp />);
     fireEvent.contextMenu(rowButton("Review PR"), {
       clientX: 200,
       clientY: 200,
     });
     const menu = await screen.findByRole("menu", { name: "Todo actions" });
-    const names = within(menu)
+    const items = within(menu)
       .getAllByRole("menuitem")
-      .map((i) => i.textContent);
-    expect(names).toEqual([
-      "Move to This week",
-      "Move to Someday",
-      "Move to Groceries",
-      "Move to Studio",
-      "Due…",
-      "Pin to top",
-      "Delete",
+      .map((i) => [
+        i.querySelector("span")?.textContent,
+        i.getAttribute("aria-keyshortcuts"),
+      ]);
+    expect(items).toEqual([
+      ["Mark done", "X"],
+      ["Move to This week", "2"],
+      ["Move to Someday", "3"],
+      ["Move to a list…", "M"],
+      ["Pin to top", "P"],
+      ["Due…", "D"],
+      ["Delete", "⌫"],
     ]);
   });
 
-  it("n focuses the focused column's composer, Today by default", () => {
+  it("the menu, the shortcuts dialog and the palette show the same keys", async () => {
     render(<WideApp />);
-    (document.activeElement as HTMLElement | null)?.blur();
-    fireEvent.keyDown(window, { key: "n" });
-    expect(document.activeElement).toHaveAccessibleName("New todo in Today");
-    rowButton("Read Piranesi").focus();
+    act(() => rowButton("Review PR").focus());
+    fireEvent.keyDown(window, { key: "?", shiftKey: true });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Keyboard shortcuts",
+    });
+    const dialogKeys = (label: string) =>
+      within(dialog)
+        .getByText(label, { selector: "dt" })
+        .nextElementSibling?.querySelector("span")
+        ?.textContent?.replace(/\s/g, "");
+    expect(dialogKeys("Mark done")).toBe("X");
+    expect(dialogKeys("Move to a list…")).toBe("M");
+    expect(dialogKeys("New list")).toBe("⇧N");
+    fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
+    await act(async () => {});
+
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const palette = await screen.findByRole("dialog", {
+      name: "Search and commands",
+    });
+    const option = (name: RegExp) =>
+      within(palette).getByRole("option", { name });
+    expect(option(/Mark “Review PR” done/)).toHaveTextContent("X");
+    expect(option(/Move “Review PR” to…/)).toHaveTextContent("M");
+    expect(option(/^New list/)).toHaveTextContent("⇧N");
+  });
+
+  it("n opens quick add on the selection's column, ⇧N the New list popover", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Read Piranesi").focus());
     press("n");
-    expect(document.activeElement).toHaveAccessibleName("New todo in Someday");
+    const quick = await screen.findByRole("dialog", { name: "Quick add" });
+    expect(
+      within(quick).getByRole("textbox", { name: "New todo in Someday" }),
+    ).toBeInTheDocument();
+    fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
+    await act(async () => {});
+
+    act(() => rowButton("Read Piranesi").focus());
+    fireEvent.keyDown(document.activeElement ?? window, {
+      key: "N",
+      shiftKey: true,
+    });
+    expect(
+      await screen.findByRole("dialog", { name: "New list" }),
+    ).toBeInTheDocument();
+  });
+
+  it("← from the first column reaches the sidebar; ↑↓ move there, → goes back in", () => {
+    render(<WideApp />);
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    act(() => rowButton("Call Mum").focus());
+    press("h");
+    expect(document.activeElement).toBe(
+      within(nav).getByRole("button", { name: "Today" }),
+    );
+    press("j");
+    expect(document.activeElement).toHaveAccessibleName("This week");
+    press("ArrowDown");
+    expect(document.activeElement).toHaveAccessibleName("Someday");
+    press("k");
+    press("ArrowRight");
+    // Into This week, as a click: its first todo.
+    expect(focusedTitle()).toContain("Send invoice");
+  });
+
+  it("Esc closes the open todo, then goes to the column's sidebar item", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Send invoice").focus());
+    await userEvent.keyboard("{Enter}");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    press("Escape");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    act(() => rowButton("Send invoice").focus());
+    press("Escape");
+    expect(document.activeElement).toHaveAccessibleName("This week");
+    // The selection stays.
+    expect(rowButton("Send invoice").closest("div")).toHaveClass("ring-2");
+  });
+
+  it("⇧-digits jump to columns and lists, back to where you were", () => {
+    render(<WideApp />);
+    const shift = (n: number) =>
+      fireEvent.keyDown(document.activeElement ?? window, {
+        key: ")!@#$%^&*("[n],
+        code: `Digit${n}`,
+        shiftKey: true,
+      });
+    act(() => rowButton("Renew passport").focus());
+    shift(1);
+    expect(focusedTitle()).toContain("Review PR");
+    shift(2);
+    expect(focusedTitle()).toContain("Renew passport");
+    shift(5);
+    expect(column("Studio")).toBeInTheDocument();
+    expect(focusedTitle()).toContain("Mix the EP");
+    shift(0);
+    expect(column("Done")).toBeInTheDocument();
+    expect(focusedTitle()).toContain("Ship the zine");
+  });
+
+  it("G then a letter jumps, with a hint; any other key cancels it", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Review PR").focus());
+    const hint = () =>
+      screen
+        .queryAllByRole("status")
+        .find((s) => s.textContent?.includes("Go to"));
+    press("g");
+    expect(hint()).toHaveTextContent(/TToday.*WThis week.*LLists/);
+    press("w");
+    expect(hint()).toBeUndefined();
+    expect(focusedTitle()).toContain("Send invoice");
+    press("g");
+    press("j");
+    expect(focusedTitle()).toContain("Renew passport");
+    press("g");
+    press("l");
+    expect(
+      await screen.findByRole("dialog", { name: "Go to a list" }),
+    ).toBeInTheDocument();
+  });
+
+  it("⌘K works while typing, searches todos first, and jumps to one", async () => {
+    render(<WideApp />);
+    const field = screen.getByRole("textbox", { name: "New todo in Today" });
+    field.focus();
+    fireEvent.keyDown(field, { key: "k", metaKey: true });
+    const palette = await screen.findByRole("dialog", {
+      name: "Search and commands",
+    });
+    const input = within(palette).getByRole("combobox");
+    await userEvent.type(input, "parm");
+    expect(
+      within(palette)
+        .getAllByRole("group")
+        .map((g) => g.getAttribute("aria-label")),
+    ).toEqual(["Todos"]);
+    const option = within(palette).getByRole("option", { name: /Parmesan/ });
+    expect(option).toHaveAttribute("aria-selected", "true");
+    expect(input).toHaveAttribute("aria-activedescendant", option.id);
+    await userEvent.keyboard("{Enter}");
+    expect(column("Groceries")).toBeInTheDocument();
+    expect(focusedTitle()).toContain("Parmesan");
+  });
+
+  it("m moves the selection to one of your lists, with Undo", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Review PR").focus());
+    press("m");
+    const dialog = await screen.findByRole("dialog", {
+      name: "Move “Review PR”",
+    });
+    const names = within(dialog)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(names).toEqual([
+      "This week22",
+      "Someday13",
+      "Groceries1",
+      "Studio1",
+    ]);
+    await userEvent.type(within(dialog).getByRole("combobox"), "groc{Enter}");
+    expect(update).toHaveBeenCalledWith({
+      id: "t1",
+      input: expect.objectContaining({ listId: "list-groceries" }),
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      "Moved to Groceries",
+      expect.anything(),
+    );
+  });
+
+  it("Move to offers a new list when nothing matches", async () => {
+    createList.mockImplementation((_input, opts) =>
+      opts.onSuccess({ ...lists[3], id: "list-new", name: "Garden" }),
+    );
+    render(<WideApp />);
+    act(() => rowButton("Review PR").focus());
+    press("m");
+    const dialog = await screen.findByRole("dialog", {
+      name: "Move “Review PR”",
+    });
+    await userEvent.type(within(dialog).getByRole("combobox"), "Garden");
+    expect(
+      within(dialog)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["New list “Garden”"]);
+    await userEvent.keyboard("{Enter}");
+    expect(createList).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Garden" }),
+      expect.anything(),
+    );
+    expect(update).toHaveBeenCalledWith({
+      id: "t1",
+      input: expect.objectContaining({ listId: "list-new" }),
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      "Moved to Garden",
+      expect.anything(),
+    );
   });
 
   it("leaves keys alone while typing", () => {

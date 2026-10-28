@@ -247,7 +247,12 @@ export function useTodoActions({
   );
 
   const move = useCallback(
-    (todo: TodoWithUrls, listId: string, { quiet = false } = {}) => {
+    (
+      todo: TodoWithUrls,
+      listId: string,
+      // `name`: for a list too new to be in the cache yet.
+      { quiet = false, name }: { quiet?: boolean; name?: string } = {},
+    ) => {
       if (todo.listId === listId) return;
       const from = { listId: todo.listId, position: todo.position };
       update({
@@ -256,7 +261,7 @@ export function useTodoActions({
       });
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
-      showUndoToast(`Moved to ${listName(listId)}`, () =>
+      showUndoToast(`Moved to ${name ?? listName(listId)}`, () =>
         update({ id: todo.id, input: from }),
       );
     },

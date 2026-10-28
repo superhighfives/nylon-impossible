@@ -57,6 +57,7 @@ function ListEntry({
       <button
         type="button"
         data-sidebar-list={list.id}
+        data-sidebar-nav
         aria-describedby={`sidebar-count-${list.id}`}
         aria-current={open ? "true" : undefined}
         onClick={() => onSelect(list)}
@@ -167,6 +168,8 @@ export function Sidebar({
               trigger={
                 <button
                   type="button"
+                  data-sidebar-nav
+                  aria-keyshortcuts="Shift+N"
                   className={`${ENTRY} font-medium text-n-ink-muted`}
                 >
                   <Plus size={15} aria-hidden="true" className="shrink-0" />
@@ -182,6 +185,7 @@ export function Sidebar({
           onClick={onDone}
           describedBy="sidebar-done-count"
           current={doneShowing}
+          item="done"
         >
           <SelectionBar on={selectionColumn === "done"} />
           <Check
@@ -226,6 +230,7 @@ function SidebarButton({
   describedBy,
   keyShortcut,
   current,
+  item,
   children,
 }: {
   onClick: () => void;
@@ -233,11 +238,15 @@ function SidebarButton({
   keyShortcut?: string;
   /** Done only: showing in the fourth column, so ink rather than muted. */
   current?: boolean;
+  /** Names a column item for the keyboard: `done`. */
+  item?: string;
   children: ReactNode;
 }) {
   return (
     <button
       type="button"
+      data-sidebar-nav
+      data-sidebar-item={item}
       aria-describedby={describedBy}
       aria-keyshortcuts={keyShortcut}
       aria-current={current ? "true" : undefined}
