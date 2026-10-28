@@ -873,6 +873,26 @@ describe("WideApp", () => {
     expect(field).toHaveValue("");
   });
 
+  it("pasting a link the todo already has just clears the field", async () => {
+    todos = [
+      makeTodo({
+        id: "l1",
+        title: "Plan Lisbon trip",
+        listId: "list-today",
+        urls: [makeUrl({ id: "u1", position: "a0" })],
+      }),
+    ];
+    render(<WideApp />);
+    act(() => rowButton("Plan Lisbon trip").focus());
+    await userEvent.keyboard("{Enter}");
+    const field = within(screen.getByRole("dialog")).getByRole("textbox", {
+      name: "Add a link",
+    });
+    await userEvent.type(field, "https://www.visitlisboa.com/tram-28{Enter}");
+    expect(addUrl).not.toHaveBeenCalled();
+    expect(field).toHaveValue("");
+  });
+
   it.each([
     ["the sidebar", "Lists"],
     ["the toolbar", null],

@@ -71,6 +71,24 @@ describe("Todo links", () => {
     expect((await storedUrl(body.id))?.url).toBe("https://visitlisboa.com/en");
   });
 
+  it("returns a link the todo already has instead of adding it again", async () => {
+    await seedTodo(TODO_ID);
+    const first = await addUrl(TODO_ID, { url: "example.com" });
+    expect(first.status).toBe(201);
+    const { id } = await first.json<{ id: string }>();
+
+    const again = await addUrl(TODO_ID, { url: "https://example.com/" });
+    expect(again.status).toBe(200);
+    expect((await again.json<{ id: string }>()).id).toBe(id);
+
+    const db = getDb(env.DB);
+    const rows = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, TODO_ID));
+    expect(rows).toHaveLength(1);
+  });
+
   it.each([
     "hello",
     "not a link",

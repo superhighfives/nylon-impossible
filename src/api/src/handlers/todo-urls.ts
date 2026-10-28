@@ -47,7 +47,9 @@ async function touchTodo(c: Context<Env>, todoId: string) {
 }
 
 // POST /todos/:id/urls - Add a link to a todo, after its others. Its title
-// is fetched in the background, the same way smart-create's links are.
+// is fetched in the background, the same way smart-create's links are. A
+// link the todo already has comes back as it is (200), so pressing Enter
+// twice doesn't add it twice or fetch it again.
 export async function createTodoUrl(c: Context<Env>) {
   const json = await readJsonBody(c);
   if (!json.ok) return json.response;
@@ -66,6 +68,13 @@ export async function createTodoUrl(c: Context<Env>) {
         .where(and(eq(todos.id, todoId), eq(todos.userId, userId)))
     : [];
   if (!todo) return apiError(c, "todo_not_found");
+
+  const [existing] = await db
+    .select()
+    .from(todoUrls)
+    .where(and(eq(todoUrls.todoId, todo.id), eq(todoUrls.url, href)))
+    .limit(1);
+  if (existing) return c.json(serializeUrl(existing), 200);
 
   const [last] = await db
     .select({ position: todoUrls.position })

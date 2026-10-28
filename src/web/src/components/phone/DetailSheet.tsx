@@ -561,7 +561,10 @@ function Links({ todo }: { todo: TodoWithUrls }) {
       setInvalid(true);
       return;
     }
-    addUrl.mutate({ todoId: todo.id, url });
+    // Already there: the card is on screen, so just clear the field.
+    if (!todo.urls.some((u) => u.url === url)) {
+      addUrl.mutate({ todoId: todo.id, url });
+    }
     setDraft("");
   };
 
