@@ -9,10 +9,15 @@ import {
   it,
   vi,
 } from "vitest";
-import { makeList, makeTodo } from "@/components/phone/__tests__/fixtures";
+import {
+  makeList,
+  makeTodo,
+  makeUrl,
+} from "@/components/phone/__tests__/fixtures";
 import type { TodoWithUrls } from "@/types/database";
 
 const update = vi.fn();
+const addUrl = vi.fn();
 const remove = vi.fn();
 const createList = vi.fn();
 const updateList = vi.fn();
@@ -46,6 +51,7 @@ vi.mock("@/hooks/useTodos", () => ({
   useSmartCreate: () => ({ mutateAsync: vi.fn() }),
   useCreateTodo: () => ({ mutate: vi.fn() }),
   useDeleteTodoUrl: () => ({ mutate: vi.fn() }),
+  useAddTodoUrl: () => ({ mutate: addUrl }),
   useProcessTodo: () => ({ mutate: vi.fn() }),
   useUpdateUrlPreview: () => ({ mutate: vi.fn() }),
 }));
@@ -107,6 +113,7 @@ beforeAll(() => {
 describe("WideApp", () => {
   beforeEach(() => {
     update.mockReset();
+    addUrl.mockReset();
     remove.mockReset();
     createList.mockReset();
     updateList.mockReset();
@@ -444,7 +451,9 @@ describe("WideApp", () => {
     press("Escape");
     expect(document.activeElement).toHaveAccessibleName("This week");
     // The selection stays.
-    expect(rowButton("Send invoice").closest("div")).toHaveClass("ring-2");
+    expect(
+      rowButton("Send invoice").closest("[data-row-container]"),
+    ).toHaveClass("ring-2");
   });
 
   it("⇧-digits jump to columns and lists, back to where you were", () => {
@@ -584,7 +593,9 @@ describe("WideApp", () => {
   it("one click selects, a second click opens the detail in the fourth column", async () => {
     render(<WideApp />);
     await userEvent.click(rowButton("Call Mum"));
-    expect(rowButton("Call Mum").closest("div")).toHaveClass("ring-2");
+    expect(rowButton("Call Mum").closest("[data-row-container]")).toHaveClass(
+      "ring-2",
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await userEvent.click(rowButton("Call Mum"));
@@ -746,16 +757,140 @@ describe("WideApp", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the overnight note on Today and dismisses it", async () => {
+  it("shows the overnight pill above Today's title, which goes to Someday", async () => {
     render(<WideApp />);
     const today = column("Today");
-    expect(
-      within(today).getByText("3 moved to Someday overnight"),
-    ).toBeInTheDocument();
+    const pill = within(today)
+      .getAllByRole("status")
+      .find((s) => s.hasAttribute("data-overnight-note")) as HTMLElement;
+    expect(pill.closest("header")).toBeInTheDocument();
     await userEvent.click(
-      within(today).getByRole("button", { name: "Dismiss overnight note" }),
+      within(pill).getByRole("button", { name: "3 moved to Someday" }),
     );
-    expect(screen.queryByText("3 moved to Someday overnight")).toBeNull();
+    expect(focusedTitle()).toContain("Read Piranesi");
+    await userEvent.click(
+      within(pill).getByRole("button", { name: "Dismiss overnight note" }),
+    );
+    expect(screen.queryByText("3 moved to Someday")).toBeNull();
+  });
+
+  it("every column keeps the banner's space, so titles line up", () => {
+    render(<WideApp />);
+    for (const region of screen.getAllByRole("region")) {
+      expect(region.querySelector("[data-banner-slot]")).toBeInTheDocument();
+    }
+  });
+
+  it("each column is one tab stop: its selected row, else its first", () => {
+    render(<WideApp />);
+    const stops = () =>
+      within(column("Today"))
+        .getAllByRole("button")
+        .filter((b) => b.hasAttribute("data-row-id"))
+        .map((b) => [b.textContent?.slice(0, 9), b.tabIndex]);
+    expect(stops()).toEqual([
+      ["Review PR", 0],
+      ["Call Mum", -1],
+    ]);
+    act(() => rowButton("Call Mum").focus());
+    expect(stops()).toEqual([
+      ["Review PR", -1],
+      ["Call Mum", 0],
+    ]);
+    // The checkbox is out of the tab order; X covers it.
+    expect(
+      within(column("Today")).getByRole("button", {
+        name: "Mark “Call Mum” done",
+      }),
+    ).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("a row's link opens in a new tab without changing the selection", async () => {
+    todos = [
+      makeTodo({
+        id: "l1",
+        title: "Plan Lisbon trip",
+        listId: "list-today",
+        urls: [
+          makeUrl({ id: "u1", position: "a0" }),
+          makeUrl({ id: "u2", url: "https://example.com", position: "a1" }),
+        ],
+      }),
+      makeTodo({ id: "l2", title: "Book flights", listId: "list-today" }),
+    ];
+    render(<WideApp />);
+    act(() => rowButton("Book flights").focus());
+    const link = within(column("Today")).getByText("visitlisboa.com");
+    expect(link.closest("a")).toHaveAttribute("target", "_blank");
+    expect(link.closest("a")).toHaveAttribute("tabindex", "-1");
+    expect(link.parentElement).toHaveTextContent("visitlisboa.com +1");
+    fireEvent.click(link);
+    expect(focusedTitle()).toContain("Book flights");
+  });
+
+  it("o opens the first link, or says there isn't one", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    todos = [
+      makeTodo({
+        id: "l1",
+        title: "Plan Lisbon trip",
+        listId: "list-today",
+        urls: [makeUrl({ id: "u1", position: "a0" })],
+      }),
+      makeTodo({ id: "l2", title: "Book flights", listId: "list-today" }),
+    ];
+    render(<WideApp />);
+    act(() => rowButton("Plan Lisbon trip").focus());
+    press("o");
+    expect(open).toHaveBeenCalledWith(
+      "https://www.visitlisboa.com/tram-28",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    act(() => rowButton("Book flights").focus());
+    press("o");
+    expect(toast.info).toHaveBeenCalledWith("No link on this todo");
+    open.mockRestore();
+  });
+
+  it("the detail always shows Links, and adds a pasted link", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Call Mum").focus());
+    await userEvent.keyboard("{Enter}");
+    const detail = screen.getByRole("dialog");
+    const field = within(detail).getByRole("textbox", { name: "Add a link" });
+    await userEvent.type(field, "hello{Enter}");
+    expect(within(detail).getByRole("alert")).toHaveTextContent(
+      "That doesn’t look like a link.",
+    );
+    expect(addUrl).not.toHaveBeenCalled();
+    await userEvent.clear(field);
+    await userEvent.type(field, "visitlisboa.com{Enter}");
+    expect(addUrl).toHaveBeenCalledWith({
+      todoId: "t2",
+      url: "https://visitlisboa.com/",
+    });
+    expect(field).toHaveValue("");
+  });
+
+  it("pasting a link the todo already has just clears the field", async () => {
+    todos = [
+      makeTodo({
+        id: "l1",
+        title: "Plan Lisbon trip",
+        listId: "list-today",
+        urls: [makeUrl({ id: "u1", position: "a0" })],
+      }),
+    ];
+    render(<WideApp />);
+    act(() => rowButton("Plan Lisbon trip").focus());
+    await userEvent.keyboard("{Enter}");
+    const field = within(screen.getByRole("dialog")).getByRole("textbox", {
+      name: "Add a link",
+    });
+    await userEvent.type(field, "https://www.visitlisboa.com/tram-28{Enter}");
+    expect(addUrl).not.toHaveBeenCalled();
+    expect(field).toHaveValue("");
   });
 
   it.each([

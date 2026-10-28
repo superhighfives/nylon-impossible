@@ -12,6 +12,14 @@ const mockVerifyToken = verifyToken as ReturnType<
 const AUTH_HEADER = { Authorization: "Bearer test-token" };
 const TODO_ID = "550e8400-e29b-41d4-a716-446655440001";
 
+function addUrl(todoId: string, body: unknown) {
+  return SELF.fetch(`http://localhost/todos/${todoId}/urls`, {
+    method: "POST",
+    headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
 function patchUrl(todoId: string, urlId: string, body: unknown) {
   return SELF.fetch(`http://localhost/todos/${todoId}/urls/${urlId}`, {
     method: "PATCH",
@@ -39,6 +47,73 @@ describe("Todo links", () => {
     mockVerifyToken.mockReset();
     mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
     await seedUser();
+  });
+
+  it("adds a link after the todo's others, pending its title", async () => {
+    await seedTodo(TODO_ID);
+    const first = await seedTodoUrl(TODO_ID, "https://example.com", "a5");
+
+    const res = await addUrl(TODO_ID, { url: "  visitlisboa.com/en  " });
+    expect(res.status).toBe(201);
+    const body = await res.json<{
+      id: string;
+      todoId: string;
+      url: string;
+      fetchStatus: string;
+      position: string;
+    }>();
+    expect(body).toMatchObject({
+      todoId: TODO_ID,
+      url: "https://visitlisboa.com/en",
+      fetchStatus: "pending",
+    });
+    expect(body.position > first.position).toBe(true);
+    expect((await storedUrl(body.id))?.url).toBe("https://visitlisboa.com/en");
+  });
+
+  it("returns a link the todo already has instead of adding it again", async () => {
+    await seedTodo(TODO_ID);
+    const first = await addUrl(TODO_ID, { url: "example.com" });
+    expect(first.status).toBe(201);
+    const { id } = await first.json<{ id: string }>();
+
+    const again = await addUrl(TODO_ID, { url: "https://example.com/" });
+    expect(again.status).toBe(200);
+    expect((await again.json<{ id: string }>()).id).toBe(id);
+
+    const db = getDb(env.DB);
+    const rows = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, TODO_ID));
+    expect(rows).toHaveLength(1);
+  });
+
+  it.each([
+    "hello",
+    "not a link",
+    "javascript:alert(1)",
+    "ftp://example.com",
+    "",
+  ])("rejects %j as not a link", async (url) => {
+    await seedTodo(TODO_ID);
+    const res = await addUrl(TODO_ID, { url });
+    expect(res.status).toBe(400);
+    expect((await res.json<{ code: string }>()).code).toBe("invalid_url");
+  });
+
+  it("rejects a body without a url", async () => {
+    await seedTodo(TODO_ID);
+    expect((await addUrl(TODO_ID, { link: "example.com" })).status).toBe(400);
+  });
+
+  it("404s when adding to another user's todo", async () => {
+    await seedTodo(TODO_ID);
+    mockVerifyToken.mockResolvedValue({ sub: "user_other" });
+    await seedUser("user_other", "other@example.com");
+    const res = await addUrl(TODO_ID, { url: "example.com" });
+    expect(res.status).toBe(404);
+    expect((await res.json<{ code: string }>()).code).toBe("todo_not_found");
   });
 
   it("shows a link as its bare URL, and back", async () => {

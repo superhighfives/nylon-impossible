@@ -27,6 +27,8 @@
   --color-n-overdue: var(--n-color-overdue);
   --color-n-destructive: var(--n-color-destructive);
   --color-n-destructive-fill: var(--n-color-destructive-fill);
+  --color-n-notice: var(--n-color-notice);
+  --color-n-notice-fill: var(--n-color-notice-fill);
   --color-n-brand: var(--n-color-brand);
   --color-n-brand-ink: var(--n-color-brand-ink);
   --font-n-display: var(--n-font-display);
@@ -142,6 +144,22 @@ code {
     outline: 3px solid var(--n-color-brand);
     outline-offset: -3px;
     box-shadow: inset 0 0 0 4px var(--n-color-ink);
+  }
+}
+
+/* The wide board's quieter focus: a rounded background at 20% of the
+   control's own text color, for sidebar items, toolbar buttons, menu items,
+   × and ⋯. Rows use the selection ring instead. A pressed yellow chip keeps
+   its fill and gets a soft ring. */
+@utility n-focus-soft {
+  outline: none;
+  &:focus-visible {
+    background-color: color-mix(in srgb, currentColor 20%, transparent);
+  }
+  &[aria-pressed="true"]:focus-visible {
+    background-color: var(--n-color-brand);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--n-color-brand-ink) 35%, transparent);
   }
 }
 

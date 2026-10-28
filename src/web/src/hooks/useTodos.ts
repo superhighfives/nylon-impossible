@@ -25,6 +25,7 @@ import {
 } from "@/server/todos";
 import type {
   CreateTodoInput,
+  SerializedTodoUrl,
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
@@ -565,6 +566,89 @@ export function useDeleteTodoUrl() {
     onError: (err, _id, context) => {
       Sentry.captureException(err, { tags: { mutation: "deleteTodoUrl" } });
       toast.error(messageFromError(err, "Couldn't remove link"));
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+}
+
+/**
+ * Add a link to a todo (the detail's "Paste a link" field). The card shows
+ * straight away, pending, with "Fetching title…"; the API fetches the title
+ * in the background and the next sync brings it in.
+ */
+export function useAddTodoUrl() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      todoId,
+      url,
+    }: {
+      todoId: string;
+      url: string;
+    }): Promise<SerializedTodoUrl> => {
+      const token = await getToken();
+      const response = await fetch(`${API_URL}/todos/${todoId}/urls`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ url }),
+      });
+      if (!response.ok) {
+        const message = await getApiError(response);
+        throw new Error(message ?? `Request failed (${response.status})`);
+      }
+      return response.json();
+    },
+    onMutate: async ({ todoId, url }) => {
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
+      const previousTodos =
+        queryClient.getQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY);
+      const now = new Date().toISOString();
+      if (previousTodos) {
+        queryClient.setQueryData<TodoWithUrls[]>(
+          TODOS_QUERY_KEY,
+          previousTodos.map((todo) => {
+            if (todo.id !== todoId) return todo;
+            const last = todo.urls.reduce<string | null>(
+              (hi, u) => (hi === null || u.position > hi ? u.position : hi),
+              null,
+            );
+            const pending: SerializedTodoUrl = {
+              id: `temp-${crypto.randomUUID()}`,
+              todoId,
+              url,
+              title: null,
+              description: null,
+              siteName: null,
+              favicon: null,
+              image: null,
+              showPreview: true,
+              position: generateKeyBetween(last, null),
+              fetchStatus: "pending",
+              fetchedAt: null,
+              createdAt: now,
+              updatedAt: now,
+            };
+            return { ...todo, urls: [...todo.urls, pending] };
+          }),
+        );
+      }
+      return { previousTodos };
+    },
+    onError: (err, _input, context) => {
+      Sentry.captureException(err, { tags: { mutation: "addTodoUrl" } });
+      toast.error(messageFromError(err, "Couldn't add link"));
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
       }

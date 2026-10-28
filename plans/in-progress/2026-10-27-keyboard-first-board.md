@@ -37,6 +37,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
    2. **Keyboard.** Moving between the sidebar and the board, Esc backing out, G sequences, ⇧-digits, the ⌘K palette and M (Move to). Build one command registry first, and have the shortcuts dialog, the palette, the right-click menu and the key handler all read from it. If each keeps its own list they drift apart, which is how the composer ended up in five places before the October redesign.
       - *As built:* the registry is `wide/commands.ts`: each command has an id, label, key caps, bindings (by `key`, or by `code` for ⇧-digits), a group, and `run(board)` against a `Board` interface that `WideApp` implements. Commands opt into the menu and the palette with a label function for the todo they act on. Because the right-click menu now reads the registry, it shows Mark done, the time lists, Move to a list… (M), Pin, Due… and Delete with their keys, rather than one "Move to" item per list. Keys that act on a todo still only act while focus is on the board. Quick add and New list hand focus back to the selected row when they close, like the palette. `o` stays with links in 2.3. `WideApp.tsx` ended up around 1,150 lines; splitting it is `plans/backlog/2026-10-28-split-wide-app.md`, best done between 2.3 and phase 3.
    3. **Details.** Adding several links (the endpoint, the detail's "Paste a link" field, clickable row links, `o`). The orange overnight banner in its reserved space. Tidier tab stops (one per column) and the soft focus backgrounds.
+      - *As built:* the API and the field share `normalizeLink` from `@nylon-impossible/shared`, so "That doesn't look like a link." shows before a request is made; the error code is `invalid_url`. Web calls the endpoint directly (as it does smart-create), so there's no web server function for it. The detail sheet is shared, so the phone already has Links always shown and the "Paste a link" field; phase 4 only needs to check it. On wide the pill drops the word "overnight" (the moon says it); the phone line keeps it until phase 4. The wide row is a container (pointer clicks and drags) holding the title button and the meta line, and the phone row is unchanged. `src/marketing/audit.ts` was still looking for the 2.1-era detail panel; it now opens the detail in the fourth column and also audits the palette, Move to and quick add. After phase 2: 68 screens, no axe violations, Esc closes every overlay, one tab stop per column.
 3. **iPad and Mac (SwiftUI wide):** the same behavior as web, built after phase 2 so it copies something already settled and reviewed. This phase also includes:
    - the Mac toolbar (Search, New todo, New list);
    - list delete with Undo in place of the confirmation dialog;
@@ -71,7 +72,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 - [x] 1. Shared foundations (tokens, sentence case)
 - [x] 2.1 Wide web: layout
 - [x] 2.2 Wide web: keyboard, command registry, palette, Move to
-- [ ] 2.3 Wide web: links, overnight banner, tab stops and focus
+- [x] 2.3 Wide web: links, overnight banner, tab stops and focus
 - [ ] 3. iPad and Mac wide, Mac toolbar, list delete with Undo, iOS links, menu bar
 - [ ] 4. Phone (iOS and mobile web)
 - [ ] 5. Gmail

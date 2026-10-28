@@ -30,6 +30,11 @@ export function DoneColumn({
   onRestore: (todo: TodoWithUrls) => void;
 }) {
   const groups = groupDoneByDay(todos, now, timeZone);
+  // One tab stop: the selected row, else the first.
+  const all = groups.flatMap((g) => g.items);
+  const tabStopId = all.some((t) => t.id === selectedId)
+    ? selectedId
+    : (all[0]?.id ?? null);
   const headingId = `column-${DONE_COLUMN}-title`;
   return (
     <section
@@ -62,6 +67,7 @@ export function DoneColumn({
                     todo={todo}
                     where={listName(todo.listId)}
                     selected={selectedId === todo.id}
+                    tabStop={tabStopId === todo.id}
                     onSelect={onSelect}
                     onRestore={onRestore}
                   />
@@ -79,12 +85,14 @@ function DoneRow({
   todo,
   where,
   selected,
+  tabStop,
   onSelect,
   onRestore,
 }: {
   todo: TodoWithUrls;
   where: string;
   selected: boolean;
+  tabStop: boolean;
   onSelect: (todo: TodoWithUrls) => void;
   onRestore: (todo: TodoWithUrls) => void;
 }) {
@@ -113,6 +121,7 @@ function DoneRow({
           type="button"
           data-row-id={todo.id}
           data-row-list={DONE_COLUMN}
+          tabIndex={tabStop ? 0 : -1}
           aria-description={`Done, from ${where}. Enter puts it back.`}
           onFocus={() => onSelect(todo)}
           // A pointer only selects; Enter and Space (a click with no

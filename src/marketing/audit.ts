@@ -249,10 +249,11 @@ async function auditWide(browser: Browser, mode: Mode) {
   checks[`wide-${mode}-list-url`] = page.url();
   await axe(page, "list-column", L, mode);
 
-  await (await firstRow(page, L)).click();
-  await page.locator("[data-detail-panel]").waitFor();
+  // One click selects, a second opens the detail in the fourth column.
+  await (await firstRow(page, L)).dblclick();
+  await page.locator("[data-detail-column]").waitFor();
   await axe(page, "detail", L, mode);
-  await escapeCloses(page, `wide-${mode}-detail`, "[data-detail-panel]");
+  await escapeCloses(page, `wide-${mode}-detail`, "[data-detail-column]");
 
   const row = await firstRow(page, L);
   await row.click({ button: "right" });
@@ -272,10 +273,30 @@ async function auditWide(browser: Browser, mode: Mode) {
   await axe(page, "shortcuts", L, mode);
   await escapeCloses(page, `wide-${mode}-shortcuts`, "[role=dialog]");
 
-  await page.getByRole("button", { name: "Done", exact: true }).click();
-  await sleep(500);
+  // The palette, Move to and quick add act on the selection. Focusing a row
+  // selects it; a click could be a second click on the selection, which
+  // opens the detail.
+  await (await firstRow(page, L)).focus();
+  await page.keyboard.press("ControlOrMeta+k");
+  await page.getByRole("dialog", { name: "Search and commands" }).waitFor();
+  await axe(page, "palette", L, mode);
+  await escapeCloses(page, `wide-${mode}-palette`, "[role=dialog]");
+  await page.keyboard.press("m");
+  await page.getByRole("combobox", { name: "Move to a list…" }).waitFor();
+  await axe(page, "move-to", L, mode);
+  await escapeCloses(page, `wide-${mode}-move-to`, "[role=dialog]");
+  await page.getByRole("button", { name: "New todo" }).click();
+  await page.getByRole("dialog", { name: "Quick add" }).waitFor();
+  await axe(page, "quick-add", L, mode);
+  await escapeCloses(page, `wide-${mode}-quick-add`, "[role=dialog]");
+
+  // Done is the fourth column's resting state, not a dialog.
+  await page
+    .getByRole("navigation", { name: "More" })
+    .getByRole("button", { name: "Done" })
+    .click();
+  await page.locator('[data-column="done"]').waitFor();
   await axe(page, "done", L, mode);
-  await escapeCloses(page, `wide-${mode}-done`, "[role=dialog]");
   await page.getByRole("button", { name: "Settings" }).click();
   await sleep(500);
   await axe(page, "settings", L, mode);

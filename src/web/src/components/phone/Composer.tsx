@@ -225,7 +225,7 @@ export function Composer({
                 onPointerDown={keepFocus}
                 onMouseDown={keepFocus}
                 onClick={() => setPickedTarget(t.id)}
-                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus-inset transition-colors duration-(--n-duration-fast) ${
+                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap transition-colors ${popover ? "n-focus-soft" : "n-focus-inset"} duration-(--n-duration-fast) ${
                   selected
                     ? "border-n-brand bg-n-brand text-n-brand-ink"
                     : "border-n-hairline bg-transparent text-n-ink-muted"

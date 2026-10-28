@@ -69,7 +69,7 @@ const ITEM_CLASS =
 
 /** The pointer-anchored menu (wide) uses denser items. */
 const COMPACT_ITEM_CLASS =
-  "flex h-10 w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-3.5 text-left text-[0.9375rem] first:border-t-0 n-focus-inset active:bg-n-fill pointer-fine:hover:bg-n-surface";
+  "flex h-10 w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-3.5 text-left text-[0.9375rem] first:border-t-0 n-focus-soft active:bg-n-fill pointer-fine:hover:bg-n-surface";
 
 const CARD =
   "overflow-hidden rounded-[0.875rem] bg-n-canvas shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] dark:bg-n-fill";
