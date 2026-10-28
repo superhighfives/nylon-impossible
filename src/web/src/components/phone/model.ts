@@ -90,7 +90,7 @@ export type MetaPart =
   | { kind: "repeat"; text: string }
   | { kind: "subtasks"; text: string }
   | { kind: "notes"; text: string }
-  | { kind: "link"; text: string };
+  | { kind: "link"; text: string; fetching?: boolean };
 
 /**
  * The meta line under a row's title, in spec order, showing only what's set:
@@ -119,7 +119,13 @@ export function rowMeta(
   const firstLink = [...todo.urls].sort((a, b) =>
     a.position.localeCompare(b.position),
   )[0];
-  if (firstLink) parts.push({ kind: "link", text: linkDomain(firstLink.url) });
+  if (firstLink) {
+    parts.push({
+      kind: "link",
+      text: linkDomain(firstLink.url),
+      fetching: firstLink.fetchStatus === "pending",
+    });
+  }
   return parts;
 }
 
