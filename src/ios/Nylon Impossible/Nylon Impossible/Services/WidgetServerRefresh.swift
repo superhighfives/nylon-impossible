@@ -75,6 +75,10 @@ enum WidgetServerRefresh {
 
     /// Fold the server's rows into the store. See the file header for the
     /// rules; `TodoItem.apply(remote:)` is the field copy `SyncService` uses.
+    ///
+    /// "Absent from the snapshot means deleted" is only safe while `GET /todos`
+    /// returns every todo for the user. If it gains a limit or filter, this will
+    /// soft-delete live rows.
     static func merge(_ snapshot: Snapshot, userId: String, into context: ModelContext) throws {
         let locals = try context.fetch(FetchDescriptor<TodoItem>())
         let localById = Dictionary(locals.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
