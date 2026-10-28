@@ -255,7 +255,7 @@ the few UIKit/AppKit touch points shared code needs go through
 `bundle exec fastlane mac beta` (TestFlight) and `mac release` archive for
 macOS and upload a `.pkg`. In CI they're the `deploy-mac` jobs in
 `ios-deploy.yml` and `ios-release.yml`, gated on the repository variable
-`ENABLE_MAC_RELEASE` (now `true`, so every TestFlight deploy ships a Mac build
+`ENABLE_MAC_RELEASE` (when `true`, every TestFlight deploy ships a Mac build
 too). They need, beyond the iOS secrets:
 
 | Secret | What |
