@@ -174,14 +174,17 @@ sync — an extension can't schedule a `BGTask` to retry sooner.
 
 ## Deployment
 
-iOS builds are deployed to TestFlight via Fastlane:
+iOS builds go to TestFlight via Fastlane:
 
 ```bash
 cd "src/ios/Nylon Impossible"
-bundle exec fastlane release
+bundle exec fastlane beta      # TestFlight
+bundle exec fastlane release   # App Store
 ```
 
-This is also automated via the `testflight.yml` GitHub Actions workflow.
+In CI, `ios-deploy.yml` runs `beta` on every push to `main` that touches
+`src/ios/**` (or by hand), and `ios-release.yml` runs `release` when
+dispatched. Both build against the production API and Clerk instance.
 
 Each embedded extension needs its own App Store provisioning profile, named in
 the Fastfile's `provisioningProfiles` dict, carrying the same App Group and
@@ -214,21 +217,31 @@ the few UIKit/AppKit touch points shared code needs go through
   inspector are separate view graphs on macOS; a `@Query` read from one of
   them trapped AttributeGraph ("setting value during update") at launch. Keep
   `@Query` out of `ContentView` and anything it hands to another column.
-- **Services.** The window, Settings and the menu bar extra share
+- **Services.** The window, Settings and the menu bar icon share
   `MacServices.shared`, so the menu bar, hotkey and Dock badge work with the
   window closed. The WebSocket stays connected while the app runs.
-- **Menu bar and hotkey.** `QuickAddView` is the menu bar extra and the
-  floating panel the global hotkey opens (`GlobalHotKey`, Carbon
-  `RegisterEventHotKey`: sandbox-safe, no permission prompt). Default
-  ⌃⌥Space; both are switchable in Settings.
+- **Menu bar and hotkey.** `MenuBarController` owns a plain `NSStatusItem`
+  (not SwiftUI's `MenuBarExtra`, which crashed the status bar window — see
+  the file's header). Its icon and the global hotkey (`GlobalHotKey`, Carbon
+  `RegisterEventHotKey`: sandbox-safe, no permission prompt) open the same
+  floating `QuickAddView` panel. Default ⌃⌥Space; both are switchable in
+  Settings.
 - **Dock badge.** `DockBadgeController` shows today's open count (the
   `TodayDigest` set the widget uses), recomputed on every store save, on
   `StoreChangeSignal` from the widget and share extension, on activation and
   at midnight. Unlike iOS, the desktop widget is also reloaded (debounced) on
   each save: a Mac's widgets are visible while the app is open.
-- **Sign-in.** ClerkKitUI is iOS-only, so `MacSignInView` is an email-code
-  flow on ClerkKit. `KeychainHelper` uses the data protection keychain on
-  macOS so the shared access group applies.
+- **Sign-in.** ClerkKitUI is iOS-only, so `MacSignInView` is a small view on
+  ClerkKit with **Continue with Google** and **Continue with GitHub** — the
+  only strategies the production Clerk instance enables — via
+  `signInWithOAuth` in an `ASWebAuthenticationSession`. `KeychainHelper` uses
+  the data protection keychain on macOS so the shared access group applies.
+  ClerkKit's own items stay in the login keychain, tied to the signature of
+  the build that wrote them, so DEBUG builds use the service
+  `….Nylon-Impossible.debug`, and unsigned builds and `-NylonScreen` runs get
+  a fresh one per launch (`clerkOptions` in `Nylon_ImpossibleApp.swift`).
+  That keeps local runs from leaving items the TestFlight build then prompts
+  for.
 - **App Group.** `TGHU37N6EX.com.superhighfives.Nylon-Impossible` on macOS —
   the Team-prefixed form macOS accepts without a provisioning profile entry —
   and `group.com.superhighfives.Nylon-Impossible` on iOS. Use
@@ -241,9 +254,9 @@ the few UIKit/AppKit touch points shared code needs go through
 
 `bundle exec fastlane mac beta` (TestFlight) and `mac release` archive for
 macOS and upload a `.pkg`. In CI they're the `deploy-mac` jobs in
-`ios-deploy.yml` and `ios-release.yml`, which are skipped until the
-repository variable `ENABLE_MAC_RELEASE` is `true`. They need, beyond the
-iOS secrets:
+`ios-deploy.yml` and `ios-release.yml`, gated on the repository variable
+`ENABLE_MAC_RELEASE` (now `true`, so every TestFlight deploy ships a Mac build
+too). They need, beyond the iOS secrets:
 
 | Secret | What |
 | --- | --- |

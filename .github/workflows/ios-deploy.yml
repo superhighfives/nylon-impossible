@@ -6,11 +6,6 @@ on:
     paths:
       - "src/ios/**"
   workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number (optional - uses preview API if set)"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -155,7 +150,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-          API_BASE_URL: ${{ inputs.pr_number && format('https://api-pr-{0}.nylonimpossible.com', inputs.pr_number) || 'https://api.nylonimpossible.com' }}
+          API_BASE_URL: https://api.nylonimpossible.com
           SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
         run: bundle exec fastlane beta --verbose
 
@@ -185,9 +180,8 @@ jobs:
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
 
-  # The Mac App Store build (Universal Purchase, same bundle IDs). Off until
-  # the owner has created the Mac profiles and installer certificate and set
-  # the repository variable ENABLE_MAC_RELEASE to "true" — see "Mac" in
+  # The Mac App Store build (Universal Purchase, same bundle IDs). Gated on
+  # the repository variable ENABLE_MAC_RELEASE — see "Mac" in
   # src/ios/README.md. Independent of the iOS deploy job: it never blocks or
   # changes the iOS release.
   deploy-mac:
@@ -263,7 +257,7 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           SPM_CACHE_PATH: ${{ runner.temp }}/spm-cache
-          API_BASE_URL: ${{ inputs.pr_number && format('https://api-pr-{0}.nylonimpossible.com', inputs.pr_number) || 'https://api.nylonimpossible.com' }}
+          API_BASE_URL: https://api.nylonimpossible.com
           SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
         run: bundle exec fastlane mac beta --verbose
 
