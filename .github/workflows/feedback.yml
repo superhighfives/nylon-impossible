@@ -70,8 +70,7 @@ jobs:
       (github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
         github.event.comment.user.login == github.repository_owner &&
         !contains(github.event.comment.body, '🐑') &&
-        contains(github.event.issue.labels.*.name, 'auto-fix') &&
-        !contains(github.event.issue.labels.*.name, 'needs-decision')) ||
+        contains(github.event.issue.labels.*.name, 'auto-fix')) ||
       (github.event_name == 'pull_request_review' &&
         github.event.review.user.login == 'control-room-review[bot]' &&
         startsWith(github.event.pull_request.head.ref, 'feedback/') &&
@@ -121,10 +120,17 @@ jobs:
           EVENT: ${{ github.event_name }}
           MAX_ROUNDS: 3
         run: |
+          # claude.yml leaves the owner's replies on an auto-fix issue to this
+          # workflow, so a reply turned away here would otherwise get no
+          # answer at all. Say where it should go instead.
+          turn_away() {
+            echo "$1"
+            [ "$EVENT" = issue_comment ] && gh issue comment "$NUMBER" -R "$GITHUB_REPOSITORY" --body "$1"
+            echo "mode=" >> "$GITHUB_OUTPUT"; exit 0
+          }
           if [ "$EVENT" != workflow_dispatch ] &&
              gh issue view "$NUMBER" -R "$GITHUB_REPOSITORY" --json labels -q '.labels[].name' | grep -qx needs-decision; then
-            echo "#$NUMBER is waiting on a decision, so it stops here."
-            echo "mode=" >> "$GITHUB_OUTPUT"; exit 0
+            turn_away "This issue has \`needs-decision\`, so no fix round ran. Remove the label to continue."
           fi
           pr=$(gh pr list -R "$GITHUB_REPOSITORY" --head "feedback/$NUMBER" --state open --json number -q '.[0].number')
           case "$EVENT" in
@@ -140,8 +146,7 @@ jobs:
             issue_comment)
               # Once there's a PR, follow-ups happen there (pastor, @claude).
               if [ -n "$pr" ]; then
-                echo "#$NUMBER already has fix PR #$pr; reply there instead."
-                echo "mode=" >> "$GITHUB_OUTPUT"; exit 0
+                turn_away "Fix PR #$pr is already open for this issue, so no fix round ran. Reply on #$pr instead."
               fi
               mode=answer ;;
             pull_request_review) mode=review ;;
@@ -216,6 +221,8 @@ jobs:
           pr=$(gh pr list -R "$GITHUB_REPOSITORY" --head "feedback/$NUMBER" --state open --json number -q '.[0].number')
           if [ -n "$pr" ]; then
             echo "::notice::#$NUMBER got fix PR #$pr while this waited; reply there instead."
+            gh issue comment "$NUMBER" -R "$GITHUB_REPOSITORY" --body \
+              "Fix PR #$pr opened while your reply was waiting, so it wasn't used. Reply on #$pr instead."
             echo "stale=true" >> "$GITHUB_OUTPUT"
           fi
 

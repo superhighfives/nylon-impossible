@@ -14,6 +14,9 @@ jobs:
   claude:
     # Replies on an auto-fix feedback issue go to feedback.yml instead, so
     # the fix lands as a feedback/<n> draft PR on the right runner, with shots.
+    # That includes the ones it turns away (a fix PR is already open, or the
+    # issue has needs-decision): it replies on the issue saying why, so
+    # they aren't run here either.
     # Collaborators only, read from each event's own author_association —
     # `github.actor_association` doesn't exist, so the old gate skipped every
     # run. Feedback issues and their fix PRs (labelled `feedback`, branch
