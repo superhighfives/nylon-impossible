@@ -201,7 +201,7 @@ because the issue body is the prompt. Spec: `plans/done/2026-10-21-feedback-inbo
 It then works in rounds, like pastor but in CI:
 
 - **answer:** while there's no fix PR yet, the owner's reply on the issue
-  (no `@claude`) reruns the fix with that reply. Claude only sees comments
+  (with or without `@claude`) reruns the fix with that reply. Claude only sees comments
   by the owner and itself; the workflow filters them before the run, since
   anyone can comment on a public issue.
 - **review:** a `control-room-review` review that isn't all-green on a

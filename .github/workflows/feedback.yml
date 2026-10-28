@@ -56,7 +56,8 @@ permissions:
 jobs:
   # Who can start a round. The repo is public, so every trigger is pinned to
   # an author: the owner (label, dispatch, issue reply) or the review bot.
-  # Comments with `@claude` belong to claude.yml, and 🐑 ones are pastor's.
+  # Replies on an auto-fix issue come here with or without `@claude`
+  # (claude.yml leaves them alone); 🐑 ones are pastor's.
   route:
     if: >-
       (github.event_name == 'workflow_dispatch' &&
@@ -68,7 +69,6 @@ jobs:
         github.event.label.name == 'auto-fix') ||
       (github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
         github.event.comment.user.login == github.repository_owner &&
-        !contains(github.event.comment.body, '@claude') &&
         !contains(github.event.comment.body, '🐑') &&
         contains(github.event.issue.labels.*.name, 'auto-fix') &&
         !contains(github.event.issue.labels.*.name, 'needs-decision')) ||

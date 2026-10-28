@@ -12,6 +12,8 @@ on:
 
 jobs:
   claude:
+    # Replies on an auto-fix feedback issue go to feedback.yml instead, so
+    # the fix lands as a feedback/<n> draft PR on the right runner, with shots.
     # Collaborators only, read from each event's own author_association —
     # `github.actor_association` doesn't exist, so the old gate skipped every
     # run. Feedback issues and their fix PRs (labelled `feedback`, branch
@@ -26,6 +28,9 @@ jobs:
           contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association)) ||
         (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
           contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.issue.author_association))
+      ) && !(
+        github.event_name == 'issue_comment' && !github.event.issue.pull_request &&
+        contains(github.event.issue.labels.*.name, 'auto-fix')
       ) && (
         github.actor == github.repository_owner || !(
           contains(github.event.issue.labels.*.name, 'feedback') ||
