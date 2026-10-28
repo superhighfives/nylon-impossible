@@ -34,7 +34,7 @@ JWT `sub` check and the API date decoder, in the full iOS suite on an
 iPhone 17 Pro simulator; the Mac build compiles. **Not verified:** the widget
 refreshing on a real device with the app closed. That needs a signed build, a
 real Clerk session, and WidgetKit's own reload schedule, none of which a
-simulator or CI gives us. The PR (#495) has the device test steps.
+simulator or CI gives us. The PR (#498) has the device test steps.
 
 ## Architecture
 
