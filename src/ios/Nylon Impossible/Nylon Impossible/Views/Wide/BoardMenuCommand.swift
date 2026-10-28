@@ -13,7 +13,7 @@ import SwiftUI
 enum BoardMenuCommand: Hashable {
     case newTodo
     case newList
-    /// View ▸ Today / This Week / Someday: show and focus that column.
+    /// View ▸ Today / This week / Someday: show and focus that column.
     case showList(SystemListKind)
     case showDone
     /// A key from the board's single-key map, as a menu item.
@@ -28,23 +28,23 @@ enum BoardMenuCommand: Hashable {
 
     var title: String {
         switch self {
-        case .newTodo: return "New Todo"
-        case .newList: return "New List"
+        case .newTodo: return "New todo"
+        case .newList: return "New list"
         case .showList(let kind): return kind.title
-        case .showDone: return "Show Done"
+        case .showDone: return "Show done"
         case .moveToList: return "Move"
         case .key(let key):
             switch key {
             case .down: return "Next"
             case .up: return "Previous"
-            case .left: return "Column Left"
-            case .right: return "Column Right"
-            case .done: return "Mark Done"
+            case .left: return "Column left"
+            case .right: return "Column right"
+            case .done: return "Mark done"
             case .open: return "Open"
             case .pin: return "Pin"
             case .due: return "Due…"
             case .delete: return "Delete"
-            case .new: return "New Todo in Column"
+            case .new: return "New todo in column"
             case .move(let kind): return kind.title
             }
         }
@@ -131,7 +131,7 @@ extension SystemListKind {
     var title: String {
         switch self {
         case .today: return "Today"
-        case .thisWeek: return "This Week"
+        case .thisWeek: return "This week"
         case .someday: return "Someday"
         }
     }

@@ -20,7 +20,7 @@ const LISTS: AddonListOption[] = [
   { id: "studio", name: "Studio", systemKind: null },
   { id: "someday", name: "Someday", systemKind: "someday" },
   { id: "today", name: "Today", systemKind: "today" },
-  { id: "week", name: "This Week", systemKind: "thisWeek" },
+  { id: "week", name: "This week", systemKind: "thisWeek" },
 ];
 
 function todo(overrides: Partial<AddonTodo> = {}): AddonTodo {
@@ -68,7 +68,7 @@ describe("orderAddonLists", () => {
   it("puts the time lists first, then your lists in their order", () => {
     expect(orderAddonLists(LISTS).map((l) => l.name)).toEqual([
       "Today",
-      "This Week",
+      "This week",
       "Someday",
       "Studio",
     ]);
@@ -108,18 +108,18 @@ describe("buildHomepageCard", () => {
     ]),
   );
 
-  it("has the composer, Today, This Week, then Someday and your lists", () => {
+  it("has the composer, Today, This week, then Someday and your lists", () => {
     expect(card.header?.title).toBe("Nylon");
     expect(card.sections.map((s) => s.header)).toEqual([
       undefined,
       "Today",
-      "This Week",
+      "This week",
       "Someday · 1",
       "Studio · 1",
     ]);
   });
 
-  it("leaves Today and This Week open", () => {
+  it("leaves Today and This week open", () => {
     expect(card.sections[1].collapsible).toBeUndefined();
     expect(card.sections[2].collapsible).toBeUndefined();
   });

@@ -15,7 +15,7 @@ import Testing
 struct AddTaskIntentTests {
     private let lists = [
         TodoListModel(id: "T-1", userId: "u", name: "Today", kind: "system", systemKind: .today),
-        TodoListModel(id: "W-2", userId: "u", name: "This Week", kind: "system", systemKind: .thisWeek),
+        TodoListModel(id: "W-2", userId: "u", name: "This week", kind: "system", systemKind: .thisWeek),
         TodoListModel(id: "S-3", userId: "u", name: "Someday", kind: "system", systemKind: .someday),
         TodoListModel(id: "Z-9", userId: "u", name: "Studio", position: "a1"),
         TodoListModel(id: "G-4", userId: "u", name: "Groceries", position: "a0"),
@@ -24,10 +24,10 @@ struct AddTaskIntentTests {
 
     // MARK: - Options
 
-    @Test("Offers Today, This Week, Someday, then your lists by position")
+    @Test("Offers Today, This week, Someday, then your lists by position")
     func offersListsInOrder() {
         let names = TodoListEntity.all(from: lists, userId: "u").map(\.name)
-        #expect(names == ["Today", "This Week", "Someday", "Groceries", "Studio"])
+        #expect(names == ["Today", "This week", "Someday", "Groceries", "Studio"])
     }
 
     @Test("The time lists are identified by kind, your lists by id")
@@ -38,13 +38,13 @@ struct AddTaskIntentTests {
 
     @Test("The time lists are offered before the first sync")
     func offersTimeListsWithNoStore() {
-        #expect(TodoListEntity.all(from: [], userId: nil).map(\.name) == ["Today", "This Week", "Someday"])
+        #expect(TodoListEntity.all(from: [], userId: nil).map(\.name) == ["Today", "This week", "Someday"])
     }
 
     @Test("Matching a spoken name ignores case, and puts an exact name first")
     func matchesSpokenName() {
         let all = TodoListEntity.all(from: lists, userId: "u")
-        #expect(TodoListQuery.matching("this week", in: all).map(\.name) == ["This Week"])
+        #expect(TodoListQuery.matching("this week", in: all).map(\.name) == ["This week"])
         #expect(TodoListQuery.matching("GROCERIES", in: all).map(\.name) == ["Groceries"])
         #expect(TodoListQuery.matching("some", in: all).map(\.name) == ["Someday"])
         #expect(TodoListQuery.matching("nope", in: all).isEmpty)
@@ -63,7 +63,7 @@ struct AddTaskIntentTests {
     func resolvesTimeList() {
         let resolved = AddTaskIntent.resolve(TodoListEntity.thisWeek.target, lists: lists)
         #expect(resolved.listId == "W-2")
-        #expect(resolved.name == "This Week")
+        #expect(resolved.name == "This week")
     }
 
     @Test("One of your lists resolves by id")
@@ -98,7 +98,7 @@ struct AddTaskIntentTests {
         let parsed = TodoDateParser.parse("Send the invoice friday", now: now)
         let due = try #require(parsed.dueDay)
         #expect(parsed.title == "Send the invoice")
-        #expect(AddTaskIntent.confirmation(listName: "This Week", dueDate: due, now: now) == "Added to This Week · Due Fri")
+        #expect(AddTaskIntent.confirmation(listName: "This week", dueDate: due, now: now) == "Added to This week · Due Fri")
         #expect(AddTaskIntent.confirmation(listName: "Today", dueDate: nil, now: now) == "Added to Today")
     }
 
@@ -120,6 +120,6 @@ struct AddTaskIntentTests {
         #expect(todo.title == "Pay rent")
         #expect(todo.listKey == "W-2")
         let due = try #require(todo.dueDate)
-        #expect(AddTaskIntent.confirmation(listName: destination.name, dueDate: due) == "Added to This Week · Due Tomorrow")
+        #expect(AddTaskIntent.confirmation(listName: destination.name, dueDate: due) == "Added to This week · Due Tomorrow")
     }
 }

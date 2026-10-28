@@ -21,7 +21,7 @@ type Timer = ReturnType<typeof setTimeout>;
 
 const PLACEMENT_NAMES = {
   today: "Today",
-  thisWeek: "This Week",
+  thisWeek: "This week",
   someday: "Someday",
 } as const;
 
@@ -66,7 +66,7 @@ export function showActionToast(
   return id;
 }
 
-/** "Done · Undo", "Moved to This Week · Undo", "Deleted · Undo" … */
+/** "Done · Undo", "Moved to This week · Undo", "Deleted · Undo" … */
 export function showUndoToast(text: string, undo: () => void) {
   return showActionToast(text, "Undo", undo);
 }

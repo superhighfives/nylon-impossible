@@ -21,7 +21,7 @@ const TODO_URL_INSERT_CHUNK_SIZE = 7;
 // because this is the single place a user row is ever created.
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
-  { name: "This Week", systemKind: "thisWeek" as const },
+  { name: "This week", systemKind: "thisWeek" as const },
   { name: "Someday", systemKind: "someday" as const },
 ];
 

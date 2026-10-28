@@ -27,16 +27,16 @@ extension ContentView {
             Button {
                 run(.newTodo)
             } label: {
-                Label("New Todo", systemImage: Theme.Icon.add)
+                Label("New todo", systemImage: Theme.Icon.add)
             }
-            .help("New Todo (⌘N)")
+            .help("New todo (⌘N)")
 
             Button {
                 run(.showDone)
             } label: {
                 Label("Done", systemImage: Theme.Icon.doneCircle)
             }
-            .help("Show Done (⇧⌘D)")
+            .help("Show done (⇧⌘D)")
         }
     }
 }

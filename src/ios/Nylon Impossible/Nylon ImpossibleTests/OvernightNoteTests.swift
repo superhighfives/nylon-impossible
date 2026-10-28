@@ -65,14 +65,14 @@ struct LastSweepDecodeTests {
 
 @Suite("Overnight note: copy")
 struct OvernightCopyTests {
-    @Test("This Week only")
+    @Test("This week only")
     func weekOnly() {
-        #expect(OvernightNote.text(movedToThisWeek: 2, movedToSomeday: 0) == "2 moved to This Week overnight")
+        #expect(OvernightNote.text(movedToThisWeek: 2, movedToSomeday: 0) == "2 moved to This week overnight")
     }
 
     @Test("Both")
     func both() {
-        #expect(OvernightNote.text(movedToThisWeek: 2, movedToSomeday: 1) == "2 moved to This Week, 1 to Someday overnight")
+        #expect(OvernightNote.text(movedToThisWeek: 2, movedToSomeday: 1) == "2 moved to This week, 1 to Someday overnight")
     }
 
     @Test("Someday only")
@@ -124,7 +124,7 @@ struct OvernightDayTests {
     func today() {
         let sweep = LastSweep(at: date("2026-10-20T07:00:00Z"), movedToThisWeek: 2, movedToSomeday: 1)
         #expect(OvernightNote.visibleText(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("America/Los_Angeles"), dismissedAt: nil)
-            == "2 moved to This Week, 1 to Someday overnight")
+            == "2 moved to This week, 1 to Someday overnight")
     }
 
     @Test("A sweep that moved nothing doesn't show")

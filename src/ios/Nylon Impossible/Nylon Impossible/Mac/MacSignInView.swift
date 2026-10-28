@@ -140,9 +140,9 @@ struct MacSignInView: View {
                 .foregroundStyle(Theme.Colors.ink)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Theme.Space.s2) {
-                Button("Start Over") { signInTask?.cancel() }
+                Button("Start over") { signInTask?.cancel() }
                 if handoff.suggestsSafari {
-                    Button("Default Browser Settings…") {
+                    Button("Default browser settings…") {
                         NSWorkspace.shared.open(MacSignInHandoff.defaultBrowserSettingsURL)
                     }
                 }

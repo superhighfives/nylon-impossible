@@ -49,7 +49,7 @@ export interface UpdateListInput {
   position?: string;
 }
 
-/** A list (Today/This Week/Someday, or a custom list) as returned by the server. */
+/** A list (Today/This week/Someday, or a custom list) as returned by the server. */
 export interface SerializedList {
   id: string;
   userId: string;

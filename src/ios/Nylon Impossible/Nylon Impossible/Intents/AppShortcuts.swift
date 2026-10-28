@@ -29,7 +29,7 @@ struct NylonShortcuts: AppShortcutsProvider {
                 "\(.applicationName) new todo",
                 "Save to \(.applicationName)"
             ],
-            shortTitle: "Add Todo",
+            shortTitle: "Add todo",
             systemImageName: "plus.circle"
         )
     }

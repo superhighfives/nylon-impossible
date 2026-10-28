@@ -8,7 +8,7 @@
 //    h / l, ← / →     move across columns
 //    x                done
 //    Return           open
-//    1 / 2 / 3        move to Today / This Week / Someday
+//    1 / 2 / 3        move to Today / This week / Someday
 //    p                pin
 //    d                due
 //    Delete           delete, with Undo
@@ -132,24 +132,24 @@ struct BoardCommands: Commands {
     var body: some Commands {
         CommandGroup(after: .help) {
             if showsFeedback, let feedback {
-                Button("Send Feedback…") { feedback.presentWithSnapshot() }
+                Button("Send feedback…") { feedback.presentWithSnapshot() }
                     .keyboardShortcut(FeedbackService.shortcut.key, modifiers: FeedbackService.shortcut.modifiers)
             }
         }
         CommandMenu("Todo") {
-            Button("New Todo") { board?.perform(.new) }
+            Button("New todo") { board?.perform(.new) }
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(board == nil)
             if let board, board.keysEnabled {
                 Section {
-                    item("New Todo in Column", .new, "n", board)
+                    item("New todo in column", .new, "n", board)
                     item("Next", .down, "j", board)
                     item("Previous", .up, "k", board)
-                    item("Column Left", .left, "h", board)
-                    item("Column Right", .right, "l", board)
+                    item("Column left", .left, "h", board)
+                    item("Column right", .right, "l", board)
                 }
                 Section {
-                    item("Mark Done", .done, "x", board)
+                    item("Mark done", .done, "x", board)
                     item("Open", .open, .return, board)
                     item("Pin", .pin, "p", board)
                     item("Due…", .due, "d", board)
@@ -157,7 +157,7 @@ struct BoardCommands: Commands {
                 }
                 Section {
                     item("Move to Today", .move(.today), "1", board)
-                    item("Move to This Week", .move(.thisWeek), "2", board)
+                    item("Move to This week", .move(.thisWeek), "2", board)
                     item("Move to Someday", .move(.someday), "3", board)
                 }
             }

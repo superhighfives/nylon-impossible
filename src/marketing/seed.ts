@@ -35,7 +35,7 @@ interface SeedTodo {
 
 export const SEED_LISTS: SeedList[] = [
   { key: "today", name: "Today", systemKind: "today" },
-  { key: "week", name: "This Week", systemKind: "thisWeek" },
+  { key: "week", name: "This week", systemKind: "thisWeek" },
   { key: "someday", name: "Someday", systemKind: "someday" },
   { key: "groceries", name: "Groceries", systemKind: null },
   { key: "studio", name: "Studio", systemKind: null },

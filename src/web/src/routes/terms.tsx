@@ -3,14 +3,14 @@ import { LegalPage, LegalSection } from "@/components/LegalPage";
 
 export const Route = createFileRoute("/terms")({
   component: TermsPage,
-  head: () => ({ meta: [{ title: "Terms of Service — Nylon Impossible" }] }),
+  head: () => ({ meta: [{ title: "Terms of service — Nylon Impossible" }] }),
 });
 
 const CONTACT_EMAIL = "hi@charliegleason.com";
 
 function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="October 5, 2026">
+    <LegalPage title="Terms of service" lastUpdated="October 5, 2026">
       <p>
         These terms cover your use of Nylon Impossible ("the app"). By using the
         app, you agree to them. They're meant to be reasonable and easy to read.

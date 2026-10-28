@@ -2,7 +2,7 @@
 //  ContentView+Wide.swift
 //  Nylon Impossible
 //
-//  The iPad board: the sidebar, then Today, This Week and Someday as hairline
+//  The iPad board: the sidebar, then Today, This week and Someday as hairline
 //  columns that are always there, plus one of your lists as a fourth column
 //  when it's picked in the sidebar. The detail, Done and Settings open in a
 //  trailing panel (an inspector) instead of a sheet.
@@ -322,7 +322,7 @@ extension ContentView {
         switch kind {
         case .today:
             let waiting = count(.thisWeek)
-            let link = timeList(.thisWeek).map { list in ("\(waiting) waiting in This Week", { focusColumn(list.id) }) }
+            let link = timeList(.thisWeek).map { list in ("\(waiting) waiting in This week", { focusColumn(list.id) }) }
             return ("Nothing today.", waiting > 0 ? link : nil)
         case .thisWeek:
             let waiting = count(.someday)

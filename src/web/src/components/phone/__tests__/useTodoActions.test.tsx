@@ -28,7 +28,7 @@ import { dueIn, makeTodo, NOW, TZ } from "./fixtures";
 
 const names: Record<string, string> = {
   "list-today": "Today",
-  "list-week": "This Week",
+  "list-week": "This week",
 };
 
 function setup(todos = [makeTodo()]) {
@@ -126,7 +126,7 @@ describe("useTodoActions", () => {
       input: { completed: true },
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Done · next Oct 25, in This Week",
+      "Done · next Oct 25, in This week",
       expect.anything(),
     );
     clickToastAction();
@@ -191,7 +191,7 @@ describe("useTodoActions", () => {
     expect(input.listId).toBe("list-week");
     expect(input.position < "a1").toBe(true);
     expect(toast.success).toHaveBeenCalledWith(
-      "Moved to This Week",
+      "Moved to This week",
       expect.anything(),
     );
     clickToastAction();

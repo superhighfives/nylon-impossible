@@ -2,10 +2,10 @@
 //  Switcher.swift
 //  Nylon Impossible
 //
-//  The top row: Today · This Week · Someday · Lists, with the avatar on the
+//  The top row: Today · This week · Someday · Lists, with the avatar on the
 //  right. The current title is in ink with a yellow underline that follows the
 //  pager as you swipe; the others are muted. The three time titles are drop
-//  targets — dropping a dragged row on "This Week" moves it there.
+//  targets — dropping a dragged row on "This week" moves it there.
 //
 
 import SwiftUI

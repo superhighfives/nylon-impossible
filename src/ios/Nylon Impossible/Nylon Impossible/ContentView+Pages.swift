@@ -127,7 +127,7 @@ extension ContentView {
         switch page {
         case .today:
             let waiting = count(.thisWeek)
-            return ("Nothing today.", waiting > 0 ? ("\(waiting) waiting in This Week", { select(.thisWeek) }) : nil)
+            return ("Nothing today.", waiting > 0 ? ("\(waiting) waiting in This week", { select(.thisWeek) }) : nil)
         case .thisWeek:
             let waiting = count(.someday)
             return ("A clear week.", waiting > 0 ? ("\(waiting) waiting in Someday", { select(.someday) }) : nil)

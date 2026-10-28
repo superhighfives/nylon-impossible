@@ -1,7 +1,7 @@
 # Nylon Gmail / Workspace Add-on
 
 A Google Workspace Add-on that puts Nylon in Gmail's right-hand side panel:
-a composer with a list dropdown, Today and This Week with tick-to-done, Someday
+a composer with a list dropdown, Today and This week with tick-to-done, Someday
 and each of your lists as collapsed "Name · N" sections, and an "Add to Nylon"
 card that turns the open message into a todo through the existing
 smart-create path.

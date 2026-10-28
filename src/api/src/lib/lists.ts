@@ -4,7 +4,7 @@ type Db = ReturnType<typeof getDb>;
 export type SystemListKind = "today" | "thisWeek" | "someday";
 
 /**
- * Look up one of a user's system list ids (Today/This Week/Someday).
+ * Look up one of a user's system list ids (Today/This week/Someday).
  * These are seeded for every user at account creation (`ensure-user.ts`), so
  * this should always resolve — callers can treat a null result as a bug, not
  * a normal case to handle gracefully.

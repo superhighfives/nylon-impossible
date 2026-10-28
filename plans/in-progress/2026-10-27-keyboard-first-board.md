@@ -1,8 +1,8 @@
 ---
 title: "Keyboard-first board: wide layout, menu bar, phone and Gmail polish"
-status: Ready
+status: In Progress
 created: 2026-10-27
-updated: 2026-10-27
+updated: 2026-10-28
 ---
 
 # Keyboard-first board: wide layout, menu bar, phone and Gmail polish
@@ -66,7 +66,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 
 ### Checklist
 
-- [ ] 1. Shared foundations (tokens, sentence case)
+- [x] 1. Shared foundations (tokens, sentence case)
 - [ ] 2.1 Wide web: layout
 - [ ] 2.2 Wide web: keyboard, command registry, palette, Move to
 - [ ] 2.3 Wide web: links, overnight banner, tab stops and focus
@@ -256,7 +256,9 @@ Stay within Card Service widgets. The add-on is the HTTP-endpoint model in `src/
 ### Shared foundations
 
 - **Red:** `destructive` in `tokens.json` goes to red-11 (`#CE2C31` light; dark stays a passing red-11). Run `bun run tokens`. `Theme.swift` and `tokens.css` are generated; don't edit them by hand.
-- **Sentence case** for all visible copy: "This Week" becomes "This week" on every platform, in the API's Gmail cards and toasts, and in `src/marketing/seed.ts`. Enum values, route paths (`/this-week`), identifiers and stored data don't change.
+- **Sentence case** for all visible copy: "This Week" becomes "This week" on every platform, in the API's Gmail cards and toasts, and in `src/marketing/seed.ts`. Enum values, route paths (`/this-week`) and identifiers don't change.
+  - **The one stored value that does change** is the This week system list's `name`. Every client renders `lists.name`, so a copy-only change would leave "This Week" in the sidebar, column titles and chips. Migration `0003_system_list_sentence_case` renames the existing rows; the seeds (`ensure-user.ts`, `lists.ts`, `seed.sql`, `scripts/db-reset`) create new ones as "This week". It's data only, with nothing tightened, so it's safe to apply before rollout.
+  - The pass also covers the other title-case labels on Apple platforms (menus, intents, settings): "New todo", "Mark done", "Show done", "Send feedback…", "Sign out", "Privacy policy" and so on. Strings that macOS composes itself, like Edit ▸ "Undo Done", stay as the system renders them.
 
 ## Implementation
 

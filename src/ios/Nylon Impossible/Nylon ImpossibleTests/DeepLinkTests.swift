@@ -72,7 +72,7 @@ struct DeepLinkTests {
 
     private let lists = [
         TodoListModel(id: "T-1", userId: "u", name: "Today", kind: "system", systemKind: .today),
-        TodoListModel(id: "W-2", userId: "u", name: "This Week", kind: "system", systemKind: .thisWeek),
+        TodoListModel(id: "W-2", userId: "u", name: "This week", kind: "system", systemKind: .thisWeek),
         TodoListModel(id: "S-3", userId: "u", name: "Someday", kind: "system", systemKind: .someday),
         TodoListModel(id: "G-4", userId: "u", name: "Groceries"),
     ]

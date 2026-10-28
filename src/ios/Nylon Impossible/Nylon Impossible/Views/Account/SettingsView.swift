@@ -28,7 +28,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Masthead(title: "Settings", subline: "Synced across your devices")
                 section("Appearance") { appearance }
-                section("Timezone", footer: "Today moves to This Week, and This Week to Someday, at your local midnight. A todo gets at least a full day in Today.") {
+                section("Timezone", footer: "Today moves to This week, and This week to Someday, at your local midnight. A todo gets at least a full day in Today.") {
                     timezone
                 }
                 section("About") { about }
@@ -110,8 +110,8 @@ struct SettingsView: View {
 
     private var about: some View {
         VStack(spacing: 0) {
-            linkRow("Privacy Policy", "https://nylonimpossible.com/privacy")
-            linkRow("Terms of Service", "https://nylonimpossible.com/terms")
+            linkRow("Privacy policy", "https://nylonimpossible.com/privacy")
+            linkRow("Terms of service", "https://nylonimpossible.com/terms")
         }
     }
 

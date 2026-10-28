@@ -101,7 +101,7 @@ enum AuditAllowance {
         // The switcher's titles stop growing at xxxLarge on purpose, like a
         // tab bar, and show in the Large Content Viewer on long press; the
         // masthead under them carries the list's name at full size.
-        if issue.auditType == .dynamicType, ["Today", "This Week", "Someday", "Lists"].contains(label),
+        if issue.auditType == .dynamicType, ["Today", "This week", "Someday", "Lists"].contains(label),
            detail.contains("partially") || issue.compactDescription.contains("partially") {
             return true
         }

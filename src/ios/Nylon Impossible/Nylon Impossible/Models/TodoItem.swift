@@ -32,7 +32,7 @@ final class TodoItem {
     // handled explicitly, which avoids self-referential relationship pitfalls
     // and keeps the wire mapping trivial.
     var parentId: UUID?
-    // Which list (Today/This Week/Someday, or a custom list) this todo
+    // Which list (Today/This week/Someday, or a custom list) this todo
     // belongs to. Stored as a plain id (not a SwiftData relationship) for the
     // same reasons as `parentId` — explicit grouping, trivial wire mapping.
     // Optional only for migration safety on existing local stores predating

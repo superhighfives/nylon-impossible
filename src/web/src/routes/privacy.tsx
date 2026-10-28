@@ -3,14 +3,14 @@ import { LegalPage, LegalSection } from "@/components/LegalPage";
 
 export const Route = createFileRoute("/privacy")({
   component: PrivacyPage,
-  head: () => ({ meta: [{ title: "Privacy Policy — Nylon Impossible" }] }),
+  head: () => ({ meta: [{ title: "Privacy policy — Nylon Impossible" }] }),
 });
 
 const CONTACT_EMAIL = "hi@charliegleason.com";
 
 function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 18, 2026">
+    <LegalPage title="Privacy policy" lastUpdated="October 18, 2026">
       <p>
         This is the privacy policy for Nylon Impossible ("the app"). It explains
         what information the app collects, why, and what happens to it. The

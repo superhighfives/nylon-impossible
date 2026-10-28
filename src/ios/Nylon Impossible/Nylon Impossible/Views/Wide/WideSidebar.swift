@@ -2,7 +2,7 @@
 //  WideSidebar.swift
 //  Nylon Impossible
 //
-//  The iPad sidebar: the wordmark; Today, This Week and Someday with counts;
+//  The iPad sidebar: the wordmark; Today, This week and Someday with counts;
 //  a small "Lists" heading, your lists with counts and "New list"; then Done
 //  and Settings at the foot. Every list entry — time lists included — takes a
 //  dropped todo and moves it there without scrolling. New list, Done and
@@ -143,7 +143,7 @@ struct WideSidebar: View {
         .buttonStyle(SidebarButtonStyle())
         .pointingHandCursor()
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
-        // "This Week, 6 todos" — the count is the value, not a second
+        // "This week, 6 todos" — the count is the value, not a second
         // number read out in the label.
         .accessibilityLabel(entry.list.name)
         .accessibilityValue(WideSidebar.countText(entry.openTodos))
@@ -199,7 +199,7 @@ struct WideSidebar: View {
     private var account: some View {
         Menu {
             if let onFeedback {
-                Button("Send Feedback…", systemImage: "exclamationmark.bubble", action: onFeedback)
+                Button("Send feedback…", systemImage: "exclamationmark.bubble", action: onFeedback)
             }
             Button("Sign out", systemImage: "rectangle.portrait.and.arrow.right", action: onSignOut)
         } label: {

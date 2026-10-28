@@ -8,7 +8,7 @@
 //  - Done holds the checked row for ~400ms, then lets it go and toasts
 //    "Done · Undo". A repeat's next occurrence goes where its new due date
 //    puts it (`RecurrenceHelper.placement`) and toasts "Done · next Mon",
-//    adding ", in This Week" when that's a different list.
+//    adding ", in This week" when that's a different list.
 //  - Delete hides the row at once but only deletes when its toast goes, so
 //    Undo never has to resurrect something the server already dropped.
 //  - Moves and restores toast with an Undo that puts every field back.

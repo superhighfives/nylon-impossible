@@ -5,7 +5,7 @@ import { Button } from "./ui";
 
 /** The headline and subhead, kept together so they're easy to change. */
 export const LANDING_COPY = {
-  headline: "Today, This Week, Someday.",
+  headline: "Today, This week, Someday.",
   subhead:
     "Nylon is a todo list shaped by time. Things you don't get to move along on their own, and done means gone. The same on web, iPhone, iPad and Gmail.",
 };
@@ -14,10 +14,10 @@ export const LANDING_COPY = {
 const horizons = [
   {
     title: "Today",
-    body: "What you're doing now. Anything still here tomorrow moves on to This Week by itself.",
+    body: "What you're doing now. Anything still here tomorrow moves on to This week by itself.",
   },
   {
-    title: "This Week",
+    title: "This week",
     body: "What's coming up. After seven days it settles into Someday, without you sorting it.",
   },
   {
@@ -143,7 +143,7 @@ export function LandingPage() {
             <div className="hidden overflow-hidden rounded-n-field border border-n-hairline sm:block">
               <Shot
                 name="board"
-                alt="Nylon on the web: Today, This Week and Someday side by side, with a sidebar of lists."
+                alt="Nylon on the web: Today, This week and Someday side by side, with a sidebar of lists."
                 width={1600}
                 height={1000}
                 className="block h-auto w-full"

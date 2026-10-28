@@ -57,7 +57,7 @@ export function useBoardData() {
     [todos, actions.hidden],
   );
 
-  /** Today, This Week, Someday, then your lists — move and add targets. */
+  /** Today, This week, Someday, then your lists — move and add targets. */
   const targets = useMemo(
     () =>
       [...TIME_KINDS.map((kind) => byKind[kind]), ...collections]

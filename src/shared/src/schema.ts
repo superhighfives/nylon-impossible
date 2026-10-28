@@ -35,7 +35,7 @@ export const users = sqliteTable(
       .default(true),
     // The most recent aging sweep that moved anything for this user, and how
     // many todos it moved each way. Clients show it as Today's overnight note
-    // ("2 moved to This Week overnight"). A sweep that moves nothing leaves
+    // ("2 moved to This week overnight"). A sweep that moves nothing leaves
     // these alone, so the note always describes the last real move.
     lastSweepAt: integer("last_sweep_at", { mode: "timestamp" }),
     lastSweepMovedToThisWeek: integer("last_sweep_moved_to_this_week")
@@ -74,14 +74,14 @@ export const todos = sqliteTable(
     parentId: text("parent_id").references((): AnySQLiteColumn => todos.id, {
       onDelete: "cascade",
     }),
-    // Which list this todo belongs to (Today/This Week/Someday, or a custom
+    // Which list this todo belongs to (Today/This week/Someday, or a custom
     // list). A todo belongs to exactly one list. Independent of dueDate —
     // list membership never implies or derives a due date, and vice versa.
     listId: text("list_id")
       .notNull()
       .references(() => lists.id, { onDelete: "cascade" }),
     // When listId last changed (manual drag, creation, or the aging sweep).
-    // Drives the "how long has this been in This Week" demotion rule, since
+    // Drives the "how long has this been in This week" demotion rule, since
     // listId alone carries no entry timestamp.
     listEnteredAt: integer("list_entered_at", { mode: "timestamp" })
       .notNull()
@@ -153,7 +153,7 @@ export const gmailAddonLinks = sqliteTable(
   (table) => [index("idx_gmail_addon_links_clerk_user").on(table.clerkUserId)],
 );
 
-// Lists table. Three system lists per user (Today/This Week/Someday,
+// Lists table. Three system lists per user (Today/This week/Someday,
 // kind = "system", fixed first-three order) plus unlimited user-named
 // custom lists (kind = "custom"). A todo belongs to exactly one list via
 // todos.listId.

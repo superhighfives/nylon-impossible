@@ -25,7 +25,7 @@ final class TodoViewModel {
         var title: String {
             switch self {
             case .today: return "Today"
-            case .thisWeek: return "This Week"
+            case .thisWeek: return "This week"
             case .someday: return "Someday"
             case .lists: return "Lists"
             }
@@ -299,7 +299,7 @@ final class TodoViewModel {
         return list
     }
 
-    /// Rename a custom list. System lists (Today/This Week/Someday) can't be
+    /// Rename a custom list. System lists (Today/This week/Someday) can't be
     /// renamed — callers should only offer this for `list.kind == "custom"`.
     @MainActor
     func renameList(_ list: TodoListModel, name: String, apiService: any APIProviding) async throws {

@@ -89,12 +89,12 @@ extension APIUser {
 
 /// When and how Today mentions the overnight sweep.
 enum OvernightNote {
-    /// "2 moved to This Week overnight", "2 moved to This Week, 1 to Someday
+    /// "2 moved to This week overnight", "2 moved to This week, 1 to Someday
     /// overnight", "1 moved to Someday overnight"; nil when nothing moved.
     static func text(movedToThisWeek week: Int, movedToSomeday someday: Int) -> String? {
         switch (week > 0, someday > 0) {
-        case (true, true): return "\(week) moved to This Week, \(someday) to Someday overnight"
-        case (true, false): return "\(week) moved to This Week overnight"
+        case (true, true): return "\(week) moved to This week, \(someday) to Someday overnight"
+        case (true, false): return "\(week) moved to This week overnight"
         case (false, true): return "\(someday) moved to Someday overnight"
         case (false, false): return nil
         }

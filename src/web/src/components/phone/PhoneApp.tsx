@@ -44,7 +44,7 @@ function pageForView(view: BoardView | null | undefined): number {
 }
 
 /**
- * The phone layout (web under 1024px): the Today · This Week · Someday ·
+ * The phone layout (web under 1024px): the Today · This week · Someday ·
  * Lists switcher, horizontally paged lists, the keyboard-attached composer,
  * and the detail sheet, context menu, Done history and Settings above them.
  * Data comes from `useBoardData`, shared with the wide layout.
@@ -325,14 +325,14 @@ export function PhoneApp({
     );
   };
 
-  /** Written empty states: "Nothing today." and "4 waiting in This Week →". */
+  /** Written empty states: "Nothing today." and "4 waiting in This week →". */
   function renderEmpty(kind: PageKey | null) {
     const next =
       kind === "today"
         ? {
             index: 1,
             kind: "thisWeek" as const,
-            name: "This Week",
+            name: "This week",
             text: "Nothing today.",
           }
         : kind === "thisWeek"

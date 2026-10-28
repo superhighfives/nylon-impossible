@@ -43,7 +43,7 @@ describe("LandingPage", () => {
       .getAllByRole("heading", { level: 3 })
       .slice(0, 3)
       .map((h) => h.textContent);
-    expect(horizons).toEqual(["Today", "This Week", "Someday"]);
+    expect(horizons).toEqual(["Today", "This week", "Someday"]);
   });
 
   it("keeps the privacy and terms links", () => {

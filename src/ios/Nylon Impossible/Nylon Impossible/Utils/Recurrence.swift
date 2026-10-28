@@ -70,7 +70,7 @@ enum ListPlacement: String {
 
 enum RecurrenceHelper {
     /// Placement heuristic for a recurring todo's new occurrence: due today or
-    /// tomorrow → Today; due within the next 7 days → This Week; further out →
+    /// tomorrow → Today; due within the next 7 days → This week; further out →
     /// Someday. Applied once when a new occurrence is created (initial
     /// creation of any recurring todo, or a repeat's dueDate advancing on
     /// completion) — the occurrence ages normally afterward. Mirrors

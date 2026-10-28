@@ -16,12 +16,12 @@ const TODO_URL_INSERT_CHUNK_SIZE = 7;
 
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
-  { name: "This Week", systemKind: "thisWeek" as const },
+  { name: "This week", systemKind: "thisWeek" as const },
   { name: "Someday", systemKind: "someday" as const },
 ];
 
 /**
- * Seed the system lists (Today/This Week/Someday) for a user, if
+ * Seed the system lists (Today/This week/Someday) for a user, if
  * they don't already exist. Web-only signups create their user row via
  * `ensureUserExists` rather than the API worker's `sync.ts` — this is the
  * matching provisioning step for that path, so a web-only user always has
@@ -145,7 +145,7 @@ export async function seedDemoTodos(
   }
 }
 
-/** Look up one of a user's system list ids (Today/This Week/Someday). */
+/** Look up one of a user's system list ids (Today/This week/Someday). */
 export async function getSystemListId(
   db: DbClient,
   userId: string,

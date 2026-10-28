@@ -2,7 +2,7 @@
 //  TodoListModel.swift
 //  Nylon Impossible
 //
-//  A list (Today/This Week/Someday, or a custom list) a todo can belong to.
+//  A list (Today/This week/Someday, or a custom list) a todo can belong to.
 //  Named `TodoListModel` (not `List`/`TodoList`) to avoid clashing with
 //  SwiftUI's `List` view and this app's own `TodoListView`-style naming.
 //
@@ -58,7 +58,7 @@ final class TodoListModel {
 
     var isSystem: Bool { kind == "system" }
 
-    /// Fixed display order: Today, This Week, Someday, then custom lists
+    /// Fixed display order: Today, This week, Someday, then custom lists
     /// (by `position`, handled separately since this only orders the three
     /// system kinds relative to each other).
     var systemSortIndex: Int {

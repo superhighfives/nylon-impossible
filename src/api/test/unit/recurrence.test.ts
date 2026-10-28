@@ -45,13 +45,13 @@ describe("placementForDueDate", () => {
     );
   });
 
-  it("places 2 days out in This Week", () => {
+  it("places 2 days out in This week", () => {
     expect(placementForDueDate(new Date("2026-06-17T09:00:00.000Z"), now)).toBe(
       "thisWeek",
     );
   });
 
-  it("places exactly 7 days out in This Week", () => {
+  it("places exactly 7 days out in This week", () => {
     expect(placementForDueDate(new Date("2026-06-22T09:00:00.000Z"), now)).toBe(
       "thisWeek",
     );

@@ -221,7 +221,7 @@ the few UIKit/AppKit touch points shared code needs go through
 - **Window.** The iPad board in a `NavigationSplitView`: sidebar, columns,
   the inspector, the focused list as the window title. Menus come from
   `BoardMenuCommand` (File ▸ New Todo ⌘N / New List ⇧⌘N, View ▸ Today ⌘1 /
-  This Week ⌘2 / Someday ⌘3 / Show Done ⇧⌘D, Todo ▸ the single-key map).
+  This week ⌘2 / Someday ⌘3 / Show Done ⇧⌘D, Todo ▸ the single-key map).
   ⌘Z reaches the toast's Undo through `ToastUndoBridge`. Text and links
   dragged in from other apps become todos in that column.
 - **`ContentRoot` owns the queries.** The split view's columns and the

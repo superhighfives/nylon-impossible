@@ -20,7 +20,7 @@ struct TodoActionsTests {
         let container = try ModelContainer(for: TodoItem.self, TodoUrl.self, TodoListModel.self, configurations: config)
         let context = container.mainContext
         let today = TodoListModel(id: "today", userId: "u1", name: "Today", kind: "system", systemKind: .today)
-        let week = TodoListModel(id: "thisweek", userId: "u1", name: "This Week", kind: "system", systemKind: .thisWeek)
+        let week = TodoListModel(id: "thisweek", userId: "u1", name: "This week", kind: "system", systemKind: .thisWeek)
         let someday = TodoListModel(id: "someday", userId: "u1", name: "Someday", kind: "system", systemKind: .someday)
         [today, week, someday].forEach(context.insert)
         let actions = TodoActions()
@@ -113,10 +113,10 @@ struct TodoActionsTests {
 
         fixture.actions.commitDone(todo)
 
-        // A week out places in This Week.
+        // A week out places in This week.
         #expect(todo.listKey == fixture.week.id)
         let label = DueLabel.text(for: DueLabel.inDays(7)).text
-        #expect(fixture.actions.toasts.current?.text == "Done · next \(label), in This Week")
+        #expect(fixture.actions.toasts.current?.text == "Done · next \(label), in This week")
 
         fixture.actions.toasts.performAction()
         #expect(todo.listKey == fixture.today.id)
@@ -205,7 +205,7 @@ struct TodoActionsTests {
         fixture.actions.move(todo, toList: fixture.week.id)
         #expect(todo.listKey == fixture.week.id)
         #expect(todo.position > "a3")
-        #expect(fixture.actions.toasts.current?.text == "Moved to This Week")
+        #expect(fixture.actions.toasts.current?.text == "Moved to This week")
 
         fixture.actions.toasts.performAction()
         #expect(todo.listKey == fixture.today.id)
@@ -231,7 +231,7 @@ struct TodoActionsTests {
 
         #expect(!todo.isCompleted)
         #expect(todo.listKey == fixture.week.id)
-        #expect(fixture.actions.toasts.current?.text == "Back in This Week")
+        #expect(fixture.actions.toasts.current?.text == "Back in This week")
     }
 
     @Test("a pasted list adds one todo per line, in order, with typed dates")
@@ -333,7 +333,7 @@ struct PageTests {
         let vm = TodoViewModel()
         let lists = [
             TodoListModel(id: "today", userId: "u", name: "Today", kind: "system", systemKind: .today),
-            TodoListModel(id: "thisweek", userId: "u", name: "This Week", kind: "system", systemKind: .thisWeek),
+            TodoListModel(id: "thisweek", userId: "u", name: "This week", kind: "system", systemKind: .thisWeek),
             TodoListModel(id: "groceries", userId: "u", name: "Groceries")
         ]
         vm.show(listId: "thisweek", in: lists)

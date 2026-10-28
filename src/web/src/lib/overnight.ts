@@ -5,7 +5,7 @@ import type { LastSweep } from "@/hooks/useUser";
 export const OVERNIGHT_DISMISSED_KEY = "nylon:overnight-dismissed";
 
 /**
- * The note's words: "2 moved to This Week overnight", "2 moved to This Week,
+ * The note's words: "2 moved to This week overnight", "2 moved to This week,
  * 1 to Someday overnight", "1 moved to Someday overnight". Null when the
  * sweep moved nothing.
  */
@@ -13,9 +13,9 @@ export function overnightText(sweep: LastSweep): string | null {
   const week = sweep.movedToThisWeek;
   const someday = sweep.movedToSomeday;
   if (week > 0 && someday > 0) {
-    return `${week} moved to This Week, ${someday} to Someday overnight`;
+    return `${week} moved to This week, ${someday} to Someday overnight`;
   }
-  if (week > 0) return `${week} moved to This Week overnight`;
+  if (week > 0) return `${week} moved to This week overnight`;
   if (someday > 0) return `${someday} moved to Someday overnight`;
   return null;
 }

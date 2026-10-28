@@ -3,7 +3,7 @@
 //  Nylon Impossible
 //
 //  The single quiet line Today shows the morning after the sweep moved
-//  something: "2 moved to This Week, 1 to Someday overnight", with a moon and
+//  something: "2 moved to This week, 1 to Someday overnight", with a moon and
 //  a dismiss ×. `OvernightNote` decides when; this only draws it.
 //
 

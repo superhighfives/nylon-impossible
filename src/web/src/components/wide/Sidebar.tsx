@@ -63,7 +63,7 @@ function ListEntry({
 }
 
 /**
- * The wide sidebar: the wordmark; Today, This Week and Someday with counts;
+ * The wide sidebar: the wordmark; Today, This week and Someday with counts;
  * a "Lists" heading, your lists and an inline "New list"; then Done,
  * Settings and (for admins) Send feedback. Every list is a drop target.
  */

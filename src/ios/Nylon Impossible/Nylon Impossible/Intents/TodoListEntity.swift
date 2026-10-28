@@ -7,7 +7,7 @@
 //
 //  The time lists are identified by kind ("today", "this-week", "someday" —
 //  the same values `nylon://add?list=` takes), not by id. Their ids are
-//  minted per account by the server, so a Shortcut saved with "This Week"
+//  minted per account by the server, so a Shortcut saved with "This week"
 //  would otherwise break on a reinstall or a fresh sign-in, and they'd be
 //  missing entirely before the first sync. Your lists use their ids.
 //
@@ -31,13 +31,13 @@ struct TodoListEntity: AppEntity, Identifiable, Hashable {
     var target: DeepLink.ListTarget { DeepLink.ListTarget(queryValue: id) }
 
     static let today = TodoListEntity(id: DeepLink.ListTarget.today.queryValue, name: "Today")
-    static let thisWeek = TodoListEntity(id: DeepLink.ListTarget.thisWeek.queryValue, name: "This Week")
+    static let thisWeek = TodoListEntity(id: DeepLink.ListTarget.thisWeek.queryValue, name: "This week")
     static let someday = TodoListEntity(id: DeepLink.ListTarget.someday.queryValue, name: "Someday")
 
     /// Every list Siri can add to, in the app's order. The three time lists
     /// are always offered, even before the first sync has brought their rows
     /// down; a todo added then lands in Today server-side, and one meant for
-    /// This Week or Someday is placed once its list exists (see
+    /// This week or Someday is placed once its list exists (see
     /// `AddTaskIntent.resolve`).
     static func all(from lists: [TodoListModel], userId: String?) -> [TodoListEntity] {
         let custom = lists

@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  Nylon Impossible
 //
-//  The phone shell. A fixed switcher row (Today · This Week · Someday · Lists
+//  The phone shell. A fixed switcher row (Today · This week · Someday · Lists
 //  and the avatar) over four pages that page horizontally; each page scrolls
 //  its own masthead and rows. The composer is the only floating element and
 //  rides the keyboard through the bottom safe-area inset, so nothing here
@@ -338,7 +338,7 @@ struct ContentView: View {
 extension ContentView {
     // MARK: - Derived
 
-    /// Today, This Week, Someday, then collections by position. A system list
+    /// Today, This week, Someday, then collections by position. A system list
     /// this build doesn't know is skipped rather than shown blank.
     var orderedLists: [TodoListModel] {
         lists.filter { !$0.isSystem || $0.systemKind != nil }.sorted { a, b in
@@ -389,7 +389,7 @@ extension ContentView {
         if composerFocus.focusChanged(focused, at: Date()) { focusComposer = true }
     }
 
-    /// Today's "2 moved to This Week overnight" line, or nil.
+    /// Today's "2 moved to This week overnight" line, or nil.
     var overnightText: String? {
         OvernightNote.visibleText(
             preferences.lastSweep,
