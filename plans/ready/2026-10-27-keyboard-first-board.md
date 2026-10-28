@@ -11,6 +11,69 @@ The interactive prototype for everything here is the canvas at https://claude.ai
 
 Read [PRINCIPLES.md](../../PRINCIPLES.md) first. Several of its Settled rows come from this plan.
 
+## How to build this
+
+Treat this like the October redesign: this spec is the source of truth, and the work lands as a series of small PRs, one per phase or sub-phase below.
+
+**Build from the decisions written here, not from the prototype's code.** The canvas is all inline styles and sample data. Use it to check behavior and feel: open the matching artboard, press Play, and compare. When the canvas and this spec disagree, this spec wins. If the difference matters, fix the spec in the same PR.
+
+**Less of this touches the backend than it looks.**
+
+- **Several links per todo** already work in the data: the `todo_urls` table holds any number. What's missing is a way to add one to an existing todo, hence the new endpoint below.
+- **Colors** come from `src/shared/design/tokens.json`, which generates both `src/web/src/styles/tokens.css` and iOS `Theme.swift`.
+- **The rest is UI.** The only other server work is the Gmail cards, and changing "This Week" to "This week" in copy the API sends (card text and notifications).
+
+### Order of work
+
+1. **Shared foundations: one small PR, first.**
+   - Change `destructive` to red-11 in `tokens.json` and run `bun run tokens`.
+   - Do the sentence-case pass across every app, changing visible copy only, not identifiers, enum values, route paths or stored data.
+   - Update the tests that assert on that copy.
+
+   It's low risk and every later PR builds on it, so merge it before starting anything else.
+2. **Wide web: the big piece, in three PRs.**
+   1. **Layout.** Click to select, and a second click or Enter to open. The always-present fourth column with Done as its default, and the detail opening into it. The sidebar's fill and keyboard-bar states. The toolbar with its quick-add and New list popovers. List rename in place, the ⋯ menu, and delete with Undo.
+   2. **Keyboard.** Moving between the sidebar and the board, Esc backing out, G sequences, ⇧-digits, the ⌘K palette and M (Move to). Build one command registry first, and have the shortcuts dialog, the palette, the right-click menu and the key handler all read from it. If each keeps its own list they drift apart, which is how the composer ended up in five places before the October redesign.
+   3. **Details.** Adding several links (the endpoint, the detail's "Paste a link" field, clickable row links, `o`). The orange overnight banner in its reserved space. Tidier tab stops (one per column) and the soft focus backgrounds.
+3. **iPad and Mac (SwiftUI wide):** the same behavior as web, built after phase 2 so it copies something already settled and reviewed. This phase also includes:
+   - the Mac toolbar (Search, New todo, New list);
+   - list delete with Undo in place of the confirmation dialog;
+   - the iOS link-adding UI;
+   - the menu bar popover's keyboard model, and its focus fix.
+4. **Phone (iOS and mobile web together):**
+   - the Done button beside the avatar, and Done as a top-level page;
+   - the space kept for the banner on every top-level page;
+   - adding links in the phone detail.
+
+   Check that Share is still in the iOS detail sheet's header. It already exists, so this is a check, not new work.
+5. **Gmail:** the card changes, all within what Card Service can render, including the window that keeps ticked todos on the card.
+
+**Running in parallel.** Once phase 1 is merged, web and iOS can be built at the same time in separate worktrees. Phase 3 should still follow 2.1 at least, so the Apple layout copies a settled web layout. Gmail (phase 5) touches only the API and can run any time after phase 1.
+
+### Working on a phase
+
+- **Starting:** move this file to `plans/in-progress/` and set `status: In Progress` when the first phase starts. Keep it there until every phase has shipped, ticking off the checklist below as PRs merge. If a decision changes while building, update this spec in the same PR, so the next phase reads the current truth.
+- **Branches:** one branch per PR, named for the phase, for example `board/1-foundations` or `board/2-1-wide-layout`.
+- **Checks before each PR:**
+  - `bun run check`, `bun run typecheck` and `bun run test` must pass.
+  - `bun run tokens:check` must pass after any token change.
+  - Apple PRs: compile-check the iOS targets and run SwiftLint from `src/ios/Nylon Impossible/`.
+- **Reviewing against the prototype:**
+  - Apple PRs get Before | After screenshots from `fix-shots` (`src/marketing/fix-shots.ts`). Use the matching `-NylonScreen` routes, and add a route when a new screen needs one (for example the palette, or the menu bar popover with a selected row).
+  - Web PRs describe how to try the change on the PR preview at `pr-{N}.nylonimpossible.com`.
+- **Screenshots and audits:** after phases 1, 2 and 4, rerun `src/marketing/audit.ts` against a seeded dev server, and regenerate the marketing and `--parity` screenshots. The copy and layout both change.
+- **Finishing:** when the last phase merges, move this file to `plans/done/` with Overview and Architecture sections, as `plans/README.md` describes. Record any deviations honestly.
+
+### Checklist
+
+- [ ] 1. Shared foundations (tokens, sentence case)
+- [ ] 2.1 Wide web: layout
+- [ ] 2.2 Wide web: keyboard, command registry, palette, Move to
+- [ ] 2.3 Wide web: links, overnight banner, tab stops and focus
+- [ ] 3. iPad and Mac wide, Mac toolbar, list delete with Undo, iOS links, menu bar
+- [ ] 4. Phone (iOS and mobile web)
+- [ ] 5. Gmail
+
 ## Problem
 
 The October redesign (`plans/done/2026-10-18-cohesive-redesign.md`) gave every platform one structure. Using it day to day showed where it falls short:
@@ -25,7 +88,7 @@ The October redesign (`plans/done/2026-10-18-cohesive-redesign.md`) gave every p
 
 ## Solution
 
-Build what the canvas shows, in the order below. Each phase is one or more PRs that can ship alone. After phase 1, phases 2 to 5 can run in parallel.
+Build what the canvas shows. The order of work is in "How to build this" above; this section describes the end state.
 
 ### The wide board
 
@@ -199,18 +262,7 @@ Stay within Card Service widgets. The add-on is the HTTP-endpoint model in `src/
 
 ### Phases and PRs
 
-1. **Foundations** (one PR):
-   - token change, regenerated outputs;
-   - the sentence-case sweep and its test updates;
-   - `PRINCIPLES.md` updates, if any.
-2. **Wide web, three PRs:**
-   1. **Layout:** selection state, the fourth column with Done as its default, the detail in the fourth column, the toolbar with the quick-add and New list popovers, sidebar states, reserved banner space and the orange note, list rename, ⋯ and delete with Undo.
-   2. **Keyboard:** the command registry, sidebar and board levels, Esc backing out, ⇧-digits, G sequences, the palette, Move to, roving tab stops and focus styles.
-   3. **Links:** the endpoint, adding links in the detail, clickable row links, `o`.
-3. **iPad and Mac wide:** mirror phase 2 in SwiftUI. Includes the Mac toolbar, list delete with Undo, and the iOS link-adding UI. It can start once 2.1 is merged, so it copies something settled.
-4. **Menu bar:** the focus fix and the keyboard model.
-5. **Phone:** the Done button, the top-level Done page, reserved banner space, adding links in the phone detail (iOS and web).
-6. **Gmail:** the card changes and the ticked-row window.
+See "How to build this" above for the order, what goes in each PR, and the checklist. Files below are grouped by app, not by phase.
 
 ### Files to modify
 
@@ -282,8 +334,8 @@ Stay within Card Service widgets. The add-on is the HTTP-endpoint model in `src/
   - The selected row uses `aria-current`.
   - The orange pill is `role="status"`.
   - The Done button on the phone has `aria-current="page"` when showing.
-  - Run `src/marketing/audit.ts` after phase 2 and phase 5.
-- **Screenshots:** the marketing seed and the parity sheet use this copy and layout. Regenerate after phases 1, 2 and 5. Apple PRs get Before | After shots from `fix-shots`.
+  - Run `src/marketing/audit.ts` after phases 2 and 4.
+- **Screenshots:** the marketing seed and the parity sheet use this copy and layout. Regenerate after phases 1, 2 and 4. Apple PRs get Before | After shots from `fix-shots`.
 - **No migration is needed.** `todo_urls` already supports several links per todo.
 
 ## Acceptance criteria
