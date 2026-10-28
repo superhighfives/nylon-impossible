@@ -148,11 +148,22 @@ Three things are easy to get wrong here:
   counts due-or-overdue only, because a badge is an attention count rather than
   a plan for the day. It still takes its cutoff from `TodayDigest`, so the two
   can't disagree about when the day ends.
-- **Nothing polls.** A widget re-renders when its timeline expires (midnight,
-  here) or when something calls `WidgetCenter.reloadTimelines`. Every write
+- **Only the iOS widget polls.** A widget re-renders when its timeline
+  expires or when something calls `WidgetCenter.reloadTimelines`. Every write
   path ends in `WidgetRefresh.reload()` — the app on backgrounding and on
   sign-in/out, the share extension, the Siri intent, and the completion itself.
   A new write path needs one too.
+
+  On iOS each timeline also pulls from the server first
+  (`WidgetServerRefresh`: `GET /todos` and `GET /lists`, 8 seconds, token from
+  `SharedClerk`) and folds the rows into the shared store, so a web edit shows
+  up with the app closed. It asks to be reloaded every 30 minutes, or at
+  midnight if sooner. It never overwrites a row with a pending local change,
+  and it soft-deletes rather than deletes rows the server no longer has,
+  because the app may be suspended holding them; the app's next sync finishes
+  the job. Any failure leaves the store alone. The Mac widget stays on the
+  local store and reloads at midnight: it can't mint a token, and the running
+  Mac app keeps the store current.
 
   The app refreshes on backgrounding rather than per-mutation or per-sync,
   which is both sufficient (leaving the app is the only moment the widget

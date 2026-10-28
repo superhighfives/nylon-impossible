@@ -57,4 +57,14 @@ struct BackgroundSyncTokenTests {
         let token = try jwt(["sub": "user_1"])
         #expect(BackgroundSyncService.expiry(ofJWT: token) == nil)
     }
+
+    /// The widget's server refresh checks the token's user against the
+    /// account the store belongs to before it trusts the server's rows.
+    @Test("Reads sub")
+    func readsSubject() throws {
+        let token = try jwt(["sub": "user_1", "exp": 1_800_000_060])
+        #expect(BackgroundSyncService.subject(ofJWT: token) == "user_1")
+        #expect(BackgroundSyncService.subject(ofJWT: try jwt(["exp": 1])) == nil)
+        #expect(BackgroundSyncService.subject(ofJWT: "not-a-jwt") == nil)
+    }
 }

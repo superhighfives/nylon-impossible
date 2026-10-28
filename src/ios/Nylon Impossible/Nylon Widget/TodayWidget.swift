@@ -28,25 +28,45 @@ struct TodayProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<TodayEntry>) -> Void) {
         Task { @MainActor in
+            #if os(iOS)
+            // Nothing writes the store while the app is closed, so an edit on
+            // the web would otherwise wait for the app to be opened. Pull the
+            // server's rows into the store first; on any failure (offline, no
+            // session, the 8s deadline) the store is left alone and the entry
+            // below is exactly what it would have been without this.
+            if let userId = Self.signedInUserId {
+                await WidgetServerRefresh.refresh(userId: userId, container: SharedModelContainer.shared)
+            }
             let entry = Self.currentEntry()
 
-            // A single entry, refetched at local midnight — which is both when
-            // "due before midnight" starts meaning a different set of todos
-            // and when the meta line's "Tomorrow" becomes "Today" or a due day
-            // tips into overdue. The overnight sweep that ages todos out of the
-            // Today list is the server's, so it lands here with a sync rather
-            // than on this schedule — and that, like every other way the list
-            // changes (an edit in the app, a tap on a checkbox), ends in a
-            // `WidgetRefresh.reload()`, so there's nothing to poll for between.
-            let midnight = TodayDigest.startOfTomorrow(after: entry.date)
-            completion(Timeline(entries: [entry], policy: .after(midnight)))
+            // Every half hour, so the pull above runs again, or at local
+            // midnight if that's sooner — which is both when "due before
+            // midnight" starts meaning a different set of todos and when the
+            // meta line's "Tomorrow" becomes "Today". Every local write still
+            // ends in a `WidgetRefresh.reload()` on top of this.
+            let next = WidgetServerRefresh.nextReload(after: entry.date)
+            #else
+            let entry = Self.currentEntry()
+
+            // The Mac widget stays on the local store: it can't mint a session
+            // token (see `SharedClerk`), and the running Mac app keeps the
+            // store current and reloads this on each save. So a single entry,
+            // refetched at local midnight, when "due before midnight" starts
+            // meaning a different set of todos.
+            let next = TodayDigest.startOfTomorrow(after: entry.date)
+            #endif
+            completion(Timeline(entries: [entry], policy: .after(next)))
         }
+    }
+
+    private static var signedInUserId: String? {
+        UserDefaults(suiteName: BackgroundSyncService.appGroupSuiteName)?
+            .string(forKey: BackgroundSyncService.userIdKey)
     }
 
     @MainActor
     private static func currentEntry(now: Date = Date()) -> TodayEntry {
-        let defaults = UserDefaults(suiteName: BackgroundSyncService.appGroupSuiteName)
-        guard let userId = defaults?.string(forKey: BackgroundSyncService.userIdKey) else {
+        guard let userId = signedInUserId else {
             return TodayEntry(date: now, content: .signedOut)
         }
 
