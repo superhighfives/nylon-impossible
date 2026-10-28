@@ -70,6 +70,8 @@ struct ContentView: View {
     @State var feedbackAfterAccount = false
     @State var chosenListId: String?
     @State var focusComposer = false
+    /// Keeps a sync that moves rows off the page from dropping the keyboard.
+    @State var composerFocus = ComposerFocusGuard()
     @State var renamingList: TodoListModel?
     @State var renameText = ""
     @State var deletingList: TodoListModel?
@@ -211,6 +213,9 @@ struct ContentView: View {
         // the keyboard, and each page pads its last row clear of it.
         .overlay(alignment: .bottom) { bottomBar }
         .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: syncService.state)
+        .onChange(of: pageRows) { old, new in
+            composerFocus.rowsChanged(from: old, to: new, at: Date())
+        }
         .sheet(item: $detailTodo) { todo in
             TodoDetailSheet(
                 todo: todo,
@@ -313,7 +318,8 @@ struct ContentView: View {
                     currentListId: currentListId,
                     chosenListId: $chosenListId,
                     focusRequested: $focusComposer,
-                    onSubmit: add
+                    onSubmit: add,
+                    onFocusChange: composerFocusChanged
                 )
                 .transition(.opacity)
             }
@@ -374,6 +380,14 @@ extension ContentView {
     var currentListId: String? { viewModel.currentListId(in: orderedLists) }
 
     var showsComposer: Bool { currentListId != nil }
+
+    var pageRows: ComposerFocusGuard.PageRows {
+        .init(page: viewModel.page, ids: timeList(viewModel.page).map { rows($0).map(\.id) } ?? [])
+    }
+
+    func composerFocusChanged(_ focused: Bool) {
+        if composerFocus.focusChanged(focused, at: Date()) { focusComposer = true }
+    }
 
     /// Today's "2 moved to This Week overnight" line, or nil.
     var overnightText: String? {
