@@ -179,36 +179,36 @@ enum WidgetServerRefresh {
         operation: @escaping () async -> T?
     ) async -> T? {
         await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
-            let gate = ResumeOnce(continuation)
+            let gate = FirstCaller()
             let work = Task { @MainActor in
                 await operation()
             }
             let timer = Task { @MainActor in
                 try? await Task.sleep(for: limit)
-                if gate.resume(nil) { work.cancel() }
+                guard gate.claim() else { return }
+                continuation.resume(returning: nil)
+                work.cancel()
             }
             Task { @MainActor in
                 let value = await work.value
                 timer.cancel()
-                gate.resume(value)
+                guard gate.claim() else { return }
+                continuation.resume(returning: value)
             }
         }
     }
 
-    /// Resumes its continuation exactly once, whichever side gets there first.
-    private final class ResumeOnce<T> {
-        private var continuation: CheckedContinuation<T?, Never>?
+    /// Lets exactly one side resume the continuation, whichever gets there
+    /// first. Not generic on purpose: a generic class holding the
+    /// continuation crashed Swift 6.3.3's inliner in its deinit when
+    /// archiving the Mac app for release.
+    private final class FirstCaller {
+        private var claimed = false
 
-        init(_ continuation: CheckedContinuation<T?, Never>) {
-            self.continuation = continuation
-        }
-
-        /// True if this call was the one that resumed it.
-        @discardableResult
-        func resume(_ value: T?) -> Bool {
-            guard let continuation else { return false }
-            self.continuation = nil
-            continuation.resume(returning: value)
+        /// True for the first call only.
+        func claim() -> Bool {
+            guard !claimed else { return false }
+            claimed = true
             return true
         }
     }
