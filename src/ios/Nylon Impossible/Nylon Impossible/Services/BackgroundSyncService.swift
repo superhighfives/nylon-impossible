@@ -55,18 +55,27 @@ struct BackgroundSyncService {
     /// When a JWT stops being accepted: its `exp` claim, less a margin for
     /// the request to arrive and for clock drift. Nil when it can't be read.
     static func expiry(ofJWT token: String, margin: TimeInterval = 10) -> Date? {
+        guard let exp = claims(ofJWT: token)?["exp"] as? TimeInterval else { return nil }
+        return Date(timeIntervalSince1970: exp - margin)
+    }
+
+    /// Who a JWT was issued to: its `sub` claim, which for a Clerk session
+    /// token is the Clerk user id. Nil when it can't be read.
+    static func subject(ofJWT token: String) -> String? {
+        claims(ofJWT: token)?["sub"] as? String
+    }
+
+    /// A JWT's payload, decoded but not verified: fine for reading our own
+    /// token's claims, never for trusting anyone else's.
+    private static func claims(ofJWT token: String) -> [String: Any]? {
         let parts = token.split(separator: ".")
         guard parts.count == 3 else { return nil }
         var payload = parts[1]
             .replacingOccurrences(of: "-", with: "+")
             .replacingOccurrences(of: "_", with: "/")
         payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
-        guard
-            let data = Data(base64Encoded: payload),
-            let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let exp = object["exp"] as? TimeInterval
-        else { return nil }
-        return Date(timeIntervalSince1970: exp - margin)
+        guard let data = Data(base64Encoded: payload) else { return nil }
+        return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
 
     /// Upload all unsynced items for the current user to the server.

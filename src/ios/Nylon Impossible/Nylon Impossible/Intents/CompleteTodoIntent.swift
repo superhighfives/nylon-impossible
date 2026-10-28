@@ -68,8 +68,10 @@ struct CompleteTodoIntent: AppIntent {
         // stale, not the store — and since the button only ever offers
         // "complete", passing this to the toggle would un-complete instead,
         // rolling a repeat's dueDate back an occurrence with nothing on screen
-        // to say so. Redraw and leave it alone.
-        guard !todo.isEffectivelyCompleted else {
+        // to say so. Redraw and leave it alone. The same goes for a todo
+        // deleted since (the widget's server refresh soft-deletes rows the
+        // server no longer has): completing it would upload it again.
+        guard !todo.isEffectivelyCompleted, !todo.isSoftDeleted else {
             WidgetRefresh.reload()
             return .result()
         }

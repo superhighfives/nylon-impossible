@@ -4,37 +4,9 @@ import Foundation
 
 @Suite("API Models")
 struct APIServiceTests {
+    /// The decoder `APIService` and the widget's server refresh use.
     private func makeDecoder() -> JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-
-            if let dateString = try? container.decode(String.self) {
-                let formatter = ISO8601DateFormatter()
-                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                if let date = formatter.date(from: dateString) {
-                    return date
-                }
-                formatter.formatOptions = [.withInternetDateTime]
-                if let date = formatter.date(from: dateString) {
-                    return date
-                }
-            }
-
-            if let timestamp = try? container.decode(Double.self) {
-                if timestamp < 32_503_680_000 {
-                    return Date(timeIntervalSince1970: timestamp)
-                } else {
-                    return Date(timeIntervalSince1970: timestamp / 1000)
-                }
-            }
-
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Cannot decode date"
-            )
-        }
-        return decoder
+        .api
     }
 
     private func makeEncoder() -> JSONEncoder {
@@ -106,6 +78,28 @@ struct APIServiceTests {
         let response = try decoder.decode(SyncResponse.self, from: json.data(using: .utf8)!)
         let todo = response.todos[0]
         #expect(abs(todo.createdAt.timeIntervalSince1970 - 1700000000) < 1)
+    }
+
+    /// Every date shape the decoder accepts, to the millisecond: the server's
+    /// `toISOString()`, ISO 8601 without fractions, and unix seconds and
+    /// milliseconds.
+    @Test("Decodes every date shape the API sends", arguments: [
+        ("\"2023-11-14T22:13:20.123Z\"", 1_700_000_000.123),
+        ("\"2023-11-14T22:13:20Z\"", 1_700_000_000),
+        ("\"2023-11-14T23:13:20+01:00\"", 1_700_000_000),
+        ("1700000000", 1_700_000_000),
+        ("1700000000123", 1_700_000_000.123)
+    ])
+    func decodesDateShapes(json: String, expected: Double) throws {
+        let date = try makeDecoder().decode([Date].self, from: Data("[\(json)]".utf8))[0]
+        #expect(abs(date.timeIntervalSince1970 - expected) < 0.0005)
+    }
+
+    @Test("Rejects a date it can't read")
+    func rejectsBadDate() {
+        #expect(throws: DecodingError.self) {
+            try makeDecoder().decode([Date].self, from: Data("[\"yesterday\"]".utf8))
+        }
     }
 
     @Test("TodoChange correctly encodes nil fields")

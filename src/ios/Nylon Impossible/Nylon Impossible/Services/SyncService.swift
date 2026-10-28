@@ -240,43 +240,12 @@ final class SyncService {
 
                 // Conflict: compare updatedAt, last write wins
                 if remote.updatedAt > local.updatedAt {
-                    local.title = remote.title
-                    local.parentId = remote.parentId.flatMap { UUID(uuidString: $0) }
-                    if let remoteListId = remote.listId, remoteListId.lowercased() != local.listKey?.lowercased() {
-                        local.listKey = remoteListId.lowercased()
-                        local.listEnteredAt = Date()
-                    }
-                    local.itemNotes = remote.notes
-                    local.isCompleted = remote.completed
-                    local.completedAt = remote.completedAt
-                    local.position = remote.position ?? local.position
-                    local.dueDate = remote.dueDate
-                    local.recurrence = remote.recurrence
-                    // pinned is user-toggled, so it follows the same
-                    // last-write-wins resolution as the other user-editable
-                    // fields here.
-                    local.pinned = remote.isPinned
-                    local.updatedAt = remote.updatedAt
-                    local.isSynced = true
+                    local.apply(remote: remote)
                 }
                 // If local is newer, it will be synced on next sync
             } else {
                 // New remote item - create locally
-                let todo = TodoItem(title: remote.title, userId: userId, position: remote.position ?? "a0")
-                todo.id = remoteId
-                todo.parentId = remote.parentId.flatMap { UUID(uuidString: $0) }
-                todo.listKey = remote.listId?.lowercased()
-                todo.listEnteredAt = Date()
-                todo.itemNotes = remote.notes
-                todo.isCompleted = remote.completed
-                todo.completedAt = remote.completedAt
-                todo.dueDate = remote.dueDate
-                todo.recurrence = remote.recurrence
-                todo.pinned = remote.isPinned
-                todo.createdAt = remote.createdAt
-                todo.updatedAt = remote.updatedAt
-                todo.isSynced = true
-                todo.isSoftDeleted = false
+                let todo = TodoItem(remote: remote, id: remoteId, userId: userId)
                 modelContext.insert(todo)
             }
         }
