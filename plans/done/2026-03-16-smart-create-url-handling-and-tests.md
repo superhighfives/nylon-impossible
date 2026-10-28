@@ -2,8 +2,58 @@
 title: Smart create URL handling and test coverage
 status: Complete
 created: 2026-03-16
-updated: 2026-03-16
+updated: 2026-10-27
 ---
+
+## Overview
+
+Sharing a very long URL (a Google search link, say) to the iOS app gave a bare
+400. When AI extraction failed, `POST /todos/smart` used the raw text as the
+title, and that broke the 500-character limit. This change gave URL-only input
+a short "Check {domain}" title, kept the full link in `todo_urls`, added a
+safety truncation for any title over 500 characters, and gave the smart-create
+endpoint its first real test coverage. Shipped in #33 (2026-03-16).
+
+The URL handling has outlived the AI path it was written around. #94
+(2026-03-26) removed the `shouldUseAI()` heuristic in favour of
+post-creation enrichment, and #355 (2026-09-22) removed AI enrichment
+entirely, along with the opt-in real-AI tests and their workflow. The "Check
+{domain}" fallback and `truncateTitle` are still the create path today.
+
+## Architecture
+
+**Helpers.** `src/api/src/lib/url-helpers.ts` holds `extractDomain`,
+`createFallbackFromUrl` and `truncateTitle` as planned, plus a
+`cleanUrlString` (added in review) that strips trailing punctuation the URL
+regex picks up, such as `.` and `)`. Review also made `truncateTitle` work on
+code points (`Array.from`) so it can't split an emoji's surrogate pair.
+
+**Handler.** `smart-create.ts` got a `createFallbackItem()` used on every
+fallback path. If one URL is more than 80% of the input, the todo becomes
+"Check {domain}" with the URL attached. Otherwise the text is truncated.
+`createAndReturn()` truncates every title again before insert as a safety net.
+
+**Tests.** `test/unit/url-helpers.test.ts` and
+`test/integration/smart-create.test.ts` were added as planned. The AI mock
+changed shape on the way in. The first `__mocks__/ai.ts` (a fake `ai.run`
+returning tool calls) went unused and was dropped in review. The one that
+shipped (`6c52b67`) mocks `extractTodos` from `src/lib/ai.ts`, and
+`vitest.config.ts` swaps it in with a module alias unless
+`RUN_AI_TESTS=true`.
+
+**Real AI tests.** `smart-create-ai.test.ts` used a separate
+`wrangler.test-ai.jsonc` with the Workers AI binding, selected by
+`RUN_AI_TESTS`, and ran from a manually dispatched
+`.github/workflows/api-test-ai.yml`. That way the default suite stayed fast
+(~2s) and didn't need the AI binding. All of this went with #355.
+
+**Today.** `src/api/src/handlers/smart-create.ts` is a thin wrapper over
+`createSmartTodo` in `src/api/src/lib/create-todo.ts`, shared with the Gmail
+add-on. The bare-link check there is stricter than the 80% rule: it applies
+only when the input has no letters or digits apart from the URL. Sync also
+runs incoming titles through `truncateTitle`, and `isPlaceholderTitle` lets a
+later metadata fetch replace "Check {domain}" with the page title.
+
 
 ## Problem
 

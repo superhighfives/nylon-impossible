@@ -2,7 +2,7 @@
 title: Subscription Plans (Free + Pro)
 status: Complete
 created: 2026-03-23
-updated: 2026-03-23
+updated: 2026-10-27
 ---
 
 **Scope:** API + Shared Schema + Web UI
@@ -28,6 +28,39 @@ Payment processing (Stripe) and usage-based credits/trials remain out of scope
 — plan upgrades are still a manual DB update (`users.plan = 'pro'`). A future
 plan covers the payment integration and, if credits are introduced, the
 usage-tracking schema they require.
+
+## Architecture
+
+This spec landed in March (#86) but wasn't built until July, by which time
+AI ran after creation and sat behind a per-user `aiEnabled` switch
+(`plans/done/2026-03-25-ai-features.md`). The gate was built on top of that
+switch.
+
+- **#191 (2026-07-01).** Migration `0011_add_user_plan.sql` added
+  `users.plan` (`'free' | 'pro'`, default `'free'`), not `0002` as the spec
+  said, since `0002` was already taken. `lib/auth.ts` loads `aiEnabled` and
+  `plan` in one query and sets both on the context, typed in `types.ts`.
+  `smart-create.ts` runs AI only when `aiEnabled && plan === "pro"`. The
+  spec's `shouldUseAI` heuristic was already gone, so pro users with AI on
+  always got enrichment. The same PR added the `src/admin` app and
+  `PATCH /admin/users/:id/plan`, so plans were flipped from the admin UI
+  instead of by hand in the database.
+- **#194 (2026-07-04).** `GET/PATCH /users/me` returned `plan`, and the web
+  and iOS apps showed the AI toggle only to pro users. The admin plan
+  endpoint became a general `PATCH /admin/users/:id`.
+- **#219 (2026-07-10).** Gated `POST /todos/:id/research` and
+  `POST /todos/:id/reply` with a new `pro_required` (403) error, hid the
+  location field and "Not used by AI" hint from free users, removed the dead
+  web `AiToggle`, and wrote the Overview above.
+
+Stripe and usage credits were never built.
+
+**This no longer exists.** Eight days after #219, #234 (2026-07-18) dropped
+the plan gate: the AI split button never showed for anyone without Pro, so
+every AI feature went back to depending on `aiEnabled` alone, and
+`ai_disabled` replaced `pro_required`. AI enrichment itself was removed in
+#355 (2026-09-22). The `plan` column, its `/users/me` field and the admin
+plan editing were removed in the backend schema reset (#386, 2026-10-18).
 
 ## Problem
 

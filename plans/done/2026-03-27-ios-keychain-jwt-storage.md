@@ -2,10 +2,57 @@
 title: iOS Keychain JWT Storage
 status: Complete
 created: 2026-03-27
-updated: 2026-03-27
+updated: 2026-10-27
 ---
 
 **Scope:** iOS
+
+## Overview
+
+The Clerk JWT that Siri, the share extension and background sync use was
+sitting in plain text in the App Group's UserDefaults plist. #125 (merged
+2026-04-05) moved it and its expiry into the Keychain, in an access group
+shared by the app and its extensions, readable after first unlock so
+background refresh still works while the phone is locked. Existing installs
+copy the old token across once and the UserDefaults entries are deleted.
+
+It is still how the token is stored. The Mac app (#408) reused it, and #462
+(2026-10-25) changed what goes into it: ClerkKit now shares one session
+between the app and its extensions, so `BackgroundSyncService` mints a
+fresh token itself and only falls back to the stored one while its real
+`exp` hasn't passed.
+
+## Architecture
+
+- `Utils/KeychainHelper.swift` wraps `SecItem*` for generic-password items
+  under the service `com.superhighfives.Nylon-Impossible.shared`, with
+  string and date helpers. Writes update first and add only on
+  `errSecItemNotFound`, so a failed write never destroys the old value.
+- `AuthService` writes the token and expiry with `persistAuthTokenToKeychain()`
+  and deletes them on sign-out, along with any leftover UserDefaults copies.
+  `migrateAuthTokenFromUserDefaultsToKeychain()` does the one-time copy; the
+  app calls it when `isSignedIn` turns true, just before writing a fresh token.
+- `BackgroundSyncService` reads the token from the Keychain instead of
+  UserDefaults. `userId` stays in shared UserDefaults, as the plan allowed.
+- `keychain-access-groups` (`$(AppIdentifierPrefix)com.superhighfives.Nylon-Impossible.shared`)
+  is in the app and share-extension entitlements, and later the widget's
+  and the macOS variants.
+
+Deviations, mostly from review (e709373):
+
+- **No `kSecAttrAccessGroup` in code.** The plan passed the access group to
+  each call. The `$(AppIdentifierPrefix)` placeholder only expands in
+  entitlements, not at runtime, so items are keyed by `kSecAttrService` and
+  the entitlement scopes them to the group. The helper's functions take no
+  `accessGroup` argument.
+- **Update-then-add** instead of delete-then-add, and `loadUnaligned` when
+  decoding the stored date.
+- **macOS** (#408) sets `kSecUseDataProtectionKeychain`, because the legacy
+  file keychain ignores access groups and wouldn't share the token with the
+  widget.
+
+I couldn't confirm from the repo whether the provisioning profiles were
+updated by hand or picked up by automatic signing.
 
 ## Problem
 

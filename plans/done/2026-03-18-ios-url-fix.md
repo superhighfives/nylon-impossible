@@ -2,8 +2,38 @@
 title: "Plan: Fix iOS URL Title Causing 400 Server Error"
 status: Complete
 created: 2026-03-18
-updated: 2026-03-18
+updated: 2026-10-27
 ---
+
+## Overview
+
+Sharing a long URL (a Google Search result, say) into the iOS Share
+Extension pre-filled the title as `Check: <full URL>`. That blew past the
+500-character limit on `POST /todos/sync`, and the sync failed with
+`Server error (400)`. The fix, in PR #37 (`47d8505`, tests in `6d42a3a`),
+gives shared URLs a short `Check domain.com` title, matching the server's
+`createFallbackFromUrl`, and makes the sync handler truncate long titles
+instead of rejecting them.
+
+## Architecture
+
+- **iOS.** The helper went into `TaskCreationService.titleFromURL(_:)`
+  (`Services/TaskCreationService.swift`) rather than a private static on
+  `ShareSheetView` as planned. The commit doesn't say why, but it puts the
+  helper where the test target can reach it. It strips `www.` from the host and falls back to the raw string
+  when the URL doesn't parse. `ShareTitleTests.swift` covers it, including the
+  Google Search URL from the bug report.
+- **Server.** `syncRequestSchema` in `src/api/src/handlers/sync.ts` dropped
+  `.max(500)` on `title` (still `.min(1)`), and both the insert and update
+  paths pass the title through `truncateTitle()` from `lib/url-helpers.ts`.
+  `test/integration/sync.test.ts` checks that a 500+ character title is
+  truncated on create and update, and that an empty title is still rejected.
+
+Both halves are still in place. The share flow has been rebuilt since:
+`ShareSheetView` now lives in the main app target (`Views/Share/`) and
+the title is chosen in `Services/ShareCapture.swift`, which still calls
+`titleFromURL`. iOS also has its own `truncateTitle` in
+`TaskCreationService`.
 
 ## Problem
 

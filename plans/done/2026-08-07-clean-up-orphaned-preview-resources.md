@@ -2,30 +2,36 @@
 title: Clean up orphaned preview resources
 status: Complete
 created: 2026-08-07
-updated: 2026-08-07
+updated: 2026-10-27
 ---
 
 # Clean up orphaned preview resources
 
-## Problem
+## Overview
 
-Debugging why PR preview deploys ("`domains/records` request failed") kept
-failing on unrelated PRs surfaced the real cause: the Cloudflare account was
-sitting on ~230 orphaned Workers and Queues left behind by closed/merged PRs
-going back to PR #107, almost certainly bumping into an account-level quota
-(Workers had 147 scripts total; Queues sat at exactly 100). Investigation
-found `cleanup-preview` (the job that's supposed to delete a PR's preview
-Worker/Queue when the PR closes) deletes the **Worker before the Queue** —
-but a Worker can't be deleted while it's a registered Queue consumer, so that
-delete always failed. Every deletion step had `continue-on-error: true`, so
-this failed silently on every single PR close, for as long as the
-producer/consumer queue pattern has existed.
+PR preview deploys were failing because the Cloudflare account was full of
+about 230 orphaned preview Workers and Queues, left by `cleanup-preview`
+silently failing on every PR close. #278 (merged 2026-08-07) deleted the
+orphans across this repo and two others, fixed the job's delete order and
+error handling, and added a daily `preview-cleanup-sweep.yml` as a backstop.
+#281 fixed both jobs failing before checkout.
 
-Same repo, `records.charliegleason.com`, and `nowhere-forever` all shared
-this pattern and all had orphaned resources; only `nylon-impossible`'s were
-cleaned up here.
+All of it was retired nine days later. #298 (2026-08-16) moved PR previews to
+Cloudflare Worker Previews, which evict themselves, and deleted
+`cleanup-preview`, the `closed` trigger and the sweep workflow (see
+`plans/done/2026-08-13-migrate-pr-previews-to-worker-previews.md`). Per-PR
+queues no longer exist, so neither does this failure mode.
 
-## Solution
+## Architecture
+
+Everything lived in `.github/workflows/web-deploy.yml` (`deploy-preview` and
+`cleanup-preview`) and the new `.github/workflows/preview-cleanup-sweep.yml`.
+The one-time cleanup was a hand-run `wrangler` script and wasn't committed.
+The stuck `nylon-impossible-api-pr-107` Worker described below was still
+there when #298 deleted the sweep. The repo doesn't record whether it was
+cleared later.
+
+### What shipped
 
 1. **One-time cleanup**: computed the diff between every PR-preview-shaped
    Worker/Queue in the account and currently-open PRs (across all three
@@ -47,19 +53,7 @@ cleaned up here.
    via the GitHub API, and deletes anything orphaned using the same
    consumer-then-worker-then-queue order.
 
-## Tasks
-
-- [x] Delete ~230 orphaned Workers/Queues across `nylon-impossible`,
-      `records.charliegleason.com`, `nowhere-forever` (verified against each
-      repo's open PRs first).
-- [x] Fix `cleanup-preview`'s deletion order and error-swallowing in
-      `nylon-impossible`.
-- [x] Fix the queue-creation step's blanket `|| true` in `deploy-preview`.
-- [x] Add `preview-cleanup-sweep.yml` scheduled backstop to `nylon-impossible`.
-- [ ] Same fixes for `records.charliegleason.com` — tracked separately.
-- [ ] Same fixes for `nowhere-forever` — tracked separately.
-
-## Deviations / known issues
+### Deviations / known issues
 
 - **`nylon-impossible-api-pr-107` could not be deleted.** It has a
   server-side orphaned queue-consumer registration pointing at a queue ID
@@ -80,3 +74,33 @@ cleaned up here.
   `records` used a `records-pr-N` queue name when it actually uses
   `records-analyze-pr-N`. The sweep paginates fully via `result_info` and
   matches Worker/Queue names directly rather than assuming a shared pattern.
+
+## Problem
+
+Debugging why PR preview deploys ("`domains/records` request failed") kept
+failing on unrelated PRs surfaced the real cause: the Cloudflare account was
+sitting on ~230 orphaned Workers and Queues left behind by closed/merged PRs
+going back to PR #107, almost certainly bumping into an account-level quota
+(Workers had 147 scripts total; Queues sat at exactly 100). Investigation
+found `cleanup-preview` (the job that's supposed to delete a PR's preview
+Worker/Queue when the PR closes) deletes the **Worker before the Queue** —
+but a Worker can't be deleted while it's a registered Queue consumer, so that
+delete always failed. Every deletion step had `continue-on-error: true`, so
+this failed silently on every single PR close, for as long as the
+producer/consumer queue pattern has existed.
+
+Same repo, `records.charliegleason.com`, and `nowhere-forever` all shared
+this pattern and all had orphaned resources; only `nylon-impossible`'s were
+cleaned up here.
+
+## Tasks
+
+- [x] Delete ~230 orphaned Workers/Queues across `nylon-impossible`,
+      `records.charliegleason.com`, `nowhere-forever` (verified against each
+      repo's open PRs first).
+- [x] Fix `cleanup-preview`'s deletion order and error-swallowing in
+      `nylon-impossible`.
+- [x] Fix the queue-creation step's blanket `|| true` in `deploy-preview`.
+- [x] Add `preview-cleanup-sweep.yml` scheduled backstop to `nylon-impossible`.
+- [ ] Same fixes for `records.charliegleason.com` — tracked separately.
+- [ ] Same fixes for `nowhere-forever` — tracked separately.

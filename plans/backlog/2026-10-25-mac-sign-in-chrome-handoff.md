@@ -1,7 +1,11 @@
-# Mac sign-in stalls when Chrome is the default browser
+---
+title: Mac sign-in stalls when Chrome is the default browser
+status: Backlog
+created: 2026-10-25
+updated: 2026-10-25
+---
 
-**Date**: 2026-10-25
-**Status**: Backlog
+# Mac sign-in stalls when Chrome is the default browser
 
 ## Problem
 

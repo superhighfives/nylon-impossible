@@ -2,8 +2,40 @@
 title: Logo as Favicon, App Icons, and README Branding
 status: Complete
 created: 2026-02-27
-updated: 2026-02-27
+updated: 2026-10-27
 ---
+
+## Overview
+
+Replaced the TanStack starter branding with the Nylon Impossible pixel-art
+logo: SVG and ICO favicons, an Apple touch icon, PWA icons, the iOS app icon,
+manifest names and colours, and a logo at the top of the README. Everything
+was generated from one source SVG with `rsvg-convert`. It shipped as #6 on
+2026-02-27, with a Copilot follow-up (#7) that added the `manifest` link and
+`theme-color` meta to `__root.tsx`.
+
+None of these assets are still current. A new icon set replaced them on
+2026-03-08, and the favicon and in-app logo have been reworked several times
+since (light/dark favicons, the yellow brand colour in #299, the Mac app's
+icons in #408).
+
+## Architecture
+
+The pipeline was as planned. `assets/logo.svg` was the single source,
+`rsvg-convert` produced each raster size, `sips` turned the 32px PNG into
+`favicon.ico`, and `__root.tsx` `head()` linked the SVG favicon, the ICO and
+the touch icon.
+
+Before #6 merged, a second commit (8d7f155) removed the gradient background
+from the SVG, cropped the viewBox to the artwork with about 5% padding, and
+regenerated the rasters. Later that day a commit on the preview-API branch
+(be6af14, part of #16) put the earlier PNGs back for the touch, PWA and iOS
+icons. Git shows which files went back but not why. A transparent icon
+doesn't work for iOS or touch icons, so that's the likely reason. That left
+the SVGs with no background and the raster icons with the gradient.
+
+The plan's verification steps (checking in the browser and in Xcode) aren't
+recorded anywhere, so I can't say whether they were run.
 
 ## Context
 

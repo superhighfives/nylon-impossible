@@ -9,8 +9,7 @@ plans/
 ├── backlog/     # Stubs and ideas not yet ready for work
 ├── ready/       # Fully specced plans ready for an agent to implement
 ├── in-progress/ # Plans currently being worked on
-├── done/        # Completed work with full documentation
-└── assets/      # Supporting files (images, diagrams, etc.)
+└── done/        # Completed work with full documentation
 ```
 
 ## File Naming Convention
@@ -24,6 +23,21 @@ YYYY-MM-DD-descriptive-name.md
 - **Date**: When the plan was created (ISO 8601 format)
 - **Descriptive name**: Kebab-case description of the work
 - **Extension**: Always `.md`
+
+## Frontmatter
+
+Every plan starts with YAML frontmatter:
+
+```yaml
+---
+title: Add OAuth login
+status: Ready         # Backlog | Ready | In Progress | Complete
+created: 2026-07-01   # matches the filename's date prefix
+updated: 2026-07-17   # bump whenever you touch the file
+---
+```
+
+`status` mirrors the directory the plan lives in.
 
 ### Examples
 
@@ -71,7 +85,7 @@ Plans actively being implemented.
 
 **Characteristics:**
 - Moved from `ready/` when work begins
-- Status header updated to `In Progress`
+- `status` updated to `In Progress`
 - May include implementation notes as work progresses
 - Helps track what's currently being worked on
 
@@ -103,6 +117,13 @@ Documentation of completed work.
 ### Backlog Stub
 
 ```markdown
+---
+title: Title
+status: Backlog
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+---
+
 # Title
 
 Brief description of the problem or opportunity.
@@ -113,10 +134,14 @@ Maybe a note about why this matters or what triggered the idea.
 ### Ready Spec
 
 ```markdown
-# Title
+---
+title: Title
+status: Ready
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+---
 
-**Date**: YYYY-MM-DD
-**Status**: Ready
+# Title
 
 ## Problem
 
@@ -152,10 +177,14 @@ Detailed approach to solving the problem.
 ### Done Documentation
 
 ```markdown
-# Title
+---
+title: Title
+status: Complete
+created: YYYY-MM-DD
+updated: YYYY-MM-DD
+---
 
-**Date**: YYYY-MM-DD
-**Status**: Complete
+# Title
 
 ## Overview
 

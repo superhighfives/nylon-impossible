@@ -1,4 +1,78 @@
+---
+title: Feedback inbox
+status: Complete
+created: 2026-10-21
+updated: 2026-10-27
+---
+
 # Feedback inbox
+
+## Overview
+
+Every app (web, iOS, iPadOS and Mac) has an admin-only **Send feedback**:
+a sentence and a screenshot become a labelled GitHub issue in this repo,
+with the platform, version, screen and appearance filled in automatically.
+On iOS, taking an ordinary screenshot offers a "Send as feedback" pill. The
+point is to capture the problem while you're looking at it.
+
+#412 (merged 2026-10-21) built the endpoint and all four clients, filing to
+a private `nylon-feedback` repo. #413 (same day) moved the issues and
+screenshots here and added `feedback.yml`. When the owner applies
+`auto-fix` (the API does that for admins' reports), Claude reads the issue
+and either opens a draft fix PR or comments with its questions. #423 made
+that loop actually run.
+
+Later work builds on it. `plans/done/2026-10-22-feedback-fix-previews.md`
+covers before/after screenshots on Apple-platform fix PRs (#433 onward).
+#487 runs fixes in rounds, counted by `fix-round:N` labels, until a
+`needs-decision` label stops them; #493 sends the owner's `@claude`
+replies on auto-fix issues to those rounds. CLAUDE.md's "Feedback issues"
+section describes the current behaviour.
+
+## Architecture
+
+- **API.** `handlers/feedback.ts` validates the body and `lib/feedback.ts`
+  does the GitHub work. Each image is committed to
+  `screenshots/YYYY/MM/<uuid>.<ext>` on the orphan `feedback-assets`
+  branch through the Contents API, then the issue is opened with the
+  images embedded, the labels `feedback` + `platform:<platform>` (plus
+  `auto-fix` for an admin), and a context table. The route sits behind
+  `authMiddleware` + `requireAdmin`, and `GET /users/me` reports `isAdmin`.
+  `FEEDBACK_REPO` is a var in `wrangler.jsonc` and `GITHUB_FEEDBACK_TOKEN`
+  a secret. Without the token (as on previews) the route returns
+  `feedback_unavailable`.
+- **Web.** `components/FeedbackDialog.tsx` (paste, drop, file picker),
+  `lib/feedback.ts` (context and image encoding) and `hooks/useFeedback.ts`.
+  It opens from the phone account sheet, the wide sidebar, and `f` on the
+  wide board. `vite.config.ts` injects the commit SHA.
+- **iOS, iPadOS, Mac.** One shared implementation:
+  `Services/FeedbackService.swift` builds the request and context.
+  `Views/Feedback/FeedbackPresentation.swift` listens for
+  `userDidTakeScreenshotNotification`, snapshots the app's own window and
+  shows the pill (ten seconds since #455). `FeedbackSheet.swift` is the
+  form. The Mac and iPad get Help → Send Feedback… (⇧⌘F) through
+  `MacCommands` and `BoardKeyboard`.
+- **Fixing.** `.github/workflows/feedback.yml` runs on an `auto-fix` label
+  applied by the repo owner, or on `workflow_dispatch`. It picks
+  `macos-26` or `ubuntu-latest` from the platform label, checks the
+  screenshots out into a git-excluded `.feedback-assets/`, and runs Claude
+  with a quoted `--allowedTools` list. Force-push, hard reset and merge are
+  denied. #413 also fixed `claude.yml`: it read a
+  `github.actor_association` field that doesn't exist, so it had skipped
+  every run. It now checks each event's `author_association` and, on
+  feedback issues and PRs, answers only the owner.
+
+Deviations from the first cut:
+
+- **Private repo to public.** Fixing needs this repo's code and CI, and
+  macOS runners are free on public repos but billed at 10× on private ones.
+  Every screenshot is therefore public, and both dialogs say so.
+- **Fixes start from a label, not from every issue.** `auto-fix` is the
+  owner's sign-off on the issue body as a prompt, and the workflow checks
+  the sender as well as the label.
+- **#423.** `claude_args` is split like a shell command line, so the
+  unquoted `Bash(bun run *)` rule broke apart. Every Bash call was refused
+  and runs ended after two turns while still reporting success.
 
 ## Problem
 

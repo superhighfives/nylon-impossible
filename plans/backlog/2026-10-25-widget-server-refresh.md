@@ -1,7 +1,11 @@
-# Refresh the Today widget from the server
+---
+title: Refresh the Today widget from the server
+status: Backlog
+created: 2026-10-25
+updated: 2026-10-25
+---
 
-**Date**: 2026-10-25
-**Status**: Backlog
+# Refresh the Today widget from the server
 
 ## Problem
 

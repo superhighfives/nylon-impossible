@@ -2,8 +2,34 @@
 title: Web Mobile Popover Menu
 status: Complete
 created: 2026-03-24
-updated: 2026-03-24
+updated: 2026-10-27
 ---
+
+## Overview
+
+On phone-width web there's no hover, so the row actions that desktop hides
+until hover were always visible on every todo. PR #128 (`525482c`,
+2026-04-07) put them behind a single `⋯` button below the `sm` breakpoint,
+which opens a Base UI menu with expand and delete. Desktop didn't change.
+#87 had landed the spec and a stub component two weeks earlier.
+
+## Architecture
+
+- `src/web/src/components/TodoActionsMenu.tsx`: `@base-ui/react/menu` with
+  a Portal and Positioner, styled like the `Select` popup. The delete item is
+  red and disabled while `deletePending`.
+- `TodoList.tsx`: `TodoItemContent` renders the menu inside
+  `flex sm:hidden` and the existing hover-revealed control inside
+  `hidden sm:flex`.
+
+One deviation: the plan's Edit item became "Expand details" / "Collapse
+details" with a chevron (`514f983`), matching the desktop button's aria
+labels, because "Close" could be read as closing the menu.
+
+**Replaced.** #332 (2026-08-26) removed `TodoActionsMenu`. Mobile rows now
+show their actions (expand, recurrence/pin, delete) in a static row under
+the content instead of behind a menu. The web board has been redesigned
+twice since (#293, and the 2026-10 cohesive redesign).
 
 ## Problem
 

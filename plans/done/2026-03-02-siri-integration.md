@@ -2,8 +2,67 @@
 title: Siri Integration
 status: Complete
 created: 2026-03-02
-updated: 2026-03-02
+updated: 2026-10-27
 ---
+
+## Overview
+
+Lets people add a todo by voice ("Add buy milk to Nylon") through an App
+Intent, without opening the app. An intent can run while the app isn't
+open, so the plan moved the SwiftData store into an App Group container
+every target can open, and pulled todo creation into a shared
+`TaskCreationService`. Those two pieces were also the groundwork for the
+share extension (`2026-03-02-share-sheet-support.md`). Shipped in #19
+(2026-03-04) together with the share sheet, following the task list below
+nearly commit for commit.
+
+As shipped it didn't work end to end: asking Siri to add something did
+nothing, and once that was fixed Siri couldn't take the todo inline and
+often handed the request to Reminders. That took three follow-ups
+(`2026-03-09-siri-integration.md`, `2026-03-13-siri-inline-parameters.md`,
+`2026-03-18-ios-siri-background-sync.md`). The feature is still live and
+has grown since.
+
+## Architecture
+
+What #19 added:
+
+| Component | What was added |
+|-----------|---------------|
+| **Entitlements** | App Group, Siri capability |
+| **SharedModelContainer** | SwiftData container in App Group for shared access |
+| **TaskCreationService** | Reusable task creation logic |
+| **AddTaskIntent** | App Intent for Siri task creation |
+| **AppShortcuts** | Siri phrase registration |
+| **AuthService** | userId persistence to shared UserDefaults |
+
+Every target opens one store, `SharedModelContainer` (`nylon.store` in
+`group.com.superhighfives.Nylon-Impossible`). `AuthService` writes the
+signed-in user's id to the App Group's `UserDefaults` so the intent can
+attribute what it creates. `AddTaskIntent` creates the todo through
+`TaskCreationService`, and the main app syncs it next time it runs. #19
+also added `TaskCreationServiceTests`.
+
+Deviations, in order:
+
+- **Phrases.** The plan's phrases put the String parameter inline
+  ("Add \(\.$taskTitle) to …"). App Shortcuts rejected that, so #19 shipped
+  generic phrases only (`bb7cccc`) and Siri asked for the title.
+- **Not working.** `ae7a927` (2026-03-13, see `2026-03-09-siri-integration.md`)
+  set `openAppWhenRun = false`, added a `requestValueDialog`, and renamed the app to "Nylon"
+  (`CFBundleDisplayName`). #32 brought inline titles back through a
+  `TaskTitleEntity`. `4114b49` (landed in #33) added `INAlternativeAppNames`
+  and app-first phrases because Siri kept sending requests to Reminders.
+- **Sync.** The plan relied on the main app opening. #92 (2026-03-26) added
+  `BackgroundSyncService`, which uploads from the intent's process using a
+  token cached in the App Group, with a `BGAppRefreshTask` fallback. That
+  token moved to the Keychain later (`2026-03-27-ios-keychain-jwt-storage.md`).
+- **Since.** #404 (2026-10-20, cohesive redesign phase 5) added an optional
+  List parameter, composer-style date parsing ("Added to This Week · Due
+  Fri"), and "todo" in user-facing copy. The type names (`AddTaskIntent`,
+  `TaskTitle`) were kept so saved Shortcuts keep working. The intents also
+  build for the Mac app (#408), and `CompleteTodoIntent`/`OpenComposerIntent`
+  now sit alongside it in `Intents/`.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -448,17 +507,6 @@ xcodebuild -scheme "Nylon Impossible" -destination "platform=iOS Simulator,name=
 5. Open app, verify sync happens
 
 ---
-
-## Summary
-
-| Component | What was added |
-|-----------|---------------|
-| **Entitlements** | App Group, Siri capability |
-| **SharedModelContainer** | SwiftData container in App Group for shared access |
-| **TaskCreationService** | Reusable task creation logic |
-| **AddTaskIntent** | App Intent for Siri task creation |
-| **AppShortcuts** | Siri phrase registration |
-| **AuthService** | userId persistence to shared UserDefaults |
 
 ## Acceptance criteria
 

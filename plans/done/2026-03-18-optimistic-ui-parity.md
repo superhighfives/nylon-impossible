@@ -2,7 +2,7 @@
 title: Optimistic UI Parity
 status: Complete
 created: 2026-03-18
-updated: 2026-03-18
+updated: 2026-10-27
 ---
 
 **Completed:** 2026-03-26
@@ -17,6 +17,56 @@ All four changes from the plan were implemented as specced:
 - Web offline banner: new `OfflineBanner.tsx` rendered in `__root.tsx` after `<Header />`.
 - iOS per-item unsynced indicator: small dot in `TodoItemRow.swift` when `isSynced == false`.
 - iOS URL persistence: new `TodoUrl` SwiftData model with inverse relationship to `TodoItem`; `SyncService` replaced in-memory `urlsByTodoId` dict with SwiftData persistence. `TodoUrl+APIConversion.swift` added for the `APITodoUrl(from:todoId:)` convenience init.
+
+## Architecture
+
+The four changes are independent and touch different layers.
+
+- **Web optimistic create** (`src/web/src/hooks/useTodos.ts`). `onMutate`
+  cancels in-flight todo queries, snapshots the cache and inserts a
+  temporary todo; `onError` restores the snapshot; `onSettled` invalidates so
+  the server's copy and position replace the placeholder. From the PR #93
+  review (`b4b547b`): the optimistic id is kept in the mutation context so
+  `onError` can filter it out when there was no snapshot to restore, and
+  `notifyChanged()` moved to `onSuccess` so a failed create isn't broadcast to
+  other clients.
+- **Web offline banner** (`components/OfflineBanner.tsx`, rendered from
+  `routes/__root.tsx`). Its first state reads `navigator.onLine`, with an SSR
+  guard, so a page loaded offline is right on first paint. It uses
+  `<output>` instead of `<div role="status">` to satisfy Biome. In PR #94
+  (`2f88dbb`) the online state moved into a `useOnlineStatus` hook and
+  context, and the header shifts down while the banner is showing so they
+  don't overlap.
+- **iOS unsynced dot** (`Views/Components/TodoItemRow.swift`). A 6pt
+  `Color.appSubtle` dot at the trailing edge of the row while
+  `isSynced == false`.
+- **iOS URL persistence.** `Models/TodoUrl.swift` is a SwiftData model with
+  a cascade-delete relationship from `TodoItem.urls`, which the review made
+  non-optional (`[TodoUrl] = []`). `SyncService.applySync` replaces each
+  affected todo's URL rows from the server response, so `urlsByTodoId` and
+  `urls(for:)` are gone. `TodoUrl.self` is in `SharedModelContainer`'s schema
+  and in the test and preview containers. Callers read `todo.urls` and map
+  them through `APITodoUrl(from:todoId:)`, using the lowercased UUID to match
+  the server's casing.
+
+Deviations from the plan:
+
+- The `APITodoUrl(from:todoId:)` init was first added to `APIService.swift`,
+  then moved with the model into `Models/TodoUrl+APIConversion.swift`
+  (`76bad0c`). The share extension compiles `TodoUrl` through `TodoItem` and
+  `SharedModelContainer` but can't compile `APIService`, so the conversion
+  had to live in a file only the app and tests include.
+- The `TodoEditSheet` URL data source was switched in `ContentView`, which
+  builds the sheet, rather than in the sheet itself.
+- `applySync` fetches affected todos one at a time. The batch
+  `#Predicate { ids.contains($0.id) }` isn't supported by SwiftData's SQL
+  translator and threw at runtime (`0bc1449`).
+
+What's still here: the optimistic create and `OfflineBanner` remain in the
+web app, now inside the redesigned layout. `TodoUrl` still backs iOS link
+metadata. The unsynced dot went with the old row views when the iOS app was
+rebuilt in #398 (Phase 3 of the cohesive redesign), and the new rows don't
+show sync state.
 
 ---
 

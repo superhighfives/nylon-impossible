@@ -2,7 +2,7 @@
 title: Research Agent for Todos
 status: Complete
 created: 2026-03-13
-updated: 2026-03-13
+updated: 2026-10-27
 ---
 
 **Updated:** 2026-03-27  
@@ -11,6 +11,58 @@ updated: 2026-03-13
 ## Overview
 
 When a todo has research intent ("Dogs ages vs human ages", "Best practices for React Server Components", "Book dinner at San Jalisco"), the system automatically researches the topic in the background and attaches a 2-3 sentence summary with numbered citations to the todo. Research runs after creation via `waitUntil`, same pattern as the existing AI enrichment.
+
+Written on 2026-03-13 and reworked on 2026-03-27 for the post-creation AI
+pipeline (`2026-03-25-post-creation-ai-processing.md`, #94), then shipped the
+same day in #98 (merged 2026-03-28). Getting it reliable took several more
+PRs: #107 for research stuck on pending, #109 for iOS, #144 for invented
+links, and #148 for grounded search. #232 made research opt-in. It was then
+removed entirely in #354 (2026-09-21) during the pre-launch simplification
+pass. No research code, table or UI exists today.
+
+## Architecture
+
+As shipped in #98, it followed the phases below closely:
+
+- **Detection.** `TodoEnrichment` in `src/api/src/lib/ai.ts` got the
+  optional `research: { type }` field, and the enrichment tool and prompt
+  were extended as described in Phase 1.
+- **Data.** Migrations `0004_add_todo_research.sql`,
+  `0005_add_research_id_to_todo_urls.sql` and `0006_add_user_location.sql`
+  were applied exactly as planned. Source links were rows in `todo_urls`
+  with a `research_id`, so they reused the existing metadata fetch and card
+  UI.
+- **Execution.** `src/api/src/lib/research.ts` ran general or location
+  research with `@cf/moonshotai/kimi-k2.5`. `ai-enrich.ts` started it after
+  enrichment, and `src/api/src/handlers/reresearch.ts` served
+  `POST /todos/:id/research`.
+- **Web.** `ResearchSection.tsx` in the expanded todo, a pending spinner in
+  `TodoList.tsx`, and `SettingsModal.tsx` with the location field.
+
+Where it departed from the plan:
+
+- **A queue, not `waitUntil`** (#107). Research inside the enrichment's
+  `waitUntil` got killed by the Worker's duration limit before its `catch`
+  could mark it failed, so todos stayed on "Researching…" forever. Jobs
+  moved to a Cloudflare Queue (`RESEARCH_QUEUE`, with retries and a
+  dead-letter queue), which gave each job its own invocation and let the
+  timeout go from 20s to 5 minutes. The same PR cancelled research when its
+  todo was deleted, re-ran it when the title changed, and added cancel/retry
+  to the UI. Preview deploys had to strip the queue consumer (`8df2059`).
+- **Web search was never real.** The plan assumed kimi-k2.5 could search the
+  web. It couldn't, and the source URLs it cited were made up from training
+  data. #144 changed the prompts and hid research links in the collapsed
+  row. #148 (2026-05-04) fixed it properly: `searchWeb()` called the Tavily
+  API, and a model (glm-4.7-flash) summarised only the sources Tavily
+  returned, so every stored URL came from a real search result.
+- **Settings grew.** The modal took over the AI toggle and moved to a
+  bottom-right button, and the location field gained a "use current
+  location" button (browser geolocation reverse-geocoded through Nominatim).
+  This was all in `6ad296c`, the same commit that fixed parsing of kimi's
+  OpenAI-style `choices[0].message.content` responses. Before that fix,
+  every research run failed.
+- **iOS** was out of scope here but followed in #109, with the location
+  field added to the iOS settings in `6ad296c`.
 
 ## What triggers research
 

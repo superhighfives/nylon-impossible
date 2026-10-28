@@ -2,9 +2,30 @@
 title: Kumo to Radix Migration Plan
 status: Complete
 created: 2026-03-05
-updated: 2026-03-05
+updated: 2026-10-27
 phase: 1
 ---
+
+## Overview
+
+Dropped, never started. This was the lower-effort route off Kumo: swap in
+pre-styled Radix Themes components with a near-identical API. It was written
+the same day as the Base UI alternative
+(`2026-03-05-kumo-to-baseui-migration.md`), and the Base UI plan won because
+the goal was a fresh design with full control over styling, which Radix
+Themes' theme props limit. Base UI shipped in #20 on 2026-03-06. Every
+checkbox below is unticked, and `@radix-ui/themes` never appears in the
+repo's history. This file only reached `done/` when plans were moved
+together in `14c9acd`. Its `status: Complete` means "closed", not
+"implemented".
+
+## Architecture
+
+Nothing from this plan shipped. The one overlap was `tailwindcss-radix-colors`,
+which both plans used and which arrived through the Base UI migration
+(gray/indigo/tomato, not the blue/gray defaults proposed here). It was
+removed in the 2026-10 cohesive redesign (#401). So no Radix Themes code,
+config or colour scale from this plan is left in the repo.
 
 ## Goal
 Replace `@cloudflare/kumo` with Radix Themes for UI components and `tailwindcss-radix-colors` for Tailwind color utilities.

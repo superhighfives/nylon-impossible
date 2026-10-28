@@ -2,17 +2,23 @@
 title: iOS Clerk authentication and data sync
 status: Complete
 created: 2026-02-20
-updated: 2026-02-20
+updated: 2026-10-27
 ---
 
-Add Clerk authentication to the iOS app and sync todos between web and iOS via a shared D1 database.
+## Overview
 
-## Goals
+This gave the iOS app accounts and sync. Users sign in with the same Clerk
+accounts as web, keep their todos in a local SwiftData store so the app
+works offline, and sync with the web through a new standalone API worker
+(`src/api`) that shares the web app's D1 database. The work was committed
+straight to `main` on 2026-02-20, with no PR (5788abb for the API worker,
+0aa1b2a to add it to the workspace, 7601867 for the iOS app), and was tidied
+up in "Pre-production updates" on 2026-02-22.
 
-- iOS users can sign in with Clerk (same accounts as web)
-- Todos sync between web and iOS
-- iOS works offline with local SwiftData cache
-- Simple, maintainable architecture
+Its main pieces still exist: the API worker, `POST /todos/sync`, ClerkKit
+sign-in, and the `AuthService` / `APIService` / `SyncService` split. The
+5-second polling is gone. Durable Object WebSockets replaced it a week later
+(`2026-02-25-durable-objects-websocket-sync.md`).
 
 ## Architecture
 
@@ -45,6 +51,40 @@ Add Clerk authentication to the iOS app and sync todos between web and iOS via a
      │ (sessions)  │                 │ (JWT)       │
      └─────────────┘                 └─────────────┘
 ```
+
+### As built
+
+Most of the plan went in as written. The plan was edited on 2026-02-26 and
+2026-02-27, though, so some of what it lists as complete arrived after
+2026-02-20:
+
+- **`position` and fractional indexing** came with drag-and-drop reordering
+  in #2 (2026-02-25), not on 2026-02-20. That PR added
+  `Utils/FractionalIndexing.swift` and the `position` column on both sides,
+  and removed the iOS filter tabs.
+- **Environment config** at first switched on `#if DEBUG` and had one
+  hard-coded test Clerk key. The simulator-vs-device split shown below came
+  in with the fastlane setup on 2026-02-24. Today `Config.swift` uses `targetEnvironment(simulator)` for the
+  Clerk key and for localhost, and a device build reads `APIBaseURL` from
+  Info.plist so preview builds can point at a preview API (#16).
+- **Sync triggers**: 5s polling plus a 500ms debounced sync lasted about
+  six days. WebSocket sync (db8577e, 2026-02-26) removed both.
+  `syncAfterAction()` now syncs straight away and then pings the other
+  clients.
+- **Migrations** originally lived in `../web/migrations`. They moved to
+  `src/api/migrations` in March 2026, and web's `wrangler.jsonc` now points at
+  `../api/migrations`.
+- The API began as a hand-rolled router in `index.ts`. It moved to Hono in
+  `2026-02-26-test-suite-implementation.md`.
+
+The original 2026-02-20 spec follows.
+
+## Goals
+
+- iOS users can sign in with Clerk (same accounts as web)
+- Todos sync between web and iOS
+- iOS works offline with local SwiftData cache
+- Simple, maintainable architecture
 
 ## Design decisions
 

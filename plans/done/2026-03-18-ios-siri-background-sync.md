@@ -2,7 +2,7 @@
 title: iOS Siri Background Sync
 status: Complete
 created: 2026-03-18
-updated: 2026-03-18
+updated: 2026-10-27
 ---
 
 **Completed:** 2026-03-26
@@ -12,6 +12,59 @@ updated: 2026-03-18
 ## Overview
 
 Implemented as specced. `BackgroundSyncService.swift` added as a lightweight, dependency-free struct that reads credentials from shared App Group UserDefaults and POSTs unsynced todos to the API. `AddTaskIntent` now attempts an immediate sync after task creation and schedules a `BGAppRefreshTask` as fallback. `BGTaskScheduler` registration and handling added to `Nylon_ImpossibleApp.swift`. `AuthService` updated to persist the Clerk JWT (with a 50-minute expiry window) to shared UserDefaults on foreground and sign-in, and clears it on sign-out. `BGTaskSchedulerPermittedIdentifiers` added to `Info.plist`.
+
+PR #38 landed this spec; PR #92 (commits `6ed5f92`, `fd256f1`) built it.
+
+## Architecture
+
+Two paths get a Siri-created todo to the server without opening the app:
+
+1. **Direct upload from the intent.** `AddTaskIntent.perform()` saves the
+   `TodoItem`, then builds a `BackgroundSyncService` from shared App Group
+   storage and calls `sync(modelContainer:)`. The service fetches the user's
+   unsynced items, POSTs them to `/todos/sync`, and marks them synced on a
+   2xx. It only uploads; the main app's `SyncService` does the full
+   two-way reconcile next time it runs.
+2. **BGAppRefreshTask fallback.** If there are no credentials or the upload
+   fails, the intent submits a `com.nylonimpossible.backgroundsync` request.
+   `Nylon_ImpossibleApp.init()` registers the handler, which schedules the
+   next refresh (15 minutes out), runs a sync and completes the task.
+
+Key files: `Services/BackgroundSyncService.swift`, `Intents/AddTaskIntent.swift`,
+`Nylon_ImpossibleApp.swift`, `Services/AuthService.swift`,
+`Nylon-Impossible-Info.plist`.
+
+Changes from the spec:
+
+- The BGTask handler runs `BackgroundSyncService`, not the full
+  `SyncService` the spec named: the same upload-only path as the intent, with
+  no WebSocket or download. The plan's "if expired, the BGTask handles it via
+  the full `SyncService`" therefore didn't hold; an expired token just failed
+  until the app was opened.
+
+From the PR #92 review (`fd256f1`):
+
+- `sync()` isn't `@MainActor`. The SwiftData fetch and save run in
+  `MainActor.run {}` and the HTTP request runs off the main actor, so a slow
+  network can't trip the watchdog.
+- `apiBaseURL` is a `URL`, not a `String`, and the task identifier is one
+  constant (`BackgroundSyncService.backgroundSyncTaskIdentifier`).
+- The BGTask handler uses a safe cast and a lock-guarded completion helper so
+  `setTaskCompleted` runs once even if the work and the expiration handler
+  race.
+- A failed `getToken()` keeps the saved credentials instead of overwriting
+  them.
+
+Since then the token handling has changed twice. In April the JWT and its
+expiry moved from App Group UserDefaults to a shared Keychain access group
+(`03db26c`, `plans/done/2026-03-27-ios-keychain-jwt-storage.md`). In October,
+#462 found that Clerk session tokens last 60 seconds, so the 50-minute
+window meant these paths nearly always sent an expired token and got a 401.
+`BackgroundSyncService` now mints a token through `SharedClerk` (the app and
+extensions share one ClerkKit session), and uses the saved token only until
+its real `exp`. Only `currentUserId` still comes from shared UserDefaults.
+The service and the BGTask are still in the app, and `CompleteTodoIntent`
+(the widget checkbox) uses the same upload path.
 
 ---
 

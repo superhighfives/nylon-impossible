@@ -2,7 +2,7 @@
 title: Security Hardening
 status: Complete
 created: 2026-02-27
-updated: 2026-02-27
+updated: 2026-10-27
 ---
 
 **Scope**: API + Web + iOS
@@ -15,7 +15,12 @@ Audit and harden auth / permissions across the full stack so every entry point �
 - [#132](https://github.com/superhighfives/nylon-impossible/pull/132) — full audit, cross-user isolation tests, WS auth tests, iOS 401 sign-out
 - [#143](https://github.com/superhighfives/nylon-impossible/pull/143) — follow-up fix for a post-sign-in 401 race
 
-## What shipped
+## Architecture
+
+Mostly an audit: the existing auth middleware, `/ws` upgrade check and
+per-user Durable Object keying held up, and the work was one ownership fix,
+a CORS allowlist, an iOS 401 policy, and tests that pin all of it down. Each
+area below says what was checked and what changed; the file list follows.
 
 ### Clerk JWT verification (API)
 
@@ -56,7 +61,7 @@ The permissive `origin: "*"` was replaced with a strict allowlist regex matching
 
 Not mitigated in code — documented as an accepted risk while the user pool is private/closed. The plan captures the recommended mitigations (scheme allowlist, link-local / private-range denylist) to revisit before enabling public signups.
 
-## Files changed
+### Files changed
 
 | File | Purpose |
 |------|---------|
@@ -68,6 +73,16 @@ Not mitigated in code — documented as an accepted risk while the user pool is 
 | `src/api/test/integration/routing.test.ts` | CORS allow/deny tests, `/ws` auth tests |
 | `src/api/test/integration/todos-crud.test.ts` | Cross-user isolation tests |
 | `src/ios/Nylon Impossible/Nylon Impossible/Services/APIService.swift` | Sign out on 401, with one-shot token refresh retry |
+
+### Since then
+
+- The Clerk webhook (`POST /webhooks/clerk`) and self-serve
+  `DELETE /users/me` both exist now, from #191 (subscription plans + admin
+  app + account deletion), so the first deferred item below is done.
+- `fetchUrlMetadata` callers only accept `http:`/`https:` URLs
+  (`src/api/src/lib/url-helpers.ts`); there's still no private-range or
+  link-local denylist.
+- CORS has grown a dev-only `*.workers.dev` carve-out for Worker Previews.
 
 ## Deferred
 

@@ -2,8 +2,54 @@
 title: Test Suite Implementation
 status: Complete
 created: 2026-02-26
-updated: 2026-02-26
+updated: 2026-10-27
 ---
+
+## Overview
+
+Took the repo from no tests at all to a suite in each of API, web and iOS,
+and moved the API off hand-rolled `if`/regex routing onto Hono first, so it
+could be tested with `app.request()`. It shipped in db8577e on 2026-02-26,
+committed straight to `main` together with Durable Object WebSocket sync
+(`2026-02-25-durable-objects-websocket-sync.md`). There was no PR. The suites
+have grown a lot since. As of 2026-10 there are roughly 30 API test files,
+27 web and 37 iOS, and the layout set up here (`src/api/test/{unit,
+integration}`, `src/web/src/**/__tests__`, the `Nylon ImpossibleTests`
+target) is still the one in use.
+
+## Architecture
+
+- **API**: Hono app in `src/api/src/index.ts`, with auth as middleware that
+  sets `userId` on the context. `Env` became
+  `{ Bindings: {...}; Variables: { userId } }`, the shape the root
+  `CLAUDE.md` now tells handlers to use as `Context<Env>`. Tests run in the
+  Workers runtime through `@cloudflare/vitest-pool-workers`, with real D1
+  (migrations applied in `test/apply-migrations.ts`) and a real `UserSync`
+  DO. Clerk is mocked through `test/__mocks__/clerk-backend.ts`.
+- **Web**: a separate `vitest.config.ts` (jsdom, away from the Cloudflare
+  and TanStack Vite plugins), `src/test/setup.ts`, and a `TestWrapper` in
+  `src/test/helpers.tsx` that provides a QueryClient and a mock
+  WebSocket context.
+- **iOS**: a Swift Testing target. `AuthProviding` / `APIProviding`
+  protocols let `SyncService` run against mocks and an in-memory SwiftData
+  container.
+- **CI**: `.github/workflows/test.yml` with one job per project.
+
+How it differed from the plan:
+
+- **Web coverage was thinner than planned.** Only `validation`, `errors`,
+  `TodoPreview`, `LandingPage` and `Header` tests shipped. `TodoInput`,
+  `TodoList` and `useTodos` tests weren't written in this pass.
+  `TodoPreview` and its test were deleted the next day when smart input
+  (#5) replaced the preview flow.
+- The iOS CI job ran on `macos-15`, not `macos-26`.
+- `test.yml` lasted two days. 47445de (2026-02-27) made deploys wait for
+  it, and #16 then folded it into the deploy workflows. Today the tests run
+  in `web-test.yml` (API and web, via `bun run --cwd src/x test`) and
+  `ios-test.yml`.
+- Smart input's AI binding forced a separate `src/api/wrangler.test.jsonc`
+  for the API tests (853d1ca). That file is still used.
+- Vitest is now 5.x, with a patch pinned in `patchedDependencies`.
 
 ## Context
 

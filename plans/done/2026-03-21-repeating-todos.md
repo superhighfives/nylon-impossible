@@ -2,8 +2,60 @@
 title: Repeating Todos
 status: Complete
 created: 2026-03-21
-updated: 2026-03-21
+updated: 2026-10-27
 ---
+
+## Overview
+
+Repeating todos shipped in PR #174 (2026-06-05), about ten weeks after this
+spec was written (#65). A todo with a due date can repeat daily, weekly,
+monthly or yearly. Completing one moves its due date forward to the next
+occurrence on the same row, rather than cloning a new todo. The same
+`nextDueDate` helper runs on the server and, optimistically, on web and
+iOS, with shared fixtures so they agree. The PR also added the app-icon
+badge (due today or overdue) on iOS and web, and taught AI smart-create to
+pull a recurrence out of text like "every Monday review backlog".
+
+## Architecture
+
+- **Storage.** A nullable JSON `recurrence` column on `todos`
+  (`{ "frequency": ... }`, migration `0009_add_recurrence_to_todos`), typed in
+  `src/shared/src/schema.ts` and mirrored on `TodoItem.swift`.
+- **Advance helper.** `nextDueDate` lives in `src/shared/src/recurrence.ts`,
+  not `src/api/src/lib` as the outline suggested, so the API and web import
+  the same code. The Swift port is `Utils/Recurrence.swift`. The cases are in
+  `src/shared/src/recurrence-test-fixtures.ts`, exported from the shared
+  package for `test/unit/recurrence.test.ts`; `RecurrenceTests.swift` checks
+  the same cases on iOS.
+- **Writes.** The advance is applied in four places: the API's
+  `handlers/todos.ts` and `handlers/sync.ts`, the web server function in
+  `src/web/src/server/todos.ts`, and optimistically in `useTodos.ts` and
+  `TodoViewModel.swift`. The plan named only the API handler and the clients.
+- **Picker.** A recurrence `Select` in `TodoItemExpanded.tsx` and a menu
+  `Picker` in `TodoEditSheet.swift`, both disabled until there's a due date.
+- **Badge.** `src/web/src/lib/badge.ts` (`navigator.setAppBadge`, and
+  `clearAppBadge` at zero so no "0" is left behind) and `Utils/Badge.swift`,
+  which uses `setBadgeCount` rather than the deprecated
+  `applicationIconBadgeNumber` the plan named.
+- **AI.** The `extract_todos` tool in `src/api/src/lib/ai.ts` gained an
+  optional `recurrence` field, and the prompt asks for a matching `dueDate`
+  with it.
+
+The plan's "Advance, don't clone" model changed a month later. In #214
+(2026-07-06), completing a repeat stamps a new `completedAt` and still
+advances the date, but the todo shows as done until local midnight and then
+comes back as active, with no extra write. Unchecking it clears `completedAt`
+and steps the date back with a new `previousDueDate()`. Rows also got a
+recurrence badge ("Weekly on Wednesday").
+
+Later changes, briefly: AI extraction went away with the rest of AI
+enrichment in #355 (2026-09-22). Due dates became calendar days in #370, so
+`nextDueDate` now compares days in the user's time zone instead of instants.
+When time-bucket lists arrived (#291), a repeat's next occurrence started
+landing in Today, This Week or Sometime by how far off its due date is
+(`placementForDueDate()` in the shared recurrence module). In the
+cohesive redesign (#386), completing a todo removes it from its list and
+offers an Undo that restores a repeat's due date and list.
 
 ## Problem
 

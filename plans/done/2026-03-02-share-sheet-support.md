@@ -2,8 +2,59 @@
 title: iOS Share Sheet Support
 status: Complete
 created: 2026-03-02
-updated: 2026-03-02
+updated: 2026-10-27
 ---
+
+## Overview
+
+Adds a "Nylon" share extension, so a link or text from Safari or any other
+app becomes a todo without switching apps. The extension writes into the
+same App Group SwiftData store the app and Siri use
+(`2026-03-02-siri-integration.md`), and the app syncs it to the server
+later, so it works offline. Shipped in #19 (2026-03-04) alongside Siri,
+following the task list below.
+
+The extension is still how sharing to Nylon works on iOS, and now on the
+Mac too. The parts that changed most since are how a shared URL is
+stored, what the title field shows, and the sheet's UI.
+
+## Architecture
+
+What #19 added:
+
+| Component | What was added |
+|-----------|---------------|
+| **Share Extension Target** | New `Nylon Share` target with App Group |
+| **ShareViewController** | Handles URL and text content from share sheet |
+| **ShareSheetView** | SwiftUI UI for editing task before save |
+| **TaskCreationService** | URL-aware task creation method |
+| **Info.plist** | Activation rules for URLs and text |
+
+`ShareViewController` reads the first URL or plain-text attachment, shows
+`ShareSheetView` (a SwiftUI form) for editing the title, and saves through
+`TaskCreationService` into `SharedModelContainer`, using the user id the app
+left in the App Group's `UserDefaults`. Two things the plan didn't cover were
+needed to ship: wiring the `Nylon Share` target into the Xcode project by
+hand-edited `project.pbxproj` (`92616c5`), and a provisioning profile for the
+extension in CI and the Fastfile (`a94b7ca`).
+
+Later changes:
+
+- **URL storage.** The plan's stopgap, putting `URL: …` in the description
+  for the server to extract, shipped as written. #89 (2026-03-25) replaced it
+  with `pendingUrls` on `TodoItem`, sent as an explicit `urls` field in the
+  sync payload.
+- **Titles.** The prefilled `Check: <url>` title broke the 500-character sync
+  limit on long URLs. #37 changed it to `Check <domain>`. #43 fixed apps like
+  Reeder that put a text item before the URL: the plan's "first match wins"
+  scan dropped the URL. It now prefers a URL and uses the sharing app's
+  title. #336 made the
+  suggested title a placeholder instead of text in the field, so the API's
+  `isPlaceholderTitle` can still swap in the page's real title.
+- **UI.** #404 (cohesive redesign phase 5) replaced the form with the app's
+  own composer, adding list chips, due-date parsing and one todo per line.
+  Loading and saving moved into `ShareExtensionLoader`. #408 added a macOS
+  host (`ShareViewController+macOS.swift`).
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -515,16 +566,6 @@ xcodebuild -scheme "Nylon Share" -destination "platform=iOS Simulator,name=iPhon
 6. Verify task syncs to server
 
 ---
-
-## Summary
-
-| Component | What was added |
-|-----------|---------------|
-| **Share Extension Target** | New `Nylon Share` target with App Group |
-| **ShareViewController** | Handles URL and text content from share sheet |
-| **ShareSheetView** | SwiftUI UI for editing task before save |
-| **TaskCreationService** | URL-aware task creation method |
-| **Info.plist** | Activation rules for URLs and text |
 
 ## Acceptance criteria
 

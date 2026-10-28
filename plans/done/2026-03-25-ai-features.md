@@ -2,7 +2,7 @@
 title: AI Features
 status: Complete
 created: 2026-03-25
-updated: 2026-03-25
+updated: 2026-10-27
 ---
 
 **Completed:** 2026-03-27
@@ -27,3 +27,48 @@ All items from this plan were completed across several PRs on the `feature/post-
 - **plans/in-progress folder + lifecycle docs** (PR #91): `plans/in-progress/` created, `AGENTS.md` and `plans/README.md` updated with the backlog → ready → in-progress → done lifecycle.
 
 The research agent (`2026-03-13-research-agent.md`) was implemented separately in PR #98 and the plan has moved to `plans/in-progress/`.
+
+## Architecture
+
+- **AI Gateway (#85).** `src/api/src/lib/ai.ts` calls Workers AI through the
+  `AI` binding with a `gateway` option, so requests go through Cloudflare AI
+  Gateway. The PR first used the gateway's dynamic-routing endpoint, then
+  `ai.gateway().run()`, which returned an empty body under local
+  wrangler/miniflare; it settled on `ai.run()` with the gateway option
+  (`9ac04bb`), and moved to the `kimi-k2.5` model at the same time.
+- **AI toggle (#91).** Migration `0002_add_user_preferences.sql` added
+  `users.ai_enabled`. `lib/auth.ts` loads it onto the context, and
+  `handlers/users.ts` exposes `GET/PATCH /users/me` (CORS had to allow
+  `PATCH`). On web, `useUser.ts` and an `AiToggle`, first in the header and
+  then moved to the bottom-right corner; on iOS, `UserPreferencesService` and
+  a toggle in a new `SettingsView`. `smart-create.ts` skips AI when the
+  preference is off.
+- **Post-creation processing (#94).** `POST /todos/smart` now inserts one
+  todo straight from the text and returns it, with `ai_status` (migration
+  `0003_add_ai_processing_status.sql`) set to `pending`. It then runs
+  `enrichTodoWithAI` from a new `lib/ai-enrich.ts` in `waitUntil`, and that
+  sets the status to complete or failed. The multi-todo split
+  (`lib/smart-input.ts`) and the `shouldUseAI` heuristic were deleted.
+  `aiStatus` is serialized on todos and in the sync response; web shows a
+  small grey loader on the row, and iOS shows an indicator in `TodoItemRow`
+  and `TodoEditSheet`.
+- **Plans lifecycle (#91).** `plans/in-progress/` and the lifecycle docs in
+  `plans/README.md` and `AGENTS.md`.
+
+Deviations and corrections:
+
+- The Overview lists "title cleanup", but before #94 merged `43211be`
+  narrowed enrichment to pulling URLs out of the title, due dates and
+  priority. It doesn't otherwise rewrite the title.
+- Enrichment only ran from `POST /todos/smart`. Todos that reached the
+  server through `/todos/sync`, such as offline iOS creates, weren't
+  enriched.
+- The research agent plan is now in `plans/done/`, not `in-progress/` as
+  the Overview says.
+
+None of this is in the app today. AI was gated on a Pro plan in July
+(`plans/done/2026-03-23-subscription-plans.md`) and back on `aiEnabled` alone
+in #234. The research feature was removed in #354 and AI enrichment, with
+`ai_status` and `ai_enabled`, in #355 (September 2026). `POST /todos/smart`
+still exists but no longer calls a model. The `plans/in-progress/` stage is
+still in use.

@@ -2,12 +2,22 @@
 title: Add Durable Objects + WebSocket for Real-Time Sync
 status: Complete
 created: 2026-02-25
-updated: 2026-02-25
+updated: 2026-10-27
 ---
 
-## Context
+## Overview
 
-Currently, real-time sync uses polling: web polls every 3s via React Query `refetchInterval`, iOS polls every 5s via `SyncService.startPolling()`. This introduces latency for cross-device updates and generates unnecessary API calls when nothing has changed. We're replacing polling entirely with WebSocket push via Cloudflare Durable Objects.
+Replaced polling (web every 3s, iOS every 5s) with WebSocket push. Each user
+gets a `UserSync` Durable Object. It holds every open web and iOS socket for
+that user and tells the others to re-fetch whenever one of them changes
+something. The DO only broadcasts and never touches D1, so clients keep
+their existing write paths. It shipped in db8577e on 2026-02-26, committed
+straight to `main` together with the Hono migration and the first test
+suites (`2026-02-26-test-suite-implementation.md`). There was no separate PR.
+
+The design is still in use. `UserSync.ts`, `GET /ws?token=` and both client
+services exist today, and they are how every web and iOS client hears about
+changes.
 
 ## Architecture
 
@@ -39,6 +49,33 @@ iOS client ───────────────────────
 - Pass Clerk JWT as query param: `wss://api.nylonimpossible.com/ws?token=<jwt>`
 - Verified once at upgrade time in the API worker before forwarding to DO
 - Token expiry during long connections is acceptable — connection drops naturally, reconnect gets fresh token
+
+### As built
+
+The client side went in as planned. Web uses `useWebSocket.ts` (with a
+`useWebSocketSync()` context that the mutation hooks call `notifyChanged()`
+from) and `refetchInterval` was removed. iOS has `WebSocketService.swift`.
+`SyncService` lost its polling and its 500ms debounce, so `syncAfterAction()`
+now syncs straight away and then sends `changed`. Both clients reconnect
+with backoff, and iOS connects and disconnects on `scenePhase`.
+
+One addition the plan didn't have: the DO also takes `POST /notify`, which
+the worker calls itself to broadcast `sync` to *every* socket. Nothing used
+it on day one. Smart input (#5) started calling it the next day, because
+todos the server creates have no client to send `changed`. It now runs
+through `notifySync()` in `src/api/src/lib/notify-sync.ts` and is called by
+most server-side writers (create, AI enrichment, list sweeps, URL metadata),
+so today it's at least as important as the client `changed` path. The
+security pass (`2026-02-27-security-hardening.md`) confirmed `/notify` can't
+be reached from outside: the worker only forwards `/ws` to the DO, after
+verifying the JWT.
+
+The DO binding is `USER_SYNC`, with a `v1` `new_classes` migration in
+`src/api/wrangler.jsonc`, as specified.
+
+## Context
+
+Currently, real-time sync uses polling: web polls every 3s via React Query `refetchInterval`, iOS polls every 5s via `SyncService.startPolling()`. This introduces latency for cross-device updates and generates unnecessary API calls when nothing has changed. We're replacing polling entirely with WebSocket push via Cloudflare Durable Objects.
 
 ## File Changes
 

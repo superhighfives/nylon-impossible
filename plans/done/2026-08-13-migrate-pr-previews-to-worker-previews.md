@@ -1,8 +1,11 @@
-# Migrate PR previews to Worker Previews
+---
+title: Migrate PR previews to Worker Previews
+status: Complete
+created: 2026-08-13
+updated: 2026-08-20
+---
 
-**Date**: 2026-08-13
-**Status**: Complete
-**Updated**: 2026-08-20
+# Migrate PR previews to Worker Previews
 
 ## Implementation notes (2026-08-14)
 

@@ -2,9 +2,54 @@
 title: Kumo to Base UI + Radix Colors Migration Plan
 status: Complete
 created: 2026-03-05
-updated: 2026-03-05
+updated: 2026-10-27
 phase: 1
 ---
+
+## Overview
+
+Replaced Cloudflare's Kumo component library on the web app with a small set
+of in-repo components built on `@base-ui/react` (unstyled) and coloured with
+`tailwindcss-radix-colors` (indigo accent, gray neutrals, tomato for
+errors). The aim was full control over the look rather than restyling a
+pre-styled kit. This won out over the Radix Themes alternative
+(`2026-03-05-kumo-to-radix-migration.md`), which was never started. Shipped
+in #20 (merged 2026-03-06): the migration itself is `2b80e38`, then
+`0299102` removed the last Kumo references, plus Copilot fixups in #21–#23.
+
+Base UI is still the web app's primitive layer. The Radix colour scales and
+most of the components from this plan were replaced by the 2026-10 cohesive
+redesign (`2026-10-18-cohesive-redesign.md`).
+
+## Architecture
+
+#20 added `src/web/src/components/ui/` with `button`, `checkbox`, `input`,
+`field`, `loader` and `select`, re-exported from `ui/index.tsx`, and moved
+`LandingPage`, `TodoInput`, `TodoList` and `TodoItemExpanded` onto them.
+`styles.css` imported the gray, indigo and tomato scales, and `__root.tsx`
+switched dark mode from `data-mode` to a `light`/`dark` class on `<html>`,
+which the scales key off.
+
+Deviations from the plan:
+
+- **Select, not Combobox.** The plan chose Combobox for filtering, but
+  `ui/select.tsx` wraps Base UI's Select instead. Nothing in the history
+  says why; the only dropdown was the three-option priority picker.
+- **No semantic token layer.** Components used raw scale steps
+  (`bg-gray-1`, `text-gray-12`) rather than the `--bg-app`-style tokens in
+  the notes. That custom layer was never built; later code used the
+  library's own semantic utilities instead (`bg-gray-solid` in `0f23d8b`).
+- **Wider than the web app.** `0299102` also renamed the iOS `Color.kumo*`
+  tokens to `Color.app*`, rewrote `src/web/AGENTS.md`, and the PR moved
+  Biome config to the repo root.
+
+Since then the files were renamed to PascalCase (`0d9fae8`, 2026-04-29,
+which also added a Base UI `Toast`). The cohesive redesign removed
+`tailwindcss-radix-colors` (#401). Colours now come from generated tokens
+(`src/shared/design/tokens.json` → `styles/tokens.css`). Over #227, #386 and
+#401, `ui/` was cut down to `Button` and `Toast`. `@base-ui/react` is still a
+dependency, used directly by the dialogs, sheets, menus and toasts in
+`components/phone`, `components/wide` and `FeedbackDialog`.
 
 ## Goal
 

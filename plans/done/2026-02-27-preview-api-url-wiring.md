@@ -2,8 +2,54 @@
 title: Wire Preview Deployments to Use Preview API + Consolidate CI
 status: Complete
 created: 2026-02-27
-updated: 2026-02-27
+updated: 2026-10-27
 ---
+
+## Overview
+
+PR previews used to deploy their own API worker (`api-pr-N`) while the web
+and iOS builds kept talking to production, so an API change in a PR couldn't
+be exercised from its own preview. This made the API base URL a build-time
+input on both clients: the PR's API when the PR changes `src/api/`,
+production otherwise. The same change folded `lint.yml` and `test.yml` into a
+single `checks` job so tests stopped running twice per push. Shipped in #16
+(`fba2496`, 2026-02-27), with an SSR test added in #17.
+
+The URL plumbing is still how both clients pick their API. The CI shape and
+the preview hosting it was built for have both since been replaced (see
+below).
+
+## Architecture
+
+- **Web.** `src/web/src/lib/config.ts` exports `API_URL` and `WS_URL`:
+  localhost (now also `127.0.0.1`) maps to `http://localhost:8787`, otherwise
+  `VITE_API_BASE_URL`, falling back to production. `useTodos` and
+  `useWebSocket` import from it instead of hardcoding URLs. Tests in
+  `src/web/src/lib/__tests__/config.test.ts` cover the browser and SSR cases.
+- **iOS.** `Info.plist` carries `APIBaseURL = $(API_BASE_URL)`, the Fastfile
+  passes `API_BASE_URL` to `xcodebuild`, and `Config.apiBaseURL` reads it
+  (ignoring an unexpanded `$(...)`), with the simulator still pinned to
+  localhost. `WebSocketService` derives its `ws`/`wss` URL from
+  `Config.apiBaseURL`. Implemented as specified.
+- **CI.** `lint.yml` and `test.yml` were deleted; `deploy.yml` gained the
+  `checks` job and `testflight.yml` gained SwiftLint, path-filtered API
+  detection, and automatic runs on iOS PRs. Two follow-up commits added the
+  `pull-requests: read` and `contents: read` permissions `dorny/paths-filter`
+  and checkout needed.
+
+Since then:
+
+- `cf52749` (2026-03-09) reorganised CI again into `web-test`, `web-deploy`,
+  `ios-test` and `ios-deploy`, so `deploy.yml`/`testflight.yml` no longer
+  exist.
+- Web previews moved to Cloudflare Worker Previews
+  (`2026-08-13-migrate-pr-previews-to-worker-previews.md`). `web-deploy.yml`
+  now always deploys an API preview and bakes its `*.workers.dev` URL into
+  `VITE_API_BASE_URL`, rather than choosing between `api-pr-N` and
+  production.
+- `ios-deploy.yml` still formats `https://api-pr-{N}.nylonimpossible.com`
+  for PR builds. Whether that host still resolves after the Worker Previews
+  migration wasn't checked here.
 
 ## Context
 

@@ -1,8 +1,13 @@
+---
+title: Video for interactions on feedback fix PRs
+status: Backlog
+created: 2026-10-24
+updated: 2026-10-26
+---
+
 # Video for interactions on feedback fix PRs
 
-**Date**: 2026-10-24
-**Status**: Backlog. Blocked on `2026-10-23-self-hosted-mac-capture-runner.md`
-**Updated**: 2026-10-26
+Blocked on `2026-10-23-self-hosted-mac-capture-runner.md`.
 
 ## Problem
 

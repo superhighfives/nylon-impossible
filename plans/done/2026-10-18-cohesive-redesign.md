@@ -1,7 +1,13 @@
+---
+title: "Cohesive redesign: one Nylon across web, iOS and Gmail"
+status: Complete
+created: 2026-10-18
+updated: 2026-10-27
+---
+
 # Cohesive redesign: one Nylon across web, iOS and Gmail
 
-**Date**: 2026-10-18
-**Status**: Complete (2026-10-21). Phase 0's prototype is at
+Completed 2026-10-21. Phase 0's prototype is at
 https://claude.ai/artifact/LdsHRNLhPuVqZ9ejvMnysh.
 
 ## Overview
@@ -19,9 +25,52 @@ backend's behaviour and resetting its history. What shipped, by phase:
 | 3. Phone | The mobile web phone layout, and the iOS views rewritten (switcher, composer, rows, detail sheet, Done history, Settings, share extension) with Archivo bundled | #397, #398 |
 | 4. Wide | Wide web (sidebar, three columns, a fourth for your list, drag, keyboard map, context menus, overnight note) and the iPad equivalent | #401, #402, #403 |
 | 5. Edges | Siri list parameter, share-extension composer, widget quick-add and an Add todo control; the Gmail card on the spec; the editorial landing page; the new marketing pipeline | #404, #405 |
-| 6. Quality pass | Web and Gmail audit with fixes, per-list URLs (`/today`, `/this-week`, `/someday`, `/lists`, `/list/:id`) used by the Gmail card's links, the axe audit script and the iOS/web parity sheet. iOS was audited in parallel | this PR |
+| 6. Quality pass | Web and Gmail audit with fixes, per-list URLs (`/today`, `/this-week`, `/someday`, `/lists`, `/list/:id`) used by the Gmail card's links, the axe audit script and the iOS/web parity sheet. iOS was audited in parallel | #406, #407 (iOS) |
 
-## Key decisions
+## Architecture
+
+The backend kept its behaviour. Sync, recurrence, the midnight sweep and
+offline iOS carried over; #386 squashed the schema into one baseline
+migration. What's new is shared between the clients:
+
+- **`src/shared`** holds the design tokens (`design/tokens.json`, which
+  generates `tokens.css` for web and `Theme.swift` for iOS), the typed-date
+  parser (`todo-date.ts`), whose Swift mirror `Utils/TodoDateParser.swift`
+  runs the same fixtures, and `board-path.ts`, which builds the per-list
+  URLs for the web board and the Gmail card.
+- **Web** is one pathless `_board` route. Its children only select a view,
+  so moving between lists doesn't remount the board. Under 1024px it draws
+  `components/phone/`, and at 1024px and up `components/wide/`. The row,
+  composer, detail, menu, Done and Settings components in `phone/` are
+  used by both layouts.
+- **iOS** shares one set of views between phone and iPad
+  (`ContentView+Wide.swift` for the board), and `Views/Shell/ScreenRoute.swift`
+  adds DEBUG `-NylonScreen` routes that open any screen on sample data.
+- **Marketing** (`generate.ts`) uses those routes and the web demo seed for
+  the landing-page screenshots, the App Store set and the `--parity` sheet.
+  `audit.ts` runs the accessibility and layout checks.
+
+Since then, the native Mac app (#408, `plans/done/2026-10-21-mac-app.md`) was
+built from the same targets and views. The token generator now emits macOS
+types too, and the screen routes feed the feedback fix-PR screenshots
+(`plans/done/2026-10-22-feedback-fix-previews.md`).
+
+### Key files
+
+| File | Purpose |
+| --- | --- |
+| `src/shared/design/tokens.json`, `generate.mjs` | Design tokens; generates `src/web/src/styles/tokens.css` and iOS `Theme.swift` |
+| `src/shared/src/todo-date.ts`, `todo-date-fixtures.json` | Typed-date parser and the fixtures its Swift mirror shares |
+| `src/shared/src/board-path.ts` | Per-list web URLs, shared with the Gmail card |
+| `src/web/src/routes/_board*.tsx` | The board route and its view paths |
+| `src/web/src/components/phone/` | Phone layout, and the row, composer, detail, menu, Done and Settings both layouts use |
+| `src/web/src/components/wide/` | Sidebar, columns, drag, keyboard map, shortcuts overlay |
+| `src/api/src/lib/addon-cards.ts` | Gmail card JSON |
+| `src/ios/Nylon Impossible/Nylon Impossible/Views/` | iOS views; `Views/Shell/ScreenRoute.swift` has the DEBUG screenshot routes |
+| `src/marketing/generate.ts`, `manifest.json`, `seed.ts` | Marketing screenshots and the `--parity` sheet |
+| `src/marketing/audit.ts` | The web accessibility and layout audit |
+
+### Key decisions
 
 - **Keep the backend, reset its history.** Sync, recurrence, the midnight
   sweep and offline iOS worked; only the UI layer and the schema's history
@@ -40,7 +89,7 @@ backend's behaviour and resetting its history. What shipped, by phase:
   web, side by side; it's uploaded from `marketing.yml` as an artifact and
   never published.
 
-## Deviations from the spec as first written
+### Deviations from the spec as first written
 
 - **Row swipes replaced by long-press.** Found in the prototype: a
   horizontal swipe pages between Today, This Week and Someday, so row swipes
@@ -521,21 +570,6 @@ Every screen on every platform is checked against this list:
 `marketing.yml`'s capture also produces a **parity sheet**: the same screen
 on iOS and web side by side, so mismatches are visible in review instead of
 discovered later.
-
-## Files
-
-| File | Purpose |
-| --- | --- |
-| `src/shared/design/tokens.json`, `generate.mjs` | Design tokens; generates `src/web/src/styles/tokens.css` and iOS `Theme.swift` |
-| `src/shared/src/todo-date.ts`, `todo-date-fixtures.json` | Typed-date parser and the fixtures its Swift mirror shares |
-| `src/shared/src/board-path.ts` | Per-list web URLs, shared with the Gmail card |
-| `src/web/src/routes/_board*.tsx` | The board route and its view paths |
-| `src/web/src/components/phone/` | Phone layout, and the row, composer, detail, menu, Done and Settings both layouts use |
-| `src/web/src/components/wide/` | Sidebar, columns, drag, keyboard map, shortcuts overlay |
-| `src/api/src/lib/addon-cards.ts` | Gmail card JSON |
-| `src/ios/Nylon Impossible/Nylon Impossible/Views/` | iOS views; `Views/Shell/ScreenRoute.swift` has the DEBUG screenshot routes |
-| `src/marketing/generate.ts`, `manifest.json`, `seed.ts` | Marketing screenshots and the `--parity` sheet |
-| `src/marketing/audit.ts` | The web accessibility and layout audit |
 
 ## Resolved questions (2026-10-18)
 

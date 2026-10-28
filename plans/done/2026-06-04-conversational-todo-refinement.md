@@ -2,10 +2,60 @@
 title: Conversational Todo Refinement
 status: Complete
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-10-27
 ---
 
 **Scope**: API + Web + iOS
+
+## Overview
+
+AI enrichment could ask one clarifying question when a todo was too vague
+to improve ("Book a flight"). The question went into a per-todo thread, you
+answered or dismissed it from the todo's detail view on web or iOS, and
+enrichment re-ran with the whole conversation. Everything shipped in one PR,
+#175 (merged 2026-06-20), across the API, web and iOS. Phase 0 rejected Flue
+for this (see below), so it was built on the existing `ai.ts` tool calls.
+
+**It no longer exists.** #282 (2026-08-08) changed enrichment to propose
+suggestions rather than apply them, and #290 later added Flue-based per-todo
+agents in a separate worker. #355 (2026-09-22) then removed AI enrichment
+entirely, along with the reply/question endpoints and the thread UI.
+Migration 0028 dropped `todo_messages` and `todos.needs_input`.
+
+## Architecture
+
+As shipped in #175:
+
+- **Data.** Migration `0010_add_todo_messages.sql` (the plan said `0009`)
+  added an append-only `todo_messages` table (`role`, `content`,
+  `awaiting_reply`) and `todos.needs_input`, the cheap flag the list view
+  reads. Sync returned each todo's `messages` and `needsInput`.
+- **API.** `lib/ai.ts` gained the `ask_user` tool next to `enrich_todo`.
+  `enrichTodoWithAI` in `lib/ai-enrich.ts` became `enrichOrAskWithAI`,
+  taking the message history. `POST /todos/:id/reply` (`handlers/reply.ts`)
+  stored the answer and re-ran enrichment in `waitUntil`;
+  `DELETE /todos/:id/question` (`handlers/dismiss-question.ts`) cleared the
+  question without re-running. Completing a todo cleared any open question.
+- **Web.** `ConversationSection.tsx` in the expanded todo, a question
+  indicator in `TodoList.tsx`, and optimistic reply/dismiss hooks in
+  `useTodos.ts`.
+- **iOS.** A `TodoMessage` SwiftData model, `ConversationSection.swift` in
+  the edit sheet and an indicator on `TodoItemRow`. Replies made offline
+  queued with `isSynced = false` and were pushed on the next sync.
+
+Two fixes beyond the plan landed in the same PR:
+
+- **Web expanded form.** A re-enrichment could change a todo while its
+  expanded form was open, and saving wrote the stale snapshot back over
+  it. The form now tracks which fields were touched and syncs the rest from
+  the live todo.
+- **iOS sync.** The delete sweep removed a reply that had just been pushed
+  when the server's response didn't include it yet. Replies pushed in the
+  current round are now skipped until the next sync.
+
+Several acceptance boxes below were never ticked, even though the PR's tests
+cover most of them. I didn't recheck each one against the code before it was
+removed.
 
 ## Phase 0 outcome (2026-06-05): Fall back — do NOT adopt Flue
 

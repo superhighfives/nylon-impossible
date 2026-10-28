@@ -2,8 +2,36 @@
 title: iOS Share Todo
 status: Complete
 created: 2026-03-20
-updated: 2026-03-20
+updated: 2026-10-27
 ---
+
+## Overview
+
+Nylon could take things in from the iOS Share Sheet but couldn't send a todo
+out. PR #129 (`77517ae`, tests in `36e7353`) added a share button that hands
+a plain-text version of the todo (title, notes, due date, URLs) to the
+system Share Sheet, so it can go to Messages, Mail, Notes and so on.
+
+## Architecture
+
+- `Utils/TodoShareHelper.swift` has one function,
+  `shareText(for:urls:)`, which joins the title, the notes if there are any,
+  `Due: <date>` if set, and each URL on its own line.
+  `TodoShareHelperTests.swift` covers each field present and absent.
+- `TodoEditSheet` got a `ShareLink` in its toolbar, fed from the sheet's
+  `urls` state.
+- `TodoItemRow` got the optional Share item in its context menu.
+
+Deviations from the sketch: it reads `itemNotes`, not `itemDescription`,
+because the field had been renamed to notes a week earlier (#114). Nothing
+else changed.
+
+Since then: the row's Share action was removed in #261 (July 2026). The
+context menu's long press collided with the row's long-press drag lift, so
+the share popover hijacked drags; sharing stayed in the edit sheet. The detail-sheet button survived the Phase 3 iOS rebuild
+(#398) and now lives in `Views/Detail/TodoDetailSheet+Sections.swift`.
+`shareText` formats the due date with `DueDay.localDate` since due dates
+became calendar days (#370).
 
 ## Problem
 

@@ -2,10 +2,44 @@
 title: iOS 26 Location Modernisation
 status: Complete
 created: 2026-03-28
-updated: 2026-03-28
+updated: 2026-10-27
 ---
 
 **Scope:** iOS
+
+## Overview
+
+**This did not ship.** The plan was to rewrite the iOS Settings location
+helper on `CLLocationUpdate.updates` and `MKReverseGeocodingRequest` to clear
+a Swift 6 concurrency warning. #124 (merged 2026-04-06) attempted it, but the
+branch's last commit reverted `SettingsView.swift` to `main` while chasing a
+CI compile failure, so the merge changed nothing. The plan was moved to
+`done/` the next day (65f0e23) anyway.
+
+The delegate-and-`CLGeocoder` helper stayed until #386 (2026-10-18) removed
+the location setting altogether: the API dropped `users.location`, and iOS
+lost the Location section, its CoreLocation helper and the usage string. No
+location code remains, so there is nothing left to modernise.
+
+## Architecture
+
+Nothing from this plan is in the codebase. For the record, #124 went through
+these steps before it was reverted:
+
+- 1d05560 wrote the `@MainActor` helper the plan sketches. Review
+  (e38154f) added kilometre accuracy, an explicit authorisation wait and a
+  10-second timeout race.
+- The next dozen commits fought compile errors in CI: the failable
+  `MKReverseGeocodingRequest` initialiser, `getMapItems` via a continuation,
+  task groups swapped for an unstructured `Task`, `first(where:)` swapped
+  for a loop, and, on iOS 26, `CLLocationUpdate.Updates` being
+  non-throwing, so `try` was dropped.
+- c72432a put `CLGeocoder` back to isolate the failure, and 3450878 reverted
+  the whole file to see whether `main` itself passed CI. The PR merged at
+  that point.
+
+The commits don't say what the root compile failure was, or whether `main`
+passed.
 
 ## Problem
 

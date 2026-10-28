@@ -2,7 +2,7 @@
 title: Web Styling Overhaul
 status: Complete
 created: 2026-03-16
-updated: 2026-03-16
+updated: 2026-10-27
 ---
 
 **Scope:** Web
@@ -10,6 +10,40 @@ updated: 2026-03-16
 ## Overview
 
 Overhaul the web app styling to a minimal, high-quality iOS-inspired design. The new palette is **yellow, black, white, and grays** using Radix Colors via `tailwindcss-radix-colors`. Soft drop shadows, rounded corners, and thoughtful spacing. The goal is a clean, premium aesthetic that feels at home on Apple platforms.
+
+Shipped in #34 (merged 2026-03-18), which swapped the indigo/tomato palette
+for yellow/gray/red. The same PR then replaced the library's semantic classes
+with custom utilities (`2026-03-17-custom-semantic-color-utilities.md`), so
+the `-ui`/`-dim`/`-normal` class names in the reference below were live for
+about a day. None of this styling survives today. The web board was
+redesigned in #293, and the cohesive redesign (#401) replaced the Radix
+palette with generated design tokens.
+
+## Architecture
+
+The overhaul (`664a7d8`) was a class-name pass over the files listed under
+"Components to Update", with no structural changes:
+
+- `src/web/src/styles.css` imports `yellow.css` and `red.css` from
+  `tailwindcss-radix-colors` in place of `indigo.css` and `tomato.css`, and
+  defines the four shadow tokens in `@theme` exactly as specified.
+- `button.tsx`: primary is `bg-yellow-solid text-gray-12` (dark text on
+  yellow), destructive is `bg-red-solid`, focus rings are `ring-yellow-8`,
+  and corners went from `rounded-md` to `rounded-lg`.
+- `Header.tsx` became sticky, with an 80% opacity background and
+  `backdrop-blur-sm`. `TodoInput` and `TodoItemExpanded` became
+  `bg-gray-subtle shadow-base rounded-lg` cards.
+- `src/web/AGENTS.md` documents the new palette.
+
+A follow-up (`e444fbb`) fixed the loader, which had overridden its colour
+with a border colour (it now uses `border-current` with a text colour). It
+also replaced the single yellow `theme-color` meta in `__root.tsx` with light
+and dark variants keyed to `prefers-color-scheme`.
+
+`LandingPage.tsx` wasn't changed in the overhaul commit. It was only touched
+in the utilities pass. The plan's checkboxes were never ticked, so whether
+Phase 4's polish and dark-mode checks were done as separate steps isn't
+recorded.
 
 ---
 

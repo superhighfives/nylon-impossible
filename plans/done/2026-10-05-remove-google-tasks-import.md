@@ -1,14 +1,52 @@
+---
+title: Remove Google Tasks import
+status: Complete
+created: 2026-10-05
+updated: 2026-10-27
+---
+
 # Remove Google Tasks import
 
 Remove the Google Tasks import feature from the API, web, iOS, and database.
 
-## Rollout
+## Overview
 
-Shipped as a single PR. The column drop (`0029_drop_google_task_id`) runs
-before the workers deploy, so old workers can briefly fail todo reads with
-`no such column: google_task_id`. That was accepted because no one uses the
-feature and the window is short. Don't treat this as a precedent for features
+Google Tasks import was added in #193 (2026-07) and nobody used it, so #358
+(merged 2026-10-05) removed it in one PR: the
+`POST /todos/import/google-tasks` endpoint, the import and repeat-review UI
+on web and iOS, and the `google_task_id` column and its unique index. #362
+(2026-10-06) then removed Google Tasks from the privacy policy.
+
+The column drop (`0029_drop_google_task_id`) ran before the workers
+deployed, so old workers could briefly fail todo reads with
+`no such column: google_task_id`. That was accepted because no one used the
+feature and the window was short. Don't treat this as a precedent for features
 that are in use: those need expand/contract (see CLAUDE.md).
+
+## Architecture
+
+The removal followed the list below file for file, with no new code. A
+search for the feature's names in `src` now finds nothing outside
+migrations.
+
+- **API.** `handlers/import-google-tasks.ts`, its route, its integration
+  test and the Clerk OAuth-token mocks were deleted.
+- **Web.** `ImportReviewModal`, `useImportReview`, the Import card in
+  Settings, and the `hiddenIds`/`highlightIds` plumbing through `TodoGrid`
+  and `TodoList` were deleted.
+- **iOS.** `ImportSettingsSection`, `ImportReviewSheet` and the
+  `importGoogleTasks()` API call were deleted.
+- **Schema.** `0029_drop_google_task_id.sql` drops the index, then the
+  column, because SQLite won't drop an indexed column.
+
+The PR had picked up smart-create `listId` hunks from the Gmail add-on work
+in a shared working tree. A second commit dropped them, so #358 contains
+only the removal. Migration 0029 itself was later folded into the single
+baseline in #386 (2026-10-18). The web files named below were all replaced in
+the cohesive redesign.
+
+The repo doesn't show whether the out-of-repo steps (Clerk scopes, Google
+Cloud console, memory note) were done.
 
 ## Code removal
 

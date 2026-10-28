@@ -2,8 +2,49 @@
 title: Linting & Typechecking
 status: Complete
 created: 2026-02-26
-updated: 2026-02-26
+updated: 2026-10-27
 ---
+
+## Overview
+
+Before this, only web had a linter, nothing failed CI on lint or type errors,
+and iOS had no SwiftLint. This work put Biome on the API, cleaned up the web
+errors, added a lenient SwiftLint config for iOS, tightened the API
+`tsconfig`, and enforced all of it in CI. It shipped as #3 on 2026-02-26.
+
+## Architecture
+
+At merge time:
+
+| Project | Linter | Typecheck | CI |
+|---------|--------|-----------|----|
+| **API** | Biome 2.2.4 | `tsc --noEmit` (strict + noUnused*) | lint.yml |
+| **Web** | Biome 2.2.4 | `tsc --noEmit` (strict) | lint.yml |
+| **iOS** | SwiftLint 0.63.2 | Xcode build | lint.yml |
+
+All checks pass: `pnpm api:check`, `pnpm api:typecheck`, `pnpm web:check`, `pnpm web:typecheck`, `swiftlint`.
+
+Each TypeScript package had its own `biome.json` and `lint`/`check`/
+`typecheck` scripts, with root scripts fanning out to them. CI was a separate
+`lint.yml` with one job per project, kept apart from tests for faster
+feedback.
+
+The one deviation from the plan was dropping `exactOptionalPropertyTypes`
+from the web `tsconfig`. Kumo ships `.tsx` source, so `skipLibCheck` couldn't
+hide the errors it raised inside the library.
+
+Most of the wiring has since moved:
+
+- `lint.yml` lasted two days. #16 (merged 2026-02-28) deleted it and folded
+  the checks into `deploy.yml` and `testflight.yml`, so a deploy waits on
+  them. Today they run in
+  `web-test.yml` (`api:check`, `api:typecheck`, `web:check`,
+  `web:typecheck`) and `ios-test.yml` (SwiftLint).
+- The per-package `biome.json` files were merged into one root `biome.json`
+  on 2026-03-06. Each workspace calls it with `--config-path ../..`.
+- pnpm was replaced by Bun in #391, so the commands are now
+  `bun run api:check` and so on. `admin` has its own checks too.
+- `src/ios/Nylon Impossible/.swiftlint.yml` is still in place.
 
 ## Context
 
@@ -52,15 +93,3 @@ The monorepo had inconsistent linting and typechecking across its three projects
   - `lint-ios`: SwiftLint (macos-15)
 - Runs on all PRs and pushes to main
 - Separate from test workflow for fast feedback
-
----
-
-## Final state
-
-| Project | Linter | Typecheck | CI |
-|---------|--------|-----------|----|
-| **API** | Biome 2.2.4 | `tsc --noEmit` (strict + noUnused*) | lint.yml |
-| **Web** | Biome 2.2.4 | `tsc --noEmit` (strict) | lint.yml |
-| **iOS** | SwiftLint 0.63.2 | Xcode build | lint.yml |
-
-All checks pass: `pnpm api:check`, `pnpm api:typecheck`, `pnpm web:check`, `pnpm web:typecheck`, `swiftlint`.

@@ -2,7 +2,7 @@
 title: Custom Semantic Color Utilities
 status: Complete
 created: 2026-03-17
-updated: 2026-03-17
+updated: 2026-10-27
 ---
 
 **Scope:** Web
@@ -10,6 +10,36 @@ updated: 2026-03-17
 ## Overview
 
 Replace `tailwindcss-radix-colors` bundled semantic classes with our own custom utilities. The library's classes mix hover/active states into single utilities (e.g., `bg-gray-ui` includes hover and active variants). We want explicit, composable utilities that map directly to Radix color scale steps.
+
+Shipped in `f15f8e4` as the second half of #34 (merged 2026-03-18), together
+with `2026-03-16-web-styling-overhaul.md`. Retired in the cohesive redesign:
+#401 (2026-10-20) deleted `radix-utilities.css` and dropped
+`tailwindcss-radix-colors`. The web app now uses `bg-n-*` / `text-n-*`
+utilities over design tokens generated from `src/shared/design/tokens.json`
+into `src/web/src/styles/tokens.css`.
+
+## Architecture
+
+Built as specified. `src/web/src/styles.css` imports the library's
+`*-colors-only.css` files for gray, yellow and red, which give the raw
+`--color-{gray,graydark}-N` variables without component classes, then imports
+`src/web/src/styles/radix-utilities.css`. That file defines each utility with
+Tailwind v4 `@utility` and a nested `@variant dark` block. There are 25 per
+colour and 75 in total, fewer than the plan's estimate of ~105 because every
+colour has the same set. Components compose hover and active states
+explicitly, following the migration map below. Both `AGENTS.md` files were
+updated with the new naming.
+
+Follow-ups while the utilities were in use:
+
+- **Divide utilities in dark mode** (#64, 2026-03-22). `divide-*` targets
+  children (`& > * + *`), and a top-level `@variant dark` didn't reach them.
+  Several restructurings were tried. The one kept repeats the child selector
+  inside the dark variant.
+- **No more numbered steps** (`4281490`, in #99). The styling redux swapped
+  the remaining raw steps (`bg-yellow-9`, `text-gray-12`, …) for semantic
+  utilities and added the two that were missing: `border-yellow-solid` and
+  `ring-offset-gray-app`.
 
 ---
 

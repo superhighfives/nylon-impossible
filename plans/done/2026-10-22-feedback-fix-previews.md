@@ -1,7 +1,13 @@
+---
+title: Before/after previews on feedback fix PRs
+status: Complete
+created: 2026-10-22
+updated: 2026-10-24
+---
+
 # Before/after previews on feedback fix PRs
 
-**Date**: 2026-10-22
-**Status**: Complete (2026-10-24)
+Completed 2026-10-24.
 
 ## Overview
 

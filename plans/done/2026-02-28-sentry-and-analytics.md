@@ -2,7 +2,7 @@
 title: Sentry and Analytics
 status: Complete
 created: 2026-02-28
-updated: 2026-02-28
+updated: 2026-10-27
 ---
 
 **Scope:** API + Web + iOS
@@ -12,6 +12,48 @@ updated: 2026-02-28
 Add Sentry error tracking and performance monitoring across the full stack. Currently the only observability is `console.error()` calls and Cloudflare's built-in `observability: { enabled: true }` (which captures Worker invocation metrics but not application-level errors or user flows).
 
 The goal: know when things break in production before users report them, and understand which features are actually being used.
+
+## Architecture
+
+Shipped in #134 (2026-04-10), about six weeks after the plan was written:
+`76a51c2` did the API, web and analytics phases, `36c2282` did iOS. All
+three platforms report to Sentry today.
+
+- **API.** `src/api/src/index.ts` exports the worker through
+  `Sentry.withSentry()`, keyed on the `SENTRY_DSN` secret.
+  `authMiddleware` calls `Sentry.setUser({ id: userId })`. Handlers and the
+  `UserSync` Durable Object call `Sentry.captureException` with an `area`
+  tag where they used to `console.error`.
+- **Web client.** `src/web/src/lib/sentry.ts` runs `initSentry()` from
+  `__root.tsx`, which also wraps the outlet in `Sentry.ErrorBoundary` and
+  keeps the Clerk user id in Sentry's user. Replay is on-error only, with
+  all text masked. Source maps are built `hidden` and uploaded by
+  `@sentry/vite-plugin` when `SENTRY_AUTH_TOKEN` is set, so `.map` files
+  aren't served.
+- **iOS.** `sentry-cocoa` via SPM, started in `Nylon_ImpossibleApp.swift`
+  only when the `SentryDSN` Info.plist key (from the `SENTRY_DSN` build
+  setting) is set. Screenshots and view hierarchy are off. `AuthService`
+  sets and clears the user; `APIService`, `SyncService` and
+  `WebSocketService` capture failures. dSYMs are uploaded with `sentry-cli`
+  in CI (now `ios-release.yml`).
+- **Analytics.** No separate SDK, as planned: `Sentry.addBreadcrumb` with
+  `todo.*` messages in the API, so they ride along on the next error event.
+
+Deviations and later changes:
+
+- API source maps (the plan's sentry-cli step) were never set up. Only the
+  web build uploads maps.
+- The plan's last box, checking events in the Sentry dashboard, was left
+  unticked.
+- Environments got finer than planned: preview web builds report as
+  `preview` (#156) and iOS splits debug/TestFlight/App Store (`3d63a05`).
+- The web worker's server side wasn't covered until #266, which wraps
+  `src/web/src/worker.ts` in `withSentry` too.
+- The `research.*` events went when the research feature was removed (#354).
+  `todo.completed`, `sync.triggered` and `url.added` from the event table
+  were never added.
+- Several later PRs tuned out noise rather than adding coverage: cancelled
+  WebSocket receives (#212), transient iOS timeouts (#228, #241).
 
 ---
 

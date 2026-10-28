@@ -2,21 +2,25 @@
 title: Centralise AI in the API with Smart Todo Input
 status: Complete
 created: 2026-02-26
-updated: 2026-02-26
+updated: 2026-10-27
 ---
 
-## Context
+## Overview
 
-AI-powered todo extraction currently lives in the web app (`src/web/src/server/ai.ts`) as a TanStack server function. It uses the OpenAI SDK pointed at Cloudflare AI Gateway, with secrets (`CF_ACCOUNT_ID`, `CF_API_TOKEN`, `AI_GATEWAY_NAME`) stored on the web worker. There's a separate "Extract with AI" button and a multi-step preview flow — users have to explicitly choose between "Add" (single todo) and "Extract with AI" (multiple), then confirm extracted items before creation.
+Moved AI todo extraction out of the web worker and into the API, behind one
+endpoint, `POST /todos/smart`, so web and iOS both get it from a single text
+field. A heuristic sends obviously simple input straight to the database and
+everything else to Workers AI, which can split it into several todos. The
+web "Extract with AI" button and the preview step went away. It shipped as
+#5 on 2026-02-27 (12bec93, with review fixes in 11425f5).
 
-This means:
-- iOS has no access to AI extraction at all
-- Web users have to make a conscious decision about whether to use AI
-- Two separate paths for creating todos (direct vs AI-extracted)
-
-### Goal
-
-One text area. Press enter. It just works — whether you typed "Buy milk" or "Need to buy milk, email the team about Friday's meeting, and book flights for next week." The AI lives in the API so both web and iOS get the same behaviour.
+Little of it remains. The heuristic was removed on 2026-03-26 (from then on,
+AI ran whenever it was enabled), and all AI was stripped from the product in
+#355 (2026-09-22). `POST /todos/smart` is still there, but it is now a plain
+single-todo create with typed-date parsing, shared with the Gmail add-on via
+`createSmartTodo` in `src/api/src/lib/create-todo.ts`. Web still calls it.
+iOS stopped calling it in #246 (2026-07-20) and now creates todos locally
+and syncs them.
 
 ## Architecture
 
@@ -76,6 +80,43 @@ Currently the web worker uses AI Gateway via the OpenAI SDK (`gateway.ai.cloudfl
 - Retains AI Gateway dashboard, caching, rate limiting
 
 **Recommendation: Option A (Workers AI binding)** — simpler, faster, fewer secrets to manage. Observability is already covered by the worker's `"observability": { "enabled": true }`. If AI Gateway features are needed later, it can be added as a [gateway configuration](https://developers.cloudflare.com/ai-gateway/providers/workersai/) on the binding.
+
+### As built
+
+The API side went in as planned: an `AI` Workers AI binding, `lib/ai.ts`,
+`lib/smart-input.ts` (`shouldUseAI`) and `handlers/smart-create.ts`. When
+extraction fails it falls back to a single todo. Created todos are
+broadcast through the `UserSync` DO's `/notify`, its first real caller.
+Things that changed:
+
+- **iOS** routed the call through `SyncService.smartCreate()` rather than
+  `TodoViewModel` → `APIService` directly. It calls the endpoint, then runs a
+  full sync to pull the new rows into SwiftData. When signed out or on
+  error, it creates one local todo instead.
+- **Position.** The review fixes made new todos append to the end and
+  batched the inserts. Later the same day 58d7f1c switched to *prepending*
+  them with `generateNKeysBetween`. New todos still go to the top today.
+- **Due dates** were dropped from extraction the same day (#14), along with
+  the rest of the due-date work (`2026-02-26-ios-styling-improvements.md`),
+  and came back in March.
+- **Tests.** The AI binding needs a remote wrangler session, so CI uses a
+  `wrangler.test.jsonc` without it (853d1ca).
+- **Option A didn't hold for long.** The model changes are in
+  `2026-02-28-ai-tool-calling.md`. #18 (2026-03-01) put the binding
+  behind AI Gateway (`AI_GATEWAY_ID`) for caching and observability.
+
+## Context
+
+AI-powered todo extraction currently lives in the web app (`src/web/src/server/ai.ts`) as a TanStack server function. It uses the OpenAI SDK pointed at Cloudflare AI Gateway, with secrets (`CF_ACCOUNT_ID`, `CF_API_TOKEN`, `AI_GATEWAY_NAME`) stored on the web worker. There's a separate "Extract with AI" button and a multi-step preview flow — users have to explicitly choose between "Add" (single todo) and "Extract with AI" (multiple), then confirm extracted items before creation.
+
+This means:
+- iOS has no access to AI extraction at all
+- Web users have to make a conscious decision about whether to use AI
+- Two separate paths for creating todos (direct vs AI-extracted)
+
+### Goal
+
+One text area. Press enter. It just works — whether you typed "Buy milk" or "Need to buy milk, email the team about Friday's meeting, and book flights for next week." The AI lives in the API so both web and iOS get the same behaviour.
 
 ## File Changes
 

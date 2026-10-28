@@ -1,7 +1,11 @@
-# Self-hosted Mac runner for screenshot captures
+---
+title: Self-hosted Mac runner for screenshot captures
+status: Backlog
+created: 2026-10-23
+updated: 2026-10-26
+---
 
-**Date**: 2026-10-23
-**Status**: Backlog
+# Self-hosted Mac runner for screenshot captures
 
 ## Problem
 

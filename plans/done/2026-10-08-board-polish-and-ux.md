@@ -1,7 +1,13 @@
+---
+title: Board polish and UX
+status: Complete
+created: 2026-10-08
+updated: 2026-10-12
+---
+
 # Board polish and UX
 
-**Date**: 2026-10-08
-**Status**: Complete (2026-10-09)
+Completed 2026-10-09.
 
 ## Overview
 

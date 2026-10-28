@@ -2,8 +2,44 @@
 title: iOS Styling Improvements
 status: Complete
 created: 2026-02-26
-updated: 2026-02-26
+updated: 2026-10-27
 ---
+
+## Overview
+
+A visual polish pass on the early iOS app to bring it closer to the web
+version: borderless cards with a light-mode shadow, bigger checkboxes, a
+"Completed" section header, an active-task count in the header, a nicer
+empty state, dimmed completed cards, swipe-to-dismiss for the keyboard, and
+due dates on rows. It shipped as #4 (37a84d1, merged 2026-02-27).
+
+Two parts didn't last. Due dates were taken out again the same day, and the
+new drag-to-reorder was reverted a day later (see below). None of this UI
+exists any more. `TodoItemRow`, `HeaderView` and `EmptyStateView` were
+deleted when the 2026-10 cohesive redesign rebuilt the iOS views (#398).
+
+## Architecture
+
+Everything was a SwiftUI view change, mostly in `ContentView.swift` and
+`Views/Components/TodoItemRow.swift`, matching the file summary below.
+Due dates also needed a `dueDate` field on `TodoItem`, `APITodo` and the
+sync code. How it differed from the plan:
+
+- **Reordering (§1).** The plan left the approach open. #4 replaced the
+  always-active edit mode with `.draggable` / `.dropDestination`. That broke
+  sorting, so #11 (a505492, 2026-02-28) went back to `.onMove` with
+  `.environment(\.editMode, .constant(.active))`. It also disabled moving on
+  completed rows and the header, replaced `.swipeActions` with `.onDelete`
+  (swipe actions don't work in edit mode), and added tap-to-edit on the
+  title. So the permanent reorder
+  handles that §1 set out to remove came back.
+- **Due dates (§3)** shipped in #4 and were removed the same day in #14
+  ("Remove due date for now"), which also dropped the web column and the
+  smart-input date parsing. They returned with the expanded schema on
+  2026-03-03.
+- **Add task input (§5).** Only the border change (1pt to 0.5pt) shipped.
+  The commit has no sign of the button corner radius, press animation or
+  placeholder colour.
 
 ## Context
 
