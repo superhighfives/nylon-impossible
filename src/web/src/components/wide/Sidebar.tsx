@@ -8,7 +8,7 @@ import { NewListPopover } from "./NewListPopover";
 export const sidebarDropId = (listId: string) => `side:${listId}`;
 
 const ENTRY =
-  "relative flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left text-[0.9375rem] text-n-ink n-focus transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface";
+  "relative flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left text-[0.9375rem] text-n-ink n-focus-soft transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface";
 
 /**
  * The 3px ink bar on the left edge: the column the selection is in. Ink, not

@@ -21,6 +21,14 @@ export function overnightText(sweep: LastSweep): string | null {
 }
 
 /**
+ * The pill's words on wide (the moon says when): "2 moved to This week",
+ * "2 moved to This week, 1 to Someday".
+ */
+export function overnightPillText(text: string): string {
+  return text.replace(/ overnight$/, "");
+}
+
+/**
  * What Today's overnight note says, or null when it shouldn't show. It shows
  * when the last sweep that moved anything ran on the user's current local day
  * (in their timezone setting), until it's dismissed for that sweep or

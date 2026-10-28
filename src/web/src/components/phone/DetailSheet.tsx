@@ -4,6 +4,7 @@ import {
   dayKeyIn,
   daysBetweenKeys,
   dueDayKey,
+  normalizeLink,
   type RecurrenceFrequency,
   TODO_TITLE_MAX,
 } from "@nylon-impossible/shared";
@@ -13,6 +14,7 @@ import {
   Calendar as CalendarIcon,
   Check,
   ChevronDown,
+  Link2,
   List,
   Loader2,
   MoreHorizontal,
@@ -23,6 +25,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import {
+  useAddTodoUrl,
   useCreateTodo,
   useDeleteTodo,
   useDeleteTodoUrl,
@@ -212,7 +215,7 @@ function DetailBody({
         )}
         <Dialog.Close
           aria-label="Close"
-          className="flex size-11 cursor-pointer items-center justify-center rounded-full text-n-ink-muted n-focus"
+          className={`flex size-11 cursor-pointer items-center justify-center rounded-full text-n-ink-muted ${columnVariant ? "n-focus-soft" : "n-focus"}`}
         >
           <span className="flex size-[30px] items-center justify-center rounded-full bg-n-fill">
             <X size={14} strokeWidth={2.4} aria-hidden="true" />
@@ -402,7 +405,7 @@ function DetailBody({
 
         {canSubtask && <Subtasks parent={todo} subtasks={subtasks} />}
 
-        {todo.urls.length > 0 && <Links todo={todo} />}
+        <Links todo={todo} />
 
         <hr className="mt-[1.375rem] mb-1.5 border-0 border-t border-n-hairline" />
         <div className="flex items-center justify-between">
@@ -538,21 +541,78 @@ function Subtasks({
   );
 }
 
+/**
+ * Links, always shown: a card per link, then "Paste a link" (Enter adds).
+ * A new card shows at once with its domain and "Fetching title…".
+ */
 function Links({ todo }: { todo: TodoWithUrls }) {
+  const addUrl = useAddTodoUrl();
+  const [draft, setDraft] = useState("");
+  const [invalid, setInvalid] = useState(false);
   const urls = [...todo.urls].sort((a, b) =>
     a.position.localeCompare(b.position),
   );
+  const errorId = `link-error-${todo.id}`;
+
+  const add = () => {
+    if (!draft.trim()) return;
+    const url = normalizeLink(draft);
+    if (!url) {
+      setInvalid(true);
+      return;
+    }
+    addUrl.mutate({ todoId: todo.id, url });
+    setDraft("");
+  };
+
   return (
     <section aria-labelledby="phone-links">
       <hr className="mt-[1.125rem] mb-3.5 border-0 border-t border-n-hairline" />
       <h2 id="phone-links" className={SECTION_LABEL}>
         Links
       </h2>
-      <ul className="flex flex-col gap-2">
-        {urls.map((url) => (
-          <LinkCard key={url.id} todoId={todo.id} url={url} />
-        ))}
-      </ul>
+      {urls.length > 0 && (
+        <ul className="mb-1 flex flex-col gap-2">
+          {urls.map((url) => (
+            <LinkCard key={url.id} todoId={todo.id} url={url} />
+          ))}
+        </ul>
+      )}
+      <label className="flex min-h-11 items-center gap-3 text-n-ink-muted">
+        <Link2 size={16} aria-hidden="true" className="ml-0.5 shrink-0" />
+        <span className="sr-only">Add a link</span>
+        <input
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            setInvalid(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          }}
+          inputMode="url"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="done"
+          placeholder="Paste a link"
+          aria-invalid={invalid || undefined}
+          aria-describedby={invalid ? errorId : undefined}
+          className="min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-base text-n-ink n-focus placeholder:text-n-ink-muted"
+        />
+      </label>
+      {invalid && (
+        <p
+          id={errorId}
+          role="alert"
+          className="m-0 pl-8 text-[0.8125rem] text-n-destructive"
+        >
+          That doesn’t look like a link.
+        </p>
+      )}
     </section>
   );
 }
@@ -593,7 +653,11 @@ function LinkCard({ todoId, url }: { todoId: string; url: SerializedTodoUrl }) {
             {title}
           </span>
           <span className="block truncate text-[0.8125rem] text-n-ink-muted">
-            {isFailed ? `${domain} · Couldn’t fetch` : domain}
+            {isPending
+              ? "Fetching title…"
+              : isFailed
+                ? `${domain} · Couldn’t fetch`
+                : domain}
           </span>
         </span>
       </a>

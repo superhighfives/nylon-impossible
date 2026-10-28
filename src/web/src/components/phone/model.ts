@@ -90,11 +90,20 @@ export type MetaPart =
   | { kind: "repeat"; text: string }
   | { kind: "subtasks"; text: string }
   | { kind: "notes"; text: string }
-  | { kind: "link"; text: string; fetching?: boolean };
+  | {
+      kind: "link";
+      /** The first link's domain. */
+      text: string;
+      href: string;
+      /** How many more links there are: "visitlisboa.com +2". */
+      more: number;
+      fetching?: boolean;
+    };
 
 /**
  * The meta line under a row's title, in spec order, showing only what's set:
- * Pinned, due, repeat, subtasks n/m, a notes glyph, the first link's domain.
+ * Pinned, due, repeat, subtasks n/m, a notes glyph, the first link's domain
+ * (and how many more links there are).
  */
 export function rowMeta(
   todo: TodoWithUrls,
@@ -123,6 +132,8 @@ export function rowMeta(
     parts.push({
       kind: "link",
       text: linkDomain(firstLink.url),
+      href: firstLink.url,
+      more: todo.urls.length - 1,
       fetching: firstLink.fetchStatus === "pending",
     });
   }
@@ -143,7 +154,9 @@ export function metaSummary(parts: MetaPart[]): string {
         case "notes":
           return "Has notes";
         case "link":
-          return `Link to ${p.text}`;
+          return p.more > 0
+            ? `Link to ${p.text} and ${p.more} more`
+            : `Link to ${p.text}`;
         default:
           return p.text;
       }

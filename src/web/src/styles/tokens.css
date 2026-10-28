@@ -18,6 +18,8 @@
   --n-color-overdue: #ce2c31;
   --n-color-destructive: #ce2c31;
   --n-color-destructive-fill: #feebec;
+  --n-color-notice: #b54700;
+  --n-color-notice-fill: #fff1e0;
   --n-color-brand: #ffe629;
   --n-color-brand-ink: #473b1f;
 
@@ -90,4 +92,6 @@
   --n-color-overdue: #ff9592;
   --n-color-destructive: #ff9592;
   --n-color-destructive-fill: #3b1219;
+  --n-color-notice: #ff9a4d;
+  --n-color-notice-fill: #2b1a0c;
 }

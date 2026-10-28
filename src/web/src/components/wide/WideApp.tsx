@@ -27,7 +27,7 @@ import {
   TIME_KINDS,
 } from "@/components/phone/model";
 import {
-  OvernightNote,
+  OvernightPill,
   useOvernightNote,
 } from "@/components/phone/OvernightNote";
 import { SettingsScreen } from "@/components/phone/SettingsScreen";
@@ -36,6 +36,7 @@ import { runToastUndo } from "@/components/phone/useTodoActions";
 import { useHints } from "@/hooks/useHints";
 import { useCreateList, useUpdateList } from "@/hooks/useLists";
 import { dropPlacement, slotAt } from "@/lib/dragOrder";
+import { toast } from "@/lib/toast";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import { Column, type DropIndicator } from "./Column";
@@ -68,7 +69,7 @@ const EMPTY_COPY: Record<string, string> = {
 };
 
 const TOOL_BUTTON =
-  "flex size-9 cursor-pointer items-center justify-center rounded-full text-n-ink-muted n-focus pointer-fine:hover:bg-n-fill pointer-fine:hover:text-n-ink";
+  "flex size-9 cursor-pointer items-center justify-center rounded-full text-n-ink-muted n-focus-soft pointer-fine:hover:bg-n-fill pointer-fine:hover:text-n-ink";
 
 /** How long the G hint waits for the next key. */
 const GO_HINT_MS = 1200;
@@ -530,6 +531,15 @@ export function WideApp({
       const { todo } = current();
       if (todo) setPalette({ mode: "move", todoId: todo.id });
     },
+    openLink: () => {
+      const { todo } = current();
+      if (!todo) return;
+      const first = [...todo.urls].sort((a, b) =>
+        a.position.localeCompare(b.position),
+      )[0];
+      if (first) window.open(first.url, "_blank", "noopener,noreferrer");
+      else toast.info("No link on this todo");
+    },
     pin: () => {
       const { todo } = current();
       if (todo) actions.togglePin(todo);
@@ -840,6 +850,7 @@ export function WideApp({
     COMMANDS.flatMap((c) => {
       if (!c.menu) return [];
       if (c.id === `move-${listKind(todo.listId)}`) return [];
+      if (c.id === "open-link" && todo.urls.length === 0) return [];
       return [
         {
           id: c.id,
@@ -899,12 +910,15 @@ export function WideApp({
                 showDone("head");
               }
         }
-        note={
+        banner={
           kind === "today" && overnight.text ? (
-            <OvernightNote
+            <OvernightPill
               text={overnight.text}
+              onSee={() => {
+                const target = byKind[overnight.seeKind];
+                if (target) focusColumn(target.id, 0);
+              }}
               onDismiss={overnight.dismiss}
-              className="pt-1 pb-1.5"
             />
           ) : null
         }

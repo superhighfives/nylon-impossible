@@ -30,7 +30,7 @@ export function ShortcutsOverlay({
             </Dialog.Title>
             <Dialog.Close
               aria-label="Close"
-              className="-mr-2 flex size-9 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus pointer-fine:hover:bg-n-surface"
+              className="-mr-2 flex size-9 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft pointer-fine:hover:bg-n-surface"
             >
               <X size={15} aria-hidden="true" />
             </Dialog.Close>

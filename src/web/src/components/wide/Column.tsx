@@ -22,10 +22,10 @@ type RowCallbacks = Pick<
 >;
 
 const ICON_BUTTON =
-  "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus pointer-fine:hover:bg-n-fill";
+  "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft pointer-fine:hover:bg-n-fill";
 
 const MENU_ITEM =
-  "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-n-surface";
+  "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";
 
 /**
  * A column's title and subline on the shared baseline. Your lists' titles
@@ -37,6 +37,7 @@ export function ColumnHeader({
   title,
   subline,
   muted = false,
+  banner,
   onRename,
   onDelete,
   onClose,
@@ -46,6 +47,11 @@ export function ColumnHeader({
   subline: string;
   /** Done's title reads like a subline: it's the resting state. */
   muted?: boolean;
+  /**
+   * Today's overnight pill. Every column keeps its space (two lines, 20px
+   * clear of the title) whether or not it's showing, so titles don't move.
+   */
+  banner?: ReactNode;
   onRename?: (name: string) => void;
   onDelete?: () => void;
   onClose?: () => void;
@@ -76,6 +82,12 @@ export function ColumnHeader({
 
   return (
     <header className="relative flex h-[10.5rem] shrink-0 flex-col justify-end px-6 pb-[1.125rem]">
+      <div
+        data-banner-slot
+        className="mb-5 flex h-[2.75rem] min-w-0 flex-col justify-end"
+      >
+        {banner}
+      </div>
       <div className="flex items-end">
         <h2
           id={headingId}
@@ -110,7 +122,7 @@ export function ColumnHeader({
               type="button"
               aria-description="Rename"
               onClick={() => setRenaming(true)}
-              className="-mx-1 max-w-full cursor-text rounded-n-chip px-1 text-left n-focus pointer-fine:hover:bg-n-fill"
+              className="-mx-1 max-w-full cursor-text rounded-n-chip px-1 text-left n-focus-soft pointer-fine:hover:bg-n-fill"
             >
               {title}
             </button>
@@ -181,7 +193,10 @@ function DraggableRow({
   todo,
   listId,
   ...props
-}: Omit<TodoRowProps, "bodyProps" | "dragging" | "density"> & {
+}: Omit<
+  TodoRowProps,
+  "bodyProps" | "containerProps" | "dragging" | "density"
+> & {
   listId: string;
 }) {
   const { setNodeRef, listeners, attributes, isDragging } = useDraggable({
@@ -198,9 +213,11 @@ function DraggableRow({
       density="wide"
       dragging={isDragging}
       rowRef={setNodeRef}
+      // The pointer drags the whole row; the title keeps the data hooks the
+      // board's keys and focus use.
+      containerProps={listeners}
       bodyProps={{
         ...rest,
-        ...listeners,
         "data-row-id": todo.id,
         "data-row-list": listId,
       }}
@@ -226,7 +243,7 @@ export function Column({
   selectedId,
   indicator,
   composer,
-  note,
+  banner,
   empty,
   loading,
   error,
@@ -247,8 +264,8 @@ export function Column({
   selectedId: string | null;
   indicator: DropIndicator | null;
   composer: ReactNode;
-  /** Above the rows: Today's overnight note. */
-  note?: ReactNode;
+  /** Today's overnight pill, in the header's reserved space. */
+  banner?: ReactNode;
   empty: string;
   loading: boolean;
   error: ReactNode;
@@ -264,6 +281,10 @@ export function Column({
     data: { listId },
   });
   const headingId = `column-${listId}-title`;
+  // One tab stop per column: its selected row, else its first.
+  const tabStopId = rows.some((r) => r.id === selectedId)
+    ? selectedId
+    : (rows[0]?.id ?? null);
   return (
     <section
       ref={setNodeRef}
@@ -277,6 +298,7 @@ export function Column({
         listId={listId}
         title={title}
         subline={subline}
+        banner={banner}
         onRename={onRename}
         onDelete={onDelete}
         onClose={onClose}
@@ -286,7 +308,6 @@ export function Column({
         data-column-body={listId}
         className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-width:thin]"
       >
-        {note}
         {composer}
         {loading ? (
           <p
@@ -319,6 +340,7 @@ export function Column({
                     collapsing={collapsing.has(todo.id)}
                     highlighted={highlightedId === todo.id}
                     selected={selectedId === todo.id}
+                    tabStop={tabStopId === todo.id}
                     {...rowCallbacks}
                   />
                 ))}

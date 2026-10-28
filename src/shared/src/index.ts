@@ -2,6 +2,7 @@
 export * from "./addon-state";
 export * from "./board-path";
 export * from "./due-date";
+export * from "./link";
 export * from "./recurrence";
 export * from "./schema";
 export * from "./timezone";

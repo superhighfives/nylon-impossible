@@ -66,11 +66,14 @@ describe("rowMeta", () => {
       overdue: true,
     });
     expect(parts).toContainEqual({ kind: "subtasks", text: "1/2" });
-    expect(parts).toContainEqual({
-      kind: "link",
-      text: "visitlisboa.com",
-      fetching: false,
-    });
+    expect(parts).toContainEqual(
+      expect.objectContaining({
+        kind: "link",
+        text: "visitlisboa.com",
+        more: 0,
+        fetching: false,
+      }),
+    );
     expect(metaSummary(parts)).toBe(
       "Pinned, 4 days overdue, Repeats weekly, 1/2 subtasks, Has notes, Link to visitlisboa.com",
     );
@@ -79,11 +82,28 @@ describe("rowMeta", () => {
   it("flags the link as fetching while its metadata is pending", () => {
     const url = makeUrl({ fetchStatus: "pending", title: null });
     const parts = rowMeta(makeTodo({ urls: [url] }), [], NOW, TZ);
-    expect(parts).toContainEqual({
-      kind: "link",
-      text: "visitlisboa.com",
-      fetching: true,
+    expect(parts).toContainEqual(
+      expect.objectContaining({ kind: "link", fetching: true }),
+    );
+  });
+
+  it("shows the first link's domain and how many more there are", () => {
+    const todo = makeTodo({
+      urls: [
+        makeUrl({ id: "b", url: "https://example.com/b", position: "a1" }),
+        makeUrl({ id: "a", position: "a0" }),
+        makeUrl({ id: "c", url: "https://example.com/c", position: "a2" }),
+      ],
     });
+    const parts = rowMeta(todo, [], NOW, TZ);
+    expect(parts).toContainEqual(
+      expect.objectContaining({
+        kind: "link",
+        text: "visitlisboa.com",
+        more: 2,
+      }),
+    );
+    expect(metaSummary(parts)).toBe("Link to visitlisboa.com and 2 more");
   });
 
   it("ignores whitespace-only notes", () => {

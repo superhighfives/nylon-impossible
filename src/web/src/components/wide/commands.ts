@@ -18,6 +18,7 @@ export interface Board {
   moveColumn: (delta: 1 | -1) => void;
   back: () => void;
   open: () => void;
+  openLink: () => void;
   done: () => void;
   move: (kind: SystemListKind) => void;
   moveTo: () => void;
@@ -175,6 +176,17 @@ export const COMMANDS: Command[] = [
     menu: () => "Move to a list…",
     palette: (t) => (t ? `Move ${quote(t)} to…` : null),
     run: (b) => b.moveTo(),
+  },
+  {
+    id: "open-link",
+    label: "Open link",
+    keys: [["O"]],
+    bindings: [{ key: "o" }],
+    group: "Todo",
+    needsSelection: true,
+    menu: () => "Open link",
+    palette: (t) => (t?.urls.length ? `Open ${quote(t)}’s link` : null),
+    run: (b) => b.openLink(),
   },
   {
     id: "pin",

@@ -12,6 +12,7 @@ import {
   type KeyboardEvent,
   memo,
   type PointerEvent,
+  type ReactNode,
   type Ref,
   useEffect,
   useRef,
@@ -32,7 +33,7 @@ const META_ICONS = {
   link: Link2,
 } as const;
 
-function MetaItem({ part }: { part: MetaPart }) {
+function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
   const Icon = part.kind === "due" ? null : META_ICONS[part.kind];
   const overdue = part.kind === "due" && part.overdue;
   return (
@@ -58,8 +59,104 @@ function MetaItem({ part }: { part: MetaPart }) {
         )
       )}
       {/* The notes glyph stands alone; its word is for the accessible name. */}
-      {part.kind !== "notes" && part.text}
+      {part.kind === "link" && link ? (
+        // Wide: a real link. It opens in a new tab without changing the
+        // selection, and stays out of the tab order (O opens it).
+        <a
+          href={part.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          tabIndex={-1}
+          className="text-inherit underline-offset-2 pointer-fine:hover:text-n-ink pointer-fine:hover:underline"
+        >
+          {part.text}
+        </a>
+      ) : (
+        part.kind !== "notes" && part.text
+      )}
+      {part.kind === "link" && part.more > 0 && ` +${part.more}`}
     </span>
+  );
+}
+
+function MetaLine({ parts, links }: { parts: MetaPart[]; links?: boolean }) {
+  if (parts.length === 0) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted"
+    >
+      {parts.map((part) => (
+        <MetaItem key={part.kind} part={part} link={links} />
+      ))}
+    </span>
+  );
+}
+
+/** The row's slot: collapses out when done, fades while being dragged. */
+function RowShell({
+  collapsing,
+  dragging,
+  rowRef,
+  children,
+}: {
+  collapsing: boolean;
+  dragging: boolean;
+  rowRef?: Ref<HTMLLIElement>;
+  children: ReactNode;
+}) {
+  return (
+    <li
+      ref={rowRef}
+      data-phone-row
+      className={`grid transition-[grid-template-rows,opacity] duration-(--n-duration-base) ease-n-out ${
+        collapsing
+          ? "grid-rows-[0fr] opacity-0"
+          : dragging
+            ? "grid-rows-[1fr] opacity-35"
+            : "grid-rows-[1fr] opacity-100"
+      }`}
+      aria-hidden={collapsing || undefined}
+    >
+      {children}
+    </li>
+  );
+}
+
+function CheckButton({
+  title,
+  checked,
+  wide,
+  onClick,
+}: {
+  title: string;
+  checked: boolean;
+  wide: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      data-row-check
+      aria-pressed={checked}
+      aria-label={`Mark “${title}” done`}
+      // Wide: out of the tab order; X marks the selection done.
+      tabIndex={wide ? -1 : undefined}
+      onClick={onClick}
+      className={`n-focus-inset -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field ${wide ? "-my-0.5" : "mt-0.5"}`}
+    >
+      <span
+        className={`flex items-center justify-center border-[1.75px] transition-[background-color,border-color] duration-(--n-duration-fast) ${
+          wide ? "size-[1.375rem] rounded-[6px]" : "size-6 rounded-[7px]"
+        } ${
+          checked
+            ? "animate-n-pop border-n-brand bg-n-brand text-n-brand-ink"
+            : "border-n-ink bg-transparent"
+        }`}
+      >
+        {checked && <Check size={14} strokeWidth={3.2} aria-hidden="true" />}
+      </span>
+    </button>
   );
 }
 
@@ -98,16 +195,49 @@ export interface TodoRowProps {
   /** Extra props for the row's main button — drag listeners, data hooks. */
   bodyProps?: HTMLAttributes<HTMLButtonElement> &
     Record<`data-${string}`, string>;
+  /** Wide: props for the row's container, which a pointer drags. */
+  containerProps?: HTMLAttributes<HTMLDivElement>;
+  /** Wide: the column's one tab stop (its selected row, else its first). */
+  tabStop?: boolean;
   bodyRef?: Ref<HTMLButtonElement>;
   rowRef?: Ref<HTMLLIElement>;
 }
 
 /**
  * One todo: checkbox, title (up to three lines) and a meta line. No handles,
- * chevrons or toolbars — tap opens the detail; long-press, right-click, the
+ * chevrons or toolbars. On the phone a tap opens the detail; on wide a click
+ * selects and a second click opens. Long-press (phone), right-click, the
  * context-menu key or Shift+F10 open the menu.
  */
-export const TodoRow = memo(function TodoRow({
+export const TodoRow = memo(function TodoRow(props: TodoRowProps) {
+  return props.density === "wide" ? (
+    <WideTodoRow {...props} />
+  ) : (
+    <PhoneTodoRow {...props} />
+  );
+});
+
+/** Shift+F10 and the context-menu key open the row's menu. */
+function menuKey(
+  e: KeyboardEvent<HTMLButtonElement>,
+  open: () => void,
+  bodyProps: TodoRowProps["bodyProps"],
+) {
+  bodyProps?.onKeyDown?.(e);
+  if (e.defaultPrevented) return;
+  if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+    e.preventDefault();
+    open();
+  }
+}
+
+/**
+ * The wide row: a container a pointer clicks and drags, holding the title
+ * as the focusable button and a meta line beside it, whose link is a real
+ * link (a link can't sit inside a button). One click selects; a second
+ * click, a double click or Enter opens.
+ */
+function WideTodoRow({
   todo,
   subtasks,
   now,
@@ -120,13 +250,114 @@ export const TodoRow = memo(function TodoRow({
   onCheck,
   onOpen,
   onMenu,
-  density = "phone",
+  dragging = false,
+  bodyProps,
+  bodyRef,
+  rowRef,
+  containerProps,
+  tabStop = false,
+}: TodoRowProps) {
+  const parts = rowMeta(todo, subtasks, now, timeZone);
+  const title = displayTitle(todo);
+  const titleButton = useRef<HTMLButtonElement | null>(null);
+  // Whether the row was already selected when the pointer went down.
+  const wasSelected = useRef(false);
+
+  const setTitleRef = (node: HTMLButtonElement | null) => {
+    titleButton.current = node;
+    if (typeof bodyRef === "function") bodyRef(node);
+    else if (bodyRef) bodyRef.current = node;
+  };
+
+  return (
+    <RowShell collapsing={collapsing} dragging={dragging} rowRef={rowRef}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the title button is the keyboard path; this is the pointer's larger target */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keys go to the title button */}
+      <div
+        {...containerProps}
+        data-row-container
+        onPointerDown={(e) => {
+          containerProps?.onPointerDown?.(e);
+          wasSelected.current = selected;
+        }}
+        onClick={(e) => {
+          const target = e.target as Element;
+          if (target.closest("a, [data-row-check]")) return;
+          // Enter or Space on the title (a click with no detail), a double
+          // click, or a click on the selection opens; any other selects.
+          if (e.detail === 1 && !wasSelected.current) {
+            titleButton.current?.focus();
+            onSelect?.(todo);
+            return;
+          }
+          onOpen(todo);
+        }}
+        onContextMenu={(e) => {
+          if ((e.target as Element).closest("a")) return;
+          e.preventDefault();
+          onMenu(todo, { x: e.clientX, y: e.clientY });
+        }}
+        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-hidden rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
+          selected
+            ? "bg-n-fill ring-2 ring-n-ink ring-inset"
+            : highlighted
+              ? "bg-n-fill"
+              : "pointer-fine:hover:bg-n-surface"
+        }`}
+      >
+        <CheckButton
+          title={title}
+          checked={checked}
+          wide
+          onClick={() => onCheck(todo)}
+        />
+        <div className="-ml-1.5 min-w-0 flex-1 py-2.5 pr-2 pl-1.5">
+          <button
+            {...bodyProps}
+            ref={setTitleRef}
+            type="button"
+            tabIndex={tabStop ? 0 : -1}
+            onFocus={(e) => {
+              bodyProps?.onFocus?.(e);
+              onSelect?.(todo);
+            }}
+            onKeyDown={(e) => menuKey(e, () => onMenu(todo), bodyProps)}
+            aria-haspopup="dialog"
+            aria-description={metaSummary(parts) || undefined}
+            className="block w-full cursor-pointer text-left outline-none"
+          >
+            <span
+              className={`line-clamp-3 block text-[0.9375rem] leading-[1.4] font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
+                checked ? "text-n-ink-muted line-through" : "text-n-ink"
+              }`}
+            >
+              {title}
+            </span>
+          </button>
+          <MetaLine parts={parts} links />
+        </div>
+      </div>
+    </RowShell>
+  );
+}
+
+/** The phone row: the whole row is the button; links stay in the detail. */
+function PhoneTodoRow({
+  todo,
+  subtasks,
+  now,
+  timeZone,
+  checked,
+  collapsing,
+  highlighted,
+  onCheck,
+  onOpen,
+  onMenu,
   dragging = false,
   bodyProps,
   bodyRef,
   rowRef,
 }: TodoRowProps) {
-  const wide = density === "wide";
   const parts = rowMeta(todo, subtasks, now, timeZone);
   const title = displayTitle(todo);
   const press = useRef<{
@@ -137,9 +368,6 @@ export const TodoRow = memo(function TodoRow({
   // Set when a long-press opened the menu, so the click that follows the
   // finger lifting doesn't also open the detail.
   const suppressClick = useRef(false);
-  // Wide: whether the row was already selected when the pointer went down,
-  // before focusing it selected it.
-  const wasSelected = useRef(false);
 
   useEffect(() => () => clearTimeout(press.current?.timer), []);
 
@@ -150,8 +378,7 @@ export const TodoRow = memo(function TodoRow({
 
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     bodyProps?.onPointerDown?.(e);
-    if (wide) wasSelected.current = selected;
-    if (wide || e.button !== 0) return;
+    if (e.button !== 0) return;
     suppressClick.current = false;
     endPress();
     press.current = {
@@ -177,56 +404,19 @@ export const TodoRow = memo(function TodoRow({
     }
   };
 
-  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>) => {
-    bodyProps?.onKeyDown?.(e);
-    if (e.defaultPrevented) return;
-    if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
-      e.preventDefault();
-      onMenu(todo);
-    }
-  };
-
-  const summary = metaSummary(parts);
-
   return (
-    <li
-      ref={rowRef}
-      data-phone-row
-      className={`grid transition-[grid-template-rows,opacity] duration-(--n-duration-base) ease-n-out ${
-        collapsing
-          ? "grid-rows-[0fr] opacity-0"
-          : dragging
-            ? "grid-rows-[1fr] opacity-35"
-            : "grid-rows-[1fr] opacity-100"
-      }`}
-      aria-hidden={collapsing || undefined}
-    >
+    <RowShell collapsing={collapsing} dragging={dragging} rowRef={rowRef}>
       <div
-        className={`flex min-h-0 items-start overflow-hidden transition-colors duration-(--n-duration-fast) ${
-          wide ? "-mx-2.5 gap-3 rounded-n-field px-2.5" : "gap-3 px-5"
-        } ${selected ? "bg-n-fill ring-2 ring-n-ink ring-inset" : highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"}`}
+        className={`flex min-h-0 items-start gap-3 overflow-hidden px-5 transition-colors duration-(--n-duration-fast) ${
+          highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"
+        }`}
       >
-        <button
-          type="button"
-          aria-pressed={checked}
-          aria-label={`Mark “${title}” done`}
+        <CheckButton
+          title={title}
+          checked={checked}
+          wide={false}
           onClick={() => onCheck(todo)}
-          className={`n-focus-inset -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field ${wide ? "-my-0.5" : "mt-0.5"}`}
-        >
-          <span
-            className={`flex items-center justify-center border-[1.75px] transition-[background-color,border-color] duration-(--n-duration-fast) ${
-              wide ? "size-[1.375rem] rounded-[6px]" : "size-6 rounded-[7px]"
-            } ${
-              checked
-                ? "animate-n-pop border-n-brand bg-n-brand text-n-brand-ink"
-                : "border-n-ink bg-transparent"
-            }`}
-          >
-            {checked && (
-              <Check size={14} strokeWidth={3.2} aria-hidden="true" />
-            )}
-          </span>
-        </button>
+        />
         <button
           {...bodyProps}
           ref={bodyRef}
@@ -236,18 +426,9 @@ export const TodoRow = memo(function TodoRow({
           onPointerUp={endPress}
           onPointerCancel={endPress}
           onPointerLeave={endPress}
-          onFocus={(e) => {
-            bodyProps?.onFocus?.(e);
-            onSelect?.(todo);
-          }}
-          onClick={(e) => {
+          onClick={() => {
             if (suppressClick.current) {
               suppressClick.current = false;
-              return;
-            }
-            // Enter (detail 0), a double click, or a click on the selection.
-            if (wide && e.detail === 1 && !wasSelected.current) {
-              onSelect?.(todo);
               return;
             }
             onOpen(todo);
@@ -258,32 +439,21 @@ export const TodoRow = memo(function TodoRow({
             suppressClick.current = false;
             onMenu(todo, { x: e.clientX, y: e.clientY });
           }}
-          onKeyDown={onKeyDown}
+          onKeyDown={(e) => menuKey(e, () => onMenu(todo), bodyProps)}
           aria-haspopup="dialog"
-          aria-description={summary || undefined}
-          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left [-webkit-touch-callout:none] ${wide ? "-ml-1.5 py-2.5 pr-2 pl-1.5 outline-none" : "n-focus-inset py-[0.6875rem]"}`}
+          aria-description={metaSummary(parts) || undefined}
+          className="n-focus-inset min-w-0 flex-1 cursor-pointer touch-pan-y rounded-n-chip py-[0.6875rem] text-left select-none [-webkit-touch-callout:none]"
         >
           <span
-            className={`line-clamp-3 block font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
-              wide
-                ? "text-[0.9375rem] leading-[1.4]"
-                : "text-[1.0625rem] leading-[1.35]"
-            } ${checked ? "text-n-ink-muted line-through" : "text-n-ink"}`}
+            className={`line-clamp-3 block text-[1.0625rem] leading-[1.35] font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
+              checked ? "text-n-ink-muted line-through" : "text-n-ink"
+            }`}
           >
             {title}
           </span>
-          {parts.length > 0 && (
-            <span
-              aria-hidden="true"
-              className={`mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted`}
-            >
-              {parts.map((part) => (
-                <MetaItem key={part.kind} part={part} />
-              ))}
-            </span>
-          )}
+          <MetaLine parts={parts} />
         </button>
       </div>
-    </li>
+    </RowShell>
   );
-});
+}

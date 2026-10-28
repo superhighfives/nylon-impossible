@@ -65,7 +65,7 @@ function serializeTodo(todo: typeof todos.$inferSelect) {
 }
 
 // Serialize a URL record with ISO dates
-function serializeUrl(url: typeof todoUrls.$inferSelect) {
+export function serializeUrl(url: typeof todoUrls.$inferSelect) {
   return {
     id: url.id.toLowerCase(),
     todoId: url.todoId.toLowerCase(),
