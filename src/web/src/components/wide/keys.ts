@@ -11,6 +11,7 @@ export type BoardKeyAction =
   | { type: "delete" }
   | { type: "new" }
   | { type: "undo" }
+  | { type: "back" }
   | { type: "feedback" }
   | { type: "shortcuts" };
 
@@ -58,6 +59,8 @@ export function boardKeyAction(e: {
       return { type: "new" };
     case "z":
       return { type: "undo" };
+    case "Escape":
+      return { type: "back" };
     case "f":
       return { type: "feedback" };
     case "?":

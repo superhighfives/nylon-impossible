@@ -39,8 +39,10 @@ export const TOAST_OFFSET_VAR = "--n-phone-toast-offset";
  * and the list chips pick where it goes.
  *
  * `floating` (phone) is the glass pill attached to the keyboard. `inline`
- * (wide) is the quiet "+ Add" row at the top of a column, with its chips
- * underneath once focused.
+ * (wide) is the quiet "+ Add" row at the top of a column: it only shows the
+ * due chip, since the column already says which list it adds to. `popover`
+ * (wide quick add) leads with the target's name and count, and always shows
+ * the list chips.
  */
 export function Composer({
   currentListId,
@@ -49,6 +51,8 @@ export function Composer({
   onView,
   textareaRef,
   variant = "floating",
+  countFor,
+  isVisible,
 }: {
   /** The list on screen — the default target. */
   currentListId: string;
@@ -58,9 +62,17 @@ export function Composer({
   /** "View" on the "Added to …" toast when adding somewhere off-screen. */
   onView: (listId: string) => void;
   textareaRef?: Ref<HTMLTextAreaElement>;
-  variant?: "floating" | "inline";
+  variant?: "floating" | "inline" | "popover";
+  /** `popover`: the count beside the target's name ("Today 4"). */
+  countFor?: (listId: string) => number;
+  /**
+   * Whether a list is on screen, so adding to it needs no "Added to …"
+   * toast. Defaults to just `currentListId`.
+   */
+  isVisible?: (listId: string) => boolean;
 }) {
   const inline = variant === "inline";
+  const popover = variant === "popover";
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
   const [pickedTarget, setPickedTarget] = useState<string | null>(null);
@@ -86,12 +98,12 @@ export function Composer({
   const spillsToNotes = draft
     .split("\n")
     .some((line) => splitTodoText(line).notes !== null);
-  const showChips = focused || hasDraft;
+  const showChips = popover || focused || hasDraft;
 
   // Publish where the composer's top edge sits so toasts clear it.
   useLayoutEffect(() => {
     const el = rootRef.current;
-    if (!el || inline) return;
+    if (!el || variant !== "floating") return;
     const publish = () => {
       const fromBottom = window.innerHeight - el.getBoundingClientRect().top;
       document.documentElement.style.setProperty(
@@ -152,7 +164,7 @@ export function Composer({
       );
       return;
     }
-    if (listId !== currentListId) {
+    if (!(isVisible ? isVisible(listId) : listId === currentListId)) {
       const name = targets.find((t) => t.id === listId)?.label ?? "list";
       const label =
         planned.length > 1
@@ -173,12 +185,15 @@ export function Composer({
       ? `${keyboard + 8}px`
       : "calc(1rem + env(safe-area-inset-bottom, 0px))";
 
-  const chips = showChips && (
+  // Inline has no list chips, so only the due chip can show.
+  const chips = showChips && (!inline || (dueDay && hasDraft)) && (
     <div
       className={`flex min-w-0 animate-n-fade-in gap-1.5 ${
         inline
           ? "flex-wrap pt-1 pb-2.5 pl-8"
-          : "overflow-x-auto px-2.5 pt-2.5 pb-1.5 [scrollbar-width:none]"
+          : popover
+            ? "flex-wrap px-5 pt-1 pb-1"
+            : "overflow-x-auto px-2.5 pt-2.5 pb-1.5 [scrollbar-width:none]"
       }`}
     >
       {/* The parsed date leads, so it's never scrolled out of view. */}
@@ -198,34 +213,36 @@ export function Composer({
           </button>
         </span>
       )}
-      <fieldset aria-label="Add to list" className="contents">
-        {targets.map((t) => {
-          const selected = t.id === targetId;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              aria-pressed={selected}
-              onPointerDown={keepFocus}
-              onMouseDown={keepFocus}
-              onClick={() => setPickedTarget(t.id)}
-              className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus-inset transition-colors duration-(--n-duration-fast) ${
-                selected
-                  ? "border-n-brand bg-n-brand text-n-brand-ink"
-                  : "border-n-hairline bg-transparent text-n-ink-muted"
-              }`}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </fieldset>
+      {!inline && (
+        <fieldset aria-label="Add to list" className="contents">
+          {targets.map((t) => {
+            const selected = t.id === targetId;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                aria-pressed={selected}
+                onPointerDown={keepFocus}
+                onMouseDown={keepFocus}
+                onClick={() => setPickedTarget(t.id)}
+                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus-inset transition-colors duration-(--n-duration-fast) ${
+                  selected
+                    ? "border-n-brand bg-n-brand text-n-brand-ink"
+                    : "border-n-hairline bg-transparent text-n-ink-muted"
+                }`}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </fieldset>
+      )}
     </div>
   );
 
   const spill = spillsToNotes && (
     <p
-      className={`text-[0.8125rem] text-n-ink-muted ${inline ? "pb-2 pl-8" : "px-[1.125rem] pt-2"}`}
+      className={`text-[0.8125rem] text-n-ink-muted ${inline ? "pb-2 pl-8" : popover ? "px-5 pb-2" : "px-[1.125rem] pt-2"}`}
     >
       The rest will be saved to notes.
     </p>
@@ -236,8 +253,70 @@ export function Composer({
       e.preventDefault();
       void submit();
     }
-    if (e.key === "Escape") e.currentTarget.blur();
+    // The quick-add popover closes itself on Escape.
+    if (e.key === "Escape" && !popover) e.currentTarget.blur();
   };
+
+  if (popover) {
+    return (
+      <form
+        ref={rootRef}
+        aria-label={`Add a todo to ${targetLabel}`}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        <p className="m-0 flex items-baseline gap-2.5 px-5 pt-5 pb-2">
+          <span className="font-n-display text-[1.625rem] leading-[1.1] font-bold tracking-[-0.025em] text-n-ink">
+            {targetLabel}
+          </span>
+          {countFor && (
+            <span className="text-[0.9375rem] text-n-ink-muted tabular-nums">
+              {countFor(targetId)}
+            </span>
+          )}
+        </p>
+        <div className="flex items-start gap-2.5 px-5">
+          <Plus
+            size={16}
+            strokeWidth={2.2}
+            aria-hidden="true"
+            className="mt-3 shrink-0 text-n-ink-muted"
+          />
+          <textarea
+            ref={setRefs}
+            rows={1}
+            value={draft}
+            aria-label={`New todo in ${targetLabel}`}
+            placeholder={`Add to ${targetLabel}…`}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              if (!e.target.value) setKeepDateWords(false);
+            }}
+            onKeyDown={onFieldKeyDown}
+            className="field-sizing-content block max-h-40 min-h-10 w-full flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-5 text-n-ink outline-none placeholder:text-n-ink-muted"
+          />
+          {hasDraft && (
+            <button
+              type="submit"
+              aria-label="Add todo"
+              onPointerDown={keepFocus}
+              onMouseDown={keepFocus}
+              className="mt-1.5 flex size-7 shrink-0 animate-n-fade-in cursor-pointer items-center justify-center rounded-full bg-n-brand text-n-brand-ink n-focus"
+            >
+              <ArrowUp size={15} strokeWidth={2.6} aria-hidden="true" />
+            </button>
+          )}
+        </div>
+        {spill}
+        {chips}
+        <p className="m-0 mx-5 mt-3 border-t border-n-hairline pt-3 pb-4 text-xs text-n-ink-muted">
+          Enter adds and keeps this open · Esc closes
+        </p>
+      </form>
+    );
+  }
 
   if (inline) {
     return (

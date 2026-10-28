@@ -33,6 +33,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
    It's low risk and every later PR builds on it, so merge it before starting anything else.
 2. **Wide web: the big piece, in three PRs.**
    1. **Layout.** Click to select, and a second click or Enter to open. The always-present fourth column with Done as its default, and the detail opening into it. The sidebar's fill and keyboard-bar states. The toolbar with its quick-add and New list popovers. List rename in place, the ⋯ menu, and delete with Undo.
+      - *As built:* the toolbar's Search button arrives with the palette in 2.2, so 2.1's pill holds New todo and New list. Opening a todo leaves focus on the board (that's what lets the detail follow the selection), so Esc closing the open todo landed here rather than in 2.2. `n` still focuses the column's Add field; on Done, which has none, it opens quick add. Keys fall back to the selection only while focus is on the board, until 2.2 gives the sidebar and toolbar their own keyboard model.
    2. **Keyboard.** Moving between the sidebar and the board, Esc backing out, G sequences, ⇧-digits, the ⌘K palette and M (Move to). Build one command registry first, and have the shortcuts dialog, the palette, the right-click menu and the key handler all read from it. If each keeps its own list they drift apart, which is how the composer ended up in five places before the October redesign.
    3. **Details.** Adding several links (the endpoint, the detail's "Paste a link" field, clickable row links, `o`). The orange overnight banner in its reserved space. Tidier tab stops (one per column) and the soft focus backgrounds.
 3. **iPad and Mac (SwiftUI wide):** the same behavior as web, built after phase 2 so it copies something already settled and reviewed. This phase also includes:
@@ -67,7 +68,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 ### Checklist
 
 - [x] 1. Shared foundations (tokens, sentence case)
-- [ ] 2.1 Wide web: layout
+- [x] 2.1 Wide web: layout
 - [ ] 2.2 Wide web: keyboard, command registry, palette, Move to
 - [ ] 2.3 Wide web: links, overnight banner, tab stops and focus
 - [ ] 3. iPad and Mac wide, Mac toolbar, list delete with Undo, iOS links, menu bar
@@ -103,6 +104,7 @@ Applies to wide web (1024px and up), iPad and the Mac window.
   3. otherwise Done.
 
   It never disappears, so the other three never change width.
+- **A list column's ⋯ and ×** sit in the header's top-right corner, not beside the title. At 1440px a list column has about 250px for a 40px title, and "Groceries" doesn't fit beside two buttons; the title keeps the full width and wraps to two lines before it breaks a word.
 - **Closing things in the fourth column:**
   - Closing a todo (×, or Esc) returns to the list it covered.
   - × on a list returns to Done.
@@ -142,7 +144,7 @@ Applies to wide web (1024px and up), iPad and the Mac window.
 **Lists**
 
 - **A list column's title** is a button: click it to rename in place. Enter or blur commits, Esc cancels.
-- **⋯ next to the title** opens Rename and Delete list.
+- **⋯ in the header** opens Rename and Delete list.
 - **Delete list** happens straight away, with an Undo toast that names the list and how many todos went with it. It replaces the confirmation on iOS (`ContentView.swift`, the `deletingList` dialog). Hide the list and its todos at once, and commit when the toast expires, the way todo delete already works in `useTodoActions.ts`.
 
 **Quick add (New todo)**

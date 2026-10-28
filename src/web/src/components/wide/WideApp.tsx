@@ -11,11 +11,11 @@ import {
 } from "@dnd-kit/core";
 import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
+import { ListPlus, Plus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/phone/Composer";
 import { ContextMenu, type MenuView } from "@/components/phone/ContextMenu";
 import { DetailSheet } from "@/components/phone/DetailSheet";
-import { DoneScreen } from "@/components/phone/DoneScreen";
 import {
   boardViewKey,
   columnSubline,
@@ -30,13 +30,16 @@ import { SettingsScreen } from "@/components/phone/SettingsScreen";
 import { useBoardData } from "@/components/phone/useBoardData";
 import { runToastUndo } from "@/components/phone/useTodoActions";
 import { useHints } from "@/hooks/useHints";
-import { useCreateList } from "@/hooks/useLists";
+import { useCreateList, useUpdateList } from "@/hooks/useLists";
 import { dropPlacement, slotAt } from "@/lib/dragOrder";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import { Column, type DropIndicator } from "./Column";
+import { DONE_COLUMN, DoneColumn } from "./DoneColumn";
 import { resolveDrop } from "./drop";
 import { boardKeyAction, isTypingTarget } from "./keys";
+import { NewListPopover } from "./NewListPopover";
+import { QuickAdd } from "./QuickAdd";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
 import { Sidebar } from "./Sidebar";
 
@@ -45,6 +48,15 @@ const EMPTY_COPY: Record<string, string> = {
   thisWeek: "A clear week.",
   someday: "Nothing here yet.",
 };
+
+const TOOL_BUTTON =
+  "flex size-9 cursor-pointer items-center justify-center rounded-full text-n-ink-muted n-focus pointer-fine:hover:bg-n-fill pointer-fine:hover:text-n-ink";
+
+/** A column to focus once it renders: a row, its Add field, or its title. */
+interface PendingFocus {
+  column: string;
+  target: "row" | "composer" | "head";
+}
 
 interface MenuState {
   id: string;
@@ -67,11 +79,16 @@ function focusedRow(): HTMLElement | null {
 }
 
 /**
- * The wide layout (web 1024px and up): the sidebar, the three time columns
- * always side by side, one of your lists as an optional fourth column, and
- * the detail as a right-hand panel. Rows, menus, the composer and the detail
- * are the phone's components at board density, driven by the same
- * `useBoardData`.
+ * The wide layout (web 1024px and up): the sidebar, a toolbar, then four
+ * columns that never change width: Today, This week, Someday, and a fourth
+ * that shows the open todo's detail, else the list picked in the sidebar,
+ * else Done.
+ *
+ * Selection is state, not DOM focus. Focusing a row selects it; one click
+ * selects, a second click, a double click or Enter opens it in the fourth
+ * column, and while a todo is open the detail follows the selection. Rows,
+ * menus, the composer and the detail are the phone's components at board
+ * density, driven by the same `useBoardData`.
  */
 export function WideApp({
   view = null,
@@ -94,6 +111,7 @@ export function WideApp({
     subtasksOf,
     rowsFor,
     targets,
+    doneTodos,
     doneCount,
     loading,
     todosLoading,
@@ -102,22 +120,27 @@ export function WideApp({
     isFetching,
   } = useBoardData();
   const createList = useCreateList();
+  const updateList = useUpdateList();
 
   const [openListId, setOpenListId] = useState<string | null>(() =>
     view?.kind === "list" ? view.id : null,
   );
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [screen, setScreen] = useState<"done" | "settings" | null>(null);
+  const [settings, setSettings] = useState(false);
+  const [quickAdd, setQuickAdd] = useState(false);
+  const [fourthEl, setFourthEl] = useState<HTMLElement | null>(null);
   const [shortcuts, setShortcuts] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const canSendFeedback = useCanSendFeedback();
-  const [activeColumn, setActiveColumn] = useState<string | null>(null);
   const [dragging, setDragging] = useState<TodoWithUrls | null>(null);
   const [indicator, setIndicator] = useState<DropIndicator | null>(null);
   const composers = useRef(new Map<string, HTMLTextAreaElement>());
   const justDragged = useRef(false);
-  const pendingFocus = useRef<string | null>(null);
+  const pendingFocus = useRef<PendingFocus | null>(null);
+  /** The last todo selected in each column, so going back lands on it. */
+  const lastSelected = useRef(new Map<string, string>());
 
   const now = new Date();
   const overnight = useOvernightNote(todos, byKind.today?.id);
@@ -127,11 +150,37 @@ export function WideApp({
   const openList = openListId
     ? collections.find((l) => l.id === openListId)
     : undefined;
-  const columns = openList ? [...timeLists, openList] : timeLists;
-  const columnIds = columns.map((c) => c.id);
+  const todoById = useCallback(
+    (id: string | null | undefined) =>
+      id ? todos.find((t) => t.id === id && !t.completed) : undefined,
+    [todos],
+  );
+  const doneById = useCallback(
+    (id: string | null | undefined) =>
+      id ? doneTodos.find((t) => t.id === id) : undefined,
+    [doneTodos],
+  );
+  const detailTodo = detailId ? (todoById(detailId) ?? null) : null;
+  /** What the fourth column shows: the detail, else your list, else Done. */
+  const fourth = detailTodo ? "detail" : openList ? "list" : "done";
+  // The columns with rows, left to right; the detail has none.
+  const columnIds = [
+    ...timeLists.map((l) => l.id),
+    ...(fourth === "list" && openList ? [openList.id] : []),
+    ...(fourth === "done" ? [DONE_COLUMN] : []),
+  ];
   const todayId = byKind.today?.id ?? null;
+  const selectedTodo = todoById(selectedId) ?? doneById(selectedId);
+  /** The column the selection is in: a list id, Done, or none. */
+  const selectionColumn = selectedTodo
+    ? selectedTodo.completed
+      ? DONE_COLUMN
+      : selectedTodo.listId
+    : null;
   const currentColumn =
-    activeColumn && columnIds.includes(activeColumn) ? activeColumn : todayId;
+    selectionColumn && columnIds.includes(selectionColumn)
+      ? selectionColumn
+      : todayId;
 
   // Your list was deleted elsewhere: close its column.
   useEffect(() => {
@@ -140,8 +189,12 @@ export function WideApp({
 
   // --- Focus ----------------------------------------------------------------
 
+  /**
+   * Focus (and so select) a row in a column: `index`, else the column's
+   * last-selected todo, else its first. Its title when it has no rows.
+   */
   const focusColumn = useCallback(
-    (listId: string, index = 0) => {
+    (listId: string, index?: number) => {
       const section = document.querySelector<HTMLElement>(
         `[data-column="${CSS.escape(listId)}"]`,
       );
@@ -152,22 +205,34 @@ export function WideApp({
         behavior: reducedMotion === "reduce" ? "auto" : "smooth",
       });
       const rows = columnRows(listId);
+      const remembered = lastSelected.current.get(listId);
       const target =
-        rows[Math.min(index, rows.length - 1)] ??
+        (index === undefined
+          ? rows.find((r) => r.dataset.rowId === remembered)
+          : rows[Math.min(index, rows.length - 1)]) ??
+        rows[0] ??
         section.querySelector<HTMLElement>("[data-column-head]");
       target?.focus({ preventScroll: rows.length === 0 });
-      setActiveColumn(listId);
       return true;
     },
     [reducedMotion],
   );
 
-  // A list opened from the sidebar takes focus once its column renders.
+  // A column opened from the sidebar takes focus once it renders.
   useEffect(() => {
-    const id = pendingFocus.current;
-    if (id && columnIds.includes(id)) {
-      pendingFocus.current = null;
-      focusColumn(id);
+    const pending = pendingFocus.current;
+    if (!pending || !columnIds.includes(pending.column)) return;
+    pendingFocus.current = null;
+    if (pending.target === "composer") {
+      composers.current.get(pending.column)?.focus();
+    } else if (pending.target === "head") {
+      document
+        .querySelector<HTMLElement>(
+          `[data-column-head="${CSS.escape(pending.column)}"]`,
+        )
+        ?.focus();
+    } else {
+      focusColumn(pending.column);
     }
   });
 
@@ -185,7 +250,7 @@ export function WideApp({
     if (urlKey.startsWith("list:")) {
       const id = urlKey.slice(5);
       if (openListId !== id) setOpenListId(id);
-      pendingFocus.current = id;
+      pendingFocus.current = { column: id, target: "row" };
       return;
     }
     if (openListId) setOpenListId(null);
@@ -223,22 +288,56 @@ export function WideApp({
         ?.focus();
   };
 
-  const todoById = useCallback(
-    (id: string | undefined) =>
-      id ? todos.find((t) => t.id === id && !t.completed) : undefined,
-    [todos],
-  );
+  // --- Selection ------------------------------------------------------------
+
+  const select = useCallback((todo: TodoWithUrls) => {
+    const column = todo.completed ? DONE_COLUMN : todo.listId;
+    lastSelected.current.set(column, todo.id);
+    setSelectedId(todo.id);
+    // While a todo is open, the detail follows the selection.
+    if (!todo.completed) {
+      setDetailId((open) => (open && open !== todo.id ? todo.id : open));
+    }
+  }, []);
+
+  const selectedRow = () =>
+    selectedId
+      ? document.querySelector<HTMLElement>(
+          `[data-row-id="${CSS.escape(selectedId)}"]`,
+        )
+      : null;
+
+  const closeDetail = () => {
+    setDetailId(null);
+    // Back to the selected row, which is where the keyboard left off.
+    requestAnimationFrame(() => selectedRow()?.focus());
+  };
 
   // --- Sidebar --------------------------------------------------------------
 
-  const toggleCollection = (list: SerializedList) => {
-    if (openListId === list.id) {
-      setOpenListId(null);
-      if (currentColumn === list.id && todayId) focusColumn(todayId);
+  /** Your list in the fourth column, its first todo selected. */
+  const openCollection = (
+    list: SerializedList,
+    target: PendingFocus["target"] = "row",
+  ) => {
+    // Already showing: nothing re-renders, so go straight in.
+    if (fourth === "list" && openListId === list.id && target === "row") {
+      focusColumn(list.id);
       return;
     }
+    setDetailId(null);
     setOpenListId(list.id);
-    pendingFocus.current = list.id;
+    pendingFocus.current = { column: list.id, target };
+  };
+
+  const showDone = (target: PendingFocus["target"] = "row") => {
+    if (fourth === "done" && target === "row") {
+      focusColumn(DONE_COLUMN);
+      return;
+    }
+    setDetailId(null);
+    setOpenListId(null);
+    pendingFocus.current = { column: DONE_COLUMN, target };
   };
 
   const addList = (name: string) => {
@@ -246,10 +345,8 @@ export function WideApp({
     createList.mutate(
       { name, position: generateKeyBetween(last?.position ?? null, null) },
       {
-        onSuccess: (created) => {
-          setOpenListId(created.id);
-          pendingFocus.current = created.id;
-        },
+        // Open it and put the cursor in its Add field.
+        onSuccess: (created) => openCollection(created, "composer"),
       },
     );
   };
@@ -260,8 +357,8 @@ export function WideApp({
       focusColumn(listId);
       return;
     }
-    setOpenListId(listId);
-    pendingFocus.current = listId;
+    const list = collections.find((l) => l.id === listId);
+    if (list) openCollection(list);
   };
 
   // --- Keyboard -------------------------------------------------------------
@@ -277,7 +374,14 @@ export function WideApp({
         return;
       }
       // Screens and the overlays are modal; leave their keys alone.
-      if (screen || shortcuts || feedback) return;
+      if (settings || shortcuts || feedback) return;
+      if (action.type === "back") {
+        if (detailTodo) {
+          e.preventDefault();
+          closeDetail();
+        }
+        return;
+      }
       if (action.type === "undo") {
         if (runToastUndo()) e.preventDefault();
         return;
@@ -289,21 +393,31 @@ export function WideApp({
         return;
       }
 
-      const row = focusedRow();
-      const listId = row?.dataset.rowList ?? currentColumn;
+      // Keys act on the selection while focus is on the board (or nowhere).
+      // The sidebar and toolbar keep their own keys until they get a
+      // keyboard model of their own.
+      const active = document.activeElement;
+      const onBoard =
+        !active || active === document.body || !!active.closest("main");
+      const row = focusedRow() ?? (onBoard ? selectedRow() : null);
+      const listId =
+        row?.dataset.rowList && columnIds.includes(row.dataset.rowList)
+          ? row.dataset.rowList
+          : currentColumn;
       const todo = todoById(row?.dataset.rowId);
+      const done = doneById(row?.dataset.rowId);
 
       switch (action.type) {
         case "row": {
           if (!listId) return;
           e.preventDefault();
           const rows = columnRows(listId);
-          if (!row) {
+          const at = row ? rows.indexOf(row) : -1;
+          if (at === -1) {
             rows[0]?.focus();
-            setActiveColumn(listId);
             return;
           }
-          rows[rows.indexOf(row) + action.delta]?.focus();
+          rows[at + action.delta]?.focus();
           return;
         }
         case "column": {
@@ -319,11 +433,24 @@ export function WideApp({
         case "new": {
           if (!listId) return;
           e.preventDefault();
-          composers.current.get(listId)?.focus();
+          const field = composers.current.get(listId);
+          if (field) field.focus();
+          else setQuickAdd(true);
           return;
         }
         default:
           break;
+      }
+
+      // Done's rows: X puts one back, Delete removes it.
+      if (row && done) {
+        if (action.type === "done" || action.type === "delete") {
+          e.preventDefault();
+          focusNeighbour(row);
+          if (action.type === "done") actions.restore(done);
+          else actions.destroy(done);
+        }
+        return;
       }
 
       if (!row || !todo) return;
@@ -447,7 +574,6 @@ export function WideApp({
 
   // --- Rendering ------------------------------------------------------------
 
-  const detailTodo = detailId ? (todoById(detailId) ?? null) : null;
   const menuTodo = menu ? (todos.find((t) => t.id === menu.id) ?? null) : null;
 
   useEffect(() => {
@@ -472,6 +598,7 @@ export function WideApp({
 
   const onOpen = (todo: TodoWithUrls) => {
     if (justDragged.current) return;
+    select(todo);
     setDetailId(todo.id);
   };
   const onMenu = (todo: TodoWithUrls, at?: { x: number; y: number }) => {
@@ -486,6 +613,71 @@ export function WideApp({
       },
       view: "main",
     });
+  };
+
+  const renderColumn = (list: SerializedList) => {
+    const kind = list.systemKind ?? null;
+    return (
+      <Column
+        key={list.id}
+        listId={list.id}
+        title={list.name}
+        subline={columnSubline(kind, now, timeZone)}
+        tinted={!kind}
+        rows={rowsFor(list.id)}
+        subtasksOf={subtasksOf}
+        checked={actions.checked}
+        collapsing={actions.collapsing}
+        highlightedId={menu?.id ?? null}
+        selectedId={selectedId}
+        indicator={indicator}
+        loading={loading}
+        error={errorView}
+        empty={EMPTY_COPY[kind ?? ""] ?? "Nothing here yet."}
+        onClose={kind ? undefined : () => showDone("head")}
+        onRename={
+          kind
+            ? undefined
+            : (name) => updateList.mutate({ id: list.id, input: { name } })
+        }
+        onDelete={
+          kind
+            ? undefined
+            : () => {
+                actions.destroyList(list);
+                showDone("head");
+              }
+        }
+        note={
+          kind === "today" && overnight.text ? (
+            <OvernightNote
+              text={overnight.text}
+              onDismiss={overnight.dismiss}
+              className="pt-1 pb-1.5"
+            />
+          ) : null
+        }
+        composer={
+          <Composer
+            variant="inline"
+            currentListId={list.id}
+            targets={targets}
+            timeZone={timeZone}
+            onView={viewList}
+            textareaRef={(el) => {
+              if (el) composers.current.set(list.id, el);
+              else composers.current.delete(list.id);
+            }}
+          />
+        }
+        now={now}
+        timeZone={timeZone}
+        onSelect={select}
+        onCheck={actions.complete}
+        onOpen={onOpen}
+        onMenu={onMenu}
+      />
+    );
   };
 
   return (
@@ -506,74 +698,88 @@ export function WideApp({
           timeLists={timeLists}
           collections={collections}
           countFor={(id) => rowsFor(id).length}
-          openListId={openList ? openList.id : null}
+          openListId={fourth === "list" && openList ? openList.id : null}
+          selectionColumn={selectionColumn}
+          doneShowing={fourth === "done"}
           doneCount={doneCount}
           onTimeList={(list) => focusColumn(list.id)}
-          onCollection={toggleCollection}
+          onCollection={(list) => openCollection(list)}
           onCreateList={addList}
-          onDone={() => setScreen("done")}
-          onSettings={() => setScreen("settings")}
+          onDone={() => showDone()}
+          onSettings={() => setSettings(true)}
           onShortcuts={() => setShortcuts(true)}
           onFeedback={canSendFeedback ? () => setFeedback(true) : undefined}
         />
-        <main
-          aria-label="Board"
-          className={`flex min-w-0 flex-1 overflow-x-auto transition-[padding] duration-(--n-duration-base) ease-n-out ${
-            detailTodo ? "pr-[max(22rem,min(28rem,40vw))]" : ""
-          }`}
-        >
-          {columns.map((list) => {
-            const kind = list.systemKind ?? null;
-            const rows = rowsFor(list.id);
-            return (
-              <Column
-                key={list.id}
-                listId={list.id}
-                title={list.name}
-                subline={columnSubline(kind, now, timeZone)}
-                tinted={!kind}
-                rows={rows}
-                subtasksOf={subtasksOf}
-                checked={actions.checked}
-                collapsing={actions.collapsing}
-                highlightedId={menu?.id ?? detailTodo?.id ?? null}
-                indicator={indicator}
-                loading={loading}
-                error={errorView}
-                empty={EMPTY_COPY[kind ?? ""] ?? "Nothing here yet."}
-                onClose={kind ? undefined : () => setOpenListId(null)}
-                onFocusColumn={setActiveColumn}
-                note={
-                  kind === "today" && overnight.text ? (
-                    <OvernightNote
-                      text={overnight.text}
-                      onDismiss={overnight.dismiss}
-                      className="pt-1 pb-1.5"
-                    />
-                  ) : null
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="flex h-16 shrink-0 items-center justify-end border-b border-n-hairline px-4">
+            <div className="flex items-center gap-0.5 rounded-full border border-n-hairline bg-n-surface p-[3px]">
+              <QuickAdd
+                open={quickAdd}
+                onOpenChange={setQuickAdd}
+                trigger={
+                  <button
+                    type="button"
+                    aria-label="New todo"
+                    title="New todo"
+                    className={TOOL_BUTTON}
+                  >
+                    <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
                 }
-                composer={
-                  <Composer
-                    variant="inline"
-                    currentListId={list.id}
-                    targets={targets}
-                    timeZone={timeZone}
-                    onView={viewList}
-                    textareaRef={(el) => {
-                      if (el) composers.current.set(list.id, el);
-                      else composers.current.delete(list.id);
-                    }}
-                  />
+                startListId={
+                  selectionColumn && selectionColumn !== DONE_COLUMN
+                    ? selectionColumn
+                    : (todayId ?? "")
                 }
+                targets={targets}
+                timeZone={timeZone}
+                countFor={(id) => rowsFor(id).length}
+                isVisible={(id) => columnIds.includes(id)}
+                onView={viewList}
+              />
+              <NewListPopover
+                align="end"
+                onCreate={addList}
+                trigger={
+                  <button
+                    type="button"
+                    aria-label="New list"
+                    title="New list"
+                    className={TOOL_BUTTON}
+                  >
+                    <ListPlus size={16} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                }
+              />
+            </div>
+          </div>
+          <main
+            aria-label="Board"
+            className="flex min-h-0 flex-1 overflow-x-auto"
+          >
+            {timeLists.map((list) => renderColumn(list))}
+            {fourth === "detail" ? (
+              <section
+                ref={setFourthEl}
+                aria-label="Todo"
+                data-column-detail
+                className="relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline"
+              />
+            ) : fourth === "list" && openList ? (
+              renderColumn(openList)
+            ) : (
+              <DoneColumn
+                todos={doneTodos}
+                listName={listName}
                 now={now}
                 timeZone={timeZone}
-                onCheck={actions.complete}
-                onOpen={onOpen}
-                onMenu={onMenu}
+                selectedId={selectedId}
+                onSelect={select}
+                onRestore={actions.restore}
               />
-            );
-          })}
-        </main>
+            )}
+          </main>
+        </div>
         <DragOverlay dropAnimation={null}>
           {dragging ? (
             <div className="flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5">
@@ -604,25 +810,15 @@ export function WideApp({
       />
 
       <DetailSheet
-        variant="panel"
+        variant="column"
+        container={fourth === "detail" ? fourthEl : null}
         todo={detailTodo}
         subtasks={detailTodo ? subtasksOf(detailTodo.id) : []}
         listTargets={targets}
         listName={listName}
         timeZone={timeZone}
         actions={actions}
-        onClose={() => {
-          const id = detailId;
-          setDetailId(null);
-          // Back to the row it opened from.
-          if (id) {
-            requestAnimationFrame(() =>
-              document
-                .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)
-                ?.focus(),
-            );
-          }
-        }}
+        onClose={closeDetail}
       />
 
       <ShortcutsOverlay
@@ -638,18 +834,7 @@ export function WideApp({
         />
       )}
 
-      <DoneScreen
-        open={screen === "done"}
-        onClose={() => setScreen(null)}
-        todos={todos}
-        listName={listName}
-        timeZone={timeZone}
-        onRestore={actions.restore}
-      />
-      <SettingsScreen
-        open={screen === "settings"}
-        onClose={() => setScreen(null)}
-      />
+      <SettingsScreen open={settings} onClose={() => setSettings(false)} />
     </div>
   );
 }

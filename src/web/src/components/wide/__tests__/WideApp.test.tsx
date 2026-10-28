@@ -15,6 +15,8 @@ import type { TodoWithUrls } from "@/types/database";
 const update = vi.fn();
 const remove = vi.fn();
 const createList = vi.fn();
+const updateList = vi.fn();
+const deleteList = vi.fn();
 const lists = [
   makeList("list-today", "Today", "today", "a0"),
   makeList("list-week", "This week", "thisWeek", "a1"),
@@ -28,6 +30,8 @@ const sweptAt = new Date().toISOString();
 vi.mock("@/hooks/useLists", () => ({
   useLists: () => ({ data: lists, isLoading: false }),
   useCreateList: () => ({ mutate: createList }),
+  useUpdateList: () => ({ mutate: updateList }),
+  useDeleteList: () => ({ mutate: deleteList }),
 }));
 vi.mock("@/hooks/useTodos", () => ({
   useTodos: () => ({
@@ -105,6 +109,8 @@ describe("WideApp", () => {
     update.mockReset();
     remove.mockReset();
     createList.mockReset();
+    updateList.mockReset();
+    deleteList.mockReset();
     vi.mocked(toast.success).mockClear();
     window.localStorage.clear();
     todos = [
@@ -152,6 +158,20 @@ describe("WideApp", () => {
         listId: "list-studio",
         position: "a0",
       }),
+      makeTodo({
+        id: "d1",
+        title: "Ship the zine",
+        listId: "list-today",
+        completed: true,
+        completedAt: new Date().toISOString(),
+      }),
+      makeTodo({
+        id: "d2",
+        title: "Book the venue",
+        listId: "list-week",
+        completed: true,
+        completedAt: new Date(Date.now() - 1000).toISOString(),
+      }),
     ];
   });
   afterEach(() => vi.useRealTimers());
@@ -165,37 +185,78 @@ describe("WideApp", () => {
     ).toHaveAccessibleDescription("2 todos");
     const groceries = within(nav).getByRole("button", { name: "Groceries" });
     expect(groceries).toHaveAccessibleDescription("1 todo");
-    expect(groceries).toHaveAttribute("aria-pressed", "false");
-    expect(
-      screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(expect.arrayContaining(["Today", "This week", "Someday"]));
+    expect(groceries).not.toHaveAttribute("aria-current");
     expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
   });
 
-  it("opens one of your lists as a fourth column, swaps it, and closes it", async () => {
+  it("always has a fourth column, Done by default, with no ×", () => {
+    render(<WideApp />);
+    expect(
+      screen.getAllByRole("region").map((r) => r.getAttribute("data-column")),
+    ).toEqual(["list-today", "list-week", "list-someday", "done"]);
+    expect(
+      within(column("Done")).getByText("Ship the zine"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close Done" })).toBeNull();
+    const more = screen.getByRole("navigation", { name: "More" });
+    expect(within(more).getByRole("button", { name: "Done" })).toHaveAttribute(
+      "aria-current",
+      "true",
+    );
+  });
+
+  it("opens one of your lists in the fourth column, swaps it, and × goes back to Done", async () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
     await userEvent.click(
       within(nav).getByRole("button", { name: /Groceries/ }),
     );
     expect(column("Groceries")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Done" })).toBeNull();
+    expect(
+      within(nav).getByRole("button", { name: "Groceries" }),
+    ).toHaveAttribute("aria-current", "true");
     expect(focusedTitle()).toContain("Parmesan");
 
     await userEvent.click(within(nav).getByRole("button", { name: /Studio/ }));
     expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
     expect(column("Studio")).toBeInTheDocument();
 
+    // Clicking the open list again goes into it; it doesn't close it.
     await userEvent.click(within(nav).getByRole("button", { name: /Studio/ }));
+    expect(column("Studio")).toBeInTheDocument();
+    expect(focusedTitle()).toContain("Mix the EP");
+
+    await userEvent.click(screen.getByRole("button", { name: "Close Studio" }));
     expect(screen.queryByRole("region", { name: "Studio" })).toBeNull();
+    expect(column("Done")).toBeInTheDocument();
   });
 
-  it("focuses a time list's column from the sidebar", async () => {
+  it("goes into a time list from the sidebar, back to its last selection", async () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
     await userEvent.click(
       within(nav).getByRole("button", { name: /This week/ }),
     );
     expect(focusedTitle()).toContain("Send invoice");
+    press("j");
+    expect(focusedTitle()).toContain("Renew passport");
+    await userEvent.click(within(nav).getByRole("button", { name: /Today/ }));
+    expect(focusedTitle()).toContain("Review PR");
+    await userEvent.click(
+      within(nav).getByRole("button", { name: /This week/ }),
+    );
+    expect(focusedTitle()).toContain("Renew passport");
+  });
+
+  it("marks the selection's column in the sidebar with the ink bar", () => {
+    render(<WideApp />);
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    const bar = () =>
+      nav.querySelector("[data-selection-bar]")?.closest("button");
+    expect(bar()).toBeFalsy();
+    act(() => rowButton("Send invoice").focus());
+    expect(bar()).toHaveAccessibleName("This week");
   });
 
   it("j/k move through rows and h/l and arrows move across columns", () => {
@@ -321,14 +382,161 @@ describe("WideApp", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("Enter opens the detail as a panel", async () => {
+  it("one click selects, a second click opens the detail in the fourth column", async () => {
     render(<WideApp />);
     await userEvent.click(rowButton("Call Mum"));
-    const panel = await screen.findByRole("dialog");
-    expect(panel).toHaveAttribute("data-detail-panel");
-    expect(within(panel).getByRole("textbox", { name: "Title" })).toHaveValue(
+    expect(rowButton("Call Mum").closest("div")).toHaveClass("ring-2");
+    expect(screen.queryByRole("dialog")).toBeNull();
+
+    await userEvent.click(rowButton("Call Mum"));
+    const detail = await screen.findByRole("dialog");
+    expect(detail).toHaveAttribute("data-detail-column");
+    expect(detail.closest("[data-column-detail]")).toBeInTheDocument();
+    expect(within(detail).getByRole("textbox", { name: "Title" })).toHaveValue(
       "Call Mum",
     );
+    // The time columns stay; the detail took Done's place.
+    expect(column("Today")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Done" })).toBeNull();
+  });
+
+  it("a double click opens straight away", async () => {
+    render(<WideApp />);
+    await userEvent.dblClick(rowButton("Send invoice"));
+    expect(
+      within(await screen.findByRole("dialog")).getByRole("textbox", {
+        name: "Title",
+      }),
+    ).toHaveValue("Send invoice");
+  });
+
+  it("Enter opens, the detail follows the selection, and Esc closes it", async () => {
+    render(<WideApp />);
+    rowButton("Review PR").focus();
+    await userEvent.keyboard("{Enter}");
+    const title = () =>
+      within(screen.getByRole("dialog")).getByRole("textbox", {
+        name: "Title",
+      });
+    expect(title()).toHaveValue("Review PR");
+    // Focus stays on the board, so arrowing shows each todo.
+    expect(focusedTitle()).toContain("Review PR");
+    press("j");
+    expect(title()).toHaveValue("Call Mum");
+
+    press("Escape");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(column("Done")).toBeInTheDocument();
+  });
+
+  it("closing a todo returns to the list it covered", async () => {
+    render(<WideApp />);
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    await userEvent.click(
+      within(nav).getByRole("button", { name: /Groceries/ }),
+    );
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Close",
+      }),
+    );
+    expect(column("Groceries")).toBeInTheDocument();
+  });
+
+  it("Done's rows select; X puts one back and Delete removes one", () => {
+    render(<WideApp />);
+    const done = column("Done");
+    const row = (title: string) =>
+      within(done)
+        .getAllByRole("button")
+        .find(
+          (b) =>
+            b.hasAttribute("data-row-id") && b.textContent?.startsWith(title),
+        ) as HTMLElement;
+    row("Ship the zine").focus();
+    press("x");
+    expect(update).toHaveBeenCalledWith({
+      id: "d1",
+      input: expect.objectContaining({ completed: false }),
+    });
+    row("Book the venue").focus();
+    press("Delete");
+    expect(toast.success).toHaveBeenLastCalledWith(
+      "Deleted",
+      expect.anything(),
+    );
+    expect(row("Book the venue")).toBeUndefined();
+  });
+
+  it("renames a list in place from its title", async () => {
+    render(<WideApp view={{ kind: "list", id: "list-groceries" }} />);
+    await userEvent.click(
+      within(column("Groceries")).getByRole("button", { name: "Groceries" }),
+    );
+    const field = screen.getByRole("textbox", { name: "List name" });
+    await userEvent.clear(field);
+    await userEvent.type(field, "Food{Enter}");
+    expect(updateList).toHaveBeenCalledWith({
+      id: "list-groceries",
+      input: { name: "Food" },
+    });
+  });
+
+  it("Esc cancels a rename", async () => {
+    render(<WideApp view={{ kind: "list", id: "list-groceries" }} />);
+    await userEvent.click(
+      within(column("Groceries")).getByRole("button", { name: "Groceries" }),
+    );
+    await userEvent.type(
+      screen.getByRole("textbox", { name: "List name" }),
+      "zzz{Escape}",
+    );
+    expect(updateList).not.toHaveBeenCalled();
+    expect(screen.queryByRole("textbox", { name: "List name" })).toBeNull();
+  });
+
+  it("deletes a list from its ⋯ menu straight away, with Undo", async () => {
+    render(<WideApp view={{ kind: "list", id: "list-groceries" }} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "Groceries options" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Delete list" }),
+    );
+    expect(toast.success).toHaveBeenCalledWith(
+      "Deleted “Groceries” and 1 todo",
+      expect.anything(),
+    );
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    expect(within(nav).queryByRole("button", { name: /Groceries/ })).toBeNull();
+    expect(column("Done")).toBeInTheDocument();
+    expect(deleteList).not.toHaveBeenCalled();
+  });
+
+  it("quick add starts on the selection's column, with a chip per list", async () => {
+    render(<WideApp />);
+    rowButton("Read Piranesi").focus();
+    await userEvent.click(screen.getByRole("button", { name: "New todo" }));
+    const popup = await screen.findByRole("dialog", { name: "Quick add" });
+    expect(
+      within(popup).getByRole("textbox", { name: "New todo in Someday" }),
+    ).toBeInTheDocument();
+    expect(
+      within(within(popup).getByRole("group", { name: "Add to list" }))
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Today", "This week", "Someday", "Groceries", "Studio"]);
+  });
+
+  it("the column composers have no list picker", async () => {
+    render(<WideApp />);
+    await userEvent.click(
+      screen.getByRole("textbox", { name: "New todo in Today" }),
+    );
+    expect(screen.queryByRole("group", { name: "Add to list" })).toBeNull();
   });
 
   it("? toggles the shortcuts overlay", async () => {
@@ -351,10 +559,18 @@ describe("WideApp", () => {
     expect(screen.queryByText("3 moved to Someday overnight")).toBeNull();
   });
 
-  it("creates a list from the sidebar and opens it", async () => {
+  it.each([
+    ["the sidebar", "Lists"],
+    ["the toolbar", null],
+  ])("creates a list from %s's New list popover", async (_where, nav) => {
     render(<WideApp />);
+    const scope = nav
+      ? within(screen.getByRole("navigation", { name: nav }))
+      : within(screen.getByRole("main").parentElement as HTMLElement);
+    await userEvent.click(scope.getByRole("button", { name: "New list" }));
+    const popup = await screen.findByRole("dialog", { name: "New list" });
     await userEvent.type(
-      screen.getByRole("textbox", { name: "New list name" }),
+      within(popup).getByRole("textbox", { name: "Name" }),
       "Studio B{Enter}",
     );
     expect(createList).toHaveBeenCalledWith(

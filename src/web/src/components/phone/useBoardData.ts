@@ -28,12 +28,32 @@ export function useBoardData() {
   } = useTodos();
   const todos = todosData ?? EMPTY;
 
-  const { byKind, collections } = useMemo(() => splitLists(lists), [lists]);
   const listName = useCallback(
     (id: string) => lists?.find((l) => l.id === id)?.name ?? "List",
     [lists],
   );
   const actions = useTodoActions({ timeZone, listName, allTodos: todos });
+  // A list deleted with Undo still pending is gone from every view.
+  const { hiddenLists } = actions;
+  const { byKind, collections } = useMemo(() => {
+    const split = splitLists(lists);
+    return {
+      ...split,
+      collections: split.collections.filter((l) => !hiddenLists.has(l.id)),
+    };
+  }, [lists, hiddenLists]);
+  /** Finished top-level todos, minus any deleted with Undo pending. */
+  const doneTodos = useMemo(
+    () =>
+      todos.filter(
+        (t) =>
+          t.parentId == null &&
+          t.completed &&
+          !actions.hidden.has(t.id) &&
+          !hiddenLists.has(t.listId),
+      ),
+    [todos, actions.hidden, hiddenLists],
+  );
 
   const subtasksByParent = useMemo(() => {
     const map = new Map<string, TodoWithUrls[]>();
@@ -66,10 +86,7 @@ export function useBoardData() {
     [byKind, collections],
   );
 
-  const doneCount = useMemo(
-    () => todos.filter((t) => t.parentId == null && t.completed).length,
-    [todos],
-  );
+  const doneCount = doneTodos.length;
 
   return {
     timeZone,
@@ -82,6 +99,7 @@ export function useBoardData() {
     subtasksOf,
     rowsFor,
     targets,
+    doneTodos,
     doneCount,
     loading: listsLoading || todosLoading,
     todosLoading,
