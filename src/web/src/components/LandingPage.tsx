@@ -6,8 +6,9 @@ import { Button } from "./ui";
 /** The headline and subhead, kept together so they're easy to change. */
 export const LANDING_COPY = {
   headline: "Today, This week, Someday.",
+  lead: "Nylon is a todo list shaped by time.",
   subhead:
-    "Nylon is a todo list shaped by time. Things you don't get to move along on their own, and done means gone. The same on the web, iPhone, iPad and Mac.",
+    "Things you don't get to move along on their own, and done means gone. The same on the web, iPhone, iPad and Mac.",
   eyebrow: "Coming soon",
   joined: "You're on the list. We'll email you when it's ready.",
 };
@@ -244,6 +245,9 @@ export function LandingPage() {
                 {LANDING_COPY.eyebrow}
               </p>
               <p className="text-[1.0625rem] leading-relaxed text-n-ink-muted text-pretty">
+                <strong className="font-semibold text-n-ink">
+                  {LANDING_COPY.lead}
+                </strong>{" "}
                 {LANDING_COPY.subhead}
               </p>
               <WaitlistForm />

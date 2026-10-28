@@ -75,7 +75,11 @@ describe("LandingPage", () => {
     expect(
       screen.getByRole("heading", { level: 1, name: LANDING_COPY.headline }),
     ).toBeInTheDocument();
-    expect(screen.getByText(LANDING_COPY.subhead)).toBeInTheDocument();
+    const lead = screen.getByText(LANDING_COPY.lead);
+    expect(lead.tagName).toBe("STRONG");
+    expect(lead.parentElement).toHaveTextContent(
+      `${LANDING_COPY.lead} ${LANDING_COPY.subhead}`,
+    );
   });
 
   it("names the three horizons in order", () => {
