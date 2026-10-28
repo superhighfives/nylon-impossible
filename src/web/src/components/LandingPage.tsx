@@ -238,7 +238,7 @@ export function LandingPage() {
               ))}
             </h1>
             <div className="space-y-6 lg:pb-3">
-              <p className="inline-block rounded-full bg-n-brand px-3 py-1 text-[0.8125rem] font-medium text-n-brand-ink">
+              <p className="inline-block rounded-full border border-n-hairline px-3 py-1 text-[0.8125rem] font-medium text-n-ink">
                 {LANDING_COPY.eyebrow}
               </p>
               <p className="text-[1.0625rem] leading-relaxed text-n-ink-muted text-pretty">
