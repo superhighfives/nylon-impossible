@@ -119,6 +119,12 @@ struct Composer: View {
 
     private var floating: some View {
         VStack(alignment: .leading, spacing: 0) {
+            #if os(iOS)
+            if isFocused {
+                dismissHandle
+                    .transition(.opacity)
+            }
+            #endif
             if showsChips {
                 chips
                     .padding(.horizontal, 10)
@@ -157,6 +163,30 @@ struct Composer: View {
         .padding(.horizontal, Theme.Space.s3)
         .padding(.bottom, Theme.Space.s2)
     }
+
+    #if os(iOS)
+    /// A grabber at the top of the pill while the keyboard is up: drag it
+    /// down (or tap it) to put the keyboard away, for when the list is too
+    /// short to drag.
+    private var dismissHandle: some View {
+        Capsule()
+            .fill(Theme.Colors.inkSubtle)
+            .frame(width: 36, height: 5)
+            .frame(maxWidth: .infinity, minHeight: 24)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 8)
+                    .onEnded { value in
+                        if value.translation.height > 24 { isFocused = false }
+                    }
+            )
+            .onTapGesture { isFocused = false }
+            .accessibilityElement()
+            .accessibilityLabel("Dismiss keyboard")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { isFocused = false }
+    }
+    #endif
 
     /// "+ Add": the field's own placeholder is the row, so tapping it (or
     /// pressing n) focuses in place.
