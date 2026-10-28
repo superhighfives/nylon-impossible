@@ -1,13 +1,15 @@
-import { SignInButton, SignUpButton } from "@clerk/tanstack-react-start";
+import { SignInButton, useClerk } from "@clerk/tanstack-react-start";
 import { Link } from "@tanstack/react-router";
-import { Fragment } from "react";
+import { type FormEvent, Fragment, useId, useState } from "react";
 import { Button } from "./ui";
 
 /** The headline and subhead, kept together so they're easy to change. */
 export const LANDING_COPY = {
   headline: "Today, This week, Someday.",
   subhead:
-    "Nylon is a todo list shaped by time. Things you don't get to move along on their own, and done means gone. The same on web, iPhone, iPad and Gmail.",
+    "Nylon is a todo list shaped by time. Things you don't get to move along on their own, and done means gone. The same on the web, iPhone, iPad and Mac.",
+  eyebrow: "Coming soon",
+  joined: "You're on the list. We'll email you when it's ready.",
 };
 
 /** The three horizons, in the order todos move through them. */
@@ -40,8 +42,36 @@ const features = [
     body: "Groceries, a project, a trip. Your own lists never age.",
   },
   {
-    title: "Everywhere you are",
-    body: "Web, iPhone, iPad and a Gmail add-on, synced as you type and fine offline.",
+    title: "Keyboard first",
+    body: "On a wide screen or the Mac, everything you can click has a key.",
+  },
+];
+
+/** Where Nylon runs, all synced as you type and fine offline. */
+const platforms = [
+  {
+    title: "Web",
+    body: "The full board in any desktop browser: three time columns and your lists.",
+  },
+  {
+    title: "Web on your phone",
+    body: "The same app in a mobile browser, with nothing to install.",
+  },
+  {
+    title: "iPhone",
+    body: "Swipe to mark done, and a Today widget on your Home Screen.",
+  },
+  {
+    title: "iPad",
+    body: "The wide board, with all three columns side by side.",
+  },
+  {
+    title: "Mac",
+    body: "A native app, plus quick add from the menu bar.",
+  },
+  {
+    title: "Gmail",
+    body: "Turn an email into a todo without leaving your inbox.",
   },
 ];
 
@@ -88,6 +118,91 @@ function Shot({
   );
 }
 
+/** Clerk API errors carry a readable message on their first entry. */
+function errorMessage(error: unknown): string {
+  const first = (
+    error as { errors?: { longMessage?: string; message?: string }[] }
+  )?.errors?.[0];
+  return (
+    first?.longMessage ?? first?.message ?? "Something went wrong. Try again."
+  );
+}
+
+/**
+ * Email sign-up for the waitlist. Clerk holds the entries (waitlist mode is
+ * on for the instance), so approving someone sends their invite from there.
+ */
+function WaitlistForm() {
+  const clerk = useClerk();
+  const inputId = useId();
+  const errorId = useId();
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState<"idle" | "sending" | "joined">("idle");
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setStatus("sending");
+    setError(null);
+    try {
+      await clerk.joinWaitlist({ emailAddress: email.trim() });
+      setStatus("joined");
+    } catch (err) {
+      setError(errorMessage(err));
+      setStatus("idle");
+    }
+  }
+
+  if (status === "joined") {
+    return (
+      <p role="status" className="leading-relaxed font-medium">
+        {LANDING_COPY.joined}
+      </p>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="space-y-2">
+      <label htmlFor={inputId} className="sr-only">
+        Email
+      </label>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <input
+          id={inputId}
+          type="email"
+          name="email"
+          autoComplete="email"
+          required
+          placeholder="you@example.com"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? errorId : undefined}
+          className="h-11 min-w-0 rounded-n-field border border-n-hairline bg-n-canvas px-4 text-base text-n-ink placeholder:text-n-ink-subtle n-focus sm:flex-1"
+        />
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          disabled={status === "sending"}
+          className="sm:w-auto"
+        >
+          Join the waitlist
+        </Button>
+      </div>
+      {error && (
+        <p
+          id={errorId}
+          role="alert"
+          className="text-[0.9375rem] text-n-overdue"
+        >
+          {error}
+        </p>
+      )}
+    </form>
+  );
+}
+
 export function LandingPage() {
   return (
     <div className="min-h-dvh bg-n-canvas text-n-ink">
@@ -119,21 +234,13 @@ export function LandingPage() {
               ))}
             </h1>
             <div className="space-y-6 lg:pb-3">
+              <p className="inline-block rounded-full bg-n-brand px-3 py-1 text-[0.8125rem] font-medium text-n-brand-ink">
+                {LANDING_COPY.eyebrow}
+              </p>
               <p className="text-[1.0625rem] leading-relaxed text-n-ink-muted text-pretty">
                 {LANDING_COPY.subhead}
               </p>
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <SignUpButton mode="modal">
-                  <Button variant="primary" size="lg" className="sm:w-auto">
-                    Create account
-                  </Button>
-                </SignUpButton>
-                <SignInButton mode="modal">
-                  <Button variant="outline" size="lg" className="sm:w-auto">
-                    Sign in
-                  </Button>
-                </SignInButton>
-              </div>
+              <WaitlistForm />
             </div>
           </section>
 
@@ -186,6 +293,36 @@ export function LandingPage() {
                 </li>
               ))}
             </ol>
+          </section>
+
+          <section
+            aria-labelledby="landing-platforms"
+            className="border-t border-n-hairline py-14 sm:py-20"
+          >
+            <h2
+              id="landing-platforms"
+              className="font-n-display text-[1.375rem] leading-7 font-semibold tracking-[-0.01em]"
+            >
+              Everywhere you are
+            </h2>
+            <p className="mt-2 leading-relaxed text-n-ink-muted">
+              Synced as you type, and fine offline.
+            </p>
+            <ul className="mt-8 grid sm:grid-cols-2 sm:gap-x-10 lg:grid-cols-3">
+              {platforms.map((platform) => (
+                <li
+                  key={platform.title}
+                  className="border-t border-n-hairline py-5"
+                >
+                  <h3 className="font-n-display text-[1.125rem] leading-6 font-semibold">
+                    {platform.title}
+                  </h3>
+                  <p className="mt-1 leading-relaxed text-n-ink-muted">
+                    {platform.body}
+                  </p>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section
