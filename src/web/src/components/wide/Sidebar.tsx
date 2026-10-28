@@ -1,13 +1,29 @@
 import { useDroppable } from "@dnd-kit/core";
-import { Keyboard, Plus } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { Check, Plus } from "lucide-react";
+import type { ReactNode } from "react";
 import type { SerializedList } from "@/types/database";
+import { NewListPopover } from "./NewListPopover";
 
 /** Droppable ids for sidebar entries, distinct from column ids. */
 export const sidebarDropId = (listId: string) => `side:${listId}`;
 
 const ENTRY =
-  "flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left text-[0.9375rem] text-n-ink n-focus transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface";
+  "relative flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left text-[0.9375rem] text-n-ink n-focus transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface";
+
+/**
+ * The 3px ink bar on the left edge: the column the selection is in. Ink, not
+ * yellow — yellow on white is about 1.3:1, under the 3:1 an indicator needs.
+ */
+function SelectionBar({ on }: { on: boolean }) {
+  if (!on) return null;
+  return (
+    <span
+      aria-hidden="true"
+      data-selection-bar
+      className="absolute top-1.5 bottom-1.5 -left-2.5 w-[3px] rounded-full bg-n-ink"
+    />
+  );
+}
 
 /**
  * One list in the sidebar: a button that also accepts a dropped todo. While
@@ -16,14 +32,17 @@ const ENTRY =
 function ListEntry({
   list,
   count,
-  selected,
+  open,
+  current,
   strong,
   onSelect,
 }: {
   list: SerializedList;
   count: number;
-  /** Your list is open as the fourth column. */
-  selected?: boolean;
+  /** Your list is showing in the fourth column: grey fill, semibold. */
+  open?: boolean;
+  /** The selection is in this list's column: the ink bar. */
+  current: boolean;
   /** The time lists read heavier than your own. */
   strong?: boolean;
   onSelect: (list: SerializedList) => void;
@@ -39,12 +58,13 @@ function ListEntry({
         type="button"
         data-sidebar-list={list.id}
         aria-describedby={`sidebar-count-${list.id}`}
-        aria-pressed={selected === undefined ? undefined : selected}
+        aria-current={open ? "true" : undefined}
         onClick={() => onSelect(list)}
-        className={`${ENTRY} ${strong || selected ? "font-semibold" : "font-medium"} ${
-          dropping ? "bg-n-brand text-n-brand-ink" : selected ? "bg-n-fill" : ""
+        className={`${ENTRY} ${strong || open ? "font-semibold" : "font-medium"} ${
+          dropping ? "bg-n-brand text-n-brand-ink" : open ? "bg-n-fill" : ""
         }`}
       >
+        <SelectionBar on={current} />
         <span className="min-w-0 flex-1 truncate">{list.name}</span>
         {/* The name is what's visible ("Groceries"); the count is read as
             its description ("4 todos"). */}
@@ -64,14 +84,20 @@ function ListEntry({
 
 /**
  * The wide sidebar: the wordmark; Today, This week and Someday with counts;
- * a "Lists" heading, your lists and an inline "New list"; then Done,
- * Settings and (for admins) Send feedback. Every list is a drop target.
+ * a "Lists" heading, your lists and New list; then Done, Settings, Send
+ * feedback (admins) and Keyboard shortcuts. Every list is a drop target.
+ *
+ * Two indicators, which can combine: the grey fill marks the list open in
+ * the fourth column (Done never takes it; its label goes from muted to ink
+ * instead), and the ink bar marks the column the selection is in.
  */
 export function Sidebar({
   timeLists,
   collections,
   countFor,
   openListId,
+  selectionColumn,
+  doneShowing,
   doneCount,
   onTimeList,
   onCollection,
@@ -85,6 +111,10 @@ export function Sidebar({
   collections: SerializedList[];
   countFor: (listId: string) => number;
   openListId: string | null;
+  /** The column the selection is in: a list id, `done`, or none. */
+  selectionColumn: string | null;
+  /** Done is what the fourth column is showing. */
+  doneShowing: boolean;
   doneCount: number;
   onTimeList: (list: SerializedList) => void;
   onCollection: (list: SerializedList) => void;
@@ -95,14 +125,6 @@ export function Sidebar({
   /** Shown only when set — the caller passes it for admins. */
   onFeedback?: () => void;
 }) {
-  const [draft, setDraft] = useState("");
-  const add = () => {
-    const name = draft.trim();
-    if (!name) return;
-    setDraft("");
-    onCreateList(name);
-  };
-
   return (
     <aside
       aria-label="Sidebar"
@@ -118,6 +140,7 @@ export function Sidebar({
               key={list.id}
               list={list}
               count={countFor(list.id)}
+              current={selectionColumn === list.id}
               strong
               onSelect={onTimeList}
             />
@@ -132,41 +155,43 @@ export function Sidebar({
               key={list.id}
               list={list}
               count={countFor(list.id)}
-              selected={openListId === list.id}
+              open={openListId === list.id}
+              current={selectionColumn === list.id}
               onSelect={onCollection}
             />
           ))}
           <li>
-            <label className="n-focus-within flex h-9 items-center gap-2 rounded-[0.5rem] px-2.5 text-[0.9375rem] text-n-ink-muted focus-within:bg-n-surface">
-              <Plus size={15} aria-hidden="true" className="shrink-0" />
-              <span className="sr-only">New list name</span>
-              <input
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    add();
-                  }
-                  if (e.key === "Escape") {
-                    setDraft("");
-                    e.currentTarget.blur();
-                  }
-                }}
-                placeholder="New list"
-                className="min-w-0 flex-1 bg-transparent p-0 text-n-ink outline-none placeholder:text-n-ink-muted"
-              />
-            </label>
+            <NewListPopover
+              side="right"
+              onCreate={onCreateList}
+              trigger={
+                <button
+                  type="button"
+                  className={`${ENTRY} font-medium text-n-ink-muted`}
+                >
+                  <Plus size={15} aria-hidden="true" className="shrink-0" />
+                  New list
+                </button>
+              }
+            />
           </li>
         </ul>
       </nav>
       <nav aria-label="More" className="mt-auto flex flex-col gap-0.5">
-        <SidebarButton onClick={onDone} describedBy="sidebar-done-count">
-          <span className="flex-1">Done</span>
-          <span
+        <SidebarButton
+          onClick={onDone}
+          describedBy="sidebar-done-count"
+          current={doneShowing}
+        >
+          <SelectionBar on={selectionColumn === "done"} />
+          <Check
+            size={15}
+            strokeWidth={2.4}
             aria-hidden="true"
-            className="font-normal text-n-ink-muted tabular-nums"
-          >
+            className="shrink-0"
+          />
+          <span className="flex-1">Done</span>
+          <span aria-hidden="true" className="font-normal tabular-nums">
             {doneCount}
           </span>
           <span id="sidebar-done-count" hidden>
@@ -179,23 +204,18 @@ export function Sidebar({
             <span className="flex-1">Send feedback</span>
             <span
               aria-hidden="true"
-              className="font-n-text text-xs font-normal text-n-ink-muted"
+              className="font-n-text text-xs font-normal"
             >
               f
             </span>
           </SidebarButton>
         )}
-        <button
-          type="button"
-          onClick={onShortcuts}
-          aria-keyshortcuts="?"
-          className="mt-3 flex cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 py-1.5 text-left text-xs leading-[1.6] text-n-ink-muted n-focus pointer-fine:hover:text-n-ink"
-        >
-          <Keyboard size={14} aria-hidden="true" className="shrink-0" />
-          <span>
-            Keyboard shortcuts <kbd className="font-n-text">?</kbd>
+        <SidebarButton onClick={onShortcuts} keyShortcut="?">
+          <span className="flex-1">Keyboard shortcuts</span>
+          <span aria-hidden="true" className="font-n-text text-xs font-normal">
+            ?
           </span>
-        </button>
+        </SidebarButton>
       </nav>
     </aside>
   );
@@ -205,11 +225,14 @@ function SidebarButton({
   onClick,
   describedBy,
   keyShortcut,
+  current,
   children,
 }: {
   onClick: () => void;
   describedBy?: string;
   keyShortcut?: string;
+  /** Done only: showing in the fourth column, so ink rather than muted. */
+  current?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -217,8 +240,9 @@ function SidebarButton({
       type="button"
       aria-describedby={describedBy}
       aria-keyshortcuts={keyShortcut}
+      aria-current={current ? "true" : undefined}
       onClick={onClick}
-      className={`${ENTRY} font-medium`}
+      className={`${ENTRY} font-medium ${current === false ? "text-n-ink-muted" : ""}`}
     >
       {children}
     </button>

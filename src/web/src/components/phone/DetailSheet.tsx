@@ -95,10 +95,13 @@ export interface DetailSheetProps {
   onClose: () => void;
   /**
    * `sheet` (phone): full height from the bottom, over a dimmed backdrop.
-   * `panel` (wide): a right-hand panel beside the board, which stays live —
-   * clicking another row swaps what it shows.
+   * `column` (wide): fills the board's fourth column (`container`), which
+   * stays live — the detail follows the selection, and focus stays where it
+   * was, so arrowing through rows shows each one.
    */
-  variant?: "sheet" | "panel";
+  variant?: "sheet" | "column";
+  /** `column`: the element the detail renders into. */
+  container?: HTMLElement | null;
 }
 
 /**
@@ -108,21 +111,23 @@ export interface DetailSheetProps {
  * closing is the only way to finish.
  */
 export function DetailSheet(props: DetailSheetProps) {
-  const { todo, onClose, variant = "sheet" } = props;
-  if (variant === "panel") {
+  const { todo, onClose, variant = "sheet", container } = props;
+  if (variant === "column") {
     return (
       <Dialog.Root
-        open={!!todo}
+        open={!!todo && !!container}
         modal={false}
         disablePointerDismissal
         onOpenChange={(open) => {
           if (!open) onClose();
         }}
       >
-        <Dialog.Portal>
+        <Dialog.Portal container={container}>
           <Dialog.Popup
-            data-detail-panel
-            className="fixed top-[var(--n-offline-inset,0px)] right-0 bottom-0 z-40 flex w-[min(28rem,40vw)] min-w-[22rem] flex-col border-l border-n-hairline bg-n-canvas text-n-ink outline-none transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:translate-x-6 data-starting-style:opacity-0"
+            data-detail-column
+            initialFocus={false}
+            finalFocus={false}
+            className="absolute inset-0 z-10 flex flex-col bg-n-canvas text-n-ink outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0"
           >
             {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
           </Dialog.Popup>
@@ -158,7 +163,7 @@ function DetailBody({
   onClose,
   variant = "sheet",
 }: DetailSheetProps & { todo: TodoWithUrls }) {
-  const panelVariant = variant === "panel";
+  const columnVariant = variant === "column";
   const [panel, setPanel] = useState<Panel>(null);
   const [picking, setPicking] = useState(false);
   const now = new Date();
@@ -196,10 +201,10 @@ function DetailBody({
   return (
     <>
       <div
-        className={`flex shrink-0 items-center justify-between px-3 ${panelVariant ? "pt-4" : "pt-2"}`}
+        className={`flex shrink-0 items-center justify-between px-3 ${columnVariant ? "pt-4" : "pt-2"}`}
       >
         <span className="w-11" />
-        {!panelVariant && (
+        {!columnVariant && (
           <span
             aria-hidden="true"
             className="h-[5px] w-[38px] rounded-full bg-n-hairline"
@@ -215,7 +220,7 @@ function DetailBody({
         </Dialog.Close>
       </div>
       <div
-        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(3rem+env(safe-area-inset-bottom,0px))] [scrollbar-width:none] ${panelVariant ? "px-7" : "px-5"}`}
+        className={`min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[calc(3rem+env(safe-area-inset-bottom,0px))] [scrollbar-width:none] ${columnVariant ? "px-7" : "px-5"}`}
       >
         <Dialog.Title className="sr-only">Todo</Dialog.Title>
         <label className="block">

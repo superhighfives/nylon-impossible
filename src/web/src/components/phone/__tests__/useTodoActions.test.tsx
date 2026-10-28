@@ -3,9 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const update = vi.fn();
 const remove = vi.fn();
+const removeList = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
   useUpdateTodo: () => ({ mutate: update }),
   useDeleteTodo: () => ({ mutate: remove }),
+}));
+vi.mock("@/hooks/useLists", () => ({
+  useDeleteList: () => ({ mutate: removeList }),
 }));
 vi.mock("@/lib/toast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/toast")>()),
@@ -24,7 +28,7 @@ import {
   UNDO_TOAST_MS,
   useTodoActions,
 } from "../useTodoActions";
-import { dueIn, makeTodo, NOW, TZ } from "./fixtures";
+import { dueIn, makeList, makeTodo, NOW, TZ } from "./fixtures";
 
 const names: Record<string, string> = {
   "list-today": "Today",
@@ -54,6 +58,7 @@ describe("useTodoActions", () => {
     vi.setSystemTime(NOW);
     update.mockReset();
     remove.mockReset();
+    removeList.mockReset();
     vi.mocked(toast.success).mockClear();
   });
   afterEach(() => vi.useRealTimers());
@@ -154,6 +159,31 @@ describe("useTodoActions", () => {
     act(() => result.current.destroy(todo));
     act(() => vi.advanceTimersByTime(UNDO_TOAST_MS));
     expect(remove).toHaveBeenCalledWith(todo.id, expect.anything());
+  });
+
+  it("deleting a list hides it, names it and its todos, and Undo brings it back", () => {
+    const list = makeList("list-studio", "Studio", null, "a3");
+    const todos = [
+      makeTodo({ id: "a", listId: "list-studio" }),
+      makeTodo({ id: "b", listId: "list-studio", completed: true }),
+      makeTodo({ id: "c", listId: "list-studio", parentId: "a" }),
+      makeTodo({ id: "d", listId: "list-today" }),
+    ];
+    const { result } = setup(todos);
+    act(() => result.current.destroyList(list));
+    expect(result.current.hiddenLists.has("list-studio")).toBe(true);
+    expect(toast.success).toHaveBeenCalledWith(
+      "Deleted “Studio” and 2 todos",
+      expect.anything(),
+    );
+    clickToastAction();
+    expect(result.current.hiddenLists.has("list-studio")).toBe(false);
+    act(() => vi.advanceTimersByTime(UNDO_TOAST_MS * 2));
+    expect(removeList).not.toHaveBeenCalled();
+
+    act(() => result.current.destroyList(list));
+    act(() => vi.advanceTimersByTime(UNDO_TOAST_MS));
+    expect(removeList).toHaveBeenCalledWith("list-studio", expect.anything());
   });
 
   it("Undo after a flushed delete says it's already deleted", () => {

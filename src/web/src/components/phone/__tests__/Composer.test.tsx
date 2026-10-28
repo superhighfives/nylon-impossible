@@ -6,6 +6,9 @@ const mutateAsync = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
   useSmartCreate: () => ({ mutateAsync, isPending: false }),
 }));
+vi.mock("@/hooks/useLists", () => ({
+  useDeleteList: () => ({ mutate: vi.fn() }),
+}));
 vi.mock("@/lib/toast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/toast")>()),
   toast: {

@@ -5,10 +5,15 @@ import {
 } from "@nylon-impossible/shared/recurrence";
 import { generateKeyBetween } from "fractional-indexing";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useDeleteList } from "@/hooks/useLists";
 import { useDeleteTodo, useUpdateTodo } from "@/hooks/useTodos";
 import { toast } from "@/lib/toast";
-import type { TodoWithUrls, UpdateTodoInput } from "@/types/database";
-import { dueLabel } from "./model";
+import type {
+  SerializedList,
+  TodoWithUrls,
+  UpdateTodoInput,
+} from "@/types/database";
+import { dueLabel, plural } from "./model";
 
 /** How long a checked row holds, filled, before it collapses. */
 export const DONE_HOLD_MS = 400;
@@ -90,6 +95,8 @@ function withId(set: ReadonlySet<string>, id: string, on: boolean) {
  *   expires, so Undo needs no re-create. The delete commits on that schedule
  *   even if a later toast replaces this one (one toast at a time). Undo after
  *   the delete was already sent says "Already deleted".
+ * - **Delete list** works the same way: the list and its todos hide at once,
+ *   and the list is deleted (its todos with it) when the toast expires.
  * - **Move** and **Pin** are instant, with Undo for moves.
  *
  * Pending timers are flushed (committed) on unmount and when the page is
@@ -106,9 +113,13 @@ export function useTodoActions({
 }) {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
+  const deleteList = useDeleteList();
   const [checked, setChecked] = useState<ReadonlySet<string>>(new Set());
   const [collapsing, setCollapsing] = useState<ReadonlySet<string>>(new Set());
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+  const [hiddenLists, setHiddenLists] = useState<ReadonlySet<string>>(
+    new Set(),
+  );
   const pending = useRef(
     new Map<string, { timer: Timer; commit: () => void }>(),
   );
@@ -117,6 +128,7 @@ export function useTodoActions({
 
   const update = updateTodo.mutate;
   const remove = deleteTodo.mutate;
+  const removeList = deleteList.mutate;
 
   const schedule = useCallback(
     (key: string, delay: number, commit: () => void) => {
@@ -281,6 +293,34 @@ export function useTodoActions({
     [cancel, remove, schedule],
   );
 
+  /** Delete one of your lists, and every todo in it, with Undo. */
+  const destroyList = useCallback(
+    (list: SerializedList) => {
+      const key = `delete-list:${list.id}`;
+      const count = todosRef.current.filter(
+        (t) => t.listId === list.id && t.parentId == null,
+      ).length;
+      setHiddenLists((s) => withId(s, list.id, true));
+      schedule(key, UNDO_TOAST_MS, () => {
+        removeList(list.id, {
+          onSettled: () => setHiddenLists((s) => withId(s, list.id, false)),
+        });
+      });
+      const text =
+        count > 0
+          ? `Deleted “${list.name}” and ${plural(count, "todo")}`
+          : `Deleted “${list.name}”`;
+      showUndoToast(text, () => {
+        if (!cancel(key)) {
+          toast.info("Already deleted");
+          return;
+        }
+        setHiddenLists((s) => withId(s, list.id, false));
+      });
+    },
+    [cancel, removeList, schedule],
+  );
+
   /** Done history: put a todo back in the list it was finished from. */
   const restore = useCallback(
     (todo: TodoWithUrls) => {
@@ -331,12 +371,14 @@ export function useTodoActions({
     checked,
     collapsing,
     hidden,
+    hiddenLists,
     complete,
     move,
     place,
     setDue,
     togglePin,
     destroy,
+    destroyList,
     restore,
     save,
   };

@@ -74,6 +74,16 @@ export interface TodoRowProps {
   collapsing: boolean;
   /** The context menu is open for this row. */
   highlighted: boolean;
+  /**
+   * Wide only: the board's selection. Drawn as a ring with the pressed fill,
+   * the row's only focus indicator.
+   */
+  selected?: boolean;
+  /**
+   * Wide only: focusing the row selects it. A click on an unselected row
+   * just selects; a second click, a double click or Enter opens.
+   */
+  onSelect?: (todo: TodoWithUrls) => void;
   onCheck: (todo: TodoWithUrls) => void;
   onOpen: (todo: TodoWithUrls) => void;
   /** `at` is the pointer, for a right-click; absent from the keyboard. */
@@ -105,6 +115,8 @@ export const TodoRow = memo(function TodoRow({
   checked,
   collapsing,
   highlighted,
+  selected = false,
+  onSelect,
   onCheck,
   onOpen,
   onMenu,
@@ -125,6 +137,9 @@ export const TodoRow = memo(function TodoRow({
   // Set when a long-press opened the menu, so the click that follows the
   // finger lifting doesn't also open the detail.
   const suppressClick = useRef(false);
+  // Wide: whether the row was already selected when the pointer went down,
+  // before focusing it selected it.
+  const wasSelected = useRef(false);
 
   useEffect(() => () => clearTimeout(press.current?.timer), []);
 
@@ -135,6 +150,7 @@ export const TodoRow = memo(function TodoRow({
 
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     bodyProps?.onPointerDown?.(e);
+    if (wide) wasSelected.current = selected;
     if (wide || e.button !== 0) return;
     suppressClick.current = false;
     endPress();
@@ -188,7 +204,7 @@ export const TodoRow = memo(function TodoRow({
       <div
         className={`flex min-h-0 items-start overflow-hidden transition-colors duration-(--n-duration-fast) ${
           wide ? "-mx-2.5 gap-3 rounded-n-field px-2.5" : "gap-3 px-5"
-        } ${highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"}`}
+        } ${selected ? "bg-n-fill ring-2 ring-n-ink ring-inset" : highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"}`}
       >
         <button
           type="button"
@@ -220,9 +236,18 @@ export const TodoRow = memo(function TodoRow({
           onPointerUp={endPress}
           onPointerCancel={endPress}
           onPointerLeave={endPress}
-          onClick={() => {
+          onFocus={(e) => {
+            bodyProps?.onFocus?.(e);
+            onSelect?.(todo);
+          }}
+          onClick={(e) => {
             if (suppressClick.current) {
               suppressClick.current = false;
+              return;
+            }
+            // Enter (detail 0), a double click, or a click on the selection.
+            if (wide && e.detail === 1 && !wasSelected.current) {
+              onSelect?.(todo);
               return;
             }
             onOpen(todo);
@@ -236,7 +261,7 @@ export const TodoRow = memo(function TodoRow({
           onKeyDown={onKeyDown}
           aria-haspopup="dialog"
           aria-description={summary || undefined}
-          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left n-focus-inset [-webkit-touch-callout:none] ${wide ? "-ml-1.5 py-2.5 pr-2 pl-1.5" : "py-[0.6875rem]"}`}
+          className={`min-w-0 flex-1 cursor-pointer touch-pan-y select-none rounded-n-chip text-left [-webkit-touch-callout:none] ${wide ? "-ml-1.5 py-2.5 pr-2 pl-1.5 outline-none" : "n-focus-inset py-[0.6875rem]"}`}
         >
           <span
             className={`line-clamp-3 block font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
