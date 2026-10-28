@@ -118,7 +118,11 @@ function Shot({
   );
 }
 
-/** Clerk API errors carry a readable message on their first entry. */
+/**
+ * Clerk API errors carry a readable message on their first entry. The cast is
+ * a third-party boundary: Clerk's error shape isn't exported, so every field
+ * is optional-chained with a fallback.
+ */
 function errorMessage(error: unknown): string {
   const first = (
     error as { errors?: { longMessage?: string; message?: string }[] }
