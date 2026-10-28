@@ -187,11 +187,16 @@ bundle exec fastlane release
 
 | Workflow | Trigger | What it does |
 |----------|---------|-------------|
-| `deploy.yml` | Push to `main`, PRs | Lint + typecheck + test, then deploy to Cloudflare; PRs get preview environments at `pr-{N}.nylonimpossible.com` |
-| `testflight.yml` | Manual | Build and upload iOS to TestFlight |
-| `copilot-setup-steps.yml` | Manual | GitHub Copilot environment setup |
+| `web-test.yml` | Push to `main`, PRs | Lint, typecheck and test web, API and admin |
+| `web-deploy.yml` | Push to `main`, PRs | Migrate D1, then deploy API and web to Cloudflare; PRs get Worker Previews (`*.workers.dev`) on a preview D1 and the Clerk development instance |
+| `admin-deploy.yml` | Push to `main` (`src/admin/**`) | Deploy the admin app |
+| `ios-test.yml` | Push to `main`, PRs (`src/ios/**`) | Build and test the Apple app |
+| `ios-deploy.yml` | Push to `main` (`src/ios/**`), manual | TestFlight build for iOS, and Mac when `ENABLE_MAC_RELEASE` is `true` |
+| `ios-release.yml` | Manual | App Store build for iOS and Mac |
+| `marketing.yml` | After a successful `web-deploy` | Regenerate the landing-page screenshots |
+| `feedback.yml` | `auto-fix` label, owner replies, review rounds | Have Claude open and iterate on a draft fix PR (see CLAUDE.md) |
 
-Preview deployments are created per PR and cleaned up on PR close. Preview API URLs follow the pattern `api-pr-{N}.nylonimpossible.com`.
+Previews are named after the PR's branch, so later pushes keep the same URLs.
 
 ## Plans
 

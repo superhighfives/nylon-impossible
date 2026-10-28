@@ -169,9 +169,8 @@ jobs:
         run: |
           security delete-keychain $RUNNER_TEMP/app-signing.keychain-db || true
 
-  # The Mac App Store build (Universal Purchase, same bundle IDs). Off until
-  # the owner has created the Mac profiles and installer certificate and set
-  # the repository variable ENABLE_MAC_RELEASE to "true" — see "Mac" in
+  # The Mac App Store build (Universal Purchase, same bundle IDs). Gated on
+  # the repository variable ENABLE_MAC_RELEASE — see "Mac" in
   # src/ios/README.md. Independent of the iOS deploy job: it never blocks or
   # changes the iOS release.
   deploy-mac:

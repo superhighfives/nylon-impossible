@@ -300,7 +300,7 @@ Implementation plans live in [`plans/`](plans/):
 |----------|---------|-------------|
 | `lint.yml` | PRs, push to main | Biome + tsc (web, API), SwiftLint (iOS) |
 | `deploy.yml` | Push to main, PRs | Deploy to Cloudflare Workers + preview environments |
-| `testflight.yml` | Manual | Build and upload iOS app to TestFlight |
+| `ios-deploy.yml` | Push to `main` (`src/ios/**`), manual | Build and upload iOS app to TestFlight |
 | `marketing.yml` | Manual (`workflow_dispatch`) | Capture screenshots, composite, and publish to superhighfives.com |
 
 ### Marketing workflow setup

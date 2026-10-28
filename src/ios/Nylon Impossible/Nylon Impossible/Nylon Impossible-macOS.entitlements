@@ -6,10 +6,6 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
-	<key>com.apple.developer.associated-domains</key>
-	<array>
-		<string>webcredentials:more-unicorn-94.clerk.accounts.dev</string>
-	</array>
 	<key>com.apple.security.application-groups</key>
 	<array>
 		<string>$(TeamIdentifierPrefix)com.superhighfives.Nylon-Impossible</string>
