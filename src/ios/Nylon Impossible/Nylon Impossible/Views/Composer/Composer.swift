@@ -71,6 +71,10 @@ struct Composer: View {
 
     private var showsChips: Bool { isFocused || hasDraft }
 
+    /// The grabber only shows while the keyboard is up, and not in the share
+    /// sheet, which has no keyboard to hand back.
+    private var showsHandle: Bool { isFocused && placeholder == nil }
+
     private var canSubmit: Bool { hasDraft || allowsEmptySubmit }
 
     var body: some View {
@@ -84,6 +88,7 @@ struct Composer: View {
         // animates under Reduce Motion.
         .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: showsChips)
         .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: hasDraft)
+        .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: showsHandle)
         .animation(Theme.Motion.moving(Theme.Motion.fast, reduceMotion: reduceMotion), value: typedDue)
         .onChange(of: text) { _, newValue in
             if newValue.isEmpty { keepWords = false }
@@ -117,8 +122,34 @@ struct Composer: View {
             .accessibilityLabel("New todo")
     }
 
+    /// A grabber that hands the keyboard back: drag it down or tap it. The
+    /// list's interactive dismiss needs something to drag, and a short list
+    /// has none.
+    private var handle: some View {
+        Capsule()
+            .fill(Theme.Colors.inkMuted.opacity(0.5))
+            .frame(width: 36, height: 5)
+            .frame(maxWidth: .infinity, minHeight: 24)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 6)
+                    .onEnded { drag in
+                        if drag.translation.height > 12 { isFocused = false }
+                    }
+            )
+            .onTapGesture { isFocused = false }
+            .accessibilityElement()
+            .accessibilityLabel("Hide keyboard")
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { isFocused = false }
+    }
+
     private var floating: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if showsHandle {
+                handle
+                    .transition(.opacity)
+            }
             if showsChips {
                 chips
                     .padding(.horizontal, 10)
