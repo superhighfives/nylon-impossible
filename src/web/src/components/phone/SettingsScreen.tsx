@@ -158,7 +158,7 @@ export function SettingsScreen({
           />
         </div>
         <p className={HINT}>
-          Today moves to This Week, and This Week to Someday, at your local
+          Today moves to This week, and This week to Someday, at your local
           midnight. A todo gets at least a full day in Today.
         </p>
       </section>
@@ -166,8 +166,8 @@ export function SettingsScreen({
       <section className={SECTION}>
         <h2 className={LABEL}>About</h2>
         {[
-          { href: "/privacy", label: "Privacy Policy" },
-          { href: "/terms", label: "Terms of Service" },
+          { href: "/privacy", label: "Privacy policy" },
+          { href: "/terms", label: "Terms of service" },
         ].map((link) => (
           <a
             key={link.href}

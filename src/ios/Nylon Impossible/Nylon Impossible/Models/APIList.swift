@@ -5,7 +5,7 @@
 
 import Foundation
 
-/// A list (Today/This Week/Someday, or a custom list) as returned by the
+/// A list (Today/This week/Someday, or a custom list) as returned by the
 /// server. Mirrors `src/api/src/handlers/lists.ts`'s `serializeList`.
 struct APIList: Codable, Sendable, Identifiable {
     let id: String

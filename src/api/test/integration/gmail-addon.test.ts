@@ -243,7 +243,7 @@ describe("Gmail add-on", () => {
       expect(rowTitles(openSection)).toEqual(["Still open"]);
     });
 
-    it("shows Today and This Week as rows and Someday as a count", async () => {
+    it("shows Today and This week as rows and Someday as a count", async () => {
       await linkUser();
       const thisWeekId = await getTimeListId("thisWeek");
       const somedayId = await getSomedayListId();
@@ -252,7 +252,7 @@ describe("Gmail add-on", () => {
         position: "a0",
       });
       await seedTodo("99999999-9999-9999-9999-999999999999", "user_test_123", {
-        title: "In This Week",
+        title: "In This week",
         position: "a0",
         listId: thisWeekId,
       });
@@ -273,11 +273,11 @@ describe("Gmail add-on", () => {
       expect(card.sections.map((s: any) => s.header)).toEqual([
         undefined,
         "Today",
-        "This Week",
+        "This week",
         "Someday · 2",
       ]);
       expect(rowTitles(section(card, "Today"))).toEqual(["In Today"]);
-      expect(rowTitles(section(card, "This Week"))).toEqual(["In This Week"]);
+      expect(rowTitles(section(card, "This week"))).toEqual(["In This week"]);
 
       // Someday is collapsed to its header, with tick rows inside.
       const someday = section(card, "Someday · 2");
@@ -296,7 +296,7 @@ describe("Gmail add-on", () => {
       ]);
     });
 
-    it("orders the composer dropdown Today, This Week, Someday, then lists", async () => {
+    it("orders the composer dropdown Today, This week, Someday, then lists", async () => {
       await linkUser();
       const db = getDb(env.DB);
       // A list created before the time lists' positions still sorts after them.
@@ -316,7 +316,7 @@ describe("Gmail add-on", () => {
       const listInput = card.sections[0].widgets[1].selectionInput;
       expect(listInput.items.map((i: any) => i.text)).toEqual([
         "Today",
-        "This Week",
+        "This week",
         "Someday",
         "Groceries",
       ]);
@@ -429,7 +429,7 @@ describe("Gmail add-on", () => {
       const card = body.action.navigations[0].pushCard;
 
       expect(section(card, "Today").widgets[0].textParagraph.text).toBe(
-        "Nothing today. 1 waiting in This Week.",
+        "Nothing today. 1 waiting in This week.",
       );
       expect(section(card, "Someday · 0").widgets[0].textParagraph.text).toBe(
         "Nothing in Someday.",

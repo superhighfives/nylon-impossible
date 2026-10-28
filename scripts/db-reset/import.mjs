@@ -46,7 +46,7 @@ const warn = (message) => warnings.push(message);
 
 const SYSTEM_KINDS = [
   { kind: "today", name: "Today" },
-  { kind: "thisWeek", name: "This Week" },
+  { kind: "thisWeek", name: "This week" },
   { kind: "someday", name: "Someday" },
 ];
 const RENAMED_KINDS = { sometime: "someday" };

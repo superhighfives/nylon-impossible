@@ -27,7 +27,7 @@ struct ShareSheetView: View {
 
     /// The shared link, if one was shared.
     let url: String?
-    /// Today, This Week, Someday, then your lists — in the app's order.
+    /// Today, This week, Someday, then your lists — in the app's order.
     let lists: [TodoListModel]
     let onSave: (Submission) -> Void
     let onCancel: () -> Void
@@ -184,7 +184,7 @@ struct ShareSheetView: View {
         url: "https://www.visitlisboa.com/tram-28",
         lists: [
             TodoListModel(id: "t", userId: "u", name: "Today", kind: "system", systemKind: .today),
-            TodoListModel(id: "w", userId: "u", name: "This Week", kind: "system", systemKind: .thisWeek)
+            TodoListModel(id: "w", userId: "u", name: "This week", kind: "system", systemKind: .thisWeek)
         ],
         onSave: { _ in },
         onCancel: {}

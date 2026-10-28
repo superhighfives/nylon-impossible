@@ -67,7 +67,7 @@ extension ContentView {
     }
 
     /// A menu command that isn't one of the board's single keys: File ▸ New
-    /// List, View ▸ Today / This Week / Someday / Show Done, the details
+    /// List, View ▸ Today / This week / Someday / Show Done, the details
     /// toggle, and Todo ▸ Move to ▸ one of your lists.
     func run(_ command: BoardMenuCommand) {
         switch command {

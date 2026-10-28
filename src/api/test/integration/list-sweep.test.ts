@@ -25,7 +25,7 @@ describe("runListSweep", () => {
     await cleanDb();
   });
 
-  it("demotes a non-completed Today todo to This Week at the user's local midnight", async () => {
+  it("demotes a non-completed Today todo to This week at the user's local midnight", async () => {
     await seedUser(USER, "test@example.com", { timezone: "UTC" });
     const todayListId = await getListId(USER, "today");
     const todoId = "550e8400-e29b-41d4-a716-446655440001";
@@ -123,7 +123,7 @@ describe("runListSweep", () => {
     expect(stored.listId).toBe(todayListId);
   });
 
-  it("demotes a This Week todo to Someday once it's sat there 7+ days", async () => {
+  it("demotes a This week todo to Someday once it's sat there 7+ days", async () => {
     await seedUser(USER, "test@example.com", { timezone: "UTC" });
     const thisWeekListId = await getListId(USER, "thisWeek");
     const todoId = "550e8400-e29b-41d4-a716-446655440004";
@@ -142,7 +142,7 @@ describe("runListSweep", () => {
     expect(stored.listId).toBe(somedayListId);
   });
 
-  it("leaves a This Week todo alone if it hasn't been there 7 days yet", async () => {
+  it("leaves a This week todo alone if it hasn't been there 7 days yet", async () => {
     await seedUser(USER, "test@example.com", { timezone: "UTC" });
     const thisWeekListId = await getListId(USER, "thisWeek");
     const todoId = "550e8400-e29b-41d4-a716-446655440005";
@@ -251,7 +251,7 @@ describe("runListSweep", () => {
 
       await runListSweep(getDb(env.DB), env, sweptAt);
 
-      // The two that just arrived in This Week aren't also counted as
+      // The two that just arrived in This week aren't also counted as
       // moving on to Someday.
       expect(await record()).toEqual({
         at: sweptAt,

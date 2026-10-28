@@ -3,7 +3,7 @@
 //  Nylon Impossible
 //
 //  The Mac menu bar. File: New Todo ⌘N and New List ⇧⌘N (in place of New
-//  Window). View: Today ⌘1, This Week ⌘2, Someday ⌘3, Show Done ⇧⌘D, and
+//  Window). View: Today ⌘1, This week ⌘2, Someday ⌘3, Show Done ⇧⌘D, and
 //  the sidebar toggle. Todo: the board's single-key map as menu items —
 //  their keys are only bound while no text field is focused — plus Move to.
 //  Edit keeps the system's items; ⌘Z reaches the toast's Undo through the
@@ -56,11 +56,11 @@ struct MacCommands: Commands {
         }
 
         CommandGroup(replacing: .help) {
-            Link("Nylon Help", destination: URL(string: "https://nylonimpossible.com")!)
+            Link("Nylon help", destination: URL(string: "https://nylonimpossible.com")!)
             // Admin only: files an issue in the private feedback repo.
             if MacServices.shared.preferencesService.isAdmin {
                 Divider()
-                Button("Send Feedback…") {
+                Button("Send feedback…") {
                     MacServices.shared.showMainWindow()
                     MacServices.shared.feedbackService.presentWithSnapshot()
                 }

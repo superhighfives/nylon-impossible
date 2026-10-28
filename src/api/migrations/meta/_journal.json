@@ -22,6 +22,13 @@
       "when": 1792551788976,
       "tag": "0002_users_last_sweep",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793170886339,
+      "tag": "0003_system_list_sentence_case",
+      "breakpoints": true
     }
   ]
 }

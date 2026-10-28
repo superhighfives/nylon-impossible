@@ -74,7 +74,7 @@ extension Masthead where Accessory == EmptyView {
 }
 
 /// The written empty state: "Nothing today." and, when there's somewhere to
-/// go, "4 waiting in This Week →".
+/// go, "4 waiting in This week →".
 struct EmptyLine: View {
     let text: String
     var link: (text: String, action: () -> Void)?

@@ -22,7 +22,7 @@ import { dueIn, NOW, TZ } from "./fixtures";
 
 const TARGETS = [
   { id: "today", label: "Today" },
-  { id: "week", label: "This Week" },
+  { id: "week", label: "This week" },
   { id: "someday", label: "Someday" },
   { id: "groceries", label: "Groceries" },
 ];
@@ -51,7 +51,7 @@ describe("Composer", () => {
 
   it("aims at the list on screen", () => {
     const { field } = setup("week");
-    expect(field).toHaveAttribute("placeholder", "Add to This Week…");
+    expect(field).toHaveAttribute("placeholder", "Add to This week…");
   });
 
   it("shows the list chips only while focused or drafting", async () => {

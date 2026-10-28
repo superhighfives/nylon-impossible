@@ -56,12 +56,12 @@ export function localMidnight(timezone: string, now: Date): Date {
 /**
  * Hourly aging sweep. For every user whose local midnight just passed:
  *
- * - Today → This Week: non-completed todos that entered Today at least 24
+ * - Today → This week: non-completed todos that entered Today at least 24
  *   hours before this midnight. So a todo moves at the first midnight that's
  *   24+ hours after it arrived — added 4am Tuesday or 8pm Tuesday, it stays
  *   through Wednesday and moves at the midnight ending Wednesday. Something
  *   added late in the day still gets a full day in Today.
- * - This Week → Someday: non-completed todos that have sat in This Week
+ * - This week → Someday: non-completed todos that have sat in This week
  *   for 7+ days.
  *
  * Someday is terminal. Never touches completed todos, due dates, or custom
@@ -131,8 +131,8 @@ export async function runListSweep(
 
     // Today's overnight note reads these. A sweep that moved nothing keeps
     // the previous record, so the note always describes the last real move.
-    // The Today → This Week rows are swept first, so a todo can't be counted
-    // twice in one run (it entered This Week `now`, well inside the week).
+    // The Today → This week rows are swept first, so a todo can't be counted
+    // twice in one run (it entered This week `now`, well inside the week).
     const movedToThisWeek = toThisWeek.length;
     if (movedToThisWeek > 0 || movedToSomeday > 0) {
       await db

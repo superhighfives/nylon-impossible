@@ -127,7 +127,7 @@ function actionUrl(baseUrl: string, path: string): string {
 // The card format fixes the look, so the add-on matches the apps on structure
 // and words instead: a composer with a list dropdown, then Today and This
 // Week with tick-to-done, then Someday collapsed to a count. Copy follows the
-// redesign spec's Vocabulary (todo, Today / This Week / Someday, Pin, Done).
+// redesign spec's Vocabulary (todo, Today / This week / Someday, Pin, Done).
 // ---------------------------------------------------------------------------
 
 /** Name of the composer text input, referenced by the submit action handlers. */
@@ -169,7 +169,7 @@ export interface HomepageCardInput {
 
 const TIME_ORDER: AddonSystemKind[] = ["today", "thisWeek", "someday"];
 
-/** Today, This Week, Someday, then your lists in their own order. */
+/** Today, This week, Someday, then your lists in their own order. */
 export function orderAddonLists(lists: AddonListOption[]): AddonListOption[] {
   const time = TIME_ORDER.flatMap((kind) =>
     lists.filter((list) => list.systemKind === kind),
@@ -267,7 +267,7 @@ function openNylonButton(webUrl: string, text = "Open Nylon"): Button {
  * response payload limit), so the homepage designs for at most ~60 widgets:
  *
  *   composer                        3
- *   Today + This Week               up to 8 rows + 1 overflow each  = 18
+ *   Today + This week               up to 8 rows + 1 overflow each  = 18
  *   Someday + your lists            share ADDON_ROW_BUDGET rows, plus one
  *                                   overflow row per section
  *   list sections                   at most ADDON_MAX_LIST_SECTIONS, then a
@@ -327,7 +327,7 @@ function todoSection(
 
 /**
  * Homepage card: the composer (list dropdown defaulting to Today), Today and
- * This Week open with tick-to-done, then Someday and each of your lists as
+ * This week open with tick-to-done, then Someday and each of your lists as
  * collapsed "Name · N" sections that expand to the same rows. Lists with no
  * open todos are left out. Each "N more in X" opens X in the web app
  * (`/this-week`, `/list/:id`), and "N more lists" opens Lists.
@@ -346,7 +346,7 @@ export function buildHomepageCard(
 
   const todayEmpty =
     thisWeek.length > 0
-      ? `Nothing today. ${thisWeek.length} waiting in This Week.`
+      ? `Nothing today. ${thisWeek.length} waiting in This week.`
       : "Nothing today.";
 
   const sections: Section[] = [
@@ -380,7 +380,7 @@ export function buildHomepageCard(
       limit: ADDON_SECTION_LIMIT,
       empty: todayEmpty,
     }),
-    todoSection(baseUrl, input, "This Week", { kind: "thisWeek" }, thisWeek, {
+    todoSection(baseUrl, input, "This week", { kind: "thisWeek" }, thisWeek, {
       limit: ADDON_SECTION_LIMIT,
       empty: "Nothing this week.",
     }),

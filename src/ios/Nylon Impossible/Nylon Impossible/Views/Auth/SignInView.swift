@@ -35,7 +35,7 @@ struct SignInView: View {
                 .textStyle(Theme.Fonts.Role.masthead, tracking: Theme.Tracking.masthead)
                 .foregroundStyle(Theme.Colors.ink)
                 .accessibilityAddTraits(.isHeader)
-            Text("Today, This Week, Someday. Todos that age on their own.")
+            Text("Today, This week, Someday. Todos that age on their own.")
                 .textStyle(Theme.Fonts.Role.body)
                 .foregroundStyle(Theme.Colors.inkMuted)
                 .padding(.top, Theme.Space.s3)

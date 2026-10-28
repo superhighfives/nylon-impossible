@@ -51,12 +51,12 @@ struct MenuCommandTests {
 
     @Test("Titles use the app's words")
     func titles() {
-        #expect(BoardMenuCommand.newTodo.title == "New Todo")
-        #expect(BoardMenuCommand.newList.title == "New List")
-        #expect(BoardMenuCommand.showList(.thisWeek).title == "This Week")
-        #expect(BoardMenuCommand.key(.done).title == "Mark Done")
+        #expect(BoardMenuCommand.newTodo.title == "New todo")
+        #expect(BoardMenuCommand.newList.title == "New list")
+        #expect(BoardMenuCommand.showList(.thisWeek).title == "This week")
+        #expect(BoardMenuCommand.key(.done).title == "Mark done")
         #expect(BoardMenuCommand.key(.due).title == "Due…")
-        #expect(BoardMenuCommand.moveMenu.map(\.title) == ["Today", "This Week", "Someday"])
+        #expect(BoardMenuCommand.moveMenu.map(\.title) == ["Today", "This week", "Someday"])
     }
 
     @Test("Only the board's own keys are single keys")

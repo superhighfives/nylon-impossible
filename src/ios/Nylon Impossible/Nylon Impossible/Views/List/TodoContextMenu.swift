@@ -3,7 +3,7 @@
 //  Nylon Impossible
 //
 //  A row's long-press (and, on iPad, right-click) menu. The phone lists each
-//  move flat — "Move to This Week" — as the spec's touch menu does. The wide
+//  move flat — "Move to This week" — as the spec's touch menu does. The wide
 //  layout groups them the pointer way: Move to…, Due…, Pin, Delete. Delete
 //  never confirms; it toasts with Undo.
 //

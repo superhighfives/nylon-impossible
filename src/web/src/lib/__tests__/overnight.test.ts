@@ -18,9 +18,9 @@ const sweep = (week: number, someday: number, at = SWEPT) => ({
 
 describe("overnightText", () => {
   it("names each list that got something", () => {
-    expect(overnightText(sweep(2, 0))).toBe("2 moved to This Week overnight");
+    expect(overnightText(sweep(2, 0))).toBe("2 moved to This week overnight");
     expect(overnightText(sweep(2, 1))).toBe(
-      "2 moved to This Week, 1 to Someday overnight",
+      "2 moved to This week, 1 to Someday overnight",
     );
     expect(overnightText(sweep(0, 1))).toBe("1 moved to Someday overnight");
   });
@@ -42,7 +42,7 @@ describe("overnightNote", () => {
 
   it("shows on the user's local day of the sweep", () => {
     expect(overnightNote(base)).toBe(
-      "2 moved to This Week, 1 to Someday overnight",
+      "2 moved to This week, 1 to Someday overnight",
     );
   });
 

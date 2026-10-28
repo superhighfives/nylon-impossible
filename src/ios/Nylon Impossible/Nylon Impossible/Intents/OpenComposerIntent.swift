@@ -2,7 +2,7 @@
 //  OpenComposerIntent.swift
 //  Nylon Impossible
 //
-//  "New Todo": open Nylon with the composer focused on a list. Behind the
+//  "New todo": open Nylon with the composer focused on a list. Behind the
 //  Today widget's "+", the Control Center / Lock Screen control, and the
 //  Action button or a Shortcut. A widget can't take text, so this is the
 //  quickest way in from one.
@@ -16,7 +16,7 @@
 import AppIntents
 
 struct OpenComposerIntent: AppIntent {
-    static var title: LocalizedStringResource = "New Todo"
+    static var title: LocalizedStringResource = "New todo"
     static var description = IntentDescription("Open Nylon ready to type a new todo.")
     static var openAppWhenRun: Bool = true
 

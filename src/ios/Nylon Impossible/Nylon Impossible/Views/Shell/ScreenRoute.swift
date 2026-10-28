@@ -31,7 +31,7 @@
 //
 //  States for the quality pass, on either layout: signin (the signed-out
 //  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
-//  Today, two waiting in This Week), syncerror (Today, or the board, under
+//  Today, two waiting in This week), syncerror (Today, or the board, under
 //  the sync error line), and perf (500 todos in Today, for scrolling and the
 //  done hold).
 //
@@ -248,13 +248,13 @@ enum SampleData {
     private static func lists(_ context: ModelContext) -> (today: TodoListModel, week: TodoListModel, someday: TodoListModel) {
         let user = "sample-user"
         let today = TodoListModel(id: "today", userId: user, name: "Today", kind: "system", systemKind: .today)
-        let week = TodoListModel(id: "thisweek", userId: user, name: "This Week", kind: "system", systemKind: .thisWeek)
+        let week = TodoListModel(id: "thisweek", userId: user, name: "This week", kind: "system", systemKind: .thisWeek)
         let someday = TodoListModel(id: "someday", userId: user, name: "Someday", kind: "system", systemKind: .someday)
         [today, week, someday].forEach(context.insert)
         return (today, week, someday)
     }
 
-    /// Today empty, two waiting in This Week: the written empty state with
+    /// Today empty, two waiting in This week: the written empty state with
     /// its link, and Someday's plain one.
     static func seedEmptyToday(_ context: ModelContext, now: Date = Date()) {
         let (_, week, _) = lists(context)
@@ -293,7 +293,7 @@ enum SampleData {
     static func seed(_ context: ModelContext, now: Date = Date()) {
         let user = "sample-user"
         let today = TodoListModel(id: "today", userId: user, name: "Today", kind: "system", systemKind: .today)
-        let week = TodoListModel(id: "thisweek", userId: user, name: "This Week", kind: "system", systemKind: .thisWeek)
+        let week = TodoListModel(id: "thisweek", userId: user, name: "This week", kind: "system", systemKind: .thisWeek)
         let someday = TodoListModel(id: "someday", userId: user, name: "Someday", kind: "system", systemKind: .someday)
         let groceries = TodoListModel(id: "groceries", userId: user, name: "Groceries", position: "a0")
         let studio = TodoListModel(id: "studio", userId: user, name: "Studio", position: "a1")

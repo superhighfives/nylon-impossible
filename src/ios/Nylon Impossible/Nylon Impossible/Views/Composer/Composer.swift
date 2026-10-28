@@ -29,7 +29,7 @@ struct Composer: View {
     let currentListId: String?
     /// A chip the user picked over the default; reset when the page changes.
     @Binding var chosenListId: String?
-    /// Raised to focus the field without a tap (the "New Task" quick action).
+    /// Raised to focus the field without a tap (the "New todo" quick action).
     @Binding var focusRequested: Bool
     /// Add what's typed to `listId`; `parseDates` is false once × was tapped.
     let onSubmit: (_ listId: String?, _ parseDates: Bool) -> Void

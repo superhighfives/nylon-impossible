@@ -14,7 +14,7 @@ struct APITodo: Codable, Sendable {
     let id: String
     let userId: String
     let parentId: String?  // Parent todo id for subtasks; nil for top-level
-    let listId: String?    // Which list (Today/This Week/Someday/custom) this todo belongs to
+    let listId: String?    // Which list (Today/This week/Someday/custom) this todo belongs to
     let title: String
     let notes: String?
     let completed: Bool

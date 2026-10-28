@@ -85,7 +85,7 @@ struct MacGeneralSettings: View {
                     }
                 }
             } footer: {
-                Text("Today moves to This Week, and This Week to Someday, at your local midnight. A todo gets at least a full day in Today.")
+                Text("Today moves to This week, and This week to Someday, at your local midnight. A todo gets at least a full day in Today.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -212,7 +212,7 @@ struct MacAccountSettings: View {
                     }
                     Spacer()
                     if isSignedIn {
-                        Button("Sign Out") {
+                        Button("Sign out") {
                             Task { await authService.signOut() }
                         }
                     }
@@ -221,14 +221,14 @@ struct MacAccountSettings: View {
             }
 
             Section {
-                Link("Privacy Policy", destination: URL(string: "https://nylonimpossible.com/privacy")!)
-                Link("Terms of Service", destination: URL(string: "https://nylonimpossible.com/terms")!)
+                Link("Privacy policy", destination: URL(string: "https://nylonimpossible.com/privacy")!)
+                Link("Terms of service", destination: URL(string: "https://nylonimpossible.com/terms")!)
             }
 
             if isSignedIn {
                 Section {
                     HStack {
-                        Button("Delete Account…", role: .destructive) { confirmsDelete = true }
+                        Button("Delete account…", role: .destructive) { confirmsDelete = true }
                             .disabled(isDeleting)
                         if isDeleting { ProgressView().controlSize(.small) }
                     }

@@ -30,7 +30,7 @@ import type {
 /** The four pages the switcher pages between, in swipe order. */
 export const PAGES = [
   { key: "today", label: "Today" },
-  { key: "thisWeek", label: "This Week" },
+  { key: "thisWeek", label: "This week" },
   { key: "someday", label: "Someday" },
   { key: "lists", label: "Lists" },
 ] as const;

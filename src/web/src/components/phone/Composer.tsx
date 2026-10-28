@@ -52,7 +52,7 @@ export function Composer({
 }: {
   /** The list on screen — the default target. */
   currentListId: string;
-  /** Today, This Week, Someday, then the user's lists. */
+  /** Today, This week, Someday, then the user's lists. */
   targets: ComposerTarget[];
   timeZone: string;
   /** "View" on the "Added to …" toast when adding somewhere off-screen. */

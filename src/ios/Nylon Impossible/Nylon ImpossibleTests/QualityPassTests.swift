@@ -19,7 +19,7 @@ import Testing
 struct RowAccessibilityTests {
     private let lists = [
         TodoListModel(id: "today", userId: "u", name: "Today", kind: "system", systemKind: .today),
-        TodoListModel(id: "thisweek", userId: "u", name: "This Week", kind: "system", systemKind: .thisWeek),
+        TodoListModel(id: "thisweek", userId: "u", name: "This week", kind: "system", systemKind: .thisWeek),
         TodoListModel(id: "someday", userId: "u", name: "Someday", kind: "system", systemKind: .someday),
         TodoListModel(id: "groceries", userId: "u", name: "Groceries", position: "a0")
     ]

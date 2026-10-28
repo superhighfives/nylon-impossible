@@ -15,7 +15,7 @@ VALUES ('user_test_123', 'test@example.com', unixepoch(), unixepoch());
 -- for real users; seeding the user row directly skips that, so do it here).
 INSERT INTO lists (id, user_id, name, kind, system_kind, position, created_at, updated_at) VALUES
   ('list_today', 'user_test_123', 'Today', 'system', 'today', 'a0', unixepoch(), unixepoch()),
-  ('list_this_week', 'user_test_123', 'This Week', 'system', 'thisWeek', 'a1', unixepoch(), unixepoch()),
+  ('list_this_week', 'user_test_123', 'This week', 'system', 'thisWeek', 'a1', unixepoch(), unixepoch()),
   ('list_someday', 'user_test_123', 'Someday', 'system', 'someday', 'a2', unixepoch(), unixepoch());
 
 -- Custom lists with fractional indexing positions, after the system lists

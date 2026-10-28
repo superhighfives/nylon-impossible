@@ -18,7 +18,7 @@ import SwiftData
 /// those identifiers, so renaming them would orphan every Shortcut someone
 /// has already built on this one. Everything a person sees says "todo".
 struct AddTaskIntent: AppIntent {
-    static var title: LocalizedStringResource = "Add Todo"
+    static var title: LocalizedStringResource = "Add todo"
     static var description = IntentDescription("Add a todo to Nylon. Say when it’s due — “pay rent tomorrow” — and the due day is set.")
 
     /// Don't open the app when running via Siri - just confirm and return
@@ -106,7 +106,7 @@ struct AddTaskIntent: AppIntent {
         return (today?.id, today?.name ?? "Today")
     }
 
-    /// "Added to This Week · Due Fri", or "Added to Today" with no due day.
+    /// "Added to This week · Due Fri", or "Added to Today" with no due day.
     static func confirmation(listName: String, dueDate: Date?, now: Date = Date()) -> String {
         guard let dueDate else { return "Added to \(listName)" }
         return "Added to \(listName) · \(DueLabel.chip(for: dueDate, now: now))"

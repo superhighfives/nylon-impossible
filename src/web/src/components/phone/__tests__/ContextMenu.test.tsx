@@ -16,7 +16,7 @@ function setup(todo = makeTodo()) {
       todo={todo}
       where="Today"
       moveTargets={[
-        { id: "list-week", label: "This Week" },
+        { id: "list-week", label: "This week" },
         { id: "list-someday", label: "Someday" },
       ]}
       {...handlers}
@@ -60,7 +60,7 @@ describe("ContextMenu", () => {
 
   it("arrow keys move between items", async () => {
     setup();
-    const first = screen.getByRole("menuitem", { name: "Move to This Week" });
+    const first = screen.getByRole("menuitem", { name: "Move to This week" });
     // Opens with focus on the first action.
     await waitFor(() => expect(first).toHaveFocus());
     await userEvent.keyboard("{ArrowDown}");

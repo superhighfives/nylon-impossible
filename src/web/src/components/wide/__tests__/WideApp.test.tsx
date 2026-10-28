@@ -17,7 +17,7 @@ const remove = vi.fn();
 const createList = vi.fn();
 const lists = [
   makeList("list-today", "Today", "today", "a0"),
-  makeList("list-week", "This Week", "thisWeek", "a1"),
+  makeList("list-week", "This week", "thisWeek", "a1"),
   makeList("list-someday", "Someday", "someday", "a2"),
   makeList("list-groceries", "Groceries", null, "a3"),
   makeList("list-studio", "Studio", null, "a4"),
@@ -168,7 +168,7 @@ describe("WideApp", () => {
     expect(groceries).toHaveAttribute("aria-pressed", "false");
     expect(
       screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
-    ).toEqual(expect.arrayContaining(["Today", "This Week", "Someday"]));
+    ).toEqual(expect.arrayContaining(["Today", "This week", "Someday"]));
     expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
   });
 
@@ -193,7 +193,7 @@ describe("WideApp", () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
     await userEvent.click(
-      within(nav).getByRole("button", { name: /This Week/ }),
+      within(nav).getByRole("button", { name: /This week/ }),
     );
     expect(focusedTitle()).toContain("Send invoice");
   });
@@ -231,7 +231,7 @@ describe("WideApp", () => {
       input: expect.objectContaining({ listId: "list-week" }),
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Moved to This Week",
+      "Moved to This week",
       expect.anything(),
     );
     expect(focusedTitle()).toContain("Call Mum");
@@ -291,7 +291,7 @@ describe("WideApp", () => {
       .getAllByRole("menuitem")
       .map((i) => i.textContent);
     expect(names).toEqual([
-      "Move to This Week",
+      "Move to This week",
       "Move to Someday",
       "Move to Groceries",
       "Move to Studio",
@@ -399,7 +399,7 @@ describe("WideApp URLs", () => {
     });
   });
 
-  it("focuses This Week's column for /this-week", () => {
+  it("focuses This week's column for /this-week", () => {
     render(<WideApp view={{ kind: "thisWeek" }} />);
     expect(focusedTitle()).toContain("Send invoice");
   });

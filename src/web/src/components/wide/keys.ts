@@ -88,7 +88,7 @@ export const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["h", "l"], label: "Move across columns" },
   { keys: ["x"], label: "Mark done" },
   { keys: ["Enter"], label: "Open" },
-  { keys: ["1", "2", "3"], label: "Move to Today, This Week, Someday" },
+  { keys: ["1", "2", "3"], label: "Move to Today, This week, Someday" },
   { keys: ["p"], label: "Pin or unpin" },
   { keys: ["d"], label: "Due…" },
   { keys: ["⌫"], label: "Delete" },

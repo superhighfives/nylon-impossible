@@ -66,7 +66,7 @@ final class ShareExtensionLoader {
         return nil
     }
 
-    /// Today, This Week, Someday, then the user's lists — the same order and
+    /// Today, This week, Someday, then the user's lists — the same order and
     /// names as the app's composer chips. Empty before the app's first sync,
     /// in which case the todo lands in Today server-side.
     func availableLists() -> [TodoListModel] {

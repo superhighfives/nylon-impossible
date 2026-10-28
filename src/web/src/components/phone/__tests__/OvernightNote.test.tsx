@@ -37,7 +37,7 @@ describe("useOvernightNote", () => {
 
   it("shows the sweep's counts on the morning after", () => {
     const { result } = renderHook(() => useOvernightNote([older], TODAY));
-    expect(result.current.text).toBe("2 moved to This Week overnight");
+    expect(result.current.text).toBe("2 moved to This week overnight");
   });
 
   it("dismisses for that sweep and remembers it", () => {
@@ -97,14 +97,14 @@ describe("OvernightNote", () => {
     const onDismiss = vi.fn();
     render(
       <OvernightNote
-        text="2 moved to This Week overnight"
+        text="2 moved to This week overnight"
         onDismiss={onDismiss}
       />,
     );
-    const line = screen.getByText("2 moved to This Week overnight");
+    const line = screen.getByText("2 moved to This week overnight");
     expect(line).toBeInTheDocument();
     // Truncated to one line, with the full text on hover.
-    expect(line).toHaveAttribute("title", "2 moved to This Week overnight");
+    expect(line).toHaveAttribute("title", "2 moved to This week overnight");
     await userEvent.click(
       screen.getByRole("button", { name: "Dismiss overnight note" }),
     );

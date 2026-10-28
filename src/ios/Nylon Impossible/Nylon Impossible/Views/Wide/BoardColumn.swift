@@ -84,7 +84,7 @@ struct BoardColumn<Accessory: View>: View {
                 .textStyle(Theme.Fonts.Role.columnTitle, tracking: Theme.Tracking.masthead)
                 .foregroundStyle(Theme.Colors.ink)
                 // Wraps (then shrinks a little) at large sizes in a narrow
-                // column rather than clipping "This Week".
+                // column rather than clipping "This week".
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
                 .accessibilityAddTraits(.isHeader)

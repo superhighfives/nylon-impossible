@@ -34,7 +34,7 @@ extension Theme {
 }
 
 extension Theme.Fonts.Role {
-    /// A column title ("This Week"), the wide display size.
+    /// A column title ("This week"), the wide display size.
     static let columnTitle = Theme.Fonts.Wide.display
     /// A todo's title in a column row.
     static let rowTitleWide = Theme.Fonts.Style(

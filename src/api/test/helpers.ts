@@ -2,7 +2,7 @@ import { env } from "cloudflare:test";
 import { and, eq, getDb, lists, todos, todoUrls, users } from "../src/lib/db";
 
 /**
- * Seed the system lists (Today/This Week/Someday) for a user,
+ * Seed the system lists (Today/This week/Someday) for a user,
  * mirroring the provisioning `ensure-user.ts` does at real account creation.
  * Idempotent — safe to call even if the lists already exist.
  */
@@ -10,7 +10,7 @@ export async function seedSystemLists(userId = "user_test_123") {
   const db = getDb(env.DB);
   const SYSTEM_LISTS = [
     { name: "Today", systemKind: "today" as const },
-    { name: "This Week", systemKind: "thisWeek" as const },
+    { name: "This week", systemKind: "thisWeek" as const },
     { name: "Someday", systemKind: "someday" as const },
   ];
   const [existing] = await db

@@ -25,7 +25,7 @@ import SwiftData
 /// So an already-completed todo is a no-op here rather than an un-complete —
 /// see `perform()`.
 struct CompleteTodoIntent: AppIntent {
-    static var title: LocalizedStringResource = "Mark Todo Done"
+    static var title: LocalizedStringResource = "Mark todo done"
     static var description = IntentDescription("Mark a todo done from the Nylon widget")
 
     /// Not offered in Shortcuts: `AddTaskIntent` is the one Nylon offers there and

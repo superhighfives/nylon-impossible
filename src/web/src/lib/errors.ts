@@ -73,7 +73,7 @@ export class ListNotFoundError extends Data.TaggedError("ListNotFoundError")<{
 
 /**
  * Thrown when an operation tries to rename, delete, or reorder a system list
- * (Today/This Week/Someday), which is immutable from the client.
+ * (Today/This week/Someday), which is immutable from the client.
  */
 export class SystemListImmutableError extends Data.TaggedError(
   "SystemListImmutableError",
