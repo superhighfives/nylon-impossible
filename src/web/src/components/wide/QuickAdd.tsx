@@ -19,6 +19,7 @@ export function QuickAdd({
   countFor,
   isVisible,
   onView,
+  returnFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -29,6 +30,8 @@ export function QuickAdd({
   countFor: (listId: string) => number;
   isVisible: (listId: string) => boolean;
   onView: (listId: string) => void;
+  /** Where focus goes on close: back to the board's selection. */
+  returnFocus?: () => HTMLElement | null;
 }) {
   return (
     <Popover.Root open={open} onOpenChange={onOpenChange}>
@@ -42,6 +45,7 @@ export function QuickAdd({
         >
           <Popover.Popup
             aria-label="Quick add"
+            finalFocus={() => returnFocus?.() ?? true}
             className={`${POPOVER_CARD} w-[26rem]`}
           >
             <Composer

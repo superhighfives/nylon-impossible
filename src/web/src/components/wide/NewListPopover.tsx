@@ -14,14 +14,27 @@ export function NewListPopover({
   side = "bottom",
   align = "start",
   onCreate,
+  open: openProp,
+  onOpenChange,
+  returnFocus,
 }: {
   /** The button that opens it, rendered as the popover's trigger. */
   trigger: ReactElement<Record<string, unknown>>;
   side?: "bottom" | "right";
   align?: "start" | "end";
   onCreate: (name: string) => void;
+  /** Controlled, for ⇧N; otherwise the popover keeps its own state. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Where focus goes on close, when not back to the trigger. */
+  returnFocus?: () => HTMLElement | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [ownOpen, setOwnOpen] = useState(false);
+  const open = openProp ?? ownOpen;
+  const setOpen = (next: boolean) => {
+    setOwnOpen(next);
+    onOpenChange?.(next);
+  };
   const [name, setName] = useState("");
   const add = () => {
     const trimmed = name.replace(/\s+/g, " ").trim();
@@ -46,7 +59,10 @@ export function NewListPopover({
           sideOffset={6}
           className="z-50"
         >
-          <Popover.Popup className={`${POPOVER_CARD} w-72 p-3`}>
+          <Popover.Popup
+            finalFocus={() => returnFocus?.() ?? true}
+            className={`${POPOVER_CARD} w-72 p-3`}
+          >
             <Popover.Title className="m-0 mb-2 text-[0.8125rem] font-semibold text-n-ink-muted">
               New list
             </Popover.Title>

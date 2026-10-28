@@ -11,10 +11,14 @@ import {
 } from "@dnd-kit/core";
 import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
-import { ListPlus, Plus } from "lucide-react";
+import { ListPlus, Plus, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Composer } from "@/components/phone/Composer";
-import { ContextMenu, type MenuView } from "@/components/phone/ContextMenu";
+import {
+  ContextMenu,
+  type MenuCommand,
+  type MenuView,
+} from "@/components/phone/ContextMenu";
 import { DetailSheet } from "@/components/phone/DetailSheet";
 import {
   boardViewKey,
@@ -35,9 +39,23 @@ import { dropPlacement, slotAt } from "@/lib/dragOrder";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import { Column, type DropIndicator } from "./Column";
+import {
+  CommandPalette,
+  filterItems,
+  type PaletteGroup,
+  type PaletteItem,
+} from "./CommandPalette";
+import {
+  type Board,
+  COMMANDS,
+  commandForKey,
+  type JumpTarget,
+  keyHint,
+  visibleCommands,
+} from "./commands";
 import { DONE_COLUMN, DoneColumn } from "./DoneColumn";
 import { resolveDrop } from "./drop";
-import { boardKeyAction, isTypingTarget } from "./keys";
+import { isTypingTarget } from "./keys";
 import { NewListPopover } from "./NewListPopover";
 import { QuickAdd } from "./QuickAdd";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
@@ -52,11 +70,21 @@ const EMPTY_COPY: Record<string, string> = {
 const TOOL_BUTTON =
   "flex size-9 cursor-pointer items-center justify-center rounded-full text-n-ink-muted n-focus pointer-fine:hover:bg-n-fill pointer-fine:hover:text-n-ink";
 
+/** How long the G hint waits for the next key. */
+const GO_HINT_MS = 1200;
+
 /** A column to focus once it renders: a row, its Add field, or its title. */
 interface PendingFocus {
   column: string;
   target: "row" | "composer" | "head";
+  /** `row`: this todo's row rather than the remembered one. */
+  rowId?: string;
 }
+
+type PaletteState =
+  | { mode: "all" }
+  | { mode: "lists" }
+  | { mode: "move"; todoId: string };
 
 interface MenuState {
   id: string;
@@ -130,6 +158,8 @@ export function WideApp({
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [settings, setSettings] = useState(false);
   const [quickAdd, setQuickAdd] = useState(false);
+  const [newListOpen, setNewListOpen] = useState(false);
+  const [palette, setPalette] = useState<PaletteState | null>(null);
   const [fourthEl, setFourthEl] = useState<HTMLElement | null>(null);
   const [shortcuts, setShortcuts] = useState(false);
   const [feedback, setFeedback] = useState(false);
@@ -170,6 +200,8 @@ export function WideApp({
     ...(fourth === "done" ? [DONE_COLUMN] : []),
   ];
   const todayId = byKind.today?.id ?? null;
+  const listKind = (listId: string) =>
+    timeLists.find((l) => l.id === listId)?.systemKind ?? null;
   const selectedTodo = todoById(selectedId) ?? doneById(selectedId);
   /** The column the selection is in: a list id, Done, or none. */
   const selectionColumn = selectedTodo
@@ -190,11 +222,12 @@ export function WideApp({
   // --- Focus ----------------------------------------------------------------
 
   /**
-   * Focus (and so select) a row in a column: `index`, else the column's
-   * last-selected todo, else its first. Its title when it has no rows.
+   * Focus (and so select) a row in a column: `rowId`, else `index`, else
+   * the column's last-selected todo, else its first. Its title when it has
+   * no rows.
    */
   const focusColumn = useCallback(
-    (listId: string, index?: number) => {
+    (listId: string, index?: number, rowId?: string) => {
       const section = document.querySelector<HTMLElement>(
         `[data-column="${CSS.escape(listId)}"]`,
       );
@@ -205,9 +238,9 @@ export function WideApp({
         behavior: reducedMotion === "reduce" ? "auto" : "smooth",
       });
       const rows = columnRows(listId);
-      const remembered = lastSelected.current.get(listId);
+      const remembered = rowId ?? lastSelected.current.get(listId);
       const target =
-        (index === undefined
+        (index === undefined || rowId
           ? rows.find((r) => r.dataset.rowId === remembered)
           : rows[Math.min(index, rows.length - 1)]) ??
         rows[0] ??
@@ -232,7 +265,7 @@ export function WideApp({
         )
         ?.focus();
     } else {
-      focusColumn(pending.column);
+      focusColumn(pending.column, undefined, pending.rowId);
     }
   });
 
@@ -319,25 +352,26 @@ export function WideApp({
   const openCollection = (
     list: SerializedList,
     target: PendingFocus["target"] = "row",
+    rowId?: string,
   ) => {
     // Already showing: nothing re-renders, so go straight in.
     if (fourth === "list" && openListId === list.id && target === "row") {
-      focusColumn(list.id);
+      focusColumn(list.id, undefined, rowId);
       return;
     }
     setDetailId(null);
     setOpenListId(list.id);
-    pendingFocus.current = { column: list.id, target };
+    pendingFocus.current = { column: list.id, target, rowId };
   };
 
-  const showDone = (target: PendingFocus["target"] = "row") => {
+  const showDone = (target: PendingFocus["target"] = "row", rowId?: string) => {
     if (fourth === "done" && target === "row") {
-      focusColumn(DONE_COLUMN);
+      focusColumn(DONE_COLUMN, undefined, rowId);
       return;
     }
     setDetailId(null);
     setOpenListId(null);
-    pendingFocus.current = { column: DONE_COLUMN, target };
+    pendingFocus.current = { column: DONE_COLUMN, target, rowId };
   };
 
   const addList = (name: string) => {
@@ -362,132 +396,332 @@ export function WideApp({
   };
 
   // --- Keyboard -------------------------------------------------------------
+  // Every key is a command in `commands.ts`; this is what each one does.
+
+  const sidebar = () =>
+    document.querySelector<HTMLElement>('aside[aria-label="Sidebar"]');
+  const sidebarItemFor = (column: string | null) =>
+    column
+      ? sidebar()?.querySelector<HTMLElement>(
+          column === DONE_COLUMN
+            ? '[data-sidebar-item="done"]'
+            : `[data-sidebar-list="${CSS.escape(column)}"]`,
+        )
+      : null;
+  const inSidebar = () => !!sidebar()?.contains(document.activeElement);
+
+  /** The selected row and its todo: open, or finished (in Done). */
+  const current = () => {
+    const row = focusedRow() ?? selectedRow();
+    return {
+      row,
+      todo: todoById(row?.dataset.rowId),
+      done: doneById(row?.dataset.rowId),
+    };
+  };
+  const rowColumn = (row: HTMLElement | null) =>
+    row?.dataset.rowList && columnIds.includes(row.dataset.rowList)
+      ? row.dataset.rowList
+      : currentColumn;
+
+  const goPending = useRef(false);
+  const goTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [goHint, setGoHint] = useState(false);
+  const endGo = () => {
+    goPending.current = false;
+    if (goTimer.current) clearTimeout(goTimer.current);
+    setGoHint(false);
+  };
+  useEffect(
+    () => () => {
+      if (goTimer.current) clearTimeout(goTimer.current);
+    },
+    [],
+  );
+
+  /** Go into a column: its remembered row, or `rowId` when given. */
+  const jump = (target: JumpTarget, rowId?: string) => {
+    if (target.kind === "done") return showDone("row", rowId);
+    if (target.kind === "list") {
+      const list = collections[target.index];
+      if (list) openCollection(list, "row", rowId);
+      return;
+    }
+    const list = byKind[target.list];
+    if (list) focusColumn(list.id, undefined, rowId);
+  };
+
+  /** A todo chosen in the palette: its column, opened if need be, and it. */
+  const goToTodo = (todo: TodoWithUrls) => {
+    if (todo.completed) return jump({ kind: "done" }, todo.id);
+    const index = collections.findIndex((l) => l.id === todo.listId);
+    if (index !== -1) return jump({ kind: "list", index }, todo.id);
+    focusColumn(todo.listId, undefined, todo.id);
+  };
+
+  const board: Board = {
+    moveRow: (delta) => {
+      if (inSidebar()) {
+        const items = Array.from(
+          sidebar()?.querySelectorAll<HTMLElement>("[data-sidebar-nav]") ?? [],
+        );
+        const at = items.indexOf(document.activeElement as HTMLElement);
+        items[at + delta]?.focus();
+        return;
+      }
+      const { row } = current();
+      const column = rowColumn(row);
+      if (!column) return;
+      const rows = columnRows(column);
+      const at = row ? rows.indexOf(row) : -1;
+      if (at === -1) rows[0]?.focus();
+      else rows[at + delta]?.focus();
+    },
+    moveColumn: (delta) => {
+      if (inSidebar()) {
+        // → goes into the column, as a click; New list, Settings and
+        // Keyboard shortcuts take Enter instead.
+        const el = document.activeElement as HTMLElement;
+        if (delta === 1 && (el.dataset.sidebarList || el.dataset.sidebarItem)) {
+          el.click();
+        }
+        return;
+      }
+      const { row } = current();
+      const column = rowColumn(row);
+      if (!column) return;
+      const at = columnIds.indexOf(column);
+      if (at === 0 && delta === -1) {
+        sidebarItemFor(column)?.focus();
+        return;
+      }
+      const to = columnIds[at + delta];
+      if (!to) return;
+      const index = row ? columnRows(column).indexOf(row) : 0;
+      focusColumn(to, Math.max(0, index));
+    },
+    back: () => {
+      if (detailTodo) closeDetail();
+      else sidebarItemFor(selectionColumn ?? currentColumn)?.focus();
+    },
+    open: () => {
+      const { todo } = current();
+      if (todo) onOpen(todo);
+    },
+    done: () => {
+      const { row, todo, done } = current();
+      if (!row) return;
+      if (done) {
+        focusNeighbour(row);
+        actions.restore(done);
+      } else if (todo) {
+        focusNeighbour(row);
+        actions.complete(todo);
+      }
+    },
+    move: (kind) => {
+      const { row, todo } = current();
+      const target = byKind[kind];
+      if (!row || !todo || !target || target.id === todo.listId) return;
+      focusNeighbour(row);
+      actions.move(todo, target.id);
+    },
+    moveTo: () => {
+      const { todo } = current();
+      if (todo) setPalette({ mode: "move", todoId: todo.id });
+    },
+    pin: () => {
+      const { todo } = current();
+      if (todo) actions.togglePin(todo);
+    },
+    due: () => {
+      const { row, todo } = current();
+      if (!row || !todo) return;
+      const rect = row.getBoundingClientRect();
+      setMenu({
+        id: todo.id,
+        anchor: { x: rect.left, y: rect.bottom + 4 },
+        view: "due",
+      });
+    },
+    remove: () => {
+      const { row, todo, done } = current();
+      const target = todo ?? done;
+      if (!row || !target) return;
+      focusNeighbour(row);
+      actions.destroy(target);
+    },
+    newTodo: () => setQuickAdd(true),
+    newList: () => setNewListOpen(true),
+    undo: () => runToastUndo(),
+    palette: () => setPalette((p) => (p ? null : { mode: "all" })),
+    jump,
+    startGo: () => {
+      goPending.current = true;
+      setGoHint(true);
+      if (goTimer.current) clearTimeout(goTimer.current);
+      goTimer.current = setTimeout(endGo, GO_HINT_MS);
+    },
+    goToList: () => setPalette({ mode: "lists" }),
+    shortcuts: () => setShortcuts((s) => !s),
+    feedback: () => {
+      if (canSendFeedback) setFeedback(true);
+    },
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || isTypingTarget(e.target)) return;
-      const action = boardKeyAction(e);
-      if (!action) return;
-      if (action.type === "shortcuts") {
-        e.preventDefault();
-        setShortcuts((s) => !s);
-        return;
+      if (e.defaultPrevented) return;
+      // After G, the next key is a destination; anything else cancels the
+      // G and does its usual job.
+      const afterG = goPending.current;
+      if (afterG) endGo();
+      const hit =
+        (afterG ? commandForKey(e, { afterG: true }) : null) ??
+        commandForKey(e);
+      if (!hit) return;
+      const { command, arg } = hit;
+      if (!command.anywhere && isTypingTarget(e.target)) return;
+      if (command.admin && !canSendFeedback) return;
+      // Settings and Send feedback are modal; leave their keys alone, ⌘K
+      // included, or the palette would act on the board behind them.
+      if (settings || feedback) return;
+      // Keys that act on a todo act on the selection while focus is on the
+      // board (or nowhere), not from the sidebar or toolbar.
+      if (command.needsSelection) {
+        const active = document.activeElement;
+        const onBoard =
+          !active || active === document.body || !!active.closest("main");
+        if (!onBoard) return;
       }
-      // Screens and the overlays are modal; leave their keys alone.
-      if (settings || shortcuts || feedback) return;
-      if (action.type === "back") {
-        if (detailTodo) {
-          e.preventDefault();
-          closeDetail();
-        }
-        return;
-      }
-      if (action.type === "undo") {
-        if (runToastUndo()) e.preventDefault();
-        return;
-      }
-      if (action.type === "feedback") {
-        if (!canSendFeedback) return;
-        e.preventDefault();
-        setFeedback(true);
-        return;
-      }
-
-      // Keys act on the selection while focus is on the board (or nowhere).
-      // The sidebar and toolbar keep their own keys until they get a
-      // keyboard model of their own.
-      const active = document.activeElement;
-      const onBoard =
-        !active || active === document.body || !!active.closest("main");
-      const row = focusedRow() ?? (onBoard ? selectedRow() : null);
-      const listId =
-        row?.dataset.rowList && columnIds.includes(row.dataset.rowList)
-          ? row.dataset.rowList
-          : currentColumn;
-      const todo = todoById(row?.dataset.rowId);
-      const done = doneById(row?.dataset.rowId);
-
-      switch (action.type) {
-        case "row": {
-          if (!listId) return;
-          e.preventDefault();
-          const rows = columnRows(listId);
-          const at = row ? rows.indexOf(row) : -1;
-          if (at === -1) {
-            rows[0]?.focus();
-            return;
-          }
-          rows[at + action.delta]?.focus();
-          return;
-        }
-        case "column": {
-          if (!listId) return;
-          e.preventDefault();
-          const at = columnIds.indexOf(listId);
-          const to = columnIds[at + action.delta];
-          if (!to) return;
-          const index = row ? columnRows(listId).indexOf(row) : 0;
-          focusColumn(to, Math.max(0, index));
-          return;
-        }
-        case "new": {
-          if (!listId) return;
-          e.preventDefault();
-          const field = composers.current.get(listId);
-          if (field) field.focus();
-          else setQuickAdd(true);
-          return;
-        }
-        default:
-          break;
-      }
-
-      // Done's rows: X puts one back, Delete removes it.
-      if (row && done) {
-        if (action.type === "done" || action.type === "delete") {
-          e.preventDefault();
-          focusNeighbour(row);
-          if (action.type === "done") actions.restore(done);
-          else actions.destroy(done);
-        }
-        return;
-      }
-
-      if (!row || !todo) return;
       e.preventDefault();
-      switch (action.type) {
-        case "done":
-          focusNeighbour(row);
-          actions.complete(todo);
-          return;
-        case "move": {
-          const target = byKind[action.kind];
-          if (!target || target.id === todo.listId) return;
-          focusNeighbour(row);
-          actions.move(todo, target.id);
-          return;
-        }
-        case "pin":
-          actions.togglePin(todo);
-          return;
-        case "due": {
-          const rect = row.getBoundingClientRect();
-          setMenu({
-            id: todo.id,
-            anchor: { x: rect.left, y: rect.bottom + 4 },
-            view: "due",
-          });
-          return;
-        }
-        case "delete":
-          focusNeighbour(row);
-          actions.destroy(todo);
-          return;
-      }
+      command.run(board, arg);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   });
+
+  // --- Palette --------------------------------------------------------------
+
+  const countLabel = (n: number) => String(n);
+  const goToItems = (): PaletteItem[] => [
+    ...timeLists.map((l) => ({
+      id: `go:${l.id}`,
+      label: l.name,
+      meta: countLabel(rowsFor(l.id).length),
+      hint: keyHint(`go-${l.systemKind}`),
+      run: () => focusColumn(l.id),
+    })),
+    ...collections.map((l, index) => ({
+      id: `go:${l.id}`,
+      label: l.name,
+      meta: countLabel(rowsFor(l.id).length),
+      hint: index < 6 ? `⇧${index + 4}` : undefined,
+      run: () => openCollection(l),
+    })),
+    {
+      id: "go:done",
+      label: "Done",
+      meta: countLabel(doneCount),
+      hint: keyHint("go-done"),
+      run: () => showDone(),
+    },
+  ];
+
+  const commandItems = (): PaletteItem[] => {
+    const selected = current().todo ?? null;
+    return visibleCommands(canSendFeedback).flatMap((c) => {
+      const label = c.palette?.(selected);
+      if (!label) return [];
+      return [
+        {
+          id: `cmd:${c.id}`,
+          label,
+          hint: keyHint(c.id),
+          run: () => c.run(board),
+        },
+      ];
+    });
+  };
+
+  const todoItems = (query: string): PaletteItem[] => {
+    const q = query.trim().toLowerCase();
+    if (!q) return [];
+    return todos
+      .filter(
+        (t) =>
+          t.parentId == null &&
+          !actions.hidden.has(t.id) &&
+          !actions.hiddenLists.has(t.listId) &&
+          displayTitle(t).toLowerCase().includes(q),
+      )
+      .slice(0, 8)
+      .map((t) => ({
+        id: `todo:${t.id}`,
+        label: displayTitle(t),
+        meta: t.completed ? "Done" : listName(t.listId),
+        run: () => goToTodo(t),
+      }));
+  };
+
+  const moveToNewList = (todo: TodoWithUrls, name: string) => {
+    const last = collections[collections.length - 1];
+    createList.mutate(
+      { name, position: generateKeyBetween(last?.position ?? null, null) },
+      { onSuccess: (created) => actions.move(todo, created.id, { name }) },
+    );
+  };
+
+  const paletteTodo =
+    palette?.mode === "move" ? todoById(palette.todoId) : undefined;
+
+  const paletteGroups = (query: string): PaletteGroup[] => {
+    if (palette?.mode === "lists") {
+      return [{ label: "Lists", items: filterItems(goToItems(), query) }];
+    }
+    if (palette?.mode === "move") {
+      const todo = paletteTodo;
+      if (!todo) return [];
+      const lists = [...timeLists, ...collections].filter(
+        (l) => l.id !== todo.listId,
+      );
+      const items: PaletteItem[] = filterItems(
+        lists.map((l) => ({
+          id: `move:${l.id}`,
+          label: l.name,
+          meta: countLabel(rowsFor(l.id).length),
+          hint: l.systemKind ? keyHint(`move-${l.systemKind}`) : undefined,
+          run: () => {
+            const row = selectedRow();
+            if (row && selectedId === todo.id) focusNeighbour(row);
+            actions.move(todo, l.id);
+          },
+        })),
+        query,
+      );
+      const name = query.replace(/\s+/g, " ").trim();
+      const exists = [...timeLists, ...collections].some(
+        (l) => l.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (name && !exists) {
+        items.push({
+          id: "move:new",
+          label: `New list “${name}”`,
+          run: () => {
+            const row = selectedRow();
+            if (row && selectedId === todo.id) focusNeighbour(row);
+            moveToNewList(todo, name);
+          },
+        });
+      }
+      return [{ label: "Move to", items }];
+    }
+    return [
+      { label: "Todos", items: todoItems(query) },
+      { label: "Go to", items: filterItems(goToItems(), query) },
+      { label: "Commands", items: filterItems(commandItems(), query) },
+    ];
+  };
 
   // --- Drag -----------------------------------------------------------------
 
@@ -601,7 +835,24 @@ export function WideApp({
     select(todo);
     setDetailId(todo.id);
   };
+  /** The right-click menu: the registry's menu commands for this todo. */
+  const menuCommands = (todo: TodoWithUrls): MenuCommand[] =>
+    COMMANDS.flatMap((c) => {
+      if (!c.menu) return [];
+      if (c.id === `move-${listKind(todo.listId)}`) return [];
+      return [
+        {
+          id: c.id,
+          label: c.menu(todo),
+          hint: keyHint(c.id),
+          run: () => c.run(board),
+        },
+      ];
+    });
+
   const onMenu = (todo: TodoWithUrls, at?: { x: number; y: number }) => {
+    // The menu's commands act on the selection, so right-click selects.
+    select(todo);
     const fallback = document
       .querySelector(`[data-row-id="${CSS.escape(todo.id)}"]`)
       ?.getBoundingClientRect();
@@ -713,6 +964,16 @@ export function WideApp({
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex h-16 shrink-0 items-center justify-end border-b border-n-hairline px-4">
             <div className="flex items-center gap-0.5 rounded-full border border-n-hairline bg-n-surface p-[3px]">
+              <button
+                type="button"
+                aria-label="Search and commands"
+                title="Search and commands (⌘K)"
+                aria-keyshortcuts="Meta+K Control+K"
+                onClick={() => setPalette({ mode: "all" })}
+                className={TOOL_BUTTON}
+              >
+                <Search size={16} strokeWidth={2.2} aria-hidden="true" />
+              </button>
               <QuickAdd
                 open={quickAdd}
                 onOpenChange={setQuickAdd}
@@ -720,7 +981,8 @@ export function WideApp({
                   <button
                     type="button"
                     aria-label="New todo"
-                    title="New todo"
+                    title="New todo (N)"
+                    aria-keyshortcuts="N"
                     className={TOOL_BUTTON}
                   >
                     <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
@@ -736,15 +998,20 @@ export function WideApp({
                 countFor={(id) => rowsFor(id).length}
                 isVisible={(id) => columnIds.includes(id)}
                 onView={viewList}
+                returnFocus={selectedRow}
               />
               <NewListPopover
                 align="end"
+                open={newListOpen}
+                onOpenChange={setNewListOpen}
+                returnFocus={selectedRow}
                 onCreate={addList}
                 trigger={
                   <button
                     type="button"
                     aria-label="New list"
-                    title="New list"
+                    title="New list (⇧N)"
+                    aria-keyshortcuts="Shift+N"
                     className={TOOL_BUTTON}
                   >
                     <ListPlus size={16} strokeWidth={2.2} aria-hidden="true" />
@@ -807,7 +1074,52 @@ export function WideApp({
         timeZone={timeZone}
         anchor={menu?.anchor ?? null}
         initialView={menu?.view ?? "main"}
+        commands={menuTodo ? menuCommands(menuTodo) : undefined}
       />
+
+      <CommandPalette
+        open={!!palette && (palette.mode !== "move" || !!paletteTodo)}
+        onClose={() => setPalette(null)}
+        title={
+          palette?.mode === "move" && paletteTodo
+            ? `Move “${displayTitle(paletteTodo)}”`
+            : palette?.mode === "lists"
+              ? "Go to a list"
+              : undefined
+        }
+        placeholder={
+          palette?.mode === "move"
+            ? "Move to a list…"
+            : palette?.mode === "lists"
+              ? "Go to a list…"
+              : "Search todos, lists and commands…"
+        }
+        groups={paletteGroups}
+        returnFocus={selectedRow}
+      />
+
+      {goHint && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 animate-n-fade-in items-center gap-3 rounded-[0.75rem] border border-n-hairline bg-n-surface px-4 py-2.5 text-[0.8125rem] text-n-ink-muted shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)]"
+        >
+          {[
+            ["G", "Go to"],
+            ["T", "Today"],
+            ["W", "This week"],
+            ["S", "Someday"],
+            ["D", "Done"],
+            ["L", "Lists"],
+          ].map(([key, label]) => (
+            <span key={key} className="flex items-center gap-1.5">
+              <kbd className="inline-flex h-6 min-w-6 items-center justify-center rounded-n-chip border border-n-hairline bg-n-canvas px-1.5 font-n-text font-medium text-n-ink">
+                {key}
+              </kbd>
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <DetailSheet
         variant="column"

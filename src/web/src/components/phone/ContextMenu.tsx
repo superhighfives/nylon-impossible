@@ -3,6 +3,7 @@ import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
 import {
   ArrowRight,
   Calendar as CalendarIcon,
+  Check,
   ChevronLeft,
   Pin,
   PinOff,
@@ -16,6 +17,32 @@ import { displayTitle, dueChoices, dueLabel } from "./model";
 export interface MenuTarget {
   id: string;
   label: string;
+}
+
+/**
+ * One item of the wide board's menu, from its command registry: the label,
+ * the key that does the same thing, and what it runs. `due` opens the Due
+ * view in place.
+ */
+export interface MenuCommand {
+  id: string;
+  label: string;
+  hint: string;
+  run: (todo: TodoWithUrls) => void;
+}
+
+function commandIcon(id: string, pinned: boolean, size: number) {
+  if (id === "done") return <Check size={size} aria-hidden="true" />;
+  if (id === "due") return <CalendarIcon size={size} aria-hidden="true" />;
+  if (id === "pin") {
+    return pinned ? (
+      <PinOff size={size} aria-hidden="true" />
+    ) : (
+      <Pin size={size} aria-hidden="true" />
+    );
+  }
+  if (id === "delete") return <Trash2 size={size} aria-hidden="true" />;
+  return <ArrowRight size={size} aria-hidden="true" />;
 }
 
 /** Arrow keys, Home and End move between a menu's items. */
@@ -71,6 +98,7 @@ export function ContextMenu({
   timeZone = "UTC",
   anchor = null,
   initialView = "main",
+  commands,
 }: {
   todo: TodoWithUrls | null;
   /** The name of the list the todo is in. */
@@ -87,6 +115,11 @@ export function ContextMenu({
   /** Viewport point to open beside, instead of centred. */
   anchor?: { x: number; y: number } | null;
   initialView?: MenuView;
+  /**
+   * Wide: the items, from the board's command registry, with their keys.
+   * Replaces the phone's Move to …, Due…, Pin and Delete.
+   */
+  commands?: MenuCommand[];
 }) {
   const firstItem = useRef<HTMLButtonElement>(null);
   const [view, setView] = useState<MenuView>(initialView);
@@ -181,7 +214,39 @@ export function ContextMenu({
                   {due && ` · ${due.text}`}
                 </Dialog.Description>
               </div>
-              {view === "main" ? (
+              {view === "main" && commands ? (
+                <div
+                  role="menu"
+                  aria-label="Todo actions"
+                  tabIndex={-1}
+                  onKeyDown={moveMenuFocus}
+                  className={CARD}
+                >
+                  {commands.map((c, i) => (
+                    <button
+                      key={c.id}
+                      ref={i === 0 ? firstItem : undefined}
+                      type="button"
+                      role="menuitem"
+                      aria-haspopup={c.id === "due" ? "menu" : undefined}
+                      aria-keyshortcuts={c.hint}
+                      onClick={() =>
+                        c.id === "due" ? setView("due") : run(c.run)
+                      }
+                      className={`${item} ${c.id === "delete" ? "text-n-destructive" : ""}`}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{c.label}</span>
+                      <span
+                        aria-hidden="true"
+                        className="font-n-text text-[0.8125rem] text-n-ink-muted"
+                      >
+                        {c.hint}
+                      </span>
+                      {commandIcon(c.id, current.pinned, iconSize)}
+                    </button>
+                  ))}
+                </div>
+              ) : view === "main" ? (
                 <div
                   role="menu"
                   aria-label="Todo actions"

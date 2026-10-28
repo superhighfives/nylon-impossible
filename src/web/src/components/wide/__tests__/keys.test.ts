@@ -1,41 +1,96 @@
 import { describe, expect, it } from "vitest";
 import { makeTodo } from "@/components/phone/__tests__/fixtures";
+import { COMMANDS, commandForKey, keyHint, visibleCommands } from "../commands";
 import { resolveDrop } from "../drop";
-import { boardKeyAction, isTypingTarget } from "../keys";
+import { isTypingTarget } from "../keys";
 
-describe("boardKeyAction", () => {
+const idFor = (e: Parameters<typeof commandForKey>[0], afterG = false) =>
+  commandForKey(e, { afterG })?.command.id ?? null;
+
+describe("commandForKey", () => {
   it.each([
-    ["j", { type: "row", delta: 1 }],
-    ["ArrowDown", { type: "row", delta: 1 }],
-    ["k", { type: "row", delta: -1 }],
-    ["ArrowUp", { type: "row", delta: -1 }],
-    ["l", { type: "column", delta: 1 }],
-    ["ArrowRight", { type: "column", delta: 1 }],
-    ["h", { type: "column", delta: -1 }],
-    ["ArrowLeft", { type: "column", delta: -1 }],
-    ["x", { type: "done" }],
-    ["1", { type: "move", kind: "today" }],
-    ["2", { type: "move", kind: "thisWeek" }],
-    ["3", { type: "move", kind: "someday" }],
-    ["p", { type: "pin" }],
-    ["d", { type: "due" }],
-    ["Backspace", { type: "delete" }],
-    ["Delete", { type: "delete" }],
-    ["n", { type: "new" }],
-    ["z", { type: "undo" }],
-    ["f", { type: "feedback" }],
-    ["?", { type: "shortcuts" }],
-  ])("%s", (key, action) => {
-    expect(boardKeyAction({ key })).toEqual(action);
+    [{ key: "j" }, "next"],
+    [{ key: "ArrowDown" }, "next"],
+    [{ key: "k" }, "previous"],
+    [{ key: "ArrowUp" }, "previous"],
+    [{ key: "l" }, "right"],
+    [{ key: "ArrowRight" }, "right"],
+    [{ key: "h" }, "left"],
+    [{ key: "ArrowLeft" }, "left"],
+    [{ key: "Escape" }, "back"],
+    [{ key: "x" }, "done"],
+    [{ key: "1" }, "move-today"],
+    [{ key: "2" }, "move-thisWeek"],
+    [{ key: "3" }, "move-someday"],
+    [{ key: "m" }, "move-to"],
+    [{ key: "p" }, "pin"],
+    [{ key: "d" }, "due"],
+    [{ key: "Backspace" }, "delete"],
+    [{ key: "Delete" }, "delete"],
+    [{ key: "n" }, "new-todo"],
+    [{ key: "N", shiftKey: true }, "new-list"],
+    [{ key: "z" }, "undo"],
+    [{ key: "f" }, "feedback"],
+    [{ key: "?", shiftKey: true }, "shortcuts"],
+    [{ key: "g" }, "go"],
+    [{ key: "k", metaKey: true }, "palette"],
+    [{ key: "k", ctrlKey: true }, "palette"],
+  ])("%o → %s", (e, id) => {
+    expect(idFor(e)).toBe(id);
   });
 
-  it("leaves modified keys and unmapped keys to the browser", () => {
-    expect(boardKeyAction({ key: "x", metaKey: true })).toBeNull();
-    expect(boardKeyAction({ key: "1", ctrlKey: true })).toBeNull();
-    expect(boardKeyAction({ key: "j", altKey: true })).toBeNull();
-    expect(boardKeyAction({ key: "q" })).toBeNull();
+  it("reads ⇧-digits by code, since Shift changes the key", () => {
+    const shift = (n: number, key: string) => ({
+      key,
+      code: `Digit${n}`,
+      shiftKey: true,
+    });
+    expect(idFor(shift(1, "!"))).toBe("go-today");
+    expect(idFor(shift(2, "@"))).toBe("go-thisWeek");
+    expect(idFor(shift(3, "#"))).toBe("go-someday");
+    expect(idFor(shift(0, ")"))).toBe("go-done");
+    const lists = commandForKey(shift(6, "^"));
+    expect(lists?.command.id).toBe("go-list");
+    expect(lists?.arg).toBe(2);
+    // Unshifted, the digits still move the todo.
+    expect(idFor({ key: "1", code: "Digit1" })).toBe("move-today");
+  });
+
+  it("maps the letters after G to destinations", () => {
+    expect(idFor({ key: "t" }, true)).toBe("go-today");
+    expect(idFor({ key: "w" }, true)).toBe("go-thisWeek");
+    expect(idFor({ key: "s" }, true)).toBe("go-someday");
+    expect(idFor({ key: "d" }, true)).toBe("go-done");
+    expect(idFor({ key: "l" }, true)).toBe("go-lists");
+    expect(idFor({ key: "x" }, true)).toBeNull();
+  });
+
+  it("leaves modified and unmapped keys to the browser", () => {
+    expect(idFor({ key: "x", metaKey: true })).toBeNull();
+    expect(idFor({ key: "1", ctrlKey: true })).toBeNull();
+    expect(idFor({ key: "j", altKey: true })).toBeNull();
+    expect(idFor({ key: "q" })).toBeNull();
     // Enter opens natively: the focused row is a button.
-    expect(boardKeyAction({ key: "Enter" })).toBeNull();
+    expect(idFor({ key: "Enter" })).toBeNull();
+  });
+});
+
+describe("the registry", () => {
+  it("gives every command a unique id and some way to press it", () => {
+    const ids = COMMANDS.map((c) => c.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const c of COMMANDS) expect(c.keys.length).toBeGreaterThan(0);
+  });
+
+  it("hides Send feedback from everyone but admins", () => {
+    expect(visibleCommands(false).some((c) => c.id === "feedback")).toBe(false);
+    expect(visibleCommands(true).some((c) => c.id === "feedback")).toBe(true);
+  });
+
+  it("joins a command's first keys into a hint", () => {
+    expect(keyHint("go-today")).toBe("⇧1");
+    expect(keyHint("palette")).toBe("⌘K");
+    expect(keyHint("done")).toBe("X");
   });
 });
 
