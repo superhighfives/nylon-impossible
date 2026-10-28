@@ -246,6 +246,7 @@ enum Theme {
         static let email = "envelope" // lucide: Mail
         static let subtasks = "list.bullet.indent" // lucide: ListTree
         static let edit = "pencil" // lucide: Pencil
+        static let newList = "text.badge.plus" // lucide: ListPlus
         static let delete = "trash" // lucide: Trash2
         static let more = "ellipsis" // lucide: Ellipsis
         static let settings = "gear" // lucide: Settings

@@ -2,9 +2,9 @@
 //  BoardColumn.swift
 //  Nylon Impossible
 //
-//  One column of the iPad board: an Archivo title and subline in a header of
-//  fixed (Dynamic Type–scaled) height, so every column's title sits on the
-//  same baseline, then a hairline, the quiet "+ Add" composer, and the rows.
+//  One column of the board (iPad and Mac): the header (BoardColumnHeader),
+//  a hairline, the quiet "+ Add" composer, and the rows. One click selects a
+//  row; a click on the selection opens it in the fourth column.
 //
 //  The whole column takes a dropped todo, which moves it here (one list per
 //  todo). Dropping onto a row places it just above that row, which is also
@@ -29,14 +29,17 @@ struct BoardColumn<Accessory: View>: View {
     var overnight: (text: String, dismiss: () -> Void)?
     var empty: (text: String, link: (text: String, action: () -> Void)?)
     let composer: Composer
+    let onSelect: (TodoItem) -> Void
     let onOpen: (TodoItem) -> Void
+    /// Your list's column: rename in place, and Rename in its ⋯ menu.
+    var onRename: ((String) -> Void)?
+    var isRenaming: Binding<Bool> = .constant(false)
     /// A dropped todo, and the row it landed on (nil: the column itself).
     let onDrop: (UUID, TodoItem?) -> Void
     /// Text or a link dragged in from another app, to add here.
     var onExternalDrop: ((String) -> Void)?
     @ViewBuilder var accessory: () -> Accessory
 
-    @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isTargeted = false
     @State private var targetedRow: UUID?
@@ -78,30 +81,13 @@ struct BoardColumn<Accessory: View>: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
-            Text(title)
-                .textStyle(Theme.Fonts.Role.columnTitle, tracking: Theme.Tracking.masthead)
-                .foregroundStyle(Theme.Colors.ink)
-                // Wraps (then shrinks a little) at large sizes in a narrow
-                // column rather than clipping "This week".
-                .lineLimit(2)
-                .minimumScaleFactor(0.7)
-                .accessibilityAddTraits(.isHeader)
-            Text(subline)
-                .textStyle(Theme.Fonts.Role.meta)
-                .foregroundStyle(Theme.Colors.inkMuted)
-                .lineLimit(2)
-                .padding(.top, 10)
-        }
-        .frame(maxWidth: .infinity, minHeight: headerHeight, maxHeight: headerHeight, alignment: .bottomLeading)
-        .overlay(alignment: .topTrailing) {
-            accessory()
-                .padding(.top, Theme.Space.s3)
-                .padding(.trailing, Theme.Space.s3)
-        }
-        .padding(.horizontal, Theme.Wide.gutter)
-        .padding(.bottom, 18)
+        BoardColumnHeader(
+            title: title,
+            subline: subline,
+            onRename: onRename,
+            isRenaming: isRenaming,
+            accessory: accessory
+        )
     }
 
     private func row(_ todo: TodoItem) -> some View {
@@ -110,7 +96,8 @@ struct BoardColumn<Accessory: View>: View {
             subtasks: subtasks[todo.id] ?? [],
             actions: actions,
             isSelected: selectedId == todo.id,
-            lists: lists
+            lists: lists,
+            onSelect: { onSelect(todo) }
         ) {
             onOpen(todo)
         }
@@ -157,6 +144,7 @@ extension BoardColumn where Accessory == EmptyView {
         overnight: (text: String, dismiss: () -> Void)?,
         empty: (text: String, link: (text: String, action: () -> Void)?),
         composer: Composer,
+        onSelect: @escaping (TodoItem) -> Void,
         onOpen: @escaping (TodoItem) -> Void,
         onDrop: @escaping (UUID, TodoItem?) -> Void,
         onExternalDrop: ((String) -> Void)? = nil
@@ -164,7 +152,8 @@ extension BoardColumn where Accessory == EmptyView {
         self.init(
             list: list, title: title, subline: subline, rows: rows, subtasks: subtasks, lists: lists,
             actions: actions, selectedId: selectedId, isTinted: false, overnight: overnight, empty: empty,
-            composer: composer, onOpen: onOpen, onDrop: onDrop, onExternalDrop: onExternalDrop
+            composer: composer, onSelect: onSelect, onOpen: onOpen, onDrop: onDrop,
+            onExternalDrop: onExternalDrop
         ) { EmptyView() }
     }
 }

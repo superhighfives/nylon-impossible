@@ -18,10 +18,14 @@ struct TodoRow: View {
     let todo: TodoItem
     let subtasks: [TodoItem]
     let actions: TodoActions
-    /// The keyboard's current row on the iPad board.
+    /// The board's selection (iPad and Mac).
     var isSelected = false
     /// Every list in display order, for VoiceOver's Move actions.
     var lists: [TodoListModel] = []
+    /// The board: a click on an unselected row selects it; a click on the
+    /// selection (so a double click too) opens it. Nil on the phone, where a
+    /// tap opens.
+    var onSelect: (() -> Void)?
     let onOpen: () -> Void
 
     @Environment(\.isWideLayout) private var isWide
@@ -43,7 +47,7 @@ struct TodoRow: View {
             .padding(.trailing, -6)
             .padding(.vertical, -10)
 
-            Button(action: onOpen) {
+            Button(action: tap) {
                 VStack(alignment: .leading, spacing: Theme.Space.s1) {
                     Text(todo.title)
                         .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: -0.005)
@@ -87,6 +91,14 @@ struct TodoRow: View {
         .sensoryFeedback(.impact(weight: .medium), trigger: checked) { _, isChecked in isChecked }
     }
 
+    private func tap() {
+        if let onSelect, !isSelected {
+            onSelect()
+        } else {
+            onOpen()
+        }
+    }
+
     private func perform(_ action: TodoRowAccessibility.Action) {
         switch action {
         case .markDone, .markNotDone: actions.toggleDone(todo)
@@ -96,12 +108,17 @@ struct TodoRow: View {
         }
     }
 
-    /// The keyboard's row is tinted with the soft fill, as on wide web;
-    /// hover tints it more lightly. No ring: yellow is kept for focus rings
-    /// on controls, and a row isn't one.
+    /// The board's selection: the soft fill plus a 2pt ring in ink, as on
+    /// wide web; it's the row's only focus indicator. Hover tints lightly.
+    /// Ink, not yellow: yellow on white is about 1.3:1.
     private var highlight: some View {
         RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
             .fill(Theme.Colors.fill)
+            .overlay {
+                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                    .strokeBorder(Theme.Colors.ink, lineWidth: 2)
+                    .opacity(isSelected && isWide ? 1 : 0)
+            }
             .opacity(isSelected ? 1 : (isHovering ? 0.6 : 0))
             .padding(.horizontal, -10)
             .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isHovering)

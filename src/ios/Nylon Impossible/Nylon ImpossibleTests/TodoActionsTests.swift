@@ -196,6 +196,48 @@ struct TodoActionsTests {
         #expect(fixture.actions.toasts.current?.text == "Done")
     }
 
+    @Test("deleting a list hides it now, names it and its todos, and commits when the toast goes")
+    func deleteListDeferred() throws {
+        let fixture = try makeFixture()
+        let studio = TodoListModel(id: "studio", userId: "u1", name: "Studio", kind: "custom", systemKind: nil)
+        var committed = 0
+        fixture.actions.deleteList(studio, todoCount: 3) { finished in
+            committed += 1
+            finished()
+        }
+        #expect(fixture.actions.pendingListDeletes.contains("studio"))
+        #expect(fixture.actions.toasts.current?.text == "Deleted “Studio” and 3 todos")
+        #expect(committed == 0)
+
+        fixture.actions.toasts.expire()
+        #expect(committed == 1)
+        #expect(fixture.actions.pendingListDeletes.isEmpty)
+    }
+
+    @Test("Undo on a list delete brings it back without deleting it")
+    func undoDeleteList() throws {
+        let fixture = try makeFixture()
+        let studio = TodoListModel(id: "studio", userId: "u1", name: "Studio", kind: "custom", systemKind: nil)
+        var committed = false
+        fixture.actions.deleteList(studio, todoCount: 0) { _ in committed = true }
+        #expect(fixture.actions.toasts.current?.text == "Deleted “Studio”")
+        fixture.actions.toasts.performAction()
+        fixture.actions.toasts.expire()
+        #expect(!committed)
+        #expect(fixture.actions.pendingListDeletes.isEmpty)
+    }
+
+    @Test("deleting a list that's already pending doesn't commit the first request")
+    func deleteListOnce() throws {
+        let fixture = try makeFixture()
+        let studio = TodoListModel(id: "studio", userId: "u1", name: "Studio", kind: "custom", systemKind: nil)
+        var committed = 0
+        fixture.actions.deleteList(studio, todoCount: 1) { _ in committed += 1 }
+        fixture.actions.deleteList(studio, todoCount: 1) { _ in committed += 1 }
+        #expect(committed == 0)
+        #expect(fixture.actions.pendingListDeletes.contains("studio"))
+    }
+
     @Test("move goes to the end of the target list and Undo moves it back")
     func moveAndUndo() throws {
         let fixture = try makeFixture()

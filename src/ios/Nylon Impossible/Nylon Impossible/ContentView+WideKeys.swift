@@ -76,8 +76,7 @@ extension ContentView {
         case .newTodo:
             perform(.new)
         case .newList:
-            newListName = ""
-            showsNewList = true
+            newListAnchor = .toolbar
         case .showList(let kind):
             guard let list = orderedLists.first(where: { $0.systemKind == kind }) else { return }
             focusColumn(list.id)
@@ -100,7 +99,9 @@ extension ContentView {
     func carryAcross(toWide wide: Bool) {
         if wide {
             if showsAccount {
-                widePanel = accountPath.last
+                // Done is the board's fourth column already; Settings comes
+                // across as the board's sheet.
+                if accountPath.last == .settings { widePanel = .settings }
                 showsAccount = false
                 accountPath = []
             }

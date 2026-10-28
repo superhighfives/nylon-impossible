@@ -21,22 +21,26 @@ extension ContentView {
         return count
     }
 
+    /// New todo (quick add) and New list, in place of New todo and Done:
+    /// Done is the board's fourth column now.
     @ToolbarContentBuilder
     var macToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
-                run(.newTodo)
+                showsQuickAdd = true
             } label: {
                 Label("New todo", systemImage: Theme.Icon.add)
             }
             .help("New todo (⌘N)")
+            .popover(isPresented: $showsQuickAdd, arrowEdge: .bottom) { quickAdd }
 
             Button {
-                run(.showDone)
+                newListAnchor = .toolbar
             } label: {
-                Label("Done", systemImage: Theme.Icon.doneCircle)
+                Label("New list", systemImage: Theme.Icon.newList)
             }
-            .help("Show done (⇧⌘D)")
+            .help("New list (⇧⌘N)")
+            .popover(isPresented: newListPopoverBinding, arrowEdge: .bottom) { newListForm }
         }
     }
 }

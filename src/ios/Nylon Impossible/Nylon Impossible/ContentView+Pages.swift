@@ -79,7 +79,7 @@ extension ContentView {
                         Label("Rename", systemImage: Theme.Icon.edit)
                     }
                     Button(role: .destructive) {
-                        deletingList = list
+                        deleteListWithUndo(list)
                     } label: {
                         Label("Delete list", systemImage: Theme.Icon.delete)
                     }

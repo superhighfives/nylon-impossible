@@ -2,9 +2,9 @@
 //  ContentView+Panel.swift
 //  Nylon Impossible
 //
-//  The board's trailing panel, what it offers the menu bar, and drops from
-//  other apps. Split from ContentView+Wide.swift; shared by the iPad and the
-//  Mac.
+//  The fourth column's detail, what the board offers the menu bar, and drops
+//  from other apps. Split from ContentView+Wide.swift; shared by the iPad
+//  and the Mac.
 //
 
 import SwiftUI
@@ -15,49 +15,107 @@ private struct PanelTodoState: Equatable {
 }
 
 extension ContentView {
-    // MARK: - Panel
+    // MARK: - Detail
 
-    /// The board with the detail, Done or Settings in an inspector.
-    ///
-    /// Everything the panel shows is read out here, in the board's own update,
-    /// and handed in as values: on macOS the inspector is a separate hosting
-    /// view with its own view graph (see `ContentRoot`).
-    var boardWithPanel: some View {
-        let lists = orderedLists
-        let todo = detailTodo
-        let route = widePanel
-        let showsCalendar = showsDueCalendar
-        let apiService = syncService.apiService
-        let userId = authService.userId
-        let actions = actions
-        return board
-            .inspector(isPresented: panelBinding) {
-                WidePanel(
-                    todo: todo,
-                    route: route,
-                    lists: lists,
-                    actions: actions,
-                    apiService: apiService,
-                    userId: userId,
-                    showsCalendar: showsCalendar,
-                    onClose: closePanel
-                )
-                .overlay(alignment: .leading) { VerticalHairline() }
-                .inspectorColumnWidth(min: 340, ideal: Theme.Wide.panelWidth, max: 520)
+    /// The board, with what the fourth column's detail needs from outside
+    /// it: checking off the todo it shows puts it away, as the row leaving
+    /// the board would (opening one that's already done changes the id too,
+    /// so it stays), and the detail follows the selection.
+    var boardWithDetail: some View {
+        board
+            .onChange(of: PanelTodoState(id: detailTodo?.id, done: detailTodo?.isEffectivelyCompleted ?? false)) { old, new in
+                if new.done, !old.done, old.id == new.id { closeDetail() }
             }
-            // Checking off the todo the panel is showing puts the panel away,
-            // as the row leaving the board would. Opening one that's already
-            // done (Show Done) changes the id too, so it stays.
-            .onChange(of: PanelTodoState(id: todo?.id, done: todo?.isEffectivelyCompleted ?? false)) { old, new in
-                if new.done, !old.done, old.id == new.id { closePanel() }
-            }
+            .onChange(of: selectedTodoId) { _, id in followSelection(id) }
     }
 
-    var panelBinding: Binding<Bool> {
-        Binding(
-            get: { detailTodo != nil || widePanel != nil },
-            set: { if !$0 { closePanel() } }
-        )
+    // MARK: - Panel and fourth column
+
+    func showPanel(_ route: AccountRoute) {
+        switch route {
+        case .done:
+            showDone()
+        case .settings:
+            #if os(macOS)
+            // A Mac has a Settings window (⌘,); the sidebar's Settings opens it.
+            if screenRoute == nil {
+                openSettings()
+                return
+            }
+            #endif
+            widePanel = .settings
+        }
+    }
+
+    /// Done in the fourth column: close the open todo and your list.
+    func showDone() {
+        detailTodo = nil
+        openColumnId = nil
+        showsDueCalendar = false
+        boardFocused = true
+    }
+
+    /// Close the open todo; the fourth column goes back to what it covered.
+    func closeDetail() {
+        detailTodo = nil
+        showsDueCalendar = false
+        boardFocused = true
+    }
+
+    // MARK: - Selection
+
+    /// Select a todo: the board's keys act on it, and an open detail
+    /// follows it (see `followSelection`).
+    func selectWide(_ todo: TodoItem) {
+        selectedTodoId = todo.id
+        let column = todo.isCompleted
+            ? Self.doneColumn
+            : boardColumns.first { $0.id.lowercased() == todo.listKey?.lowercased() }?.id
+        if let column {
+            lastSelected[column] = todo.id
+            if column != Self.doneColumn { focusedColumnId = column }
+        }
+        boardFocused = true
+    }
+
+    /// Open a todo in the fourth column (a second click, or Return).
+    func openWide(_ todo: TodoItem) {
+        selectWide(todo)
+        showsDueCalendar = false
+        detailTodo = todo
+    }
+
+    /// While a todo is open, the detail follows the selection.
+    func followSelection(_ id: UUID?) {
+        guard detailTodo != nil, let id, detailTodo?.id != id,
+              let todo = todos.first(where: { $0.id == id && !$0.isCompleted }) else { return }
+        showsDueCalendar = false
+        detailTodo = todo
+    }
+
+    /// Go into a column: select its last-selected todo, or its first.
+    func focusColumn(_ id: String) {
+        focusedColumnId = id
+        scrollColumnId = id
+        boardFocused = true
+        guard let list = orderedLists.first(where: { $0.id == id }) else { return }
+        let ids = rows(list).map(\.id)
+        selectedTodoId = lastSelected[id].flatMap { ids.contains($0) ? $0 : nil } ?? ids.first
+    }
+
+    /// One of your lists: open it in the fourth column and go into it.
+    /// Clicking the open list again does the same; it doesn't close it.
+    func openCollection(_ list: TodoListModel) {
+        detailTodo = nil
+        openColumnId = list.id
+        focusColumn(list.id)
+    }
+
+    func rename(_ list: TodoListModel, to name: String) {
+        renameText = name
+        renamingList = list
+        commitRename()
+        renamingList = nil
     }
 
     // MARK: - Menus
