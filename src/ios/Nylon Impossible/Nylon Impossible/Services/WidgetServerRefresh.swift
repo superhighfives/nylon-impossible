@@ -173,8 +173,9 @@ enum WidgetServerRefresh {
     /// `operation`'s result, or nil if it hasn't finished within `limit`.
     /// Returns at the deadline even if `operation` ignores cancellation (a
     /// Clerk client refresh might), which a task group wouldn't: it waits for
-    /// every child before returning.
-    static func withDeadline<T>(
+    /// every child before returning. The timer runs off the main actor, so a
+    /// busy main actor can't hold the deadline up.
+    nonisolated static func withDeadline<T>(
         _ limit: Duration,
         operation: @escaping () async -> T?
     ) async -> T? {
@@ -183,11 +184,11 @@ enum WidgetServerRefresh {
             let work = Task { @MainActor in
                 await operation()
             }
-            let timer = Task { @MainActor in
+            let timer = Task.detached {
                 try? await Task.sleep(for: limit)
                 if gate.resume(nil) { work.cancel() }
             }
-            Task { @MainActor in
+            Task.detached {
                 let value = await work.value
                 timer.cancel()
                 gate.resume(value)
@@ -196,7 +197,10 @@ enum WidgetServerRefresh {
     }
 
     /// Resumes its continuation exactly once, whichever side gets there first.
-    private final class ResumeOnce<T> {
+    /// The timer and the work resume it from different threads, so a lock
+    /// guards it.
+    private nonisolated final class ResumeOnce<T>: @unchecked Sendable {
+        private let lock = NSLock()
         private var continuation: CheckedContinuation<T?, Never>?
 
         init(_ continuation: CheckedContinuation<T?, Never>) {
@@ -206,8 +210,11 @@ enum WidgetServerRefresh {
         /// True if this call was the one that resumed it.
         @discardableResult
         func resume(_ value: T?) -> Bool {
-            guard let continuation else { return false }
+            lock.lock()
+            let continuation = self.continuation
             self.continuation = nil
+            lock.unlock()
+            guard let continuation else { return false }
             continuation.resume(returning: value)
             return true
         }

@@ -247,11 +247,11 @@ struct WidgetServerRefreshTests {
         #expect(value == 42)
     }
 
-    /// Generous margins: the suite runs in parallel on a shared main actor,
-    /// so the deadline's own hop back to it can be held up by other tests.
+    /// Runs off the main actor, as the deadline does: other suites share the
+    /// main actor in parallel and held it for seconds on CI's iPad runner, so
+    /// a main-actor test measured the queue, not the deadline.
     @Test("A fetch that ignores cancellation still gives up at the deadline")
-    @MainActor
-    func deadlineGivesUp() async {
+    nonisolated func deadlineGivesUp() async {
         let start = ContinuousClock.now
         let value: Int? = await WidgetServerRefresh.withDeadline(.milliseconds(100)) {
             // A detached sleep can't be cancelled from here, like a Clerk
