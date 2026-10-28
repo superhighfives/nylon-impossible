@@ -9,6 +9,8 @@
 
 A todo app for web and iOS. Fast, simple, and in sync everywhere you are.
 
+What Nylon is, and the decisions that stay put, are in [PRINCIPLES.md](PRINCIPLES.md).
+
 > **Note:** This is an exploratory project, not a production template. It was built to experiment with Cloudflare's developer platform — specifically Durable Objects (for WebSocket-based real-time sync), D1 (SQLite at the edge), and the Workers runtime in general. Expect rough edges, opinionated choices, and things that exist because they were interesting to build.
 
 ## Features
