@@ -247,19 +247,27 @@ struct WidgetServerRefreshTests {
         #expect(value == 42)
     }
 
-    /// Generous margins: the suite runs in parallel on a shared main actor,
-    /// so the deadline's own hop back to it can be held up by other tests.
+    /// Checks order, not elapsed time: the suite runs in parallel on a shared
+    /// main actor, and the deadline's hop back to it has been held up past
+    /// any wall-clock bound we tried. Returning before the operation finishes
+    /// is what a wait-for-every-child task group couldn't do.
     @Test("A fetch that ignores cancellation still gives up at the deadline")
     @MainActor
     func deadlineGivesUp() async {
-        let start = ContinuousClock.now
+        let operation = Finished()
         let value: Int? = await WidgetServerRefresh.withDeadline(.milliseconds(100)) {
             // A detached sleep can't be cancelled from here, like a Clerk
             // client refresh that doesn't check for cancellation.
-            await Task.detached { try? await Task.sleep(for: .seconds(10)) }.value
+            await Task.detached { try? await Task.sleep(for: .seconds(60)) }.value
+            operation.done = true
             return 1
         }
         #expect(value == nil)
-        #expect(ContinuousClock.now - start < .seconds(8))
+        #expect(!operation.done)
     }
+}
+
+@MainActor
+private final class Finished {
+    var done = false
 }
