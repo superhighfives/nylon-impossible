@@ -178,6 +178,81 @@ struct MacSignInTests {
     }
 }
 
+/// A sign-in handed to Chrome can stall with no page and no error, so the
+/// sheet offers a way out instead of waiting forever.
+@Suite("Mac sign-in handoff")
+struct MacSignInHandoffTests {
+    private let start = Date(timeIntervalSinceReferenceDate: 1_000)
+
+    @Test("Safari is recognised by bundle ID, or by name when that's all there is")
+    func classifiesSafari() {
+        #expect(MacSignInHandoff.browser(bundleIdentifier: "com.apple.Safari", name: "Safari") == .safari)
+        #expect(MacSignInHandoff.browser(bundleIdentifier: "com.apple.SafariTechnologyPreview", name: "Safari Technology Preview") == .safari)
+        #expect(MacSignInHandoff.browser(bundleIdentifier: nil, name: "Safari") == .safari)
+    }
+
+    @Test("Any other default browser is named")
+    func classifiesOthers() {
+        #expect(MacSignInHandoff.browser(bundleIdentifier: "com.google.Chrome", name: "Google Chrome") == .other(name: "Google Chrome"))
+        #expect(MacSignInHandoff.browser(bundleIdentifier: "com.google.Chrome", name: nil) == .other(name: "your browser"))
+        #expect(MacSignInHandoff.browser(bundleIdentifier: nil, name: nil) == .unknown)
+    }
+
+    @Test("Help stays hidden until the sign-in has run for a while")
+    func helpAfterDelay() {
+        var handoff = MacSignInHandoff(browser: .other(name: "Google Chrome"), startedAt: start)
+        #expect(!handoff.showsHelp)
+        handoff.update(now: start.addingTimeInterval(MacSignInHandoff.helpDelay - 1))
+        #expect(!handoff.showsHelp)
+        handoff.update(now: start.addingTimeInterval(MacSignInHandoff.helpDelay))
+        #expect(handoff.showsHelp)
+    }
+
+    @Test("Coming back to the app after the browser took focus shows help")
+    func helpOnReturn() {
+        var handoff = MacSignInHandoff(browser: .other(name: "Google Chrome"), startedAt: start)
+        // Becoming active without having left (the system prompt closing)
+        // isn't a return.
+        handoff.appDidBecomeActive()
+        #expect(!handoff.showsHelp)
+        handoff.appDidResignActive()
+        #expect(!handoff.showsHelp)
+        handoff.appDidBecomeActive()
+        #expect(handoff.showsHelp)
+    }
+
+    @Test("With Safari, only the delay shows help")
+    func safariIgnoresReturn() {
+        var handoff = MacSignInHandoff(browser: .safari, startedAt: start)
+        handoff.appDidResignActive()
+        handoff.appDidBecomeActive()
+        #expect(!handoff.showsHelp)
+        handoff.update(now: start.addingTimeInterval(MacSignInHandoff.helpDelay))
+        #expect(handoff.showsHelp)
+    }
+
+    @Test("Only a non-Safari default gets the browser-specific way out")
+    func messages() {
+        let chrome = MacSignInHandoff(browser: .other(name: "Google Chrome"), startedAt: start)
+        #expect(chrome.suggestsSafari)
+        #expect(chrome.helpMessage.contains("Google Chrome"))
+        #expect(chrome.helpMessage.contains("Safari"))
+        #expect(chrome.refusedMessage.contains("Google Chrome"))
+
+        for browser in [MacSignInHandoff.Browser.safari, .unknown] {
+            let handoff = MacSignInHandoff(browser: browser, startedAt: start)
+            #expect(!handoff.suggestsSafari)
+            #expect(!handoff.helpMessage.contains("default browser"))
+        }
+    }
+
+    @Test("The settings link opens Desktop & Dock")
+    func settingsURL() {
+        #expect(MacSignInHandoff.defaultBrowserSettingsURL.scheme == "x-apple.systempreferences")
+        #expect(MacSignInHandoff.defaultBrowserSettingsURL.absoluteString.hasSuffix("com.apple.Desktop-Settings.extension"))
+    }
+}
+
 @Suite("Today widget on the Mac desktop")
 struct MacWidgetTests {
     private func todos(_ count: Int, meta: Bool = false) -> [WidgetTodo] {

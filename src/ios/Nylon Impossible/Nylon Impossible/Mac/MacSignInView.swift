@@ -13,6 +13,11 @@
 //  Once Clerk has a session, `RootView` swaps to the board and persists the
 //  token to the shared Keychain item, the same as on iOS.
 //
+//  macOS hands the session to the default browser. When that's Chrome, the
+//  handoff can stall with no page and no error, so the sheet watches for the
+//  signs of that (`MacSignInHandoff`) and offers Start Over and a way to make
+//  Safari the default, rather than waiting forever.
+//
 
 #if os(macOS)
 import AuthenticationServices
@@ -39,6 +44,8 @@ struct MacSignInView: View {
     /// The sign-in in flight. Cancelling it closes Clerk's browser session, so
     /// Cancel (or the sheet going away) never leaves one waiting.
     @State private var signInTask: Task<Void, Never>?
+    /// Where the sign-in in flight went, and whether to offer help with it.
+    @State private var handoff: MacSignInHandoff?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s4) {
@@ -86,6 +93,10 @@ struct MacSignInView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if working != nil, let handoff, handoff.showsHelp {
+                stalledHelp(handoff)
+            }
+
             if let message {
                 Text(message)
                     .textStyle(Theme.Fonts.Role.meta)
@@ -105,6 +116,38 @@ struct MacSignInView: View {
         .padding(Theme.Space.s6)
         .frame(width: 380)
         .onDisappear { signInTask?.cancel() }
+        .task(id: working) {
+            guard working != nil else { return }
+            try? await Task.sleep(for: .seconds(MacSignInHandoff.helpDelay))
+            guard !Task.isCancelled else { return }
+            handoff?.update(now: .now)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)) { _ in
+            handoff?.appDidResignActive()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            handoff?.appDidBecomeActive()
+        }
+    }
+
+    /// Shown once a sign-in looks stuck: cancel the session in place (the
+    /// sheet stays, so the person can pick again) and, when the default
+    /// browser isn't Safari, a way to change it.
+    private func stalledHelp(_ handoff: MacSignInHandoff) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s2) {
+            Text(handoff.helpMessage)
+                .textStyle(Theme.Fonts.Role.meta)
+                .foregroundStyle(Theme.Colors.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: Theme.Space.s2) {
+                Button("Start Over") { signInTask?.cancel() }
+                if handoff.suggestsSafari {
+                    Button("Default Browser Settings…") {
+                        NSWorkspace.shared.open(MacSignInHandoff.defaultBrowserSettingsURL)
+                    }
+                }
+            }
+        }
     }
 
     private var lastUsedBadge: some View {
@@ -121,10 +164,13 @@ struct MacSignInView: View {
         guard working == nil else { return }
         working = provider
         message = nil
+        let handoff = MacSignInHandoff(browser: MacSignInHandoff.currentDefaultBrowser(), startedAt: .now)
+        self.handoff = handoff
         signInTask = Task {
             defer {
                 working = nil
                 signInTask = nil
+                self.handoff = nil
             }
             do {
                 let result = try await clerk.auth.signInWithOAuth(provider: provider)
@@ -140,6 +186,11 @@ struct MacSignInView: View {
                 message = error.longMessage ?? error.message ?? "That didn’t work. Try again."
             } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
                 // The user closed the web sign-in sheet.
+            } catch let error as ASWebAuthenticationSessionError
+                where error.code == .presentationContextInvalid || error.code == .presentationContextNotProvided {
+                // The browser refused the session (Chrome does when it can't
+                // open a window for its profile).
+                message = handoff.refusedMessage
             } catch {
                 message = "Couldn’t sign in. Check your connection and try again."
             }
