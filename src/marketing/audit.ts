@@ -453,6 +453,10 @@ async function keyboardWalk(page: Page) {
   await page.goto(BASE);
   await page.getByText(READY).first().waitFor();
   await hideDevtools(page);
+  // Settled styles, so focused and blurred can be compared straight away.
+  await page.addStyleTag({
+    content: "*, *::before, *::after { transition: none !important; }",
+  });
   await sleep(500);
   const stops: { name: string; visible: boolean }[] = [];
   for (let i = 0; i < 40; i++) {
@@ -461,14 +465,38 @@ async function keyboardWalk(page: Page) {
       await page.evaluate(() => {
         const el = document.activeElement as HTMLElement | null;
         if (!el || el === document.body) return { name: "(body)", visible: false };
-        // The ring is on the field, or on its container for the composers.
-        let visible = false;
-        let node: HTMLElement | null = el;
-        for (let depth = 0; node && depth < 4 && !visible; depth++) {
-          const cs = getComputedStyle(node);
-          visible = cs.outlineStyle !== "none" && cs.outlineWidth !== "0px";
-          node = node.parentElement;
+        // Focus is visible when something changes with it: an outline (the
+        // yellow ring), a box-shadow (a row's selection ring, on its
+        // container) or a background (the wide board's soft focus), on the
+        // element or one of its near ancestors. Compare focused with blurred.
+        const chain: HTMLElement[] = [];
+        for (let n: HTMLElement | null = el; n && chain.length < 5; n = n.parentElement) {
+          chain.push(n);
         }
+        // No named functions in here: tsx would wrap them in a `__name`
+        // helper that doesn't exist in the page.
+        const looks: string[][] = [];
+        for (let phase = 0; phase < 2; phase++) {
+          if (phase === 1) el.blur();
+          looks.push(
+            chain.map((n) => {
+              const cs = getComputedStyle(n);
+              const outline =
+                cs.outlineStyle !== "none" && cs.outlineWidth !== "0px"
+                  ? `${cs.outlineStyle} ${cs.outlineColor}`
+                  : "";
+              return `${outline}|${cs.boxShadow}|${cs.backgroundColor}`;
+            }),
+          );
+        }
+        el.focus({ focusVisible: true } as FocusOptions);
+        const [focused, blurred] = looks;
+        // A board row's indicator is the selection ring on its container,
+        // which stays after blur because the selection does.
+        const row = el.closest<HTMLElement>("[data-row-container]");
+        const visible =
+          focused.some((s, i) => s !== blurred[i]) ||
+          (!!row && getComputedStyle(row).boxShadow !== "none");
         const name =
           el.getAttribute("aria-label") ??
           (el.textContent ?? "").trim().slice(0, 30) ??

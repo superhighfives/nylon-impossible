@@ -100,6 +100,7 @@ function DoneRow({
   return (
     <li>
       <div
+        data-row-container
         className={`-mx-2.5 flex items-start gap-3 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
           selected
             ? "bg-n-fill ring-2 ring-n-ink ring-inset"
