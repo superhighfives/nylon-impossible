@@ -2,6 +2,8 @@
 
 This is the root agent guide for the **Nylon Impossible** monorepo. Read this before making changes.
 
+For what the app is and the product decisions that stay put (principles, settled choices, vocabulary, copy and visual rules), read [PRINCIPLES.md](PRINCIPLES.md) before any UI or copy change.
+
 ## Project Overview
 
 Nylon Impossible is a cross-platform todo application with three clients:

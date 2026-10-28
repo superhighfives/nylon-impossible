@@ -3,6 +3,9 @@
 Baseline rules live in [superhighfives/control-room](https://github.com/superhighfives/control-room/blob/main/BASELINE.md).
 This file is the repo-specific part.
 
+Read [PRINCIPLES.md](PRINCIPLES.md) before any UI or copy change. Its Settled
+table needs a written reason to reopen.
+
 ## Layout
 
 Bun workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
