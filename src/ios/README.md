@@ -234,8 +234,11 @@ the few UIKit/AppKit touch points shared code needs go through
 - **Sign-in.** ClerkKitUI is iOS-only, so `MacSignInView` is a small view on
   ClerkKit with **Continue with Google** and **Continue with GitHub** — the
   only strategies the production Clerk instance enables — via
-  `signInWithOAuth` in an `ASWebAuthenticationSession`. `KeychainHelper` uses
-  the data protection keychain on macOS so the shared access group applies.
+  `signInWithOAuth` in an `ASWebAuthenticationSession`. macOS hands that
+  session to the default browser, and with Chrome it can stall with no page
+  and no error; `MacSignInHandoff` spots a likely stall and offers Start Over
+  and a link to the default-browser setting. `KeychainHelper` uses the data
+  protection keychain on macOS so the shared access group applies.
   ClerkKit's own items stay in the login keychain, tied to the signature of
   the build that wrote them, so DEBUG builds use the service
   `….Nylon-Impossible.debug`, and unsigned builds and `-NylonScreen` runs get
