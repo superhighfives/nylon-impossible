@@ -2,7 +2,7 @@
 title: Refresh the Today widget from the server
 status: Backlog
 created: 2026-10-25
-updated: 2026-10-25
+updated: 2026-10-27
 ---
 
 # Refresh the Today widget from the server
@@ -22,20 +22,13 @@ reload at local midnight and otherwise waits for the app to call
 closed after the redesign (#386, #398–#408) left it conflicting with main.
 Its findings carry over:
 
-- **Getting a token inside the widget is the hard part.** ClerkKit stores its
-  login under the app's bundle id in the `.shared` keychain access group, and
-  the widget already has that entitlement. That leaves two ways to get a
-  fresh token:
-  - **Link ClerkKit into the widget target** and call
-    `Clerk.configure(..., keychainConfig: .init(service: "com.superhighfives.Nylon-Impossible"))`,
-    then `auth.getToken()`. ClerkKit 1.0.1 calls `UIApplication.shared`
-    without a guard in three places, so it may not build in an app extension.
-    Check that before anything else.
-  - **Read ClerkKit's keychain items directly** (`clerkDeviceToken`,
-    `cachedClient`) and
-    `POST {frontend API}/v1/client/sessions/{id}/tokens?_is_native=true`.
-    This adds no dependency, but those items are ClerkKit internals, so any
-    ClerkKit upgrade can break it.
+- **Getting a token inside the widget was the hard part. On iOS, #462
+  solved it.** The widget now links ClerkKit and shares the app's session
+  through `SharedClerk` (the app's keychain service plus the shared access
+  group), and `SharedClerk.freshToken()` mints a token in whatever process
+  it runs in. `BackgroundSyncService` already uses it for the widget's
+  checkbox, so a server fetch can call the same thing. The spike's other
+  idea, reading ClerkKit's keychain items directly, isn't needed.
 - **Fetch with a deadline, and fall back to the local store on failure.** The
   spike gave `/todos` + `/lists` 8 seconds. Any failure meant the widget
   showed what it shows today.
@@ -60,12 +53,15 @@ Its findings carry over:
   token requests may need an assertion that the widget can't produce.
 - **Widget reload budget.** WidgetKit throttles reloads. Every 30 minutes is
   within the budget, but measure how often it actually happens on a device.
-- **The Mac widget.** The same approach should work under
-  `Nylon Widget-macOS.entitlements`, but ClerkKit uses the legacy keychain on
-  macOS, so check that path separately.
+- **The Mac widget.** #462 left the Mac out: its session stays in the legacy
+  login keychain, not a shared access group, so the Mac widget can't mint a
+  token. It only has the saved token, which now carries its real expiry
+  (about 60 seconds). A server refresh on the Mac means either moving its
+  session into an access group (a move between keychains; see #411 and #414
+  for why that's delicate) or leaving the Mac widget on the local store,
+  which the running Mac app keeps current anyway.
 
 ## Related
 
-- The stored token that the extensions and background sync use assumes a
-  50-minute lifetime. See #460. Whatever token
-  approach this plan settles on may also fix that.
+- #460 (closed by #462): the stored token assumed a 50-minute lifetime.
+  #462's `SharedClerk` is the token approach this plan builds on.
