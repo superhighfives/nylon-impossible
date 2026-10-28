@@ -583,8 +583,9 @@ export function WideApp({
       const { command, arg } = hit;
       if (!command.anywhere && isTypingTarget(e.target)) return;
       if (command.admin && !canSendFeedback) return;
-      // Settings and Send feedback are modal; leave their keys alone.
-      if ((settings || feedback) && !command.anywhere) return;
+      // Settings and Send feedback are modal; leave their keys alone, ⌘K
+      // included, or the palette would act on the board behind them.
+      if (settings || feedback) return;
       // Keys that act on a todo act on the selection while focus is on the
       // board (or nowhere), not from the sidebar or toolbar.
       if (command.needsSelection) {
