@@ -2,10 +2,12 @@ import { type BoardView, boardUrl, dueLabel } from "@nylon-impossible/shared";
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
 import {
+  ADDON_DONE_VALUE,
   type AddonAdded,
   type AddonListOption,
   type AddonMessage,
   buildContextualCard,
+  doneInputName,
   QUICK_ADD_INPUT,
   QUICK_ADD_LIST_INPUT,
 } from "../../lib/addon-cards";
@@ -230,8 +232,12 @@ export async function gmailAddonUndoAdd(c: Context<Env>) {
 // done. A repeat rolls forward instead, and the toast says when it's next and,
 // if it left the list, where it went — the apps' "Done · next Mon, in This
 // week". A todo ticked in the last few minutes is still on the card, checked;
-// unticking it marks it not done ("Back in Today"). The flip goes by what's
-// stored, not the checkbox, so a stale card can't tick something twice.
+// unticking it marks it not done ("Back in Today").
+//
+// A checked box sends its value, so a tick always means done: ticking twice,
+// or ticking on an old card something already finished elsewhere, leaves it
+// done rather than reopening it. When the box's state doesn't come through
+// (unticked, or a host that leaves it out), the toggle flips what's stored.
 export async function gmailAddonToggle(c: Context<Env>) {
   const claims = c.get("googleClaims");
   const db = getDb(c.env.DB);
@@ -249,15 +255,18 @@ export async function gmailAddonToggle(c: Context<Env>) {
     .select({ listId: todos.listId, completed: todos.completed })
     .from(todos)
     .where(and(eq(todos.id, todoId), eq(todos.userId, resolved.userId)));
+  const ticked =
+    readFormInput(event, doneInputName(todoId)) === ADDON_DONE_VALUE;
+  const done = ticked || !before?.completed;
   const updated = await setTodoCompleted(
     db,
     c.env,
     resolved.userId,
     todoId,
-    !before?.completed,
+    done,
   );
 
-  if (before?.completed && updated) {
+  if (!done && updated) {
     const listId = updated.listId;
     return refreshedHomepage(
       c,

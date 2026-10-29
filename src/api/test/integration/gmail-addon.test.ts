@@ -834,6 +834,49 @@ describe("Gmail add-on", () => {
       expect(row.completed).toBe(false);
     });
 
+    it("a tick on a stale card leaves a todo finished elsewhere done", async () => {
+      await linkUser();
+      const todoId = "56565656-5656-5656-5656-565656565656";
+      // Finished on web or iOS a moment ago; this card still shows it open.
+      await seedTodo(todoId, "user_test_123", {
+        title: "Done elsewhere",
+        completed: true,
+      });
+      const token = await idToken();
+      const tick = () =>
+        post("/gmail-addon/actions/toggle", token, {
+          commonEventObject: {
+            parameters: { todoId },
+            formInputs: {
+              [`done_${todoId}`]: { stringInputs: { value: ["done"] } },
+            },
+          },
+        });
+
+      // Ticking says done, and doing it twice changes nothing.
+      for (let i = 0; i < 2; i++) {
+        const body = await (await tick()).json<any>();
+        expect(body.renderActions.action.notification.text).toBe("Done");
+        const [row] = await getDb(env.DB)
+          .select()
+          .from(todos)
+          .where(eq(todos.id, todoId));
+        expect(row.completed).toBe(true);
+      }
+    });
+
+    it("gives each row's checkbox a value, so a tick says what it means", async () => {
+      await linkUser();
+      const todoId = "57575757-5757-5757-5757-575757575757";
+      await seedTodo(todoId, "user_test_123", { title: "Row" });
+      const res = await post("/gmail-addon/homepage", await idToken());
+      const card = (await res.json<any>()).action.navigations[0].pushCard;
+      const control = section(card, "Today").widgets[0].decoratedText
+        .switchControl;
+      expect(control.name).toBe(`done_${todoId}`);
+      expect(control.value).toBe("done");
+    });
+
     it("drops a ticked todo from the card once the window has passed", async () => {
       await linkUser();
       await seedTodo("88888888-8888-8888-8888-888888888881", "user_test_123", {

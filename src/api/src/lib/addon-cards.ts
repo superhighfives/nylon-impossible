@@ -36,6 +36,8 @@ interface Widget {
     button?: Button;
     switchControl?: {
       name: string;
+      /** Sent as the form input's value while the box is checked. */
+      value?: string;
       selected: boolean;
       controlType: "CHECKBOX" | "SWITCH";
       onChangeAction: CardAction;
@@ -135,6 +137,14 @@ function actionUrl(baseUrl: string, path: string): string {
 
 /** Name of the composer text input, referenced by the submit action handlers. */
 export const QUICK_ADD_INPUT = "todoText";
+
+/**
+ * A row's checkbox: its form input is named for the todo and carries
+ * `ADDON_DONE_VALUE` while checked, so the toggle can tell a tick from an
+ * untick rather than guessing from what's stored.
+ */
+export const ADDON_DONE_VALUE = "done";
+export const doneInputName = (todoId: string) => `done_${todoId}`;
 
 /** Name of the composer list dropdown, referenced by the submit action handlers. */
 export const QUICK_ADD_LIST_INPUT = "listId";
@@ -260,7 +270,8 @@ function todoRowWidget(
       ...(meta ? { bottomLabel: meta } : {}),
       wrapText: true,
       switchControl: {
-        name: `done_${todo.id}`,
+        name: doneInputName(todo.id),
+        value: ADDON_DONE_VALUE,
         selected: todo.done,
         controlType: "CHECKBOX",
         onChangeAction: {
