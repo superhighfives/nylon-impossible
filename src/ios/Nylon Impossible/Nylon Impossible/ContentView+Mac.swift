@@ -27,6 +27,13 @@ extension ContentView {
     var macToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
+                palette = .all
+            } label: {
+                Label("Search and commands", systemImage: "magnifyingglass")
+            }
+            .help("Search and commands (⌘K)")
+
+            Button {
                 showsQuickAdd = true
             } label: {
                 Label("New todo", systemImage: Theme.Icon.add)

@@ -46,6 +46,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 
    Split like phase 2: **3.1 layout** (the fourth column, select then open, the sidebar's fill and bar, the toolbar with quick add and New list, rename in place, list delete with Undo on every Apple layout), **3.2 keyboard** (two levels, jumps, the palette as a `CommandMenu`, Move to, Search in the toolbar, the Keyboard shortcuts item, `BoardMenuCommand`/`BoardKey` as the registry), and **3.3 details** (links, the overnight pill, the menu bar popover).
       - *3.1 as built:* the inspector is gone; the detail renders in the fourth column, so the Mac board no longer has a separate inspector hosting view. Settings is a sheet on iPad (its own window on a Mac, as before). Done reads from `ContentView`'s todos rather than `DoneHistoryView`'s own `@Query`. The `inspector` screen route keeps its name and now shows the detail in the fourth column. The sidebar's shortcut hint stays until 3.2 replaces it with the Keyboard shortcuts item. List delete with Undo replaces the confirmation on the phone too, and its toast counts every todo in the list, done ones included (they go with it).
+      - *3.2 as built:* `BoardKey` gains Esc (back), M, ⇧N, G (and G then a letter), ? and the ⇧-digit jumps; `BoardMenuCommand` gains Search (⌘K) and `shortcutSections`, which the Keyboard shortcuts sheet and the palette read, and the iPad's Todo menu is now built from the same table as the Mac's. The sidebar level is a cursor the board's keys move, drawn as soft focus, rather than real focus: iPad buttons aren't keyboard-focusable by default, and moving focus in and out of the Mac's split view is where its layout loops came from. ⇧-digits are read from the character typed ("!" for ⇧1), because SwiftUI's key presses carry no key code; on non-US layouts they differ, and the Mac's ⌘1/2/3 still work. The palette is an overlay on the board, not a sheet. Done's rows join the keyboard columns (X or Return puts one back). Esc isn't a menu shortcut, so it can never take Esc from a popover; the board handles it.
 4. **Phone (iOS and mobile web together):**
    - the Done button beside the avatar, and Done as a top-level page;
    - the space kept for the banner on every top-level page;
@@ -78,7 +79,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 - [x] 2.3 Wide web: links, overnight banner, tab stops and focus
 - [ ] 3. iPad and Mac wide, Mac toolbar, list delete with Undo, iOS links, menu bar
   - [x] 3.1 Layout: fourth column, select then open, sidebar, toolbar, rename, list delete with Undo
-  - [ ] 3.2 Keyboard, palette, Move to
+  - [x] 3.2 Keyboard, palette, Move to
   - [ ] 3.3 Links, overnight pill, menu bar
 - [ ] 4. Phone (iOS and mobile web)
 - [ ] 5. Gmail

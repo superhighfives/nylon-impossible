@@ -21,7 +21,8 @@ extension ContentView {
             lists: orderedLists,
             startListId: quickAddStart,
             countFor: { counts[$0.lowercased()] ?? 0 },
-            onAdd: addQuick
+            onAdd: addQuick,
+            onClose: { showsQuickAdd = false }
         )
     }
 
@@ -30,10 +31,10 @@ extension ContentView {
     }
 
     var newListForm: some View {
-        NewListForm { name in
+        NewListForm(onCreate: { name in
             newListAnchor = nil
             commitNewList(name)
-        }
+        }, onClose: { newListAnchor = nil })
     }
 
     /// Quick add's Return: add to the chosen list and keep the popover open.
@@ -57,6 +58,7 @@ extension ContentView {
         HStack {
             Spacer(minLength: 0)
             HStack(spacing: 2) {
+                toolbarButton("Search and commands", systemImage: "magnifyingglass") { palette = .all }
                 toolbarButton("New todo", systemImage: Theme.Icon.add) { showsQuickAdd = true }
                     .popover(isPresented: $showsQuickAdd, arrowEdge: .top) { quickAdd }
                 toolbarButton("New list", systemImage: Theme.Icon.newList) { newListAnchor = .toolbar }

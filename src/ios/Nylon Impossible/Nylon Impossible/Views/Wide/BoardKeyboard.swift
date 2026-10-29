@@ -2,18 +2,32 @@
 //  BoardKeyboard.swift
 //  Nylon Impossible
 //
-//  The iPad board's hardware-keyboard map, the same keys as wide web:
+//  The board's hardware-keyboard map (iPad and Mac), the same keys as wide
+//  web:
 //
-//    j / k, ↓ / ↑     move through rows
-//    h / l, ← / →     move across columns
+//    j / k, ↓ / ↑     move through rows, or the sidebar's items
+//    h / l, ← / →     move across columns; ← from the first goes to the
+//                     sidebar, → from the sidebar goes back in
+//    Return           open (in the sidebar: go into that column)
+//    Esc              close the open todo, else go to the sidebar
 //    x                done
-//    Return           open
 //    1 / 2 / 3        move to Today / This week / Someday
+//    m                move to a list…
 //    p                pin
 //    d                due
 //    Delete           delete, with Undo
-//    n                new todo in the focused column
+//    n / ⇧N           new todo (quick add) / new list
+//    ⇧1 ⇧2 ⇧3         go to Today / This week / Someday
+//    ⇧4 … ⇧9, ⇧0      go to your lists, in sidebar order / Done
+//    g, then t w s d  go to Today / This week / Someday / Done
+//    g, then l        go to a list (the palette, lists only)
+//    ?                keyboard shortcuts
+//    ⌘K               search and commands (works while typing, too)
 //    ⌘N               new todo (works while typing, too)
+//
+//  ⇧-digits are read from the character they type ("!" for ⇧1): SwiftUI's
+//  key presses don't carry a physical key code. On a non-US layout the
+//  punctuation differs, and the Mac's ⌘1/2/3 in the View menu still work.
 //
 //  The board handles keys with `onKeyPress` while it has focus. The same keys
 //  are published as a "Todo" menu so they show in the iPadOS shortcut overlay
@@ -23,10 +37,39 @@
 
 import SwiftUI
 
+/// Where a jump lands.
+enum BoardJump: Equatable, Hashable {
+    case time(SystemListKind)
+    /// One of your lists, by its place in the sidebar (⇧4 is 0).
+    case list(Int)
+    case done
+}
+
 enum BoardKey: Equatable, Hashable {
     case down, up, left, right
     case done, open, pin, due, delete, new
     case move(SystemListKind)
+    case back, moveTo, newList, go, goToList, shortcuts
+    case jump(BoardJump)
+
+    /// ⇧1…⇧0 as the US layout types them.
+    private static let shiftedDigits: [Character: BoardJump] = [
+        "!": .time(.today), "@": .time(.thisWeek), "#": .time(.someday),
+        "$": .list(0), "%": .list(1), "^": .list(2), "&": .list(3), "*": .list(4), "(": .list(5),
+        ")": .done
+    ]
+
+    /// After g: the letter's destination, or nil (any other key cancels).
+    static func afterGo(_ characters: String) -> BoardKey? {
+        switch characters.lowercased() {
+        case "t": return .jump(.time(.today))
+        case "w": return .jump(.time(.thisWeek))
+        case "s": return .jump(.time(.someday))
+        case "d": return .jump(.done)
+        case "l": return .goToList
+        default: return nil
+        }
+    }
 
     /// The key a press means, or nil. Presses with ⌘, ⌃ or ⌥ are left alone
     /// so system and menu shortcuts keep working.
@@ -38,8 +81,28 @@ enum BoardKey: Equatable, Hashable {
         case .leftArrow: return .left
         case .rightArrow: return .right
         case .return: return .open
+        case .escape: return .back
         case .delete, .deleteForward: return .delete
         default: break
+        }
+        if let first = characters.first, characters.count == 1, let jump = shiftedDigits[first] {
+            return .jump(jump)
+        }
+        if characters == "N" { return .newList }
+        if characters == "?" { return .shortcuts }
+        // Some keyboards (and XCUITest) send Shift with the unshifted
+        // character: ⇧2 as "2", ⇧N as "n".
+        if modifiers.contains(.shift) {
+            switch characters.lowercased() {
+            case "1": return .jump(.time(.today))
+            case "2": return .jump(.time(.thisWeek))
+            case "3": return .jump(.time(.someday))
+            case "4", "5", "6", "7", "8", "9": return .jump(.list((Int(characters) ?? 4) - 4))
+            case "0": return .jump(.done)
+            case "n": return .newList
+            case "/": return .shortcuts
+            default: break
+            }
         }
         switch characters.lowercased() {
         case "j": return .down
@@ -50,6 +113,8 @@ enum BoardKey: Equatable, Hashable {
         case "p": return .pin
         case "d": return .due
         case "n": return .new
+        case "m": return .moveTo
+        case "g": return .go
         case "1": return .move(.today)
         case "2": return .move(.thisWeek)
         case "3": return .move(.someday)
@@ -122,7 +187,9 @@ extension FocusedValues {
     @Entry var board: BoardCommandHandler?
 }
 
-/// The "Todo" menu: the board's keys, for the shortcut overlay and menu bar.
+/// The iPad's "Todo" menu: the board's commands from `BoardMenuCommand`, so
+/// they show in the shortcut overlay (hold ⌘) and work as key commands.
+/// Single keys are only bound while no field is being edited.
 struct BoardCommands: Commands {
     @FocusedValue(\.board) private var board
     /// Send Feedback… in the Help menu, for an admin.
@@ -137,35 +204,27 @@ struct BoardCommands: Commands {
             }
         }
         CommandMenu("Todo") {
-            Button("New todo") { board?.perform(.new) }
-                .keyboardShortcut("n", modifiers: .command)
-                .disabled(board == nil)
-            if let board, board.keysEnabled {
-                Section {
-                    item("New todo in column", .new, "n", board)
-                    item("Next", .down, "j", board)
-                    item("Previous", .up, "k", board)
-                    item("Column left", .left, "h", board)
-                    item("Column right", .right, "l", board)
-                }
-                Section {
-                    item("Mark done", .done, "x", board)
-                    item("Open", .open, .return, board)
-                    item("Pin", .pin, "p", board)
-                    item("Due…", .due, "d", board)
-                    item("Delete", .delete, .delete, board)
-                }
-                Section {
-                    item("Move to Today", .move(.today), "1", board)
-                    item("Move to This week", .move(.thisWeek), "2", board)
-                    item("Move to Someday", .move(.someday), "3", board)
+            item(.newTodo)
+            ForEach(Array(BoardMenuCommand.todoMenu.enumerated()), id: \.offset) { _, command in
+                if let command {
+                    // Single keys only while the board has the keyboard, so
+                    // the overlay never lists keys that would eat typing.
+                    if !command.isSingleKey || board?.keysEnabled == true { item(command) }
+                } else {
+                    Divider()
                 }
             }
         }
     }
 
-    private func item(_ title: String, _ key: BoardKey, _ shortcut: KeyEquivalent, _ board: BoardCommandHandler) -> some View {
-        Button(title) { board.perform(key) }
-            .keyboardShortcut(shortcut, modifiers: [])
+    @ViewBuilder
+    private func item(_ command: BoardMenuCommand) -> some View {
+        let button = Button(command.title) { board?.handle(command) }
+            .disabled(!command.isEnabled(in: board))
+        if let shortcut = command.shortcut {
+            button.keyboardShortcut(shortcut.key, modifiers: shortcut.modifiers)
+        } else {
+            button
+        }
     }
 }

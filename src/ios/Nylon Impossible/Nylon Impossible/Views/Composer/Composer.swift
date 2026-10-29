@@ -46,6 +46,8 @@ struct Composer: View {
     /// The list chips. Off for a board column's Add field, whose column
     /// already says which list it is; the due chip still shows.
     var showsListChips = true
+    /// Esc, after the field lets go: quick add closes its popover with it.
+    var onEscape: (() -> Void)?
 
     @State private var keepWords = false
     @FocusState private var isFocused: Bool
@@ -120,6 +122,7 @@ struct Composer: View {
             #endif
             .onKeyPress(.escape) {
                 isFocused = false
+                onEscape?()
                 return .handled
             }
             .accessibilityLabel("New todo")

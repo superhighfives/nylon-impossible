@@ -88,7 +88,7 @@ extension ContentView {
         // A Mac window: the sidebar in a split view (so it has the system's
         // toggle, ⌃⌘S and a resizable divider), the focused list as the
         // window title, and a toolbar.
-        NavigationSplitView(columnVisibility: $sidebarVisibility) {
+        boardOverlays(NavigationSplitView(columnVisibility: $sidebarVisibility) {
             sidebar
                 // The sidebar shares the board's canvas, so the split view's
                 // own divider doesn't show; draw the iPad's hairline instead.
@@ -107,7 +107,7 @@ extension ContentView {
                     minWidth: Theme.Wide.columnMinWidth, maxWidth: .infinity,
                     minHeight: Self.boardMinHeight, maxHeight: .infinity
                 )
-        }
+        })
         .navigationTitle(focusedColumn?.name ?? "Nylon")
         .navigationSubtitle(windowSubtitle)
         .toolbar { macToolbar }
@@ -115,7 +115,7 @@ extension ContentView {
         .focusedSceneValue(\.board, commandHandler)
         .onChange(of: actions.toasts.current) { undoBridge.sync(actions.toasts, undoManager: undoManager) }
         #else
-        HStack(spacing: 0) {
+        boardOverlays(HStack(spacing: 0) {
             sidebar
             VerticalHairline()
             VStack(spacing: 0) {
@@ -123,7 +123,7 @@ extension ContentView {
                 Hairline()
                 boardWithDetail
             }
-        }
+        })
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .focusedSceneValue(\.board, commandHandler)
         .sheet(isPresented: Binding(get: { widePanel == .settings }, set: { if !$0 { widePanel = nil } })) {
@@ -151,6 +151,8 @@ extension ContentView {
             onCreateList: commitNewList,
             onDone: showDone,
             onSettings: { showPanel(.settings) },
+            onShortcuts: { showsShortcuts = true },
+            cursor: sidebarCursor,
             onDrop: { list, id in
                 guard let todo = todos.first(where: { $0.id == id }) else { return }
                 actions.move(todo, toList: list.id)
@@ -242,8 +244,12 @@ extension ContentView {
         .focused($boardFocused)
         .focusEffectDisabled()
         .onKeyPress(phases: .down) { press in
-            guard editingColumnId == nil, renamingColumnId == nil,
-                  let key = BoardKey.from(key: press.key, characters: press.characters, modifiers: press.modifiers)
+            guard editingColumnId == nil, renamingColumnId == nil, palette == nil else { return .ignored }
+            if let key = takeGo(press.characters) {
+                perform(key)
+                return .handled
+            }
+            guard let key = BoardKey.from(key: press.key, characters: press.characters, modifiers: press.modifiers)
             else { return .ignored }
             perform(key)
             return .handled
@@ -266,6 +272,11 @@ extension ContentView {
                 onClose: closeDetail
             )
             .background(Theme.Colors.canvas)
+            // Esc closes the open todo even while its fields have focus.
+            .onKeyPress(.escape) {
+                closeDetail()
+                return .handled
+            }
         } else if let list = openList {
             column(list, derived: derived)
         } else {

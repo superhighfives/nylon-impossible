@@ -96,6 +96,15 @@ struct ContentView: View {
     /// it's anchored to).
     @State var showsQuickAdd = false
     @State var newListAnchor: NewListAnchor?
+    /// The keyboard's place in the sidebar, when it's there rather than on
+    /// the board (← from the first column, or Esc).
+    @State var sidebarCursor: SidebarItem?
+    /// ⌘K's palette, G L's lists, or M's Move to.
+    @State var palette: PaletteMode?
+    @State var showsShortcuts = false
+    /// G was pressed: the next key is a destination (for 1.2 seconds).
+    @State var goPending = false
+    @State var goTask: Task<Void, Never>?
     /// Each column's composer: its draft, a chip picked over the default, a
     /// focus request, and which one is being typed in.
     @State var drafts: [String: String] = [:]
