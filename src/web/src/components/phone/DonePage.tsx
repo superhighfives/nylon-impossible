@@ -1,23 +1,18 @@
 import { Check } from "lucide-react";
 import type { TodoWithUrls } from "@/types/database";
 import { Masthead } from "./Masthead";
-import { displayTitle, groupDoneByDay } from "./model";
-import { Screen } from "./Screen";
+import { displayTitle, groupDoneByDay, mastheadSubline } from "./model";
 
 /**
- * Done history: finished todos grouped by day. Tapping a check puts the todo
- * back in the list it was finished from.
+ * Done: the switcher's last page, finished todos grouped by day. Tapping a
+ * check puts the todo back in the list it was finished from.
  */
-export function DoneScreen({
-  open,
-  onClose,
+export function DonePage({
   todos,
   listName,
   timeZone,
   onRestore,
 }: {
-  open: boolean;
-  onClose: () => void;
   todos: TodoWithUrls[];
   listName: (id: string) => string;
   timeZone: string;
@@ -25,8 +20,11 @@ export function DoneScreen({
 }) {
   const groups = groupDoneByDay(todos, new Date(), timeZone);
   return (
-    <Screen open={open} onClose={onClose} backLabel="Back" title="Done">
-      <Masthead pushed title="Done" subline="Finished todos, by day" />
+    <>
+      <Masthead
+        title="Done"
+        subline={mastheadSubline("done", 0, new Date(), timeZone)}
+      />
       {groups.length === 0 ? (
         <p className="mx-5 mt-7 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
           Nothing done yet.
@@ -69,6 +67,6 @@ export function DoneScreen({
           Tap a check to put a todo back.
         </p>
       )}
-    </Screen>
+    </>
   );
 }

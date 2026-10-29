@@ -200,15 +200,18 @@ async function auditPhone(browser: Browser, mode: Mode) {
   await axe(page, "context-menu", L, mode);
   await escapeCloses(page, `phone-${mode}-menu`, "[role=dialog]");
 
-  // Account sheet, then Done and Settings.
+  // Done, the last page, then the account sheet and Settings.
+  await page.getByRole("button", { name: "Done", exact: true }).click();
+  await sleep(800);
+  checks[`phone-${mode}-done-current`] = await page
+    .getByRole("button", { name: "Done", exact: true })
+    .getAttribute("aria-current");
+  await axe(page, "done", L, mode);
+  await page.getByRole("button", { name: "Today", exact: true }).click();
+  await sleep(800);
   await page.getByRole("button", { name: "Account" }).click();
   await page.getByRole("dialog").waitFor();
   await axe(page, "account", L, mode);
-  await page.getByRole("menuitem", { name: /^Done/ }).click();
-  await sleep(500);
-  await axe(page, "done", L, mode);
-  await escapeCloses(page, `phone-${mode}-done`, "[role=dialog]");
-  await page.getByRole("button", { name: "Account" }).click();
   await page.getByRole("menuitem", { name: "Settings" }).click();
   await sleep(500);
   await axe(page, "settings", L, mode);

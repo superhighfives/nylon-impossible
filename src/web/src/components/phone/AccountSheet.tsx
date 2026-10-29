@@ -34,14 +34,12 @@ const ITEM =
   "mt-1.5 flex h-[3.25rem] w-full cursor-pointer items-center rounded-[0.875rem] bg-n-surface px-3.5 text-left text-base font-medium text-n-ink n-focus-inset dark:bg-n-fill";
 
 /**
- * The avatar menu: Done history, Settings, Send feedback (admins only) and
- * Sign out, as a bottom sheet.
+ * The avatar menu: Settings, Send feedback (admins only) and Sign out, as a
+ * bottom sheet. Done is its own page, the round check beside the avatar.
  */
 export function AccountSheet({
   open,
   onClose,
-  doneCount,
-  onDone,
   onOpen,
   onSettings,
   onFeedback,
@@ -49,8 +47,6 @@ export function AccountSheet({
   open: boolean;
   onOpen: () => void;
   onClose: () => void;
-  doneCount: number;
-  onDone: () => void;
   onSettings: () => void;
   /** Shown only when set — the caller passes it for admins. */
   onFeedback?: () => void;
@@ -91,24 +87,6 @@ export function AccountSheet({
           <div role="menu" aria-label="Account" onKeyDown={moveMenuFocus}>
             <button
               ref={first}
-              type="button"
-              role="menuitem"
-              onClick={onDone}
-              aria-describedby="account-done-count"
-              className={ITEM}
-            >
-              Done
-              <span
-                aria-hidden="true"
-                className="ml-auto font-normal text-n-ink-muted tabular-nums"
-              >
-                {doneCount}
-              </span>
-              <span id="account-done-count" hidden>
-                {doneCount} {doneCount === 1 ? "todo" : "todos"}
-              </span>
-            </button>
-            <button
               type="button"
               role="menuitem"
               onClick={onSettings}

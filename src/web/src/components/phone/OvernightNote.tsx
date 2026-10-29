@@ -57,7 +57,7 @@ export function useOvernightNote(
 
 /**
  * The overnight note as a small orange pill, above Today's title in the
- * space every column keeps for it. Its text selects the first todo in the
+ * space every column (and every top-level phone page) keeps for it. Its text selects the first todo in the
  * list they moved to; × dismisses it. Up to two lines, then truncated.
  */
 export function OvernightPill({
@@ -90,37 +90,6 @@ export function OvernightPill({
         className="flex size-[1.625rem] shrink-0 cursor-pointer items-center justify-center rounded-[0.375rem] n-focus-soft"
       >
         <X size={12} strokeWidth={2.4} aria-hidden="true" />
-      </button>
-    </div>
-  );
-}
-
-/** The quiet line under Today's title. Same on phone and wide. */
-export function OvernightNote({
-  text,
-  onDismiss,
-  className = "",
-}: {
-  text: string;
-  onDismiss: () => void;
-  className?: string;
-}) {
-  return (
-    <div
-      data-overnight-note
-      className={`flex animate-n-fade-in items-center gap-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted ${className}`}
-    >
-      <Moon size={13} aria-hidden="true" className="shrink-0" />
-      <p className="m-0 min-w-0 flex-1 truncate" title={text}>
-        {text}
-      </p>
-      <button
-        type="button"
-        aria-label="Dismiss overnight note"
-        onClick={onDismiss}
-        className="n-hit -mr-1.5 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus pointer-fine:hover:bg-n-fill"
-      >
-        <X size={13} strokeWidth={2.4} aria-hidden="true" />
       </button>
     </div>
   );

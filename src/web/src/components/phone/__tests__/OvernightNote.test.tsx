@@ -20,7 +20,7 @@ vi.mock("@/hooks/useHints", () => ({
 }));
 
 import { OVERNIGHT_DISMISSED_KEY } from "@/lib/overnight";
-import { OvernightNote, useOvernightNote } from "../OvernightNote";
+import { OvernightPill, useOvernightNote } from "../OvernightNote";
 import { makeTodo } from "./fixtures";
 
 const TODAY = "list-today";
@@ -92,19 +92,22 @@ describe("useOvernightNote", () => {
   });
 });
 
-describe("OvernightNote", () => {
-  it("reads the line and has a labelled dismiss", async () => {
+describe("OvernightPill", () => {
+  it("is a status with the text as a link and a labelled dismiss", async () => {
+    const onSee = vi.fn();
     const onDismiss = vi.fn();
     render(
-      <OvernightNote
+      <OvernightPill
         text="2 moved to This week overnight"
+        onSee={onSee}
         onDismiss={onDismiss}
       />,
     );
-    const line = screen.getByText("2 moved to This week overnight");
-    expect(line).toBeInTheDocument();
-    // Truncated to one line, with the full text on hover.
-    expect(line).toHaveAttribute("title", "2 moved to This week overnight");
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "2 moved to This week" }),
+    );
+    expect(onSee).toHaveBeenCalled();
     await userEvent.click(
       screen.getByRole("button", { name: "Dismiss overnight note" }),
     );
