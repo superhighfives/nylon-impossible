@@ -122,7 +122,12 @@ extension ContentView {
             $0.parentId == nil && !$0.isSoftDeleted && $0.listKey?.lowercased() == list.id.lowercased()
         }.count
         actions.deleteList(list, todoCount: count) { [syncService, viewModel, modelContext, actions] finished in
-            guard let apiService = syncService.apiService else { return finished() }
+            // No API (DEBUG screen routes, tests): fail like a network error
+            // does, so the toast that said "Deleted" isn't silently undone.
+            guard let apiService = syncService.apiService else {
+                actions.toasts.show("Couldn’t delete the list", action: nil)
+                return finished()
+            }
             Task {
                 do {
                     try await viewModel.deleteList(list, apiService: apiService, context: modelContext)
