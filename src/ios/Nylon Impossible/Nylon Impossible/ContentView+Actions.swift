@@ -50,7 +50,6 @@ extension ContentView {
         })
     }
 
-    /// Put the overnight note away for good.
     /// The pill's text: the first todo in the list they moved to (This week
     /// if anything went there, else Someday). On the phone, that page.
     func seeOvernight() {
@@ -64,6 +63,7 @@ extension ContentView {
         selectedTodoId = rows(list).first?.id
     }
 
+    /// Put the overnight note away for good.
     func dismissOvernight() {
         guard let sweep = preferences.lastSweep else { return }
         overnightDismissedAt = sweep.atString
