@@ -33,8 +33,6 @@ extension ContentView {
 
     func showPanel(_ route: AccountRoute) {
         switch route {
-        case .done:
-            showDone()
         case .settings:
             #if os(macOS)
             // A Mac has a Settings window (⌘,); the sidebar's Settings opens it.

@@ -22,7 +22,7 @@ struct ListsIndexPage: View {
 
     var body: some View {
         List {
-            Masthead(title: "Lists", subline: MastheadCopy.lists(count: collections.count))
+            Masthead(title: "Lists", subline: MastheadCopy.lists(count: collections.count), keepsBanner: true)
                 .plainListRow()
                 .moveDisabled(true)
 

@@ -2,10 +2,12 @@
 //  Switcher.swift
 //  Nylon Impossible
 //
-//  The top row: Today · This week · Someday · Lists, with the avatar on the
-//  right. The current title is in ink with a yellow underline that follows the
-//  pager as you swipe; the others are muted. The three time titles are drop
-//  targets — dropping a dragged row on "This week" moves it there.
+//  The top row: Today · This week · Someday · Lists, then Done's round check
+//  and the avatar on the right. The current title is in ink with a yellow
+//  underline that follows the pager as you swipe; the others are muted. Done
+//  is the last page: its check turns yellow instead, and the underline fades
+//  out on the way to it. The three time titles are drop targets — dropping a
+//  dragged row on "This week" moves it there.
 //
 
 import SwiftUI
@@ -28,14 +30,14 @@ struct Switcher: View {
     @State private var targeted: Page?
 
     var body: some View {
-        HStack(spacing: Theme.Space.s3) {
+        HStack(spacing: Theme.Space.s1) {
             // The titles scroll sideways when they don't fit — a narrow phone,
             // or large text — and keep the current one in view, so the avatar
             // is never pushed off screen.
             ScrollViewReader { proxy in
                 ScrollView(.horizontal) {
                     HStack(spacing: 18) {
-                        ForEach(Page.allCases, id: \.self) { page in
+                        ForEach(Page.tabs, id: \.self) { page in
                             title(page)
                                 .id(page)
                         }
@@ -56,23 +58,53 @@ struct Switcher: View {
             // the current list's name at full size.
             .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
 
-            Button(action: onAvatar) {
-                AvatarView(imageURL: avatarURL, initials: initials)
-                    .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
-                    .contentShape(Circle())
+            HStack(spacing: 0) {
+                doneButton
+                avatar
             }
-            .buttonStyle(.plain)
-            .padding(.trailing, -6)
-            .accessibilityLabel("Account")
-            .accessibilityShowsLargeContentViewer {
-                Label("Account", systemImage: "person.crop.circle")
-            }
-            .accessibilityHint("Done, Settings and sign out")
         }
         .padding(.leading, Theme.Phone.gutter)
         .padding(.trailing, Theme.Space.s4)
         .padding(.top, Theme.Space.s1)
         .frame(minHeight: Theme.Phone.switcherHeight)
+    }
+
+    private var doneButton: some View {
+        let isCurrent = current == .done
+        return Button {
+            onSelect(.done)
+        } label: {
+            Image(systemName: Theme.Icon.done)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(isCurrent ? Theme.Colors.brandInk : Theme.Colors.inkMuted)
+                .frame(width: 30, height: 30)
+                .background(isCurrent ? Theme.Colors.brand : Theme.Colors.fill, in: Circle())
+                .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
+                .contentShape(Circle())
+                .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isCurrent)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Done")
+        .accessibilityAddTraits(isCurrent ? [.isSelected, .isHeader] : [])
+        .accessibilityRemoveTraits(isCurrent ? [] : .isSelected)
+        .accessibilityShowsLargeContentViewer {
+            Label("Done", systemImage: Theme.Icon.done)
+        }
+    }
+
+    private var avatar: some View {
+        Button(action: onAvatar) {
+            AvatarView(imageURL: avatarURL, initials: initials)
+                .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .padding(.trailing, -6)
+        .accessibilityLabel("Account")
+        .accessibilityShowsLargeContentViewer {
+            Label("Account", systemImage: "person.crop.circle")
+        }
+        .accessibilityHint("Settings and sign out")
     }
 
     private func title(_ page: Page) -> some View {
@@ -125,7 +157,8 @@ final class PagerProgress {
 }
 
 /// 2pt of brand yellow under the current title, interpolated between the two
-/// titles either side of the pager's position.
+/// titles either side of the pager's position. Past Lists it fades out, since
+/// Done has no title.
 private struct SwitcherUnderline: View {
     typealias Page = TodoViewModel.Page
 
@@ -133,8 +166,9 @@ private struct SwitcherUnderline: View {
     let frames: [Page: CGRect]
 
     var body: some View {
-        let pages = Page.allCases
+        let pages = Page.tabs
         let clamped = min(max(progress.value, 0), CGFloat(pages.count - 1))
+        let opacity = min(max(CGFloat(pages.count) - progress.value, 0), 1)
         let lower = Int(clamped.rounded(.down))
         let upper = min(lower + 1, pages.count - 1)
         let fraction = clamped - CGFloat(lower)
@@ -145,6 +179,7 @@ private struct SwitcherUnderline: View {
                 .fill(Theme.Colors.brand)
                 .frame(width: width, height: 2)
                 .offset(x: x)
+                .opacity(opacity)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }

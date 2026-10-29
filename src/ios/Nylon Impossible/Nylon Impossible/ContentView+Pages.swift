@@ -2,7 +2,7 @@
 //  ContentView+Pages.swift
 //  Nylon Impossible
 //
-//  The four pages and their copy, split from ContentView.swift.
+//  The five pages and their copy, split from ContentView.swift.
 //
 
 import SwiftUI
@@ -23,13 +23,17 @@ extension ContentView {
                     empty: empty(for: page),
                     onOpen: open
                 ) {
-                    VStack(spacing: 0) {
-                        Masthead(title: page.title, subline: subline(page, count: rows.count))
-                        if page == .today, let overnightText {
-                            OvernightLine(text: overnightText, onDismiss: dismissOvernight)
-                                .transition(.opacity)
-                        }
-                    }
+                    Masthead(
+                        title: page.title,
+                        subline: subline(page, count: rows.count),
+                        keepsBanner: true,
+                        banner: page == .today ? overnightText.map { text in
+                            AnyView(
+                                OvernightPill(text: text, onSee: seeOvernight, onDismiss: dismissOvernight)
+                                    .transition(.opacity)
+                            )
+                        } : nil
+                    )
                     .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnightText)
                 }
             } else {
@@ -56,6 +60,8 @@ extension ContentView {
                 }
             }
             .background(Theme.Colors.canvas)
+        case .done:
+            DoneHistoryView(todos: doneTodos, lists: orderedLists, actions: actions)
         }
     }
 
@@ -106,10 +112,9 @@ extension ContentView {
 
     func loading(_ title: String) -> some View {
         VStack(spacing: 0) {
-            Masthead(title: title, subline: "Getting your lists…")
+            Masthead(title: title, subline: "Getting your lists…", keepsBanner: true)
             Spacer()
         }
-        .padding(.top, Theme.Space.s2)
     }
 
     // MARK: - Copy
@@ -120,6 +125,7 @@ extension ContentView {
         case .thisWeek: return MastheadCopy.thisWeek(count: count)
         case .someday: return MastheadCopy.someday(count: count)
         case .lists: return MastheadCopy.lists(count: collections.count)
+        case .done: return MastheadCopy.done
         }
     }
 

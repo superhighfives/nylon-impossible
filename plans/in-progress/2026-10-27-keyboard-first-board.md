@@ -57,6 +57,7 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 
    Split like phases 2 and 3: **4.1 mobile web**, then **4.2 iOS phone**.
       - *4.1 as built:* Done is the pager's fifth page (`PAGES` in `model.ts`), so swiping, ←/→ and Home/End in the switcher reach it like the tabs; the yellow underline fades out past Lists, since the check turns yellow instead. The check sits inside the switcher's `nav`, between Lists and the avatar. Done has no URL of its own, as on wide, so the address keeps the last list's while you're on it. The account sheet is Settings, Send feedback (admins) and Sign out. Every top-level page's masthead keeps the 44px banner slot, 20px below the tabs and 20px clear of the title, so titles sit at the same height on all five; the quiet one-line overnight note is gone and the phone uses the wide pill, whose text goes to the page the sweep moved todos to. The tab gap drops from 16 to 12px below 384px so the four tabs, the check and the avatar fit a 375pt screen. Tapping a tab several pages away no longer counts the pages it scrolls past, which had pushed a URL for each. The detail sheet is shared, so links were already there. After 4.1: `audit.ts` covers Done as a page (68 screens, no axe violations).
+      - *4.2 as built:* `TodoViewModel.Page` gains `.done` (with `Page.tabs` for the switcher's four titles), so the pager, swiping and the `done` screen route reach it like the others; `currentListId` no longer matches the first collection for a page with no system kind, so Done has no composer. `DoneHistoryView` is the page, reading `ContentView.doneTodos` rather than its own `@Query`, so todos in a list deleted with Undo pending stay out of it as they do on the board. `AccountRoute.done` is gone: the sheet is Settings, Send feedback (admins) and Sign out, and Done was only ever the board's fourth column on wide. `Masthead`'s `keepsBanner` reserves the slot on the five top-level pages (it grows at large text sizes rather than clipping a two-line pill); the quiet `OvernightLine` is gone and the phone uses `OvernightPill`, whose text pages to the list the sweep moved todos to. Share is still in the detail sheet, in its footer beside Delete (phase 4's list above says the header). The parity sheet's web Done screen presses the check rather than the account menu. SwiftUI reported the check as selected on every page until `.isSelected` was removed explicitly when it isn't current.
 5. **Gmail:** the card changes, all within what Card Service can render, including the window that keeps ticked todos on the card.
 
 **Running in parallel.** Once phase 1 is merged, web and iOS can be built at the same time in separate worktrees. Phase 3 should still follow 2.1 at least, so the Apple layout copies a settled web layout. Gmail (phase 5) touches only the API and can run any time after phase 1.
@@ -85,9 +86,9 @@ Treat this like the October redesign: this spec is the source of truth, and the 
   - [x] 3.1 Layout: fourth column, select then open, sidebar, toolbar, rename, list delete with Undo
   - [x] 3.2 Keyboard, palette, Move to
   - [x] 3.3 Links, overnight pill, menu bar
-- [ ] 4. Phone (iOS and mobile web)
+- [x] 4. Phone (iOS and mobile web)
   - [x] 4.1 Mobile web: Done button and page, banner space, links check
-  - [ ] 4.2 iOS phone
+  - [x] 4.2 iOS phone
 - [ ] 5. Gmail
 
 ## Problem

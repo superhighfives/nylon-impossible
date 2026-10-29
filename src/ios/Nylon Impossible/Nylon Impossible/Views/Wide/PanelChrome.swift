@@ -48,7 +48,7 @@ struct PanelChrome<Content: View>: View {
 }
 
 /// A todo's detail in the board's fourth column, or (on iPad, in a sheet)
-/// Done or Settings. Takes plain values rather than reading the board's
+/// Settings. Takes plain values rather than reading the board's
 /// queries itself (see `ContentRoot`).
 struct WidePanel: View {
     let todo: TodoItem?
@@ -76,7 +76,6 @@ struct WidePanel: View {
         } else if let route {
             PanelChrome(onClose: onClose) {
                 switch route {
-                case .done: DoneHistoryView(actions: actions, lists: lists)
                 case .settings: SettingsView()
                 }
             }

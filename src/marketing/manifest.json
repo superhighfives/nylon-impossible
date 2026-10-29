@@ -53,7 +53,7 @@
       { "name": "lists", "device": "iphone", "ios": "lists", "web": "/lists" },
       { "name": "detail", "device": "iphone", "ios": "detail", "web": "/this-week", "open": "Plan Lisbon trip" },
       { "name": "composer", "device": "iphone", "ios": "composer", "web": "/this-week", "type": "Call the dentist friday" },
-      { "name": "done", "device": "iphone", "ios": "done", "web": "/today", "account": "Done" },
+      { "name": "done", "device": "iphone", "ios": "done", "web": "/today", "tap": "Done" },
       { "name": "settings", "device": "iphone", "ios": "settings", "web": "/today", "account": "Settings" },
       { "name": "board", "device": "ipad", "ios": "board", "web": "/" },
       { "name": "column", "device": "ipad", "ios": "column", "web": "/list/mktg_list_groceries" },

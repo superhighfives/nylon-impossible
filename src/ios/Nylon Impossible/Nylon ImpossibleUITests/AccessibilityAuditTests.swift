@@ -24,13 +24,15 @@ final class AccessibilityAuditTests: NylonUITestCase {
     private var allRoutes: [(route: String, ready: String)] {
         var routes: [(String, String)] = [
             ("today", "Review PR for the sync engine"),
-            ("week", "Plan Lisbon trip"),
+            // The first row: at AX5 the masthead and its banner space push
+            // later ones below the fold, where the list hasn't drawn them.
+            ("week", "Send invoice to Pika"),
             ("someday", "Read Piranesi"),
             ("detail", "Notes"),
             ("composer", "New todo"),
             ("done", "Email the landlord"),
             ("settings", "Appearance"),
-            ("overnight", "Dismiss"),
+            ("overnight", "Dismiss overnight note"),
             ("empty", "Nothing today."),
             ("loading", "Getting your lists…"),
             ("syncerror", "Retry sync"),
@@ -103,6 +105,15 @@ enum AuditAllowance {
         // masthead under them carries the list's name at full size.
         if issue.auditType == .dynamicType, ["Today", "This week", "Someday", "Lists"].contains(label),
            detail.contains("partially") || issue.compactDescription.contains("partially") {
+            return true
+        }
+
+        // At AX sizes the switcher's titles don't all fit beside Done's check
+        // and the avatar, so they scroll sideways (keeping the current one in
+        // view), and "Lists" sits past the edge. The audit samples the
+        // clipped title; on screen it's the same muted ink as the others.
+        if issue.auditType == .contrast, ["Today", "This week", "Someday", "Lists"].contains(label),
+           issue.element?.isHittable == false {
             return true
         }
 
