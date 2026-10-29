@@ -17,6 +17,8 @@ struct BoardQuickAdd: View {
     let countFor: (String) -> Int
     /// Add what's typed to a list; `parseDates` is false once × was tapped.
     let onAdd: (_ text: String, _ listId: String?, _ parseDates: Bool) -> Void
+    /// Esc: close the popover (a popover doesn't on its own on iPad).
+    var onClose: () -> Void = {}
 
     @State private var text = ""
     @State private var chosenListId: String?
@@ -51,7 +53,8 @@ struct BoardQuickAdd: View {
                     text = ""
                     onAdd(typed, listId, parseDates)
                 },
-                style: .inline
+                style: .inline,
+                onEscape: onClose
             )
             Hairline()
                 .padding(.top, Theme.Space.s3)
@@ -62,8 +65,13 @@ struct BoardQuickAdd: View {
         }
         .padding(20)
         .frame(width: 400)
+        .background { EscapeKey(action: onClose) }
         .background(Theme.Colors.surface)
         .environment(\.isWideLayout, true)
         .presentationCompactAdaptation(.popover)
+        .onKeyPress(.escape) {
+            onClose()
+            return .handled
+        }
     }
 }

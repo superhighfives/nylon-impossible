@@ -16,6 +16,15 @@
 
 import SwiftUI
 
+/// A place the keyboard can be in the sidebar.
+enum SidebarItem: Hashable {
+    case list(String)
+    case newList
+    case done
+    case settings
+    case shortcuts
+}
+
 struct WideSidebar: View {
     struct Entry: Identifiable {
         let list: TodoListModel
@@ -43,6 +52,9 @@ struct WideSidebar: View {
     let onCreateList: (String) -> Void
     let onDone: () -> Void
     let onSettings: () -> Void
+    let onShortcuts: () -> Void
+    /// The keyboard's place in the sidebar, drawn as soft focus.
+    let cursor: SidebarItem?
     let onDrop: (TodoListModel, UUID) -> Void
     let onSignOut: () -> Void
     /// Send Feedback… in the account menu; nil hides it (not an admin).
@@ -62,6 +74,7 @@ struct WideSidebar: View {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(timeLists) { entry in
                         listRow(entry, isOpen: false) { onTimeList(entry.list) }
+                            .softFocus(cursor == .list(entry.id))
                     }
                     Text("Lists")
                         .textStyle(Theme.Fonts.Role.label)
@@ -72,6 +85,7 @@ struct WideSidebar: View {
                         .accessibilityAddTraits(.isHeader)
                     ForEach(collections) { entry in
                         listRow(entry, isOpen: entry.id == openColumnId) { onCollection(entry.list) }
+                            .softFocus(cursor == .list(entry.id))
                     }
                     Button { newListAnchor = .sidebar } label: {
                         HStack(spacing: Theme.Space.s2) {
@@ -86,6 +100,7 @@ struct WideSidebar: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(SidebarButtonStyle())
+                    .softFocus(cursor == .newList)
                     .popover(
                         isPresented: Binding(
                             get: { newListAnchor == .sidebar },
@@ -93,10 +108,10 @@ struct WideSidebar: View {
                         ),
                         arrowEdge: .trailing
                     ) {
-                        NewListForm { name in
+                        NewListForm(onCreate: { name in
                             newListAnchor = nil
                             onCreateList(name)
-                        }
+                        }, onClose: { newListAnchor = nil })
                     }
                 }
             }
@@ -104,15 +119,27 @@ struct WideSidebar: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 doneRow
+                    .softFocus(cursor == .done)
                 plainRow("Settings", action: onSettings)
+                    .softFocus(cursor == .settings)
                 account
                     .padding(.top, Theme.Space.s2)
-                Text("n new · j k move · x done\n1 2 3 move to list · p pin")
-                    .textStyle(Theme.Fonts.Role.meta)
-                    .foregroundStyle(Theme.Colors.inkMuted)
+                Button(action: onShortcuts) {
+                    HStack {
+                        Text("Keyboard shortcuts")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("?").foregroundStyle(Theme.Colors.inkMuted)
+                    }
+                    .textStyle(Theme.Fonts.Role.bodyWide)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Theme.Colors.ink)
                     .padding(.horizontal, 10)
-                    .padding(.top, Theme.Space.s3)
-                    .accessibilityHidden(true)
+                    .frame(minHeight: Theme.Wide.sidebarRow)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(SidebarButtonStyle())
+                .softFocus(cursor == .shortcuts)
+                .accessibilityHint("Lists the board's keys")
             }
         }
         .padding(.vertical, 28)
@@ -281,6 +308,19 @@ private struct SelectionBar: View {
             // clips anything drawn outside it.
             .opacity(isOn ? 1 : 0)
             .accessibilityHidden(true)
+    }
+}
+
+extension View {
+    /// The keyboard's place in the sidebar: a rounded background at 20% of
+    /// the text color, as on wide web, rather than a ring.
+    func softFocus(_ isOn: Bool) -> some View {
+        background(
+            RoundedRectangle(cornerRadius: Theme.Wide.sidebarRadius, style: .continuous)
+                .fill(Theme.Colors.ink.opacity(0.2))
+                .opacity(isOn ? 1 : 0)
+                .accessibilityHidden(true)
+        )
     }
 }
 

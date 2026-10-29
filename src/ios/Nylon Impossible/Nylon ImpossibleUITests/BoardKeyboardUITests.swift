@@ -81,7 +81,7 @@ final class BoardKeyboardUITests: NylonUITestCase {
 
     func testBackspaceDeletesWithUndo() {
         // Known: Return and Backspace don't reach the board when XCUITest
-        // simulates a hardware key, while letters, arrows, Escape and ⌘N do.
+        // simulates a hardware key (nor does Esc), while letters, arrows and ⌘N do.
         // Most likely the focus system takes them as "activate" and
         // "delete backward" before onKeyPress and the menu's key commands
         // see them. Needs checking on a device with a real keyboard, and
@@ -98,7 +98,7 @@ final class BoardKeyboardUITests: NylonUITestCase {
 
     func testReturnOpensTheDetail() {
         // Known: Return and Backspace don't reach the board when XCUITest
-        // simulates a hardware key, while letters, arrows, Escape and ⌘N do.
+        // simulates a hardware key (nor does Esc), while letters, arrows and ⌘N do.
         // Most likely the focus system takes them as "activate" and
         // "delete backward" before onKeyPress and the menu's key commands
         // see them. Needs checking on a device with a real keyboard, and
@@ -120,7 +120,13 @@ final class BoardKeyboardUITests: NylonUITestCase {
         XCTAssertEqual(app.textFields["Title"].firstMatch.value as? String, "Review PR for the sync engine")
     }
 
-    func testNFocusesTheComposerAndTypingIsNotAShortcut() {
+    func testNOpensQuickAddAndTypingIsNotAShortcut() {
+        // Known: Esc doesn't reach the app when XCUITest simulates it on
+        // iPad, as with Return and Backspace below. Log markers showed no Esc
+        // at onKeyPress, and the board's Esc key command (`EscapeKey`) didn't
+        // fire either. Needs checking on a device with a real keyboard.
+        // Expected to fail until then; it passes if fixed.
+        XCTExpectFailure("Esc isn't delivered to the app under XCUITest", strict: false)
         press("j")
         press("n")
         let field = app.textFields["New todo"].firstMatch
@@ -136,10 +142,100 @@ final class BoardKeyboardUITests: NylonUITestCase {
         // would match the sidebar's Done entry.)
         XCTAssertFalse(app.buttons["Undo"].exists)
 
-        // Escape hands the keyboard back to the board, and j works again.
+        // Escape closes quick add and hands the keyboard back to the board.
         press(XCUIKeyboardKey.escape.rawValue)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field)
+        waitForExpectations(timeout: 3)
         press("j")
         waitFor(selectedRow)
+    }
+
+    // MARK: - Two levels, jumps, palette
+
+    func testLeftFromTheFirstColumnReachesTheSidebarAndRightGoesBackIn() {
+        press("j")
+        press("h")
+        // In the sidebar, on Today: down to This week, then into it.
+        press("j")
+        press("l")
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+    }
+
+    func testEscapeClosesTheTodoThenGoesToTheSidebar() {
+        // Known: Esc doesn't reach the app when XCUITest simulates it on
+        // iPad, as with Return and Backspace below. Log markers showed no Esc
+        // at onKeyPress, and the board's Esc key command (`EscapeKey`) didn't
+        // fire either. Needs checking on a device with a real keyboard.
+        // Expected to fail until then; it passes if fixed.
+        XCTExpectFailure("Esc isn't delivered to the app under XCUITest", strict: false)
+        let review = row("Review PR for the sync engine")
+        review.tap()
+        review.tap()
+        let detail = app.staticTexts["Notes"].firstMatch
+        waitFor(detail)
+        press(XCUIKeyboardKey.escape.rawValue)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: detail)
+        waitForExpectations(timeout: 3)
+        // The selection stays; Esc again goes to the sidebar, and → back in.
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+        press(XCUIKeyboardKey.escape.rawValue)
+        press("j")
+        press("l")
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+    }
+
+    func testShiftDigitsJumpToColumnsAndLists() {
+        press("j")
+        press("2", .shift)
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+        press("4", .shift)
+        waitFor(row("Parmesan"))
+        XCTAssertEqual(selectedRow.label, "Parmesan")
+        press("1", .shift)
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+    }
+
+    func testGThenALetterJumps() {
+        press("j")
+        press("g")
+        press("s")
+        waitFor(row("Repaint the hallway"))
+        XCTAssertEqual(selectedRow.label, "Repaint the hallway")
+        // Any other key after G cancels it and does its usual job.
+        press("g")
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Learn to make sourdough")
+    }
+
+    func testCommandKSearchesAndGoesToATodo() {
+        press("k", .command)
+        let field = app.textFields["Search todos, lists and commands…"].firstMatch
+        waitFor(field)
+        app.typeText("parm\n")
+        waitFor(row("Parmesan"))
+        XCTAssertEqual(selectedRow.label, "Parmesan")
+    }
+
+    func testMMovesTheSelectionToAList() {
+        press("j")
+        press("m")
+        waitFor(app.staticTexts["Move “Review PR for the sync engine”"])
+        app.typeText("groc\n")
+        waitFor(XCUIElement.toast("Moved to Groceries", in: app))
+    }
+
+    func testQuestionMarkListsTheShortcuts() {
+        press("/", .shift)
+        waitFor(app.staticTexts["Keyboard shortcuts"].firstMatch)
+        XCTAssertTrue(app.staticTexts["Move to a list…"].exists)
+        XCTAssertTrue(app.staticTexts["⇧1 or G T"].exists)
+    }
+
+    func testShiftNOpensNewList() {
+        press("n", .shift)
+        waitFor(app.textFields["Name"].firstMatch)
     }
 
     func testCommandNWorksWhileTyping() {

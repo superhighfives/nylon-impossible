@@ -12,6 +12,8 @@ import SwiftUI
 
 struct NewListForm: View {
     let onCreate: (String) -> Void
+    /// Esc: close the popover.
+    var onClose: () -> Void = {}
 
     @State private var name = ""
     @FocusState private var focused: Bool
@@ -53,9 +55,14 @@ struct NewListForm: View {
         }
         .padding(14)
         .frame(width: 300)
+        .background { EscapeKey(action: onClose) }
         .background(Theme.Colors.surface)
         .presentationCompactAdaptation(.popover)
         .onAppear { focused = true }
+        .onKeyPress(.escape) {
+            onClose()
+            return .handled
+        }
     }
 
     private func add() {

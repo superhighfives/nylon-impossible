@@ -43,7 +43,7 @@ struct MacCommands: Commands {
             }
             Divider()
             Menu("Move to") {
-                ForEach(BoardMenuCommand.moveMenu, id: \.self) { item($0) }
+                ForEach(BoardMenuCommand.moveMenu, id: \.self) { item($0, title: $0.submenuTitle) }
                 if let collections = board?.collections, !collections.isEmpty {
                     Divider()
                     ForEach(collections, id: \.id) { list in
@@ -73,8 +73,8 @@ struct MacCommands: Commands {
     /// the board has the keyboard; the item itself stays, so the menu
     /// doesn't change shape as you type.
     @ViewBuilder
-    private func item(_ command: BoardMenuCommand) -> some View {
-        let button = Button(command.title) { board?.handle(command) }
+    private func item(_ command: BoardMenuCommand, title: String? = nil) -> some View {
+        let button = Button(title ?? command.title) { board?.handle(command) }
             .disabled(!command.isEnabled(in: board))
         if let shortcut = command.shortcut, !command.isSingleKey || board?.keysEnabled == true {
             button.keyboardShortcut(shortcut.key, modifiers: shortcut.modifiers)
