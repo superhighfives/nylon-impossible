@@ -322,7 +322,11 @@ final class TodoActions {
         }
         save()
         onMutate()
-        recentLists.record(listId)
+        // Only collections are ever shown as recents; time lists would just
+        // push them out of the capped history.
+        if allLists().first(where: { $0.id.lowercased() == listId.lowercased() })?.isSystem == false {
+            recentLists.record(listId)
+        }
         guard announce else { return }
         toasts.show("Moved to \(listName(listId))", action: { [weak self] in
             self?.undo(snapshot, todo: todo)
