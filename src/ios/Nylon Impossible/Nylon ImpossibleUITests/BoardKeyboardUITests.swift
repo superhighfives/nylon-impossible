@@ -180,7 +180,8 @@ final class BoardKeyboardUITests: NylonUITestCase {
         // The selection stays; Esc again goes to the sidebar and deselects.
         XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
         press(XCUIKeyboardKey.escape.rawValue)
-        XCTAssertFalse(selectedRow.exists)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: selectedRow)
+        waitForExpectations(timeout: 3)
         press("j")
         press("l")
         XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
