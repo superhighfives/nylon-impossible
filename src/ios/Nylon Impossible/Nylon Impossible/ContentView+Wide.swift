@@ -2,16 +2,23 @@
 //  ContentView+Wide.swift
 //  Nylon Impossible
 //
-//  The iPad board: the sidebar, then Today, This week and Someday as hairline
-//  columns that are always there, plus one of your lists as a fourth column
-//  when it's picked in the sidebar. The detail, Done and Settings open in a
-//  trailing panel (an inspector) instead of a sheet.
+//  The board (iPad and Mac): the sidebar, a toolbar, then four columns that
+//  never change width: Today, This week, Someday, and a fourth that shows
+//  the open todo's detail, else the list picked in the sidebar, else Done.
+//  One click selects a row; a click on the selection (or Return) opens it in
+//  the fourth column, and while a todo is open the detail follows the
+//  selection. Settings is a sheet on iPad and its own window on a Mac.
 //
 //  It shares ContentView's state and TodoActions with the phone layout, so a
 //  window resized between the two keeps what's open; see `carryAcross`.
 //
 
 import SwiftUI
+
+/// Which button the New list popover is anchored to.
+enum NewListAnchor: Hashable {
+    case sidebar, toolbar
+}
 
 /// What every board column reads from the whole store, worked out once per
 /// update of the board.
@@ -24,14 +31,36 @@ struct BoardDerived {
 extension ContentView {
     // MARK: - Derived
 
-    /// The board's columns, left to right.
+    /// The three time lists, always the first three columns.
+    var timeColumns: [TodoListModel] {
+        [Page.today, .thisWeek, .someday].compactMap(timeList)
+    }
+
+    /// Your list open in the fourth column, if it still exists.
+    var openList: TodoListModel? {
+        openColumnId.flatMap { id in collections.first { $0.id == id } }
+    }
+
+    /// The columns with rows, left to right: the time lists, and your list
+    /// when the fourth column shows it (not under an open todo, not Done).
     var boardColumns: [TodoListModel] {
-        var columns = [Page.today, .thisWeek, .someday].compactMap(timeList)
-        if let id = openColumnId, let list = collections.first(where: { $0.id == id }) {
-            columns.append(list)
-        }
+        var columns = timeColumns
+        if detailTodo == nil, let list = openList { columns.append(list) }
         return columns
     }
+
+    /// The fourth column shows Done: nothing's open and no list is picked.
+    var doneShowing: Bool { detailTodo == nil && openList == nil }
+
+    /// The column the selection is in: a list's id, `done`, or nil.
+    var selectionColumn: String? {
+        guard let id = selectedTodoId, let todo = todos.first(where: { $0.id == id }) else { return nil }
+        if todo.isCompleted { return Self.doneColumn }
+        return orderedLists.first { $0.id.lowercased() == todo.listKey?.lowercased() }?.id
+    }
+
+    /// The selection's column key when it's in Done.
+    static let doneColumn = "done"
 
     var focusedColumn: TodoListModel? {
         boardColumns.first { $0.id == focusedColumnId } ?? boardColumns.first
@@ -66,7 +95,7 @@ extension ContentView {
                 .overlay(alignment: .trailing) { VerticalHairline() }
                 .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Wide.sidebarWidth, max: 320)
         } detail: {
-            boardWithPanel
+            boardWithDetail
                 // A fixed minimum, so the split view never asks the board's
                 // content for one. Left to SwiftUI, the detail's minimum size
                 // came from the columns and rows; collapsing or showing the
@@ -89,10 +118,18 @@ extension ContentView {
         HStack(spacing: 0) {
             sidebar
             VerticalHairline()
-            boardWithPanel
+            VStack(spacing: 0) {
+                boardToolbar
+                Hairline()
+                boardWithDetail
+            }
         }
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .focusedSceneValue(\.board, commandHandler)
+        .sheet(isPresented: Binding(get: { widePanel == .settings }, set: { if !$0 { widePanel = nil } })) {
+            PanelChrome(onClose: { widePanel = nil }) { SettingsView() }
+                .presentationBackground(Theme.Colors.canvas)
+        }
         #endif
     }
 
@@ -101,19 +138,19 @@ extension ContentView {
         return WideSidebar(
             timeLists: sidebarTimeLists(counts: counts),
             collections: sidebarCollections(counts: counts),
-            openColumnId: openColumnId,
-            panel: detailTodo == nil ? widePanel : nil,
+            openColumnId: detailTodo == nil ? openList?.id : nil,
+            selectionColumn: selectionColumn,
+            doneShowing: doneShowing,
             doneCount: doneCount,
             name: displayName,
             initials: initials,
             avatarURL: screenRoute == nil ? authService.userImageURL : nil,
             onTimeList: { focusColumn($0.id) },
-            onCollection: toggleColumn,
-            onNewList: {
-                newListName = ""
-                showsNewList = true
-            },
-            onPanel: showPanel,
+            onCollection: openCollection,
+            newListAnchor: $newListAnchor,
+            onCreateList: commitNewList,
+            onDone: showDone,
+            onSettings: { showPanel(.settings) },
             onDrop: { list, id in
                 guard let todo = todos.first(where: { $0.id == id }) else { return }
                 actions.move(todo, toList: list.id)
@@ -131,15 +168,14 @@ extension ContentView {
     }
 
     var board: some View {
-        let columns = boardColumns
+        let columns = timeColumns
         // Every column reads these; work them out once per update rather than
         // once per column (each is a pass over every todo in the store).
         let derived = BoardDerived(counts: counts, subtasks: subtasksByParent, lists: orderedLists)
         // At accessibility text sizes the columns keep a readable width
-        // and the board scrolls sideways, rather than squeezing three
+        // and the board scrolls sideways, rather than squeezing four
         // columns until words break mid-letter.
         let minimum = dynamicTypeSize.isAccessibilitySize ? Theme.Wide.columnMinWidthLargeText : Theme.Wide.columnMinWidth
-        let count = CGFloat(max(columns.count, 1))
         return ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
@@ -156,30 +192,27 @@ extension ContentView {
                         // height from its content, so sizing the height from
                         // the container too is a cycle, and inside the Mac's
                         // split view it never settles (AppKit throws after
-                        // too many constraint passes, at launch).
+                        // too many constraint passes, at launch). Always a
+                        // quarter, so the columns never change width.
                         .containerRelativeFrame(.horizontal) { length, _ in
-                            max(minimum, length / count)
+                            max(minimum, length / 4)
                         }
                         .frame(maxHeight: .infinity)
                         .id(list.id)
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
                     }
+                    HStack(spacing: 0) {
+                        VerticalHairline()
+                        fourthColumn(derived: derived)
+                    }
+                    .containerRelativeFrame(.horizontal) { length, _ in
+                        max(minimum, length / 4)
+                    }
+                    .frame(maxHeight: .infinity)
+                    .id(openList?.id ?? Self.doneColumn)
                 }
-                // On macOS the inspector closing doesn't re-resolve the
-                // columns' container-relative width, so they stay as narrow
-                // as they were beside the panel until the window is resized.
-                // A new identity on each close makes them measure again;
-                // only the close, so opening a todo keeps the columns'
-                // scroll and drag state.
-                .id(panelCloses)
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
-            .onChange(of: panelBinding.wrappedValue) { _, shown in
-                #if os(macOS)
-                if !shown { panelCloses += 1 }
-                #endif
-            }
             .onChange(of: scrollColumnId) { _, id in
                 guard let id else { return }
                 withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.slow)) {
@@ -189,7 +222,6 @@ extension ContentView {
             }
         }
         .environment(\.isWideLayout, true)
-        .animation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base), value: openColumnId)
         .overlay(alignment: .top) {
             if case .error(let message) = syncService.state {
                 SyncErrorLine(
@@ -210,13 +242,41 @@ extension ContentView {
         .focused($boardFocused)
         .focusEffectDisabled()
         .onKeyPress(phases: .down) { press in
-            guard editingColumnId == nil,
+            guard editingColumnId == nil, renamingColumnId == nil,
                   let key = BoardKey.from(key: press.key, characters: press.characters, modifiers: press.modifiers)
             else { return .ignored }
             perform(key)
             return .handled
         }
         .refreshable { await syncService.sync() }
+    }
+
+    /// The fourth column: the open todo's detail, else your list, else Done.
+    @ViewBuilder
+    func fourthColumn(derived: BoardDerived) -> some View {
+        if let todo = detailTodo {
+            WidePanel(
+                todo: todo,
+                route: nil,
+                lists: derived.lists,
+                actions: actions,
+                apiService: syncService.apiService,
+                userId: authService.userId,
+                showsCalendar: showsDueCalendar,
+                onClose: closeDetail
+            )
+            .background(Theme.Colors.canvas)
+        } else if let list = openList {
+            column(list, derived: derived)
+        } else {
+            BoardDoneColumn(
+                todos: doneTodos,
+                lists: derived.lists,
+                selectedId: selectedTodoId,
+                onSelect: selectWide,
+                onRestore: { actions.restoreFromDone($0) }
+            )
+        }
     }
 
     @ViewBuilder
@@ -236,6 +296,7 @@ extension ContentView {
                 overnight: kind == .today ? overnightText.map { ($0, dismissOvernight) } : nil,
                 empty: wideEmpty(kind, counts: derived.counts),
                 composer: composer,
+                onSelect: selectWide,
                 onOpen: openWide,
                 onDrop: { id, row in dropWide(id, on: row, into: list) },
                 onExternalDrop: { addDropped($0, to: list) }
@@ -254,11 +315,27 @@ extension ContentView {
                 overnight: nil,
                 empty: ("Nothing here yet.", nil),
                 composer: composer,
+                onSelect: selectWide,
                 onOpen: openWide,
+                onRename: { rename(list, to: $0) },
+                isRenaming: Binding(
+                    get: { renamingColumnId == list.id },
+                    set: { renamingColumnId = $0 ? list.id : nil }
+                ),
                 onDrop: { id, row in dropWide(id, on: row, into: list) },
                 onExternalDrop: { addDropped($0, to: list) }
             ) {
                 collectionMenu(list)
+                Button(action: showDone) {
+                    Image(systemName: Theme.Icon.close)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.inkMuted)
+                        .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close \(list.name)")
+                .help("Close \(list.name)")
             }
         }
     }
@@ -284,26 +361,21 @@ extension ContentView {
                     editingColumnId = nil
                     boardFocused = true
                 }
-            }
+            },
+            showsListChips: false
         )
     }
 
     func collectionMenu(_ list: TodoListModel) -> some View {
         Menu {
             Button {
-                renameText = list.name
-                renamingList = list
+                renamingColumnId = list.id
             } label: {
                 Label("Rename", systemImage: Theme.Icon.edit)
             }
-            Button {
-                toggleColumn(list)
-            } label: {
-                Label("Close column", systemImage: Theme.Icon.close)
-            }
             Divider()
             Button(role: .destructive) {
-                deletingList = list
+                deleteListWithUndo(list)
             } label: {
                 Label("Delete list", systemImage: Theme.Icon.delete)
             }
@@ -314,7 +386,7 @@ extension ContentView {
                 .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
                 .contentShape(Rectangle())
         }
-        .accessibilityLabel("List options")
+        .accessibilityLabel("\(list.name) options")
     }
 
     func wideEmpty(_ kind: SystemListKind, counts: [String: Int]) -> (text: String, link: (text: String, action: () -> Void)?) {
@@ -330,60 +402,6 @@ extension ContentView {
             return ("A clear week.", waiting > 0 ? link : nil)
         case .someday:
             return ("Nothing here yet.", nil)
-        }
-    }
-
-    // MARK: - Panel
-
-    func showPanel(_ route: AccountRoute) {
-        #if os(macOS)
-        // A Mac has a Settings window (⌘,); the sidebar's Settings opens it.
-        if route == .settings, screenRoute == nil {
-            openSettings()
-            return
-        }
-        #endif
-        detailTodo = nil
-        widePanel = widePanel == route ? nil : route
-    }
-
-    func closePanel() {
-        detailTodo = nil
-        widePanel = nil
-        showsDueCalendar = false
-        boardFocused = true
-    }
-
-    // MARK: - Actions
-
-    func openWide(_ todo: TodoItem) {
-        selectedTodoId = todo.id
-        if let column = boardColumns.first(where: { $0.id.lowercased() == todo.listKey?.lowercased() }) {
-            focusedColumnId = column.id
-        }
-        showsDueCalendar = false
-        widePanel = nil
-        detailTodo = todo
-    }
-
-    /// A time list in the sidebar: scroll to its column and give it the
-    /// keyboard. Nothing opens.
-    func focusColumn(_ id: String) {
-        if focusedColumnId != id { selectedTodoId = nil }
-        focusedColumnId = id
-        scrollColumnId = id
-        boardFocused = true
-    }
-
-    /// One of your lists: open it as the fourth column, swap it for another,
-    /// or close it when it's the one already open.
-    func toggleColumn(_ list: TodoListModel) {
-        if openColumnId == list.id {
-            openColumnId = nil
-            if focusedColumnId == list.id { focusedColumnId = timeList(.today)?.id }
-        } else {
-            openColumnId = list.id
-            focusColumn(list.id)
         }
     }
 
@@ -408,8 +426,11 @@ extension ContentView {
 
     func showColumn(_ listId: String) {
         guard let list = orderedLists.first(where: { $0.id.lowercased() == listId.lowercased() }) else { return }
-        if !list.isSystem { openColumnId = list.id }
-        focusColumn(list.id)
+        if list.isSystem {
+            focusColumn(list.id)
+        } else {
+            openCollection(list)
+        }
     }
 
     /// A drop on a column moves the todo there; a drop on a row also places
@@ -429,13 +450,16 @@ extension ContentView {
         actions.edited()
     }
 
-    func commitNewList() {
-        let name = newListName.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// New list: create it, open it in the fourth column, and put the
+    /// cursor in its Add field.
+    func commitNewList(_ name: String) {
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
         Task {
-            if await createList(name), let id = viewModel.openCollectionId {
-                openColumnId = id
-                focusColumn(id)
+            if await createList(name), let id = viewModel.openCollectionId,
+               let list = collections.first(where: { $0.id == id }) {
+                openCollection(list)
+                requestComposer(id)
             }
         }
     }

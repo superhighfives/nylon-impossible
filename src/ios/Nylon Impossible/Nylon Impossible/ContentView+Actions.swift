@@ -114,16 +114,33 @@ extension ContentView {
         }
     }
 
-    func commitDeleteList() {
-        guard let list = deletingList, let apiService = syncService.apiService else { return }
-        Task {
-            do {
-                try await viewModel.deleteList(list, apiService: apiService, context: modelContext)
-                syncService.syncAfterAction()
-            } catch {
+    /// Delete one of your lists straight away, with Undo (no confirmation).
+    /// It and its todos hide now; the delete goes to the server when the
+    /// toast does.
+    func deleteListWithUndo(_ list: TodoListModel) {
+        let count = todos.filter {
+            $0.parentId == nil && !$0.isSoftDeleted && $0.listKey?.lowercased() == list.id.lowercased()
+        }.count
+        actions.deleteList(list, todoCount: count) { [syncService, viewModel, modelContext, actions] finished in
+            // No API (DEBUG screen routes, tests): fail like a network error
+            // does, so the toast that said "Deleted" isn't silently undone.
+            guard let apiService = syncService.apiService else {
                 actions.toasts.show("Couldn’t delete the list", action: nil)
+                return finished()
+            }
+            Task {
+                do {
+                    try await viewModel.deleteList(list, apiService: apiService, context: modelContext)
+                    syncService.syncAfterAction()
+                } catch {
+                    actions.toasts.show("Couldn’t delete the list", action: nil)
+                }
+                finished()
             }
         }
+        // Hidden first, then out of the way: the fourth column goes to Done.
+        if openColumnId == list.id { openColumnId = nil }
+        if viewModel.openCollectionId == list.id { viewModel.openCollectionId = nil }
     }
 
     func signOut() {
@@ -221,7 +238,7 @@ extension ContentView {
                     ScreenRouteMenu.present()
                     #endif
                 case .done where isWide:
-                    widePanel = .done
+                    showDone()
                 case .settings where isWide:
                     widePanel = .settings
                 case .done:

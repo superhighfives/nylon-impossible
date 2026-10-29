@@ -74,6 +74,9 @@ final class TodoActions {
     private(set) var fading: Set<UUID> = []
     /// Deleted rows whose toast is still up. Hidden, not yet deleted.
     private(set) var pendingDeletes: Set<UUID> = []
+    /// Deleted lists (by id) whose toast is still up, or whose delete is
+    /// still on its way to the server. Hidden, with their todos.
+    private(set) var pendingListDeletes: Set<String> = []
 
     @ObservationIgnored var reduceMotion = false
     @ObservationIgnored var holdDuration: Duration = Theme.Phone.doneHold
@@ -265,6 +268,39 @@ final class TodoActions {
         viewModel.deleteTodo(todo, context: context)
         save()
         onMutate()
+    }
+
+    /// Delete one of your lists straight away, with Undo: it and its todos
+    /// hide now, and `commit` deletes it when the toast goes. `commit` calls
+    /// its argument when it's done (or failed), which un-hides the list.
+    func deleteList(
+        _ list: TodoListModel,
+        todoCount: Int,
+        commit: @escaping (_ finished: @escaping () -> Void) -> Void
+    ) {
+        let id = list.id
+        // Once per list: a second request would replace this toast, which
+        // expires it and commits the delete it was holding back.
+        guard !pendingListDeletes.contains(id) else { return }
+        withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+            _ = pendingListDeletes.insert(id)
+        }
+        let text = todoCount > 0
+            ? "Deleted “\(list.name)” and \(todoCount) \(todoCount == 1 ? "todo" : "todos")"
+            : "Deleted “\(list.name)”"
+        toasts.show(
+            text,
+            onExpire: { [weak self] in
+                guard let self, self.pendingListDeletes.contains(id) else { return }
+                commit { [weak self] in _ = self?.pendingListDeletes.remove(id) }
+            },
+            action: { [weak self] in
+                guard let self else { return }
+                withAnimation(self.reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+                    _ = self.pendingListDeletes.remove(id)
+                }
+            }
+        )
     }
 
     /// Commit anything a toast is holding back — leaving the app, signing out.

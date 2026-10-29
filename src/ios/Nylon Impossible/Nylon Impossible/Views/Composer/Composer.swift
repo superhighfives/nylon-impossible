@@ -43,6 +43,9 @@ struct Composer: View {
     /// Send with nothing typed (the share sheet, where the placeholder is
     /// what's saved). The send button then shows from the start.
     var allowsEmptySubmit = false
+    /// The list chips. Off for a board column's Add field, whose column
+    /// already says which list it is; the due chip still shows.
+    var showsListChips = true
 
     @State private var keepWords = false
     @FocusState private var isFocused: Bool
@@ -205,7 +208,7 @@ struct Composer: View {
             .frame(minHeight: Theme.Space.rowMinHeight)
             .contentShape(Rectangle())
             .onTapGesture { isFocused = true }
-            if showsChips {
+            if showsChips, showsListChips || typedDue != nil {
                 chips
                     .padding(.bottom, Theme.Space.s1)
                     .transition(.opacity)
@@ -255,7 +258,7 @@ struct Composer: View {
         if let due = typedDue {
             dueChip(due)
         }
-        ForEach(lists) { list in
+        ForEach(showsListChips ? lists : []) { list in
             ChipButton(text: list.name, isOn: list.id == targetId, strong: true) {
                 chosenListId = list.id == currentListId ? nil : list.id
             }

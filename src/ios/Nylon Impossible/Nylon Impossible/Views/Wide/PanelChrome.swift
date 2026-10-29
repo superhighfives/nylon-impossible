@@ -47,9 +47,9 @@ struct PanelChrome<Content: View>: View {
     }
 }
 
-/// What the board's trailing panel shows: a todo's detail, or Done or
-/// Settings. Takes plain values so it never reads the board's queries from
-/// the inspector's own view graph (see `ContentView.boardWithPanel`).
+/// A todo's detail in the board's fourth column, or (on iPad, in a sheet)
+/// Done or Settings. Takes plain values rather than reading the board's
+/// queries itself (see `ContentRoot`).
 struct WidePanel: View {
     let todo: TodoItem?
     let route: AccountRoute?

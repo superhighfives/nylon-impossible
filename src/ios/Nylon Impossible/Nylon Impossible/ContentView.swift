@@ -74,23 +74,28 @@ struct ContentView: View {
     @State var composerFocus = ComposerFocusGuard()
     @State var renamingList: TodoListModel?
     @State var renameText = ""
-    @State var deletingList: TodoListModel?
     // Bumped at each local midnight so dates and repeats done "today" roll
     // over without a refetch; any @State write re-runs body.
     @State var midnightTick = 0
     @State var composerHeight: CGFloat = 0
 
-    // MARK: Wide (iPad) state
-    /// The collection open as the board's fourth column.
+    // MARK: Wide (iPad and Mac) state
+    /// Your list open in the board's fourth column (else Done shows there).
     @State var openColumnId: String?
-    /// Done or Settings in the trailing panel.
+    /// iPad: Settings, as a sheet over the board. (A Mac has its Settings
+    /// window; Done is the fourth column.)
     @State var widePanel: AccountRoute?
-    /// Bumped each time the Mac panel closes, so the board's columns measure
-    /// their width again (see `board`).
-    @State var panelCloses = 0
-    /// The keyboard's row, and the column it's in.
+    /// The board's selection, and the column it's in.
     @State var selectedTodoId: UUID?
     @State var focusedColumnId: String?
+    /// The last todo selected in each column, so going back lands on it.
+    @State var lastSelected: [String: UUID] = [:]
+    /// Your list whose title is being renamed in place.
+    @State var renamingColumnId: String?
+    /// The toolbar's quick add, and the New list popover (and which button
+    /// it's anchored to).
+    @State var showsQuickAdd = false
+    @State var newListAnchor: NewListAnchor?
     /// Each column's composer: its draft, a chip picked over the default, a
     /// focus request, and which one is being typed in.
     @State var drafts: [String: String] = [:]
@@ -100,8 +105,6 @@ struct ContentView: View {
     /// Raised to scroll the board to a column.
     @State var scrollColumnId: String?
     @State var showsDueCalendar = false
-    @State var showsNewList = false
-    @State var newListName = ""
     @State var lastKey: (key: BoardKey, at: Date)?
     @FocusState var boardFocused: Bool
 
@@ -150,21 +153,6 @@ struct ContentView: View {
             TextField("List name", text: $renameText)
             Button("Cancel", role: .cancel) {}
             Button("Rename") { commitRename() }
-        }
-        .confirmationDialog(
-            "Delete “\(deletingList?.name ?? "")”?",
-            isPresented: Binding(get: { deletingList != nil }, set: { if !$0 { deletingList = nil } }),
-            titleVisibility: .visible
-        ) {
-            Button("Delete list and its todos", role: .destructive) { commitDeleteList() }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Todos in this list are deleted too. This can’t be undone.")
-        }
-        .alert("New list", isPresented: $showsNewList) {
-            TextField("List name", text: $newListName)
-            Button("Cancel", role: .cancel) {}
-            Button("Create") { commitNewList() }
         }
         .task {
             actions.configure(context: modelContext) { syncService.syncAfterAction() }
@@ -341,7 +329,9 @@ extension ContentView {
     /// Today, This week, Someday, then collections by position. A system list
     /// this build doesn't know is skipped rather than shown blank.
     var orderedLists: [TodoListModel] {
-        lists.filter { !$0.isSystem || $0.systemKind != nil }.sorted { a, b in
+        // A list deleted with Undo still up is gone from every view.
+        let hidden = actions.pendingListDeletes
+        return lists.filter { ($0.isSystem ? $0.systemKind != nil : !hidden.contains($0.id)) }.sorted { a, b in
             if a.isSystem != b.isSystem { return a.isSystem }
             if a.isSystem && b.isSystem { return a.systemSortIndex < b.systemSortIndex }
             return a.position < b.position
@@ -398,8 +388,21 @@ extension ContentView {
         )
     }
 
-    var doneCount: Int {
-        todos.filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }.count
+    var doneCount: Int { doneTodos.count }
+
+    /// Finished top-level todos, newest first, minus any in a list deleted
+    /// with Undo still up.
+    var doneTodos: [TodoItem] {
+        let hidden = actions.pendingListDeletes
+        return todos
+            .filter {
+                $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted
+                    && !actions.pendingDeletes.contains($0.id)
+                    && !hidden.contains($0.listKey ?? "")
+            }
+            .map { (todo: $0, at: $0.completedAt ?? $0.updatedAt) }
+            .sorted { DoneHistoryView.isOrderedBefore($0, $1) }
+            .map(\.todo)
     }
 
     // MARK: - Feedback
@@ -414,7 +417,8 @@ extension ContentView {
         let openId = isWide ? openColumnId : viewModel.openCollectionId
         if let openId, let list = lists.first(where: { $0.id == openId }) { parts.append(list.name) }
         if detailTodo != nil { parts.append("detail") }
-        if isWide, let widePanel { parts.append(widePanel == .done ? "done" : "settings") }
+        if isWide, detailTodo == nil, openColumnId == nil { parts.append("done") }
+        if isWide, widePanel == .settings { parts.append("settings") }
         if showsAccount { parts.append(accountPath.last.map { $0 == .done ? "done" : "settings" } ?? "account") }
         return parts.joined(separator: " › ")
     }

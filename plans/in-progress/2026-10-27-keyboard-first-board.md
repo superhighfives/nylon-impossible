@@ -43,6 +43,9 @@ Treat this like the October redesign: this spec is the source of truth, and the 
    - list delete with Undo in place of the confirmation dialog;
    - the iOS link-adding UI;
    - the menu bar popover's keyboard model, and its focus fix.
+
+   Split like phase 2: **3.1 layout** (the fourth column, select then open, the sidebar's fill and bar, the toolbar with quick add and New list, rename in place, list delete with Undo on every Apple layout), **3.2 keyboard** (two levels, jumps, the palette as a `CommandMenu`, Move to, Search in the toolbar, the Keyboard shortcuts item, `BoardMenuCommand`/`BoardKey` as the registry), and **3.3 details** (links, the overnight pill, the menu bar popover).
+      - *3.1 as built:* the inspector is gone; the detail renders in the fourth column, so the Mac board no longer has a separate inspector hosting view. Settings is a sheet on iPad (its own window on a Mac, as before). Done reads from `ContentView`'s todos rather than `DoneHistoryView`'s own `@Query`. The `inspector` screen route keeps its name and now shows the detail in the fourth column. The sidebar's shortcut hint stays until 3.2 replaces it with the Keyboard shortcuts item. List delete with Undo replaces the confirmation on the phone too, and its toast counts every todo in the list, done ones included (they go with it).
 4. **Phone (iOS and mobile web together):**
    - the Done button beside the avatar, and Done as a top-level page;
    - the space kept for the banner on every top-level page;
@@ -74,6 +77,9 @@ Treat this like the October redesign: this spec is the source of truth, and the 
 - [x] 2.2 Wide web: keyboard, command registry, palette, Move to
 - [x] 2.3 Wide web: links, overnight banner, tab stops and focus
 - [ ] 3. iPad and Mac wide, Mac toolbar, list delete with Undo, iOS links, menu bar
+  - [x] 3.1 Layout: fourth column, select then open, sidebar, toolbar, rename, list delete with Undo
+  - [ ] 3.2 Keyboard, palette, Move to
+  - [ ] 3.3 Links, overnight pill, menu bar
 - [ ] 4. Phone (iOS and mobile web)
 - [ ] 5. Gmail
 
