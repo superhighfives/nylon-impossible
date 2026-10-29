@@ -35,8 +35,13 @@ struct OvernightPill: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    // A 44pt target around a one-line pill, without making
+                    // the pill taller.
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .padding(.vertical, -14)
             .accessibilityHint(isWide ? "Selects the first of them" : "Shows them")
             Button(action: onDismiss) {
                 Image(systemName: Theme.Icon.close)

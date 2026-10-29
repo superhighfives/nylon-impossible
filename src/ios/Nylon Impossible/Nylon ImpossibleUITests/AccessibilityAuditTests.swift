@@ -108,6 +108,15 @@ enum AuditAllowance {
             return true
         }
 
+        // At AX sizes the switcher's titles don't all fit beside Done's check
+        // and the avatar, so they scroll sideways (keeping the current one in
+        // view), and "Lists" sits past the edge. The audit samples the
+        // clipped title; on screen it's the same muted ink as the others.
+        if issue.auditType == .contrast, ["Today", "This week", "Someday", "Lists"].contains(label),
+           issue.element?.isHittable == false {
+            return true
+        }
+
         // The avatar's initials are decorative, drawn in a fixed 30pt circle
         // (ink on gray-3, 14:1); the button around them is labelled
         // "Account" and shows in the Large Content Viewer. The audit samples
