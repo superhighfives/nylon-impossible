@@ -392,6 +392,30 @@ struct PageTests {
     }
 
     @MainActor
+    @Test("Done has no list to add to, even with a collection open")
+    func doneHasNoList() {
+        let vm = TodoViewModel()
+        let lists = [
+            TodoListModel(id: "today", userId: "u", name: "Today", kind: "system", systemKind: .today),
+            TodoListModel(id: "groceries", userId: "u", name: "Groceries")
+        ]
+        // A page with no system list once matched the first collection
+        // (`systemKind == nil`), which put a composer on Done.
+        vm.page = .done
+        #expect(vm.currentListId(in: lists) == nil)
+        vm.openCollectionId = "groceries"
+        #expect(vm.currentListId(in: lists) == nil)
+    }
+
+    @Test("the switcher's tabs are the first four pages; Done is last and not a tab")
+    func tabs() {
+        #expect(TodoViewModel.Page.tabs == [.today, .thisWeek, .someday, .lists])
+        #expect(TodoViewModel.Page.allCases.last == .done)
+        #expect(TodoViewModel.Page.allCases.starts(with: TodoViewModel.Page.tabs))
+        #expect(TodoViewModel.Page.done.systemKind == nil)
+    }
+
+    @MainActor
     @Test("page rows: pinned first, then position; done and deleted left out")
     func pageOrder() {
         let vm = TodoViewModel()
