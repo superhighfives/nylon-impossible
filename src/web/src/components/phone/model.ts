@@ -27,13 +27,20 @@ import type {
   TodoWithUrls,
 } from "@/types/database";
 
-/** The four pages the switcher pages between, in swipe order. */
+/**
+ * The pages the switcher pages between, in swipe order. The first four are
+ * its tabs; Done is the round check beside the avatar, and the last page.
+ */
 export const PAGES = [
   { key: "today", label: "Today" },
   { key: "thisWeek", label: "This week" },
   { key: "someday", label: "Someday" },
   { key: "lists", label: "Lists" },
+  { key: "done", label: "Done" },
 ] as const;
+
+/** Done's page index: the last one. */
+export const DONE_PAGE = PAGES.length - 1;
 
 export type PageKey = (typeof PAGES)[number]["key"];
 
@@ -306,6 +313,8 @@ export function mastheadSubline(
       return `Whenever you’re ready · ${plural(count, "todo")}`;
     case "lists":
       return `${plural(count, "list")} · never age`;
+    case "done":
+      return "Finished todos, by day";
   }
 }
 

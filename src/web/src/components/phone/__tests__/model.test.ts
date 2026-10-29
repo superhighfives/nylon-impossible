@@ -255,6 +255,7 @@ describe("mastheadSubline", () => {
       "Through Saturday, October 24 · 1 todo",
     );
     expect(mastheadSubline("lists", 2, NOW, TZ)).toBe("2 lists · never age");
+    expect(mastheadSubline("done", 0, NOW, TZ)).toBe("Finished todos, by day");
   });
 });
 

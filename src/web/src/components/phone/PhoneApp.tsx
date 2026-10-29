@@ -1,6 +1,6 @@
 import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
-import { ArrowRight, ChevronRight, Plus } from "lucide-react";
+import { ArrowRight, Check, ChevronRight, Plus } from "lucide-react";
 import {
   type KeyboardEvent,
   useCallback,
@@ -17,10 +17,11 @@ import { AccountSheet } from "./AccountSheet";
 import { Composer } from "./Composer";
 import { ContextMenu } from "./ContextMenu";
 import { DetailSheet } from "./DetailSheet";
-import { DoneScreen } from "./DoneScreen";
+import { DonePage } from "./DonePage";
 import { BackButton, Masthead } from "./Masthead";
 import {
   boardViewKey,
+  DONE_PAGE,
   mastheadSubline,
   PAGES,
   type PageKey,
@@ -28,7 +29,7 @@ import {
   TIME_KINDS,
   viewForKey,
 } from "./model";
-import { OvernightNote, useOvernightNote } from "./OvernightNote";
+import { OvernightPill, useOvernightNote } from "./OvernightNote";
 import { SettingsScreen } from "./SettingsScreen";
 import { TodoRow } from "./TodoRow";
 import { useBoardData } from "./useBoardData";
@@ -45,8 +46,9 @@ function pageForView(view: BoardView | null | undefined): number {
 
 /**
  * The phone layout (web under 1024px): the Today · This week · Someday ·
- * Lists switcher, horizontally paged lists, the keyboard-attached composer,
- * and the detail sheet, context menu, Done history and Settings above them.
+ * Lists switcher with Done's check beside the avatar, horizontally paged
+ * lists, the keyboard-attached composer, and the detail sheet, context menu
+ * and Settings above them.
  * Data comes from `useBoardData`, shared with the wide layout.
  */
 export function PhoneApp({
@@ -70,7 +72,6 @@ export function PhoneApp({
     subtasksOf,
     rowsFor,
     targets,
-    doneCount,
     loading,
     todosLoading,
     error,
@@ -88,13 +89,19 @@ export function PhoneApp({
   const [account, setAccount] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const canSendFeedback = useCanSendFeedback();
-  const [screen, setScreen] = useState<"done" | "settings" | null>(null);
+  const [settings, setSettings] = useState(false);
   const [newList, setNewList] = useState("");
 
   const pagerRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+  const switcherRef = useRef<HTMLElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  /**
+   * The page `goTo` is scrolling to, until it gets there, a finger or
+   * trackpad takes over, or the scroll ends somewhere else.
+   */
+  const scrollingTo = useRef<number | null>(null);
 
   const now = new Date();
   const overnight = useOvernightNote(todos, byKind.today?.id);
@@ -103,16 +110,22 @@ export function PhoneApp({
   const currentListId =
     page === "lists"
       ? collectionId
-      : (byKind[page as (typeof TIME_KINDS)[number]]?.id ?? null);
+      : page === "done"
+        ? null
+        : (byKind[page]?.id ?? null);
 
   // --- Paging ---------------------------------------------------------------
 
-  /** Slide the switcher's yellow underline under the title at `position`. */
+  /**
+   * Slide the switcher's yellow underline under the tab at `position`. Done
+   * has no tab (its check turns yellow instead), so the underline fades out
+   * past Lists.
+   */
   const placeIndicator = useCallback((position: number) => {
     const nav = navRef.current;
     const bar = indicatorRef.current;
     if (!nav || !bar) return;
-    const buttons = nav.querySelectorAll<HTMLElement>("[data-page-button]");
+    const buttons = nav.querySelectorAll<HTMLElement>("[data-page-tab]");
     const lo = Math.max(0, Math.min(buttons.length - 1, Math.floor(position)));
     const hi = Math.min(buttons.length - 1, lo + 1);
     const t = position - lo;
@@ -123,6 +136,7 @@ export function PhoneApp({
     const width = a.offsetWidth + (b.offsetWidth - a.offsetWidth) * t;
     bar.style.transform = `translateX(${left}px)`;
     bar.style.width = `${width}px`;
+    bar.style.opacity = `${Math.max(0, Math.min(1, buttons.length - position))}`;
   }, []);
 
   useLayoutEffect(() => {
@@ -152,9 +166,18 @@ export function PhoneApp({
     const position = pager.scrollLeft / pager.clientWidth;
     placeIndicator(position);
     const settled = Math.round(position);
-    if (Math.abs(position - settled) < 0.02 && settled !== pageIndex) {
-      setPageIndex(settled);
-    }
+    if (Math.abs(position - settled) >= 0.02) return;
+    // A tap on a tab scrolls past the pages in between; they aren't visits.
+    if (scrollingTo.current !== null && settled !== scrollingTo.current) return;
+    scrollingTo.current = null;
+    if (settled !== pageIndex) setPageIndex(settled);
+  };
+
+  /** A finger or trackpad took over, or the scroll stopped short: settle where it is. */
+  const releaseScroll = () => {
+    if (scrollingTo.current === null) return;
+    scrollingTo.current = null;
+    onPagerScroll();
   };
 
   const goTo = useCallback(
@@ -162,8 +185,12 @@ export function PhoneApp({
       const pager = pagerRef.current;
       setPageIndex(index);
       if (!pager) return;
+      const left = index * pager.clientWidth;
+      // Already there means no scroll event will clear it.
+      scrollingTo.current =
+        Math.abs(pager.scrollLeft - left) > 1 ? index : null;
       pager.scrollTo({
-        left: index * pager.clientWidth,
+        left,
         behavior: reducedMotion === "reduce" ? "auto" : "smooth",
       });
     },
@@ -239,7 +266,7 @@ export function PhoneApp({
     }
     e.preventDefault();
     goTo(to);
-    navRef.current
+    switcherRef.current
       ?.querySelectorAll<HTMLElement>("[data-page-button]")
       [to]?.focus();
   };
@@ -390,6 +417,16 @@ export function PhoneApp({
   };
 
   const renderPage = (key: PageKey) => {
+    if (key === "done") {
+      return (
+        <DonePage
+          todos={todos}
+          listName={listName}
+          timeZone={timeZone}
+          onRestore={actions.restore}
+        />
+      );
+    }
     if (key === "lists") {
       if (collection) {
         const count = rowsFor(collection.id).length;
@@ -475,14 +512,17 @@ export function PhoneApp({
         <Masthead
           title={PAGES.find((p) => p.key === key)?.label}
           subline={mastheadSubline(key, rowsFor(listId).length, now, timeZone)}
+          banner={
+            key === "today" &&
+            overnight.text && (
+              <OvernightPill
+                text={overnight.text}
+                onSee={() => goTo(TIME_KINDS.indexOf(overnight.seeKind))}
+                onDismiss={overnight.dismiss}
+              />
+            )
+          }
         />
-        {key === "today" && overnight.text && (
-          <OvernightNote
-            text={overnight.text}
-            onDismiss={overnight.dismiss}
-            className="mx-5 mt-3"
-          />
-        )}
         {renderRows(listId, key)}
       </>
     );
@@ -491,52 +531,73 @@ export function PhoneApp({
   return (
     <div className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 bg-n-canvas font-n-text text-n-ink antialiased">
       <div className="mx-auto flex h-full max-w-[42rem] flex-col">
-        <div className="flex h-14 shrink-0 items-center gap-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pr-4 pl-5">
+        <div className="flex h-14 shrink-0 items-center pt-[max(0.75rem,env(safe-area-inset-top,0px))] pr-4 pl-5">
           <nav
-            ref={navRef}
+            ref={switcherRef}
             aria-label="Lists"
             onKeyDown={onNavKey}
-            className="relative flex min-w-0 flex-1 items-center gap-[1.125rem] overflow-x-auto [scrollbar-width:none]"
+            className="flex min-w-0 flex-1 items-center gap-1"
           >
-            {PAGES.map((p, i) => {
-              const active = i === pageIndex;
-              return (
-                <button
-                  key={p.key}
-                  type="button"
-                  data-page-button
-                  aria-current={active ? "page" : undefined}
-                  aria-controls={`phone-page-${p.key}`}
-                  onClick={() => {
-                    if (p.key === "lists" && active) setCollectionId(null);
-                    goTo(i);
-                  }}
-                  className={`n-hit h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
-                    active ? "text-n-ink" : "text-n-ink-muted"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-            <span
-              ref={indicatorRef}
-              aria-hidden="true"
-              className="pointer-events-none absolute bottom-0 left-0 h-0.5 bg-n-brand"
-            />
+            <div
+              ref={navRef}
+              className="relative flex min-w-0 flex-1 items-center gap-3 overflow-x-auto min-[24rem]:gap-4 [scrollbar-width:none]"
+            >
+              {PAGES.slice(0, DONE_PAGE).map((p, i) => {
+                const active = i === pageIndex;
+                return (
+                  <button
+                    key={p.key}
+                    type="button"
+                    data-page-button
+                    data-page-tab
+                    aria-current={active ? "page" : undefined}
+                    aria-controls={`phone-page-${p.key}`}
+                    onClick={() => {
+                      if (p.key === "lists" && active) setCollectionId(null);
+                      goTo(i);
+                    }}
+                    className={`n-hit h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
+                      active ? "text-n-ink" : "text-n-ink-muted"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+              <span
+                ref={indicatorRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute bottom-0 left-0 h-0.5 bg-n-brand"
+              />
+            </div>
+            {/* Done: the last page, after Lists when swiping and tabbing. */}
+            <button
+              type="button"
+              data-page-button
+              aria-label="Done"
+              aria-current={pageIndex === DONE_PAGE ? "page" : undefined}
+              aria-controls="phone-page-done"
+              onClick={() => goTo(DONE_PAGE)}
+              className="flex size-11 cursor-pointer items-center justify-center rounded-full n-focus"
+            >
+              <span
+                className={`flex size-[1.875rem] items-center justify-center rounded-full transition-colors duration-(--n-duration-fast) ${
+                  pageIndex === DONE_PAGE
+                    ? "bg-n-brand text-n-brand-ink"
+                    : "bg-n-fill text-n-ink-muted"
+                }`}
+              >
+                <Check size={16} strokeWidth={3} aria-hidden="true" />
+              </span>
+            </button>
           </nav>
           <AccountSheet
             open={account}
             onOpen={() => setAccount(true)}
             onClose={() => setAccount(false)}
-            doneCount={doneCount}
-            onDone={() => {
-              setAccount(false);
-              setScreen("done");
-            }}
             onSettings={() => {
               setAccount(false);
-              setScreen("settings");
+              setSettings(true);
             }}
             onFeedback={
               canSendFeedback
@@ -552,6 +613,9 @@ export function PhoneApp({
         <div
           ref={pagerRef}
           onScroll={onPagerScroll}
+          onPointerDown={releaseScroll}
+          onWheel={releaseScroll}
+          onScrollEnd={releaseScroll}
           data-phone-ready={loading ? undefined : ""}
           // Nothing to swipe to while loading, and a scroller with nothing
           // focusable in it is a dead end for the keyboard.
@@ -603,18 +667,7 @@ export function PhoneApp({
         onClose={() => setDetailId(null)}
       />
 
-      <DoneScreen
-        open={screen === "done"}
-        onClose={() => setScreen(null)}
-        todos={todos}
-        listName={listName}
-        timeZone={timeZone}
-        onRestore={actions.restore}
-      />
-      <SettingsScreen
-        open={screen === "settings"}
-        onClose={() => setScreen(null)}
-      />
+      <SettingsScreen open={settings} onClose={() => setSettings(false)} />
       {canSendFeedback && (
         <FeedbackDialog
           open={feedback}
