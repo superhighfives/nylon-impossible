@@ -88,7 +88,7 @@ enum BoardKey: Equatable, Hashable {
         if let first = characters.first, characters.count == 1, let jump = shiftedDigits[first] {
             return .jump(jump)
         }
-        if characters == "N" { return .newList }
+        if characters == "N", modifiers.contains(.shift) { return .newList }
         if characters == "?" { return .shortcuts }
         // Some keyboards (and XCUITest) send Shift with the unshifted
         // character: ⇧2 as "2", ⇧N as "n".

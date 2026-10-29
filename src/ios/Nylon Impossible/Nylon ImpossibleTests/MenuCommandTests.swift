@@ -114,6 +114,8 @@ struct MenuCommandTests {
         #expect(key("n") == .newList)
         #expect(key("2", []) == .move(.thisWeek))
         #expect(key("n", []) == .new)
+        // Caps Lock types "N" with no Shift: still quick add.
+        #expect(key("N", []) == .new)
         #expect(key("m", []) == .moveTo)
         #expect(key("g", []) == .go)
         #expect(BoardKey.from(key: .escape, characters: "", modifiers: []) == .back)
