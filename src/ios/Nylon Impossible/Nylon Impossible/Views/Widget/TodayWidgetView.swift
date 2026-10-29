@@ -204,8 +204,8 @@ struct WidgetMetaLine: View {
             glyphed(Theme.Icon.subtasks, "\(done)/\(total)")
         case .notes:
             Image(systemName: Theme.Icon.notes).imageScale(.small)
-        case .link(let domain):
-            glyphed(Theme.Icon.link, domain)
+        case .link(let domain, let more):
+            glyphed(Theme.Icon.link, more > 0 ? "\(domain) +\(more)" : domain)
         }
     }
 

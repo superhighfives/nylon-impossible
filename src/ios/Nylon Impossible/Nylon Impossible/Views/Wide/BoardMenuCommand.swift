@@ -52,6 +52,7 @@ enum BoardMenuCommand: Hashable {
             case .move(let kind): return "Move to \(kind.title)"
             case .back: return "Back out: close, then the sidebar"
             case .moveTo: return "Move to a list…"
+            case .openLink: return "Open link"
             case .newList: return "New list"
             case .go: return "Go to…"
             case .goToList: return "Go to a list"
@@ -126,7 +127,7 @@ enum BoardMenuCommand: Hashable {
         ("Move around", [.key(.down), .key(.up), .key(.left), .key(.right), .key(.open), .key(.back)]),
         ("Todo", [
             .key(.done), .key(.move(.today)), .key(.move(.thisWeek)), .key(.move(.someday)),
-            .key(.moveTo), .key(.pin), .key(.due), .key(.delete)
+            .key(.moveTo), .key(.openLink), .key(.pin), .key(.due), .key(.delete)
         ]),
         ("Go to", [
             .key(.jump(.time(.today))), .key(.jump(.time(.thisWeek))), .key(.jump(.time(.someday))),
@@ -142,7 +143,7 @@ enum BoardMenuCommand: Hashable {
         case .moveToList: return true
         case .key(let key):
             switch key {
-            case .done, .open, .pin, .due, .delete, .move, .moveTo: return true
+            case .done, .open, .pin, .due, .delete, .move, .moveTo, .openLink: return true
             default: return false
             }
         default: return false
@@ -153,7 +154,7 @@ enum BoardMenuCommand: Hashable {
     static let todoMenu: [BoardMenuCommand?] = [
         .search,
         nil,
-        .key(.done), .key(.open), .key(.pin), .key(.due), .key(.delete), .key(.moveTo),
+        .key(.done), .key(.open), .key(.pin), .key(.due), .key(.delete), .key(.moveTo), .key(.openLink),
         nil,
         .key(.down), .key(.up), .key(.left), .key(.right),
         nil,
@@ -202,6 +203,7 @@ extension BoardKey {
         case .new: return S(key: "n", modifiers: [])
         case .newList: return S(key: "n", modifiers: .shift)
         case .moveTo: return S(key: "m", modifiers: [])
+        case .openLink: return S(key: "o", modifiers: [])
         case .go: return S(key: "g", modifiers: [])
         case .goToList: return nil
         case .shortcuts: return S(key: "/", modifiers: .shift)

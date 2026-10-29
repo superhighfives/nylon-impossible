@@ -97,6 +97,47 @@ extension TodoDetailSheet {
         }
     }
 
+    /// "Paste a link": checked here first (the API applies the same rule),
+    /// shown at once as a pending card, then swapped for the server's copy;
+    /// its title arrives once the background fetch does.
+    func addLink() async {
+        guard !newLink.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard let href = LinkInput.normalize(newLink) else {
+            linkInvalid = true
+            // Keep the field, so the text can be fixed straight away.
+            focus = .link
+            AccessibilityNotification.Announcement("That doesn’t look like a link.").post()
+            return
+        }
+        newLink = ""
+        focus = .link
+        // Already there: its card is on screen.
+        guard !urls.contains(where: { $0.url == href }) else { return }
+        guard let apiService else { return linkUnavailable() }
+        let now = Date()
+        let pending = APITodoUrl(
+            id: "pending-\(UUID().uuidString)", todoId: todoId, url: href, title: nil, description: nil,
+            siteName: nil, favicon: nil, image: nil, showPreview: true,
+            position: (urls.map(\.position).max() ?? "a0") + "V", fetchStatus: .pending,
+            fetchedAt: nil, createdAt: now, updatedAt: now
+        )
+        withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { urls.append(pending) }
+        do {
+            let added = try await apiService.addTodoUrl(todoId: todoId, url: href)
+            if let index = urls.firstIndex(where: { $0.id == pending.id }) { urls[index] = added }
+            actions.edited()
+            // The title is fetched server-side; come back once for it, and
+            // let the next sync bring anything slower.
+            try? await Task.sleep(for: .seconds(3))
+            await loadUrls()
+        } catch {
+            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+                urls.removeAll { $0.id == pending.id }
+            }
+            actions.toasts.show("Couldn’t add the link", action: nil)
+        }
+    }
+
     func linkUnavailable() {
         actions.toasts.show("Links need a connection", action: nil)
     }

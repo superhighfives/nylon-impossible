@@ -26,7 +26,8 @@ struct BoardColumn<Accessory: View>: View {
     var selectedId: UUID?
     /// A collection column has a faint tint, like the prototype.
     var isTinted = false
-    var overnight: (text: String, dismiss: () -> Void)?
+    /// Today's overnight pill: its text, what its text does, and dismiss.
+    var overnight: (text: String, see: () -> Void, dismiss: () -> Void)?
     var empty: (text: String, link: (text: String, action: () -> Void)?)
     let composer: Composer
     let onSelect: (TodoItem) -> Void
@@ -51,10 +52,6 @@ struct BoardColumn<Accessory: View>: View {
                 .padding(.horizontal, Theme.Wide.gutter)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
-                    if let overnight {
-                        OvernightLine(text: overnight.text, gutter: Theme.Wide.gutter, onDismiss: overnight.dismiss)
-                            .transition(.opacity)
-                    }
                     composer
                         .padding(.horizontal, Theme.Wide.gutter)
                     if rows.isEmpty {
@@ -86,6 +83,9 @@ struct BoardColumn<Accessory: View>: View {
             subline: subline,
             onRename: onRename,
             isRenaming: isRenaming,
+            banner: overnight.map { note in
+                AnyView(OvernightPill(text: note.text, onSee: note.see, onDismiss: note.dismiss).transition(.opacity))
+            },
             accessory: accessory
         )
     }
@@ -141,7 +141,7 @@ extension BoardColumn where Accessory == EmptyView {
         lists: [TodoListModel],
         actions: TodoActions,
         selectedId: UUID?,
-        overnight: (text: String, dismiss: () -> Void)?,
+        overnight: (text: String, see: () -> Void, dismiss: () -> Void)?,
         empty: (text: String, link: (text: String, action: () -> Void)?),
         composer: Composer,
         onSelect: @escaping (TodoItem) -> Void,

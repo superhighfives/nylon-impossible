@@ -49,7 +49,7 @@ struct LinkCard: View {
     }
 
     private var subtitle: String {
-        if isPending { return "\(domain) · Fetching…" }
+        if isPending { return "Fetching title…" }
         if isFailed { return "\(domain) · Couldn’t fetch" }
         if emailUrlInfo(for: url.url) != nil { return url.siteName ?? "Gmail" }
         return domain

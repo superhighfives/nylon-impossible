@@ -13,6 +13,7 @@
 //    x                done
 //    1 / 2 / 3        move to Today / This week / Someday
 //    m                move to a list…
+//    o                open the todo's first link
 //    p                pin
 //    d                due
 //    Delete           delete, with Undo
@@ -49,7 +50,7 @@ enum BoardKey: Equatable, Hashable {
     case down, up, left, right
     case done, open, pin, due, delete, new
     case move(SystemListKind)
-    case back, moveTo, newList, go, goToList, shortcuts
+    case back, moveTo, newList, go, goToList, shortcuts, openLink
     case jump(BoardJump)
 
     /// ⇧1…⇧0 as the US layout types them.
@@ -114,6 +115,7 @@ enum BoardKey: Equatable, Hashable {
         case "d": return .due
         case "n": return .new
         case "m": return .moveTo
+        case "o": return .openLink
         case "g": return .go
         case "1": return .move(.today)
         case "2": return .move(.thisWeek)

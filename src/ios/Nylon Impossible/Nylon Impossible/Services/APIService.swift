@@ -238,6 +238,13 @@ final class APIService: APIProviding {
         )
     }
 
+    /// Add a link to a todo, after its others. The server fetches its title
+    /// in the background; the returned link starts pending.
+    func addTodoUrl(todoId: String, url: String) async throws -> APITodoUrl {
+        struct AddUrlRequest: Encodable { let url: String }
+        return try await post(path: "/todos/\(todoId)/urls", body: AddUrlRequest(url: url))
+    }
+
     /// Remove a link from a todo.
     func deleteTodoUrl(todoId: String, urlId: String) async throws {
         let _: EmptyResponse = try await delete(path: "/todos/\(todoId)/urls/\(urlId)")

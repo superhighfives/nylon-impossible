@@ -78,6 +78,9 @@ extension ContentView {
                 item(.key(.done), "Mark “\(todo.title)” done"),
                 item(.key(.pin), "\(todo.pinned ? "Unpin" : "Pin") “\(todo.title)”")
             ]
+            if !todo.urls.isEmpty || !todo.pendingUrls.isEmpty {
+                items.append(item(.key(.openLink), "Open “\(todo.title)”’s link"))
+            }
         }
         return items
     }

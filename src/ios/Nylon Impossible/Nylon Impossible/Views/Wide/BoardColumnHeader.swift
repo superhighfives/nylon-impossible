@@ -19,16 +19,27 @@ struct BoardColumnHeader<Accessory: View>: View {
     var onRename: ((String) -> Void)?
     /// Set from outside too, by Rename in the ⋯ menu.
     @Binding var isRenaming: Bool
+    /// Today's overnight pill. Every header keeps its space (two lines,
+    /// 20pt clear of the title) whether or not it's showing.
+    var banner: AnyView?
     /// The top-trailing corner: ⋯ and × on your list's column.
     @ViewBuilder var accessory: () -> Accessory
 
-    @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader
+    @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader + 44
+    /// Two lines of the pill's text.
+    @ScaledMetric(relativeTo: .footnote) private var bannerHeight: CGFloat = 44
     @State private var draft = ""
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: 0)
+            VStack(alignment: .leading, spacing: 0) {
+                Spacer(minLength: 0)
+                banner
+            }
+            .frame(height: bannerHeight, alignment: .bottomLeading)
+            .padding(.bottom, 20)
             titleView
             Text(subline)
                 .textStyle(Theme.Fonts.Role.meta)
@@ -106,7 +117,7 @@ struct BoardColumnHeader<Accessory: View>: View {
 
 extension BoardColumnHeader where Accessory == EmptyView {
     init(title: String, subline: String, isMuted: Bool = false) {
-        self.init(title: title, subline: subline, isMuted: isMuted, onRename: nil, isRenaming: .constant(false)) {
+        self.init(title: title, subline: subline, isMuted: isMuted, onRename: nil, isRenaming: .constant(false), banner: nil) {
             EmptyView()
         }
     }

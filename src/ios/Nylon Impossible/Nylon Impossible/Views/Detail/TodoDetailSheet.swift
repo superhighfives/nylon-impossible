@@ -32,12 +32,15 @@ struct TodoDetailSheet: View {
     @State var title: String
     @State var notes: String
     @State var newSubtask = ""
+    @State var newLink = ""
+    /// "That doesn't look like a link." under the field.
+    @State var linkInvalid = false
     @State var showsDatePicker = false
     @State var urls: [APITodoUrl]
     @State var pendingSync: Task<Void, Never>?
     @FocusState var focus: Field?
 
-    enum Field { case title, notes, subtask }
+    enum Field { case title, notes, subtask, link }
 
     init(
         todo: TodoItem,
@@ -92,7 +95,7 @@ struct TodoDetailSheet: View {
                 Hairline().padding(.top, 22).padding(.bottom, Theme.Space.s4)
                 notesField
                 if todo.recurrence == nil { subtasksSection }
-                if !urls.isEmpty { linksSection }
+                linksSection
                 Hairline().padding(.top, 22).padding(.bottom, Theme.Space.s1)
                 footer
             }
