@@ -52,9 +52,13 @@ extension ContentView {
 
     /// Put the overnight note away for good.
     /// The pill's text: the first todo in the list they moved to (This week
-    /// if anything went there, else Someday).
+    /// if anything went there, else Someday). On the phone, that page.
     func seeOvernight() {
         let kind: SystemListKind = (preferences.lastSweep?.movedToThisWeek ?? 0) > 0 ? .thisWeek : .someday
+        if !isWide, let page = Page(systemKind: kind) {
+            select(page)
+            return
+        }
         guard let list = orderedLists.first(where: { $0.systemKind == kind }) else { return }
         focusColumn(list.id)
         selectedTodoId = rows(list).first?.id
@@ -251,9 +255,7 @@ extension ContentView {
                 case .settings where isWide:
                     widePanel = .settings
                 case .done:
-                    accountDetent = .large
-                    accountPath = [.done]
-                    showsAccount = true
+                    viewModel.page = .done
                 default:
                     accountDetent = .large
                     accountPath = [.settings]

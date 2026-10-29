@@ -2,16 +2,14 @@
 //  AccountSheet.swift
 //  Nylon Impossible
 //
-//  What the avatar opens: who you are, then Done, Settings and Sign out —
-//  and, for an admin, Send feedback.
-//  Done and Settings push inside the sheet, which grows to full height for
-//  them.
+//  What the avatar opens: who you are, then Settings and Sign out — and, for
+//  an admin, Send feedback. Settings pushes inside the sheet, which grows to
+//  full height for it. Done is its own page, the check beside the avatar.
 //
 
 import SwiftUI
 
 enum AccountRoute: Hashable {
-    case done
     case settings
 }
 
@@ -19,9 +17,7 @@ struct AccountSheet: View {
     let name: String
     let initials: String
     let imageURL: URL?
-    let doneCount: Int
     let actions: TodoActions
-    let lists: [TodoListModel]
     let onSignOut: () -> Void
     /// Opens the feedback sheet; nil hides the row (not an admin).
     var onFeedback: (() -> Void)?
@@ -35,7 +31,6 @@ struct AccountSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 6) {
                     identity
-                    row("Done", detail: "\(doneCount)") { path.append(.done) }
                     row("Settings") { path.append(.settings) }
                     if let onFeedback {
                         row("Send feedback", showsChevron: false, action: onFeedback)
@@ -50,8 +45,6 @@ struct AccountSheet: View {
             .hidesNavigationBar()
             .navigationDestination(for: AccountRoute.self) { route in
                 switch route {
-                case .done:
-                    DoneHistoryView(actions: actions, lists: lists)
                 case .settings:
                     SettingsView()
                 }
@@ -89,7 +82,6 @@ struct AccountSheet: View {
 
     private func row(
         _ title: String,
-        detail: String? = nil,
         showsChevron: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
@@ -100,12 +92,6 @@ struct AccountSheet: View {
                     .fontWeight(.medium)
                     .foregroundStyle(Theme.Colors.ink)
                 Spacer()
-                if let detail {
-                    Text(detail)
-                        .textStyle(Theme.Fonts.Role.body)
-                        .monospacedDigit()
-                        .foregroundStyle(Theme.Colors.inkMuted)
-                }
                 if showsChevron { Chevron() }
             }
             .padding(.horizontal, 14)

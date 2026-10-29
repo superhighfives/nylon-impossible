@@ -24,13 +24,15 @@ final class AccessibilityAuditTests: NylonUITestCase {
     private var allRoutes: [(route: String, ready: String)] {
         var routes: [(String, String)] = [
             ("today", "Review PR for the sync engine"),
-            ("week", "Plan Lisbon trip"),
+            // The first row: at AX5 the masthead and its banner space push
+            // later ones below the fold, where the list hasn't drawn them.
+            ("week", "Send invoice to Pika"),
             ("someday", "Read Piranesi"),
             ("detail", "Notes"),
             ("composer", "New todo"),
             ("done", "Email the landlord"),
             ("settings", "Appearance"),
-            ("overnight", "Dismiss"),
+            ("overnight", "Dismiss overnight note"),
             ("empty", "Nothing today."),
             ("loading", "Getting your lists…"),
             ("syncerror", "Retry sync"),

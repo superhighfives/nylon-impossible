@@ -240,9 +240,7 @@ struct ContentView: View {
                 name: displayName,
                 initials: initials,
                 imageURL: screenRoute == nil ? authService.userImageURL : nil,
-                doneCount: doneCount,
                 actions: actions,
-                lists: orderedLists,
                 onSignOut: signOut,
                 onFeedback: showsFeedback ? {
                     feedbackAfterAccount = true
@@ -429,7 +427,7 @@ extension ContentView {
         if detailTodo != nil { parts.append("detail") }
         if isWide, detailTodo == nil, openColumnId == nil { parts.append("done") }
         if isWide, widePanel == .settings { parts.append("settings") }
-        if showsAccount { parts.append(accountPath.last.map { $0 == .done ? "done" : "settings" } ?? "account") }
+        if showsAccount { parts.append(accountPath.isEmpty ? "account" : "settings") }
         return parts.joined(separator: " › ")
     }
 

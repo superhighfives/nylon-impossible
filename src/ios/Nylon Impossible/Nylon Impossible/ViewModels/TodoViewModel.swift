@@ -13,14 +13,18 @@ import SwiftUI
 final class TodoViewModel {
     /// What the composer holds.
     var newTaskText: String = ""
-    /// The page in view: one of the three time lists, or the Lists index.
+    /// The page in view: one of the three time lists, the Lists index, or Done.
     var page: Page = .today
     /// The collection pushed over the Lists page, if any.
     var openCollectionId: String?
 
-    /// The four horizontal pages, in swipe order.
+    /// The five horizontal pages, in swipe order. The switcher's tabs are
+    /// the first four; Done is the round check beside the avatar.
     enum Page: Hashable, CaseIterable {
-        case today, thisWeek, someday, lists
+        case today, thisWeek, someday, lists, done
+
+        /// The pages with a title in the switcher.
+        static let tabs: [Page] = [.today, .thisWeek, .someday, .lists]
 
         var title: String {
             switch self {
@@ -28,6 +32,7 @@ final class TodoViewModel {
             case .thisWeek: return "This week"
             case .someday: return "Someday"
             case .lists: return "Lists"
+            case .done: return "Done"
             }
         }
 
@@ -36,7 +41,7 @@ final class TodoViewModel {
             case .today: return .today
             case .thisWeek: return .thisWeek
             case .someday: return .someday
-            case .lists: return nil
+            case .lists, .done: return nil
             }
         }
 
@@ -54,7 +59,8 @@ final class TodoViewModel {
     /// collection, or the time list in view. Nil on the Lists index.
     func currentListId(in lists: [TodoListModel]) -> String? {
         if page == .lists { return openCollectionId }
-        return lists.first { $0.systemKind == page.systemKind }?.id
+        guard let kind = page.systemKind else { return nil }
+        return lists.first { $0.systemKind == kind }?.id
     }
 
     /// Show a list: a time list pages to it, a collection opens over Lists.

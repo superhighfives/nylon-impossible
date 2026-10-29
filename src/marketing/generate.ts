@@ -123,6 +123,8 @@ interface ParityScreen {
   type?: string;
   /** Then open this from the avatar menu (phone). */
   account?: string;
+  /** Then press this switcher button (phone: "Done", beside the avatar). */
+  tap?: string;
 }
 
 interface Manifest {
@@ -334,11 +336,7 @@ async function withDropShadow(
 }
 
 /** Round the corners and draw a hairline just inside the edge. */
-async function frame(
-  buf: Buffer,
-  radius: number,
-  mode: Mode,
-): Promise<Buffer> {
+async function frame(buf: Buffer, radius: number, mode: Mode): Promise<Buffer> {
   const meta = await sharp(buf).metadata();
   const w = meta.width ?? 0;
   const h = meta.height ?? 0;
@@ -368,7 +366,11 @@ const CHROME_BAR_H = 80;
  * address field, no colour. The editorial direction keeps colour for the one
  * yellow fill inside the app.
  */
-function makeBrowserChromeSvg(width: number, height: number, mode: Mode): string {
+function makeBrowserChromeSvg(
+  width: number,
+  height: number,
+  mode: Mode,
+): string {
   const { bar, hairline, fill } = FRAME[mode];
   const dotY = Math.round(height / 2);
   const cx = Math.round(width / 2);
@@ -411,7 +413,9 @@ async function clerkUserId(email: string): Promise<string> {
     { headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` } },
   );
   if (!res.ok) {
-    throw new Error(`Clerk user lookup failed: ${res.status} ${await res.text()}`);
+    throw new Error(
+      `Clerk user lookup failed: ${res.status} ${await res.text()}`,
+    );
   }
   const users = (await res.json()) as { id: string }[];
   if (!users[0]) throw new Error(`No Clerk user with email ${email}`);
@@ -538,7 +542,14 @@ async function withWebSession(
     console.log(`  Starting web dev server on ${WEB_URL}…`);
     const proc = spawn(
       join(WORKSPACE_ROOT, "src/web/node_modules/.bin/vite"),
-      ["dev", "--port", String(WEB_PORT), "--strictPort", "--host", "127.0.0.1"],
+      [
+        "dev",
+        "--port",
+        String(WEB_PORT),
+        "--strictPort",
+        "--host",
+        "127.0.0.1",
+      ],
       {
         cwd: join(WORKSPACE_ROOT, "src/web"),
         env: { ...process.env },
@@ -602,7 +613,9 @@ async function withWebSession(
 
     // Derives the Frontend API URL from the publishable key and fetches a
     // testing token — must be called before any clerk.signIn calls.
-    await clerkSetup({ publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY });
+    await clerkSetup({
+      publishableKey: process.env.VITE_CLERK_PUBLISHABLE_KEY,
+    });
 
     const browser = await chromium.launch();
 
@@ -628,7 +641,9 @@ async function withWebSession(
           break;
         } catch (err) {
           lastErr = err;
-          console.log(`  [${name}] demo todos not found on attempt ${attempt}/4`);
+          console.log(
+            `  [${name}] demo todos not found on attempt ${attempt}/4`,
+          );
           syncLocalD1Storage();
           await sleep(1000);
           await page.reload();
@@ -641,7 +656,9 @@ async function withWebSession(
         // Best-effort: don't let a screenshot failure mask lastErr below.
         await page
           .screenshot({ path: debugPng, fullPage: true })
-          .catch((err) => console.log(`  Failed to capture ${debugPng}: ${err}`));
+          .catch((err) =>
+            console.log(`  Failed to capture ${debugPng}: ${err}`),
+          );
         console.log(`  Dumped ${debugHtml} and ${debugPng}`);
         const tail = serverLog.join("").trimEnd();
         console.log("  Dev server output at time of failure:");
@@ -676,7 +693,11 @@ async function hideDevtools(page: PlaywrightPage): Promise<void> {
       while (node?.parentElement && node.parentElement !== document.body) {
         node = node.parentElement;
       }
-      if (node && node !== document.body && !node.textContent?.includes(ready)) {
+      if (
+        node &&
+        node !== document.body &&
+        !node.textContent?.includes(ready)
+      ) {
         node.style.display = "none";
       }
     }
@@ -778,7 +799,8 @@ function buildIOSApp(udid: string): string {
     "Build/Products/Debug-iphonesimulator",
     `${scheme}.app`,
   );
-  if (!existsSync(appPath)) throw new Error(`App not found after build: ${appPath}`);
+  if (!existsSync(appPath))
+    throw new Error(`App not found after build: ${appPath}`);
   console.log("  App built");
   builtAppPath = appPath;
   return appPath;
@@ -817,11 +839,24 @@ async function captureIOSDevice(
   spawnSync(
     "xcrun",
     [
-      "simctl", "status_bar", udid, "override",
-      "--time", "9:41",
-      "--batteryState", "charged", "--batteryLevel", "100",
-      "--cellularMode", "active", "--cellularBars", "4",
-      "--wifiMode", "active", "--wifiBars", "3",
+      "simctl",
+      "status_bar",
+      udid,
+      "override",
+      "--time",
+      "9:41",
+      "--batteryState",
+      "charged",
+      "--batteryLevel",
+      "100",
+      "--cellularMode",
+      "active",
+      "--cellularBars",
+      "4",
+      "--wifiMode",
+      "active",
+      "--wifiBars",
+      "3",
     ],
     { stdio: "pipe", timeout: 30_000 },
   );
@@ -842,8 +877,15 @@ async function captureIOSDevice(
   await withSimRetries("launch", udid, () =>
     execFileSync(
       "xcrun",
-      ["simctl", "launch", "--terminate-running-process", udid, bundleId,
-        "-NylonScreen", firstShot?.screen ?? "today"],
+      [
+        "simctl",
+        "launch",
+        "--terminate-running-process",
+        udid,
+        bundleId,
+        "-NylonScreen",
+        firstShot?.screen ?? "today",
+      ],
       { stdio: "pipe", timeout: 120_000, env: SIM_LAUNCH_ENV },
     ),
   );
@@ -857,16 +899,26 @@ async function captureIOSDevice(
         timeout: 30_000,
       });
       const launchArgs = [
-        "-NylonScreen", shot.screen,
-        "-NylonDark", mode === "dark" ? "YES" : "NO",
-        "-NylonLandscape", shot.landscape ? "YES" : "NO",
+        "-NylonScreen",
+        shot.screen,
+        "-NylonDark",
+        mode === "dark" ? "YES" : "NO",
+        "-NylonLandscape",
+        shot.landscape ? "YES" : "NO",
       ];
       await withSimRetries("launch", udid, () =>
         // --terminate-running-process: each shot is a fresh launch with its
         // own route, and a half-launched app would otherwise fail the next.
         execFileSync(
           "xcrun",
-          ["simctl", "launch", "--terminate-running-process", udid, bundleId, ...launchArgs],
+          [
+            "simctl",
+            "launch",
+            "--terminate-running-process",
+            udid,
+            bundleId,
+            ...launchArgs,
+          ],
           { stdio: "pipe", timeout: 120_000, env: SIM_LAUNCH_ENV },
         ),
       );
@@ -885,7 +937,9 @@ async function captureIOSDevice(
           break;
         } catch (err) {
           lastErr = err;
-          console.log(`  screenshot attempt ${attempt} failed: ${describeError(err)}`);
+          console.log(
+            `  screenshot attempt ${attempt} failed: ${describeError(err)}`,
+          );
           await sleep(3000);
         }
       }
@@ -901,10 +955,17 @@ async function captureIOSDevice(
     }
   }
 
-  spawnSync("xcrun", ["simctl", "terminate", udid, bundleId], { stdio: "pipe" });
-  spawnSync("xcrun", ["simctl", "status_bar", udid, "clear"], { stdio: "pipe" });
+  spawnSync("xcrun", ["simctl", "terminate", udid, bundleId], {
+    stdio: "pipe",
+  });
+  spawnSync("xcrun", ["simctl", "status_bar", udid, "clear"], {
+    stdio: "pipe",
+  });
   console.log(`  Shutting down ${device} simulator…`);
-  spawnSync("xcrun", ["simctl", "shutdown", udid], { stdio: "pipe", timeout: 60_000 });
+  spawnSync("xcrun", ["simctl", "shutdown", udid], {
+    stdio: "pipe",
+    timeout: 60_000,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -1041,7 +1102,10 @@ async function captureIOSPhases(): Promise<void> {
   }
 }
 
-async function runCaptureStep(opts: { web: boolean; ios: boolean }): Promise<void> {
+async function runCaptureStep(opts: {
+  web: boolean;
+  ios: boolean;
+}): Promise<void> {
   console.log("\n── Capture ──────────────────────────────────────");
   mkdirSync(SOURCE_DIR, { recursive: true });
   if (opts.web) await capturePhase("web", WEB_ASSETS, captureWebScreenshots);
@@ -1057,7 +1121,9 @@ type Composite = { input: Buffer; left: number; top: number };
 
 /** Desktop web shot in a quiet browser frame, scaled to `width`. */
 async function browserLayer(p: Placement, mode: Mode): Promise<Composite> {
-  const webImg = await sharp(sourcePath(`${p.shot}-${mode}`)).ensureAlpha().toBuffer();
+  const webImg = await sharp(sourcePath(`${p.shot}-${mode}`))
+    .ensureAlpha()
+    .toBuffer();
   const meta = await sharp(webImg).metadata();
   const webW = meta.width ?? 0;
   const chromeImg = await sharp(
@@ -1205,7 +1271,10 @@ async function writeAppStoreSet(): Promise<void> {
         continue;
       }
       const label = `${shot.screen}${shot.landscape ? "-landscape" : ""}`;
-      const dest = join(dir, `${String(n).padStart(2, "0")}-${label}-${mode}.png`);
+      const dest = join(
+        dir,
+        `${String(n).padStart(2, "0")}-${label}-${mode}.png`,
+      );
       const meta = await sharp(src).metadata();
       if (meta.width !== expected.width || meta.height !== expected.height) {
         console.log(
@@ -1304,7 +1373,11 @@ async function captureParityWeb(): Promise<void> {
             // sheet or dialog for the devtools launcher.
             await hideDevtools(page);
             if (screen.open) {
-              await page.locator(row).filter({ hasText: screen.open }).first().click();
+              await page
+                .locator(row)
+                .filter({ hasText: screen.open })
+                .first()
+                .click();
               await sleep(700);
             }
             if (screen.type) {
@@ -1312,6 +1385,12 @@ async function captureParityWeb(): Promise<void> {
               await field.click();
               await field.fill(screen.type);
               await sleep(500);
+            }
+            if (screen.tap) {
+              await page
+                .getByRole("button", { name: screen.tap, exact: true })
+                .click();
+              await sleep(900);
             }
             if (screen.account) {
               await page.getByRole("button", { name: "Account" }).click();
@@ -1325,7 +1404,9 @@ async function captureParityWeb(): Promise<void> {
             await page.screenshot({ path: dest });
             console.log(`  → parity/web-${screen.name}-${mode}.png`);
           } catch (err) {
-            console.log(`  ✘ parity web ${screen.name} (${mode}): ${describeError(err)}`);
+            console.log(
+              `  ✘ parity web ${screen.name} (${mode}): ${describeError(err)}`,
+            );
           }
         }
         await context.close();
@@ -1353,7 +1434,8 @@ async function captureParityIOS(): Promise<void> {
     // fails to take must show as "not captured", not as an older revision's
     // screen that would then be saved under this revision's cache key.
     for (const s of mine) {
-      for (const mode of MODES) rmSync(paritySource("ios", s.name, mode), { force: true });
+      for (const mode of MODES)
+        rmSync(paritySource("ios", s.name, mode), { force: true });
     }
     if (!windowOpen) {
       await openSimulatorWindow();
@@ -1379,7 +1461,10 @@ async function captureParityIOS(): Promise<void> {
 }
 
 function escapeXml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 /** One screen's pair: a title, then iOS and web side by side, captioned. */
@@ -1397,7 +1482,10 @@ async function parityPair(
     (["ios", "web"] as const).map(async (side) => {
       const path = paritySource(side, screen.name, mode);
       if (!existsSync(path)) return null;
-      return sharp(path).resize({ width }).png().toBuffer({ resolveWithObject: true });
+      return sharp(path)
+        .resize({ width })
+        .png()
+        .toBuffer({ resolveWithObject: true });
     }),
   );
   // A missing side keeps the device's shape.
@@ -1526,7 +1614,9 @@ function runPublishStep(): void {
   const assetsDir = join(WEBSITE_DIR, "public", "assets");
   if (!existsSync(assetsDir)) {
     console.error(`  Error: assets dir not found: ${assetsDir}`);
-    console.error("  Set SUPERHIGHFIVES_DIR to the path of the superhighfives.com repo.");
+    console.error(
+      "  Set SUPERHIGHFIVES_DIR to the path of the superhighfives.com repo.",
+    );
     process.exit(1);
   }
 
@@ -1534,7 +1624,9 @@ function runPublishStep(): void {
     MODES.flatMap((mode) => [
       `${name}-${mode}@2x.jpg`,
       `${name}-${mode}.jpg`,
-      ...(manifest.composite.png ? [`${name}-${mode}@2x.png`, `${name}-${mode}.png`] : []),
+      ...(manifest.composite.png
+        ? [`${name}-${mode}@2x.png`, `${name}-${mode}.png`]
+        : []),
     ]),
   );
 
@@ -1555,7 +1647,9 @@ function runPublishStep(): void {
     return;
   }
 
-  execSync(`git -C "${WEBSITE_DIR}" add ${copied.map((f) => `"${f}"`).join(" ")}`);
+  execSync(
+    `git -C "${WEBSITE_DIR}" add ${copied.map((f) => `"${f}"`).join(" ")}`,
+  );
   try {
     execSync(
       `git -C "${WEBSITE_DIR}" commit -m "Update Nylon Impossible marketing screenshots"`,

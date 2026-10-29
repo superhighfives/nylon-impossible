@@ -2,18 +2,18 @@
 //  DoneHistoryView.swift
 //  Nylon Impossible
 //
-//  Done todos, by day. Done means gone from the lists, but not lost: tapping
-//  a check puts the todo back in the list it came from.
+//  The phone's Done page, the last one in the pager: done todos, by day.
+//  Done means gone from the lists, but not lost: tapping a check puts the
+//  todo back in the list it came from.
 //
 
-import SwiftData
 import SwiftUI
 
 struct DoneHistoryView: View {
-    let actions: TodoActions
+    /// Finished top-level todos, newest first (`ContentView.doneTodos`).
+    let todos: [TodoItem]
     let lists: [TodoListModel]
-
-    @Query private var todos: [TodoItem]
+    let actions: TodoActions
 
     /// How far back the history reaches.
     private static let window = 60
@@ -28,10 +28,8 @@ struct DoneHistoryView: View {
         let calendar = Calendar.current
         let cutoff = calendar.date(byAdding: .day, value: -Self.window, to: Date()) ?? .distantPast
         let done = todos
-            .filter { $0.parentId == nil && $0.isCompleted && !$0.isSoftDeleted }
             .map { (todo: $0, at: $0.completedAt ?? $0.updatedAt) }
             .filter { $0.at >= cutoff }
-            .sorted { Self.isOrderedBefore($0, $1) }
         let byDay = Dictionary(grouping: done) { calendar.startOfDay(for: $0.at) }
         return byDay.keys.sorted(by: >).map { day in
             DayGroup(id: day, label: DayLabel.text(day), items: byDay[day]?.map(\.todo) ?? [])
@@ -54,7 +52,7 @@ struct DoneHistoryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                Masthead(title: "Done", subline: "Finished todos, by day")
+                Masthead(title: "Done", subline: MastheadCopy.done, keepsBanner: true)
                 let groups = groups
                 if groups.isEmpty {
                     EmptyLine(text: "Nothing done yet.")
@@ -80,8 +78,9 @@ struct DoneHistoryView: View {
             }
             .padding(.bottom, Theme.Space.s16)
         }
+        // As the list pages have, so the title sits at the same height.
+        .contentMargins(.top, Theme.Space.s2, for: .scrollContent)
         .background(Theme.Colors.canvas)
-        .inlineNavigationBar()
     }
 
     private func row(_ todo: TodoItem) -> some View {

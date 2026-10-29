@@ -295,6 +295,8 @@ extension ContentView {
             if viewModel.page == .lists, let id = viewModel.openCollectionId {
                 openColumnId = id
             }
+            // The phone's Done page is the board's resting fourth column.
+            if viewModel.page == .done { openColumnId = nil }
             if focusedColumnId == nil {
                 focusedColumnId = (viewModel.openCollectionId.flatMap { id in openColumnId == id ? id : nil })
                     ?? timeList(viewModel.page)?.id ?? timeList(.today)?.id

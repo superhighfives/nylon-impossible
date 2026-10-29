@@ -4,6 +4,10 @@
 //
 //  The editorial title block under the switcher: the list name in Archivo,
 //  a subline, and a hairline. It scrolls with the page (the switcher stays).
+//  The five top-level pages keep the banner's space above the title (two
+//  lines, 20pt below the switcher and 20pt clear of the title) whether or not
+//  it's showing, so titles sit at the same height on every page and don't
+//  move when the overnight pill comes or goes.
 //
 
 import SwiftUI
@@ -11,13 +15,24 @@ import SwiftUI
 struct Masthead<Accessory: View>: View {
     let title: String
     let subline: String
-    /// "‹ Lists" over a collection; nil on the four top-level pages.
+    /// "‹ Lists" over a collection; nil on the top-level pages.
     var back: (label: String, action: () -> Void)?
+    /// A top-level phone page: keep the banner's space above the title.
+    var keepsBanner = false
+    /// Today's overnight pill, in that space.
+    var banner: AnyView?
     /// A trailing control on the back row — the collection's ⋯ menu.
     @ViewBuilder var accessory: () -> Accessory
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            if keepsBanner {
+                // Grows at large text sizes, where two lines of pill don't fit.
+                ZStack(alignment: .bottomLeading) { banner }
+                    .frame(maxWidth: .infinity, minHeight: Theme.Space.rowMinHeight, alignment: .bottomLeading)
+                .padding(.horizontal, Theme.Phone.gutter)
+                .padding(.vertical, Theme.Space.s5)
+            }
             if let back {
                 HStack {
                     Button(action: back.action) {
@@ -47,7 +62,7 @@ struct Masthead<Accessory: View>: View {
                 .foregroundStyle(Theme.Colors.ink)
                 .lineLimit(2)
                 .minimumScaleFactor(0.7)
-                .padding(.top, back == nil ? Theme.Space.s6 : Theme.Space.s1)
+                .padding(.top, keepsBanner ? 0 : back == nil ? Theme.Space.s6 : Theme.Space.s1)
                 .padding(.horizontal, Theme.Phone.gutter)
                 .accessibilityAddTraits(.isHeader)
 
@@ -68,8 +83,14 @@ struct Masthead<Accessory: View>: View {
 }
 
 extension Masthead where Accessory == EmptyView {
-    init(title: String, subline: String, back: (label: String, action: () -> Void)? = nil) {
-        self.init(title: title, subline: subline, back: back) { EmptyView() }
+    init(
+        title: String,
+        subline: String,
+        back: (label: String, action: () -> Void)? = nil,
+        keepsBanner: Bool = false,
+        banner: AnyView? = nil
+    ) {
+        self.init(title: title, subline: subline, back: back, keepsBanner: keepsBanner, banner: banner) { EmptyView() }
     }
 }
 
@@ -141,6 +162,8 @@ enum MastheadCopy {
     static func lists(count: Int) -> String {
         "\(count) \(count == 1 ? "list" : "lists") · never age"
     }
+
+    static let done = "Finished todos, by day"
 
     /// "Sunday, October 18".
     static func longDate(_ date: Date, locale: Locale = .current) -> String {
