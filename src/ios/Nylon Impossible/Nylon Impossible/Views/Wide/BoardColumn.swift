@@ -4,7 +4,8 @@
 //
 //  One column of the board (iPad and Mac): the header (BoardColumnHeader),
 //  a hairline, the quiet "+ Add" composer, and the rows. One click selects a
-//  row; a click on the selection opens it in the fourth column.
+//  row; a click on the selection opens it in the fourth column. A click on
+//  empty space focuses the column without selecting a row.
 //
 //  The whole column takes a dropped todo, which moves it here (one list per
 //  todo). Dropping onto a row places it just above that row, which is also
@@ -39,6 +40,8 @@ struct BoardColumn<Accessory: View>: View {
     let onDrop: (UUID, TodoItem?) -> Void
     /// Text or a link dragged in from another app, to add here.
     var onExternalDrop: ((String) -> Void)?
+    /// A click on the column's empty space: focus the column, select nothing.
+    var onBackgroundTap: () -> Void = {}
     @ViewBuilder var accessory: () -> Accessory
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -70,6 +73,9 @@ struct BoardColumn<Accessory: View>: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .background(isTargeted ? Theme.Colors.fill : (isTinted ? Theme.Colors.surface : Theme.Colors.canvas))
+        .background {
+            Color.clear.contentShape(Rectangle()).onTapGesture(perform: onBackgroundTap)
+        }
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isTargeted)
         .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.text)
         .todoDropTarget(isTargeted: $isTargeted, onExternal: onExternalDrop) { onDrop($0, nil) }
@@ -147,13 +153,14 @@ extension BoardColumn where Accessory == EmptyView {
         onSelect: @escaping (TodoItem) -> Void,
         onOpen: @escaping (TodoItem) -> Void,
         onDrop: @escaping (UUID, TodoItem?) -> Void,
-        onExternalDrop: ((String) -> Void)? = nil
+        onExternalDrop: ((String) -> Void)? = nil,
+        onBackgroundTap: @escaping () -> Void = {}
     ) {
         self.init(
             list: list, title: title, subline: subline, rows: rows, subtasks: subtasks, lists: lists,
             actions: actions, selectedId: selectedId, isTinted: false, overnight: overnight, empty: empty,
             composer: composer, onSelect: onSelect, onOpen: onOpen, onDrop: onDrop,
-            onExternalDrop: onExternalDrop
+            onExternalDrop: onExternalDrop, onBackgroundTap: onBackgroundTap
         ) { EmptyView() }
     }
 }

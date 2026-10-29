@@ -101,6 +101,15 @@ extension ContentView {
         selectedTodoId = lastSelected[id].flatMap { ids.contains($0) ? $0 : nil } ?? ids.first
     }
 
+    /// A click on a column's empty space: the column takes the keyboard, but
+    /// no row is selected, so ↓ starts at its top.
+    func softFocus(_ id: String) {
+        sidebarCursor = nil
+        focusedColumnId = id
+        selectedTodoId = nil
+        boardFocused = true
+    }
+
     /// One of your lists: open it in the fourth column and go into it.
     /// Clicking the open list again does the same; it doesn't close it.
     func openCollection(_ list: TodoListModel) {
