@@ -1,11 +1,19 @@
-import { dueLabel } from "@nylon-impossible/shared";
+import { type BoardView, boardUrl, dueLabel } from "@nylon-impossible/shared";
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
-import { QUICK_ADD_INPUT, QUICK_ADD_LIST_INPUT } from "../../lib/addon-cards";
+import {
+  type AddonAdded,
+  type AddonListOption,
+  type AddonMessage,
+  buildContextualCard,
+  QUICK_ADD_INPUT,
+  QUICK_ADD_LIST_INPUT,
+} from "../../lib/addon-cards";
 import { createSmartTodo } from "../../lib/create-todo";
 import { and, eq, getDb, todos } from "../../lib/db";
 import { verifyListOwnership } from "../../lib/lists";
-import { setTodoCompleted } from "../../lib/todos-core";
+import { notifySync } from "../../lib/notify-sync";
+import { listListsForUser, setTodoCompleted } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import { buildRefreshedHomepageCard, type HomepageData } from "./homepage";
 import {
@@ -13,9 +21,12 @@ import {
   cardResponse,
   connectResponse,
   MAX_ADDON_TODO_TEXT,
+  messageFromAction,
   readAddonEvent,
   readFormInput,
   readParameter,
+  requestBaseUrl,
+  webBaseUrl,
 } from "./shared";
 
 type Db = ReturnType<typeof getDb>;
@@ -53,6 +64,34 @@ function addedToast(created: { listId: string; dueDate: string | null }) {
     if (!created.dueDate) return where;
     return `${where} · due ${dueLabel(created.dueDate, now, data.timeZone).text}`;
   };
+}
+
+/**
+ * Redraw the contextual card for the open message, optionally leading with
+ * what was just added, with an optional toast.
+ */
+async function refreshedContextual(
+  c: Context<Env>,
+  userId: string,
+  message: AddonMessage,
+  opts: { added?: AddonAdded; notification?: string } = {},
+) {
+  const lists = await listListsForUser(getDb(c.env.DB), userId);
+  const card = buildContextualCard(
+    requestBaseUrl(c),
+    message,
+    lists,
+    opts.added,
+  );
+  return cardResponse(c, card, {
+    asAction: true,
+    notification: opts.notification,
+  });
+}
+
+/** A list's place in the web app: its own page, or `/list/:id`. */
+function listView(list: AddonListOption | undefined, id: string): BoardView {
+  return list?.systemKind ? { kind: list.systemKind } : { kind: "list", id };
 }
 
 /** The composer's list, if it's one of the user's own; otherwise Today. */
@@ -111,6 +150,8 @@ export async function gmailAddonQuickAdd(c: Context<Env>) {
 }
 
 // POST /gmail-addon/actions/add-from-message — add the open message as a todo.
+// The card stays on the message and leads with "Added to <list>", with Open in
+// Nylon and Undo, rather than only flashing a toast.
 export async function gmailAddonAddFromMessage(c: Context<Env>) {
   const claims = c.get("googleClaims");
   const db = getDb(c.env.DB);
@@ -121,12 +162,17 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
   }
 
   const event = await readAddonEvent(c);
+  const message = messageFromAction(event);
   const text = readFormInput(event, QUICK_ADD_INPUT);
   if (!text) {
-    return refreshedHomepage(c, resolved.userId, "Add a title first");
+    return refreshedContextual(c, resolved.userId, message, {
+      notification: "Add a title first",
+    });
   }
   if (text.length > MAX_ADDON_TODO_TEXT) {
-    return refreshedHomepage(c, resolved.userId, "That todo is too long");
+    return refreshedContextual(c, resolved.userId, message, {
+      notification: "That todo is too long",
+    });
   }
   const permalink = readParameter(event, "permalink");
   // The original email subject, carried as a hidden parameter so the attached
@@ -143,13 +189,49 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 
-  return refreshedHomepage(c, resolved.userId, addedToast(todo));
+  const lists = await listListsForUser(db, resolved.userId);
+  const list = lists.find((l) => l.id === todo.listId);
+  const card = buildContextualCard(requestBaseUrl(c), message, lists, {
+    todoId: todo.id,
+    title: todo.title,
+    listName: list?.name ?? "Nylon",
+    url: boardUrl(webBaseUrl(c), listView(list, todo.listId)),
+  });
+  return cardResponse(c, card, { asAction: true });
+}
+
+// POST /gmail-addon/actions/undo-add — Undo on the contextual card's "Added
+// to <list>": delete the todo add-from-message just made, and go back to the
+// card for the message.
+export async function gmailAddonUndoAdd(c: Context<Env>) {
+  const claims = c.get("googleClaims");
+  const db = getDb(c.env.DB);
+
+  const resolved = await resolveNylonUser(db, c.env, claims);
+  if (resolved.status !== "linked") {
+    return connectResponse(c, claims, { asAction: true });
+  }
+
+  const event = await readAddonEvent(c);
+  const todoId = readParameter(event, "todoId");
+  if (todoId) {
+    const deleted = await db
+      .delete(todos)
+      .where(and(eq(todos.id, todoId), eq(todos.userId, resolved.userId)))
+      .returning({ id: todos.id });
+    if (deleted.length > 0) await notifySync(c.env, resolved.userId);
+  }
+  return refreshedContextual(c, resolved.userId, messageFromAction(event), {
+    notification: "Removed",
+  });
 }
 
 // POST /gmail-addon/actions/toggle — tick an open todo's checkbox to mark it
 // done. A repeat rolls forward instead, and the toast says when it's next and,
 // if it left the list, where it went — the apps' "Done · next Mon, in This
-// Week".
+// week". A todo ticked in the last few minutes is still on the card, checked;
+// unticking it marks it not done ("Back in Today"). The flip goes by what's
+// stored, not the checkbox, so a stale card can't tick something twice.
 export async function gmailAddonToggle(c: Context<Env>) {
   const claims = c.get("googleClaims");
   const db = getDb(c.env.DB);
@@ -164,7 +246,7 @@ export async function gmailAddonToggle(c: Context<Env>) {
   if (!todoId) return refreshedHomepage(c, resolved.userId, "Done");
 
   const [before] = await db
-    .select({ listId: todos.listId })
+    .select({ listId: todos.listId, completed: todos.completed })
     .from(todos)
     .where(and(eq(todos.id, todoId), eq(todos.userId, resolved.userId)));
   const updated = await setTodoCompleted(
@@ -172,8 +254,17 @@ export async function gmailAddonToggle(c: Context<Env>) {
     c.env,
     resolved.userId,
     todoId,
-    true,
+    !before?.completed,
   );
+
+  if (before?.completed && updated) {
+    const listId = updated.listId;
+    return refreshedHomepage(
+      c,
+      resolved.userId,
+      (data) => `Back in ${listName(data, listId)}`,
+    );
+  }
 
   if (!updated || updated.completed || !updated.dueDate || !before) {
     return refreshedHomepage(c, resolved.userId, "Done");

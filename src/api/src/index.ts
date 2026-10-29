@@ -9,6 +9,7 @@ import {
   gmailAddonQuickAdd,
   gmailAddonRefresh,
   gmailAddonToggle,
+  gmailAddonUndoAdd,
 } from "./handlers/gmail-addon/actions";
 import { gmailAddonContextual } from "./handlers/gmail-addon/contextual";
 import { gmailAddonHomepage } from "./handlers/gmail-addon/homepage";
@@ -122,6 +123,7 @@ app.post("/gmail-addon/contextual", gmailAddonContextual);
 app.post("/gmail-addon/actions/quick-add", gmailAddonQuickAdd);
 app.post("/gmail-addon/actions/add-from-message", gmailAddonAddFromMessage);
 app.post("/gmail-addon/actions/toggle", gmailAddonToggle);
+app.post("/gmail-addon/actions/undo-add", gmailAddonUndoAdd);
 app.post("/gmail-addon/actions/refresh", gmailAddonRefresh);
 
 // Todo routes
