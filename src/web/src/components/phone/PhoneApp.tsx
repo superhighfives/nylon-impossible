@@ -97,7 +97,10 @@ export function PhoneApp({
   const switcherRef = useRef<HTMLElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  /** The page `goTo` is scrolling to, until it gets there or a finger takes over. */
+  /**
+   * The page `goTo` is scrolling to, until it gets there, a finger or
+   * trackpad takes over, or the scroll ends somewhere else.
+   */
   const scrollingTo = useRef<number | null>(null);
 
   const now = new Date();
@@ -168,6 +171,13 @@ export function PhoneApp({
     if (scrollingTo.current !== null && settled !== scrollingTo.current) return;
     scrollingTo.current = null;
     if (settled !== pageIndex) setPageIndex(settled);
+  };
+
+  /** A finger or trackpad took over, or the scroll stopped short: settle where it is. */
+  const releaseScroll = () => {
+    if (scrollingTo.current === null) return;
+    scrollingTo.current = null;
+    onPagerScroll();
   };
 
   const goTo = useCallback(
@@ -603,9 +613,9 @@ export function PhoneApp({
         <div
           ref={pagerRef}
           onScroll={onPagerScroll}
-          onPointerDown={() => {
-            scrollingTo.current = null;
-          }}
+          onPointerDown={releaseScroll}
+          onWheel={releaseScroll}
+          onScrollEnd={releaseScroll}
           data-phone-ready={loading ? undefined : ""}
           // Nothing to swipe to while loading, and a scroller with nothing
           // focusable in it is a dead end for the keyboard.
