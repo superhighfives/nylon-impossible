@@ -51,6 +51,15 @@ extension ContentView {
     }
 
     /// Put the overnight note away for good.
+    /// The pill's text: the first todo in the list they moved to (This week
+    /// if anything went there, else Someday).
+    func seeOvernight() {
+        let kind: SystemListKind = (preferences.lastSweep?.movedToThisWeek ?? 0) > 0 ? .thisWeek : .someday
+        guard let list = orderedLists.first(where: { $0.systemKind == kind }) else { return }
+        focusColumn(list.id)
+        selectedTodoId = rows(list).first?.id
+    }
+
     func dismissOvernight() {
         guard let sweep = preferences.lastSweep else { return }
         overnightDismissedAt = sweep.atString

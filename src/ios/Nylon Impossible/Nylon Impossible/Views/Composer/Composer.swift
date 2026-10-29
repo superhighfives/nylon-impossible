@@ -48,6 +48,11 @@ struct Composer: View {
     var showsListChips = true
     /// Esc, after the field lets go: quick add closes its popover with it.
     var onEscape: (() -> Void)?
+    /// The Mac menu bar's popover: the chips show once you type (not on
+    /// focus), ⇥ and ⇧⇥ step through them, and ↓ leaves the field for the
+    /// list below (`onDown`).
+    var menuBarKeys = false
+    var onDown: (() -> Void)?
 
     @State private var keepWords = false
     @FocusState private var isFocused: Bool
@@ -74,7 +79,7 @@ struct Composer: View {
             .first
     }
 
-    private var showsChips: Bool { isFocused || hasDraft }
+    private var showsChips: Bool { menuBarKeys ? hasDraft : (isFocused || hasDraft) }
 
     /// The grabber only shows while the keyboard is up, and not in the share
     /// sheet, which has no keyboard to hand back.
@@ -123,6 +128,19 @@ struct Composer: View {
             .onKeyPress(.escape) {
                 isFocused = false
                 onEscape?()
+                return .handled
+            }
+            .onKeyPress(keys: [.tab], phases: .down) { press in
+                guard menuBarKeys, hasDraft, !lists.isEmpty else { return .ignored }
+                let at = lists.firstIndex { $0.id == targetId } ?? 0
+                let step = press.modifiers.contains(.shift) ? -1 : 1
+                let next = lists[(at + step + lists.count) % lists.count]
+                chosenListId = next.id == currentListId ? nil : next.id
+                return .handled
+            }
+            .onKeyPress(.downArrow) {
+                guard let onDown, !text.contains("\n") else { return .ignored }
+                onDown()
                 return .handled
             }
             .accessibilityLabel("New todo")

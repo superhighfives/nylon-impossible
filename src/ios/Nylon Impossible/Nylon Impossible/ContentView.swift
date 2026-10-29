@@ -122,6 +122,7 @@ struct ContentView: View {
     /// The toast's Undo on Edit ▸ Undo (⌘Z).
     @State var undoBridge = ToastUndoBridge()
     @Environment(\.undoManager) var undoManager
+    @Environment(\.openURL) var openURL
     #if os(macOS)
     @Environment(\.openSettings) var openSettings
     #endif

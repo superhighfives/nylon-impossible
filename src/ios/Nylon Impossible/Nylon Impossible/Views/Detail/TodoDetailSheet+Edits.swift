@@ -82,6 +82,14 @@ extension TodoDetailSheet {
     }
 
     func remove(_ url: APITodoUrl) async {
+        // A card still on its way exists only here: drop it, and `addLink`
+        // deletes the saved copy when the request comes back.
+        if url.id.hasPrefix("pending-") {
+            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+                urls.removeAll { $0.id == url.id }
+            }
+            return
+        }
         guard let apiService else { return linkUnavailable() }
         do {
             try await apiService.deleteTodoUrl(todoId: todoId, urlId: url.id)
@@ -94,6 +102,54 @@ extension TodoDetailSheet {
             }
         } catch {
             actions.toasts.show("Couldn’t remove the link", action: nil)
+        }
+    }
+
+    /// "Paste a link": checked here first (the API applies the same rule),
+    /// shown at once as a pending card, then swapped for the server's copy;
+    /// its title arrives once the background fetch does.
+    func addLink() async {
+        guard !newLink.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard let href = LinkInput.normalize(newLink) else {
+            linkInvalid = true
+            // Keep the field, so the text can be fixed straight away.
+            focus = .link
+            AccessibilityNotification.Announcement("That doesn’t look like a link.").post()
+            return
+        }
+        newLink = ""
+        focus = .link
+        // Already there: its card is on screen.
+        guard !urls.contains(where: { $0.url == href }) else { return }
+        guard let apiService else { return linkUnavailable() }
+        let now = Date()
+        let pending = APITodoUrl(
+            id: "pending-\(UUID().uuidString)", todoId: todoId, url: href, title: nil, description: nil,
+            siteName: nil, favicon: nil, image: nil, showPreview: true,
+            position: (urls.map(\.position).max() ?? "a0") + "V", fetchStatus: .pending,
+            fetchedAt: nil, createdAt: now, updatedAt: now
+        )
+        withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { urls.append(pending) }
+        do {
+            let added = try await apiService.addTodoUrl(todoId: todoId, url: href)
+            guard let index = urls.firstIndex(where: { $0.id == pending.id }) else {
+                // Removed while it was on its way: take the saved one back
+                // out, or it would reappear at the next refresh.
+                try? await apiService.deleteTodoUrl(todoId: todoId, urlId: added.id)
+                return
+            }
+            urls[index] = added
+            actions.edited()
+            // The title is fetched server-side; come back once for it (unless
+            // the detail has gone), and let the next sync bring anything
+            // slower.
+            guard (try? await Task.sleep(for: .seconds(3))) != nil else { return }
+            await loadUrls()
+        } catch {
+            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+                urls.removeAll { $0.id == pending.id }
+            }
+            actions.toasts.show("Couldn’t add the link", action: nil)
         }
     }
 

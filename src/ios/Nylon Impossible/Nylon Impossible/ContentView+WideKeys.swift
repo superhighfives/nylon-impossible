@@ -124,6 +124,14 @@ extension ContentView {
             actions.delete(todo)
         case .moveTo:
             palette = .move(todo.id)
+        case .openLink:
+            // The first link, without opening the detail.
+            let first = todo.urls.sorted { $0.position < $1.position }.first?.url ?? todo.pendingUrls.first
+            if let first, let url = URL(string: first) {
+                openURL(url)
+            } else {
+                actions.toasts.show("No link on this todo", action: nil)
+            }
         case .move(let kind):
             guard let target = orderedLists.first(where: { $0.systemKind == kind }),
                   target.id.lowercased() != column.lowercased() else { return }

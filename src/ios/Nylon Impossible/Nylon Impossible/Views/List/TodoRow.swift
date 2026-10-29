@@ -161,8 +161,8 @@ struct MetaLine: View {
         case .notes:
             Image(systemName: Theme.Icon.notes)
                 .imageScale(.small)
-        case .link(let domain):
-            glyphed(Theme.Icon.link, domain)
+        case .link(let domain, let more):
+            glyphed(Theme.Icon.link, more > 0 ? "\(domain) +\(more)" : domain)
                 .lineLimit(1)
         }
     }

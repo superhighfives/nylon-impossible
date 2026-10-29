@@ -100,6 +100,8 @@ extension TodoDetailSheet {
 
     // MARK: - Links
 
+    /// Always shown: a card per link, then "Paste a link" (Return adds). A
+    /// new card shows at once with its domain and "Fetching title…".
     var linksSection: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s2) {
             Hairline().padding(.top, 18).padding(.bottom, 6)
@@ -111,6 +113,35 @@ extension TodoDetailSheet {
                     onRetry: { Task { await retryLinks() } },
                     onRemove: { Task { await remove(url) } }
                 )
+            }
+            HStack(spacing: Theme.Space.s3) {
+                Image(systemName: Theme.Icon.link)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.Colors.inkMuted)
+                    .frame(width: Theme.Phone.checkbox)
+                    .accessibilityHidden(true)
+                TextField("Paste a link", text: $newLink, prompt: Text("Paste a link").foregroundStyle(Theme.Colors.inkMuted))
+                    .textStyle(Theme.Fonts.Role.subtask)
+                    .foregroundStyle(Theme.Colors.ink)
+                    .focused($focus, equals: .link)
+                    .textContentType(.URL)
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    #endif
+                    .autocorrectionDisabled()
+                    .submitLabel(.done)
+                    .onSubmit { Task { await addLink() } }
+                    .onChange(of: newLink) { linkInvalid = false }
+                    .accessibilityLabel("Add a link")
+            }
+            .frame(minHeight: Theme.Space.rowMinHeight)
+            if linkInvalid {
+                Text("That doesn’t look like a link.")
+                    .textStyle(Theme.Fonts.Role.meta)
+                    .foregroundStyle(Theme.Colors.destructive)
+                    .padding(.leading, Theme.Phone.checkbox + Theme.Space.s3)
+                    .accessibilityAddTraits(.isStaticText)
             }
         }
     }

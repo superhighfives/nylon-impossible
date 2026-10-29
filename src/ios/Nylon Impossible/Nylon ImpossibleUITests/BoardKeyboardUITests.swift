@@ -233,6 +233,13 @@ final class BoardKeyboardUITests: NylonUITestCase {
         XCTAssertTrue(app.staticTexts["⇧1 or G T"].exists)
     }
 
+    func testOSaysWhenATodoHasNoLink() {
+        press("j")
+        press("j")
+        press("o")
+        waitFor(XCUIElement.toast("No link on this todo", in: app))
+    }
+
     func testShiftNOpensNewList() {
         press("n", .shift)
         waitFor(app.textFields["Name"].firstMatch)

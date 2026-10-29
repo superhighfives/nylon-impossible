@@ -88,6 +88,15 @@ struct TodoMetaTests {
         ])
     }
 
+    @Test("the first link's domain, and how many more there are")
+    func linkCount() {
+        let todo = TodoItem(title: "Plan Lisbon trip")
+        todo.pendingUrls = ["https://www.visitlisboa.com/tram-28", "https://example.com", "https://example.org"]
+        let parts = TodoMeta.parts(for: todo, subtasks: [])
+        #expect(parts == [.link("visitlisboa.com", more: 2)])
+        #expect(TodoMeta.accessibilityText(parts) == "Link to visitlisboa.com and 2 more")
+    }
+
     @Test("a bare todo has no meta line; blank notes don't count")
     func emptyParts() {
         let todo = TodoItem(title: "Read Piranesi")

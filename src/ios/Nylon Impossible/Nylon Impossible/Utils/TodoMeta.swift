@@ -16,7 +16,9 @@ enum MetaPart: Hashable, Sendable {
     case repeats(String)
     case subtasks(done: Int, total: Int)
     case notes
-    case link(String)
+    /// The first link's domain, and how many more links there are:
+    /// "visitlisboa.com +2".
+    case link(String, more: Int = 0)
 }
 
 enum DueLabel {
@@ -162,7 +164,8 @@ enum TodoMeta {
         }
         let firstLink = todo.urls.sorted { $0.position < $1.position }.first?.url ?? todo.pendingUrls.first
         if let firstLink, let domain = LinkLabel.domain(firstLink) {
-            parts.append(.link(domain))
+            let total = max(todo.urls.count, todo.pendingUrls.count)
+            parts.append(.link(domain, more: max(total - 1, 0)))
         }
         return parts
     }
@@ -176,7 +179,8 @@ enum TodoMeta {
             case .repeats(let text): return "Repeats \(text.lowercased())"
             case .subtasks(let done, let total): return "\(done) of \(total) subtasks done"
             case .notes: return "Has notes"
-            case .link(let domain): return "Link to \(domain)"
+            case .link(let domain, let more):
+                return more > 0 ? "Link to \(domain) and \(more) more" : "Link to \(domain)"
             }
         }
         .joined(separator: ", ")
