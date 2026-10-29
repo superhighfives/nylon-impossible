@@ -31,6 +31,7 @@ function todo(overrides: Partial<AddonTodo> = {}): AddonTodo {
     dueDate: null,
     pinned: false,
     repeats: false,
+    done: false,
     ...overrides,
   };
 }
@@ -109,14 +110,29 @@ describe("buildHomepageCard", () => {
   );
 
   it("has the composer, Today, This week, then Someday and your lists", () => {
-    expect(card.header?.title).toBe("Nylon");
+    expect(card.header).toBeUndefined();
     expect(card.sections.map((s) => s.header)).toEqual([
       undefined,
-      "Today",
-      "This week",
+      "Today · 1",
+      "This week · 1",
       "Someday · 1",
       "Studio · 1",
     ]);
+  });
+
+  it("keeps a just-ticked row checked and struck through, escaped, out of the count", () => {
+    const ticked = buildHomepageCard(
+      BASE,
+      input([
+        todo({ id: "a", title: "<b>Ship</b> it", done: true }),
+        todo({ id: "b", title: "Still to do" }),
+      ]),
+    );
+    const today = ticked.sections[1];
+    expect(today.header).toBe("Today · 1");
+    const row = today.widgets[0].decoratedText;
+    expect(row?.text).toBe("<s>&lt;b&gt;Ship&lt;/b&gt; it</s>");
+    expect(row?.switchControl?.selected).toBe(true);
   });
 
   it("leaves Today and This week open", () => {
@@ -159,11 +175,7 @@ describe("buildHomepageCard", () => {
   it("deep-links each time list's overflow to its own page", () => {
     const big = buildHomepageCard(
       BASE,
-      input([
-        ...rows("today", 9),
-        ...rows("week", 9),
-        ...rows("someday", 9),
-      ]),
+      input([...rows("today", 9), ...rows("week", 9), ...rows("someday", 9)]),
     );
     const links = big.sections
       .slice(1, 4)

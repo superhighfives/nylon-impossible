@@ -36,6 +36,8 @@ interface Widget {
     button?: Button;
     switchControl?: {
       name: string;
+      /** Sent as the form input's value while the box is checked. */
+      value?: string;
       selected: boolean;
       controlType: "CHECKBOX" | "SWITCH";
       onChangeAction: CardAction;
@@ -62,6 +64,8 @@ interface Button {
   text: string;
   onClick: OnClick;
   disabled?: boolean;
+  /** Unset is OUTLINED; FILLED is for the card's primary action. */
+  type?: "FILLED" | "OUTLINED";
 }
 
 interface Section {
@@ -114,6 +118,7 @@ export const ADDON_ACTIONS = {
   quickAdd: "/gmail-addon/actions/quick-add",
   addFromMessage: "/gmail-addon/actions/add-from-message",
   toggle: "/gmail-addon/actions/toggle",
+  undoAdd: "/gmail-addon/actions/undo-add",
   refresh: "/gmail-addon/actions/refresh",
 } as const;
 
@@ -126,12 +131,20 @@ function actionUrl(baseUrl: string, path: string): string {
 //
 // The card format fixes the look, so the add-on matches the apps on structure
 // and words instead: a composer with a list dropdown, then Today and This
-// Week with tick-to-done, then Someday collapsed to a count. Copy follows the
+// week with tick-to-done, then Someday collapsed to a count. Copy follows the
 // redesign spec's Vocabulary (todo, Today / This week / Someday, Pin, Done).
 // ---------------------------------------------------------------------------
 
 /** Name of the composer text input, referenced by the submit action handlers. */
 export const QUICK_ADD_INPUT = "todoText";
+
+/**
+ * A row's checkbox: its form input is named for the todo and carries
+ * `ADDON_DONE_VALUE` while checked, so the toggle can tell a tick from an
+ * untick rather than guessing from what's stored.
+ */
+export const ADDON_DONE_VALUE = "done";
+export const doneInputName = (todoId: string) => `done_${todoId}`;
 
 /** Name of the composer list dropdown, referenced by the submit action handlers. */
 export const QUICK_ADD_LIST_INPUT = "listId";
@@ -154,12 +167,20 @@ export interface AddonTodo {
   dueDate: Date | null;
   pinned: boolean;
   repeats: boolean;
+  /**
+   * Ticked within `ADDON_DONE_WINDOW_MS`: it stays in place, checked and
+   * struck through, so it can be unticked. No Undo on homepage rows.
+   */
+  done: boolean;
 }
 
 export interface HomepageCardInput {
   /** Every list the user has, in any order: the dropdown sorts them. */
   lists: AddonListOption[];
-  /** Open top-level todos across every list, pinned first within a list. */
+  /**
+   * Open top-level todos across every list, pinned first within a list,
+   * plus any ticked in the last `ADDON_DONE_WINDOW_MS`, in their places.
+   */
   todos: AddonTodo[];
   /** The web app's base URL; the "Open" links deep-link into its lists. */
   webUrl: string;
@@ -230,7 +251,11 @@ function listDropdown(lists: AddonListOption[], selectedId: string): Widget {
   };
 }
 
-/** A row: the title, its meta line, and a checkbox that marks it done. */
+/**
+ * A row: the title, its meta line, and a checkbox that marks it done. A row
+ * ticked in the last few minutes stays checked and struck through, and
+ * unticking it marks it not done.
+ */
 function todoRowWidget(
   baseUrl: string,
   todo: AddonTodo,
@@ -238,14 +263,16 @@ function todoRowWidget(
   timeZone: string,
 ): Widget {
   const meta = addonTodoMeta(todo, now, timeZone);
+  const title = escapeCardText(todo.title);
   return {
     decoratedText: {
-      text: escapeCardText(todo.title),
+      text: todo.done ? `<s>${title}</s>` : title,
       ...(meta ? { bottomLabel: meta } : {}),
       wrapText: true,
       switchControl: {
-        name: `done_${todo.id}`,
-        selected: false,
+        name: doneInputName(todo.id),
+        value: ADDON_DONE_VALUE,
+        selected: todo.done,
         controlType: "CHECKBOX",
         onChangeAction: {
           function: actionUrl(baseUrl, ADDON_ACTIONS.toggle),
@@ -279,6 +306,13 @@ export const ADDON_ROW_BUDGET = 24;
 export const ADDON_MAX_LIST_SECTIONS = 6;
 
 /**
+ * How long a ticked todo stays on the card, checked, so a mis-tap can be
+ * unticked. The card is rebuilt from current data on every action, so after
+ * the window the row drops off on the next refresh with nothing to clean up.
+ */
+export const ADDON_DONE_WINDOW_MS = 10 * 60 * 1000;
+
+/**
  * Google documents 100 widgets and 100 sections per card but no item limit
  * for a dropdown, so the list dropdown is held to the same 100 rather than
  * trusting an unbounded number of lists to render.
@@ -290,8 +324,9 @@ function overflowRow(text: string, url: string): Widget {
 }
 
 /**
- * A section of tick rows: up to `limit` rows, a written `empty` line when
- * there are none, and "N more in <name>" with an Open link for the rest.
+ * A section of tick rows, headed "Name · N" (N counts the open ones): up to
+ * `limit` rows, a written `empty` line when there are none, and "N more in
+ * <name>" with an Open link for the rest.
  */
 function todoSection(
   baseUrl: string,
@@ -315,10 +350,11 @@ function todoSection(
       overflowRow(`${hidden} more in ${name}`, boardUrl(input.webUrl, view)),
     );
   }
-  if (!opts.collapsed) return { header: name, widgets };
-  // Collapsed sections show only "Name · N"; the rows open on demand.
+  const header = `${name} · ${rows.filter((todo) => !todo.done).length}`;
+  if (!opts.collapsed) return { header, widgets };
+  // Collapsed sections show only the header; the rows open on demand.
   return {
-    header: `${name} · ${rows.length}`,
+    header,
     collapsible: true,
     uncollapsibleWidgetsCount: 0,
     widgets,
@@ -326,8 +362,8 @@ function todoSection(
 }
 
 /**
- * Homepage card: the composer (list dropdown defaulting to Today), Today and
- * This week open with tick-to-done, then Someday and each of your lists as
+ * Homepage card: the composer (list dropdown defaulting to Today, a filled
+ * Add), Today and This week open with tick-to-done, then Someday and each of your lists as
  * collapsed "Name · N" sections that expand to the same rows. Lists with no
  * open todos are left out. Each "N more in X" opens X in the web app
  * (`/this-week`, `/list/:id`), and "N more lists" opens Lists.
@@ -344,9 +380,10 @@ export function buildHomepageCard(
   const thisWeek = rowsFor(idFor("thisWeek"));
   const someday = rowsFor(idFor("someday"));
 
+  const waiting = thisWeek.filter((todo) => !todo.done).length;
   const todayEmpty =
-    thisWeek.length > 0
-      ? `Nothing today. ${thisWeek.length} waiting in This week.`
+    waiting > 0
+      ? `Nothing today. ${waiting} waiting in This week.`
       : "Nothing today.";
 
   const sections: Section[] = [
@@ -365,6 +402,7 @@ export function buildHomepageCard(
             buttons: [
               {
                 text: "Add",
+                type: "FILLED",
                 onClick: {
                   action: {
                     function: actionUrl(baseUrl, ADDON_ACTIONS.quickAdd),
@@ -426,66 +464,120 @@ export function buildHomepageCard(
     });
   }
 
-  return { header: { title: "Nylon" }, sections };
+  // No card header: the panel's own header already says Nylon.
+  return { sections };
+}
+
+export interface AddonMessage {
+  subject: string;
+  permalink: string | null;
+}
+
+/** What add-from-message just made, for the card's confirmation. */
+export interface AddonAdded {
+  todoId: string;
+  title: string;
+  listName: string;
+  /** Where Open in Nylon goes: the list it went into. */
+  url: string;
+}
+
+/** The message's subject and permalink, carried on the card's actions. */
+function messageParameters(message: AddonMessage) {
+  return message.permalink
+    ? [
+        { key: "permalink", value: message.permalink },
+        { key: "subject", value: message.subject },
+      ]
+    : [];
 }
 
 /**
  * Contextual card shown with a message open: "Add to Nylon", titled from the
- * subject, with the same list dropdown (default Today). The thread permalink
+ * subject, with the same list dropdown (default Today). The open email shows
+ * as a row ("Attached as a link" over its subject), and the thread permalink
  * rides along as a hidden parameter so the todo gets the email as a link.
+ *
+ * After Add, an "Added to <list>" section leads the card, with Open in Nylon
+ * and Undo (which deletes the todo it just made); the composer stays below
+ * it for another.
  */
 export function buildContextualCard(
   baseUrl: string,
-  message: { subject: string; permalink: string | null },
+  message: AddonMessage,
   lists: AddonListOption[],
+  added?: AddonAdded,
 ): Card {
-  return {
-    header: { title: "Add to Nylon" },
-    sections: [
-      {
-        widgets: [
-          {
-            textInput: {
-              name: QUICK_ADD_INPUT,
-              label: "Todo",
-              value: message.subject,
-            },
-          },
-          listDropdown(lists, defaultAddonListId(lists)),
-          ...(message.permalink
-            ? [
-                {
-                  textParagraph: { text: "The email is attached as a link." },
-                } satisfies Widget,
-              ]
-            : []),
-          {
-            buttonList: {
-              buttons: [
-                {
-                  text: "Add",
-                  onClick: {
-                    action: {
-                      function: actionUrl(
-                        baseUrl,
-                        ADDON_ACTIONS.addFromMessage,
-                      ),
-                      parameters: message.permalink
-                        ? [
-                            { key: "permalink", value: message.permalink },
-                            { key: "subject", value: message.subject },
-                          ]
-                        : [],
-                    },
+  const sections: Section[] = [];
+  if (added) {
+    sections.push({
+      header: `Added to ${escapeCardText(added.listName)}`,
+      widgets: [
+        {
+          decoratedText: { text: escapeCardText(added.title), wrapText: true },
+        },
+        {
+          buttonList: {
+            buttons: [
+              openNylonButton(added.url, "Open in Nylon"),
+              {
+                text: "Undo",
+                onClick: {
+                  action: {
+                    function: actionUrl(baseUrl, ADDON_ACTIONS.undoAdd),
+                    parameters: [
+                      { key: "todoId", value: added.todoId },
+                      ...messageParameters(message),
+                    ],
                   },
                 },
-              ],
-            },
+              },
+            ],
           },
-        ],
+        },
+      ],
+    });
+  }
+  sections.push({
+    widgets: [
+      {
+        textInput: {
+          name: QUICK_ADD_INPUT,
+          label: "Todo",
+          value: message.subject,
+        },
+      },
+      listDropdown(lists, defaultAddonListId(lists)),
+      ...(message.permalink
+        ? [
+            {
+              decoratedText: {
+                topLabel: "Attached as a link",
+                text: escapeCardText(message.subject),
+                wrapText: true,
+              },
+            } satisfies Widget,
+          ]
+        : []),
+      {
+        buttonList: {
+          buttons: [
+            {
+              text: "Add",
+              type: "FILLED",
+              onClick: {
+                action: {
+                  function: actionUrl(baseUrl, ADDON_ACTIONS.addFromMessage),
+                  parameters: messageParameters(message),
+                },
+              },
+            },
+          ],
+        },
       },
     ],
-  };
+  });
+  return { header: { title: "Add to Nylon" }, sections };
 }
 
 /**

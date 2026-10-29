@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
 import {
+  ADDON_DONE_WINDOW_MS,
   type AddonListOption,
   type AddonTodo,
   buildHomepageCard,
@@ -39,13 +40,18 @@ export interface HomepageData {
   timeZone: string;
 }
 
-/** Everything the homepage card and the action toasts read. */
+/**
+ * Everything the homepage card and the action toasts read: open todos, and
+ * those ticked in the last `ADDON_DONE_WINDOW_MS` so they can be unticked.
+ */
 export async function loadHomepageData(
   db: Db,
   userId: string,
+  now = new Date(),
 ): Promise<HomepageData> {
+  const doneSince = new Date(now.getTime() - ADDON_DONE_WINDOW_MS);
   const [open, lists, timeZone] = await Promise.all([
-    listOpenTodos(db, userId),
+    listOpenTodos(db, userId, { doneSince }),
     listListsForUser(db, userId),
     getUserTimezone(db, userId),
   ]);
@@ -62,6 +68,7 @@ export async function loadHomepageData(
       dueDate: t.dueDate,
       pinned: t.pinned,
       repeats: t.recurrence != null,
+      done: t.completed,
     })),
   };
 }
@@ -73,7 +80,7 @@ export async function buildRefreshedHomepageCard(
   userId: string,
   now = new Date(),
 ): Promise<{ card: Card; data: HomepageData }> {
-  const data = await loadHomepageData(db, userId);
+  const data = await loadHomepageData(db, userId, now);
   const card = buildHomepageCard(requestBaseUrl(c), {
     ...data,
     webUrl: webBaseUrl(c),

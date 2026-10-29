@@ -4,7 +4,18 @@ import {
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
 import type { Env } from "../types";
-import { and, asc, desc, eq, type getDb, isNull, lists, todos } from "./db";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  type getDb,
+  gte,
+  isNull,
+  lists,
+  or,
+  todos,
+} from "./db";
 import { getSystemListId, verifyListOwnership } from "./lists";
 import { notifySync } from "./notify-sync";
 import { getUserTimezone } from "./user-timezone";
@@ -49,18 +60,27 @@ export interface UpdateTodoPatch {
  * list order then item order. Shared by the Gmail add-on homepage card and
  * any REST surface that needs the same "what's on my plate" view, so the two
  * can't drift. Excludes completed todos and subtasks (parentId IS NULL),
- * matching the top-level list shown on web/iOS.
+ * matching the top-level list shown on web/iOS — except, with `doneSince`,
+ * todos finished since then, which keep their place (`completed` is true).
+ * An ordinary completion only bumps `updatedAt` (`completedAt` is stamped
+ * when a repeat rolls forward), so that's what the window reads.
  *
  * Ordered by `lists.position` first — system lists are seeded before any
  * custom list and keep lower positions, so this naturally sorts Today / This
  * Week / Someday ahead of custom lists in creation/reorder order — then by
  * pinned/position within each list, matching the web board's own ordering.
  */
-export async function listOpenTodos(db: Db, userId: string) {
+export async function listOpenTodos(
+  db: Db,
+  userId: string,
+  opts: { doneSince?: Date } = {},
+) {
+  const open = eq(todos.completed, false);
   return db
     .select({
       id: todos.id,
       title: todos.title,
+      completed: todos.completed,
       position: todos.position,
       dueDate: todos.dueDate,
       pinned: todos.pinned,
@@ -74,7 +94,15 @@ export async function listOpenTodos(db: Db, userId: string) {
       and(
         eq(todos.userId, userId),
         isNull(todos.parentId),
-        eq(todos.completed, false),
+        opts.doneSince
+          ? or(
+              open,
+              and(
+                eq(todos.completed, true),
+                gte(todos.updatedAt, opts.doneSince),
+              ),
+            )
+          : open,
       ),
     )
     .orderBy(asc(lists.position), desc(todos.pinned), asc(todos.position));

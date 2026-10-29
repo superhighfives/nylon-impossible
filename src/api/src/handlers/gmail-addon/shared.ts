@@ -107,6 +107,26 @@ export function extractMessageContext(event: AddonEvent): {
 }
 
 /**
+ * The message an action on the contextual card was about. Gmail sends the
+ * open message's ids with every event, so the permalink is rebuilt from the
+ * thread when it can be; the subject (and, failing that, the permalink) come
+ * back as the card's own action parameters. A permalink from parameters is
+ * caller input, so only a Gmail URL is kept.
+ */
+export function messageFromAction(event: AddonEvent): {
+  subject: string;
+  permalink: string | null;
+} {
+  const fromEvent = extractMessageContext(event);
+  const subject = readParameter(event, "subject")?.trim();
+  const param = readParameter(event, "permalink");
+  const permalink =
+    fromEvent.permalink ??
+    (param?.startsWith("https://mail.google.com/") ? param : null);
+  return { subject: subject || fromEvent.subject, permalink };
+}
+
+/**
  * Parse and validate the POSTed event body against `addonEventSchema`. A
  * missing, non-JSON, or schema-mismatched body yields an empty event, so
  * handlers fall back to their empty-state card instead of trusting raw input.

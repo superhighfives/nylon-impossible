@@ -42,8 +42,11 @@ function dueIn(days: number): Date {
   return d;
 }
 
+/** A section by its header, or by name alone ("Today" finds "Today · 3"). */
 const section = (card: any, header: string) =>
-  card.sections.find((s: any) => s.header === header);
+  card.sections.find(
+    (s: any) => s.header === header || s.header?.startsWith(`${header} · `),
+  );
 
 const rowTitles = (s: any) =>
   s.widgets
@@ -177,7 +180,8 @@ describe("Gmail add-on", () => {
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
-      expect(card.header.title).toBe("Nylon");
+      // No card header: the panel's own header says Nylon.
+      expect(card.header).toBeUndefined();
       // A link row was recorded so future calls skip the Clerk lookup.
       const db = getDb(env.DB);
       const [link] = await db
@@ -186,7 +190,7 @@ describe("Gmail add-on", () => {
         .where(eq(gmailAddonLinks.googleSub, GOOGLE_SUB));
       expect(link.clerkUserId).toBe("user_test_123");
       // The open todo appears under its list's own section header.
-      const openSection = card.sections.find((s: any) => s.header === "Today");
+      const openSection = section(card, "Today");
       expect(openSection.widgets[0].decoratedText.text).toBe("Open one");
     });
 
@@ -223,7 +227,7 @@ describe("Gmail add-on", () => {
       expect(links).toHaveLength(0);
     });
 
-    it("lists only open top-level todos for a linked user", async () => {
+    it("lists open top-level todos, leaving out ones done a while ago", async () => {
       await linkUser();
       await seedTodo("22222222-2222-2222-2222-222222222222", "user_test_123", {
         title: "Still open",
@@ -233,13 +237,15 @@ describe("Gmail add-on", () => {
         title: "Already done",
         completed: true,
         position: "a1",
+        // Past the 10-minute window that keeps a ticked row on the card.
+        updatedAt: new Date(Date.now() - 20 * 60 * 1000),
       });
 
       const token = await idToken();
       const res = await post("/gmail-addon/homepage", token);
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
-      const openSection = card.sections.find((s: any) => s.header === "Today");
+      const openSection = section(card, "Today");
       expect(rowTitles(openSection)).toEqual(["Still open"]);
     });
 
@@ -272,8 +278,8 @@ describe("Gmail add-on", () => {
       // Composer first, then the time sections; Someday collapsed with a count.
       expect(card.sections.map((s: any) => s.header)).toEqual([
         undefined,
-        "Today",
-        "This week",
+        "Today · 1",
+        "This week · 1",
         "Someday · 2",
       ]);
       expect(rowTitles(section(card, "Today"))).toEqual(["In Today"]);
@@ -497,9 +503,12 @@ describe("Gmail add-on", () => {
       // The same list dropdown as the composer, defaulting to Today.
       const listInput = card.sections[0].widgets[1].selectionInput;
       expect(listInput.items.find((i: any) => i.selected).text).toBe("Today");
-      expect(card.sections[0].widgets[2].textParagraph.text).toBe(
-        "The email is attached as a link.",
-      );
+      // The open email, as a row.
+      expect(card.sections[0].widgets[2].decoratedText).toEqual({
+        topLabel: "Attached as a link",
+        text: "Reply to Sam",
+        wrapText: true,
+      });
       const button = card.sections[0].widgets.at(-1).buttonList.buttons[0];
       expect(button.onClick.action.parameters).toEqual([
         {
@@ -783,6 +792,202 @@ describe("Gmail add-on", () => {
       );
     });
 
+    it("keeps a ticked todo on the card, struck through, until unticked", async () => {
+      await linkUser();
+      const todoId = "55555555-5555-5555-5555-555555555555";
+      await seedTodo(todoId, "user_test_123", {
+        title: "Tick me",
+        position: "a0",
+      });
+      await seedTodo("55555555-5555-5555-5555-555555555556", "user_test_123", {
+        title: "Next",
+        position: "a1",
+      });
+      const token = await idToken();
+      const toggle = () =>
+        post("/gmail-addon/actions/toggle", token, {
+          commonEventObject: { parameters: { todoId } },
+        });
+
+      // Tick: done in the store, still in place on the card, checked.
+      let body = await (await toggle()).json<any>();
+      expect(body.renderActions.action.notification.text).toBe("Done");
+      let card = body.renderActions.action.navigations[0].updateCard;
+      let today = section(card, "Today");
+      // The count is what's left to do.
+      expect(today.header).toBe("Today · 1");
+      expect(rowTitles(today)).toEqual(["<s>Tick me</s>", "Next"]);
+      expect(today.widgets[0].decoratedText.switchControl.selected).toBe(true);
+      const db = getDb(env.DB);
+      let [row] = await db.select().from(todos).where(eq(todos.id, todoId));
+      expect(row.completed).toBe(true);
+
+      // Untick: not done again.
+      body = await (await toggle()).json<any>();
+      expect(body.renderActions.action.notification.text).toBe("Back in Today");
+      card = body.renderActions.action.navigations[0].updateCard;
+      today = section(card, "Today");
+      expect(today.header).toBe("Today · 2");
+      expect(rowTitles(today)).toEqual(["Tick me", "Next"]);
+      expect(today.widgets[0].decoratedText.switchControl.selected).toBe(false);
+      [row] = await db.select().from(todos).where(eq(todos.id, todoId));
+      expect(row.completed).toBe(false);
+    });
+
+    it("a tick on a stale card leaves a todo finished elsewhere done", async () => {
+      await linkUser();
+      const todoId = "56565656-5656-5656-5656-565656565656";
+      // Finished on web or iOS a moment ago; this card still shows it open.
+      await seedTodo(todoId, "user_test_123", {
+        title: "Done elsewhere",
+        completed: true,
+      });
+      const token = await idToken();
+      const tick = () =>
+        post("/gmail-addon/actions/toggle", token, {
+          commonEventObject: {
+            parameters: { todoId },
+            formInputs: {
+              [`done_${todoId}`]: { stringInputs: { value: ["done"] } },
+            },
+          },
+        });
+
+      // Ticking says done, and doing it twice changes nothing.
+      for (let i = 0; i < 2; i++) {
+        const body = await (await tick()).json<any>();
+        expect(body.renderActions.action.notification.text).toBe("Done");
+        const [row] = await getDb(env.DB)
+          .select()
+          .from(todos)
+          .where(eq(todos.id, todoId));
+        expect(row.completed).toBe(true);
+      }
+    });
+
+    it("gives each row's checkbox a value, so a tick says what it means", async () => {
+      await linkUser();
+      const todoId = "57575757-5757-5757-5757-575757575757";
+      await seedTodo(todoId, "user_test_123", { title: "Row" });
+      const res = await post("/gmail-addon/homepage", await idToken());
+      const card = (await res.json<any>()).action.navigations[0].pushCard;
+      const control = section(card, "Today").widgets[0].decoratedText
+        .switchControl;
+      expect(control.name).toBe(`done_${todoId}`);
+      expect(control.value).toBe("done");
+    });
+
+    it("drops a ticked todo from the card once the window has passed", async () => {
+      await linkUser();
+      await seedTodo("88888888-8888-8888-8888-888888888881", "user_test_123", {
+        title: "Just now",
+        completed: true,
+        position: "a0",
+        updatedAt: new Date(Date.now() - 9 * 60 * 1000),
+      });
+      await seedTodo("88888888-8888-8888-8888-888888888882", "user_test_123", {
+        title: "Earlier",
+        completed: true,
+        position: "a1",
+        updatedAt: new Date(Date.now() - 11 * 60 * 1000),
+      });
+      const res = await post("/gmail-addon/homepage", await idToken());
+      const card = (await res.json<any>()).action.navigations[0].pushCard;
+      expect(rowTitles(section(card, "Today"))).toEqual(["<s>Just now</s>"]);
+      expect(section(card, "Today").header).toBe("Today · 0");
+    });
+
+    it("makes Add the filled button", async () => {
+      await linkUser();
+      const res = await post("/gmail-addon/homepage", await idToken());
+      const card = (await res.json<any>()).action.navigations[0].pushCard;
+      const add = card.sections[0].widgets.at(-1).buttonList.buttons[0];
+      expect(add.text).toBe("Add");
+      expect(add.type).toBe("FILLED");
+    });
+
+    it("add-from-message confirms on the card, with Open in Nylon and Undo", async () => {
+      await linkUser();
+      const token = await idToken();
+      const permalink = "https://mail.google.com/mail/u/0/#all/thread-xyz";
+      const res = await post("/gmail-addon/actions/add-from-message", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: ["Reply to Sam"] } },
+          },
+          parameters: { permalink, subject: "Q3 planning notes" },
+        },
+        gmail: { messageId: "m1", threadId: "thread-xyz" },
+      });
+      const body = await res.json<any>();
+      // The card stays on the message rather than swapping to the homepage.
+      const card = body.renderActions.action.navigations[0].updateCard;
+      expect(card.header.title).toBe("Add to Nylon");
+      const added = card.sections[0];
+      expect(added.header).toBe("Added to Today");
+      expect(added.widgets[0].decoratedText.text).toBe("Reply to Sam");
+      const [open, undo] = added.widgets[1].buttonList.buttons;
+      expect(open.text).toBe("Open in Nylon");
+      expect(open.onClick.openLink.url).toMatch(/\/today$/);
+      expect(undo.text).toBe("Undo");
+      expect(undo.onClick.action.function).toContain(
+        "/gmail-addon/actions/undo-add",
+      );
+
+      const db = getDb(env.DB);
+      const [todo] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(undo.onClick.action.parameters).toEqual([
+        { key: "todoId", value: todo.id },
+        { key: "permalink", value: permalink },
+        { key: "subject", value: "Q3 planning notes" },
+      ]);
+      // The composer is still there for another.
+      expect(card.sections[1].widgets[0].textInput.value).toBe(
+        "Q3 planning notes",
+      );
+    });
+
+    it("undo-add deletes the todo it made and goes back to the message", async () => {
+      await linkUser();
+      const todoId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
+      await seedTodo(todoId, "user_test_123", { title: "Reply to Sam" });
+      const res = await post("/gmail-addon/actions/undo-add", await idToken(), {
+        commonEventObject: {
+          parameters: {
+            todoId,
+            permalink: "https://mail.google.com/mail/u/0/#all/thread-xyz",
+            subject: "Q3 planning notes",
+          },
+        },
+      });
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe("Removed");
+      const card = body.renderActions.action.navigations[0].updateCard;
+      expect(card.sections).toHaveLength(1);
+      expect(card.sections[0].widgets[0].textInput.value).toBe(
+        "Q3 planning notes",
+      );
+      const db = getDb(env.DB);
+      const rows = await db.select().from(todos).where(eq(todos.id, todoId));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("undo-add leaves another user's todo alone", async () => {
+      await linkUser();
+      await seedUser("user_other_456", "other@example.com");
+      const todoId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb";
+      await seedTodo(todoId, "user_other_456", { title: "Not yours" });
+      await post("/gmail-addon/actions/undo-add", await idToken(), {
+        commonEventObject: { parameters: { todoId } },
+      });
+      const db = getDb(env.DB);
+      const rows = await db.select().from(todos).where(eq(todos.id, todoId));
+      expect(rows).toHaveLength(1);
+    });
+
     it("refresh re-shows the connect card when still unlinked", async () => {
       const token = await idToken();
       const res = await post("/gmail-addon/actions/refresh", token);
@@ -805,9 +1010,10 @@ describe("Gmail add-on", () => {
       expect(res.status).toBe(200);
       const body = await res.json<any>();
       const card = body.renderActions.action.navigations[0].updateCard;
-      expect(card.header.title).toBe("Nylon");
+      // No card header: the panel's own header says Nylon.
+      expect(card.header).toBeUndefined();
       expect(body.renderActions.action.notification.text).toBe("Connected");
-      const openSection = card.sections.find((s: any) => s.header === "Today");
+      const openSection = section(card, "Today");
       expect(openSection.widgets[0].decoratedText.text).toBe("Now visible");
     });
   });
