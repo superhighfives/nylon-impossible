@@ -159,7 +159,7 @@ export interface AddonTodo {
   repeats: boolean;
   /**
    * Ticked within `ADDON_DONE_WINDOW_MS`: it stays in place, checked and
-   * struck through, so it can be unticked. There's no Undo in a card.
+   * struck through, so it can be unticked. No Undo on homepage rows.
    */
   done: boolean;
 }
