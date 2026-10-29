@@ -37,7 +37,10 @@ extension ContentView {
             if detailTodo != nil {
                 closeDetail()
             } else {
+                // Into the sidebar at this column, letting go of the todo.
+                // Going back in (→) reselects the column's last todo.
                 sidebarCursor = sidebarItem(for: selectionColumn ?? focusedColumn?.id)
+                selectedTodoId = nil
             }
             return
         case .new:
