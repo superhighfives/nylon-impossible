@@ -82,6 +82,14 @@ extension TodoDetailSheet {
     }
 
     func remove(_ url: APITodoUrl) async {
+        // A card still on its way exists only here: drop it, and `addLink`
+        // deletes the saved copy when the request comes back.
+        if url.id.hasPrefix("pending-") {
+            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
+                urls.removeAll { $0.id == url.id }
+            }
+            return
+        }
         guard let apiService else { return linkUnavailable() }
         do {
             try await apiService.deleteTodoUrl(todoId: todoId, urlId: url.id)
@@ -124,11 +132,18 @@ extension TodoDetailSheet {
         withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { urls.append(pending) }
         do {
             let added = try await apiService.addTodoUrl(todoId: todoId, url: href)
-            if let index = urls.firstIndex(where: { $0.id == pending.id }) { urls[index] = added }
+            guard let index = urls.firstIndex(where: { $0.id == pending.id }) else {
+                // Removed while it was on its way: take the saved one back
+                // out, or it would reappear at the next refresh.
+                try? await apiService.deleteTodoUrl(todoId: todoId, urlId: added.id)
+                return
+            }
+            urls[index] = added
             actions.edited()
-            // The title is fetched server-side; come back once for it, and
-            // let the next sync bring anything slower.
-            try? await Task.sleep(for: .seconds(3))
+            // The title is fetched server-side; come back once for it (unless
+            // the detail has gone), and let the next sync bring anything
+            // slower.
+            guard (try? await Task.sleep(for: .seconds(3))) != nil else { return }
             await loadUrls()
         } catch {
             withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {

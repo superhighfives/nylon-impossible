@@ -226,7 +226,7 @@ The same dialog, titled "Move "Plan Lisbon trip"".
 - **↓ from the field moves into the list.** The selected row gets the same ring as on wide.
 - **In the list, letters are shortcuts:** ↵ opens in Nylon, X done (stay in the slot), P pin (follow the todo to its new row), O open link.
 - **↑ from the top row, Esc, or N** returns to the field.
-- While in the list, a footer reads "↵ open · X done · P pin · O link · ↑ or N to type".
+- While in the list, a footer reads "↵ open Nylon · X done · P pin · O link · ↑ or N to type" (↵ opens the app, not that todo).
 - It shows 5 rows, then "+N more in Nylon".
 
 ### Phone (iOS and mobile web)

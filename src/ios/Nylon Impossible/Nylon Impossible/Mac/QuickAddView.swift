@@ -178,7 +178,7 @@ struct QuickAddView: View {
                 }
             }
             if listFocused {
-                Text("↵ open · X done · P pin · O link · ↑ or N to type")
+                Text("↵ open Nylon · X done · P pin · O link · ↑ or N to type")
                     .textStyle(Theme.Fonts.Role.meta)
                     .foregroundStyle(Theme.Colors.inkMuted)
                     .padding(.horizontal, Theme.Space.s4)

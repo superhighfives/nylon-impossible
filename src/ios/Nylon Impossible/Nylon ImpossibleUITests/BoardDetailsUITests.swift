@@ -40,7 +40,12 @@ final class BoardDetailsUITests: NylonUITestCase {
             )
         ).firstMatch
         waitFor(outcome)
-        XCTAssertFalse(app.staticTexts["That doesn’t look like a link."].exists)
+        // The error clears once the text changes (it can lag the submit).
+        expectation(
+            for: NSPredicate(format: "exists == false"),
+            evaluatedWith: app.staticTexts["That doesn’t look like a link."]
+        )
+        waitForExpectations(timeout: 3)
     }
 
     func testTheOvernightPillGoesToThisWeekAndDismisses() {
