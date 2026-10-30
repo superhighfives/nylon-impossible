@@ -37,7 +37,10 @@ const sweptAt = new Date().toISOString();
 vi.mock("@/hooks/useLists", () => ({
   useLists: () => ({
     data: listsLoading ? undefined : lists,
-    isLoading: listsLoading,
+    // As in the server render: no data, but nothing fetching yet either, so
+    // `isLoading` is false. The board has to go by the missing data.
+    isLoading: false,
+    error: null,
   }),
   useCreateList: () => ({ mutate: createList }),
   useUpdateList: () => ({ mutate: updateList }),
