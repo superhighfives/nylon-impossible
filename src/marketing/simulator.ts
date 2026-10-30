@@ -101,21 +101,6 @@ export function ensureSimulator(name: string, types: string[]): string {
 }
 
 /**
- * Boot a simulator and block until it is *fully* booted, throwing if it can't
- * get there. Under CI load CoreSimulator can drop a freshly-booted device back
- * to Shutdown, so lean on `simctl bootstatus -b` (which boots if needed and
- * blocks until the device reports booted), verify the state, and retry the
- * whole cycle a few times before giving up loudly.
- *
- * Only a state we actually read gets the device shut down and restarted. On a
- * loaded runner the state lookup itself times out ("unknown"), and treating
- * that as a failed boot threw away boots that were nearly done: feedback run
- * 40057233704 lost three in a row that way. So an unknown state after a
- * successful bootstatus counts as booted, after a timed-out one the next
- * attempt carries on with the same boot, and after a failed one it waits
- * a moment and tries again.
- */
-/**
  * Mark the keyboard's "slide to type" introduction as seen, so it doesn't
  * cover the first shot that brings up the keyboard (the composer). Best-
  * effort: a failure here only costs that tip showing.
@@ -138,6 +123,21 @@ function quietKeyboardTips(udid: string) {
   );
 }
 
+/**
+ * Boot a simulator and block until it is *fully* booted, throwing if it can't
+ * get there. Under CI load CoreSimulator can drop a freshly-booted device back
+ * to Shutdown, so lean on `simctl bootstatus -b` (which boots if needed and
+ * blocks until the device reports booted), verify the state, and retry the
+ * whole cycle a few times before giving up loudly.
+ *
+ * Only a state we actually read gets the device shut down and restarted. On a
+ * loaded runner the state lookup itself times out ("unknown"), and treating
+ * that as a failed boot threw away boots that were nearly done: feedback run
+ * 40057233704 lost three in a row that way. So an unknown state after a
+ * successful bootstatus counts as booted, after a timed-out one the next
+ * attempt carries on with the same boot, and after a failed one it waits
+ * a moment and tries again.
+ */
 export async function ensureBooted(udid: string): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const boot = spawnSync("xcrun", ["simctl", "bootstatus", udid, "-b"], {
