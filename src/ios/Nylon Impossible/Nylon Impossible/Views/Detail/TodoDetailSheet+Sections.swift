@@ -14,30 +14,37 @@ extension TodoDetailSheet {
     var subtasksSection: some View {
         let items = subtasks
         let done = items.filter(\.isCompleted).count
+        // In the fourth column, subtasks are the board's rows: its 24pt
+        // checkbox, 15pt titles and row height, under a label, not a rule.
+        let box = isColumn ? Theme.Phone.checkbox : Theme.Phone.subtaskCheckbox
         return VStack(alignment: .leading, spacing: 0) {
-            Hairline().padding(.top, 18).padding(.bottom, 14)
+            if isColumn {
+                Spacer().frame(height: Theme.Space.s4)
+            } else {
+                Hairline().padding(.top, 18).padding(.bottom, 14)
+            }
             SectionLabel(text: "Subtasks", detail: items.isEmpty ? nil : "\(done)/\(items.count)")
                 .padding(.bottom, Theme.Space.s1)
             ForEach(items) { subtask in
-                HStack(spacing: Theme.Space.s3) {
+                HStack(alignment: isColumn ? .top : .center, spacing: Theme.Space.s3) {
                     Checkbox(
                         isChecked: subtask.isCompleted,
-                        size: Theme.Phone.subtaskCheckbox,
+                        size: box,
                         label: subtask.isCompleted ? "Mark \(subtask.title) not done" : "Mark \(subtask.title) done"
                     ) {
                         actions.viewModel.toggleSubtask(subtask)
                         actions.edited()
                     }
-                    .padding(.leading, -13)
-                    .padding(.trailing, -9)
-                    .padding(.vertical, -6)
+                    .padding(.leading, isColumn ? -10 : -13)
+                    .padding(.trailing, isColumn ? -6 : -9)
+                    .padding(.vertical, isColumn ? -10 : -6)
                     Text(subtask.title)
-                        .textStyle(Theme.Fonts.Role.subtask)
+                        .textStyle(isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.subtask)
                         .foregroundStyle(subtask.isCompleted ? Theme.Colors.inkMuted : Theme.Colors.ink)
                         .strikethrough(subtask.isCompleted, color: Theme.Colors.inkMuted)
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 7)
+                .padding(.vertical, isColumn ? Theme.Space.s3 : 7)
                 .contentShape(Rectangle())
                 .contextMenu {
                     Button(role: .destructive) {
@@ -64,10 +71,10 @@ extension TodoDetailSheet {
                 Image(systemName: Theme.Icon.add)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: Theme.Phone.subtaskCheckbox)
+                    .frame(width: box)
                     .accessibilityHidden(true)
                 TextField("Add subtask", text: $newSubtask, prompt: Text("Add subtask").foregroundStyle(Theme.Colors.inkMuted))
-                    .textStyle(Theme.Fonts.Role.subtask)
+                    .textStyle(isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.subtask)
                     .foregroundStyle(Theme.Colors.ink)
                     .focused($focus, equals: .subtask)
                     .submitLabel(.next)
@@ -103,12 +110,18 @@ extension TodoDetailSheet {
     /// Always shown: a card per link, then "Paste a link" (Return adds). A
     /// new card shows at once with its domain and "Fetching title…".
     var linksSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            Hairline().padding(.top, 18).padding(.bottom, 6)
+        VStack(alignment: .leading, spacing: isColumn ? 0 : Theme.Space.s2) {
+            if isColumn {
+                Spacer().frame(height: Theme.Space.s4)
+            } else {
+                Hairline().padding(.top, 18).padding(.bottom, 6)
+            }
             SectionLabel(text: "Links")
+                .padding(.bottom, isColumn ? Theme.Space.s1 : 0)
             ForEach(urls) { url in
                 LinkCard(
                     url: url,
+                    isRow: isColumn,
                     onToggleShowPreview: { Task { await setShowPreview(url, !url.showsPreview) } },
                     onRetry: { Task { await retryLinks() } },
                     onRemove: { Task { await remove(url) } }
@@ -121,7 +134,7 @@ extension TodoDetailSheet {
                     .frame(width: Theme.Phone.checkbox)
                     .accessibilityHidden(true)
                 TextField("Paste a link", text: $newLink, prompt: Text("Paste a link").foregroundStyle(Theme.Colors.inkMuted))
-                    .textStyle(Theme.Fonts.Role.subtask)
+                    .textStyle(isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.subtask)
                     .foregroundStyle(Theme.Colors.ink)
                     .focused($focus, equals: .link)
                     .textContentType(.URL)

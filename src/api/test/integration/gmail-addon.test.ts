@@ -990,6 +990,8 @@ describe("Gmail add-on", () => {
         gmail: { messageId: "m1", threadId: "thread-xyz" },
       });
       const body = await res.json<any>();
+      // Gmail drops its cached homepage, so the todo is there on the way back.
+      expect(body.stateChanged).toBe(true);
       // The card stays on the message rather than swapping to the homepage.
       const card = body.renderActions.action.navigations[0].updateCard;
       expect(card.header.title).toBe("Add to Nylon");
@@ -1035,6 +1037,7 @@ describe("Gmail add-on", () => {
       });
       const body = await res.json<any>();
       expect(body.renderActions.action.notification.text).toBe("Removed");
+      expect(body.stateChanged).toBe(true);
       const card = body.renderActions.action.navigations[0].updateCard;
       expect(card.sections).toHaveLength(1);
       expect(card.sections[0].widgets[0].textInput.value).toBe(
@@ -1043,6 +1046,18 @@ describe("Gmail add-on", () => {
       const db = getDb(env.DB);
       const rows = await db.select().from(todos).where(eq(todos.id, todoId));
       expect(rows).toHaveLength(0);
+    });
+
+    it("undo-add of a todo that's already gone leaves cached cards alone", async () => {
+      await linkUser();
+      const res = await post("/gmail-addon/actions/undo-add", await idToken(), {
+        commonEventObject: {
+          parameters: { todoId: "cccccccc-cccc-cccc-cccc-cccccccccccc" },
+        },
+      });
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe("Removed");
+      expect(body.stateChanged).toBeUndefined();
     });
 
     it("undo-add leaves another user's todo alone", async () => {

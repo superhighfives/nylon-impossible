@@ -19,14 +19,13 @@ const EMPTY: TodoWithUrls[] = [];
 export function useBoardData() {
   const { timeZone } = useHints();
   useLocalMidnightTick();
-  const { data: lists, isLoading: listsLoading } = useLists();
-  const {
-    data: todosData,
-    isLoading: todosLoading,
-    error,
-    refetch,
-    isFetching,
-  } = useTodos();
+  const { data: lists, error: listsError } = useLists();
+  const { data: todosData, error, refetch, isFetching } = useTodos();
+  // Loading means "no data yet", not `isLoading`: that's false while a query
+  // is idle, which it is in the server render and before the client's first
+  // fetch starts, so the board painted empty (just "Nothing done yet.").
+  const listsLoading = lists === undefined && !listsError;
+  const todosLoading = todosData === undefined && !error;
   const todos = todosData ?? EMPTY;
 
   const listName = useCallback(

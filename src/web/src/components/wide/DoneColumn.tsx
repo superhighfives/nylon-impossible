@@ -3,6 +3,7 @@ import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import { SelectionBar } from "@/components/phone/TodoRow";
 import type { TodoWithUrls } from "@/types/database";
 import { ColumnHeader, isColumnBackground, TINTED } from "./Column";
+import { SkeletonRows } from "./Skeleton";
 
 /** Done's column id: the fourth column's resting state, not a list. */
 export const DONE_COLUMN = "done";
@@ -22,6 +23,7 @@ export function DoneColumn({
   onSelect,
   onRestore,
   onBackgroundClick,
+  loading = false,
 }: {
   todos: TodoWithUrls[];
   listName: (id: string) => string;
@@ -32,6 +34,8 @@ export function DoneColumn({
   onRestore: (todo: TodoWithUrls) => void;
   /** A click on the column's empty space: focus it, select nothing. */
   onBackgroundClick?: () => void;
+  /** Todos haven't arrived: placeholder rows, not "Nothing done yet." */
+  loading?: boolean;
 }) {
   const groups = groupDoneByDay(todos, now, timeZone);
   // One tab stop: the selected row, else the first.
@@ -58,7 +62,14 @@ export function DoneColumn({
       />
       <div aria-hidden="true" className="mx-6 h-px shrink-0 bg-n-hairline" />
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-width:thin]">
-        {groups.length === 0 ? (
+        {loading ? (
+          <>
+            <p className="sr-only" aria-live="polite">
+              Loading…
+            </p>
+            <SkeletonRows count={3} />
+          </>
+        ) : groups.length === 0 ? (
           <p className="m-0 pt-4 font-n-display text-[1.125rem] font-semibold tracking-[-0.01em] text-n-ink-muted">
             Nothing done yet.
           </p>

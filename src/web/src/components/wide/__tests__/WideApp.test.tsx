@@ -30,10 +30,18 @@ const lists = [
   makeList("list-studio", "Studio", null, "a4"),
 ];
 let todos: TodoWithUrls[] = [];
+/** The lists' first load, before they arrive. */
+let listsLoading = false;
 const sweptAt = new Date().toISOString();
 
 vi.mock("@/hooks/useLists", () => ({
-  useLists: () => ({ data: lists, isLoading: false }),
+  useLists: () => ({
+    data: listsLoading ? undefined : lists,
+    // As in the server render: no data, but nothing fetching yet either, so
+    // `isLoading` is false. The board has to go by the missing data.
+    isLoading: false,
+    error: null,
+  }),
   useCreateList: () => ({ mutate: createList }),
   useUpdateList: () => ({ mutate: updateList }),
   useDeleteList: () => ({ mutate: deleteList }),
@@ -194,6 +202,50 @@ describe("WideApp", () => {
     expect(groceries).toHaveAccessibleDescription("1 todo");
     expect(groceries).not.toHaveAttribute("aria-current");
     expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+  });
+
+  it("draws the board's shape while it loads, instead of Done across it", () => {
+    listsLoading = true;
+    try {
+      render(<WideApp />);
+      const board = screen.getByRole("main", { name: "Board" });
+      // The three time columns hold their places, by name, beside Done.
+      expect(
+        [...board.querySelectorAll("[data-column]")].map((c) =>
+          c.getAttribute("data-column"),
+        ),
+      ).toEqual([
+        "skeleton-today",
+        "skeleton-thisWeek",
+        "skeleton-someday",
+        "done",
+      ]);
+      expect(
+        within(board)
+          .getAllByRole("heading", { level: 2 })
+          .map((h) => h.textContent),
+      ).toEqual(["Today", "This week", "Someday", "Done"]);
+      // Placeholder rows everywhere, and no false empty state for Done.
+      expect(board.querySelectorAll("[data-skeleton-rows]")).toHaveLength(4);
+      expect(within(board).queryByText("Nothing done yet.")).toBeNull();
+      // Screen readers hear "Loading…"; nothing in a placeholder takes focus.
+      expect(within(board).getAllByText("Loading…").length).toBeGreaterThan(0);
+      for (const column of board.querySelectorAll(
+        '[data-column^="skeleton-"]',
+      )) {
+        expect(
+          column.querySelectorAll("button, input, textarea, [tabindex='0']"),
+        ).toHaveLength(0);
+      }
+      // The sidebar shows the time lists too, as placeholders.
+      expect(
+        [...document.querySelectorAll("[data-skeleton-entry]")].map(
+          (e) => e.textContent,
+        ),
+      ).toEqual(["Today", "This week", "Someday"]);
+    } finally {
+      listsLoading = false;
+    }
   });
 
   it("always has a fourth column, Done by default, with no ×", () => {
@@ -909,6 +961,77 @@ describe("WideApp", () => {
     press("o");
     expect(toast.info).toHaveBeenCalledWith("No link on this todo");
     open.mockRestore();
+  });
+
+  it("the detail's properties are rows: List and Due open their choices, Pin toggles", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Call Mum").focus());
+    await userEvent.keyboard("{Enter}");
+    const detail = screen.getByRole("dialog");
+    // Built like a column: the list is the header's subline.
+    expect(within(detail).getByText("In Today")).toBeInTheDocument();
+
+    const list = within(detail).getByRole("button", { name: "List: Today" });
+    expect(list).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(list);
+    expect(list).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(detail).getByRole("group", { name: "Move to list" }),
+    ).toBeInTheDocument();
+
+    const due = within(detail).getByRole("button", { name: "Due date" });
+    await userEvent.click(due);
+    expect(due).toHaveAttribute("aria-expanded", "true");
+    // One set of choices at a time.
+    expect(list).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(detail).getByRole("group", { name: "Due" }),
+    ).toBeInTheDocument();
+    expect(
+      within(detail).queryByRole("group", { name: "Move to list" }),
+    ).toBeNull();
+
+    const pin = within(detail).getByRole("button", { name: "Pin" });
+    expect(pin).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(pin);
+    expect(update).toHaveBeenCalledWith({ id: "t2", input: { pinned: true } });
+  });
+
+  it("adding a subtask closes Repeat's choices for good", async () => {
+    const { rerender } = render(<WideApp />);
+    act(() => rowButton("Call Mum").focus());
+    await userEvent.keyboard("{Enter}");
+    const detail = () => screen.getByRole("dialog");
+    await userEvent.click(
+      within(detail()).getByRole("button", { name: "Repeat" }),
+    );
+    expect(
+      within(detail()).getByRole("group", { name: "Repeat" }),
+    ).toBeInTheDocument();
+
+    const subtask = makeTodo({
+      id: "t2-sub",
+      title: "Buy flowers",
+      listId: "list-today",
+      parentId: "t2",
+    });
+    todos = [...todos, subtask];
+    rerender(<WideApp />);
+    expect(
+      within(detail()).queryByRole("button", { name: "Repeat" }),
+    ).toBeNull();
+    expect(
+      within(detail()).queryByRole("group", { name: "Repeat" }),
+    ).toBeNull();
+
+    todos = todos.filter((t) => t.id !== subtask.id);
+    rerender(<WideApp />);
+    expect(
+      within(detail()).getByRole("button", { name: "Repeat" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(detail()).queryByRole("group", { name: "Repeat" }),
+    ).toBeNull();
   });
 
   it("the detail always shows Links, and adds a pasted link", async () => {

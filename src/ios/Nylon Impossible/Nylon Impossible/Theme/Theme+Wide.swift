@@ -42,6 +42,11 @@ extension Theme.Fonts.Role {
     )
     /// Wide body: the column composer.
     static let bodyWide = Theme.Fonts.Wide.body
+    /// The open todo's title, heading the fourth column: Archivo 28, under
+    /// the column titles' 40 so a todo's longer name doesn't wrap word by word.
+    static let detailTitleWide = Theme.Fonts.Style(
+        size: 28, lineHeight: 31, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .title1
+    )
     /// The sidebar wordmark, Archivo 20 heavy.
     static let wordmark = Theme.Fonts.Style(
         size: 20, lineHeight: 24, weight: .heavy, variationWeight: 800, isDisplay: true, textStyle: .title3

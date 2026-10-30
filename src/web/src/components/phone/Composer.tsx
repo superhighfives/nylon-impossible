@@ -185,14 +185,28 @@ export function Composer({
       ? `${keyboard + 8}px`
       : "calc(1rem + env(safe-area-inset-bottom, 0px))";
 
-  // Inline has no list chips, so only the due chip can show.
+  // The chips scroll sideways in one row, so keep the chosen list in view
+  // as it changes (and when the chips first show).
+  const chipsRef = useRef<HTMLDivElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-runs when the chosen list changes or the chips appear
+  useEffect(() => {
+    chipsRef.current
+      ?.querySelector<HTMLElement>('[aria-pressed="true"]')
+      ?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+  }, [targetId, showChips]);
+
+  // Inline has no list chips, so only the due chip can show. Elsewhere the
+  // chips are one row that scrolls sideways, as on iOS, however many lists
+  // there are.
   const chips = showChips && (!inline || (dueDay && hasDraft)) && (
     <div
+      ref={chipsRef}
+      data-composer-chips
       className={`flex min-w-0 animate-n-fade-in gap-1.5 ${
         inline
           ? "flex-wrap pt-1 pb-2.5 pl-8"
           : popover
-            ? "flex-wrap px-5 pt-1 pb-1"
+            ? "scroll-px-5 overflow-x-auto px-5 pt-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             : "overflow-x-auto px-2.5 pt-2.5 pb-1.5 [scrollbar-width:none]"
       }`}
     >
@@ -330,7 +344,7 @@ export function Composer({
         }}
         onFocus={() => setFocused(true)}
         onBlur={onBlur}
-        className={`n-focus-within -mx-2.5 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
+        className={`n-focus-within relative -mx-2.5 rounded-n-field focus-within:z-1 px-2.5 transition-colors duration-(--n-duration-fast) ${
           showChips ? "bg-n-surface" : "pointer-fine:hover:bg-n-surface"
         }`}
       >

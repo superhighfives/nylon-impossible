@@ -69,6 +69,36 @@ describe("Composer", () => {
     );
   });
 
+  it("keeps quick add's chips in one scrolling row, the chosen one in view", async () => {
+    const scrolled: string[] = [];
+    const original = HTMLElement.prototype.scrollIntoView;
+    HTMLElement.prototype.scrollIntoView = function () {
+      scrolled.push(this.textContent ?? "");
+    };
+    try {
+      const user = userEvent.setup();
+      render(
+        <Composer
+          variant="popover"
+          currentListId="today"
+          targets={TARGETS}
+          timeZone={TZ}
+          onView={vi.fn()}
+          countFor={() => 0}
+        />,
+      );
+      const row = document.querySelector("[data-composer-chips]");
+      // One row that scrolls sideways, however many lists there are.
+      expect(row?.className).toContain("overflow-x-auto");
+      expect(row?.className).not.toContain("flex-wrap");
+      expect(scrolled.at(-1)).toBe("Today");
+      await user.click(screen.getByRole("button", { name: "Groceries" }));
+      expect(scrolled.at(-1)).toBe("Groceries");
+    } finally {
+      HTMLElement.prototype.scrollIntoView = original;
+    }
+  });
+
   it("picking a chip retargets the placeholder and the create", async () => {
     const user = userEvent.setup();
     const { field } = setup();

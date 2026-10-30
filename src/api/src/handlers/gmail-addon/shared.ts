@@ -136,7 +136,18 @@ export async function loadMessageContext(
   const messageToken = event.gmail?.accessToken;
   const auth = event.authorizationEventObject;
   const userToken = auth?.userOAuthToken ?? auth?.userOauthToken;
-  if (!messageId || !messageToken || !userToken) return message;
+  if (!messageId || !messageToken || !userToken) {
+    // Which of the three Gmail left out, as booleans only.
+    console.log(
+      JSON.stringify({
+        gmailMetadata: "skipped",
+        messageId: !!messageId,
+        messageToken: !!messageToken,
+        userToken: !!userToken,
+      }),
+    );
+    return message;
+  }
   const metadata = await fetchMessageMetadata({
     messageId,
     messageToken,
@@ -223,11 +234,13 @@ export async function buildConnectUrl(
 export function cardResponse(
   c: Context<Env>,
   card: Card,
-  opts: { asAction?: boolean; notification?: string } = {},
+  opts: {
+    asAction?: boolean;
+    notification?: string;
+    stateChanged?: boolean;
+  } = {},
 ) {
-  return c.json(
-    opts.asAction ? updateCard(card, opts.notification) : renderCard(card),
-  );
+  return c.json(opts.asAction ? updateCard(card, opts) : renderCard(card));
 }
 
 /** The connect card wrapped for the current surface. */
