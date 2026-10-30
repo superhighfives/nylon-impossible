@@ -1,7 +1,16 @@
 import { env, SELF } from "cloudflare:test";
 import { and, eq } from "drizzle-orm";
 import { generateKeyPair, type JWTVerifyGetKey, SignJWT } from "jose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { __setGoogleJwksForTest } from "../../src/lib/addon-auth";
 import {
   getDb,
@@ -517,6 +526,67 @@ describe("Gmail add-on", () => {
         },
         { key: "subject", value: "Reply to Sam" },
       ]);
+    });
+  });
+
+  describe("contextual, reading the open email", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const event = {
+      gmail: {
+        messageId: "m1",
+        threadId: "thread-xyz",
+        accessToken: "message-token",
+      },
+      authorizationEventObject: { userOAuthToken: "user-token" },
+    };
+
+    it("titles the todo from the email and says who sent it and when", async () => {
+      await linkUser();
+      const sent = new Date();
+      const gmail = vi.spyOn(globalThis, "fetch").mockImplementation(async () =>
+        Response.json({
+          internalDate: String(sent.getTime()),
+          payload: {
+            headers: [
+              { name: "Subject", value: "Q3 planning notes" },
+              { name: "From", value: "Sam Lee <sam@example.com>" },
+            ],
+          },
+        }),
+      );
+      const res = await post("/gmail-addon/contextual", await idToken(), event);
+      const card = (await res.json<any>()).action.navigations[0].pushCard;
+      const [input, , row] = card.sections[0].widgets;
+      expect(input.textInput.value).toBe("Q3 planning notes");
+      expect(row.decoratedText.text).toBe("Q3 planning notes");
+      expect(row.decoratedText.bottomLabel).toMatch(
+        /^From Sam Lee · \w{3} \d{1,2}$/,
+      );
+      expect(String(gmail.mock.calls[0][0])).toContain(
+        "gmail.googleapis.com/gmail/v1/users/me/messages/m1",
+      );
+      // Add carries them along, so the card after it doesn't read Gmail again.
+      const add = card.sections[0].widgets.at(-1).buttonList.buttons[0];
+      expect(add.onClick.action.parameters.map((p: any) => p.key)).toEqual([
+        "permalink",
+        "subject",
+        "from",
+        "date",
+      ]);
+    });
+
+    it("falls back when Gmail can't be read", async () => {
+      await linkUser();
+      vi.spyOn(globalThis, "fetch").mockImplementation(
+        async () => new Response("", { status: 401 }),
+      );
+      const res = await post("/gmail-addon/contextual", await idToken(), event);
+      expect(res.status).toBe(200);
+      const card = (await res.json<any>()).action.navigations[0].pushCard;
+      const [input, , row] = card.sections[0].widgets;
+      expect(input.textInput.value).toBe("Follow up on email");
+      expect(row.decoratedText.text).toBe("This email");
     });
   });
 

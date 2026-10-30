@@ -212,6 +212,7 @@ extension ContentView {
                     .frame(maxHeight: .infinity)
                     .id(openList?.id ?? Self.doneColumn)
                 }
+                .sharesBoardHeaderHeight()
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)

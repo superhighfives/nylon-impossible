@@ -4,11 +4,13 @@ import type { Context } from "hono";
 import { z } from "zod/v4";
 import {
   ADDON_ACTIONS,
+  type AddonMessage,
   buildConnectCard,
   type Card,
   renderCard,
   updateCard,
 } from "../../lib/addon-cards";
+import { fetchMessageMetadata } from "../../lib/gmail-message";
 import type { Env, GoogleIdTokenClaims } from "../../types";
 
 const DEFAULT_WEB_BASE_URL = "https://www.nylonimpossible.com";
@@ -53,6 +55,16 @@ const addonEventSchema = z.object({
       // Present only in some token/scope configurations — see the identity
       // spike in the plan. Read defensively; the card falls back if absent.
       subject: z.string().optional(),
+      // A short-lived token for just the open message, for the Gmail API.
+      accessToken: z.string().optional(),
+    })
+    .optional(),
+  // The user's OAuth token, sent alongside `gmail.accessToken` so the add-on
+  // can read the open message's headers. Google's docs spell it both ways.
+  authorizationEventObject: z
+    .object({
+      userOAuthToken: z.string().optional(),
+      userOauthToken: z.string().optional(),
     })
     .optional(),
 });
@@ -88,42 +100,78 @@ export function readParameter(
 }
 
 /**
- * Pull the message context for the contextual card. `messageId`/`threadId` come
- * from the event's `gmail` block; the thread permalink is derived from the
- * thread id. Subject carriage depends on the deployment's token config (the
- * plan's spike) — we read it if present and fall back otherwise. No Gmail API
- * call and no message body is read, keeping us on the metadata-only scope.
+ * The message context the event itself carries: the thread permalink, derived
+ * from the thread id, and a subject if the deployment's token config put one
+ * there (in practice it doesn't; `loadMessageContext` reads it from Gmail).
  */
-export function extractMessageContext(event: AddonEvent): {
-  subject: string;
-  permalink: string | null;
-} {
+export function extractMessageContext(event: AddonEvent): AddonMessage {
   const threadId = event.gmail?.threadId;
   const permalink = threadId
     ? `https://mail.google.com/mail/u/0/#all/${threadId}`
     : null;
-  const subject = event.gmail?.subject?.trim() || "Follow up on email";
-  return { subject, permalink };
+  return { subject: event.gmail?.subject?.trim() || null, permalink };
+}
+
+/** "Oct 28", in the user's timezone: when the open email was sent. */
+export function formatSentDate(date: Date, timeZone: string): string {
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone,
+  });
+}
+
+/**
+ * The open message for the contextual card: the event's context, filled in
+ * with the subject, sender and date read from the Gmail API with the event's
+ * tokens. Headers only, inside the metadata scope; if the call can't be made
+ * or fails, the card shows what the event had.
+ */
+export async function loadMessageContext(
+  event: AddonEvent,
+  timeZone: string,
+): Promise<AddonMessage> {
+  const message = extractMessageContext(event);
+  const messageId = event.gmail?.messageId;
+  const messageToken = event.gmail?.accessToken;
+  const auth = event.authorizationEventObject;
+  const userToken = auth?.userOAuthToken ?? auth?.userOauthToken;
+  if (!messageId || !messageToken || !userToken) return message;
+  const metadata = await fetchMessageMetadata({
+    messageId,
+    messageToken,
+    userToken,
+  });
+  if (!metadata) return message;
+  return {
+    ...message,
+    subject: metadata.subject ?? message.subject,
+    from: metadata.from,
+    date: metadata.date ? formatSentDate(metadata.date, timeZone) : null,
+  };
 }
 
 /**
  * The message an action on the contextual card was about. Gmail sends the
  * open message's ids with every event, so the permalink is rebuilt from the
- * thread when it can be; the subject (and, failing that, the permalink) come
- * back as the card's own action parameters. A permalink from parameters is
+ * thread when it can be; the subject, sender and date (and, failing that, the
+ * permalink) come back as the card's own action parameters, rather than
+ * reading Gmail again. A permalink from parameters is
  * caller input, so only a Gmail URL is kept.
  */
-export function messageFromAction(event: AddonEvent): {
-  subject: string;
-  permalink: string | null;
-} {
+export function messageFromAction(event: AddonEvent): AddonMessage {
   const fromEvent = extractMessageContext(event);
   const subject = readParameter(event, "subject")?.trim();
   const param = readParameter(event, "permalink");
   const permalink =
     fromEvent.permalink ??
     (param?.startsWith("https://mail.google.com/") ? param : null);
-  return { subject: subject || fromEvent.subject, permalink };
+  return {
+    subject: subject || fromEvent.subject,
+    permalink,
+    from: readParameter(event, "from")?.trim() || null,
+    date: readParameter(event, "date")?.trim() || null,
+  };
 }
 
 /**

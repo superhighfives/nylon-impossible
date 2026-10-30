@@ -469,9 +469,17 @@ export function buildHomepageCard(
 }
 
 export interface AddonMessage {
-  subject: string;
+  /** The email's subject, or null when Gmail didn't give us one. */
+  subject: string | null;
   permalink: string | null;
+  /** Who sent it ("Sam Lee"), when known. */
+  from?: string | null;
+  /** When it was sent, already formatted ("Oct 28"), when known. */
+  date?: string | null;
 }
+
+/** The todo's title when the email's subject isn't known. */
+export const ADDON_MESSAGE_FALLBACK_TITLE = "Follow up on email";
 
 /** What add-from-message just made, for the card's confirmation. */
 export interface AddonAdded {
@@ -482,14 +490,37 @@ export interface AddonAdded {
   url: string;
 }
 
-/** The message's subject and permalink, carried on the card's actions. */
+/**
+ * The message's permalink, subject, sender and date, carried on the card's
+ * actions so the card can be redrawn without reading Gmail again.
+ */
 function messageParameters(message: AddonMessage) {
-  return message.permalink
-    ? [
-        { key: "permalink", value: message.permalink },
-        { key: "subject", value: message.subject },
-      ]
-    : [];
+  if (!message.permalink) return [];
+  const params = [{ key: "permalink", value: message.permalink }];
+  for (const key of ["subject", "from", "date"] as const) {
+    const value = message[key];
+    if (value) params.push({ key, value });
+  }
+  return params;
+}
+
+/**
+ * The open email as a row: "Attached as a link" over its subject, then who
+ * sent it and when. Without a subject it says "This email" rather than
+ * repeating the todo's placeholder title.
+ */
+function emailRow(message: AddonMessage): Widget {
+  const meta = [message.from && `From ${message.from}`, message.date]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    decoratedText: {
+      topLabel: "Attached as a link",
+      text: message.subject ? escapeCardText(message.subject) : "This email",
+      ...(meta ? { bottomLabel: escapeCardText(meta) } : {}),
+      wrapText: true,
+    },
+  };
 }
 
 /**
@@ -544,21 +575,11 @@ export function buildContextualCard(
         textInput: {
           name: QUICK_ADD_INPUT,
           label: "Todo",
-          value: message.subject,
+          value: message.subject ?? ADDON_MESSAGE_FALLBACK_TITLE,
         },
       },
       listDropdown(lists, defaultAddonListId(lists)),
-      ...(message.permalink
-        ? [
-            {
-              decoratedText: {
-                topLabel: "Attached as a link",
-                text: escapeCardText(message.subject),
-                wrapText: true,
-              },
-            } satisfies Widget,
-          ]
-        : []),
+      ...(message.permalink ? [emailRow(message)] : []),
       {
         buttonList: {
           buttons: [
