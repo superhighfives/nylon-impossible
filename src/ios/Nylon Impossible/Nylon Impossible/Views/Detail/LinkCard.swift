@@ -5,6 +5,8 @@
 //  A link in the detail sheet: favicon tile, title and domain, and a menu
 //  with Copy URL, Show as URL, Retry and Remove. Titles fetch on their own; Retry
 //  re-runs the same processing for a fetch that didn't land.
+//  In the board's fourth column it's a row instead of a card: the tile in
+//  the checkbox gutter, the board's 15pt title, and no border.
 //
 
 import SwiftUI
@@ -16,6 +18,8 @@ import UIKit
 
 struct LinkCard: View {
     let url: APITodoUrl
+    /// A board row rather than a bordered card.
+    var isRow = false
     let onToggleShowPreview: () -> Void
     let onRetry: () -> Void
     let onRemove: () -> Void
@@ -63,17 +67,27 @@ struct LinkCard: View {
         return URL(string: "https://www.google.com/s2/favicons?domain=\(encoded)&sz=64")
     }
 
+    @ViewBuilder
     var body: some View {
-        HStack(spacing: Theme.Space.s3) {
-            content
-            menu
+        if isRow {
+            HStack(spacing: Theme.Space.s3) {
+                content
+                menu.padding(.trailing, -Theme.Space.s3)
+            }
+            .frame(minHeight: Theme.Space.rowMinHeight)
+            .padding(.vertical, Theme.Space.s1)
+        } else {
+            HStack(spacing: Theme.Space.s3) {
+                content
+                menu
+            }
+            .padding(.leading, Theme.Space.s3)
+            .padding(.vertical, Theme.Space.s2)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                    .strokeBorder(Theme.Colors.hairline, lineWidth: 1)
+            )
         }
-        .padding(.leading, Theme.Space.s3)
-        .padding(.vertical, Theme.Space.s2)
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                .strokeBorder(Theme.Colors.hairline, lineWidth: 1)
-        )
     }
 
     @ViewBuilder
@@ -82,7 +96,7 @@ struct LinkCard: View {
             tile
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .textStyle(Theme.Fonts.Role.control)
+                    .textStyle(isRow ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.control)
                     .fontWeight(.medium)
                     .foregroundStyle(Theme.Colors.ink)
                     .lineLimit(dynamicTypeSize.isAccessibilitySize ? 3 : 1)
@@ -107,7 +121,7 @@ struct LinkCard: View {
 
     private var tile: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: isRow ? 6 : 8, style: .continuous)
                 .fill(Theme.Colors.fill)
             if isPending {
                 ProgressView().controlSize(.small)
@@ -116,13 +130,14 @@ struct LinkCard: View {
                     .foregroundStyle(Theme.Colors.overdue)
             } else {
                 Text(domain.prefix(1).uppercased())
-                    .font(.system(size: 13, weight: .bold))
+                    .font(.system(size: isRow ? 11 : 13, weight: .bold))
                     .foregroundStyle(Theme.Colors.inkMuted)
                 FaviconImage(primaryURL: faviconURL, fallbackURL: fallbackFaviconURL)
-                    .frame(width: 18, height: 18)
+                    .frame(width: isRow ? 14 : 18, height: isRow ? 14 : 18)
             }
         }
-        .frame(width: 32, height: 32)
+        // As a row, the tile takes the checkbox's place in the gutter.
+        .frame(width: isRow ? Theme.Phone.checkbox : 32, height: isRow ? Theme.Phone.checkbox : 32)
         .accessibilityHidden(true)
     }
 
