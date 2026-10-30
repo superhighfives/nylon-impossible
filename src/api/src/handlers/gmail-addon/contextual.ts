@@ -3,11 +3,12 @@ import { resolveNylonUser } from "../../lib/addon-auth";
 import { buildContextualCard } from "../../lib/addon-cards";
 import { getDb } from "../../lib/db";
 import { listListsForUser } from "../../lib/todos-core";
+import { getUserTimezone } from "../../lib/user-timezone";
 import type { Env } from "../../types";
 import {
   cardResponse,
   connectResponse,
-  extractMessageContext,
+  loadMessageContext,
   readAddonEvent,
   requestBaseUrl,
 } from "./shared";
@@ -22,11 +23,12 @@ export async function gmailAddonContextual(c: Context<Env>) {
     return connectResponse(c, claims);
   }
 
-  const [event, lists] = await Promise.all([
+  const [event, lists, timeZone] = await Promise.all([
     readAddonEvent(c),
     listListsForUser(db, resolved.userId),
+    getUserTimezone(db, resolved.userId),
   ]);
-  const message = extractMessageContext(event);
+  const message = await loadMessageContext(event, timeZone);
   const card = buildContextualCard(requestBaseUrl(c), message, lists);
   return cardResponse(c, card);
 }

@@ -302,7 +302,8 @@ function WideTodoRow({
             ? "bg-n-fill ring-2 ring-n-ink ring-inset"
             : highlighted
               ? "bg-n-fill"
-              : "pointer-fine:hover:bg-n-surface"
+              : // `surface`, or `fill` in the tinted fourth column (TINTED).
+                "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
         }`}
       >
         <CheckButton

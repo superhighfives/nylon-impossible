@@ -73,7 +73,9 @@ struct BoardDoneColumn: View {
             .scrollIndicators(.hidden)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .background(Theme.Colors.canvas)
+        // The fourth column is always tinted, whatever it shows, so it reads
+        // as distinct from the three time columns.
+        .background(Theme.Colors.surface)
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Done")
     }

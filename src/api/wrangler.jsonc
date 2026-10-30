@@ -58,7 +58,7 @@
     // exact endpoint URL it POSTs to — so this is the comma-separated allow-list
     // of every endpoint Google calls, not the base path. Public, not a secret.
     // GMAIL_ADDON_STATE_SECRET is a secret — set via `wrangler secret put`.
-    "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
+    "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/undo-add,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
     "WEB_BASE_URL": "https://www.nylonimpossible.com",
     // Repo in-app feedback is filed to (screenshots go to its feedback-assets
     // branch). GITHUB_FEEDBACK_TOKEN (a fine-grained PAT scoped to this repo) is
@@ -92,7 +92,7 @@
   "previews": {
     "vars": {
       "ENVIRONMENT": "preview",
-      "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
+      "GMAIL_ADDON_AUDIENCE": "https://api.nylonimpossible.com/gmail-addon/homepage,https://api.nylonimpossible.com/gmail-addon/contextual,https://api.nylonimpossible.com/gmail-addon/actions/quick-add,https://api.nylonimpossible.com/gmail-addon/actions/add-from-message,https://api.nylonimpossible.com/gmail-addon/actions/toggle,https://api.nylonimpossible.com/gmail-addon/actions/undo-add,https://api.nylonimpossible.com/gmail-addon/actions/refresh",
       "WEB_BASE_URL": "https://www.nylonimpossible.com",
       "FEEDBACK_REPO": "superhighfives/nylon-impossible",
     },

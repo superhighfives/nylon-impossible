@@ -131,8 +131,12 @@ struct SettingsView: View {
     private var advanced: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s1) {
             Text("Environment  \(Config.sentryEnvironment)")
+            // Selectable, to copy the URL into a bug report, so it's a
+            // target: a full row tall rather than one line of footnote.
             Text("API  \(Config.apiBaseURL.absoluteString)")
                 .textSelection(.enabled)
+                .frame(minHeight: Theme.Space.rowMinHeight, alignment: .leading)
+                .contentShape(Rectangle())
         }
         .font(.system(.footnote, design: .monospaced))
         .foregroundStyle(Theme.Colors.inkMuted)

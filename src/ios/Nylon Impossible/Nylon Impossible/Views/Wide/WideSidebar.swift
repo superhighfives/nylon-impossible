@@ -100,6 +100,9 @@ struct WideSidebar: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(SidebarButtonStyle())
+                    .accessibilityShowsLargeContentViewer {
+                        Label("New list", systemImage: Theme.Icon.add)
+                    }
                     .softFocus(cursor == .newList)
                     .popover(
                         isPresented: Binding(
@@ -138,6 +141,7 @@ struct WideSidebar: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(SidebarButtonStyle())
+                .accessibilityShowsLargeContentViewer { Text("Keyboard shortcuts") }
                 .softFocus(cursor == .shortcuts)
                 .accessibilityHint("Lists the board's keys")
             }
@@ -146,7 +150,8 @@ struct WideSidebar: View {
         .padding(.horizontal, 10)
         // Navigation chrome in a fixed 248pt column: it stops growing at
         // xxxLarge, like the phone's switcher, so names don't break
-        // mid-word. The columns carry each list's name at full size.
+        // mid-word. Each control shows in the Large Content Viewer on long
+        // press, and the columns carry each list's name at full size.
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         #if os(macOS)
         // The split view sets the width, and lets it be dragged.
@@ -194,6 +199,7 @@ struct WideSidebar: View {
         .buttonStyle(SidebarButtonStyle())
         .pointingHandCursor()
         .accessibilityAddTraits(isOpen ? .isSelected : [])
+        .accessibilityShowsLargeContentViewer { Text(entry.list.name) }
         // "This week, 6 todos" — the count is the value, not a second
         // number read out in the label.
         .accessibilityLabel(entry.list.name)
@@ -243,6 +249,9 @@ struct WideSidebar: View {
         }
         .buttonStyle(SidebarButtonStyle())
         .accessibilityAddTraits(doneShowing ? .isSelected : [])
+        .accessibilityShowsLargeContentViewer {
+            Label("Done", systemImage: Theme.Icon.done)
+        }
         .accessibilityLabel("Done")
         .accessibilityValue(WideSidebar.countText(doneCount))
         .accessibilityHint("Shows Done in the fourth column")
@@ -260,6 +269,7 @@ struct WideSidebar: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(SidebarButtonStyle())
+        .accessibilityShowsLargeContentViewer { Text(title) }
     }
 
     private var account: some View {
@@ -290,6 +300,9 @@ struct WideSidebar: View {
         .menuIndicator(.hidden)
         #endif
         .accessibilityLabel("Account, \(name)")
+        .accessibilityShowsLargeContentViewer {
+            Label(name, systemImage: "person.crop.circle")
+        }
     }
 }
 

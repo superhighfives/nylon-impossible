@@ -21,6 +21,13 @@ type RowCallbacks = Pick<
   "now" | "timeZone" | "onCheck" | "onOpen" | "onMenu" | "onSelect"
 >;
 
+/**
+ * The fourth column's tint, whatever it shows (your list, Done or a todo),
+ * so it reads as distinct from the three time columns. Rows inside hover
+ * with `fill` instead of `surface`, which would vanish against it.
+ */
+export const TINTED = "bg-n-surface [--n-row-hover:var(--color-n-fill)]";
+
 const ICON_BUTTON =
   "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft pointer-fine:hover:bg-n-fill";
 
@@ -291,7 +298,7 @@ export function Column({
       aria-labelledby={headingId}
       data-column={listId}
       className={`relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline first:border-l-0 ${
-        tinted ? "bg-n-surface" : ""
+        tinted ? TINTED : ""
       }`}
     >
       <ColumnHeader

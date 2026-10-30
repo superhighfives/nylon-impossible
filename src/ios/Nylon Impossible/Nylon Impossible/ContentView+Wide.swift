@@ -212,6 +212,7 @@ extension ContentView {
                     .frame(maxHeight: .infinity)
                     .id(openList?.id ?? Self.doneColumn)
                 }
+                .sharesBoardHeaderHeight()
             }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
@@ -271,7 +272,7 @@ extension ContentView {
                 showsCalendar: showsDueCalendar,
                 onClose: closeDetail
             )
-            .background(Theme.Colors.canvas)
+            .background(Theme.Colors.surface)
             // Esc closes the open todo even while its fields have focus.
             .onKeyPress(.escape) {
                 closeDetail()

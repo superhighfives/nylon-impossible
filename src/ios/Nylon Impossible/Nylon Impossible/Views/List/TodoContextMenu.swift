@@ -2,8 +2,8 @@
 //  TodoContextMenu.swift
 //  Nylon Impossible
 //
-//  A row's long-press (and, on iPad, right-click) menu. The phone lists each
-//  move flat — "Move to This week" — as the spec's touch menu does. The wide
+//  A row's long-press (and, on iPad, right-click) menu. The phone lists the
+//  moves flat under a "Move to" header (see MoveMenuPlan). The wide
 //  layout groups them the pointer way: Move to…, Due…, Pin, Delete. Delete
 //  never confirms; it toasts with Undo.
 //
@@ -33,17 +33,21 @@ struct TodoContextMenu: View {
 
     @ViewBuilder
     private var phone: some View {
-        let timeLists = others.filter(\.isSystem)
-        let collections = others.filter { !$0.isSystem }
-        Section {
-            ForEach(timeLists) { target in
-                moveButton(target, label: "Move to \(target.name)", systemImage: "arrow.right")
+        let plan = MoveMenuPlan(others: others, recentIds: actions.recentLists.ids)
+        Section("Move to") {
+            ForEach(plan.timeLists) { target in
+                moveButton(target, label: target.name, systemImage: arrow(to: target))
             }
-        }
-        if !collections.isEmpty {
-            Section {
-                ForEach(collections) { target in
-                    moveButton(target, label: "Move to \(target.name)", systemImage: "list.bullet")
+            ForEach(plan.recent) { target in
+                moveButton(target, label: target.name, systemImage: "list.bullet")
+            }
+            if !plan.more.isEmpty {
+                Menu {
+                    ForEach(plan.more) { target in
+                        moveButton(target, label: target.name, systemImage: "list.bullet")
+                    }
+                } label: {
+                    Label("More", systemImage: "ellipsis")
                 }
             }
         }
@@ -60,7 +64,7 @@ struct TodoContextMenu: View {
             let collections = others.filter { !$0.isSystem }
             Section {
                 ForEach(timeLists) { target in
-                    moveButton(target, label: target.name, systemImage: "arrow.right")
+                    moveButton(target, label: target.name, systemImage: arrow(to: target))
                 }
             }
             if !collections.isEmpty {
@@ -82,6 +86,11 @@ struct TodoContextMenu: View {
             pinButton
             deleteButton
         }
+    }
+
+    private func arrow(to target: TodoListModel) -> String {
+        let here = todo.listKey?.lowercased()
+        return MoveMenuPlan.arrow(to: target, from: lists.first { $0.id.lowercased() == here })
     }
 
     private func moveButton(_ target: TodoListModel, label: String, systemImage: String) -> some View {

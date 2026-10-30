@@ -304,3 +304,37 @@ describe("buildContextualCard", () => {
     expect(selected?.map((i) => i.text)).toEqual(["Today"]);
   });
 });
+
+describe("buildContextualCard's email row", () => {
+  const row = (message: Parameters<typeof buildContextualCard>[1]) =>
+    buildContextualCard(BASE, message, LISTS).sections[0].widgets[2]
+      .decoratedText;
+
+  it("names the email, who sent it and when", () => {
+    expect(
+      row({
+        subject: "Q3 <planning>",
+        permalink: "https://mail.google.com/x",
+        from: "Sam Lee",
+        date: "Oct 28",
+      }),
+    ).toEqual({
+      topLabel: "Attached as a link",
+      text: "Q3 &lt;planning&gt;",
+      bottomLabel: "From Sam Lee · Oct 28",
+      wrapText: true,
+    });
+  });
+
+  it("says This email, not the placeholder title, without a subject", () => {
+    const card = buildContextualCard(
+      BASE,
+      { subject: null, permalink: "https://mail.google.com/x" },
+      LISTS,
+    );
+    expect(card.sections[0].widgets[0].textInput?.value).toBe(
+      "Follow up on email",
+    );
+    expect(card.sections[0].widgets[2].decoratedText?.text).toBe("This email");
+  });
+});
