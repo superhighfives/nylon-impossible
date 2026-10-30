@@ -136,7 +136,18 @@ export async function loadMessageContext(
   const messageToken = event.gmail?.accessToken;
   const auth = event.authorizationEventObject;
   const userToken = auth?.userOAuthToken ?? auth?.userOauthToken;
-  if (!messageId || !messageToken || !userToken) return message;
+  if (!messageId || !messageToken || !userToken) {
+    // Which of the three Gmail left out, as booleans only.
+    console.log(
+      JSON.stringify({
+        gmailMetadata: "skipped",
+        messageId: !!messageId,
+        messageToken: !!messageToken,
+        userToken: !!userToken,
+      }),
+    );
+    return message;
+  }
   const metadata = await fetchMessageMetadata({
     messageId,
     messageToken,

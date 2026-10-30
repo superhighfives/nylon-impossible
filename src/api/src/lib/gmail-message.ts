@@ -56,6 +56,18 @@ export async function fetchMessageMetadata(input: {
       signal: AbortSignal.timeout(GMAIL_METADATA_TIMEOUT_MS),
     });
     if (!res.ok) {
+      // Gmail's own reason ("accessNotConfigured", "insufficientPermissions"),
+      // so a fallback in the panel can be traced in the Worker's logs. Never
+      // the tokens or the message's headers.
+      const error = (await res.json().catch(() => null)) as {
+        error?: { status?: string; errors?: { reason?: string }[] };
+      } | null;
+      console.log(
+        JSON.stringify({
+          gmailMetadata: res.status,
+          reason: error?.error?.errors?.[0]?.reason ?? error?.error?.status,
+        }),
+      );
       Sentry.addBreadcrumb({
         category: "gmail-addon",
         message: `message metadata: ${res.status}`,
@@ -80,6 +92,11 @@ export async function fetchMessageMetadata(input: {
       date,
     };
   } catch (err) {
+    console.log(
+      JSON.stringify({
+        gmailMetadata: err instanceof Error ? err.name : "error",
+      }),
+    );
     Sentry.addBreadcrumb({
       category: "gmail-addon",
       message: `message metadata failed: ${err instanceof Error ? err.name : "error"}`,
