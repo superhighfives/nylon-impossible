@@ -344,7 +344,7 @@ export function Composer({
         }}
         onFocus={() => setFocused(true)}
         onBlur={onBlur}
-        className={`n-focus-within -mx-2.5 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
+        className={`n-focus-within relative -mx-2.5 rounded-n-field focus-within:z-1 px-2.5 transition-colors duration-(--n-duration-fast) ${
           showChips ? "bg-n-surface" : "pointer-fine:hover:bg-n-surface"
         }`}
       >
