@@ -20,6 +20,7 @@ struct BoardDoneColumn: View {
     let onRestore: (TodoItem) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.selectsByKeyboard) private var selectsByKeyboard
 
     private struct DayGroup: Identifiable {
         let id: Date
@@ -111,11 +112,8 @@ struct BoardDoneColumn: View {
         .background {
             RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
                 .fill(Theme.Colors.fill)
-                .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
-                        .strokeBorder(Theme.Colors.inkMuted, lineWidth: 1)
-                }
                 .padding(.horizontal, -10)
+                .overlay(alignment: .leading) { RowSelectionBar(isOn: selectsByKeyboard) }
                 .opacity(selected ? 1 : 0)
                 .accessibilityHidden(true)
         }

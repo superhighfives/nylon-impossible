@@ -39,6 +39,7 @@ import { Toolbar } from "./Toolbar";
 import { DragPreview, useBoardDrag } from "./useBoardDrag";
 import { useBoardKeys } from "./useBoardKeys";
 import { useGoSequence } from "./useGoSequence";
+import { useKeyboardModality } from "./useKeyboardModality";
 
 const EMPTY_COPY: Record<string, string> = {
   today: "Nothing today.",
@@ -406,6 +407,10 @@ export function WideApp({
     },
   });
 
+  // Moving with the keys adds a bar beside the selected row (TodoRow).
+  const boardRoot = useRef<HTMLDivElement>(null);
+  useKeyboardModality(boardRoot);
+
   useBoardKeys({
     board,
     takeGo: go.take,
@@ -611,7 +616,8 @@ export function WideApp({
   return (
     <div
       data-wide-ready={loading ? undefined : ""}
-      className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas font-n-text text-n-ink antialiased"
+      ref={boardRoot}
+      className="group/board fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas font-n-text text-n-ink antialiased"
     >
       <DndContext
         sensors={drag.sensors}

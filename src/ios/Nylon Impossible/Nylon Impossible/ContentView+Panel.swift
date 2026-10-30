@@ -76,6 +76,19 @@ extension ContentView {
         boardFocused = true
     }
 
+    /// A click or tap on a row: the selection takes the fill alone, without
+    /// the keyboard's bar.
+    func clickSelect(_ todo: TodoItem) {
+        selectsByKeyboard = false
+        selectWide(todo)
+    }
+
+    /// A second click (or a double click) opens the todo.
+    func clickOpen(_ todo: TodoItem) {
+        selectsByKeyboard = false
+        openWide(todo)
+    }
+
     /// Open a todo in the fourth column (a second click, or Return).
     func openWide(_ todo: TodoItem) {
         selectWide(todo)
@@ -104,6 +117,7 @@ extension ContentView {
     /// A click on a column's empty space: the column takes the keyboard, but
     /// no row is selected, so ↓ starts at its top.
     func softFocus(_ id: String) {
+        selectsByKeyboard = false
         sidebarCursor = nil
         focusedColumnId = id
         selectedTodoId = nil

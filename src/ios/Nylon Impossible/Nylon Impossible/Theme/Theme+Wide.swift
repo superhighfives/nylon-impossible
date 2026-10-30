@@ -56,4 +56,8 @@ extension EnvironmentValues {
     /// True inside the iPad board, where rows use the wide type scale, the
     /// column gutter and a pointer hover tint.
     @Entry var isWideLayout = false
+    /// True while the board's selection last moved by keyboard: the selected
+    /// row adds a bar beside its fill, as in the sidebar. A click or tap
+    /// selects with the fill alone.
+    @Entry var selectsByKeyboard = false
 }

@@ -28,6 +28,7 @@ extension ContentView {
         // A press the menu and onKeyPress both saw is one press.
         if let last = lastKey, last.key == key, Date().timeIntervalSince(last.at) < 0.05 { return }
         lastKey = (key, Date())
+        selectsByKeyboard = true
 
         if sidebarCursor != nil, performInSidebar(key) { return }
 

@@ -8,8 +8,8 @@
 //  detail sheet. There are no swipe actions: a horizontal swipe pages lists.
 //
 //  On the iPad board the same row takes the wide type scale, tints under the
-//  pointer (no controls appear), and draws a quiet focus ring when it's the
-//  selected row.
+//  pointer (no controls appear), and fills when it's the selected row, with
+//  a bar beside it while moving with the keyboard.
 //
 
 import SwiftUI
@@ -29,6 +29,7 @@ struct TodoRow: View {
     let onOpen: () -> Void
 
     @Environment(\.isWideLayout) private var isWide
+    @Environment(\.selectsByKeyboard) private var selectsByKeyboard
     @State private var isHovering = false
 
     private var gutter: CGFloat { isWide ? Theme.Wide.gutter : Theme.Phone.gutter }
@@ -108,22 +109,38 @@ struct TodoRow: View {
         }
     }
 
-    /// The board's selection: the soft fill plus a quiet 1pt ring in muted
-    /// ink, as on wide web; it's the row's only focus indicator, and the
-    /// ring carries the 3:1 the fill can't (5:1 or more against canvas,
-    /// surface and fill, light and dark). Hover tints lightly.
+    /// The board's selection, and the row's only focus indicator: the soft
+    /// fill, plus a bar beside it while moving with the keyboard, as on wide
+    /// web. Hover tints lightly.
     private var highlight: some View {
         RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
             .fill(Theme.Colors.fill)
-            .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
-                    .strokeBorder(Theme.Colors.inkMuted, lineWidth: 1)
-                    .opacity(isSelected && isWide ? 1 : 0)
-            }
             .opacity(isSelected ? 1 : (isHovering ? 0.6 : 0))
             .padding(.horizontal, -10)
+            .overlay(alignment: .leading) {
+                RowSelectionBar(isOn: isSelected && isWide && selectsByKeyboard)
+            }
             .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isHovering)
             .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isSelected)
+            .accessibilityHidden(true)
+    }
+}
+
+/// Beside the board's selected row while moving with the keyboard: the
+/// sidebar's bar (3pt, inset 6pt top and bottom), drawn 7pt clear of the
+/// row's fill so nothing shifts. Overlaid at the row's content edge, which
+/// is 10pt inside the fill. Muted ink is 5:1 or more against canvas,
+/// surface and fill.
+struct RowSelectionBar: View {
+    let isOn: Bool
+
+    var body: some View {
+        Capsule()
+            .fill(Theme.Colors.inkMuted)
+            .frame(width: 3)
+            .padding(.vertical, 6)
+            .offset(x: -20)
+            .opacity(isOn ? 1 : 0)
             .accessibilityHidden(true)
     }
 }

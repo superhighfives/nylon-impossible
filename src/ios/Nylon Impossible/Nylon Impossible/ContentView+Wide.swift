@@ -145,8 +145,15 @@ extension ContentView {
             name: displayName,
             initials: initials,
             avatarURL: screenRoute == nil ? authService.userImageURL : nil,
-            onTimeList: { focusColumn($0.id) },
-            onCollection: openCollection,
+            // A click selects with the fill alone, without the keyboard's bar.
+            onTimeList: { list in
+                selectsByKeyboard = false
+                focusColumn(list.id)
+            },
+            onCollection: { list in
+                selectsByKeyboard = false
+                openCollection(list)
+            },
             newListAnchor: $newListAnchor,
             onCreateList: commitNewList,
             onDone: showDone,
@@ -225,6 +232,7 @@ extension ContentView {
             }
         }
         .environment(\.isWideLayout, true)
+        .environment(\.selectsByKeyboard, selectsByKeyboard)
         .overlay(alignment: .top) {
             if case .error(let message) = syncService.state {
                 SyncErrorLine(
@@ -285,7 +293,7 @@ extension ContentView {
                 todos: doneTodos,
                 lists: derived.lists,
                 selectedId: selectedTodoId,
-                onSelect: selectWide,
+                onSelect: clickSelect,
                 onRestore: { actions.restoreFromDone($0) }
             )
         }
@@ -308,8 +316,8 @@ extension ContentView {
                 overnight: kind == .today ? overnightText.map { ($0, seeOvernight, dismissOvernight) } : nil,
                 empty: wideEmpty(kind, counts: derived.counts),
                 composer: composer,
-                onSelect: selectWide,
-                onOpen: openWide,
+                onSelect: clickSelect,
+                onOpen: clickOpen,
                 onDrop: { id, row in dropWide(id, on: row, into: list) },
                 onExternalDrop: { addDropped($0, to: list) },
                 onBackgroundTap: { softFocus(list.id) }
@@ -328,8 +336,8 @@ extension ContentView {
                 overnight: nil,
                 empty: ("Nothing here yet.", nil),
                 composer: composer,
-                onSelect: selectWide,
-                onOpen: openWide,
+                onSelect: clickSelect,
+                onOpen: clickOpen,
                 onRename: { rename(list, to: $0) },
                 isRenaming: Binding(
                     get: { renamingColumnId == list.id },

@@ -440,6 +440,23 @@ describe("WideApp", () => {
     expect(focusedTitle()).toContain("Send invoice");
   });
 
+  it("moving with the keys adds the bar beside the selection; a click takes it away", async () => {
+    const { container } = render(<WideApp />);
+    const board = container.querySelector("[data-wide-ready]");
+    const bar = () =>
+      rowButton("Call Mum")
+        .closest("li")
+        ?.querySelector("[data-row-selection-bar]");
+    await userEvent.click(rowButton("Review PR"));
+    expect(board).not.toHaveAttribute("data-keyboard");
+    press("j");
+    expect(focusedTitle()).toContain("Call Mum");
+    expect(board).toHaveAttribute("data-keyboard");
+    expect(bar()).toBeInTheDocument();
+    await userEvent.click(rowButton("Send invoice"));
+    expect(board).not.toHaveAttribute("data-keyboard");
+  });
+
   it("Esc closes the open todo, then goes to the column's sidebar item", async () => {
     render(<WideApp />);
     act(() => rowButton("Send invoice").focus());
@@ -453,11 +470,11 @@ describe("WideApp", () => {
     // Into the sidebar lets go of the todo…
     const container = () =>
       rowButton("Send invoice").closest("[data-row-container]");
-    expect(container()).not.toHaveClass("ring-1");
+    expect(container()).not.toHaveAttribute("data-selected");
     // …and → goes back in to the column's last one.
     press("ArrowRight");
     expect(document.activeElement).toBe(rowButton("Send invoice"));
-    expect(container()).toHaveClass("ring-1");
+    expect(container()).toHaveAttribute("data-selected");
   });
 
   it("a click on a column's empty space focuses it and selects nothing", async () => {
@@ -465,7 +482,7 @@ describe("WideApp", () => {
     act(() => rowButton("Send invoice").focus());
     const container = () =>
       rowButton("Send invoice").closest("[data-row-container]");
-    expect(container()).toHaveClass("ring-1");
+    expect(container()).toHaveAttribute("data-selected");
     const week =
       rowButton("Send invoice").closest<HTMLElement>("[data-column]");
     const someday = document.querySelector<HTMLElement>(
@@ -473,7 +490,7 @@ describe("WideApp", () => {
     );
     // The empty space under Someday's rows.
     await userEvent.click(someday as HTMLElement);
-    expect(container()).not.toHaveClass("ring-1");
+    expect(container()).not.toHaveAttribute("data-selected");
     expect(document.activeElement?.hasAttribute("data-column-head")).toBe(true);
     // ↓ starts at the top of the column that has focus.
     const column =
@@ -620,9 +637,9 @@ describe("WideApp", () => {
   it("one click selects, a second click opens the detail in the fourth column", async () => {
     render(<WideApp />);
     await userEvent.click(rowButton("Call Mum"));
-    expect(rowButton("Call Mum").closest("[data-row-container]")).toHaveClass(
-      "ring-1",
-    );
+    expect(
+      rowButton("Call Mum").closest("[data-row-container]"),
+    ).toHaveAttribute("data-selected");
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await userEvent.click(rowButton("Call Mum"));

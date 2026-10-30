@@ -469,9 +469,9 @@ async function keyboardWalk(page: Page) {
         const el = document.activeElement as HTMLElement | null;
         if (!el || el === document.body) return { name: "(body)", visible: false };
         // Focus is visible when something changes with it: an outline (the
-        // yellow ring), a box-shadow (a row's selection ring, on its
-        // container) or a background (the wide board's soft focus), on the
-        // element or one of its near ancestors. Compare focused with blurred.
+        // yellow ring), a box-shadow or a background (the wide board's soft
+        // focus), on the element or one of its near ancestors. Compare
+        // focused with blurred.
         const chain: HTMLElement[] = [];
         for (let n: HTMLElement | null = el; n && chain.length < 5; n = n.parentElement) {
           chain.push(n);
@@ -494,12 +494,16 @@ async function keyboardWalk(page: Page) {
         }
         el.focus({ focusVisible: true } as FocusOptions);
         const [focused, blurred] = looks;
-        // A board row's indicator is the selection ring on its container,
-        // which stays after blur because the selection does.
-        const row = el.closest<HTMLElement>("[data-row-container]");
+        // A board row's indicator is the selection, which stays after blur:
+        // moving with the keys (Tab included) shows the bar beside its fill.
+        const bar = el
+          .closest<HTMLElement>("[data-row-container][data-selected]")
+          ?.parentElement?.querySelector<HTMLElement>(
+            "[data-row-selection-bar]",
+          );
         const visible =
           focused.some((s, i) => s !== blurred[i]) ||
-          (!!row && getComputedStyle(row).boxShadow !== "none");
+          (!!bar && getComputedStyle(bar).display !== "none");
         const name =
           el.getAttribute("aria-label") ??
           (el.textContent ?? "").trim().slice(0, 30) ??
