@@ -1048,6 +1048,18 @@ describe("Gmail add-on", () => {
       expect(rows).toHaveLength(0);
     });
 
+    it("undo-add of a todo that's already gone leaves cached cards alone", async () => {
+      await linkUser();
+      const res = await post("/gmail-addon/actions/undo-add", await idToken(), {
+        commonEventObject: {
+          parameters: { todoId: "cccccccc-cccc-cccc-cccc-cccccccccccc" },
+        },
+      });
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe("Removed");
+      expect(body.stateChanged).toBeUndefined();
+    });
+
     it("undo-add leaves another user's todo alone", async () => {
       await linkUser();
       await seedUser("user_other_456", "other@example.com");
