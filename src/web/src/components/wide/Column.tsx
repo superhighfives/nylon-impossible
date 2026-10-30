@@ -41,7 +41,8 @@ type RowCallbacks = Pick<
  */
 export const TINTED = "bg-n-surface [--n-row-hover:var(--color-n-fill)]";
 
-const ICON_BUTTON =
+/** The header's quiet icon buttons: ⋯ and ×, here and on an open todo. */
+export const ICON_BUTTON =
   "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft pointer-fine:hover:bg-n-fill";
 
 const MENU_ITEM =
