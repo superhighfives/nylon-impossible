@@ -6,6 +6,11 @@
 //  text on screen, edited in place), a chip row (List, Due, Repeat, Pin),
 //  Notes, Subtasks, Links, and a footer with Delete and the dates.
 //
+//  In the board's fourth column (iPad and Mac) it's built like a column
+//  instead: the title on the column header's baseline, the hairline, and the
+//  board's type sizes, with the properties as rows rather than chips (see
+//  TodoDetailSheet+Column.swift).
+//
 //  Every edit saves as it's made. There's no Save or Cancel: closing the sheet
 //  is the only way to finish, and there's nothing left to save when you do.
 //  Typing writes to the store at once and syncs once you pause.
@@ -81,7 +86,19 @@ struct TodoDetailSheet: View {
         lists.first { $0.id.lowercased() == todo.listKey?.lowercased() }
     }
 
+    /// The board's fourth column rather than a sheet.
+    var isColumn: Bool { onClose != nil && isWide }
+
+    @ViewBuilder
     var body: some View {
+        if isColumn {
+            columnBody
+        } else {
+            sheetBody
+        }
+    }
+
+    var sheetBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 // The sheet closes with the drag indicator or a swipe down; only
@@ -137,11 +154,14 @@ struct TodoDetailSheet: View {
 
     var titleField: some View {
         TextField("Title", text: $title, axis: .vertical)
-            .textStyle(Theme.Fonts.Role.sheetTitle, tracking: Theme.Tracking.sheetTitle)
+            .textStyle(
+                isColumn ? Theme.Fonts.Role.detailTitleWide : Theme.Fonts.Role.sheetTitle,
+                tracking: Theme.Tracking.sheetTitle
+            )
             .foregroundStyle(Theme.Colors.ink)
             .focused($focus, equals: .title)
             .submitLabel(.done)
-            .padding(.bottom, Theme.Space.s4)
+            .padding(.bottom, isColumn ? 0 : Theme.Space.s4)
             .onChange(of: title) { _, newValue in
                 // Return finishes the title rather than starting a new line.
                 if newValue.contains(where: \.isNewline) {
@@ -184,17 +204,7 @@ struct TodoDetailSheet: View {
 
     var listChip: some View {
         Menu {
-            ForEach(lists) { option in
-                Button {
-                    actions.move(todo, toList: option.id, announce: false)
-                } label: {
-                    if option.id == list?.id {
-                        Label(option.name, systemImage: Theme.Icon.done)
-                    } else {
-                        Text(option.name)
-                    }
-                }
-            }
+            listMenuItems
         } label: {
             ChipLabel(text: list?.name ?? "List", systemImage: "list.bullet", isOn: true, opensMenu: true)
                 .frame(minHeight: Theme.Space.rowMinHeight)
@@ -205,16 +215,7 @@ struct TodoDetailSheet: View {
     var dueChip: some View {
         let label = todo.dueDate.map { DueLabel.text(for: $0) }
         return Menu {
-            DueMenuItems(hasDue: false) { setDue($0) }
-            Button {
-                withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { showsDatePicker.toggle() }
-            } label: {
-                Label(showsDatePicker ? "Hide calendar" : "Pick a date…", systemImage: Theme.Icon.due)
-            }
-            if todo.dueDate != nil {
-                Divider()
-                Button("No date", role: .destructive) { setDue(nil) }
-            }
+            dueMenuItems
         } label: {
             ChipLabel(
                 text: label?.text ?? "Due",
@@ -230,21 +231,7 @@ struct TodoDetailSheet: View {
 
     var repeatChip: some View {
         Menu {
-            ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
-                Button {
-                    setRepeat(frequency)
-                } label: {
-                    if todo.recurrence?.frequency == frequency {
-                        Label(RepeatLabel.text(frequency), systemImage: Theme.Icon.done)
-                    } else {
-                        Text(RepeatLabel.text(frequency))
-                    }
-                }
-            }
-            if todo.recurrence != nil {
-                Divider()
-                Button("Don’t repeat", role: .destructive) { setRepeat(nil) }
-            }
+            repeatMenuItems
         } label: {
             ChipLabel(
                 text: todo.recurrence.map { RepeatLabel.text($0.frequency) } ?? "Repeat",
@@ -276,12 +263,12 @@ struct TodoDetailSheet: View {
     // MARK: - Notes
 
     var notesField: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: isColumn ? Theme.Space.s1 : 6) {
             SectionLabel(text: "Notes")
             TextField("Add notes", text: $notes, prompt: Text("Add notes").foregroundStyle(Theme.Colors.inkMuted), axis: .vertical)
-                .textStyle(Theme.Fonts.Role.body)
+                .textStyle(isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body)
                 .foregroundStyle(Theme.Colors.ink)
-                .lineLimit(3...)
+                .lineLimit(isColumn ? 2... : 3...)
                 .focused($focus, equals: .notes)
                 .onChange(of: notes) { _, newValue in
                     let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newValue
@@ -294,4 +281,57 @@ struct TodoDetailSheet: View {
         }
     }
 
+}
+
+extension TodoDetailSheet {
+    // The menus behind List, Due and Repeat, shared by the sheet's chips and
+    // the column's rows.
+
+    @ViewBuilder
+    var listMenuItems: some View {
+        ForEach(lists) { option in
+            Button {
+                actions.move(todo, toList: option.id, announce: false)
+            } label: {
+                if option.id == list?.id {
+                    Label(option.name, systemImage: Theme.Icon.done)
+                } else {
+                    Text(option.name)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    var dueMenuItems: some View {
+        DueMenuItems(hasDue: false) { setDue($0) }
+        Button {
+            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { showsDatePicker.toggle() }
+        } label: {
+            Label(showsDatePicker ? "Hide calendar" : "Pick a date…", systemImage: Theme.Icon.due)
+        }
+        if todo.dueDate != nil {
+            Divider()
+            Button("No date", role: .destructive) { setDue(nil) }
+        }
+    }
+
+    @ViewBuilder
+    var repeatMenuItems: some View {
+        ForEach(RecurrenceFrequency.allCases, id: \.self) { frequency in
+            Button {
+                setRepeat(frequency)
+            } label: {
+                if todo.recurrence?.frequency == frequency {
+                    Label(RepeatLabel.text(frequency), systemImage: Theme.Icon.done)
+                } else {
+                    Text(RepeatLabel.text(frequency))
+                }
+            }
+        }
+        if todo.recurrence != nil {
+            Divider()
+            Button("Don’t repeat", role: .destructive) { setRepeat(nil) }
+        }
+    }
 }
