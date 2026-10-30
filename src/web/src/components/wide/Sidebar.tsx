@@ -83,6 +83,8 @@ function ListEntry({
   );
 }
 
+const TIME_PLACEHOLDERS = ["Today", "This week", "Someday"];
+
 /**
  * The wide sidebar: the wordmark; Today, This week and Someday with counts;
  * a "Lists" heading, your lists and New list; then Done, Settings, Send
@@ -107,6 +109,7 @@ export function Sidebar({
   onSettings,
   onShortcuts,
   onFeedback,
+  loading = false,
 }: {
   timeLists: SerializedList[];
   collections: SerializedList[];
@@ -125,6 +128,8 @@ export function Sidebar({
   onShortcuts: () => void;
   /** Shown only when set — the caller passes it for admins. */
   onFeedback?: () => void;
+  /** Lists haven't arrived: draw the time lists as placeholders. */
+  loading?: boolean;
 }) {
   return (
     <aside
@@ -136,6 +141,22 @@ export function Sidebar({
       </p>
       <nav aria-label="Lists">
         <ul className="flex flex-col gap-0.5">
+          {/* Before the lists arrive the time lists are already known by
+              name, so they hold their place (not focusable; the columns
+              say "Loading…"). */}
+          {loading &&
+            timeLists.length === 0 &&
+            TIME_PLACEHOLDERS.map((name) => (
+              <li
+                key={name}
+                aria-hidden="true"
+                data-skeleton-entry
+                className="flex h-9 items-center gap-2 px-2.5 text-[0.9375rem] font-semibold text-n-ink"
+              >
+                <span className="min-w-0 flex-1 truncate">{name}</span>
+                <span className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse" />
+              </li>
+            ))}
           {timeLists.map((list) => (
             <ListEntry
               key={list.id}
@@ -195,9 +216,17 @@ export function Sidebar({
             className="shrink-0"
           />
           <span className="flex-1">Done</span>
-          <span aria-hidden="true" className="font-normal tabular-nums">
-            {doneCount}
-          </span>
+          {/* Not a false "0" before the todos arrive. */}
+          {loading ? (
+            <span
+              aria-hidden="true"
+              className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse"
+            />
+          ) : (
+            <span aria-hidden="true" className="font-normal tabular-nums">
+              {doneCount}
+            </span>
+          )}
           <span id="sidebar-done-count" hidden>
             {doneCount} {doneCount === 1 ? "todo" : "todos"}
           </span>

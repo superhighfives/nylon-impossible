@@ -35,10 +35,19 @@ import { GoHint } from "./GoHint";
 import { type PaletteState, paletteGroups } from "./paletteGroups";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
 import { Sidebar } from "./Sidebar";
+import { SkeletonComposer } from "./Skeleton";
 import { Toolbar } from "./Toolbar";
 import { DragPreview, useBoardDrag } from "./useBoardDrag";
 import { useBoardKeys } from "./useBoardKeys";
 import { useGoSequence } from "./useGoSequence";
+
+/** The time columns' names, known before the lists arrive. */
+const TIME_TITLES: Record<(typeof TIME_KINDS)[number], string> = {
+  today: "Today",
+  thisWeek: "This week",
+  someday: "Someday",
+};
+const EMPTY_ROWS: TodoWithUrls[] = [];
 
 const EMPTY_COPY: Record<string, string> = {
   today: "Nothing today.",
@@ -608,9 +617,43 @@ export function WideApp({
     );
   };
 
+  /**
+   * A time column before the lists arrive. Their names are fixed, so the
+   * board is drawn at its real widths from the first paint (the same header,
+   * subline and banner space as the loaded column), with placeholder rows,
+   * rather than Done filling the board. Nothing in it takes focus.
+   */
+  const renderSkeletonColumn = (kind: (typeof TIME_KINDS)[number]) => (
+    <Column
+      key={`skeleton-${kind}`}
+      listId={`skeleton-${kind}`}
+      title={TIME_TITLES[kind]}
+      subline={columnSubline(kind, now, timeZone)}
+      rows={EMPTY_ROWS}
+      subtasksOf={() => EMPTY_ROWS}
+      checked={actions.checked}
+      collapsing={actions.collapsing}
+      highlightedId={null}
+      selectedId={null}
+      indicator={null}
+      loading
+      error={null}
+      empty=""
+      composer={<SkeletonComposer />}
+      now={now}
+      timeZone={timeZone}
+      onSelect={select}
+      onCheck={actions.complete}
+      onOpen={onOpen}
+      onMenu={onMenu}
+    />
+  );
+  const skeleton = loading && timeLists.length === 0;
+
   return (
     <div
       data-wide-ready={loading ? undefined : ""}
+      aria-busy={loading || undefined}
       className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas font-n-text text-n-ink antialiased"
     >
       <DndContext
@@ -634,6 +677,7 @@ export function WideApp({
           onSettings={() => setSettings(true)}
           onShortcuts={() => setShortcuts(true)}
           onFeedback={canSendFeedback ? () => setFeedback(true) : undefined}
+          loading={loading}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <Toolbar
@@ -663,7 +707,9 @@ export function WideApp({
             aria-label="Board"
             className="flex min-h-0 flex-1 overflow-x-auto"
           >
-            {timeLists.map((list) => renderColumn(list))}
+            {skeleton
+              ? TIME_KINDS.map(renderSkeletonColumn)
+              : timeLists.map((list) => renderColumn(list))}
             {fourth === "detail" ? (
               <section
                 ref={setFourthEl}
@@ -683,6 +729,7 @@ export function WideApp({
                 onSelect={select}
                 onRestore={actions.restore}
                 onBackgroundClick={() => softFocus(DONE_COLUMN)}
+                loading={loading}
               />
             )}
           </main>
