@@ -117,7 +117,7 @@ export interface DetailSheetProps {
 
 /**
  * The full-height detail sheet. Same order as every platform: title, the
- * properties chips (List, Due, Repeat, Pin), Notes, Subtasks, Links, then a
+ * properties chips (List, Due, Repeat, Pin; rows in the `column` variant), Notes, Subtasks, Links, then a
  * quiet Delete with the created/edited times. Every edit saves as it's made;
  * closing is the only way to finish.
  */
