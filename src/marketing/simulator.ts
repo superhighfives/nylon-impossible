@@ -115,6 +115,29 @@ export function ensureSimulator(name: string, types: string[]): string {
  * attempt carries on with the same boot, and after a failed one it waits
  * a moment and tries again.
  */
+/**
+ * Mark the keyboard's "slide to type" introduction as seen, so it doesn't
+ * cover the first shot that brings up the keyboard (the composer). Best-
+ * effort: a failure here only costs that tip showing.
+ */
+function quietKeyboardTips(udid: string) {
+  spawnSync(
+    "xcrun",
+    [
+      "simctl",
+      "spawn",
+      udid,
+      "defaults",
+      "write",
+      "com.apple.Preferences",
+      "DidShowContinuousPathIntroduction",
+      "-bool",
+      "true",
+    ],
+    { stdio: "pipe", timeout: 30_000 },
+  );
+}
+
 export async function ensureBooted(udid: string): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     const boot = spawnSync("xcrun", ["simctl", "bootstatus", udid, "-b"], {
@@ -123,11 +146,11 @@ export async function ensureBooted(udid: string): Promise<void> {
     });
     const state = simulatorState(udid);
     console.log(`  Simulator state: ${state}`);
-    if (state === "Booted") return;
+    if (state === "Booted") return quietKeyboardTips(udid);
     if (state === "unknown") {
       if (boot.status === 0) {
         console.log("  bootstatus reported booted; going with that.");
-        return;
+        return quietKeyboardTips(udid);
       }
       if (boot.error) {
         console.log(`  boot attempt ${attempt} is still going, waiting on it…`);
