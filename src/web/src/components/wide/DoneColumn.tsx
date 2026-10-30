@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import type { TodoWithUrls } from "@/types/database";
-import { ColumnHeader } from "./Column";
+import { ColumnHeader, TINTED } from "./Column";
 
 /** Done's column id: the fourth column's resting state, not a list. */
 export const DONE_COLUMN = "done";
@@ -40,7 +40,7 @@ export function DoneColumn({
     <section
       aria-labelledby={headingId}
       data-column={DONE_COLUMN}
-      className="relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline"
+      className={`relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline ${TINTED}`}
     >
       <ColumnHeader
         listId={DONE_COLUMN}
@@ -104,7 +104,7 @@ function DoneRow({
         className={`-mx-2.5 flex items-start gap-3 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
           selected
             ? "bg-n-fill ring-2 ring-n-ink ring-inset"
-            : "pointer-fine:hover:bg-n-surface"
+            : "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
         }`}
       >
         <button

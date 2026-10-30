@@ -130,7 +130,7 @@ export function DetailSheet(props: DetailSheetProps) {
             data-detail-column
             initialFocus={false}
             finalFocus={false}
-            className="absolute inset-0 z-10 flex flex-col bg-n-canvas text-n-ink outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0"
+            className="absolute inset-0 z-10 flex flex-col bg-n-surface text-n-ink outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0"
           >
             {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
           </Dialog.Popup>

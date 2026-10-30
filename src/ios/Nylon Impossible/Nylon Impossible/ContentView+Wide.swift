@@ -272,7 +272,7 @@ extension ContentView {
                 showsCalendar: showsDueCalendar,
                 onClose: closeDetail
             )
-            .background(Theme.Colors.canvas)
+            .background(Theme.Colors.surface)
             // Esc closes the open todo even while its fields have focus.
             .onKeyPress(.escape) {
                 closeDetail()
