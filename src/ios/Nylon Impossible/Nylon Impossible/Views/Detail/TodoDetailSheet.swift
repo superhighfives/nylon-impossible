@@ -26,6 +26,8 @@ struct TodoDetailSheet: View {
     var onClose: (() -> Void)?
 
     @Environment(\.dismiss) var dismiss
+    /// In the board's fourth column, which is tinted; a sheet sits on canvas.
+    @Environment(\.isWideLayout) var isWide
     @Environment(\.modelContext) var modelContext
     @Query var everyTodo: [TodoItem]
 
@@ -103,7 +105,7 @@ struct TodoDetailSheet: View {
             .padding(.bottom, Theme.Space.s12)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(Theme.Colors.canvas)
+        .background(isWide ? Theme.Colors.surface : Theme.Colors.canvas)
         .task { await loadUrls() }
         .onDisappear(perform: flushEdits)
     }
