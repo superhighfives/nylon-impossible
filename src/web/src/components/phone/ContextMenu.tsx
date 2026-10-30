@@ -158,11 +158,14 @@ export function ContextMenu({
 
   // Each opening starts on the view it was asked for.
   const openId = todo?.id ?? null;
-  // Recents are read as the menu opens, so a move just made counts.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening
+  // Recents are read as the menu opens, so a move just made counts. The
+  // callers build `moveTargets` fresh each render, so key on the opening and
+  // the targets' ids rather than the array itself.
+  const targetIds = moveTargets.map((t) => t.id).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening, or when the targets change
   const plan = useMemo(
     () => moveMenuPlan(moveTargets, readRecentMoves()),
-    [openId, moveTargets],
+    [openId, targetIds],
   );
   useEffect(() => {
     if (openId) {

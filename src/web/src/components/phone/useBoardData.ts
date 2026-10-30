@@ -33,16 +33,21 @@ export function useBoardData() {
     (id: string) => lists?.find((l) => l.id === id)?.name ?? "List",
     [lists],
   );
-  const actions = useTodoActions({
-    timeZone,
-    listName,
-    allTodos: todos,
-    // Your lists moved to feed the Move to menu's recents.
-    onMoved: (listId) => {
+  // Your lists moved to feed the Move to menu's recents. Stable, so the
+  // actions built on it (`move`) stay stable too.
+  const onMoved = useCallback(
+    (listId: string) => {
       if (lists?.some((l) => l.id === listId && !l.systemKind)) {
         recordRecentMove(listId);
       }
     },
+    [lists],
+  );
+  const actions = useTodoActions({
+    timeZone,
+    listName,
+    allTodos: todos,
+    onMoved,
   });
   // A list deleted with Undo still pending is gone from every view.
   const { hiddenLists } = actions;
