@@ -30,11 +30,16 @@ before any handler runs. The connect flow lives in the web app at
 
 - `gmail.addons.execute` — run the add-on.
 - `gmail.addons.current.message.metadata` — read the **current message's
-  metadata** (subject/sender/permalink) from the event object.
+  headers** (subject, sender, date). The event carries only its ids, so the
+  contextual card asks the Gmail API for them (`format=metadata`), with the
+  event's `authorizationEventObject.userOAuthToken` and the per-message
+  `gmail.accessToken` (`src/api/src/lib/gmail-message.ts`). If that fails the
+  card falls back to a placeholder title.
 
 It deliberately does **not** request the restricted `gmail.readonly` scope, so we
 stay in "sensitive" scope territory (a materially lighter Google review) and
-never read message bodies or call the Gmail API. No message content is persisted.
+never read message bodies. The subject becomes the todo's title and the link's
+label, as the user adds it; nothing else from the message is stored.
 
 ## One-time Google Cloud setup
 
