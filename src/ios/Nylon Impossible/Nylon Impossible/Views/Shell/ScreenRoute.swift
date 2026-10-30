@@ -111,7 +111,11 @@ struct ScreenRouteRoot: View {
     @State private var authService = AuthService()
     @State private var syncService: SyncService
     @State private var preferences: UserPreferencesService
-    private let container: ModelContainer
+    /// Kept in state, like the services: SwiftUI can recreate this view
+    /// struct, and a new container would release the old one and destroy
+    /// every sample todo the board is still showing (a re-render then reads
+    /// a dead model and crashes).
+    @State private var container: ModelContainer
 
     init(route: ScreenRoute) {
         self.route = route
@@ -131,7 +135,7 @@ struct ScreenRouteRoot: View {
             OvernightDismissal().clear()
         }
         _preferences = State(initialValue: preferences)
-        container = SampleData.container(for: route)
+        _container = State(initialValue: SampleData.container(for: route))
     }
 
     var body: some View {

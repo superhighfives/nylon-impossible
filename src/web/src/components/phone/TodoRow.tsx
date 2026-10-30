@@ -172,7 +172,8 @@ export interface TodoRowProps {
   /** The context menu is open for this row. */
   highlighted: boolean;
   /**
-   * Wide only: the board's selection. Drawn as a ring with the pressed fill,
+   * Wide only: the board's selection. Drawn as the pressed fill with a quiet
+   * 1px ring in muted ink (5:1 or more against canvas, surface and fill),
    * the row's only focus indicator.
    */
   selected?: boolean;
@@ -297,9 +298,9 @@ function WideTodoRow({
           e.preventDefault();
           onMenu(todo, { x: e.clientX, y: e.clientY });
         }}
-        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-hidden rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
+        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-hidden rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
           selected
-            ? "bg-n-fill ring-2 ring-n-ink ring-inset"
+            ? "bg-n-fill ring-1 ring-n-ink-muted ring-inset"
             : highlighted
               ? "bg-n-fill"
               : // `surface`, or `fill` in the tinted fourth column (TINTED).

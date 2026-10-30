@@ -108,9 +108,9 @@ function DoneRow({
     <li>
       <div
         data-row-container
-        className={`-mx-2.5 flex items-start gap-3 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
+        className={`-mx-2.5 flex items-start gap-3 rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) ${
           selected
-            ? "bg-n-fill ring-2 ring-n-ink ring-inset"
+            ? "bg-n-fill ring-1 ring-n-ink-muted ring-inset"
             : "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
         }`}
       >

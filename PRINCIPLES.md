@@ -63,4 +63,4 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 - Colors that must be told apart also differ in lightness, not hue alone.
 - Touch targets are at least 44 points on touch screens.
 - Motion respects reduced motion: transitions shorten to a fade or nothing.
-- Focus is always visible: the selection ring on rows, a soft tinted background elsewhere.
+- Focus is always visible: a quiet ring on the selected row, a soft tinted background elsewhere.

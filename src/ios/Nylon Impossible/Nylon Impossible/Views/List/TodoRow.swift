@@ -8,8 +8,8 @@
 //  detail sheet. There are no swipe actions: a horizontal swipe pages lists.
 //
 //  On the iPad board the same row takes the wide type scale, tints under the
-//  pointer (no controls appear), and draws the keyboard focus ring when it's
-//  the selected row.
+//  pointer (no controls appear), and draws a quiet focus ring when it's the
+//  selected row.
 //
 
 import SwiftUI
@@ -108,15 +108,16 @@ struct TodoRow: View {
         }
     }
 
-    /// The board's selection: the soft fill plus a 2pt ring in ink, as on
-    /// wide web; it's the row's only focus indicator. Hover tints lightly.
-    /// Ink, not yellow: yellow on white is about 1.3:1.
+    /// The board's selection: the soft fill plus a quiet 1pt ring in muted
+    /// ink, as on wide web; it's the row's only focus indicator, and the
+    /// ring carries the 3:1 the fill can't (5:1 or more against canvas,
+    /// surface and fill, light and dark). Hover tints lightly.
     private var highlight: some View {
-        RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+        RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
             .fill(Theme.Colors.fill)
             .overlay {
-                RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                    .strokeBorder(Theme.Colors.ink, lineWidth: 2)
+                RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
+                    .strokeBorder(Theme.Colors.inkMuted, lineWidth: 1)
                     .opacity(isSelected && isWide ? 1 : 0)
             }
             .opacity(isSelected ? 1 : (isHovering ? 0.6 : 0))

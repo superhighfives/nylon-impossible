@@ -109,11 +109,11 @@ struct BoardDoneColumn: View {
         .padding(.vertical, Theme.Space.s3)
         .frame(minHeight: Theme.Space.rowMinHeight)
         .background {
-            RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+            RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
                 .fill(Theme.Colors.fill)
                 .overlay {
-                    RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
-                        .strokeBorder(Theme.Colors.ink, lineWidth: 2)
+                    RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
+                        .strokeBorder(Theme.Colors.inkMuted, lineWidth: 1)
                 }
                 .padding(.horizontal, -10)
                 .opacity(selected ? 1 : 0)
