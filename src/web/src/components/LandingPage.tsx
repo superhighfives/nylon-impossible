@@ -211,7 +211,7 @@ function WaitlistForm() {
 export function LandingPage() {
   return (
     <div className="min-h-dvh bg-n-canvas text-n-ink">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8">
+      <div className="mx-auto max-w-6xl pr-[max(1rem,env(safe-area-inset-right,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] sm:pr-[max(2rem,env(safe-area-inset-right,0px))] sm:pl-[max(2rem,env(safe-area-inset-left,0px))]">
         <header className="flex h-16 items-center justify-between border-b border-n-hairline">
           <span className="font-n-display text-xl font-bold tracking-[-0.02em]">
             Nylon
