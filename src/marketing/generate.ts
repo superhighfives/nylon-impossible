@@ -1378,6 +1378,9 @@ async function captureParityWeb(): Promise<void> {
                 .filter({ hasText: screen.open })
                 .first()
                 .click();
+              // On the wide board one click only selects; Return opens it
+              // in the fourth column, as iOS's inspector route does.
+              if (layout === "wide") await page.keyboard.press("Enter");
               await sleep(700);
             }
             if (screen.type) {

@@ -74,10 +74,11 @@ jobs:
           && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event))
     runs-on: macos-26
     # A run that rebuilds the iOS screenshots spends about 42 minutes in the
-    # publish step alone. At 45 the job timed out in the parity sheet (or,
-    # once, in the publish step itself) and the whole run showed as
-    # cancelled; 75 leaves room for the parity sheet's own 20 below.
-    timeout-minutes: 75
+    # publish step alone, and the parity sheet up to about 37 more when its
+    # own iOS shots aren't cached. At 45 the job timed out in the parity
+    # sheet (or, once, in the publish step itself) and the whole run showed
+    # as cancelled; 100 leaves room for both plus the parity step's own 45.
+    timeout-minutes: 100
 
     steps:
       # Screenshot the commit that was actually deployed. A workflow_run event
@@ -211,8 +212,9 @@ jobs:
         if: success()
         continue-on-error: true
         # Its own budget, so a slow sheet fails this step (which is allowed
-        # to fail) instead of running the job out of time.
-        timeout-minutes: 20
+        # to fail) instead of running the job out of time. Building its iOS
+        # shots from scratch took 37 minutes in run 40974530544.
+        timeout-minutes: 45
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}

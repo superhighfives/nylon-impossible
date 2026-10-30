@@ -101,6 +101,29 @@ export function ensureSimulator(name: string, types: string[]): string {
 }
 
 /**
+ * Mark the keyboard's "slide to type" introduction as seen, so it doesn't
+ * cover the first shot that brings up the keyboard (the composer). Best-
+ * effort: a failure here only costs that tip showing.
+ */
+function quietKeyboardTips(udid: string) {
+  spawnSync(
+    "xcrun",
+    [
+      "simctl",
+      "spawn",
+      udid,
+      "defaults",
+      "write",
+      "com.apple.Preferences",
+      "DidShowContinuousPathIntroduction",
+      "-bool",
+      "true",
+    ],
+    { stdio: "pipe", timeout: 30_000 },
+  );
+}
+
+/**
  * Boot a simulator and block until it is *fully* booted, throwing if it can't
  * get there. Under CI load CoreSimulator can drop a freshly-booted device back
  * to Shutdown, so lean on `simctl bootstatus -b` (which boots if needed and
@@ -123,11 +146,11 @@ export async function ensureBooted(udid: string): Promise<void> {
     });
     const state = simulatorState(udid);
     console.log(`  Simulator state: ${state}`);
-    if (state === "Booted") return;
+    if (state === "Booted") return quietKeyboardTips(udid);
     if (state === "unknown") {
       if (boot.status === 0) {
         console.log("  bootstatus reported booted; going with that.");
-        return;
+        return quietKeyboardTips(udid);
       }
       if (boot.error) {
         console.log(`  boot attempt ${attempt} is still going, waiting on it…`);
