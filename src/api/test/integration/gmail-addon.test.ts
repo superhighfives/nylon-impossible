@@ -990,6 +990,8 @@ describe("Gmail add-on", () => {
         gmail: { messageId: "m1", threadId: "thread-xyz" },
       });
       const body = await res.json<any>();
+      // Gmail drops its cached homepage, so the todo is there on the way back.
+      expect(body.stateChanged).toBe(true);
       // The card stays on the message rather than swapping to the homepage.
       const card = body.renderActions.action.navigations[0].updateCard;
       expect(card.header.title).toBe("Add to Nylon");
@@ -1035,6 +1037,7 @@ describe("Gmail add-on", () => {
       });
       const body = await res.json<any>();
       expect(body.renderActions.action.notification.text).toBe("Removed");
+      expect(body.stateChanged).toBe(true);
       const card = body.renderActions.action.navigations[0].updateCard;
       expect(card.sections).toHaveLength(1);
       expect(card.sections[0].widgets[0].textInput.value).toBe(

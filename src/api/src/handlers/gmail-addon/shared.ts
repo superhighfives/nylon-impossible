@@ -234,11 +234,13 @@ export async function buildConnectUrl(
 export function cardResponse(
   c: Context<Env>,
   card: Card,
-  opts: { asAction?: boolean; notification?: string } = {},
+  opts: {
+    asAction?: boolean;
+    notification?: string;
+    stateChanged?: boolean;
+  } = {},
 ) {
-  return c.json(
-    opts.asAction ? updateCard(card, opts.notification) : renderCard(card),
-  );
+  return c.json(opts.asAction ? updateCard(card, opts) : renderCard(card));
 }
 
 /** The connect card wrapped for the current surface. */

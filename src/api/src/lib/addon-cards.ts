@@ -98,15 +98,25 @@ export function renderCard(card: Card) {
   };
 }
 
-/** Action-callback envelope that replaces the current card, with an optional toast. */
-export function updateCard(card: Card, notification?: string) {
+/**
+ * Action-callback envelope that replaces the current card, with an optional
+ * toast. `stateChanged` tells Gmail its other cards are stale: without it,
+ * going back from a message shows the homepage Gmail cached before the add.
+ */
+export function updateCard(
+  card: Card,
+  opts: { notification?: string; stateChanged?: boolean } = {},
+) {
   return {
     renderActions: {
       action: {
         navigations: [{ updateCard: card }],
-        ...(notification ? { notification: { text: notification } } : {}),
+        ...(opts.notification
+          ? { notification: { text: opts.notification } }
+          : {}),
       },
     },
+    ...(opts.stateChanged ? { stateChanged: true } : {}),
   };
 }
 
