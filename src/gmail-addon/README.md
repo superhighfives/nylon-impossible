@@ -16,7 +16,8 @@ There is no Apps Script project. All the code lives in `src/api`:
 | Contextual card (message open) | `POST /gmail-addon/contextual` |
 | Quick-add submit | `POST /gmail-addon/actions/quick-add` |
 | Add-from-message submit | `POST /gmail-addon/actions/add-from-message` |
-| Tick-to-done | `POST /gmail-addon/actions/toggle` |
+| Tick-to-done (and untick) | `POST /gmail-addon/actions/toggle` |
+| Undo an add from a message | `POST /gmail-addon/actions/undo-add` |
 | Refresh after connecting | `POST /gmail-addon/actions/refresh` |
 
 Each request carries a Google-signed ID token in `Authorization: Bearer` and is
