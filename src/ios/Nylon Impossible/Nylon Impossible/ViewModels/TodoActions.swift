@@ -84,6 +84,8 @@ final class TodoActions {
     @ObservationIgnored private var context: ModelContext?
     @ObservationIgnored private var container: ModelContainer?
     @ObservationIgnored private var onMutate: () -> Void = {}
+    /// Where the context menu's "Move to" recents come from.
+    @ObservationIgnored var recentLists = RecentMoveLists()
 
     init(viewModel: TodoViewModel? = nil) {
         self.viewModel = viewModel ?? TodoViewModel()
@@ -320,6 +322,11 @@ final class TodoActions {
         }
         save()
         onMutate()
+        // Only collections are ever shown as recents; time lists would just
+        // push them out of the capped history.
+        if allLists().first(where: { $0.id.lowercased() == listId.lowercased() })?.isSystem == false {
+            recentLists.record(listId)
+        }
         guard announce else { return }
         toasts.show("Moved to \(listName(listId))", action: { [weak self] in
             self?.undo(snapshot, todo: todo)
