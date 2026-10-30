@@ -880,6 +880,77 @@ describe("WideApp", () => {
     open.mockRestore();
   });
 
+  it("the detail's properties are rows: List and Due open their choices, Pin toggles", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Call Mum").focus());
+    await userEvent.keyboard("{Enter}");
+    const detail = screen.getByRole("dialog");
+    // Built like a column: the list is the header's subline.
+    expect(within(detail).getByText("In Today")).toBeInTheDocument();
+
+    const list = within(detail).getByRole("button", { name: "List: Today" });
+    expect(list).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(list);
+    expect(list).toHaveAttribute("aria-expanded", "true");
+    expect(
+      within(detail).getByRole("group", { name: "Move to list" }),
+    ).toBeInTheDocument();
+
+    const due = within(detail).getByRole("button", { name: "Due date" });
+    await userEvent.click(due);
+    expect(due).toHaveAttribute("aria-expanded", "true");
+    // One set of choices at a time.
+    expect(list).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(detail).getByRole("group", { name: "Due" }),
+    ).toBeInTheDocument();
+    expect(
+      within(detail).queryByRole("group", { name: "Move to list" }),
+    ).toBeNull();
+
+    const pin = within(detail).getByRole("button", { name: "Pin" });
+    expect(pin).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(pin);
+    expect(update).toHaveBeenCalledWith({ id: "t2", input: { pinned: true } });
+  });
+
+  it("adding a subtask closes Repeat's choices for good", async () => {
+    const { rerender } = render(<WideApp />);
+    act(() => rowButton("Call Mum").focus());
+    await userEvent.keyboard("{Enter}");
+    const detail = () => screen.getByRole("dialog");
+    await userEvent.click(
+      within(detail()).getByRole("button", { name: "Repeat" }),
+    );
+    expect(
+      within(detail()).getByRole("group", { name: "Repeat" }),
+    ).toBeInTheDocument();
+
+    const subtask = makeTodo({
+      id: "t2-sub",
+      title: "Buy flowers",
+      listId: "list-today",
+      parentId: "t2",
+    });
+    todos = [...todos, subtask];
+    rerender(<WideApp />);
+    expect(
+      within(detail()).queryByRole("button", { name: "Repeat" }),
+    ).toBeNull();
+    expect(
+      within(detail()).queryByRole("group", { name: "Repeat" }),
+    ).toBeNull();
+
+    todos = todos.filter((t) => t.id !== subtask.id);
+    rerender(<WideApp />);
+    expect(
+      within(detail()).getByRole("button", { name: "Repeat" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(detail()).queryByRole("group", { name: "Repeat" }),
+    ).toBeNull();
+  });
+
   it("the detail always shows Links, and adds a pasted link", async () => {
     render(<WideApp />);
     act(() => rowButton("Call Mum").focus());

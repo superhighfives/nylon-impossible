@@ -3,6 +3,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Ellipsis, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
+import { ICON_BUTTON } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 
 /** Droppable ids for columns, distinct from sidebar entries. */
@@ -40,10 +41,6 @@ type RowCallbacks = Pick<
  * with `fill` instead of `surface`, which would vanish against it.
  */
 export const TINTED = "bg-n-surface [--n-row-hover:var(--color-n-fill)]";
-
-/** The header's quiet icon buttons: ⋯ and ×, here and on an open todo. */
-export const ICON_BUTTON =
-  "flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft pointer-fine:hover:bg-n-fill";
 
 const MENU_ITEM =
   "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";

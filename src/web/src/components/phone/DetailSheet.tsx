@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { ICON_BUTTON } from "@/components/wide/Column";
+import { ICON_BUTTON } from "@/components/ui/styles";
 import {
   useAddTodoUrl,
   useCreateTodo,
@@ -198,6 +198,9 @@ function DetailBody({
   const due = todo.dueDate ? dueLabel(todo.dueDate, now, timeZone) : null;
   const dueKey = todo.dueDate ? dueDayKey(todo.dueDate) : null;
   const canRepeat = subtasks.length === 0;
+  // Adding a subtask takes Repeat away, so its choices close with it rather
+  // than coming back if the subtasks go.
+  if (panel === "repeat" && !canRepeat) setPanel(null);
   const canSubtask = !todo.recurrence;
 
   const setDue = (day: Date | null) => {
@@ -511,9 +514,7 @@ function DetailBody({
           </button>
         </div>
 
-        {panel &&
-          (panel !== "repeat" || canRepeat) &&
-          choices(panel, PANEL_CLASS)}
+        {panel && choices(panel, PANEL_CLASS)}
 
         <hr className="mt-[1.375rem] mb-4 border-0 border-t border-n-hairline" />
         {notesField(
