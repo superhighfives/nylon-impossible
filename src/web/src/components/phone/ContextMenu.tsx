@@ -1,23 +1,35 @@
 import { Dialog } from "@base-ui/react/dialog";
 import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
 import {
+  ArrowLeft,
   ArrowRight,
   Calendar as CalendarIcon,
   Check,
   ChevronLeft,
+  Ellipsis,
+  List as ListIcon,
   Pin,
   PinOff,
   Trash2,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
-import type { TodoWithUrls } from "@/types/database";
+import {
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import type { SystemListKind, TodoWithUrls } from "@/types/database";
 import { Calendar } from "./Calendar";
 import { displayTitle, dueChoices, dueLabel } from "./model";
+import {
+  type MoveTarget,
+  moveArrow,
+  moveMenuPlan,
+  readRecentMoves,
+} from "./moveMenu";
 
-export interface MenuTarget {
-  id: string;
-  label: string;
-}
+export type MenuTarget = MoveTarget;
 
 /**
  * One item of the wide board's menu, from its command registry: the label,
@@ -76,12 +88,16 @@ const CARD =
 
 const MENU_WIDTH = 288;
 
-export type MenuView = "main" | "due";
+export type MenuView = "main" | "due" | "more";
 
 /**
  * The row's context menu, from a long-press, right-click, the context-menu
  * key or Shift+F10 (and `d` on wide, straight into Due): Move to …, Due…,
  * Pin/Unpin, Delete. Delete isn't confirmed — it shows an Undo toast instead.
+ *
+ * Move to is a group: the other time lists, with an arrow pointing the way
+ * they lie (Today ← This week → Someday), the two lists you moved to most
+ * recently, and the rest under More (see `moveMenuPlan`).
  *
  * On phone it floats centred over a blurred backdrop. Given an `anchor` (a
  * right-click or a focused row on wide) it opens beside that point instead.
@@ -90,6 +106,7 @@ export function ContextMenu({
   todo,
   where,
   moveTargets,
+  listKind = null,
   onClose,
   onMove,
   onTogglePin,
@@ -103,8 +120,10 @@ export function ContextMenu({
   todo: TodoWithUrls | null;
   /** The name of the list the todo is in. */
   where: string;
-  /** Every list except the one it's in. */
+  /** Every list except the one it's in, in display order. */
   moveTargets: MenuTarget[];
+  /** The kind of list the todo is in, for the Move to arrows. */
+  listKind?: SystemListKind | null;
   onClose: () => void;
   onMove: (todo: TodoWithUrls, listId: string) => void;
   onTogglePin: (todo: TodoWithUrls) => void;
@@ -139,6 +158,12 @@ export function ContextMenu({
 
   // Each opening starts on the view it was asked for.
   const openId = todo?.id ?? null;
+  // Recents are read as the menu opens, so a move just made counts.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per opening
+  const plan = useMemo(
+    () => moveMenuPlan(moveTargets, readRecentMoves()),
+    [openId, moveTargets],
+  );
   useEffect(() => {
     if (openId) {
       setView(initialView);
@@ -254,21 +279,49 @@ export function ContextMenu({
                   onKeyDown={moveMenuFocus}
                   className={CARD}
                 >
-                  {moveTargets.map((target, i) => (
-                    <button
-                      key={target.id}
-                      ref={i === 0 ? firstItem : undefined}
-                      type="button"
-                      role="menuitem"
-                      onClick={() => run((t) => onMove(t, target.id))}
-                      className={item}
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        Move to {target.label}
-                      </span>
-                      <ArrowRight size={iconSize} aria-hidden="true" />
-                    </button>
-                  ))}
+                  {moveTargets.length > 0 && (
+                    // biome-ignore lint/a11y/useSemanticElements: a group of menu items; a fieldset isn't valid inside a menu
+                    <div role="group" aria-labelledby="menu-move-to">
+                      <div
+                        id="menu-move-to"
+                        className={`${compact ? "px-3.5" : "px-4"} pt-2.5 pb-1.5 text-[0.8125rem] font-semibold text-n-ink-muted`}
+                      >
+                        Move to
+                      </div>
+                      {[...plan.timeLists, ...plan.recent].map((target, i) => (
+                        <button
+                          key={target.id}
+                          ref={i === 0 ? firstItem : undefined}
+                          type="button"
+                          role="menuitem"
+                          aria-label={`Move to ${target.label}`}
+                          onClick={() => run((t) => onMove(t, target.id))}
+                          className={item}
+                        >
+                          <span className="min-w-0 flex-1 truncate">
+                            {target.label}
+                          </span>
+                          <MoveIcon
+                            target={target}
+                            from={listKind}
+                            size={iconSize}
+                          />
+                        </button>
+                      ))}
+                      {plan.more.length > 0 && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          aria-haspopup="menu"
+                          onClick={() => setView("more")}
+                          className={item}
+                        >
+                          <span className="flex-1">More</span>
+                          <Ellipsis size={iconSize} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {onSetDue && (
                     <button
                       ref={moveTargets.length === 0 ? firstItem : undefined}
@@ -311,6 +364,40 @@ export function ContextMenu({
                     <span className="flex-1">Delete</span>
                     <Trash2 size={iconSize} aria-hidden="true" />
                   </button>
+                </div>
+              ) : view === "more" ? (
+                <div
+                  role="menu"
+                  aria-label="Move to"
+                  tabIndex={-1}
+                  onKeyDown={moveMenuFocus}
+                  className={CARD}
+                >
+                  <button
+                    ref={firstItem}
+                    type="button"
+                    role="menuitem"
+                    onClick={() => setView("main")}
+                    className={`${item} text-n-ink-muted`}
+                  >
+                    <ChevronLeft size={iconSize} aria-hidden="true" />
+                    <span className="flex-1">Move to</span>
+                  </button>
+                  {plan.more.map((target) => (
+                    <button
+                      key={target.id}
+                      type="button"
+                      role="menuitem"
+                      aria-label={`Move to ${target.label}`}
+                      onClick={() => run((t) => onMove(t, target.id))}
+                      className={item}
+                    >
+                      <span className="min-w-0 flex-1 truncate">
+                        {target.label}
+                      </span>
+                      <ListIcon size={iconSize} aria-hidden="true" />
+                    </button>
+                  ))}
                 </div>
               ) : (
                 <div className={CARD}>
@@ -386,5 +473,23 @@ export function ContextMenu({
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+/** A time list's arrow points the way it lies; your lists get a list. */
+function MoveIcon({
+  target,
+  from,
+  size,
+}: {
+  target: MenuTarget;
+  from: SystemListKind | null;
+  size: number;
+}) {
+  if (!target.kind) return <ListIcon size={size} aria-hidden="true" />;
+  return moveArrow(target, from) === "left" ? (
+    <ArrowLeft size={size} aria-hidden="true" />
+  ) : (
+    <ArrowRight size={size} aria-hidden="true" />
   );
 }

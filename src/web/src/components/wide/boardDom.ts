@@ -21,6 +21,17 @@ export function focusedRow(): HTMLElement | null {
   return el instanceof HTMLElement ? el.closest("[data-row-id]") : null;
 }
 
+/**
+ * The column focus is in: a row, the column's title (a click on its empty
+ * space puts focus there), or anything else inside it.
+ */
+export function focusedColumn(): string | null {
+  const el = document.activeElement;
+  return el instanceof HTMLElement
+    ? (el.closest<HTMLElement>("[data-column]")?.dataset.column ?? null)
+    : null;
+}
+
 /** A todo's row, by id. */
 export function rowById(id: string | null): HTMLElement | null {
   return id

@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import type { TodoWithUrls } from "@/types/database";
-import { ColumnHeader, TINTED } from "./Column";
+import { ColumnHeader, isColumnBackground, TINTED } from "./Column";
 
 /** Done's column id: the fourth column's resting state, not a list. */
 export const DONE_COLUMN = "done";
@@ -20,6 +20,7 @@ export function DoneColumn({
   selectedId,
   onSelect,
   onRestore,
+  onBackgroundClick,
 }: {
   todos: TodoWithUrls[];
   listName: (id: string) => string;
@@ -28,6 +29,8 @@ export function DoneColumn({
   selectedId: string | null;
   onSelect: (todo: TodoWithUrls) => void;
   onRestore: (todo: TodoWithUrls) => void;
+  /** A click on the column's empty space: focus it, select nothing. */
+  onBackgroundClick?: () => void;
 }) {
   const groups = groupDoneByDay(todos, now, timeZone);
   // One tab stop: the selected row, else the first.
@@ -37,9 +40,13 @@ export function DoneColumn({
     : (all[0]?.id ?? null);
   const headingId = `column-${DONE_COLUMN}-title`;
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard reaches a column through its rows and title
     <section
       aria-labelledby={headingId}
       data-column={DONE_COLUMN}
+      onClick={(e) => {
+        if (isColumnBackground(e.target)) onBackgroundClick?.();
+      }}
       className={`relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline ${TINTED}`}
     >
       <ColumnHeader

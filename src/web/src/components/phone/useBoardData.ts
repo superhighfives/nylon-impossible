@@ -5,6 +5,7 @@ import { useLocalMidnightTick } from "@/hooks/useLocalMidnightTick";
 import { useTodos } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
 import { openRows, splitLists, TIME_KINDS } from "./model";
+import { recordRecentMove } from "./moveMenu";
 import { useTodoActions } from "./useTodoActions";
 
 const EMPTY: TodoWithUrls[] = [];
@@ -32,7 +33,17 @@ export function useBoardData() {
     (id: string) => lists?.find((l) => l.id === id)?.name ?? "List",
     [lists],
   );
-  const actions = useTodoActions({ timeZone, listName, allTodos: todos });
+  const actions = useTodoActions({
+    timeZone,
+    listName,
+    allTodos: todos,
+    // Your lists moved to feed the Move to menu's recents.
+    onMoved: (listId) => {
+      if (lists?.some((l) => l.id === listId && !l.systemKind)) {
+        recordRecentMove(listId);
+      }
+    },
+  });
   // A list deleted with Undo still pending is gone from every view.
   const { hiddenLists } = actions;
   const { byKind, collections } = useMemo(() => {
@@ -82,7 +93,7 @@ export function useBoardData() {
     () =>
       [...TIME_KINDS.map((kind) => byKind[kind]), ...collections]
         .filter((l) => l !== undefined)
-        .map((l) => ({ id: l.id, label: l.name })),
+        .map((l) => ({ id: l.id, label: l.name, kind: l.systemKind })),
     [byKind, collections],
   );
 

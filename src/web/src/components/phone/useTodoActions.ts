@@ -106,10 +106,13 @@ export function useTodoActions({
   timeZone,
   listName,
   allTodos,
+  onMoved,
 }: {
   timeZone: string;
   listName: (listId: string) => string;
   allTodos: TodoWithUrls[];
+  /** After any move, quiet ones included: where it went. */
+  onMoved?: (listId: string) => void;
 }) {
   const updateTodo = useUpdateTodo();
   const deleteTodo = useDeleteTodo();
@@ -259,13 +262,14 @@ export function useTodoActions({
         id: todo.id,
         input: { listId, position: topPosition(listId) },
       });
+      onMoved?.(listId);
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
       showUndoToast(`Moved to ${name ?? listName(listId)}`, () =>
         update({ id: todo.id, input: from }),
       );
     },
-    [listName, topPosition, update],
+    [listName, topPosition, update, onMoved],
   );
 
   const togglePin = useCallback(
