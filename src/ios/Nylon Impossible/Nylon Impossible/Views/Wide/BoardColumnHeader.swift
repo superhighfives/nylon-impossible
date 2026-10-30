@@ -2,8 +2,10 @@
 //  BoardColumnHeader.swift
 //  Nylon Impossible
 //
-//  A board column's title and subline, in a header of fixed (Dynamic
-//  Type–scaled) height so every column's title sits on the same baseline.
+//  A board column's title and subline, in a header of Dynamic Type–scaled
+//  height so every column's title sits on the same baseline. At large sizes,
+//  where a subline wraps, every header grows to the tallest one's height
+//  (`sharesBoardHeaderHeight`) rather than clipping it.
 //  Your lists' titles rename in place: tap the title (or Rename in the ⋯
 //  menu), Return or leaving the field saves, Esc cancels. Done's title is
 //  muted, like a subline: it's the fourth column's resting state.
@@ -28,12 +30,14 @@ struct BoardColumnHeader<Accessory: View>: View {
     @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader + 44
     /// Two lines of the pill's text.
     @ScaledMetric(relativeTo: .footnote) private var bannerHeight: CGFloat = 44
+    /// The tallest header and subline on the board, so all of them match.
+    @Environment(\.boardHeaderHeights) private var shared
+    @State private var measured = BoardHeaderHeights()
     @State private var draft = ""
     @FocusState private var fieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Spacer(minLength: 0)
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 0)
                 banner
@@ -41,13 +45,22 @@ struct BoardColumnHeader<Accessory: View>: View {
             .frame(height: bannerHeight, alignment: .bottomLeading)
             .padding(.bottom, 20)
             titleView
+            // Wraps as far as it needs to: "Through Wednesday, November 4"
+            // at AX5 in a quarter of an iPad takes three lines. Every
+            // subline takes the longest one's height, so the titles above
+            // them stay level.
             Text(subline)
                 .textStyle(Theme.Fonts.Role.meta)
                 .foregroundStyle(Theme.Colors.inkMuted)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured.subline = $0 }
+                .frame(minHeight: shared.subline, alignment: .topLeading)
                 .padding(.top, 10)
         }
-        .frame(maxWidth: .infinity, minHeight: headerHeight, maxHeight: headerHeight, alignment: .bottomLeading)
+        .fixedSize(horizontal: false, vertical: true)
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured.content = $0 }
+        .preference(key: BoardHeaderHeightKey.self, value: measured)
+        .frame(maxWidth: .infinity, minHeight: max(headerHeight, shared.content), alignment: .bottomLeading)
         .overlay(alignment: .topTrailing) {
             HStack(spacing: 0) { accessory() }
                 .padding(.top, Theme.Space.s3)
@@ -120,5 +133,46 @@ extension BoardColumnHeader where Accessory == EmptyView {
         self.init(title: title, subline: subline, isMuted: isMuted, onRename: nil, isRenaming: .constant(false), banner: nil) {
             EmptyView()
         }
+    }
+}
+
+/// A header's natural heights: all of its content, and its subline alone.
+struct BoardHeaderHeights: Equatable {
+    var content: CGFloat = 0
+    var subline: CGFloat = 0
+}
+
+/// The tallest header and subline on the board, so every header can match.
+struct BoardHeaderHeightKey: PreferenceKey {
+    static let defaultValue = BoardHeaderHeights()
+    static func reduce(value: inout BoardHeaderHeights, nextValue: () -> BoardHeaderHeights) {
+        let next = nextValue()
+        value.content = max(value.content, next.content)
+        value.subline = max(value.subline, next.subline)
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var boardHeaderHeights = BoardHeaderHeights()
+}
+
+extension View {
+    /// Give every column header on the board the tallest one's height, and
+    /// every subline the longest one's, so the hairlines under them line up
+    /// and the titles stay level when large text wraps a subline.
+    func sharesBoardHeaderHeight() -> some View {
+        modifier(SharedBoardHeaderHeight())
+    }
+}
+
+private struct SharedBoardHeaderHeight: ViewModifier {
+    @State private var heights = BoardHeaderHeights()
+
+    func body(content: Content) -> some View {
+        content
+            .onPreferenceChange(BoardHeaderHeightKey.self) { value in
+                Task { @MainActor in heights = value }
+            }
+            .environment(\.boardHeaderHeights, heights)
     }
 }

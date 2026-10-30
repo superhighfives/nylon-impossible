@@ -71,9 +71,10 @@ final class AccessibilityAuditTests: NylonUITestCase {
             }
             // Let the route's own delayed presentation (sheets, panels) land.
             sleep(1)
+            let window = app.windows.firstMatch.frame
             do {
                 try app.performAccessibilityAudit(for: .all) { issue in
-                    if AuditAllowance.allows(issue, route: route) { return true }
+                    if AuditAllowance.allows(issue, route: route, window: window) { return true }
                     let element = issue.element.map { "\($0.elementType.rawValue) “\($0.label)” \($0.frame)" } ?? "–"
                     failures.append(
                         "\(route): \(issue.auditType.rawValue) — \(issue.compactDescription) — \(element) — \(issue.detailedDescription)"
@@ -93,18 +94,47 @@ final class AccessibilityAuditTests: NylonUITestCase {
 
 /// Audit findings that are known and accepted, each with why.
 enum AuditAllowance {
-    static func allows(_ issue: XCUIAccessibilityAuditIssue, route: String) -> Bool {
+    static func allows(_ issue: XCUIAccessibilityAuditIssue, route: String, window: CGRect) -> Bool {
         let label = issue.element?.label ?? ""
         let detail = issue.detailedDescription
+        let isPad = UIDevice.current.userInterfaceIdiom == .pad
 
-        // The system keyboard's QuickType suggestions (composer, share).
+        // The system keyboard's QuickType suggestions (composer, share). The
+        // audit names the cell when it can; with text in the field ("friday")
+        // it sometimes reports the suggestion as unlabelled text with no
+        // element at all.
         if detail.contains("TUIPredictionViewCell") { return true }
+        if ["composer", "share", "sharetext"].contains(route), issue.element == nil,
+           issue.compactDescription.contains("inaccessible text") {
+            return true
+        }
+
+        // At AX5 a phone page's rows run down under the floating glass
+        // composer, and the audit samples their text through the glass,
+        // which rows are never read through: the page scrolls them clear.
+        // Only contrast, only on the phone, and only for a row that reaches
+        // into the bottom of the window, where the composer floats.
+        if issue.auditType == .contrast, !isPad,
+           let frame = issue.element?.frame, frame.maxY > window.maxY - Self.composerReach {
+            return true
+        }
 
         // The switcher's titles stop growing at xxxLarge on purpose, like a
         // tab bar, and show in the Large Content Viewer on long press; the
         // masthead under them carries the list's name at full size.
         if issue.auditType == .dynamicType, ["Today", "This week", "Someday", "Lists"].contains(label),
            detail.contains("partially") || issue.compactDescription.contains("partially") {
+            return true
+        }
+
+        // The board's sidebar is the same kind of chrome, in a fixed 248pt
+        // column (`Theme.Wide.sidebarWidth`) on the leading edge: it stops
+        // growing at xxxLarge, each control shows in the Large Content
+        // Viewer, and the columns carry each list's name at full size. Only
+        // text inside that column, and only on iPad, where it's drawn.
+        if issue.auditType == .dynamicType,
+           detail.contains("partially") || issue.compactDescription.contains("partially"),
+           isPad, let frame = issue.element?.frame, frame.maxX <= Self.sidebarEdge {
             return true
         }
 
@@ -155,6 +185,13 @@ enum AuditAllowance {
 
         return false
     }
+
+    /// The sidebar's trailing edge: it's 248pt wide, from the leading edge.
+    private static let sidebarEdge: CGFloat = 248
+
+    /// How far up from the bottom the phone's glass composer reaches at AX5,
+    /// home indicator included.
+    private static let composerReach: CGFloat = 200
 
     /// Sample-data titles, which the board draws under the 3-line limit.
     private static let rowTitles: Set<String> = [

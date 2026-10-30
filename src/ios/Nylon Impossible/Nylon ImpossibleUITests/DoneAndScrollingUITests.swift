@@ -18,10 +18,18 @@ final class DoneAndScrollingUITests: NylonUITestCase {
             .tap()
     }
 
+    /// A row in Today. On the board, Done is the fourth column, so a todo
+    /// that's just been finished is still on screen under the same title,
+    /// there; look only in Today's column.
+    private func todayRow(_ title: String) -> XCUIElement {
+        guard isPad else { return row(title) }
+        return app.otherElements.matching(identifier: "Today").firstMatch.buttons[title].firstMatch
+    }
+
     func testDoneHoldsInPlaceThenLeavesWithUndo() {
         launch(isPad ? "board" : "today")
-        let target = row("Call Mum about Sunday lunch")
-        let next = row("Finish quarterly report")
+        let target = todayRow("Call Mum about Sunday lunch")
+        let next = todayRow("Finish quarterly report")
         waitFor(target)
         let before = (target: target.frame, next: next.frame)
 
@@ -41,7 +49,7 @@ final class DoneAndScrollingUITests: NylonUITestCase {
         waitForExpectations(timeout: 3)
         waitFor(app.buttons["Undo"])
         app.buttons["Undo"].tap()
-        waitFor(row("Call Mum about Sunday lunch"))
+        waitFor(todayRow("Call Mum about Sunday lunch"))
     }
 
     func testFiveHundredTodosScroll() throws {
