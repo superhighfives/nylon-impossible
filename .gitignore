@@ -74,3 +74,6 @@ src/ios/**/vendor/bundle
 .claude/settings.*.json
 # Xcode coverage output
 *.profraw
+
+# Browser accessibility snapshots
+.gmail-snap*
