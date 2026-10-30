@@ -79,8 +79,10 @@ extension ContentView {
             select(BoardNavigator.step(ids, from: selected, by: key == .down ? 1 : -1), in: column)
             return
         case .left where columnIndex == 0:
-            // Out of the board, into the sidebar at this column's item.
+            // Out of the board, into the sidebar at this column's item,
+            // letting go of the todo as Esc does. → reselects it.
             sidebarCursor = sidebarItem(for: column)
+            selectedTodoId = nil
             return
         case .left, .right:
             let next = columns[BoardNavigator.column(columnIndex, by: key == .right ? 1 : -1, count: columns.count)]

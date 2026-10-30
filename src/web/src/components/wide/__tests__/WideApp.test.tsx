@@ -457,6 +457,20 @@ describe("WideApp", () => {
     expect(board).not.toHaveAttribute("data-keyboard");
   });
 
+  it("← into the sidebar lets go of the todo, as Esc does; → reselects it", () => {
+    render(<WideApp />);
+    const container = () =>
+      rowButton("Call Mum").closest("[data-row-container]");
+    act(() => rowButton("Call Mum").focus());
+    expect(container()).toHaveAttribute("data-selected");
+    press("ArrowLeft");
+    expect(document.activeElement).toHaveAccessibleName("Today");
+    expect(container()).not.toHaveAttribute("data-selected");
+    press("ArrowRight");
+    expect(document.activeElement).toBe(rowButton("Call Mum"));
+    expect(container()).toHaveAttribute("data-selected");
+  });
+
   it("Esc closes the open todo, then goes to the column's sidebar item", async () => {
     render(<WideApp />);
     act(() => rowButton("Send invoice").focus());

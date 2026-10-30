@@ -101,7 +101,9 @@ export function createBoard(ctx: BoardContext): Board {
       if (!column) return;
       const at = ctx.columnIds.indexOf(column);
       if (at === 0 && delta === -1) {
+        // Into the sidebar, as Esc: let go of the todo; → reselects it.
         sidebarItemFor(column)?.focus();
+        ctx.clearSelection();
         return;
       }
       const to = ctx.columnIds[at + delta];
