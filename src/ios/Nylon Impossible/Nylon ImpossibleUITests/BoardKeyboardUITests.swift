@@ -162,6 +162,20 @@ final class BoardKeyboardUITests: NylonUITestCase {
         XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
     }
 
+    func testLeftIntoTheSidebarLetsGoOfTheTodoAndRightReselectsIt() {
+        press("j")
+        waitFor(selectedRow)
+        let first = selectedRow.label
+        // ← from the first column lets go of the todo, as Esc does…
+        press("h")
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: selectedRow)
+        waitForExpectations(timeout: 3)
+        // …and → goes back in to the column's last one.
+        press("l")
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, first)
+    }
+
     func testEscapeClosesTheTodoThenGoesToTheSidebar() {
         // Known: Esc doesn't reach the app when XCUITest simulates it on
         // iPad, as with Return and Backspace below. Log markers showed no Esc

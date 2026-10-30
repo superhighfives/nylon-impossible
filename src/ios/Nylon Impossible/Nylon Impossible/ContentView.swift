@@ -87,6 +87,9 @@ struct ContentView: View {
     @State var widePanel: AccountRoute?
     /// The board's selection, and the column it's in.
     @State var selectedTodoId: UUID?
+    /// The selection last moved by keyboard (a board key, the palette), so
+    /// the selected row shows its bar; a click or tap clears it.
+    @State var selectsByKeyboard = false
     @State var focusedColumnId: String?
     /// The last todo selected in each column, so going back lands on it.
     @State var lastSelected: [String: UUID] = [:]

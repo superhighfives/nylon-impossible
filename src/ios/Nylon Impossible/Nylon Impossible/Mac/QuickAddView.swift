@@ -16,7 +16,7 @@
 //  show once you type; ⇥ and ⇧⇥ step through them, and picking one shows that
 //  list, so the todo lands where you're looking. Return adds and stays; Esc
 //  clears the field, then closes. ↓ goes into the list, where the selected
-//  row has the board's ring and letters are shortcuts: ↵ opens Nylon, X done
+//  row has the board's fill and bar, and letters are shortcuts: ↵ opens Nylon, X done
 //  (staying in the slot), P pin (following the todo), O its link; ↑ from the
 //  top row, Esc or N go back to the field.
 //
@@ -100,6 +100,8 @@ struct QuickAddView: View {
         .frame(width: Self.width)
         .background(Theme.Colors.canvas)
         .environment(\.isWideLayout, true)
+        // Its list is driven by keys, so the selected row has the bar.
+        .environment(\.selectsByKeyboard, true)
         .task {
             actions.configure(context: modelContext) { syncService.syncAfterAction() }
         }

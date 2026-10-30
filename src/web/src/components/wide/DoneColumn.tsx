@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import { displayTitle, groupDoneByDay } from "@/components/phone/model";
+import { SelectionBar } from "@/components/phone/TodoRow";
 import type { TodoWithUrls } from "@/types/database";
 import { ColumnHeader, isColumnBackground, TINTED } from "./Column";
 import { SkeletonRows } from "./Skeleton";
@@ -116,12 +117,14 @@ function DoneRow({
 }) {
   const title = displayTitle(todo);
   return (
-    <li>
+    <li className="relative">
+      {selected && <SelectionBar />}
       <div
         data-row-container
-        className={`-mx-2.5 flex items-start gap-3 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${
+        data-selected={selected ? "" : undefined}
+        className={`-mx-2.5 flex items-start gap-3 rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) ${
           selected
-            ? "bg-n-fill ring-2 ring-n-ink ring-inset"
+            ? "bg-n-fill"
             : "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
         }`}
       >

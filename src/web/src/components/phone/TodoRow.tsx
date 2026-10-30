@@ -109,7 +109,7 @@ function RowShell({
     <li
       ref={rowRef}
       data-phone-row
-      className={`grid transition-[grid-template-rows,opacity] duration-(--n-duration-base) ease-n-out ${
+      className={`relative grid transition-[grid-template-rows,opacity] duration-(--n-duration-base) ease-n-out ${
         collapsing
           ? "grid-rows-[0fr] opacity-0"
           : dragging
@@ -120,6 +120,23 @@ function RowShell({
     >
       {children}
     </li>
+  );
+}
+
+/**
+ * Beside the board's selected row while moving with the keys (the board
+ * root's `data-keyboard`): the sidebar's bar, 3px and inset 6px top and
+ * bottom, a 7px gap clear of the row's fill so nothing shifts. Muted ink is
+ * 5:1 or more against canvas, surface and fill. Goes in a `relative` parent
+ * whose left edge is 10px inside the fill's.
+ */
+export function SelectionBar() {
+  return (
+    <span
+      aria-hidden="true"
+      data-row-selection-bar
+      className="absolute top-1.5 bottom-1.5 -left-5 hidden w-[3px] rounded-full bg-n-ink-muted group-data-[keyboard]/board:block"
+    />
   );
 }
 
@@ -172,8 +189,9 @@ export interface TodoRowProps {
   /** The context menu is open for this row. */
   highlighted: boolean;
   /**
-   * Wide only: the board's selection. Drawn as a ring with the pressed fill,
-   * the row's only focus indicator.
+   * Wide only: the board's selection, and the row's only focus indicator.
+   * Drawn as the pressed fill; moving with the keys adds `SelectionBar`
+   * beside it, as in the sidebar.
    */
   selected?: boolean;
   /**
@@ -271,11 +289,13 @@ function WideTodoRow({
 
   return (
     <RowShell collapsing={collapsing} dragging={dragging} rowRef={rowRef}>
+      {selected && <SelectionBar />}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the title button is the keyboard path; this is the pointer's larger target */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: keys go to the title button */}
       <div
         {...containerProps}
         data-row-container
+        data-selected={selected ? "" : undefined}
         onPointerDown={(e) => {
           containerProps?.onPointerDown?.(e);
           wasSelected.current = selected;
@@ -297,13 +317,11 @@ function WideTodoRow({
           e.preventDefault();
           onMenu(todo, { x: e.clientX, y: e.clientY });
         }}
-        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-hidden rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
-          selected
-            ? "bg-n-fill ring-2 ring-n-ink ring-inset"
-            : highlighted
-              ? "bg-n-fill"
-              : // `surface`, or `fill` in the tinted fourth column (TINTED).
-                "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
+        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-hidden rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
+          selected || highlighted
+            ? "bg-n-fill"
+            : //`surface`, or `fill` in the tinted fourth column (TINTED).
+              "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
         }`}
       >
         <CheckButton
