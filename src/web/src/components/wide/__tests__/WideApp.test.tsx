@@ -30,10 +30,15 @@ const lists = [
   makeList("list-studio", "Studio", null, "a4"),
 ];
 let todos: TodoWithUrls[] = [];
+/** The lists' first load, before they arrive. */
+let listsLoading = false;
 const sweptAt = new Date().toISOString();
 
 vi.mock("@/hooks/useLists", () => ({
-  useLists: () => ({ data: lists, isLoading: false }),
+  useLists: () => ({
+    data: listsLoading ? undefined : lists,
+    isLoading: listsLoading,
+  }),
   useCreateList: () => ({ mutate: createList }),
   useUpdateList: () => ({ mutate: updateList }),
   useDeleteList: () => ({ mutate: deleteList }),
@@ -194,6 +199,50 @@ describe("WideApp", () => {
     expect(groceries).toHaveAccessibleDescription("1 todo");
     expect(groceries).not.toHaveAttribute("aria-current");
     expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+  });
+
+  it("draws the board's shape while it loads, instead of Done across it", () => {
+    listsLoading = true;
+    try {
+      render(<WideApp />);
+      const board = screen.getByRole("main", { name: "Board" });
+      // The three time columns hold their places, by name, beside Done.
+      expect(
+        [...board.querySelectorAll("[data-column]")].map((c) =>
+          c.getAttribute("data-column"),
+        ),
+      ).toEqual([
+        "skeleton-today",
+        "skeleton-thisWeek",
+        "skeleton-someday",
+        "done",
+      ]);
+      expect(
+        within(board)
+          .getAllByRole("heading", { level: 2 })
+          .map((h) => h.textContent),
+      ).toEqual(["Today", "This week", "Someday", "Done"]);
+      // Placeholder rows everywhere, and no false empty state for Done.
+      expect(board.querySelectorAll("[data-skeleton-rows]")).toHaveLength(4);
+      expect(within(board).queryByText("Nothing done yet.")).toBeNull();
+      // Screen readers hear "Loading…"; nothing in a placeholder takes focus.
+      expect(within(board).getAllByText("Loading…").length).toBeGreaterThan(0);
+      for (const column of board.querySelectorAll(
+        '[data-column^="skeleton-"]',
+      )) {
+        expect(
+          column.querySelectorAll("button, input, textarea, [tabindex='0']"),
+        ).toHaveLength(0);
+      }
+      // The sidebar shows the time lists too, as placeholders.
+      expect(
+        [...document.querySelectorAll("[data-skeleton-entry]")].map(
+          (e) => e.textContent,
+        ),
+      ).toEqual(["Today", "This week", "Someday"]);
+    } finally {
+      listsLoading = false;
+    }
   });
 
   it("always has a fourth column, Done by default, with no ×", () => {

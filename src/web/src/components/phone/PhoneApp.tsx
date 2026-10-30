@@ -420,6 +420,7 @@ export function PhoneApp({
     if (key === "done") {
       return (
         <DonePage
+          loading={loading}
           todos={todos}
           listName={listName}
           timeZone={timeZone}

@@ -4,6 +4,7 @@ import { Ellipsis, X } from "lucide-react";
 import { type ReactNode, useRef, useState } from "react";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
 import type { TodoWithUrls } from "@/types/database";
+import { SkeletonRows } from "./Skeleton";
 
 /** Droppable ids for columns, distinct from sidebar entries. */
 export const columnDropId = (listId: string) => `col:${listId}`;
@@ -337,12 +338,12 @@ export function Column({
       >
         {composer}
         {loading ? (
-          <p
-            className="mt-4 text-[0.9375rem] text-n-ink-muted"
-            aria-live="polite"
-          >
-            Loading…
-          </p>
+          <>
+            <p className="sr-only" aria-live="polite">
+              Loading…
+            </p>
+            <SkeletonRows />
+          </>
         ) : error ? (
           error
         ) : (

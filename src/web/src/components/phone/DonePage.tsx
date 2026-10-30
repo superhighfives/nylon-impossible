@@ -12,11 +12,14 @@ export function DonePage({
   listName,
   timeZone,
   onRestore,
+  loading = false,
 }: {
   todos: TodoWithUrls[];
   listName: (id: string) => string;
   timeZone: string;
   onRestore: (todo: TodoWithUrls) => void;
+  /** Todos haven't arrived: say so, rather than "Nothing done yet." */
+  loading?: boolean;
 }) {
   const groups = groupDoneByDay(todos, new Date(), timeZone);
   return (
@@ -25,7 +28,14 @@ export function DonePage({
         title="Done"
         subline={mastheadSubline("done", 0, new Date(), timeZone)}
       />
-      {groups.length === 0 ? (
+      {loading ? (
+        <p
+          className="mx-5 mt-7 text-[0.9375rem] text-n-ink-muted"
+          aria-live="polite"
+        >
+          Loading…
+        </p>
+      ) : groups.length === 0 ? (
         <p className="mx-5 mt-7 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
           Nothing done yet.
         </p>
