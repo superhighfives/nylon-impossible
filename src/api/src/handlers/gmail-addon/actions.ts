@@ -76,7 +76,11 @@ async function refreshedContextual(
   c: Context<Env>,
   userId: string,
   message: AddonMessage,
-  opts: { added?: AddonAdded; notification?: string } = {},
+  opts: {
+    added?: AddonAdded;
+    notification?: string;
+    stateChanged?: boolean;
+  } = {},
 ) {
   const lists = await listListsForUser(getDb(c.env.DB), userId);
   const card = buildContextualCard(
@@ -88,6 +92,7 @@ async function refreshedContextual(
   return cardResponse(c, card, {
     asAction: true,
     notification: opts.notification,
+    stateChanged: opts.stateChanged,
   });
 }
 
@@ -199,7 +204,8 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
     listName: list?.name ?? "Nylon",
     url: boardUrl(webBaseUrl(c), listView(list, todo.listId)),
   });
-  return cardResponse(c, card, { asAction: true });
+  // The homepage behind this card now lacks the todo; have Gmail refetch it.
+  return cardResponse(c, card, { asAction: true, stateChanged: true });
 }
 
 // POST /gmail-addon/actions/undo-add — Undo on the contextual card's "Added
@@ -216,15 +222,18 @@ export async function gmailAddonUndoAdd(c: Context<Env>) {
 
   const event = await readAddonEvent(c);
   const todoId = readParameter(event, "todoId");
+  let removed = false;
   if (todoId) {
     const deleted = await db
       .delete(todos)
       .where(and(eq(todos.id, todoId), eq(todos.userId, resolved.userId)))
       .returning({ id: todos.id });
-    if (deleted.length > 0) await notifySync(c.env, resolved.userId);
+    removed = deleted.length > 0;
+    if (removed) await notifySync(c.env, resolved.userId);
   }
   return refreshedContextual(c, resolved.userId, messageFromAction(event), {
     notification: "Removed",
+    stateChanged: removed,
   });
 }
 
