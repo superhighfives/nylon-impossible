@@ -23,7 +23,7 @@ export function ShortcutsOverlay({
     >
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--n-color-canvas)_55%,transparent)] backdrop-blur-[6px] transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0" />
-        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-4rem)] w-[30rem] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.875rem] bg-n-canvas p-5 text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-base) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill">
+        <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-4rem)] w-[30rem] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.875rem] bg-n-canvas p-5 text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-base) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill">
           <div className="mb-3 flex items-center justify-between">
             <Dialog.Title className="m-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
               Keyboard shortcuts

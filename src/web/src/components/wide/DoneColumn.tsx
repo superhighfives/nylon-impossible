@@ -61,7 +61,7 @@ export function DoneColumn({
         muted
       />
       <div aria-hidden="true" className="mx-6 h-px shrink-0 bg-n-hairline" />
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-width:thin]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-gutter:stable] [scrollbar-width:thin]">
         {loading ? (
           <>
             <p className="sr-only" aria-live="polite">

@@ -317,7 +317,7 @@ function WideTodoRow({
           e.preventDefault();
           onMenu(todo, { x: e.clientX, y: e.clientY });
         }}
-        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-hidden rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
+        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-clip rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
           selected || highlighted
             ? "bg-n-fill"
             : //`surface`, or `fill` in the tinted fourth column (TINTED).
@@ -426,7 +426,7 @@ function PhoneTodoRow({
   return (
     <RowShell collapsing={collapsing} dragging={dragging} rowRef={rowRef}>
       <div
-        className={`flex min-h-0 items-start gap-3 overflow-hidden px-5 transition-colors duration-(--n-duration-fast) ${
+        className={`flex min-h-0 items-start gap-3 overflow-clip px-5 transition-colors duration-(--n-duration-fast) ${
           highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"
         }`}
       >

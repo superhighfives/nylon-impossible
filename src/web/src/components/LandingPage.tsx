@@ -257,7 +257,7 @@ export function LandingPage() {
           {/* Phone width shows the iPhone alone, large enough to read; wider
               screens put it over the desktop board. */}
           <figure className="relative mb-10 pb-4 sm:mb-0 sm:pb-16">
-            <div className="hidden overflow-hidden rounded-n-field border border-n-hairline sm:block">
+            <div className="hidden overflow-clip rounded-n-field border border-n-hairline sm:block">
               <Shot
                 name="board"
                 alt="Nylon on the web: Today, This week and Someday side by side, with a sidebar of lists."
@@ -267,7 +267,7 @@ export function LandingPage() {
                 priority
               />
             </div>
-            <div className="mx-auto w-[72%] max-w-72 overflow-hidden rounded-[14%/6.5%] border border-n-hairline bg-n-canvas sm:absolute sm:right-8 sm:bottom-6 sm:w-[30%] sm:max-w-64">
+            <div className="mx-auto w-[72%] max-w-72 overflow-clip rounded-[14%/6.5%] border border-n-hairline bg-n-canvas sm:absolute sm:right-8 sm:bottom-6 sm:w-[30%] sm:max-w-64">
               <Shot
                 name="phone"
                 alt="Nylon on iPhone, showing Today."

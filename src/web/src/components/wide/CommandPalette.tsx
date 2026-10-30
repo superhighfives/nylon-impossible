@@ -94,7 +94,7 @@ export function CommandPalette({
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--n-color-canvas)_55%,transparent)] backdrop-blur-[6px] transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup
           finalFocus={() => returnFocus() ?? true}
-          className="fixed top-[16vh] left-1/2 z-50 flex max-h-[min(32rem,70vh)] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-hidden rounded-[1rem] border border-n-hairline bg-n-surface text-n-ink shadow-[0_16px_40px_color-mix(in_srgb,black_18%,transparent)] outline-none transition-[opacity,translate] duration-(--n-duration-fast) ease-n-out data-ending-style:-translate-y-1 data-ending-style:opacity-0 data-starting-style:-translate-y-1 data-starting-style:opacity-0"
+          className="fixed top-[16dvh] left-1/2 z-50 flex max-h-[min(32rem,70dvh)] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-col overflow-clip rounded-[1rem] border border-n-hairline bg-n-surface text-n-ink shadow-[0_16px_40px_color-mix(in_srgb,black_18%,transparent)] outline-none transition-[opacity,translate] duration-(--n-duration-fast) ease-n-out data-ending-style:-translate-y-1 data-ending-style:opacity-0 data-starting-style:-translate-y-1 data-starting-style:opacity-0"
         >
           <Dialog.Title
             className={

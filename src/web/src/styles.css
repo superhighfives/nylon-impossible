@@ -107,6 +107,29 @@ code {
   @apply font-mono;
 }
 
+/* Rows and buttons draw their own pressed state, so iOS's grey tap flash
+   would double it. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* No double-tap-to-zoom wait on taps. */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
 /* Shared enter/exit for anchored popups (the link menu): a quick fade + slight
    scale that grows from the trigger via Base UI's --transform-origin. Exits
    are faster than entrances so dismissing feels immediate. */
