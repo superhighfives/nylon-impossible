@@ -8,6 +8,19 @@ import type { TodoWithUrls } from "@/types/database";
 /** Droppable ids for columns, distinct from sidebar entries. */
 export const columnDropId = (listId: string) => `col:${listId}`;
 
+/**
+ * A click that landed on a column's empty space, not on a row, a control
+ * or a field: it focuses the column without picking a todo.
+ */
+export function isColumnBackground(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    !target.closest(
+      'a, button, input, textarea, select, [contenteditable], [role="menu"], [role="dialog"], [data-row-container], [data-row-id], li',
+    )
+  );
+}
+
 /** The slot a drag would drop into, and where to draw the line. */
 export interface DropIndicator {
   listId: string;
@@ -257,6 +270,7 @@ export function Column({
   onClose,
   onRename,
   onDelete,
+  onBackgroundClick,
   ...rowCallbacks
 }: RowCallbacks & {
   listId: string;
@@ -282,6 +296,8 @@ export function Column({
   onRename?: (name: string) => void;
   /** Your list's column: Delete list, in the ⋯ menu. */
   onDelete?: () => void;
+  /** A click on the column's empty space: focus it, select nothing. */
+  onBackgroundClick?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnDropId(listId),
@@ -293,10 +309,14 @@ export function Column({
     ? selectedId
     : (rows[0]?.id ?? null);
   return (
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard reaches a column through its rows and title
     <section
       ref={setNodeRef}
       aria-labelledby={headingId}
       data-column={listId}
+      onClick={(e) => {
+        if (isColumnBackground(e.target)) onBackgroundClick?.();
+      }}
       className={`relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline first:border-l-0 ${
         tinted ? TINTED : ""
       }`}

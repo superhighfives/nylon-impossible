@@ -1,4 +1,5 @@
 import { displayTitle } from "@/components/phone/model";
+import { moveMenuPlan, readRecentMoves } from "@/components/phone/moveMenu";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import {
   filterItems,
@@ -101,7 +102,9 @@ function todoItems(s: PaletteSource, query: string): PaletteItem[] {
 
 /**
  * Move to: every list but the todo's own, with counts and 1/2/3 hints, and
- * New list "…" when what's typed matches none.
+ * New list "…" when what's typed matches none. The time lists come first,
+ * then the two lists you moved to most recently, then the rest, as the
+ * phone's menu orders them.
  */
 function moveItems(
   s: PaletteSource,
@@ -109,16 +112,26 @@ function moveItems(
   query: string,
 ): PaletteItem[] {
   const lists = [...s.timeLists, ...s.collections];
-  const items = filterItems(
-    lists
+  const plan = moveMenuPlan(
+    s.collections
       .filter((l) => l.id !== todo.listId)
-      .map((l) => ({
-        id: `move:${l.id}`,
-        label: l.name,
-        meta: String(s.countFor(l.id)),
-        hint: l.systemKind ? keyHint(`move-${l.systemKind}`) : undefined,
-        run: () => s.moveTodo(todo, l.id),
-      })),
+      .map((l) => ({ id: l.id, label: l.name, kind: null })),
+    readRecentMoves(),
+  );
+  const ordered = [
+    ...s.timeLists.filter((l) => l.id !== todo.listId),
+    ...[...plan.recent, ...plan.more].flatMap(
+      (t) => s.collections.find((l) => l.id === t.id) ?? [],
+    ),
+  ];
+  const items = filterItems(
+    ordered.map((l) => ({
+      id: `move:${l.id}`,
+      label: l.name,
+      meta: String(s.countFor(l.id)),
+      hint: l.systemKind ? keyHint(`move-${l.systemKind}`) : undefined,
+      run: () => s.moveTodo(todo, l.id),
+    })),
     query,
   );
   const name = query.replace(/\s+/g, " ").trim();

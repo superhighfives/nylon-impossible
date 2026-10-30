@@ -450,10 +450,37 @@ describe("WideApp", () => {
     act(() => rowButton("Send invoice").focus());
     press("Escape");
     expect(document.activeElement).toHaveAccessibleName("This week");
-    // The selection stays.
-    expect(
-      rowButton("Send invoice").closest("[data-row-container]"),
-    ).toHaveClass("ring-2");
+    // Into the sidebar lets go of the todo…
+    const container = () =>
+      rowButton("Send invoice").closest("[data-row-container]");
+    expect(container()).not.toHaveClass("ring-2");
+    // …and → goes back in to the column's last one.
+    press("ArrowRight");
+    expect(document.activeElement).toBe(rowButton("Send invoice"));
+    expect(container()).toHaveClass("ring-2");
+  });
+
+  it("a click on a column's empty space focuses it and selects nothing", async () => {
+    render(<WideApp />);
+    act(() => rowButton("Send invoice").focus());
+    const container = () =>
+      rowButton("Send invoice").closest("[data-row-container]");
+    expect(container()).toHaveClass("ring-2");
+    const week =
+      rowButton("Send invoice").closest<HTMLElement>("[data-column]");
+    const someday = document.querySelector<HTMLElement>(
+      `[data-column]:not([data-column="${week?.dataset.column}"]) [data-column-body]`,
+    );
+    // The empty space under Someday's rows.
+    await userEvent.click(someday as HTMLElement);
+    expect(container()).not.toHaveClass("ring-2");
+    expect(document.activeElement?.hasAttribute("data-column-head")).toBe(true);
+    // ↓ starts at the top of the column that has focus.
+    const column =
+      document.activeElement?.closest<HTMLElement>("[data-column]");
+    press("ArrowDown");
+    expect(document.activeElement?.closest("[data-column]")).toBe(column);
+    expect(document.activeElement?.hasAttribute("data-row-id")).toBe(true);
   });
 
   it("⇧-digits jump to columns and lists, back to where you were", () => {

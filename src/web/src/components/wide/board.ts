@@ -8,6 +8,7 @@ import type {
 } from "@/types/database";
 import {
   columnRows,
+  focusedColumn,
   focusedRow,
   inSidebar,
   sidebarItemFor,
@@ -29,6 +30,8 @@ export interface BoardContext {
   doneById: (id: string | undefined) => TodoWithUrls | undefined;
   selectedRow: () => HTMLElement | null;
   focusColumn: (listId: string, index?: number, rowId?: string) => void;
+  /** Let go of the selected todo; its column remembers it. */
+  clearSelection: () => void;
   /** Before a row leaves its column, hand focus (and the selection) on. */
   focusNeighbour: (row: HTMLElement) => void;
   open: (todo: TodoWithUrls) => void;
@@ -61,10 +64,15 @@ export function createBoard(ctx: BoardContext): Board {
       done: ctx.doneById(row?.dataset.rowId),
     };
   };
+  /** With no row, the column focus is in (its title, after a click). */
+  const focusColumnId = () => {
+    const column = focusedColumn();
+    return column && ctx.columnIds.includes(column) ? column : null;
+  };
   const rowColumn = (row: HTMLElement | null) =>
     row?.dataset.rowList && ctx.columnIds.includes(row.dataset.rowList)
       ? row.dataset.rowList
-      : ctx.currentColumn;
+      : (focusColumnId() ?? ctx.currentColumn);
 
   return {
     moveRow: (delta) => {
@@ -74,7 +82,8 @@ export function createBoard(ctx: BoardContext): Board {
       if (!column) return;
       const rows = columnRows(column);
       const at = row ? rows.indexOf(row) : -1;
-      if (at === -1) rows[0]?.focus();
+      // From a column with nothing selected, ↓ starts at the top, ↑ at the end.
+      if (at === -1) (delta > 0 ? rows[0] : rows.at(-1))?.focus();
       else rows[at + delta]?.focus();
     },
     moveColumn: (delta) => {
@@ -101,8 +110,13 @@ export function createBoard(ctx: BoardContext): Board {
       ctx.focusColumn(to, Math.max(0, index));
     },
     back: () => {
-      if (ctx.detailOpen) ctx.closeDetail();
-      else sidebarItemFor(ctx.selectionColumn ?? ctx.currentColumn)?.focus();
+      if (ctx.detailOpen) return ctx.closeDetail();
+      // Into the sidebar at this column, letting go of the todo. → back in
+      // reselects the column's last todo.
+      sidebarItemFor(
+        ctx.selectionColumn ?? focusColumnId() ?? ctx.currentColumn,
+      )?.focus();
+      ctx.clearSelection();
     },
     open: () => {
       const { todo } = current();

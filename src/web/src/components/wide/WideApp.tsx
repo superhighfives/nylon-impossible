@@ -381,6 +381,7 @@ export function WideApp({
     doneById,
     selectedRow,
     focusColumn,
+    clearSelection: () => setSelectedId(null),
     focusNeighbour: (row) => focusNeighbour(row),
     open: (todo) => onOpen(todo),
     closeDetail: () => closeDetail(),
@@ -524,12 +525,27 @@ export function WideApp({
     });
   };
 
+  /**
+   * A click on a column's empty space: the column takes the keyboard (its
+   * title has focus), but nothing is selected, so ↓ starts at its top. An
+   * open todo stays open, as on Apple.
+   */
+  const softFocus = (listId: string) => {
+    setSelectedId(null);
+    document
+      .querySelector<HTMLElement>(
+        `[data-column="${CSS.escape(listId)}"] [data-column-head]`,
+      )
+      ?.focus({ preventScroll: true });
+  };
+
   const renderColumn = (list: SerializedList) => {
     const kind = list.systemKind ?? null;
     return (
       <Column
         key={list.id}
         listId={list.id}
+        onBackgroundClick={() => softFocus(list.id)}
         title={list.name}
         subline={columnSubline(kind, now, timeZone)}
         tinted={!kind}
@@ -666,6 +682,7 @@ export function WideApp({
                 selectedId={selectedId}
                 onSelect={select}
                 onRestore={actions.restore}
+                onBackgroundClick={() => softFocus(DONE_COLUMN)}
               />
             )}
           </main>
@@ -678,6 +695,7 @@ export function WideApp({
       <ContextMenu
         todo={menuTodo}
         where={menuTodo ? listName(menuTodo.listId) : ""}
+        listKind={menuTodo ? listKind(menuTodo.listId) : null}
         moveTargets={targets.filter((t) => t.id !== menuTodo?.listId)}
         onClose={() => setMenu(null)}
         onMove={actions.move}

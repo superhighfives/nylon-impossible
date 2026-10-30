@@ -650,6 +650,9 @@ export function PhoneApp({
       <ContextMenu
         todo={menuTodo}
         where={menuTodo ? listName(menuTodo.listId) : ""}
+        listKind={
+          lists?.find((l) => l.id === menuTodo?.listId)?.systemKind ?? null
+        }
         moveTargets={targets.filter((t) => t.id !== menuTodo?.listId)}
         onClose={() => setMenuId(null)}
         onMove={actions.move}
