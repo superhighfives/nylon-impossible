@@ -177,9 +177,11 @@ final class BoardKeyboardUITests: NylonUITestCase {
         press(XCUIKeyboardKey.escape.rawValue)
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: detail)
         waitForExpectations(timeout: 3)
-        // The selection stays; Esc again goes to the sidebar, and → back in.
+        // The selection stays; Esc again goes to the sidebar and deselects.
         XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
         press(XCUIKeyboardKey.escape.rawValue)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: selectedRow)
+        waitForExpectations(timeout: 3)
         press("j")
         press("l")
         XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
