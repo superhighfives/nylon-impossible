@@ -74,3 +74,6 @@ src/ios/**/vendor/bundle
 .claude/settings.*.json
 # Xcode coverage output
 *.profraw
+
+# DevTools page snapshots taken while testing; they can hold personal data.
+.gmail-snap*
