@@ -26,7 +26,7 @@ Search here for real implementations when docs aren't enough.
 ## UI
 
 The app follows the redesign spec in
-`plans/done/2026-10-18-cohesive-redesign.md`.
+[2026-10-18-cohesive-redesign](https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-10-18-cohesive-redesign.md).
 
 - **Layouts.** `components/phone/` is the phone layout (under 1024px) and
   also holds the pieces both layouts share: `TodoRow`, `Composer`,

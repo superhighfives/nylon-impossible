@@ -141,7 +141,7 @@ that completes the todo in place.
 Three things are easy to get wrong here:
 
 - **"Today" is two things, not one.** A list and a due date are independent
-  (`plans/done/2026-08-06-time-bucket-lists.md`): a Today item can be undated
+  ([2026-08-06-time-bucket-lists](https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-08-06-time-bucket-lists.md)): a Today item can be undated
   or due weeks out, and reaching a due date never moves a todo into Today. So
   the widget takes the union — narrowing it to either half drops rows the user
   expects to see. The app icon badge is deliberately *not* the same set: it

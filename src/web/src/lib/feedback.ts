@@ -1,7 +1,7 @@
 /**
  * Feedback from the web app to a public GitHub issue (`POST /feedback`). Images
  * are prepared here — downscaled and base64-encoded — so the dialog only
- * deals in previews. See plans/done/2026-10-21-feedback-inbox.md.
+ * deals in previews. See https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-10-21-feedback-inbox.md.
  */
 
 export const MAX_IMAGES = 4;

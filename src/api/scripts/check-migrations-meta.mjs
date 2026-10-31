@@ -4,8 +4,8 @@
 // drifts, `bun run db:generate` silently renumbers from wherever meta last left
 // off (e.g. producing a bogus "0002_*" migration when 20 real ones already
 // exist) instead of continuing the sequence. See
-// plans/done/2026-08-06-remove-priority.md for the incident this guards
-// against, and plans/done/2026-08-06-fix-drizzle-migration-meta.md for the
+// https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-08-06-remove-priority.md for the incident this guards
+// against, and https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-08-06-fix-drizzle-migration-meta.md for the
 // fix.
 //
 // Two invariants must hold:

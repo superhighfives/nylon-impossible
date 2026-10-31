@@ -2,7 +2,7 @@
 
 Nylon is a todo app built around time. Today, This week and Someday are a flow that todos move through on their own, and your lists sit beside them as permanent collections. It runs on the web, iPhone, iPad, the Mac (including the menu bar) and inside Gmail.
 
-This page is the short, durable version of what Nylon is and how it behaves. Read it before changing UI or copy. Plans in `plans/` record how each piece was built; this file records what stays true across them.
+This page is the short, durable version of what Nylon is and how it behaves. Read it before changing UI or copy. Issues and pull requests record how each piece was built; this file records what stays true across them.
 
 ## Principles
 
