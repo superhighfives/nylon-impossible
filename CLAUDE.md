@@ -194,19 +194,25 @@ Agents may merge their own PRs in this repo. This is a deliberate exception
 to the owner's global "never merge" rule. Squash-merge, and only when **all**
 of these hold:
 
-- every required check is green and `control-room-review` is all-green;
+- every check is green, and the latest `control-room-review` review is 🟢
+  on the head commit (🟡 "approved with comments" doesn't count);
 - the PR isn't a draft and has no `needs-decision` label;
 - no unresolved review threads from the owner;
 - it touches none of the guarded areas below.
 
-Guarded areas wait for the owner to merge:
+Guarded areas wait for the owner to merge. A rename counts as touching both
+paths.
 
 - **The Settled table** in PRINCIPLES.md. Agents may edit the rest of
   PRINCIPLES.md carefully, and must say in the PR what changed and why.
 - **Migrations:** anything under `src/api/migrations/`.
-- **Releases:** `.github/workflows/ios-release.yml`, `ios-deploy.yml`,
-  Fastlane config, and version or build-number bumps.
-- **This section** and "Work tracking" above.
+- **CI, deploys and releases:** anything under `.github/` (including the
+  workflows that review and deploy), any `wrangler.jsonc`, Fastlane config,
+  and version or build-number bumps.
+- **Agent instructions:** `.claude/`, and every `CLAUDE.md` and `AGENTS.md`,
+  this file included.
+- **The foreman:** `scripts/foreman/`, which enforces these rules (see its
+  README).
 
 ## Continuous improvement routines
 
