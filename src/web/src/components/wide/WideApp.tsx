@@ -660,7 +660,7 @@ export function WideApp({
       data-wide-ready={loading ? undefined : ""}
       ref={boardRoot}
       aria-busy={loading || undefined}
-      className="group/board fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas font-n-text text-n-ink antialiased"
+      className="group/board fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas pb-[env(safe-area-inset-bottom,0px)] font-n-text text-n-ink antialiased"
     >
       <DndContext
         sensors={drag.sensors}

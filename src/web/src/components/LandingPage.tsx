@@ -77,7 +77,7 @@ const platforms = [
 ];
 
 const linkClass =
-  "rounded-sm transition-colors duration-(--n-duration-fast) pointer-fine:hover:text-n-ink n-focus";
+  "rounded-sm transition-colors duration-(--n-duration-fast) active:text-n-ink pointer-fine:hover:text-n-ink n-focus";
 
 /** One product shot in each theme; the app's class-based dark mode picks. */
 function Shot({
