@@ -22,23 +22,40 @@ Each tick:
 ## The merge gate
 
 `foreman gate <pr>` prints the verdict. The gate is a shell function, not a
-model, so an agent never decides whether its own work merges. A PR merges
-only when all of these hold:
+model, so an agent never decides whether its own work merges. **It fails
+closed:** if any step can't be completed (GitHub doesn't answer, the fetch or
+the diff fails), the answer is "wait". A PR merges only when all of these
+hold:
 
 - it's open, not a draft, mergeable, and has no `needs-decision` label;
-- every check is complete and green (success, skipped or neutral);
-- the latest `control-room-review` review is for the head commit and is
-  all-green (`## 🟢`);
+- every check is complete and green (success, skipped or neutral), and there's
+  at least one;
+- the latest `control-room-review` review is for the head commit and is 🟢.
+  🟡 "approved with comments" doesn't count;
 - there are no unresolved review threads started by the owner;
-- it touches no **guarded area**:
+- it touches no **guarded area**. The check diffs with `--no-renames`, so
+  moving a file out of a guarded path counts as touching it. The areas:
   - `src/api/migrations/`;
-  - anything under `.github/` (workflows, including the ones that review
-    and deploy), and any `wrangler.jsonc`;
+  - anything under `.github/` (workflows, including the ones that review and
+    deploy) and any `wrangler.jsonc`;
   - Fastlane config;
   - `MARKETING_VERSION` or `CURRENT_PROJECT_VERSION`;
-  - PRINCIPLES.md's Settled section;
-  - CLAUDE.md's "Work tracking" or "Merging" sections;
+  - PRINCIPLES.md's Settled table;
+  - anything that steers agents: `.claude/`, and every `CLAUDE.md` and
+    `AGENTS.md`;
   - `scripts/foreman/` itself.
+
+The merge is pinned to the commit the gate checked (`--match-head-commit`), so
+a fixup pastor pushes in between can't slip through unreviewed. A refused
+merge is logged and retried on the next tick.
+
+A PR that's green apart from a guarded area gets the `owner-merge` label, a
+comment and an alert, and waits for you. The comment points to CLAUDE.md's
+"Merging" section, which arrives with #549.
+
+`scripts/foreman/test.sh` (`bun run foreman:test`) runs the gate against a
+throwaway repo with `gh` stubbed: renames, deletes, every guarded path, and
+each way the gate has to wait. CI runs it whenever `scripts/foreman/` changes.
 
 ## What it trusts
 
@@ -47,8 +64,10 @@ The repo is public, so:
 - The foreman **polls**. It isn't a self-hosted runner, so nothing on GitHub
   can push work to the machine.
 - It only builds issues **opened by the owner** that the owner (or an agent,
-  for non-features) moved to Ready.
-- The prompt includes only the owner's and Claude's comments. Issues
+  for non-features) moved to Ready. `foreman build <n>` applies the same rule.
+- The prompt includes only comments by the owner and `claude[bot]`, matched
+  by exact login, because anyone can register a login that starts with
+  "claude". Issues
   labelled `auto-fix` are left to `feedback.yml`.
 
 ## Running it
@@ -73,7 +92,10 @@ To stop it:
   `pastor setup` and `pastor token` first.
 - Alerts use pastor's Discord webhook, if one is set.
 - Everything else lives in `~/.foreman`: a clone tracking `main`, the
-  worktrees, logs, and `events.jsonl`. The digest reads `events.jsonl`.
+  worktrees, logs, and `events.jsonl`, one line per merge, PR, question or
+  failure. The daily digest (#544) will read `events.jsonl`.
+- **It runs under macOS's `/bin/bash` 3.2**, so no associative arrays or
+  other bash 4 features.
 
 **Updating:** after each tick, the job copies `scripts/foreman/foreman.sh`
 from `origin/main` to `~/.foreman/bin`, so a merged change takes effect on the

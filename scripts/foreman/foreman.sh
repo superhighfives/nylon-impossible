@@ -97,35 +97,52 @@ section() { # file-contents(stdin) heading -> the "## heading" section, up to th
   awk -v h="## $1" '$0 == h {on=1; print; next} on && /^## / {exit} on {print}'
 }
 
-guarded_reason() { # pr base-sha head-sha -> prints why the PR is guarded, or nothing
-  local base="$1" head="$2" files f
-  files=$(git -C "$CLONE" diff --name-only "$base...$head")
-  while IFS= read -r f; do
-    case "$f" in
-      src/api/migrations/*)                      echo "touches a migration ($f)"; return ;;
-      .github/*)                                 echo "touches CI or repo automation ($f)"; return ;;
-      */wrangler.jsonc|wrangler.jsonc)           echo "touches Worker bindings ($f)"; return ;;
-      */fastlane/*|fastlane/*)                   echo "touches Fastlane config ($f)"; return ;;
-      scripts/foreman/*)                         echo "changes the foreman itself ($f)"; return ;;
-    esac
-  done <<<"$files"
-  if git -C "$CLONE" diff "$base...$head" -- '*.pbxproj' | grep -qE '^[-+][[:space:]]*(MARKETING_VERSION|CURRENT_PROJECT_VERSION) ='; then
-    echo "bumps the app version or build number"; return
-  fi
-  local s
-  for s in "PRINCIPLES.md:Settled" "CLAUDE.md:Work tracking" "CLAUDE.md:Merging"; do
-    local file="${s%%:*}" heading="${s#*:}"
-    grep -qxF "$file" <<<"$files" || continue
-    if [ "$(git -C "$CLONE" show "$base:$file" 2>/dev/null | section "$heading")" != \
-         "$(git -C "$CLONE" show "$head:$file" 2>/dev/null | section "$heading")" ]; then
-      echo "changes $file's \"$heading\" section"; return
-    fi
-  done
+# Both of these run inside $(…), where bash ignores `set -e`, so every step
+# that can fail says so explicitly. A failure anywhere means "wait", never
+# "merge".
+
+guarded_path() { # path -> why it's guarded, or nothing
+  case "$1" in
+    src/api/migrations/*)                      echo "touches a migration ($1)" ;;
+    .github/*)                                 echo "touches CI or repo automation ($1)" ;;
+    wrangler.jsonc|*/wrangler.jsonc)           echo "touches Worker bindings ($1)" ;;
+    fastlane/*|*/fastlane/*)                   echo "touches Fastlane config ($1)" ;;
+    scripts/foreman/*)                         echo "changes the foreman itself ($1)" ;;
+    # What steers the agents: the foreman runs claude with bypassed
+    # permissions in worktrees cut from main.
+    .claude/*|CLAUDE.md|*/CLAUDE.md|AGENTS.md|*/AGENTS.md) echo "changes agent instructions ($1)" ;;
+  esac
 }
 
-gate() { # pr -> prints "merge" or "wait: <why>" or "guarded: <why>"
+guarded_reason() { # base-sha head-sha -> why the change is guarded, or nothing; non-zero if it can't tell
+  local base="$1" head="$2" files f why diff
+  git -C "$CLONE" cat-file -e "$base^{commit}" 2>/dev/null || return 1
+  git -C "$CLONE" cat-file -e "$head^{commit}" 2>/dev/null || return 1
+  # --no-renames: a rename would otherwise list only its destination, so
+  # moving a migration out of src/api/migrations/ would look unguarded.
+  files=$(git -C "$CLONE" diff --no-renames --name-only "$base...$head") || return 1
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    why=$(guarded_path "$f")
+    [ -z "$why" ] || { echo "$why"; return 0; }
+  done <<<"$files"
+  diff=$(git -C "$CLONE" diff --no-renames "$base...$head" -- '*.pbxproj') || return 1
+  if grep -qE '^[-+][[:space:]]*(MARKETING_VERSION|CURRENT_PROJECT_VERSION) =' <<<"$diff"; then
+    echo "bumps the app version or build number"; return 0
+  fi
+  if grep -qxF PRINCIPLES.md <<<"$files"; then
+    local before after
+    before=$(git -C "$CLONE" show "$base:PRINCIPLES.md" | section Settled) || return 1
+    after=$(git -C "$CLONE" show "$head:PRINCIPLES.md" 2>/dev/null | section Settled)
+    [ "$before" = "$after" ] || { echo "changes PRINCIPLES.md's Settled table"; return 0; }
+  fi
+  return 0
+}
+
+gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
   local pr="$1" view head base
-  view=$(gh pr view "$pr" -R "$OWNER/$REPO" --json isDraft,labels,mergeable,headRefOid,baseRefOid,statusCheckRollup,state)
+  view=$(gh pr view "$pr" -R "$OWNER/$REPO" --json isDraft,labels,mergeable,headRefOid,baseRefOid,statusCheckRollup,state) \
+    || { echo "wait: couldn't read the PR"; return; }
   [ "$(jq -r .state <<<"$view")" = OPEN ] || { echo "wait: not open"; return; }
   [ "$(jq -r .isDraft <<<"$view")" = false ] || { echo "wait: draft"; return; }
   jq -e '[.labels[].name] | index("needs-decision")' <<<"$view" >/dev/null && { echo "wait: needs-decision"; return; }
@@ -141,13 +158,16 @@ gate() { # pr -> prints "merge" or "wait: <why>" or "guarded: <why>"
       elif any($c[]; (.status? // "COMPLETED") != "COMPLETED" or .state? == "PENDING" or .state? == "EXPECTED") then "pending"
       elif all($c[]; (.conclusion? // .state) as $r | ["SUCCESS","SKIPPED","NEUTRAL"] | index($r)) then "green"
       else "red" end' <<<"$view")
-  [ "$checks" = green ] || { echo "wait: checks $checks"; return; }
+  [ "$checks" = green ] || { echo "wait: checks ${checks:-unreadable}"; return; }
 
   head=$(jq -r .headRefOid <<<"$view")
   base=$(jq -r .baseRefOid <<<"$view")
+  [[ "$head" =~ ^[0-9a-f]{40}$ && "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "wait: no head or base commit"; return; }
+
   local review
   review=$(gh api "repos/$OWNER/$REPO/pulls/$pr/reviews" --paginate \
-    --jq "[.[] | select(.user.login == \"$REVIEW_BOT\")] | last // empty | {commit_id, green: (.body | contains(\"## 🟢\"))}")
+    --jq "[.[] | select(.user.login == \"$REVIEW_BOT\")] | last // empty | {commit_id, green: (.body | contains(\"## 🟢\"))}") \
+    || { echo "wait: couldn't read reviews"; return; }
   [ -n "$review" ] || { echo "wait: no $REVIEW_BOT review yet"; return; }
   [ "$(jq -r .commit_id <<<"$review")" = "$head" ] || { echo "wait: review is for an older commit"; return; }
   [ "$(jq -r .green <<<"$review")" = true ] || { echo "wait: review isn't all-green"; return; }
@@ -157,25 +177,31 @@ gate() { # pr -> prints "merge" or "wait: <why>" or "guarded: <why>"
     query($o: String!, $r: String!, $n: Int!) { repository(owner: $o, name: $r) { pullRequest(number: $n) {
       reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login } } } } } } } }' \
     -F o="$OWNER" -F r="$REPO" -F n="$pr" \
-    --jq "[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not) | select(.comments.nodes[0].author.login == \"$OWNER\")] | length")
-  [ "$open_threads" = 0 ] || { echo "wait: $open_threads unresolved thread(s) from $OWNER"; return; }
+    --jq "[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not) | select(.comments.nodes[0].author.login == \"$OWNER\")] | length") \
+    || { echo "wait: couldn't read review threads"; return; }
+  [ "$open_threads" = 0 ] || { echo "wait: ${open_threads:-unknown} unresolved thread(s) from $OWNER"; return; }
 
-  git -C "$CLONE" fetch -q origin main "pull/$pr/head"
-  local why; why=$(guarded_reason "$base" "$head")
+  git -C "$CLONE" fetch -q origin main "pull/$pr/head" || { echo "wait: fetch failed"; return; }
+  local why
+  why=$(guarded_reason "$base" "$head") || { echo "wait: couldn't check guarded areas"; return; }
   [ -z "$why" ] || { echo "guarded: $why"; return; }
-  echo merge
+  echo "merge $head"
 }
 
 merge_pass() { # board_json
-  local board="$1" pr branch verdict issue
+  local board="$1" pr branch verdict issue head
   while IFS=$'\t' read -r pr branch; do
     [ -n "$pr" ] || continue
     issue=$(sed -E 's#^foreman/([0-9]+).*#\1#' <<<"$branch")
     verdict=$(gate "$pr")
     case "$verdict" in
-      merge)
-        if dry; then log "would merge #$pr"; continue; fi
-        gh pr merge "$pr" -R "$OWNER/$REPO" --squash --delete-branch >/dev/null
+      merge\ *)
+        head="${verdict#merge }"
+        if dry; then log "would merge #$pr at ${head:0:7}"; continue; fi
+        # Pinned to the commit the gate checked: pastor may push in between.
+        if ! gh pr merge "$pr" -R "$OWNER/$REPO" --squash --delete-branch --match-head-commit "$head" >/dev/null; then
+          log "merge of #$pr refused; will retry next tick"; event merge_refused "$issue" "$pr"; continue
+        fi
         log "merged #$pr"; event merged "$issue" "$pr"
         set_status "$board" "$issue" Done || true
         rm_worktree "$issue" ;;
@@ -183,12 +209,12 @@ merge_pass() { # board_json
         log "#$pr $verdict"
         if ! gh pr view "$pr" -R "$OWNER/$REPO" --json labels --jq '[.labels[].name] | index("owner-merge")' | grep -q '[0-9]'; then
           dry && { log "would label #$pr owner-merge"; continue; }
-          gh pr edit "$pr" -R "$OWNER/$REPO" --add-label owner-merge >/dev/null
-          gh pr comment "$pr" -R "$OWNER/$REPO" --body "Ready to merge, but it ${verdict#guarded: }, so it's yours to merge (CLAUDE.md, \"Merging\")." >/dev/null
+          gh pr edit "$pr" -R "$OWNER/$REPO" --add-label owner-merge >/dev/null || true
+          gh pr comment "$pr" -R "$OWNER/$REPO" --body "Ready to merge, but it ${verdict#guarded: }, so it's yours to merge (CLAUDE.md, \"Merging\")." >/dev/null || true
           event guarded "$issue" "$pr" "${verdict#guarded: }"
           alert "#$pr is green and waiting for you to merge: it ${verdict#guarded: }"
         fi ;;
-      *) log "#$pr $verdict" ;;
+      *) log "#$pr ${verdict:-wait: gate printed nothing}" ;;
     esac
   done < <(gh pr list -R "$OWNER/$REPO" --state open --json number,headRefName,author \
              --jq ".[] | select(.headRefName | startswith(\"foreman/\")) | select(.author.login == \"$OWNER\") | [.number, .headRefName] | @tsv")
@@ -197,8 +223,8 @@ merge_pass() { # board_json
 # ---- building ----------------------------------------------------------------
 
 agent_pr_count() {
-  gh pr list -R "$OWNER/$REPO" --state open --json headRefName \
-    --jq '[.[] | select(.headRefName | test("^(foreman|feedback)/"))] | length'
+  gh pr list -R "$OWNER/$REPO" --state open --json headRefName,author \
+    --jq "[.[] | select(.author.login == \"$OWNER\") | select(.headRefName | test(\"^(foreman|feedback)/\"))] | length"
 }
 
 next_ready() { # board_json -> first buildable Ready issue number, or nothing
@@ -220,9 +246,10 @@ prompt_for() { # issue -> the build prompt
   local n="$1" issue comments
   issue=$(gh issue view "$n" -R "$OWNER/$REPO" --json title,body,labels \
     --jq '"# #'"$n"': \(.title)\n\nLabels: \([.labels[].name] | join(", "))\n\n\(.body)"')
-  # Only the owner's and Claude's own comments: anyone can comment on a public issue.
+  # Only the owner's and Claude's own comments, by exact login: anyone can comment
+  # on a public issue, and anyone can register a login that starts with "claude".
   comments=$(gh api "repos/$OWNER/$REPO/issues/$n/comments" --paginate \
-    --jq ".[] | select(.user.login == \"$OWNER\" or (.user.login | test(\"^claude\"))) | \"**\(.user.login)**, \(.created_at):\n\n\(.body)\n\n---\"")
+    --jq ".[] | select(.user.login == \"$OWNER\" or .user.login == \"claude[bot]\") | \"**\(.user.login)**, \(.created_at):\n\n\(.body)\n\n---\"")
   cat <<EOF
 You are the foreman for superhighfives/nylon-impossible, running unattended on
 the owner's Mac mini. Build issue #$n, below, as one pull request.
@@ -271,7 +298,7 @@ build() { # board_json issue
   if dry; then log "would build #$n on $branch"; prompt_for "$n" | sed 's/^/    | /'; return 0; fi
 
   log "building #$n on $branch"
-  set_status "$board" "$n" "In progress"
+  set_status "$board" "$n" "In progress" || true
   event started "$n"
   git -C "$CLONE" fetch -q origin main
   rm_worktree "$n"
@@ -287,18 +314,18 @@ build() { # board_json issue
   pr=$(gh pr list -R "$OWNER/$REPO" --state open --head "$branch" --json number --jq '.[0].number // empty')
   if [ -n "$pr" ]; then
     log "#$n -> PR #$pr"; event pr_opened "$n" "$pr"
-    set_status "$board" "$n" "In review"
+    set_status "$board" "$n" "In review" || true
     pastor install "$pr" -C "$dir" --runner claude >/dev/null 2>&1 || log "pastor install failed for #$pr"
   elif gh issue view "$n" -R "$OWNER/$REPO" --json labels --jq '[.labels[].name] | index("needs-decision")' | grep -q '[0-9]'; then
     log "#$n needs a decision"; event needs_decision "$n"
-    set_status "$board" "$n" Specced
+    set_status "$board" "$n" Specced || true
     alert "#$n needs your decision: https://github.com/$OWNER/$REPO/issues/$n"
     rm_worktree "$n"
   else
     log "#$n: no PR and no question (exit $status); see $out"; event failed "$n" "" "exit $status"
-    gh issue edit "$n" -R "$OWNER/$REPO" --add-label needs-decision >/dev/null
-    gh issue comment "$n" -R "$OWNER/$REPO" --body "The foreman's build stopped without a PR or a question (exit $status). Log on the Mac mini: \`$out\`. Remove \`needs-decision\` and move it back to Ready to retry." >/dev/null
-    set_status "$board" "$n" Specced
+    gh issue edit "$n" -R "$OWNER/$REPO" --add-label needs-decision >/dev/null || true
+    gh issue comment "$n" -R "$OWNER/$REPO" --body "The foreman's build stopped without a PR or a question (exit $status). Log on the Mac mini: \`$out\`. Remove \`needs-decision\` and move it back to Ready to retry." >/dev/null || true
+    set_status "$board" "$n" Specced || true
     alert "build of #$n failed (exit $status)"
   fi
 }
@@ -371,6 +398,9 @@ cmd_tick() {
 
 cmd_build() {
   local n="${1:?issue number}"; [ "${2:-}" = --dry-run ] && DRY=1
+  # The same trust rule as the board: only issues the owner opened.
+  [ "$(gh issue view "$n" -R "$OWNER/$REPO" --json author --jq .author.login)" = "$OWNER" ] \
+    || die "#$n wasn't opened by $OWNER; the foreman only builds the owner's issues"
   mkdir -p "$HOME_DIR"
   take_lock || die "a tick is running; try again when it's done"
   trap 'rm -rf "$LOCK"' EXIT
@@ -419,7 +449,8 @@ cmd_status() {
   paused && echo "paused: yes" || echo "paused: no"
   [ -d "$LOCK" ] && echo "tick running: pid $(cat "$LOCK/pid" 2>/dev/null)"
   echo "agent PRs open: $(agent_pr_count)/$MAX_AGENT_PRS"
-  echo "recent events:"; tail -n 10 "$EVENTS" 2>/dev/null | sed 's/^/  /' || echo "  none"
+  echo "recent events:"
+  if [ -s "$EVENTS" ]; then tail -n 10 "$EVENTS" | sed 's/^/  /'; else echo "  none"; fi
 }
 
 main() {
@@ -438,6 +469,7 @@ main() {
   esac
 }
 
-# Everything above is definitions, so bash has parsed the whole file before
-# anything runs; a self-update mid-tick can't change what this tick executes.
-main "$@"; exit
+# Everything above is definitions, and bash reads this whole `if` before
+# running it, so a self-update mid-tick can't change what this tick executes.
+# Sourced (as test.sh does), it only defines the functions.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then main "$@"; exit; fi
