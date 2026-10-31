@@ -16,7 +16,7 @@
 //  sheet can't route around it. What it can do is notice the signs of a stall
 //  (time passing, or the person coming back to the app) and offer to cancel
 //  and retry, or to switch the default browser to Safari for one sign-in.
-//  See plans/in-progress/2026-10-25-mac-sign-in-chrome-handoff.md.
+//  See https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/in-progress/2026-10-25-mac-sign-in-chrome-handoff.md.
 //
 
 #if os(macOS)

@@ -160,13 +160,67 @@ same weekday and date.
   seeded dev server: `MARKETING_WEB_URL=http://127.0.0.1:<port> npx tsx
   audit.ts`.
 
+## Work tracking
+
+There's no `plans/` directory any more (retired October 2026; its documents
+are in git history). Work lives on the
+[**Nylon** GitHub Project](https://github.com/users/superhighfives/projects/1)
+(`gh project … 1 --owner superhighfives`), a kanban whose `Status` field is
+the source of truth:
+
+| Status | What's there |
+| --- | --- |
+| Ideas | Draft items: a line or a paragraph. Anyone, agents included, may add one |
+| Specced | Converted to an issue with a spec in the body: problem, approach, acceptance criteria |
+| Ready | Cleared to build. An agent may pick it up |
+| In progress | Someone (or an agent) has a branch for it |
+| In review | A PR is open |
+| Done | Merged, or closed with a reason |
+
+- Every issue gets a `kind:*` label: `feature`, `fix`, `refactor`, `a11y`,
+  `test` or `chore`.
+- **Only the owner moves a `kind:feature` item into Ready.** Agents may move
+  the other kinds there themselves once the spec is written.
+- At most **3 agent PRs** are open at once. Finish or close one before
+  starting another.
+- `needs-decision` on an issue or PR means it's waiting on the owner. Leave a
+  comment that says exactly what the decision is.
+- What a plan's "done" document used to record goes in the PR description.
+  Anything that should stay true goes into PRINCIPLES.md, this file or a skill.
+
+## Merging
+
+Agents may merge their own PRs in this repo. This is a deliberate exception
+to the owner's global "never merge" rule. Squash-merge, and only when **all**
+of these hold:
+
+- every check is green, and the latest `control-room-review` review is 🟢
+  on the head commit (🟡 "approved with comments" doesn't count);
+- the PR isn't a draft and has no `needs-decision` label;
+- no unresolved review threads from the owner;
+- it touches none of the guarded areas below.
+
+Guarded areas wait for the owner to merge. A rename counts as touching both
+paths.
+
+- **The Settled table** in PRINCIPLES.md. Agents may edit the rest of
+  PRINCIPLES.md carefully, and must say in the PR what changed and why.
+- **Migrations:** anything under `src/api/migrations/`.
+- **CI, deploys and releases:** anything under `.github/` (including the
+  workflows that review and deploy), any `wrangler.jsonc`, Fastlane config,
+  and version or build-number bumps.
+- **Agent instructions:** `.claude/`, and every `CLAUDE.md` and `AGENTS.md`,
+  this file included.
+- **The foreman:** `scripts/foreman/`, which enforces these rules (see its
+  README).
+
 ## Continuous improvement routines
 
 Three Claude cloud routines are meant to run against this repo outside of any
 local session — they're configured via claude.ai, not checked into
 `.github/workflows/`, so this section is the source of truth for what they do
-and why. All three are to open or update PRs only; none of them get merge
-rights. A human merges everything they produce.
+and why. They open and update PRs, and merge them only under "Merging"
+above.
 
 **Status: not yet live.** The routines below are the agreed design, not a
 description of something already running — creating them needs an
@@ -199,7 +253,7 @@ screenshots are committed to the orphan **`feedback-assets`** branch — never
 merge it, rebase it onto `main`, or delete it, or every old issue loses its
 images. `feedback.yml` has Claude open a draft fix PR (or ask questions) when
 the repo owner applies `auto-fix` — the API does that for admins' reports —
-because the issue body is the prompt. Spec: `plans/done/2026-10-21-feedback-inbox.md`.
+because the issue body is the prompt. Spec: [2026-10-21-feedback-inbox](https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-10-21-feedback-inbox.md).
 
 It then works in rounds, like pastor but in CI:
 

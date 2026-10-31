@@ -24,11 +24,6 @@ nylon-impossible/
 │   ├── web/          # TanStack Start web app (see src/web/AGENTS.md)
 │   ├── api/          # Hono REST + WebSocket API
 │   └── ios/          # SwiftUI iOS app
-├── plans/
-│   ├── ready/        # Plans ready to implement
-│   ├── backlog/      # Ideas for future work
-│   ├── in-progress/  # Plans currently being worked on
-│   └── done/         # Completed plans
 ├── scripts/          # Shell scripts (db reset, backup)
 ├── package.json      # Root Bun workspace
 └── AGENTS.md         # This file
@@ -200,32 +195,12 @@ bundle exec fastlane release
 
 Previews are named after the PR's branch, so later pushes keep the same URLs.
 
-## Plans
+## Work tracking
 
-Implementation plans live in the `plans/` directory.
-
-The canonical documentation for:
-
-- the **backlog → ready → in-progress → done** lifecycle
-- plan file naming conventions
-- the plan template and required sections
-
-is in `plans/README.md`. Refer to that file when creating, updating, or reviewing plans to avoid conflicting sources of truth.
-
-At a high level:
-
-- New work typically starts as a plan in `plans/`.
-- Move plans to `in-progress/` when you begin implementation.
-- Keep plans up to date as decisions are made and work progresses.
-- Move plans through their lifecycle as described in `plans/README.md`.
-
-For any details beyond this summary (status definitions, examples, and frontmatter structure), always follow `plans/README.md`.
-
-
-
-
-3. Before starting significant work, check `plans/ready/` for an existing spec.
-4. When implementation is complete, move the plan file to `plans/done/` and update its **Status** to `Complete`. Add an **Overview** and **Architecture** section documenting what was actually built and any deviations from the spec.
+Work is tracked in GitHub, not in the repo: the **Nylon** Project board, with
+issues and PRs. See CLAUDE.md's "Work tracking" for the columns and labels.
+The old `plans/` directory was retired in October 2026; its documents are in
+git history.
 
 ## Environment Variables
 
