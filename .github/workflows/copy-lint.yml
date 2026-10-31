@@ -1,0 +1,57 @@
+name: Copy Lint
+
+# Checks UI strings on the web, Apple and Gmail surfaces against PRINCIPLES.md's
+# Vocabulary table and sentence case (src/shared/copy/lint.mjs). Findings show
+# as warnings with file and line, and in the job summary. Warning only for now:
+# once main is clean, add --strict to fail on web and Apple findings. Gmail
+# findings never fail.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: copy-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect copy changes
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            copy:
+              - 'src/web/src/**'
+              - 'src/ios/**'
+              - 'src/api/src/lib/addon-cards.ts'
+              - 'src/api/src/handlers/gmail-addon/**'
+              - 'src/shared/copy/**'
+              - 'PRINCIPLES.md'
+              - '.github/workflows/copy-lint.yml'
+
+      - uses: oven-sh/setup-bun@v2
+        if: steps.changes.outputs.copy == 'true'
+        with:
+          bun-version-file: package.json
+
+      - uses: actions/setup-node@v7
+        if: steps.changes.outputs.copy == 'true'
+        with:
+          node-version: 24.21.0
+
+      - run: bun install --frozen-lockfile
+        if: steps.changes.outputs.copy == 'true'
+
+      - name: Lint UI copy
+        if: steps.changes.outputs.copy == 'true'
+        run: bun run copy:lint
