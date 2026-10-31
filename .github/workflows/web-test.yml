@@ -71,3 +71,29 @@ jobs:
       - name: Test Web
         if: steps.changes.outputs.src == 'true'
         run: bun run --cwd src/web test
+
+  # The foreman's merge gate is the only thing between an agent's PR and main,
+  # so its tests run whenever the script changes.
+  foreman:
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Detect foreman changes
+        id: changes
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            foreman:
+              - 'scripts/foreman/**'
+              - '.github/workflows/web-test.yml'
+
+      - name: Shellcheck
+        if: steps.changes.outputs.foreman == 'true'
+        run: shellcheck -x scripts/foreman/*.sh
+
+      - name: Test the merge gate
+        if: steps.changes.outputs.foreman == 'true'
+        run: scripts/foreman/test.sh
