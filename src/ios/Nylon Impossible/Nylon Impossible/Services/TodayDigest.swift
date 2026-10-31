@@ -15,7 +15,7 @@ import SwiftData
 enum TodayDigest {
     /// Midnight at the start of the next calendar day in the user's local
     /// timezone. Anything due before this is "today or overdue" — matching the
-    /// shared definition in plans/done/2026-03-21-repeating-todos.md.
+    /// shared definition in https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-03-21-repeating-todos.md.
     /// Due dates strictly before this instant fall on today or earlier (for the
     /// device's day). Due dates are calendar days stored at UTC midnight, and
     /// `DueDay.normalize` rounds to the nearest midnight, so a raw value is on
@@ -36,7 +36,7 @@ enum TodayDigest {
     /// plus anything due before local midnight whatever list it's in.
     ///
     /// The two halves are deliberately independent (see
-    /// `plans/done/2026-08-06-time-bucket-lists.md`): a Today item can have no
+    /// `https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-08-06-time-bucket-lists.md`): a Today item can have no
     /// due date at all, or one three weeks out — putting it there means "I
     /// want to work on this today", not "this is due today" — and reaching a
     /// due date never promotes a todo into Today. So neither half alone

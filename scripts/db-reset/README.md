@@ -1,6 +1,6 @@
 # Backend reset: moving data onto the baseline schema
 
-Phase 1 of `plans/done/2026-10-18-cohesive-redesign.md` squashed the D1
+Phase 1 of [2026-10-18-cohesive-redesign](https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-10-18-cohesive-redesign.md) squashed the D1
 migrations into one `src/api/migrations/0000_baseline.sql` and dropped the
 Completed system list, `users.location`, `users.plan` and
 `users.hide_completed`. The existing databases can't take that baseline,

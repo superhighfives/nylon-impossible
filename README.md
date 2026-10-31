@@ -286,15 +286,10 @@ base64 -i "Nylon_Impossible_AppStore.mobileprovision" | pbcopy
 
 All scripts are also available per-package with `web:*`, `api:*`, and `ios:*` prefixes.
 
-## Plans
+## Work tracking
 
-Implementation plans live in [`plans/`](plans/):
-
-| Folder | Purpose |
-|--------|---------|
-| [`plans/ready/`](plans/ready/) | Fully specced, ready to implement |
-| [`plans/backlog/`](plans/backlog/) | Ideas and stubs |
-| [`plans/done/`](plans/done/) | Completed work |
+Ideas, specs and work in progress live on the project's GitHub Project board,
+as draft items, issues and PRs. The old `plans/` directory is in git history.
 
 ## CI/CD
 

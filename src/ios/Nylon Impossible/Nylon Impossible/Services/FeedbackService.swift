@@ -7,7 +7,7 @@
 //  nylon-impossible. The service holds the draft between the moment
 //  something is flagged (a screenshot, Help ▸ Send Feedback…) and sending it,
 //  and builds the context every issue carries so the only typing is the
-//  description. See plans/done/2026-10-21-feedback-inbox.md.
+//  description. See https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-10-21-feedback-inbox.md.
 //
 
 import Foundation

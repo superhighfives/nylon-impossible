@@ -135,7 +135,7 @@ jobs:
   # no custom domains, and no close-triggered cleanup — stale previews are
   # auto-evicted by the platform. Previews share prod D1; the hourly cron only
   # ever runs on production, never on a preview. See
-  # plans/in-progress/2026-08-13-migrate-pr-previews-to-worker-previews.md.
+  # https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-08-13-migrate-pr-previews-to-worker-previews.md.
   #
   # Preview secrets are seeded by this job (see the "Set preview API/Web
   # secrets" steps below), against the Clerk *development* instance —
