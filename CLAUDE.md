@@ -163,8 +163,10 @@ same weekday and date.
 ## Work tracking
 
 There's no `plans/` directory any more (retired October 2026; its documents
-are in git history). Work lives on the **Nylon** GitHub Project, a kanban
-whose `Status` field is the source of truth:
+are in git history). Work lives on the
+[**Nylon** GitHub Project](https://github.com/users/superhighfives/projects/1)
+(`gh project … 1 --owner superhighfives`), a kanban whose `Status` field is
+the source of truth:
 
 | Status | What's there |
 | --- | --- |
