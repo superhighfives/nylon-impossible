@@ -13,7 +13,7 @@
     "@clerk/testing": "^2.2.36",
     "dotenv": "^18.0.6",
     "playwright": "^1.62.1",
-    "sharp": "^0.33.0"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
