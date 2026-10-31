@@ -453,6 +453,10 @@ cmd_status() {
   if [ -s "$EVENTS" ]; then tail -n 10 "$EVENTS" | sed 's/^/  /'; else echo "  none"; fi
 }
 
+usage() { # the header comment, minus the shellcheck directive
+  awk 'NR > 1 && !/^#/ {exit} NR > 1 && !/shellcheck/' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
+}
+
 main() {
   local cmd="${1:-help}"; shift || true
   case "$cmd" in
@@ -465,7 +469,8 @@ main() {
     logs)      if [ "${1:-}" = -f ]; then tail -f "$LOGS/foreman.log"; else tail -n 50 "$LOGS/foreman.log"; fi ;;
     pause)     mkdir -p "$HOME_DIR"; touch "$HOME_DIR/paused"; echo paused ;;
     resume)    rm -f "$HOME_DIR/paused"; echo resumed ;;
-    *)         sed -n '2,12p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' ;;
+    help|-h|--help) usage ;;
+    *)         usage >&2; die "unknown command: $cmd" ;;
   esac
 }
 
