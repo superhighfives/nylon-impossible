@@ -13,6 +13,7 @@
     "dev": "bun run --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
     "dev:fresh": "bun run db:reset && bun run --filter @nylon-impossible/web --filter @nylon-impossible/api dev",
     "test": "bun run web:test && bun run api:test",
+    "foreman:test": "scripts/foreman/test.sh",
     "lint": "bun run tokens:check && bun run web:lint && bun run api:lint && bun run admin:lint",
     "lint:fix": "bun run web:lint:fix && bun run api:lint:fix && bun run admin:lint:fix",
     "format": "bun run web:format && bun run api:format && bun run admin:format",
