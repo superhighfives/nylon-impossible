@@ -162,6 +162,43 @@ reset; mv "$tmp/origin.git" "$tmp/gone.git"
 expect "a failed fetch waits"                          "wait: fetch failed"              "$(gate 7)"
 mv "$tmp/gone.git" "$tmp/origin.git"
 
+# ---- review rounds, with gh stubbed and claude never reached -----------------
+
+echo "review rounds"
+
+mkdir -p "$ROUNDS"
+CALLS="$tmp/calls"
+LABELS=""   # labels on the PR, comma-separated
+REVIEW_ID=101
+gh() {
+  echo "$*" >> "$CALLS"
+  case "$1 $2" in
+    "pr view")  # has_label: real gh would print the index or null
+      local want; want=$(sed -E 's/.*index\("([^"]+)"\).*/\1/' <<<"$*")
+      case ",$LABELS," in *",$want,"*) echo 0 ;; *) echo null ;; esac ;;
+    api\ repos/*) jq -cn --argjson id "$REVIEW_ID" '{id:$id, body:"## 🟡"}' ;;
+    *) return 0 ;;
+  esac
+}
+alert() { echo "alert $*" >> "$CALLS"; }
+event() { :; }
+
+: > "$CALLS"; echo 101 > "$ROUNDS/9"
+review_round 9 foreman/1-x 1
+expect "a review that already had a round is skipped"  "no edits"  "$(grep -q 'pr edit' "$CALLS" && echo edited || echo 'no edits')"
+
+: > "$CALLS"; rm -f "$ROUNDS/9"; LABELS="fix-round:1,fix-round:2,fix-round:3"
+review_round 9 foreman/1-x 1
+expect "after 3 rounds it hands over"   "yes"  "$(grep -q 'pr edit 9 .*--add-label needs-decision' "$CALLS" && echo yes || echo no)"
+expect "and remembers the review"        "101"  "$(cat "$ROUNDS/9")"
+expect "and alerts"                      "yes"  "$(grep -q '^alert ' "$CALLS" && echo yes || echo no)"
+
+: > "$CALLS"; rm -f "$ROUNDS/9"; LABELS="fix-round:1"; DRY=1
+expect "the round number counts the labels"  "would run review round 2 on #9"  "$(review_round 9 foreman/1-x 1 | sed -E 's/^[0-9-]+ [0-9:]+ //')"
+DRY=0
+
+expect_prefix "the prompt carries the review"  "yes"  "$(round_prompt 9 foreman/1-x 1 2 'FINDING-XYZ' '' | grep -q FINDING-XYZ && echo yes)"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]
