@@ -912,7 +912,7 @@ function LinkCard({
         </Menu.Trigger>
         <Menu.Portal>
           <Menu.Positioner sideOffset={4} align="end" className="z-[60]">
-            <Menu.Popup className="popup-motion min-w-44 overflow-hidden rounded-[0.875rem] bg-n-canvas py-1 shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none dark:bg-n-fill">
+            <Menu.Popup className="popup-motion min-w-44 overflow-clip rounded-[0.875rem] bg-n-canvas py-1 shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none dark:bg-n-fill">
               <Menu.Item
                 className={MENU_ITEM}
                 onClick={() =>

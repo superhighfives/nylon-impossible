@@ -77,7 +77,7 @@ const platforms = [
 ];
 
 const linkClass =
-  "rounded-sm transition-colors duration-(--n-duration-fast) pointer-fine:hover:text-n-ink n-focus";
+  "rounded-sm transition-colors duration-(--n-duration-fast) active:text-n-ink pointer-fine:hover:text-n-ink n-focus";
 
 /** One product shot in each theme; the app's class-based dark mode picks. */
 function Shot({
@@ -211,7 +211,7 @@ function WaitlistForm() {
 export function LandingPage() {
   return (
     <div className="min-h-dvh bg-n-canvas text-n-ink">
-      <div className="mx-auto max-w-6xl px-4 sm:px-8">
+      <div className="mx-auto max-w-6xl pr-[max(1rem,env(safe-area-inset-right,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] sm:pr-[max(2rem,env(safe-area-inset-right,0px))] sm:pl-[max(2rem,env(safe-area-inset-left,0px))]">
         <header className="flex h-16 items-center justify-between border-b border-n-hairline">
           <span className="font-n-display text-xl font-bold tracking-[-0.02em]">
             Nylon
@@ -257,7 +257,7 @@ export function LandingPage() {
           {/* Phone width shows the iPhone alone, large enough to read; wider
               screens put it over the desktop board. */}
           <figure className="relative mb-10 pb-4 sm:mb-0 sm:pb-16">
-            <div className="hidden overflow-hidden rounded-n-field border border-n-hairline sm:block">
+            <div className="hidden overflow-clip rounded-n-field border border-n-hairline sm:block">
               <Shot
                 name="board"
                 alt="Nylon on the web: Today, This week and Someday side by side, with a sidebar of lists."
@@ -267,7 +267,7 @@ export function LandingPage() {
                 priority
               />
             </div>
-            <div className="mx-auto w-[72%] max-w-72 overflow-hidden rounded-[14%/6.5%] border border-n-hairline bg-n-canvas sm:absolute sm:right-8 sm:bottom-6 sm:w-[30%] sm:max-w-64">
+            <div className="mx-auto w-[72%] max-w-72 overflow-clip rounded-[14%/6.5%] border border-n-hairline bg-n-canvas sm:absolute sm:right-8 sm:bottom-6 sm:w-[30%] sm:max-w-64">
               <Shot
                 name="phone"
                 alt="Nylon on iPhone, showing Today."

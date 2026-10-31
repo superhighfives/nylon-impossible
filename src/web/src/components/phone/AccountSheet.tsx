@@ -19,7 +19,7 @@ export function Avatar({ size }: { size: number }) {
   return (
     <span
       style={{ width: size, height: size }}
-      className="flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-n-fill text-xs font-semibold text-n-ink"
+      className="flex shrink-0 items-center justify-center overflow-clip rounded-full bg-n-fill text-xs font-semibold text-n-ink"
     >
       {user?.hasImage ? (
         <img src={user.imageUrl} alt="" className="size-full object-cover" />

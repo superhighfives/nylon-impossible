@@ -532,7 +532,7 @@ export function PhoneApp({
   return (
     <div className="fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 bg-n-canvas font-n-text text-n-ink antialiased">
       <div className="mx-auto flex h-full max-w-[42rem] flex-col">
-        <div className="flex h-14 shrink-0 items-center pt-[max(0.75rem,env(safe-area-inset-top,0px))] pr-4 pl-5">
+        <div className="flex min-h-14 shrink-0 items-center pt-[max(0.75rem,env(safe-area-inset-top,0px))] pr-4 pl-5">
           <nav
             ref={switcherRef}
             aria-label="Lists"

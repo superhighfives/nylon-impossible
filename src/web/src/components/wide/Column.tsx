@@ -165,7 +165,7 @@ export function ColumnHeader({
               <Menu.Positioner align="end" sideOffset={4} className="z-50">
                 <Menu.Popup
                   finalFocus={() => !fromMenu.current}
-                  className="min-w-44 overflow-hidden rounded-[0.875rem] bg-n-canvas text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill"
+                  className="min-w-44 overflow-clip rounded-[0.875rem] bg-n-canvas text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill"
                 >
                   {onRename && (
                     <Menu.Item
@@ -332,7 +332,7 @@ export function Column({
       <div aria-hidden="true" className="mx-6 h-px shrink-0 bg-n-hairline" />
       <div
         data-column-body={listId}
-        className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-width:thin]"
+        className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-gutter:stable] [scrollbar-width:thin]"
       >
         {composer}
         {loading ? (

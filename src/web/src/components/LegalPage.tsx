@@ -30,19 +30,19 @@ export function LegalPage({ title, lastUpdated, children }: LegalPageProps) {
       <div className="flex flex-wrap gap-4 text-sm text-n-ink-muted">
         <Link
           to="/"
-          className="rounded-sm transition-colors pointer-fine:hover:text-n-ink n-focus"
+          className="rounded-sm transition-colors active:text-n-ink pointer-fine:hover:text-n-ink n-focus"
         >
           Home
         </Link>
         <Link
           to="/privacy"
-          className="rounded-sm transition-colors pointer-fine:hover:text-n-ink n-focus"
+          className="rounded-sm transition-colors active:text-n-ink pointer-fine:hover:text-n-ink n-focus"
         >
           Privacy
         </Link>
         <Link
           to="/terms"
-          className="rounded-sm transition-colors pointer-fine:hover:text-n-ink n-focus"
+          className="rounded-sm transition-colors active:text-n-ink pointer-fine:hover:text-n-ink n-focus"
         >
           Terms
         </Link>
