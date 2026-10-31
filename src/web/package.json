@@ -52,7 +52,7 @@
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/workers-types": "^5.20261007.1",
     "@effect/language-service": "^0.87.5",
-    "@tanstack/devtools-vite": "^0.6.0",
+    "@tanstack/devtools-vite": "^0.8.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.2.0",
