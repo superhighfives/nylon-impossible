@@ -39,24 +39,10 @@ Biome config lives at the root; each workspace invokes it with
 
 ## Hono context typing
 
-API handlers take `Context<Env>`, not `Context<{ Bindings: Env }>`.
-
-`Env` in `src/api/src/types.ts` already contains **both** `Bindings` and
-`Variables`. Wrapping it in another `Bindings` key hides `Variables`, so
-`c.get("userId")` stops type-checking — and the usual reflex is to paper over
-that with `as string` rather than fix the annotation.
-
-```ts
-// Good
-export async function processTodo(c: Context<Env>) {
-  const userId = c.get("userId"); // already string
-}
-
-// Bad
-export async function processTodo(c: Context<{ Bindings: Env }>) {
-  const userId = c.get("userId") as string;
-}
-```
+API handlers take `Context<Env>`, not `Context<{ Bindings: Env }>`. `Env` in
+`src/api/src/types.ts` already contains **both** `Bindings` and `Variables`;
+wrapping it in another `Bindings` key hides `Variables`, so `c.get("userId")`
+stops type-checking. Fix the annotation instead of reaching for `as string`.
 
 ## Bindings
 
@@ -77,88 +63,9 @@ message strings at the call site.
 
 ## Migrations: expand/contract
 
-Deploy (`.github/workflows/web-deploy.yml`) **applies D1 migrations to the
-shared D1 database (the `DB` binding) before rolling out the workers** — migrate → deploy
-API → deploy web. Both the `web` and `api` workers bind the
-same database, so during that window the schema is already new while the old
-worker code is still serving.
-
-A migration that **tightens** a constraint in one step therefore causes a brief
-outage for live writes until rollout finishes. Concretely: `0023` made
-`todos.list_id` NOT NULL with no default, and every write that omitted the
-column 500'd (`NOT NULL constraint failed: todos.list_id`) for the length of the
-deploy — surfacing on the client as `Error: No error message`.
-
-For any constraint-tightening change, use **expand/contract**:
-
-1. Migration A adds the column **nullable** (or with a safe default).
-2. Deploy the workers that populate it.
-3. Migration B (a later deploy) makes it `NOT NULL` / adds the strict
-   constraint.
-
-A single add-nullable-then-rebuild-NOT-NULL migration applied before the new
-code deploys is what bites. Reordering CI to deploy-before-migrate just breaks
-it the other way (new code expects a column the migration hasn't added yet), so
-this is a migration-authoring discipline, not a CI tweak.
-
-## Marketing screenshots
-
-`marketing.yml` regenerates the landing-page screenshots on
-superhighfives.com. It used to be a job inside `web-deploy.yml`, which meant
-its flakes (Vite optimizer races, Clerk sign-in timeouts, `simctl launch` on a
-wedged simulator) reported the *deploy* as failed — for a stretch, every red
-`web-deploy` run was this job and `deploy-production` was green in all of them.
-It now runs on `workflow_run` after a successful deploy, with its own status.
-
-Two rules keep it that way, and both are easy to undo by accident:
-
-- **Capture is best-effort.** `capturePhase` in `generate.ts` catches a failed
-  capture and reuses the screenshot the workflow restored from cache, so the
-  composite matches what's published and the publish step no-ops. Don't
-  "fix" a flake by adding another retry — that's been tried four times and a
-  new failure mode showed up each time. A run only fails when there's nothing
-  to fall back to. `capture-status.json` records `fresh`/`cached`/`skipped`
-  per asset; anything reused gets a `::warning::`.
-- **Don't put it back in the deploy pipeline.** A job that calls a reusable
-  workflow can't be given `continue-on-error`, so coupling them is all-or-
-  nothing.
-
-The iOS screenshots are cached against `hashFiles('src/ios/**', …)`, so a
-web-only deploy skips the Xcode build and simulator entirely — that's most of
-the runtime and nearly all of the flakiness. Only a fully fresh iOS set (every
-`ios-*` entry in `capture-status.json`) is written back to that cache; caching
-a reused one would pin stale screenshots to a revision they don't belong to.
-To regenerate by hand, dispatch the workflow with `force_ios` (it also runs
-`strict` by default, so a fallback fails rather than passing quietly).
-
-What gets captured is listed in `src/marketing/manifest.json`. Its one
-`timeZone` pins the browser (`timezoneId`), the simulators
-(`SIMCTL_CHILD_TZ` on launch) and the seeded user, so every shot shows the
-same weekday and date.
-
-- **Web** signs in with Clerk's testing helpers and shoots desktop (1440×900)
-  and phone (390×844) in light and dark. `generate.ts` applies the local D1
-  migrations and writes the demo data (`seed.ts`, which mirrors the iOS
-  sample data) itself, inside the best-effort web phase — the seed needs the
-  capture account's Clerk id, so there's no separate workflow step.
-- **iOS** needs no account. It launches the DEBUG build with
-  `-NylonScreen <route>` (plus `-NylonDark`, `-NylonLandscape`), which skips
-  sign-in and draws in-memory sample data, on simulators the script creates
-  for itself (6.9" iPhone, 13" iPad). iPhone and iPad are separate capture
-  phases, so one flaking doesn't discard the other.
-- `--web` writes the composites (browser + iPhone, and iPad + iPhone), a raw
-  App Store set in `output/app-store/` (uploaded as a workflow artifact;
-  App Store Connect upload is manual), and WebP shots for the web landing page
-  in `output/landing/` (copy into `src/web/public/images/landing/`).
-- `--parity` (never part of `--all`) captures `manifest.parity`'s screens on
-  iOS and web at the same logical size and writes
-  `output/parity/parity-{light,dark}.png`, each screen an "iOS | Web" pair.
-  It uses simulators of its own ("Nylon Parity …"), is uploaded from
-  `marketing.yml` as the `parity-sheet` artifact, and is never published.
-- `audit.ts` runs axe and the layout checks (row movement on done, 44px
-  targets, focus, Escape, 200% zoom, reduced motion) against a running,
-  seeded dev server: `MARKETING_WEB_URL=http://127.0.0.1:<port> npx tsx
-  audit.ts`.
+Deploy migrates the shared D1 database before the workers roll out, so never
+tighten a constraint in one step: add it nullable, deploy the code that fills
+it, then make it strict in a later migration. Details: `d1-migrations` skill.
 
 ## Work tracking
 
@@ -214,74 +121,20 @@ paths.
 - **The foreman:** `scripts/foreman/`, which enforces these rules (see its
   README).
 
-## Continuous improvement routines
+## Situational skills
 
-Three Claude cloud routines are meant to run against this repo outside of any
-local session — they're configured via claude.ai, not checked into
-`.github/workflows/`, so this section is the source of truth for what they do
-and why. They open and update PRs, and merge them only under "Merging"
-above.
+The rest lives in `.claude/skills/` and loads when the work comes up:
 
-**Status: not yet live.** The routines below are the agreed design, not a
-description of something already running — creating them needs an
-`environment_id` from the claude.ai routines API, which wasn't reachable when
-this was written. Treat this section as the spec to build against, and delete
-this paragraph once all three exist and have run once.
+- `d1-migrations`: expand/contract, and the outage that made it a rule.
+- `marketing-screenshots`: the capture pipeline, its best-effort rules,
+  `--parity` and `audit.ts`.
+- `feedback-flow`: feedback issues, `feedback.yml` rounds, fix-shots. Fix-shots
+  are best-effort, like the marketing captures: never make them fail the run.
+  Never merge, rebase or delete the orphan **`feedback-assets`** branch; every
+  old feedback issue's images live there.
+- `cloud-routines`: the Sentry sweep, dependabot bundle and PR shepherd.
 
-- **Sentry sweep** — cron, nightly (~03:00 local). Runs the `review-sentry`
-  skill against unresolved issues for this project and opens one PR per issue
-  it decides is worth fixing.
-- **Dependabot bundle** — cron, weekly (Monday morning). Runs the
-  `dependabot-bundle` skill to combine that week's open dependabot PRs into a
-  single PR.
-- **PR shepherd** — event-triggered, not cron. Fires on `pull_request`
-  (opened/synchronize) and `workflow_run` (completed) webhook events for this
-  repo, so it reacts to a new commit or a finished CI run instead of polling
-  on a timer. Runs the `shepherd` skill to push fixup commits, respond to
-  review comments, and rebase on conflict for PRs it's watching.
-
-If any of these starts producing bad output, disable it from claude.ai (or ask
-Claude to do so via the `schedule`/`RemoteTrigger` tooling) rather than
-reverse-engineering it from PR history — the routine definition, not this
-file, is authoritative for the exact prompt and trigger config.
-
-## Feedback issues
-
-Issues labelled `feedback` + `platform:*` are filed by the apps' admin-only
-**Send feedback** (`POST /feedback`), with the owner's token. Their
-screenshots are committed to the orphan **`feedback-assets`** branch — never
-merge it, rebase it onto `main`, or delete it, or every old issue loses its
-images. `feedback.yml` has Claude open a draft fix PR (or ask questions) when
-the repo owner applies `auto-fix` — the API does that for admins' reports —
-because the issue body is the prompt. Spec: [2026-10-21-feedback-inbox](https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-10-21-feedback-inbox.md).
-
-It then works in rounds, like pastor but in CI:
-
-- **answer:** while there's no fix PR yet, the owner's reply on the issue
-  (with or without `@claude`) reruns the fix with that reply. Claude only sees comments
-  by the owner and itself; the workflow filters them before the run, since
-  anyone can comment on a public issue.
-- **review:** a `control-room-review` review that isn't all-green on a
-  `feedback/*` PR starts a round on that branch. Claude's push gets a fresh
-  review, so it loops. `fix-round:N` counts the rounds, and after 3 the
-  workflow adds `needs-decision` and stops.
-
-`needs-decision` on the issue or the PR stops every round. Claude adds it
-when a finding is the owner's call; removing it re-arms the next round.
-
-**Pastor on `feedback/*` and `foreman/*` PRs:** `feedback.yml` and the
-foreman (`scripts/foreman/`) own `control-room-review` findings there, so
-don't fix or defer them; it would duplicate the round's commits, and a
-deferred 🟡 never reaches the 🟢 the foreman merges on. Watch CI, handle the
+**Pastor on `feedback/*` and `foreman/*` PRs:** `feedback.yml` and the foreman
+own `control-room-review` findings there, so don't fix or defer them (a
+deferred 🟡 never reaches the 🟢 the foreman merges on). Watch CI, handle the
 owner's own comments and decisions, and send the ready-to-merge notice.
-
-On Apple platforms the fix PR also gets a **Before | After** table: Claude
-writes `.fix-shots/plan.json` (which `-NylonScreen` routes show the change,
-or why a still can't), and `src/marketing/fix-shots.ts` captures them on
-`main` and the branch after Claude finishes. The images go to
-`feedback-assets` under `fixes/<issue>/<sha>/`; the table sits between
-`<!-- fix-shots:start/end -->` markers in the PR body. It's best-effort, like the
-marketing captures — never make it fail the run. The simulator helpers it
-shares with `generate.ts` live in `src/marketing/simulator.ts`.
-Follow-up commits (via `@claude` or a review round) that touch `src/ios`
-retake the shots from the plan saved in the PR body.
