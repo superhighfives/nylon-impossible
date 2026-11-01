@@ -115,6 +115,11 @@ struct Composer: View {
             .textStyle(style == .inline ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body)
             .foregroundStyle(Theme.Colors.ink)
             .lineLimit(1...4)
+            // A vertical field keeps the height it grew to when the text
+            // size goes up and back down, which pushed every board column's
+            // rows 33pt down. A fresh field per size measures afresh; the
+            // draft is in `text`, so nothing is lost.
+            .id(dynamicTypeSize)
             .focused($isFocused)
             .submitLabel(.return)
             .onChange(of: text, handleReturn)
@@ -218,11 +223,19 @@ struct Composer: View {
     private var inline: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Theme.Space.s3) {
-                Image(systemName: Theme.Icon.add)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: Theme.Phone.checkbox)
-                    .accessibilityHidden(true)
+                // A button, not a hidden glyph: the audit flags drawn content
+                // no element covers, and Voice Control can't reach it. It
+                // does what tapping the row does.
+                Button { isFocused = true } label: {
+                    Image(systemName: Theme.Icon.add)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.inkMuted)
+                        .frame(width: Theme.Phone.checkbox)
+                }
+                .buttonStyle(.plain)
+                // Not "New todo", the field's own label: two elements with
+                // one label leave the audit unable to name either.
+                .accessibilityLabel("Add")
                 field
             }
             .padding(.vertical, Theme.Space.s3)
