@@ -22,6 +22,7 @@
     "typecheck": "bun run web:typecheck && bun run api:typecheck && bun run admin:typecheck",
     "tokens": "node src/shared/design/generate.mjs",
     "tokens:check": "node src/shared/design/generate.mjs --check",
+    "copy:lint": "node src/shared/copy/lint.mjs",
     "deploy": "bun run api:deploy && bun run web:deploy",
     "db:migrate": "CI=true wrangler d1 migrations apply DB --local --persist-to .wrangler/state -c src/api/wrangler.jsonc && CI=true wrangler d1 migrations apply DB --local --persist-to .wrangler/state -c src/web/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote -c src/api/wrangler.jsonc",
