@@ -11,6 +11,7 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 export FOREMAN_HOME="$tmp/home"
+export FOREMAN_MERGEABLE_RETRY_SECONDS=0
 # shellcheck source=SCRIPTDIR/foreman.sh
 source "$here/foreman.sh"
 set +e
@@ -157,6 +158,26 @@ MIG_SHA="$(case_sha add-migration)"
 reset; VIEW=$(view "$MIG_SHA" "$GREEN_CHECKS"); REVIEW=$(jq -cn --arg h "$MIG_SHA" '{commit_id:$h, green:true}')
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$MIG_SHA"
 expect_prefix "a green migration is the owner's"       "guarded: touches a migration"    "$(gate 7)"
+
+# UNKNOWN for two reads, then MERGEABLE: the gate asks again rather than waiting a tick.
+# gh runs inside $(…), so the countdown lives in a file.
+reset; echo 2 > "$tmp/unknown"
+gh() {
+  [ -n "$GH_FAIL" ] && return 1
+  case "$1 $2" in
+    "pr view")
+      local left; left=$(cat "$tmp/unknown")
+      if [ "$left" -gt 0 ]; then echo $((left - 1)) > "$tmp/unknown"; jq -c '.mergeable = "UNKNOWN"' <<<"$VIEW"
+      else echo "$VIEW"; fi ;;
+    "api graphql") echo "$THREADS" ;;
+    api\ repos/*) echo "$REVIEW" ;;
+    *) return 1 ;;
+  esac
+}
+expect "a briefly UNKNOWN mergeability is asked again"  "merge $HEAD_SHA"  "$(gate 7)"
+reset; echo 99 > "$tmp/unknown"
+expect "but one that stays UNKNOWN waits"               "wait: not mergeable (UNKNOWN)"  "$(gate 7)"
+echo 0 > "$tmp/unknown"
 
 reset; mv "$tmp/origin.git" "$tmp/gone.git"
 expect "a failed fetch waits"                          "wait: fetch failed"              "$(gate 7)"
