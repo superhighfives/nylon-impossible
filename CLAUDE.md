@@ -128,9 +128,10 @@ The rest lives in `.claude/skills/` and loads when the work comes up:
 - `d1-migrations`: expand/contract, and the outage that made it a rule.
 - `marketing-screenshots`: the capture pipeline, its best-effort rules,
   `--parity` and `audit.ts`.
-- `feedback-flow`: feedback issues, `feedback.yml` rounds, fix-shots. Never
-  merge, rebase or delete the orphan **`feedback-assets`** branch; every old
-  feedback issue's images live there.
+- `feedback-flow`: feedback issues, `feedback.yml` rounds, fix-shots. Fix-shots
+  are best-effort, like the marketing captures: never make them fail the run.
+  Never merge, rebase or delete the orphan **`feedback-assets`** branch; every
+  old feedback issue's images live there.
 - `cloud-routines`: the Sentry sweep, dependabot bundle and PR shepherd.
 
 **Pastor on `feedback/*` and `foreman/*` PRs:** `feedback.yml` and the foreman
