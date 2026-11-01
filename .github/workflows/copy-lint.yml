@@ -25,8 +25,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A manual run has no PR to diff, so it always lints.
       - name: Detect copy changes
         id: changes
+        if: github.event_name == 'pull_request'
         uses: dorny/paths-filter@v4
         with:
           filters: |
@@ -40,18 +42,18 @@ jobs:
               - '.github/workflows/copy-lint.yml'
 
       - uses: oven-sh/setup-bun@v2
-        if: steps.changes.outputs.copy == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.copy == 'true'
         with:
           bun-version-file: package.json
 
       - uses: actions/setup-node@v7
-        if: steps.changes.outputs.copy == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.copy == 'true'
         with:
           node-version: 24.21.0
 
       - run: bun install --frozen-lockfile
-        if: steps.changes.outputs.copy == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.copy == 'true'
 
       - name: Lint UI copy
-        if: steps.changes.outputs.copy == 'true'
+        if: github.event_name == 'workflow_dispatch' || steps.changes.outputs.copy == 'true'
         run: bun run copy:lint

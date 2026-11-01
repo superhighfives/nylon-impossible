@@ -84,6 +84,12 @@ export const PROPER_NOUNS = [
   "December",
 ];
 
+/**
+ * Proper nouns that are plain words after a verb: Done is the place, but the
+ * verb is "Mark done", not "Mark Done".
+ */
+const VERBS = { Done: "[Mm]ark" };
+
 const IGNORE_MARKER = "copy-lint-ignore";
 
 // ── Vocabulary ──────────────────────────────────────────────────────────────
@@ -160,8 +166,12 @@ export function checkCase(text, properNouns = PROPER_NOUNS) {
     .replace(/“[^”]*”|"[^"]*"|‘[^’]*’(?![\p{L}])/gu, PLACEHOLDER);
   const nouns = [...properNouns].sort((a, b) => b.length - a.length);
   for (const noun of nouns) {
+    const verb = VERBS[noun] ? `(?<!\\b${VERBS[noun]}\\s)` : "";
     masked = masked.replace(
-      new RegExp(`(?<![\\p{L}])${escapeRegExp(noun)}(?![\\p{L}])`, "gu"),
+      new RegExp(
+        `(?<![\\p{L}])${verb}${escapeRegExp(noun)}(?![\\p{L}])`,
+        "gu",
+      ),
       PLACEHOLDER,
     );
   }

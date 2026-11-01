@@ -62,6 +62,9 @@ describe("copy lint", () => {
 
   it("lets proper nouns, acronyms and new sentences keep capitals", () => {
     expect(checkCase("Add to Nylon")).toEqual([]);
+    expect(checkCase("Shows Done in the fourth column")).toEqual([]);
+    expect(checkCase("Mark Done")).toEqual(["Done"]);
+    expect(checkCase("Mark done")).toEqual([]);
     expect(checkCase("Nothing today. 4 waiting in This week")).toEqual([]);
     expect(checkCase("Copy API URL from GitHub")).toEqual([]);
     expect(checkCase("Enter adds · Esc closes")).toEqual([]);
