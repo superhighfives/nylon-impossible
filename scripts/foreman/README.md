@@ -8,7 +8,8 @@ Each tick:
 
 1. **Merge.** For each open `foreman/*` PR, run the merge gate. Merge if it
    passes. If the only thing stopping it is a guarded area, label it
-   `owner-merge`, comment once, and send an alert.
+   `owner-merge`, comment once, and send an alert. If its review is 🟡 or
+   🔴, run a review round (below).
 2. **Tidy.** Remove worktrees whose PR has merged or closed.
 3. **Build.** If fewer than 3 agent PRs (`foreman/*` and `feedback/*`) are
    open, take the first **Ready** issue in board order and build it.
@@ -18,6 +19,41 @@ Each tick:
      watching it.
    - Or the result is a question: the issue gets `needs-decision` and goes
      back to Specced.
+
+## Review rounds
+
+`control-room-review` reviews every push. The foreman merges only on 🟢, so
+it owns the rounds on its own PRs, the way `feedback.yml` does on
+`feedback/*`. Pastor leaves those findings alone (CLAUDE.md says so).
+
+A round starts when a `foreman/*` PR's checks are green and its latest review
+is 🟡 or 🔴 on the head commit:
+
+- Claude runs in a detached checkout of the branch, with the review and its
+  unresolved threads as the prompt.
+- It fixes what's right and replies where it disagrees, then pushes. The
+  push brings a fresh review, and the next round starts from that.
+- The PR gets a `fix-round:N` label for each round.
+- Each review gets one round at most. The last answered id is kept in
+  `~/.foreman/rounds/<pr>`, as `handed:<id>` once it's waiting on you.
+
+**It hands the PR to you** with `needs-decision`, a comment and an alert when:
+- a finding is your call;
+- a round pushes nothing, since without a new commit there's no new review,
+  so it could never reach 🟢 on its own;
+- 3 rounds pass without reaching 🟢.
+
+**Removing `needs-decision` re-arms it.** The next run clears the
+`fix-round:*` labels and starts again from round 1 on the latest review.
+
+**What the round sees:** the review, plus only those thread replies written
+by the review bot, `claude[bot]` or you. Anyone can reply on a public repo's
+threads. Bots are matched by account type as well as name, because GraphQL
+drops the `[bot]` suffix. The prompt wraps all of it in a block marked as
+data, and tells Claude not to read the PR's other comments.
+
+**A failed fetch doesn't use up a round.** Nothing is recorded until the
+checkout exists, so the next run tries again.
 
 ## The merge gate
 

@@ -162,6 +162,81 @@ reset; mv "$tmp/origin.git" "$tmp/gone.git"
 expect "a failed fetch waits"                          "wait: fetch failed"              "$(gate 7)"
 mv "$tmp/gone.git" "$tmp/origin.git"
 
+# ---- review rounds, with gh stubbed and claude never reached -----------------
+
+echo "review rounds"
+
+mkdir -p "$ROUNDS"
+CALLS="$tmp/calls"
+LABELS=""   # labels on the PR, comma-separated; the stub edits them like gh would
+REVIEW_ID=101
+gh() {
+  echo "$*" >> "$CALLS"
+  case "$1 $2" in
+    "pr view")  # has_label: real gh would print the index or null
+      local want; want=$(sed -E 's/.*index\("([^"]+)"\).*/\1/' <<<"$*")
+      case ",$LABELS," in *",$want,"*) echo 0 ;; *) echo null ;; esac ;;
+    "pr edit")
+      local all="$*"
+      case "$all" in
+        *--add-label*)    LABELS="$LABELS,${all##*--add-label }" ;;
+        *--remove-label*) LABELS=$(tr ',' '\n' <<<"$LABELS" | grep -vxF "${all##*--remove-label }" | paste -sd, -) ;;
+      esac ;;
+    api\ repos/*) jq -cn --argjson id "$REVIEW_ID" '{id:$id, body:"## 🟡"}' ;;
+    *) return 0 ;;
+  esac
+}
+alert() { echo "alert $*" >> "$CALLS"; }
+event() { :; }
+called() { grep -qF -- "$1" "$CALLS" && echo yes || echo no; }
+
+: > "$CALLS"; echo 101 > "$ROUNDS/9"; LABELS="fix-round:1"
+review_round 9 foreman/1-x 1
+expect "a review that already had a round is skipped"  "no"  "$(called 'pr edit')"
+
+: > "$CALLS"; rm -f "$ROUNDS/9"; LABELS="fix-round:1,fix-round:2,fix-round:3"
+review_round 9 foreman/1-x 1
+expect "after 3 rounds it hands over"   "yes"           "$(called '--add-label needs-decision')"
+expect "and marks the review as handed" "handed:101"    "$(cat "$ROUNDS/9")"
+expect "and alerts"                     "yes"           "$(called 'alert ')"
+
+# The owner removes needs-decision: re-arm, clear the rounds, start round 1.
+# foreman/1-x isn't on the fixture origin, so the fetch fails right after.
+: > "$CALLS"; LABELS="fix-round:1,fix-round:2,fix-round:3"
+review_round 9 foreman/1-x 1 >/dev/null
+expect "removing needs-decision re-arms"        "yes"  "$(called '--remove-label fix-round:3')"
+expect "and clears the handed state"            "no"   "$([ -e "$ROUNDS/9" ] && echo yes || echo no)"
+expect "a failed fetch doesn't use up a round"  "no"   "$(called '--add-label fix-round:1')"
+
+: > "$CALLS"; rm -f "$ROUNDS/9"; LABELS="fix-round:1"; DRY=1
+expect "the round number counts the labels"  "would run review round 2 on #9"  "$(review_round 9 foreman/1-x 1 | sed -E 's/^[0-9-]+ [0-9:]+ //')"
+DRY=0
+
+expect "the prompt carries the review"  "yes"  "$(round_prompt 9 foreman/1-x 1 2 'FINDING-XYZ' '' | grep -q FINDING-XYZ && echo yes)"
+
+echo "thread filter"
+threads_json='{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"id":"T1","isResolved":false,"path":"a.sh","line":3,"comments":{"nodes":[
+    {"author":{"__typename":"Bot","login":"control-room-review"},"body":"FINDING-ONE"},
+    {"author":{"__typename":"User","login":"stranger"},"body":"INJECT-STRANGER"},
+    {"author":{"__typename":"User","login":"claude"},"body":"INJECT-FAKE-CLAUDE"},
+    {"author":{"__typename":"Bot","login":"claude"},"body":"REPLY-CLAUDE"},
+    {"author":{"__typename":"User","login":"superhighfives"},"body":"REPLY-OWNER"}]}},
+  {"id":"T2","isResolved":true,"path":"b.sh","line":1,"comments":{"nodes":[
+    {"author":{"__typename":"Bot","login":"control-room-review"},"body":"RESOLVED-FINDING"}]}},
+  {"id":"T3","isResolved":false,"path":"c.sh","line":1,"comments":{"nodes":[
+    {"author":{"__typename":"User","login":"control-room-review"},"body":"FAKE-BOT-THREAD"}]}}
+]}}}}}'
+formatted=$(format_threads superhighfives <<<"$threads_json")
+has() { grep -qF "$1" <<<"$formatted" && echo yes || echo no; }
+expect "keeps the review bot's finding"            yes "$(has FINDING-ONE)"
+expect "keeps the owner's reply"                   yes "$(has REPLY-OWNER)"
+expect "keeps claude[bot]'s reply"                 yes "$(has REPLY-CLAUDE)"
+expect "drops a stranger's reply"                  no  "$(has INJECT-STRANGER)"
+expect "drops a person whose login is 'claude'"    no  "$(has INJECT-FAKE-CLAUDE)"
+expect "drops resolved threads"                    no  "$(has RESOLVED-FINDING)"
+expect "drops threads a person started as the bot" no  "$(has FAKE-BOT-THREAD)"
+
 echo
 echo "$pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -269,10 +269,11 @@ It then works in rounds, like pastor but in CI:
 `needs-decision` on the issue or the PR stops every round. Claude adds it
 when a finding is the owner's call; removing it re-arms the next round.
 
-**Pastor on `feedback/*` PRs:** `feedback.yml` owns `control-room-review`
-findings there, so don't fix them; it would duplicate the round's commits.
-Watch CI, handle the owner's own comments and decisions, and send the
-ready-to-merge notice.
+**Pastor on `feedback/*` and `foreman/*` PRs:** `feedback.yml` and the
+foreman (`scripts/foreman/`) own `control-room-review` findings there, so
+don't fix or defer them; it would duplicate the round's commits, and a
+deferred 🟡 never reaches the 🟢 the foreman merges on. Watch CI, handle the
+owner's own comments and decisions, and send the ready-to-merge notice.
 
 On Apple platforms the fix PR also gets a **Before | After** table: Claude
 writes `.fix-shots/plan.json` (which `-NylonScreen` routes show the change,
