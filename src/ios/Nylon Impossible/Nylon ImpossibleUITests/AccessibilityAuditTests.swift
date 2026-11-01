@@ -194,7 +194,10 @@ enum AuditAllowance {
         // The sidebar's account menu reports its whole 44pt label as the
         // name's frame, so the audit samples white and the avatar's gray-3
         // circle around the words. The name itself is ink on white, 16:1.
+        // Only the name the screen routes sign in with, so other sidebar
+        // text still gets sampled.
         if issue.auditType == .contrast, isPad, issue.element?.elementType == .staticText,
+           label.contains(Self.routeAccountName),
            let frame = issue.element?.frame, frame.maxX <= Self.sidebarEdge, frame.height >= 44 {
             return true
         }
@@ -234,6 +237,8 @@ enum AuditAllowance {
 
     /// The sidebar's trailing edge: it's 248pt wide, from the leading edge.
     private static let sidebarEdge: CGFloat = 248
+    /// The account name `ContentView.displayName` gives every screen route.
+    private static let routeAccountName = "Charlie Gleason"
 
     /// How far up from the bottom the phone's glass composer reaches at AX5,
     /// home indicator included.

@@ -55,6 +55,8 @@ struct Composer: View {
     var onDown: (() -> Void)?
 
     @State private var keepWords = false
+    @State private var wasFocused = false
+    @State private var refocusAfterResize = false
     @FocusState private var isFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -103,7 +105,21 @@ struct Composer: View {
         .onChange(of: text) { _, newValue in
             if newValue.isEmpty { keepWords = false }
         }
-        .onChange(of: isFocused) { _, focused in onFocusChange?(focused) }
+        .onChange(of: isFocused) { _, focused in
+            // The field is rebuilt when the text size changes (see `field`),
+            // and the old one lets go of focus: hand it to the new one.
+            if !focused, refocusAfterResize {
+                refocusAfterResize = false
+                isFocused = true
+                return
+            }
+            wasFocused = focused
+            onFocusChange?(focused)
+        }
+        // `isFocused` has already dropped by now; `wasFocused` hasn't.
+        .onChange(of: dynamicTypeSize) {
+            refocusAfterResize = wasFocused
+        }
         .onAppear(perform: takeFocusIfRequested)
         .onChange(of: focusRequested) { takeFocusIfRequested() }
     }
@@ -118,7 +134,7 @@ struct Composer: View {
             // A vertical field keeps the height it grew to when the text
             // size goes up and back down, which pushed every board column's
             // rows 33pt down. A fresh field per size measures afresh; the
-            // draft is in `text`, so nothing is lost.
+            // draft is in `text`, and `body` gives the new field the focus.
             .id(dynamicTypeSize)
             .focused($isFocused)
             .submitLabel(.return)
