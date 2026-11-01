@@ -60,7 +60,14 @@ jobs:
       - name: Count style literals
         if: matrix.family == 'iPhone'
         run: |
+          # The SwiftLint step above already fails the job on lint errors, so
+          # its exit status is ignored here, but a crash or a bad config would
+          # leave no report and must not read as "0 style literals".
           swiftlint lint --quiet --reporter json > swiftlint.json || true
+          if ! jq -e 'type == "array"' swiftlint.json > /dev/null; then
+            echo "::error title=Style literals::SwiftLint didn't produce a JSON report"
+            exit 1
+          fi
           total=$(jq '[.[] | select(.rule_id | startswith("style_literal_"))] | length' swiftlint.json)
           echo "::notice title=Style literals::$total hard-coded style literals outside Theme/"
           {
