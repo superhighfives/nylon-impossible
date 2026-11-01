@@ -142,6 +142,23 @@ guarded_reason() { # base-sha head-sha -> why the change is guarded, or nothing;
   return 0
 }
 
+# The review that counts is the newest one of the head commit. Not the last
+# in the list, nor the last submitted: a re-run can review an older commit
+# after the head's review, as on #563, which then waited 8 hours for a
+# review that had already arrived.
+pick_review() { # head-sha, then the reviews API's pages (stdin) -> {id, body, green}, or nothing
+  jq -sc --arg head "$1" --arg bot "$REVIEW_BOT" '
+    [.[][] | select(.user.login == $bot and .commit_id == $head)]
+    | sort_by(.submitted_at) | last // empty
+    | {id, body, green: (.body | contains("## 🟢"))}'
+}
+
+head_review() { # pr head-sha -> pick_review's answer; non-zero if GitHub can't be read
+  local pages
+  pages=$(gh api "repos/$OWNER/$REPO/pulls/$1/reviews" --paginate) || return 1
+  pick_review "$2" <<<"$pages"
+}
+
 gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
   local pr="$1" view head base
   # GitHub computes mergeability lazily, so right after main moves it reads
@@ -175,11 +192,8 @@ gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
   [[ "$head" =~ ^[0-9a-f]{40}$ && "$base" =~ ^[0-9a-f]{40}$ ]] || { echo "wait: no head or base commit"; return; }
 
   local review
-  review=$(gh api "repos/$OWNER/$REPO/pulls/$pr/reviews" --paginate \
-    --jq "[.[] | select(.user.login == \"$REVIEW_BOT\")] | last // empty | {commit_id, green: (.body | contains(\"## 🟢\"))}") \
-    || { echo "wait: couldn't read reviews"; return; }
-  [ -n "$review" ] || { echo "wait: no $REVIEW_BOT review yet"; return; }
-  [ "$(jq -r .commit_id <<<"$review")" = "$head" ] || { echo "wait: review is for an older commit"; return; }
+  review=$(head_review "$pr" "$head") || { echo "wait: couldn't read reviews"; return; }
+  [ -n "$review" ] || { echo "wait: no $REVIEW_BOT review of the head commit yet"; return; }
   [ "$(jq -r .green <<<"$review")" = true ] || { echo "wait: review isn't all-green"; return; }
 
   local open_threads
@@ -278,9 +292,9 @@ hand_over() { # pr issue review-id event comment alert
 }
 
 review_round() { # pr branch issue
-  local pr="$1" branch="$2" issue="$3" review id body threads round dir out status=0 before after state n
-  review=$(gh api "repos/$OWNER/$REPO/pulls/$pr/reviews" --paginate \
-    --jq "[.[] | select(.user.login == \"$REVIEW_BOT\")] | last // empty | {id, body}") || return 0
+  local pr="$1" branch="$2" issue="$3" review id body threads round dir out status=0 before after state n head
+  head=$(gh pr view "$pr" -R "$OWNER/$REPO" --json headRefOid --jq .headRefOid) || return 0
+  review=$(head_review "$pr" "$head") || return 0
   id=$(jq -r '.id // empty' <<<"$review")
   [ -n "$id" ] || return 0
   state=$(cat "$ROUNDS/$pr" 2>/dev/null || true)

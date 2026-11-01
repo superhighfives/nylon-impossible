@@ -109,6 +109,10 @@ GREEN_CHECKS='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"state":"SUCCESS"}
 
 # The stub returns what real gh would print *after* its --jq filter.
 GH_FAIL="" VIEW="" REVIEW="" THREADS=0
+review() { # commit-sha verdict-heading submitted-at [id] -> one raw review, as the API returns it
+  jq -cn --arg c "$1" --arg b "## $2" --arg t "$3" --argjson id "${4:-1}" \
+    '{id:$id, user:{login:"control-room-review[bot]"}, commit_id:$c, submitted_at:$t, body:($b + "\n\nfindings")}'
+}
 gh() {
   [ -n "$GH_FAIL" ] && return 1
   case "$1 $2" in
@@ -121,20 +125,39 @@ gh() {
 reset() {
   GH_FAIL="" THREADS=0
   VIEW=$(view "$HEAD_SHA" "$GREEN_CHECKS")
-  REVIEW=$(jq -cn --arg h "$HEAD_SHA" '{commit_id:$h, green:true}')
+  REVIEW="[$(review "$HEAD_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
 }
 
 reset
 expect "everything green merges, pinned to the head"   "merge $HEAD_SHA"                 "$(gate 7)"
 
-reset; REVIEW=$(jq -cn '{commit_id:"0000000000000000000000000000000000000000", green:true}')
-expect "a review of an older commit waits"             "wait: review is for an older commit" "$(gate 7)"
+OLD_SHA=0000000000000000000000000000000000000000
+reset; REVIEW="[$(review "$OLD_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
+expect_prefix "only a review of an older commit waits" "wait: no control-room-review[bot] review of the head" "$(gate 7)"
 
-reset; REVIEW=$(jq -cn --arg h "$HEAD_SHA" '{commit_id:$h, green:false}')
+reset; REVIEW="[$(review "$HEAD_SHA" "🟡 Approved with comments" 2026-11-01T09:00:00Z)]"
 expect "a 🟡 or 🔴 review waits"                        "wait: review isn't all-green"    "$(gate 7)"
 
-reset; REVIEW=""
+reset; REVIEW="[]"
 expect_prefix "no review waits"                        "wait: no "                       "$(gate 7)"
+
+# #563: the head's review came first, then a re-run reviewed an older commit,
+# and that one was last in the list. The head's review is the one that counts.
+reset; REVIEW="[$(review "$HEAD_SHA" "🟢 Approved" 2026-11-01T09:00:00Z 1), $(review "$OLD_SHA" "🟡 Approved with comments" 2026-11-01T09:44:00Z 2)]"
+expect "a later review of an older commit doesn't hide the head's"  "merge $HEAD_SHA"  "$(gate 7)"
+
+# Two reviews of the head: the newer one counts, whatever the list order.
+reset; REVIEW="[$(review "$HEAD_SHA" "🟢 Approved" 2026-11-01T10:00:00Z 2), $(review "$HEAD_SHA" "🟡 Approved with comments" 2026-11-01T09:00:00Z 1)]"
+expect "the newest review of the head counts"   "merge $HEAD_SHA"  "$(gate 7)"
+reset; REVIEW="[$(review "$HEAD_SHA" "🟡 Approved with comments" 2026-11-01T10:00:00Z 2), $(review "$HEAD_SHA" "🟢 Approved" 2026-11-01T09:00:00Z 1)]"
+expect "a newer 🟡 on the head overrides an older 🟢"  "wait: review isn't all-green"  "$(gate 7)"
+
+# --paginate prints one JSON array per page.
+expect "reviews across pages are all considered"  "2"  "$(printf '%s\n%s\n' "[$(review "$HEAD_SHA" "🟡 x" 2026-11-01T09:00:00Z 1)]" "[$(review "$HEAD_SHA" "🟢 y" 2026-11-01T10:00:00Z 2)]" | pick_review "$HEAD_SHA" | jq .id)"
+
+# Only the review bot's reviews count.
+reset; REVIEW=$(jq -c '.[0].user.login = "someone"' <<<"[$(review "$HEAD_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]")
+expect_prefix "a person's 🟢 doesn't count"  "wait: no "  "$(gate 7)"
 
 reset; VIEW=$(view "$HEAD_SHA" '[{"status":"IN_PROGRESS","conclusion":null}]')
 expect "pending checks wait"                           "wait: checks pending"            "$(gate 7)"
@@ -155,7 +178,7 @@ reset; VIEW=$(jq -c '.labels = [{name:"needs-decision"}]' <<<"$VIEW")
 expect "needs-decision waits"                          "wait: needs-decision"            "$(gate 7)"
 
 MIG_SHA="$(case_sha add-migration)"
-reset; VIEW=$(view "$MIG_SHA" "$GREEN_CHECKS"); REVIEW=$(jq -cn --arg h "$MIG_SHA" '{commit_id:$h, green:true}')
+reset; VIEW=$(view "$MIG_SHA" "$GREEN_CHECKS"); REVIEW="[$(review "$MIG_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$MIG_SHA"
 expect_prefix "a green migration is the owner's"       "guarded: touches a migration"    "$(gate 7)"
 
@@ -191,10 +214,13 @@ mkdir -p "$ROUNDS"
 CALLS="$tmp/calls"
 LABELS=""   # labels on the PR, comma-separated; the stub edits them like gh would
 REVIEW_ID=101
+ROUND_HEAD=1111111111111111111111111111111111111111
 gh() {
   echo "$*" >> "$CALLS"
   case "$1 $2" in
-    "pr view")  # has_label: real gh would print the index or null
+    "pr view")
+      case "$*" in *headRefOid*) echo "$ROUND_HEAD"; return 0 ;; esac
+      # has_label: real gh would print the index or null
       local want; want=$(sed -E 's/.*index\("([^"]+)"\).*/\1/' <<<"$*")
       case ",$LABELS," in *",$want,"*) echo 0 ;; *) echo null ;; esac ;;
     "pr edit")
@@ -203,7 +229,7 @@ gh() {
         *--add-label*)    LABELS="$LABELS,${all##*--add-label }" ;;
         *--remove-label*) LABELS=$(tr ',' '\n' <<<"$LABELS" | grep -vxF "${all##*--remove-label }" | paste -sd, -) ;;
       esac ;;
-    api\ repos/*) jq -cn --argjson id "$REVIEW_ID" '{id:$id, body:"## 🟡"}' ;;
+    api\ repos/*) echo "[$(review "$ROUND_HEAD" "🟡 Approved with comments" 2026-11-01T09:00:00Z "$REVIEW_ID")]" ;;
     *) return 0 ;;
   esac
 }
