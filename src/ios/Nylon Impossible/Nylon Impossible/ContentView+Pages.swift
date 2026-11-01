@@ -112,7 +112,7 @@ extension ContentView {
 
     func loading(_ title: String) -> some View {
         VStack(spacing: 0) {
-            Masthead(title: title, subline: "Getting your lists…", keepsBanner: true)
+            Masthead(title: title, subline: MastheadCopy.loading, keepsBanner: true)
             Spacer()
         }
     }

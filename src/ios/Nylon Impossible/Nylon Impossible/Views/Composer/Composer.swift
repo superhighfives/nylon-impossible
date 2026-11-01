@@ -55,6 +55,8 @@ struct Composer: View {
     var onDown: (() -> Void)?
 
     @State private var keepWords = false
+    @State private var wasFocused = false
+    @State private var refocusAfterResize = false
     @FocusState private var isFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -103,7 +105,23 @@ struct Composer: View {
         .onChange(of: text) { _, newValue in
             if newValue.isEmpty { keepWords = false }
         }
-        .onChange(of: isFocused) { _, focused in onFocusChange?(focused) }
+        .onChange(of: isFocused) { _, focused in
+            // The field is rebuilt when the text size changes (see `field`),
+            // and the old one lets go of focus: hand it to the new one.
+            if !focused, refocusAfterResize {
+                refocusAfterResize = false
+                isFocused = true
+                return
+            }
+            wasFocused = focused
+            onFocusChange?(focused)
+        }
+        // `isFocused` has already dropped by now; `wasFocused` hasn't. If the
+        // rebuild kept the focus after all, don't arm: nothing would clear
+        // the flag, and it would undo the next real blur.
+        .onChange(of: dynamicTypeSize) {
+            refocusAfterResize = wasFocused && !isFocused
+        }
         .onAppear(perform: takeFocusIfRequested)
         .onChange(of: focusRequested) { takeFocusIfRequested() }
     }
@@ -115,6 +133,11 @@ struct Composer: View {
             .textStyle(style == .inline ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body)
             .foregroundStyle(Theme.Colors.ink)
             .lineLimit(1...4)
+            // A vertical field keeps the height it grew to when the text
+            // size goes up and back down, which pushed every board column's
+            // rows 33pt down. A fresh field per size measures afresh; the
+            // draft is in `text`, and `body` gives the new field the focus.
+            .id(dynamicTypeSize)
             .focused($isFocused)
             .submitLabel(.return)
             .onChange(of: text, handleReturn)
@@ -218,11 +241,19 @@ struct Composer: View {
     private var inline: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Theme.Space.s3) {
-                Image(systemName: Theme.Icon.add)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: Theme.Phone.checkbox)
-                    .accessibilityHidden(true)
+                // A button, not a hidden glyph: the audit flags drawn content
+                // no element covers, and Voice Control can't reach it. It
+                // does what tapping the row does.
+                Button { isFocused = true } label: {
+                    Image(systemName: Theme.Icon.add)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Theme.Colors.inkMuted)
+                        .frame(width: Theme.Phone.checkbox)
+                }
+                .buttonStyle(.plain)
+                // Not "New todo", the field's own label: two elements with
+                // one label leave the audit unable to name either.
+                .accessibilityLabel("Add")
                 field
             }
             .padding(.vertical, Theme.Space.s3)

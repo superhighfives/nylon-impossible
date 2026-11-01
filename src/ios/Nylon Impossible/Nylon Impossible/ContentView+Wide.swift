@@ -127,8 +127,13 @@ extension ContentView {
         .background(Theme.Colors.canvas.ignoresSafeArea())
         .focusedSceneValue(\.board, commandHandler)
         .sheet(isPresented: Binding(get: { widePanel == .settings }, set: { if !$0 { widePanel = nil } })) {
-            PanelChrome(onClose: { widePanel = nil }) { SettingsView() }
-                .presentationBackground(Theme.Colors.canvas)
+            // A stack of its own, as the phone's account sheet has, so
+            // Timezone opens its picker; outside one its link is disabled.
+            // Settings keeps the bar hidden, the picker shows it for Back.
+            PanelChrome(onClose: { widePanel = nil }) {
+                NavigationStack { SettingsView().hidesNavigationBar() }
+            }
+            .presentationBackground(Theme.Colors.canvas)
         }
         #endif
     }
@@ -188,6 +193,21 @@ extension ContentView {
         return ScrollViewReader { proxy in
             ScrollView(.horizontal) {
                 HStack(spacing: 0) {
+                    // Before the first sync there are no lists yet: hold the
+                    // three time columns' places with their titles, as the
+                    // phone's pages do, rather than drawing Done alone.
+                    if columns.isEmpty {
+                        ForEach(Array([Page.today, .thisWeek, .someday].enumerated()), id: \.element) { index, page in
+                            HStack(spacing: 0) {
+                                if index > 0 { VerticalHairline() }
+                                loadingColumn(page.title)
+                            }
+                            .containerRelativeFrame(.horizontal) { length, _ in
+                                max(minimum, length / 4)
+                            }
+                            .frame(maxHeight: .infinity)
+                        }
+                    }
                     ForEach(Array(columns.enumerated()), id: \.element.id) { index, list in
                         HStack(spacing: 0) {
                             if index > 0 { VerticalHairline() }
@@ -264,6 +284,19 @@ extension ContentView {
             return .handled
         }
         .refreshable { await syncService.sync() }
+    }
+
+    /// A time column before its list has synced: the title, and the line
+    /// the phone's page shows while it waits.
+    func loadingColumn(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            BoardColumnHeader(title: title, subline: MastheadCopy.loading)
+            Hairline()
+                .padding(.horizontal, Theme.Wide.gutter)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Theme.Colors.canvas)
     }
 
     /// The fourth column: the open todo's detail, else your list, else Done.
