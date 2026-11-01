@@ -20,3 +20,38 @@ disabled_rules:
 opt_in_rules:
   - empty_count
   - closure_spacing
+
+# Style literals (#545). Padding, corner radii, opacities and colours come from
+# the design tokens (src/shared/design/tokens.json → Theme.swift), so a literal
+# outside Theme/ is where iOS drifts from web. Warnings for now, while the
+# count is burnt down screen by screen; once it reaches zero these become
+# errors. 0 and 1 opacities are show/hide, not style, so they're allowed.
+custom_rules:
+  style_literal_padding:
+    name: Style literal padding
+    regex: '(?:\.padding|EdgeInsets)\((?:[^()\n]|\([^()\n]*\))*?(?:\([^()\n]*?)?(?<![\w.])[0-9]*\.?[0-9]*[1-9]'
+    excluded: '/Theme/'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Use Theme.Space (or a named Theme constant) instead of a literal padding."
+    severity: warning
+  style_literal_corner_radius:
+    name: Style literal corner radius
+    regex: '(?:\bcornerRadius\s*:|\.cornerRadius\()[^,)\n]*?(?<![\w.])[0-9]*\.?[0-9]*[1-9]'
+    excluded: '/Theme/'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Use Theme.Radius (or a named Theme constant) instead of a literal corner radius."
+    severity: warning
+  style_literal_opacity:
+    name: Style literal opacity
+    regex: '(?:\.opacity\(|\bopacity\s*:)(?:[^()\n]|\([^()\n]*\))*?(?:\([^()\n]*?)?(?<![\w.])0?\.[0-9]*[1-9]'
+    excluded: '/Theme/'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Use a Theme colour or a named Theme opacity instead of a literal opacity."
+    severity: warning
+  style_literal_color:
+    name: Style literal colour
+    regex: '\bColor(?:\(\s*(?:red|green|blue|white|hue|\.sRGB|\.displayP3|\.linearSRGB|#colorLiteral)\b|\.(?:black|white|gray|red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown)\b)'
+    excluded: '/Theme/'
+    excluded_match_kinds: [comment, doccomment, string]
+    message: "Use a Theme.Colors token instead of a literal colour."
+    severity: warning
