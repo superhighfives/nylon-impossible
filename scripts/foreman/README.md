@@ -4,21 +4,69 @@ The foreman turns the **Nylon** project board into pull requests without a
 local session. It runs on the owner's always-on Mac mini (later a MacStadium
 Mac) as a launchd job, every 10 minutes.
 
+It acts on GitHub as its own machine account, `nylon-foreman` (below), so
+the PR history shows who did what.
+
 Each tick:
 
-1. **Merge.** For each open `foreman/*` PR, run the merge gate. Merge if it
-   passes. If the only thing stopping it is a guarded area, label it
-   `owner-merge`, comment once, and send an alert. If its review is 🟡 or
-   🔴, run a review round (below).
+1. **Merge.** For each open `foreman/*` PR by `nylon-foreman`, run the merge
+   gate. Merge if it passes. If the only thing stopping it is a guarded
+   area, label it `owner-merge`, comment once, and send an alert. If its
+   review is 🟡 or 🔴, run a review round (below). If it's waiting for
+   `verified`, see "Verified" below.
 2. **Tidy.** Remove worktrees whose PR has merged or closed.
-3. **Build.** If fewer than 3 agent PRs (`foreman/*` and `feedback/*`) are
-   open, take the first **Ready** issue in board order and build it.
+3. **Spec.** Draft or revise at most one spec (below).
+4. **Build.** If fewer than 3 agent PRs (`foreman/*` and `feedback/*`) are
+   open, take the first **Ready** issue in board order whose spec passes the
+   check (below), and build it.
    - It runs headless `claude` in a fresh worktree, with the issue body and
-     the owner's comments as the prompt.
-   - The result is a PR, which then goes to In review and gets pastor
-     watching it.
+     the trusted comments as the prompt.
+   - The result is a PR, with a **Try it** section, which then goes to In
+     review and gets pastor watching it.
    - Or the result is a question: the issue gets `needs-decision` and goes
      back to Specced.
+
+## Specs
+
+The template and the rules for arguing it are in the `prd` skill
+(`.claude/skills/prd/SKILL.md`).
+
+**The check.** Before building, the foreman reads the issue body. Every spec
+needs `## Problem`, `## Acceptance criteria`, `## How to verify`,
+`## Open questions` and `## Decisions`; a `kind:feature` also needs
+`## Outcome`, `## Behaviour`, `## Non-goals` and `## Principles`. **Open
+questions** must read exactly `None.`. If not, the issue gets `needs-spec`, a
+comment listing what's wrong, and goes back to Specced, and the foreman
+tries the next Ready issue. A spec that passes loses `needs-spec`.
+
+**Drafting and revising.** The owner's open issues labelled `spec`, in Ideas
+or Specced, get a spec run:
+- a **draft** the first time the foreman sees one;
+- a **revision** each time the owner comments after that. Only the owner's
+  comments start one; the prompt includes the owner's, `nylon-foreman`'s and
+  `claude[bot]`'s.
+
+Claude writes the spec into the issue body, posts its questions as a
+comment, and doesn't touch code. The issue moves to Specced, and you get an
+alert: either it has questions for you, or it has none left and is ready for
+you to move to Ready. One run per tick, and one per reply, even if it fails:
+the id of the reply it answered is kept in `~/.foreman/specs/<issue>`.
+
+## Verified
+
+The gate waits for the owner's `verified` on every foreman PR, for now.
+
+- **It counts only if you added it,** going by the label event's actor, and
+  only if you added it after the head commit was pushed (the repo's activity
+  log says when). If the label's latest event is anyone else's, it waits.
+- **A push after `verified` clears it.** The foreman removes the stale label
+  and comments, so what you tried is what merges.
+- **Reminders.** When a PR first waits only for `verified`, the clock starts
+  (`~/.foreman/verify/<pr>`, and an `awaiting_verified` event). After a day
+  you get one alert and one comment. `foreman status` lists every PR still
+  waiting, for the daily digest (#544) to pick up.
+- **Relaxing it** means dropping it for one kind at a time, with a written
+  reason in CLAUDE.md, and a change to the gate here.
 
 ## Review rounds
 
@@ -69,6 +117,8 @@ hold:
 - the latest `control-room-review` review is for the head commit and is 🟢.
   🟡 "approved with comments" doesn't count;
 - there are no unresolved review threads started by the owner;
+- the owner added `verified` after the head commit was pushed (checked last,
+  so a guarded PR still gets `owner-merge` first);
 - it touches no **guarded area**. The check diffs with `--no-renames`, so
   moving a file out of a guarded path counts as touching it. The areas:
   - `src/api/migrations/`;
@@ -90,8 +140,9 @@ comment and an alert, and waits for you. The comment points to CLAUDE.md's
 "Merging" section, which arrives with #549.
 
 `scripts/foreman/test.sh` (`bun run foreman:test`) runs the gate against a
-throwaway repo with `gh` stubbed: renames, deletes, every guarded path, and
-each way the gate has to wait. CI runs it whenever `scripts/foreman/` changes.
+throwaway repo with `gh` stubbed: renames, deletes, every guarded path, each
+way the gate has to wait, `verified` and its reminders, the spec check, and
+the token's expiry. CI runs it whenever `scripts/foreman/` changes.
 
 ## What it trusts
 
@@ -99,12 +150,14 @@ The repo is public, so:
 
 - The foreman **polls**. It isn't a self-hosted runner, so nothing on GitHub
   can push work to the machine.
-- It only builds issues **opened by the owner** that the owner (or an agent,
-  for non-features) moved to Ready. `foreman build <n>` applies the same rule.
-- The prompt includes only comments by the owner and `claude[bot]`, matched
-  by exact login, because anyone can register a login that starts with
-  "claude". Issues
-  labelled `auto-fix` are left to `feedback.yml`.
+- It only builds issues **opened by the owner** that the owner moved to
+  Ready. `foreman build <n>` applies the same rule, and the spec check.
+- The prompts include only comments by the owner, `nylon-foreman` and
+  `claude[bot]`, matched by exact login (and, in review threads, by account
+  type), because anyone can register a login that starts with "claude".
+  Issues labelled `auto-fix` are left to `feedback.yml`.
+- Only the owner's `verified` counts, so the machine account can't verify its
+  own work.
 
 ## Running it
 
@@ -123,13 +176,36 @@ To stop it:
   Secrets and variables → Actions → Variables). Delete it, or set it to
   anything else, to resume.
 
+## The machine account
+
+The foreman acts as `nylon-foreman`, a GitHub user with Write access to the
+repo and to the Nylon project. Its classic token (scopes `repo`, `workflow`,
+`project`) lives in **`~/.foreman/github-token`**, `chmod 600`.
+
+- Every `gh` call, and every `claude` run it starts, gets that token as
+  `GH_TOKEN`, so builds, rounds, spec runs, comments, labels and merges are
+  `nylon-foreman`'s.
+- Its clone pushes over HTTPS with that token as the credential (a
+  repo-local credential helper), and commits as `nylon-foreman`, unsigned.
+  That covers pushes from pastor's jobs in its worktrees too. Pastor's
+  comments still come from the owner's `gh` login.
+- It checks the token at the start of every command. **Seven days before it
+  expires** you get an alert (once per token) and a ⚠️ line in
+  `foreman status`. **Once it has expired** (or is missing, or belongs to
+  someone else), the foreman does nothing, says why in its log and in
+  `status`, and alerts once.
+- **To renew it:** make a new classic token on `nylon-foreman` with the same
+  scopes, and write it to `~/.foreman/github-token`. The next tick uses it.
+
 **Setup and state:**
-- Credentials come from pastor's shim (`~/.config/pastor/exec.sh`), so run
-  `pastor setup` and `pastor token` first.
+- Claude's credentials come from pastor's shim (`~/.config/pastor/exec.sh`),
+  so run `pastor setup` and `pastor token` first, and put the machine
+  account's token in place (above).
 - Alerts use pastor's Discord webhook, if one is set.
 - Everything else lives in `~/.foreman`: a clone tracking `main`, the
-  worktrees, logs, and `events.jsonl`, one line per merge, PR, question or
-  failure. The daily digest (#544) will read `events.jsonl`.
+  worktrees, logs, `rounds/`, `specs/`, `verify/`, and `events.jsonl`, one
+  line per merge, PR, question, spec run or failure. The daily digest (#544)
+  will read `events.jsonl`.
 - **It runs under macOS's `/bin/bash` 3.2**, so no associative arrays or
   other bash 4 features.
 
