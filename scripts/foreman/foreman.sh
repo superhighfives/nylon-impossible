@@ -150,7 +150,7 @@ gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
   while :; do
     view=$(gh pr view "$pr" -R "$OWNER/$REPO" --json isDraft,labels,mergeable,headRefOid,baseRefOid,statusCheckRollup,state) \
       || { echo "wait: couldn't read the PR"; return; }
-    [ "$(jq -r .mergeable <<<"$view")" = UNKNOWN ] && [ "$tries" -lt 3 ] || break
+    if [ "$(jq -r .mergeable <<<"$view")" != UNKNOWN ] || [ "$tries" -ge 3 ]; then break; fi
     tries=$((tries + 1)); sleep "$MERGEABLE_RETRY_SECONDS"
   done
   [ "$(jq -r .state <<<"$view")" = OPEN ] || { echo "wait: not open"; return; }
