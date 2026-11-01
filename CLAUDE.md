@@ -78,20 +78,35 @@ the source of truth:
 | Status | What's there |
 | --- | --- |
 | Ideas | Draft items: a line or a paragraph. Anyone, agents included, may add one |
-| Specced | Converted to an issue with a spec in the body: problem, approach, acceptance criteria |
-| Ready | Cleared to build. An agent may pick it up |
+| Specced | An issue whose body is a spec (`prd` skill), being argued until its Open questions are "None." |
+| Ready | Argued out and cleared to build by the owner. An agent may pick it up |
 | In progress | Someone (or an agent) has a branch for it |
 | In review | A PR is open |
 | Done | Merged, or closed with a reason |
 
 - Every issue gets a `kind:*` label: `feature`, `fix`, `refactor`, `a11y`,
   `test` or `chore`.
-- **Only the owner moves a `kind:feature` item into Ready.** Agents may move
-  the other kinds there themselves once the spec is written.
+- **Specs are argued, not just written.** Claude drafts every spec into the
+  issue body with the `prd` skill's template and posts its questions; the
+  owner argues until **Open questions** reads "None.". Answers go into
+  **Decisions**, dated. The owner may edit the body directly, and the edited
+  body is the truth. The foreman drafts and revises issues labelled `spec`
+  on its own; in a local session, write the result back to the issue.
+- **Only the owner moves an item into Ready,** for every kind, for now. The
+  foreman refuses to build one with a missing section or open questions: it
+  comments, adds `needs-spec` and moves it back to Specced.
+- **The owner tries agent PRs before they merge.** Each PR's body has a
+  **Try it** section (preview URL, steps, Apple before/after shots, and each
+  acceptance criterion with its proof). On the foreman's PRs, the owner adds
+  `verified` after trying it; a later push clears it.
 - At most **3 agent PRs** are open at once. Finish or close one before
   starting another.
 - `needs-decision` on an issue or PR means it's waiting on the owner. Leave a
   comment that says exactly what the decision is.
+- **The agents have their own GitHub account,** `nylon-foreman`. The
+  foreman, its review rounds and its merges act as it; local sessions act as
+  the owner. Its comments count alongside the owner's, `control-room-review`
+  and `claude[bot]`; nobody else's do.
 - What a plan's "done" document used to record goes in the PR description.
   Anything that should stay true goes into PRINCIPLES.md, this file or a skill.
 
@@ -105,6 +120,10 @@ of these hold:
   on the head commit (🟡 "approved with comments" doesn't count);
 - the PR isn't a draft and has no `needs-decision` label;
 - no unresolved review threads from the owner;
+- on the foreman's `foreman/*` PRs, the owner added `verified` after the
+  head commit was pushed (for now, every kind; it will be dropped kind by
+  kind, each with a written reason). The cloud routines' PRs don't wait for
+  it;
 - it touches none of the guarded areas below.
 
 Guarded areas wait for the owner to merge. A rename counts as touching both
@@ -133,6 +152,8 @@ The rest lives in `.claude/skills/` and loads when the work comes up:
   Never merge, rebase or delete the orphan **`feedback-assets`** branch; every
   old feedback issue's images live there.
 - `cloud-routines`: the Sentry sweep, dependabot bundle and PR shepherd.
+- `prd`: the spec template, what makes a question open, and how Decisions
+  are recorded. Load it before drafting or revising any spec.
 
 **Pastor on `feedback/*` and `foreman/*` PRs:** `feedback.yml` and the foreman
 own `control-room-review` findings there, so don't fix or defer them (a
