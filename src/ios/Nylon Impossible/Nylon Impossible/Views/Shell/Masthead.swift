@@ -165,6 +165,9 @@ enum MastheadCopy {
 
     static let done = "Finished todos, by day"
 
+    /// A page or column before its lists have synced, on phone and iPad.
+    static let loading = "Getting your lists…"
+
     /// "Sunday, October 18".
     static func longDate(_ date: Date, locale: Locale = .current) -> String {
         let formatter = DateFormatter()

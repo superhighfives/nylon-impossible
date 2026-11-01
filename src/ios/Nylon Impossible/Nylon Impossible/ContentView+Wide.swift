@@ -290,7 +290,7 @@ extension ContentView {
     /// the phone's page shows while it waits.
     func loadingColumn(_ title: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            BoardColumnHeader(title: title, subline: "Getting your lists…")
+            BoardColumnHeader(title: title, subline: MastheadCopy.loading)
             Hairline()
                 .padding(.horizontal, Theme.Wide.gutter)
             Spacer()
