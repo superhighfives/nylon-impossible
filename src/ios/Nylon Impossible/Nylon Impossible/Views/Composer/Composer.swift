@@ -116,9 +116,11 @@ struct Composer: View {
             wasFocused = focused
             onFocusChange?(focused)
         }
-        // `isFocused` has already dropped by now; `wasFocused` hasn't.
+        // `isFocused` has already dropped by now; `wasFocused` hasn't. If the
+        // rebuild kept the focus after all, don't arm: nothing would clear
+        // the flag, and it would undo the next real blur.
         .onChange(of: dynamicTypeSize) {
-            refocusAfterResize = wasFocused
+            refocusAfterResize = wasFocused && !isFocused
         }
         .onAppear(perform: takeFocusIfRequested)
         .onChange(of: focusRequested) { takeFocusIfRequested() }
