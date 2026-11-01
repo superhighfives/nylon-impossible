@@ -55,7 +55,12 @@ export function useCreateList() {
         queryClient.setQueryData(LISTS_QUERY_KEY, context.previousLists);
       }
     },
-    onSuccess: () => {
+    onSuccess: (created, _input, context) => {
+      // Swap the optimistic row for the real one now, so a caller that opens
+      // the new list finds it before the refetch lands.
+      queryClient.setQueryData<SerializedList[]>(LISTS_QUERY_KEY, (lists) =>
+        lists?.map((l) => (l.id === context?.optimisticId ? created : l)),
+      );
       notifyChanged();
     },
     onSettled: () => {

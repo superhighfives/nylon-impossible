@@ -263,6 +263,9 @@ export function WideApp({
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the column opens or closes
   useEffect(() => {
     if (loading) return;
+    // A list that isn't there is about to close (above); pointing the URL at
+    // it would reopen it and loop.
+    if (openListId && !openList) return;
     if (openListId) {
       if (urlKey !== `list:${openListId}`) {
         onNavigate?.({ kind: "list", id: openListId });
