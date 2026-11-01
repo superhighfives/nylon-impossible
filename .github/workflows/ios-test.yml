@@ -54,6 +54,24 @@ jobs:
           brew install swiftlint
           swiftlint
 
+      # The style_literal_* rules in .swiftlint.yml (#545) are warnings while
+      # the count is burnt down. Report it per rule, so it can be watched
+      # trending to zero; when it gets there the rules become errors.
+      - name: Count style literals
+        if: matrix.family == 'iPhone'
+        run: |
+          swiftlint lint --quiet --reporter json > swiftlint.json || true
+          total=$(jq '[.[] | select(.rule_id | startswith("style_literal_"))] | length' swiftlint.json)
+          echo "::notice title=Style literals::$total hard-coded style literals outside Theme/"
+          {
+            echo "### Style literals outside Theme/: $total"
+            echo
+            echo "| Rule | Count |"
+            echo "| --- | --- |"
+            jq -r '[.[] | select(.rule_id | startswith("style_literal_"))]
+              | group_by(.rule_id) | map("| `\(.[0].rule_id)` | \(length) |") | .[]' swiftlint.json
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Select Xcode
         run: |
           xcodebuild -version
