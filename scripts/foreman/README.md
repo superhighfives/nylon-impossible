@@ -60,7 +60,8 @@ The gate waits for the owner's `verified` on every foreman PR, for now.
   only if you added it after the head commit was pushed (the repo's activity
   log says when). If the label's latest event is anyone else's, it waits.
 - **A push after `verified` clears it.** The foreman removes the stale label
-  and comments, so what you tried is what merges.
+  and comments, so what you tried is what merges. The reminder clock
+  restarts from that push.
 - **Reminders.** When a PR first waits only for `verified`, the clock starts
   (`~/.foreman/verify/<pr>`, and an `awaiting_verified` event). After a day
   you get one alert and one comment. `foreman status` lists every PR still

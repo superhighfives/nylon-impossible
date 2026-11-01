@@ -379,6 +379,7 @@ verify_reminder() { # pr issue -> one comment and one alert once it has waited a
 clear_verified() { # pr issue -> removes a `verified` that predates the head commit, and says so
   dry && { log "would remove the stale verified from #$1"; return 0; }
   gh pr edit "$1" -R "$OWNER/$REPO" --remove-label verified >/dev/null || return 0
+  rm -f "$VERIFY/$1" "$VERIFY/$1.reminded" # the wait, and its one reminder, restart from this push
   gh pr comment "$1" -R "$OWNER/$REPO" --body "A push landed after \`verified\`, so I've removed it: what merges should be what you tried. Try the latest commit and add it again." >/dev/null || true
   event verified_cleared "$2" "$1"
 }
@@ -607,12 +608,18 @@ spec_ready() { # board_json issue -> 0 if it can be built; otherwise sends it ba
   fi
   log "#$n isn't ready to build: $(paste -sd' ' - <<<"$problems")"
   dry && return 1
-  gh issue edit "$n" -R "$OWNER/$REPO" --add-label needs-spec >/dev/null || true
-  gh issue comment "$n" -R "$OWNER/$REPO" --body "The foreman won't build this yet:
+  # Already labelled means it was already told: if the move back to Specced
+  # failed last tick, don't comment again on every tick until it works.
+  case ",$labels," in
+    *,needs-spec,*) ;;
+    *)
+      gh issue edit "$n" -R "$OWNER/$REPO" --add-label needs-spec >/dev/null || true
+      gh issue comment "$n" -R "$OWNER/$REPO" --body "The foreman won't build this yet:
 
 $(awk '{print "- " $0}' <<<"$problems")
 
-The template is in the \`prd\` skill (\`.claude/skills/prd/SKILL.md\`). Once the spec is complete and its open questions are \"None.\", move it back to Ready." >/dev/null || true
+The template is in the \`prd\` skill (\`.claude/skills/prd/SKILL.md\`). Once the spec is complete and its open questions are \"None.\", move it back to Ready." >/dev/null || true ;;
+  esac
   set_status "$board" "$n" Specced || true
   event spec_refused "$n" "" "$(paste -sd' ' - <<<"$problems")"
   return 1
@@ -652,6 +659,11 @@ spec_pass() { # board_json -> drafts or revises at most one spec: a new one, or 
   done
 }
 
+# A spec run only writes the issue. The prompt says so, and this backs it up,
+# since the run holds the machine account's token.
+SPEC_DENY=("Bash(git push *)" "Bash(git commit *)" "Bash(git reset --hard *)"
+  "Bash(gh pr *)" "Bash(gh project *)" "Bash(gh label *)")
+
 spec_round() { # board_json issue owner-comment-id draft|revise
   local board="$1" n="$2" dir out status=0 body
   if dry; then log "would $4 the spec for #$n"; return 0; fi
@@ -664,7 +676,8 @@ spec_round() { # board_json issue owner-comment-id draft|revise
   log "spec for #$n ($4)"; event spec "$n" "" "$4"
   out="$LOGS/spec-$n-$(date +%Y%m%d-%H%M%S).log"
   (cd "$dir" && perl -e 'alarm shift; exec @ARGV' "$BUILD_TIMEOUT" \
-      "$SHIM" claude -p "$(spec_prompt "$n" "$4")" --permission-mode bypassPermissions --model "$MODEL") \
+      "$SHIM" claude -p "$(spec_prompt "$n" "$4")" --permission-mode bypassPermissions --model "$MODEL" \
+      --disallowedTools "${SPEC_DENY[@]}") \
     >"$out" 2>&1 || status=$?
   rm_worktree "spec-$n"
   set_status "$board" "$n" Specced || true

@@ -370,6 +370,7 @@ expect "nor another comment"                    "no"   "$(called 'pr comment')"
 clear_verified 7 1
 expect "a stale verified is removed"            "yes"  "$(called '--remove-label verified')"
 expect "and the owner is told why"              "yes"  "$(called 'pr comment 7')"
+expect "and the wait restarts from the push"    "no no" "$([ -e "$VERIFY/7" ] && echo yes || echo no) $([ -e "$VERIFY/7.reminded" ] && echo yes || echo no)"
 
 # ---- specs -------------------------------------------------------------------
 
@@ -464,7 +465,12 @@ expect "with needs-spec"                        "yes"  "$(called '--add-label ne
 expect "and a comment saying why"               "yes"  "$(called "doesn't read \"None.\"")"
 expect "and back to Specced"                    "yes"  "$(called '--single-select-option-id o-specced')"
 
-: > "$CALLS"; DRY=1
+: > "$CALLS"; SPEC_LABELS="kind:fix,needs-spec"
+spec_ready "$BOARD" 11 >/dev/null
+expect "already told: no second comment"        "1 no" "$? $(called 'issue comment')"
+expect "but still back to Specced"              "yes"  "$(called '--single-select-option-id o-specced')"
+
+: > "$CALLS"; SPEC_LABELS="kind:fix"; DRY=1
 spec_ready "$BOARD" 11 >/dev/null
 expect "a dry run refuses without touching it"  "1 no"  "$? $(called 'issue edit')"
 DRY=0

@@ -95,10 +95,10 @@ the source of truth:
 - **Only the owner moves an item into Ready,** for every kind, for now. The
   foreman refuses to build one with a missing section or open questions: it
   comments, adds `needs-spec` and moves it back to Specced.
-- **The owner tries every agent PR before it merges.** Each PR's body has a
+- **The owner tries agent PRs before they merge.** Each PR's body has a
   **Try it** section (preview URL, steps, Apple before/after shots, and each
-  acceptance criterion with its proof). The owner adds `verified` after
-  trying it; a later push clears it.
+  acceptance criterion with its proof). On the foreman's PRs, the owner adds
+  `verified` after trying it; a later push clears it.
 - At most **3 agent PRs** are open at once. Finish or close one before
   starting another.
 - `needs-decision` on an issue or PR means it's waiting on the owner. Leave a
@@ -120,8 +120,10 @@ of these hold:
   on the head commit (🟡 "approved with comments" doesn't count);
 - the PR isn't a draft and has no `needs-decision` label;
 - no unresolved review threads from the owner;
-- the owner added `verified` after the head commit was pushed (for now,
-  every kind; it will be dropped kind by kind, each with a written reason);
+- on the foreman's `foreman/*` PRs, the owner added `verified` after the
+  head commit was pushed (for now, every kind; it will be dropped kind by
+  kind, each with a written reason). The cloud routines' PRs don't wait for
+  it;
 - it touches none of the guarded areas below.
 
 Guarded areas wait for the owner to merge. A rename counts as touching both
