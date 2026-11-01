@@ -34,14 +34,26 @@ is 🟡 or 🔴 on the head commit:
 - It fixes what's right and replies where it disagrees, then pushes. The
   push brings a fresh review, and the next round starts from that.
 - The PR gets a `fix-round:N` label for each round.
-- Each review gets one round at most (the last answered id is kept in
-  `~/.foreman/rounds/<pr>`).
+- Each review gets one round at most. The last answered id is kept in
+  `~/.foreman/rounds/<pr>`, as `handed:<id>` once it's waiting on you.
 
 **It hands the PR to you** with `needs-decision`, a comment and an alert when:
 - a finding is your call;
 - a round pushes nothing, since without a new commit there's no new review,
   so it could never reach 🟢 on its own;
 - 3 rounds pass without reaching 🟢.
+
+**Removing `needs-decision` re-arms it.** The next run clears the
+`fix-round:*` labels and starts again from round 1 on the latest review.
+
+**What the round sees:** the review, plus only those thread replies written
+by the review bot, `claude[bot]` or you. Anyone can reply on a public repo's
+threads. Bots are matched by account type as well as name, because GraphQL
+drops the `[bot]` suffix. The prompt wraps all of it in a block marked as
+data, and tells Claude not to read the PR's other comments.
+
+**A failed fetch doesn't use up a round.** Nothing is recorded until the
+checkout exists, so the next run tries again.
 
 ## The merge gate
 
