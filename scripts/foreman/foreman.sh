@@ -24,6 +24,7 @@ MODEL="${FOREMAN_MODEL:-opus}"
 BUILD_TIMEOUT="${FOREMAN_BUILD_TIMEOUT:-7200}" # seconds
 REVIEW_BOT="control-room-review[bot]"
 MAX_ROUNDS=3 # review rounds per PR before the owner decides
+MERGEABLE_RETRY_SECONDS="${FOREMAN_MERGEABLE_RETRY_SECONDS:-5}"
 
 HOME_DIR="${FOREMAN_HOME:-$HOME/.foreman}"
 CLONE="$HOME_DIR/repo"
@@ -143,8 +144,15 @@ guarded_reason() { # base-sha head-sha -> why the change is guarded, or nothing;
 
 gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
   local pr="$1" view head base
-  view=$(gh pr view "$pr" -R "$OWNER/$REPO" --json isDraft,labels,mergeable,headRefOid,baseRefOid,statusCheckRollup,state) \
-    || { echo "wait: couldn't read the PR"; return; }
+  # GitHub computes mergeability lazily, so right after main moves it reads
+  # UNKNOWN for a few seconds. Asking again is cheaper than a 10-minute tick.
+  local tries=0
+  while :; do
+    view=$(gh pr view "$pr" -R "$OWNER/$REPO" --json isDraft,labels,mergeable,headRefOid,baseRefOid,statusCheckRollup,state) \
+      || { echo "wait: couldn't read the PR"; return; }
+    [ "$(jq -r .mergeable <<<"$view")" = UNKNOWN ] && [ "$tries" -lt 3 ] || break
+    tries=$((tries + 1)); sleep "$MERGEABLE_RETRY_SECONDS"
+  done
   [ "$(jq -r .state <<<"$view")" = OPEN ] || { echo "wait: not open"; return; }
   [ "$(jq -r .isDraft <<<"$view")" = false ] || { echo "wait: draft"; return; }
   jq -e '[.labels[].name] | index("needs-decision")' <<<"$view" >/dev/null && { echo "wait: needs-decision"; return; }
