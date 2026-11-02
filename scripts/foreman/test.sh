@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests for the foreman's merge gate, spec check and token handling, against a
-# throwaway git repo and a stubbed `gh`. The gate is the only thing between an
+# Tests for the foreman's merge gate, spec check, feedback intake, shots and
+# token handling, against a throwaway git repo and a stubbed `gh`. The gate is the only thing between an
 # agent's PR and main, so every way it could wrongly say "merge" gets a case
 # here.
 #
@@ -490,6 +490,199 @@ expect "one run per reply"                        ""                            
 DRY=0
 # The comments call filters by the owner's login: only their replies start a run.
 expect "only the owner's comments are asked for"  "yes"  "$(called 'select(.user.login == "superhighfives") | .id')"
+
+# ---- feedback ----------------------------------------------------------------
+
+echo "feedback intake"
+
+autofix() { # id event actor -> one `auto-fix` label event, as the issue events API returns it
+  jq -cn --argjson id "$1" --arg e "$2" --arg a "$3" '{id:$id, event:$e, actor:{login:$a}, label:{name:"auto-fix"}, created_at:"2026-11-01T09:00:00Z"}'
+}
+expect "auto-fix added by the owner counts"        "2026-11-01T09:00:00Z"  "$(owner_added auto-fix <<<"[$(autofix 1 labeled superhighfives)]")"
+expect "auto-fix added by anyone else doesn't"     ""  "$(owner_added auto-fix <<<"[$(autofix 1 labeled stranger)]")"
+expect "nor by the machine account"                ""  "$(owner_added auto-fix <<<"[$(autofix 1 labeled nylon-foreman)]")"
+expect "the owner's, then removed, doesn't"        ""  "$(owner_added auto-fix <<<"[$(autofix 1 labeled superhighfives), $(autofix 2 unlabeled superhighfives)]")"
+expect "the owner's after someone else's does"     "2026-11-01T09:00:00Z"  "$(owner_added auto-fix <<<"[$(autofix 1 labeled stranger)]
+[$(autofix 2 unlabeled stranger), $(autofix 3 labeled superhighfives)]")"
+expect "another label's events don't count"        ""  "$(owner_added auto-fix <<<"[$(labeled 1 labeled superhighfives 2026-11-01T09:00:00Z)]")"
+
+FB_BOARD='{"id":"P","field":{"id":"F","options":[{"id":"o-ideas","name":"Ideas"},{"id":"o-specced","name":"Specced"},{"id":"o-progress","name":"In progress"},{"id":"o-review","name":"In review"}]},"items":{"nodes":[
+  {"id":"I21","status":{"name":"Specced"},"content":{"__typename":"Issue","number":21,"state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"feedback"},{"name":"auto-fix"}]}}},
+  {"id":"I22","status":{"name":"Ideas"},"content":{"__typename":"Issue","number":22,"state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"feedback"},{"name":"auto-fix"}]}}},
+  {"id":"I23","status":null,"content":{"__typename":"Issue","number":23,"state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"feedback"},{"name":"auto-fix"}]}}}
+]}}'
+fb_issue() { # number author labels... -> one `gh issue list` entry
+  local n="$1" a="$2"; shift 2
+  jq -cn --argjson n "$n" --arg a "$a" --args '{number:$n, author:{login:$a}, labels:($ARGS.positional | map({name:.}))}' "$@"
+}
+FB_ISSUES="[$(fb_issue 30 superhighfives feedback auto-fix platform:ios),
+  $(fb_issue 21 superhighfives feedback auto-fix),
+  $(fb_issue 22 superhighfives feedback auto-fix),
+  $(fb_issue 23 superhighfives feedback auto-fix),
+  $(fb_issue 24 stranger feedback auto-fix),
+  $(fb_issue 25 superhighfives feedback auto-fix needs-decision),
+  $(fb_issue 26 superhighfives feedback auto-fix spec),
+  $(fb_issue 27 superhighfives feedback)]"
+expect "new reports: the owner's, cleared, not yet in hand, oldest first" "22 23 30" \
+  "$(feedback_candidates "$FB_BOARD" "$FB_ISSUES" | paste -sd' ' -)"
+
+# feedback_next, with the label events stubbed per issue.
+FB_LIST="" FB_PRS="" FB_EVENTS_22="" FB_EVENTS_23=""
+gh() {
+  echo "$*" >> "$CALLS"
+  case "$1 $2" in
+    "issue list") echo "$FB_LIST" ;;
+    "pr list") [ -n "$FB_PRS" ] && echo 1; return 0 ;;
+    "api repos/superhighfives/nylon-impossible/issues/22/events") echo "$FB_EVENTS_22" ;;
+    "api repos/superhighfives/nylon-impossible/issues/23/events") echo "$FB_EVENTS_23" ;;
+    *) return 1 ;;
+  esac
+}
+rm -rf "$FEEDBACK"
+FB_LIST="[$(fb_issue 22 superhighfives feedback auto-fix), $(fb_issue 23 superhighfives feedback auto-fix)]"
+FB_EVENTS_22="[$(autofix 1 labeled superhighfives)]" FB_EVENTS_23="[$(autofix 1 labeled superhighfives)]"
+expect "the oldest cleared report is next"            "22"  "$(feedback_next "$FB_BOARD")"
+FB_EVENTS_22="[$(autofix 1 labeled stranger)]"
+expect "auto-fix from anyone else is skipped"         "23"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+FB_EVENTS_23="[$(autofix 1 labeled stranger)]"
+expect "and if nobody else's is the owner's, nothing" ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+FB_EVENTS_22="[$(autofix 1 labeled superhighfives)]"
+mkdir -p "$FEEDBACK"; echo 1 > "$FEEDBACK/22"
+expect "a report already triaged isn't triaged again" ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+rm -rf "$FEEDBACK"; FB_PRS=1
+expect "nor one with a fix PR open"                   ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+FB_PRS=""
+
+BODY_IMAGES='Hi
+![one](https://github.com/superhighfives/nylon-impossible/blob/feedback-assets/screenshots/2026/11/a1.png?raw=true)
+![two](https://github.com/superhighfives/nylon-impossible/blob/feedback-assets/screenshots/2026/11/b2.jpg?raw=true)
+![dupe](https://github.com/superhighfives/nylon-impossible/blob/feedback-assets/screenshots/2026/11/a1.png?raw=true)
+![evil](https://github.com/superhighfives/nylon-impossible/blob/feedback-assets/../../etc/passwd)
+![other](https://github.com/someone/else/blob/feedback-assets/x.png?raw=true)'
+expect "screenshots: this repo's, once each, no ..paths" "screenshots/2026/11/a1.png screenshots/2026/11/b2.jpg" \
+  "$(feedback_images <<<"$BODY_IMAGES" | paste -sd' ' -)"
+
+expect "Ready now includes cleared reports"  "22"  "$(jq '.items.nodes |= map(.status = {name:"Ready"})' <<<"$FB_BOARD" | ready_issues "$(cat)" | sed -n 2p)"
+SPEC_FB_BOARD=$(jq -c '.items.nodes = [
+  {status:{name:"Specced"}, content:{__typename:"Issue", number:41, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"},{name:"feedback"},{name:"needs-decision"}]}}},
+  {status:{name:"Specced"}, content:{__typename:"Issue", number:42, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"},{name:"needs-decision"}]}}}]' <<<"$FB_BOARD")
+expect "a report's spec still gets runs while it waits on the owner" "41" "$(spec_issues "$SPEC_FB_BOARD" | paste -sd' ' -)"
+
+echo "triage outcomes"
+
+# Everything around the claude run is stubbed; what's tested is what the
+# foreman does with the result.
+new_worktree() { :; }; run_claude() { return 0; }; opened_pr() { return 1; }
+branch_for() { echo "foreman/$1-x"; }
+TRIAGE_BODY="" TRIAGE_LABELS="feedback,auto-fix,kind:fix"
+gh() {
+  echo "$*" >> "$CALLS"
+  case "$1 $2" in
+    "issue view") jq -cn --arg b "$TRIAGE_BODY" --arg l "$TRIAGE_LABELS" '{body:$b, labels:($l | split(",") | map({name:.}))}' ;;
+    api\ repos/*) echo 777 ;;
+    *) return 0 ;;
+  esac
+}
+: > "$CALLS"; rm -rf "$FEEDBACK" "$SPECS"; TRIAGE_BODY="${SPEC_OK/None./1. Which colour?}"
+triage "$FB_BOARD" 22 >/dev/null
+expect "unclear: labelled spec"                       "yes"  "$(called '--add-label spec')"
+expect "with needs-decision while it has questions"   "yes"  "$(called '--add-label needs-decision')"
+expect "in Specced"                                   "yes"  "$(called '--single-select-option-id o-specced')"
+expect "and spec runs wait for the owner's next reply" "777" "$(cat "$SPECS/22")"
+expect "and the owner hears"                          "yes"  "$(called 'alert feedback #22 needs a spec')"
+expect "it's marked as triaged"                       "yes"  "$([ -e "$FEEDBACK/22" ] && echo yes)"
+
+: > "$CALLS"; TRIAGE_BODY="$SPEC_OK"
+triage "$FB_BOARD" 22 >/dev/null
+expect "a spec with no questions isn't waiting on the owner" "no"  "$(called '--add-label needs-decision')"
+
+: > "$CALLS"; rm -rf "$FEEDBACK"; TRIAGE_BODY="Just the report."
+triage "$FB_BOARD" 22 >/dev/null
+expect "neither: needs-decision"                      "yes"  "$(called '--add-label needs-decision')"
+expect "and a comment"                                "yes"  "$(called 'issue comment 22')"
+expect "back in Ideas"                                "yes"  "$(called '--single-select-option-id o-ideas')"
+expect "and re-armed for when the label comes off"    "no"   "$([ -e "$FEEDBACK/22" ] && echo yes || echo no)"
+
+echo "before/after shots"
+
+PR_BODY='Closes #22.
+
+## Try it
+
+- Open the app.
+
+## Notes
+
+Done.'
+SECTION_ONE=$'### Before / after\n\n| a | b |\n\n<!-- fix-shots:plan {"shots":[{"device":"iphone","screen":"today"}]} -->'
+spliced=$(splice_shots "$SECTION_ONE" <<<"$PR_BODY")
+expect "the table goes inside Try it, before the next section" "- Open the app.||<!-- fix-shots:start -->|### Before / after||| a | b |||<!-- fix-shots:plan {\"shots\":[{\"device\":\"iphone\",\"screen\":\"today\"}]} -->|<!-- fix-shots:end -->||## Notes" \
+  "$(sed -n '/- Open the app./,/## Notes/p' <<<"$spliced" | paste -sd'|' -)"
+respliced=$(splice_shots "### Before / after (again)" <<<"$spliced")
+expect "a retake replaces it in place"   "1 0 yes"  "$(grep -c 'fix-shots:start' <<<"$respliced") $(grep -c '| a | b |' <<<"$respliced") $(grep -q '(again)' <<<"$respliced" && echo yes)"
+expect "a body without Try it gets one"  "yes"  "$(splice_shots "X" <<<"Closes #1." | tr '\n' ' ' | grep -qE '## Try it +<!-- fix-shots:start' && echo yes)"
+expect "the plan can be read back"       '{"shots":[{"device":"iphone","screen":"today"}]}'  "$(saved_plan <<<"$spliced")"
+expect "no plan, nothing"                ""  "$(saved_plan <<<"$PR_BODY")"
+
+# feedback-assets: an orphan branch that's only ever added to.
+g checkout -q --orphan assets && g rm -rqf . >/dev/null
+mkdir -p "$tmp/seed/screenshots/2026/11" "$tmp/seed/fixes/9/aaaaaaaaaaaa"
+echo report > "$tmp/seed/screenshots/2026/11/r.png"; echo old > "$tmp/seed/fixes/9/aaaaaaaaaaaa/old.png"
+g add -A && g commit -qm assets && g push -q origin HEAD:refs/heads/feedback-assets
+ASSETS=$(g rev-parse HEAD)
+mkdir -p "$tmp/shots"; echo after > "$tmp/shots/today-after.png"; echo before > "$tmp/shots/today-before.png"
+push_shots "$tmp/shots" "fixes/9/bbbbbbbbbbbb" "Before/after for #10 (#9)" >/dev/null
+tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
+expect "the shots land on feedback-assets"      "after before"  "$(git -C "$tmp/origin.git" show "$tip:fixes/9/bbbbbbbbbbbb/today-after.png") $(git -C "$tmp/origin.git" show "$tip:fixes/9/bbbbbbbbbbbb/today-before.png")"
+expect "on top of what was there"               "$ASSETS"       "$(git -C "$tmp/origin.git" rev-parse "$tip^")"
+expect "which is all still there"               "report old"    "$(git -C "$tmp/origin.git" show "$tip:screenshots/2026/11/r.png") $(git -C "$tmp/origin.git" show "$tip:fixes/9/aaaaaaaaaaaa/old.png")"
+# Someone else (the API, filing a report) pushed in between: go on top of theirs.
+g fetch -q origin feedback-assets && g checkout -q -B assets "$tip" && echo new > "$tmp/seed/screenshots/2026/11/s.png" && g add -A && g commit -qm report && g push -q origin HEAD:refs/heads/feedback-assets
+theirs=$(g rev-parse HEAD)
+push_shots "$tmp/shots" "fixes/11/cccccccccccc" "Before/after for #12 (#11)" >/dev/null
+tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
+expect "a branch that moved is built on, not forced" "$theirs new"  "$(git -C "$tmp/origin.git" rev-parse "$tip^") $(git -C "$tmp/origin.git" show "$tip:screenshots/2026/11/s.png")"
+
+# fix_shots end to end, with tsx faked: FAKE_SHOTS=ok takes every shot,
+# anything else is a simulator that never comes up.
+g checkout -q main && g pull -q origin main 2>/dev/null
+mkdir -p "$tmp/seed/src/ios" "$tmp/seed/src/marketing/node_modules/.bin"
+echo before > "$tmp/seed/src/ios/app.swift"
+cat > "$tmp/seed/src/marketing/node_modules/.bin/tsx" <<'TSX'
+#!/bin/sh
+cmd=$2 out="" as=""
+while [ $# -gt 0 ]; do case "$1" in --out) out=$2; shift ;; --as) as=$2; shift ;; esac; shift; done
+case "$cmd" in
+  capture) [ "$FAKE_SHOTS" = ok ] && cat ../ios/app.swift > "$out/today-$as.png"; exit 0 ;;
+  report) printf '### Before / after\n\nTABLE %s\n\n<!-- fix-shots:plan {} -->\n' "$(ls "$out" | grep -c png)" ;;
+esac
+TSX
+chmod +x "$tmp/seed/src/marketing/node_modules/.bin/tsx"
+g add -A && g commit -qm "app" && g push -q origin HEAD:main
+g checkout -q -B foreman/9-x && echo after > "$tmp/seed/src/ios/app.swift" && g commit -qam fix && g push -q origin HEAD:refs/heads/foreman/9-x
+FIX_SHA=$(g rev-parse HEAD)
+mkdir -p "$LOGS" "$WORKTREES" "$SHOTS"
+echo '{"shots":[{"device":"iphone","screen":"today"}]}' > "$SHOTS/9.json"
+bun() { :; }
+gh() {
+  case "$1 $2" in
+    "pr view") echo "$PR_BODY" ;;
+    "pr edit") eval "printf '%s' \"\${$#}\"" > "$tmp/edited" ;;
+    *) return 0 ;;
+  esac
+}
+FAKE_SHOTS=fail fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+expect "simulator down: the PR still gets the section"  "yes"  "$(grep -q 'TABLE 0' "$tmp/edited" && echo yes)"
+expect "inside Try it"                                   "yes"  "$(sed -n '/## Try it/,/## Notes/p' "$tmp/edited" | grep -q 'TABLE 0' && echo yes)"
+expect "saying what failed and where the log is"         "yes"  "$(grep -q "2 of 2 shots weren't captured. Log on the Mac mini" "$tmp/edited" && echo yes)"
+expect "and nothing is pushed"                           "$tip" "$(git -C "$tmp/origin.git" rev-parse feedback-assets)"
+expect "the checkout is cleaned up"                      "no"   "$([ -d "$WORKTREES/shots-10" ] && echo yes || echo no)"
+
+FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+shots_tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
+expect "shots: both sides captured and in the PR"        "yes"  "$(grep -q 'TABLE 2' "$tmp/edited" && ! grep -q "weren't captured" "$tmp/edited" && echo yes)"
+expect "before is main's app, after is the branch's"     "before after"  "$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-before.png") $(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-after.png")"
+unset -f bun
 
 # ---- the machine account's token ---------------------------------------------
 

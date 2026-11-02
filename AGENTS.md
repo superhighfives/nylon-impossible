@@ -191,7 +191,6 @@ bundle exec fastlane release
 | `ios-deploy.yml` | Push to `main` (`src/ios/**`), manual | TestFlight build for iOS, and Mac when `ENABLE_MAC_RELEASE` is `true` |
 | `ios-release.yml` | Manual | App Store build for iOS and Mac |
 | `marketing.yml` | After a successful `web-deploy` | Regenerate the landing-page screenshots |
-| `feedback.yml` | `auto-fix` label, owner replies, review rounds | Have Claude open and iterate on a draft fix PR (see CLAUDE.md) |
 
 Previews are named after the PR's branch, so later pushes keep the same URLs.
 

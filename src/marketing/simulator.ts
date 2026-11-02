@@ -1,6 +1,6 @@
 /**
  * Simulator plumbing shared by generate.ts (marketing and parity shots) and
- * fix-shots.ts (before/after shots on feedback fix PRs). Every helper here
+ * fix-shots.ts (before/after shots on the foreman's Apple fix PRs). Every helper here
  * was hardened against a specific CI flake; see the comments before changing
  * the timeouts or retries.
  */
