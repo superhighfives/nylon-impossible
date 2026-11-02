@@ -11,7 +11,7 @@ This page is the short, durable version of what Nylon is and how it behaves. Rea
 3. **Done means gone.** A checked todo leaves straight away, with Undo. It doesn't move to another column, page or section.
 4. **Rows carry information, not controls.** Actions live in gestures, context menus and the keyboard. Rows have no visible handles, toolbars or chevrons.
 5. **One design, many densities.** Phone, wide screen, the menu bar and the Gmail card share the same structure, the same order and the same words.
-6. **Editorial type, native behavior.** Archivo display type and hairline rules provide the hierarchy. Each platform keeps its own conventions: sheets, swipe, haptics, Dynamic Type, keyboard shortcuts.
+6. **Editorial type, native behavior.** Archivo display type and hairline rules provide the hierarchy. Each platform keeps its own conventions: sheets, swipe, haptics, Dynamic Type, keyboard shortcuts. Native means native to the input, not the device. Touch works the same on every touch layout: long-press to drag, rows that part to make room, immediate feedback. A pointer works the same wherever there's one: a drop line, hover, a click to select.
 7. **Keyboard first where there's a keyboard.** On wide screens and the Mac, everything you can click you can also reach from the keyboard, and the same letter does the same thing everywhere.
 8. **Things don't jump.** Space that something might need (a banner, the fourth column) is kept whether or not it's showing, so titles and columns stay put.
 9. **Settled stays settled.** Decisions below need a written reason to reopen, not a polish pass.
