@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { captureRows, settleRows } from "../settle";
+import { captureRows, settleRows, settleTiming } from "../settle";
 
 /** A column whose rows sit at `tops`, in the order given. */
 function columnOf(listId: string, rows: [id: string, top: number][]) {
@@ -71,5 +71,26 @@ describe("settleRows", () => {
 
     const still = columnOf("today", [["x", 0]]);
     expect(settleRows(still, "today", from, timing)).toBe(false);
+  });
+});
+
+describe("settleTiming", () => {
+  const root = document.documentElement;
+  afterEach(() => root.removeAttribute("style"));
+
+  it.each([
+    ["220ms", 220],
+    ["0.22s", 220],
+  ])("reads --n-duration-base: %s as %d ms", (value, ms) => {
+    root.style.setProperty("--n-duration-base", value);
+    root.style.setProperty("--n-ease-out-strong", "ease-out");
+    expect(settleTiming()).toEqual({ duration: ms, easing: "ease-out" });
+  });
+
+  it("is null for a duration with no unit, or no tokens", () => {
+    expect(settleTiming()).toBeNull();
+    root.style.setProperty("--n-duration-base", "220");
+    root.style.setProperty("--n-ease-out-strong", "ease-out");
+    expect(settleTiming()).toBeNull();
   });
 });

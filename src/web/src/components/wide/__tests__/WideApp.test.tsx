@@ -64,8 +64,10 @@ vi.mock("@/hooks/useTodos", () => ({
   useProcessTodo: () => ({ mutate: vi.fn() }),
   useUpdateUrlPreview: () => ({ mutate: vi.fn() }),
 }));
+/** The client's Reduce motion hint; the drag tests turn it off. */
+let reducedMotion = "reduce";
 vi.mock("@/hooks/useHints", () => ({
-  useHints: () => ({ timeZone: "UTC", reducedMotion: "reduce" }),
+  useHints: () => ({ timeZone: "UTC", reducedMotion }),
 }));
 vi.mock("@/hooks/useLocalMidnightTick", () => ({
   useLocalMidnightTick: () => {},
@@ -1273,19 +1275,84 @@ describe("WideApp drag and drop", () => {
     );
   });
 
-  it("doesn't ease rows into place under reduced motion", () => {
+  describe("easing rows into place", () => {
     const animate = vi.fn();
-    Element.prototype.animate = animate;
-    render(<WideApp />);
-    const top = layOut("Today");
-    start("t3");
-    move("t3", "col:list-today", top + 5);
-    end("t3", "col:list-today");
-    expect(update).toHaveBeenCalledTimes(1);
-    expect(animate).not.toHaveBeenCalled();
-    for (const li of column("Today").querySelectorAll("li")) {
-      expect(li.style.transform).toBe("");
-    }
+    const realAnimate = Element.prototype.animate;
+    const realOffsetTop = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "offsetTop",
+    );
+
+    beforeEach(() => {
+      animate.mockReset();
+      Element.prototype.animate = animate;
+      // jsdom has no layout: a row sits at its index × ROW in its list.
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+        configurable: true,
+        get(this: HTMLElement) {
+          const parent = this.parentElement;
+          return parent ? [...parent.children].indexOf(this) * ROW : 0;
+        },
+      });
+      document.documentElement.style.setProperty("--n-duration-base", "220ms");
+      document.documentElement.style.setProperty(
+        "--n-ease-out-strong",
+        "cubic-bezier(0.23, 1, 0.32, 1)",
+      );
+      // The drop lands as the server's answer would.
+      update.mockImplementation(({ id, input }) => {
+        todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
+      });
+    });
+
+    afterEach(() => {
+      reducedMotion = "reduce";
+      Element.prototype.animate = realAnimate;
+      if (realOffsetTop) {
+        Object.defineProperty(
+          HTMLElement.prototype,
+          "offsetTop",
+          realOffsetTop,
+        );
+      }
+      document.documentElement.removeAttribute("style");
+    });
+
+    const dropFirst = () => {
+      const { rerender } = render(<WideApp />);
+      const top = layOut("Today");
+      start("t3");
+      move("t3", "col:list-today", top + 5);
+      end("t3", "col:list-today");
+      expect(update).toHaveBeenCalledTimes(1);
+      rerender(<WideApp />);
+    };
+
+    it("eases the rows from where they were dropped", () => {
+      reducedMotion = "no-preference";
+      dropFirst();
+      const rows = [...column("Today").querySelectorAll("li")];
+      // Water plants rises from the bottom; the two above it step down.
+      expect(rows[0]).toHaveTextContent("Water plants");
+      expect(animate.mock.contexts).toEqual(rows);
+      expect(animate.mock.calls.map(([frames]) => frames[0])).toEqual([
+        { transform: `translateY(${2 * ROW}px)` },
+        { transform: `translateY(${-ROW}px)` },
+        { transform: `translateY(${-ROW}px)` },
+      ]);
+      expect(animate).toHaveBeenCalledWith(expect.anything(), {
+        duration: 220,
+        easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+      });
+    });
+
+    it("doesn't under reduced motion", () => {
+      dropFirst();
+      expect(column("Today").querySelector("li")).toHaveTextContent(
+        "Water plants",
+      );
+      expect(animate).not.toHaveBeenCalled();
+    });
   });
 });
 

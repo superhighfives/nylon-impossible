@@ -28,9 +28,11 @@ export function captureRows(listIds: string[]): SettleFrom {
 /** `--n-duration-base` and `--n-ease-out-strong`, or null if unset. */
 export function settleTiming(): SettleTiming | null {
   const style = getComputedStyle(document.documentElement);
-  const duration = Number.parseFloat(
-    style.getPropertyValue("--n-duration-base"),
-  );
+  const raw = style.getPropertyValue("--n-duration-base").trim();
+  // A CSS time: `220ms`, or `0.22s`.
+  const duration =
+    Number.parseFloat(raw) *
+    (raw.endsWith("ms") ? 1 : raw.endsWith("s") ? 1000 : Number.NaN);
   const easing = style.getPropertyValue("--n-ease-out-strong").trim();
   return Number.isFinite(duration) && easing ? { duration, easing } : null;
 }
