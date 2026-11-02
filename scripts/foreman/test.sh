@@ -52,6 +52,9 @@ change() { # name, then a command run in the seed repo -> sha of a commit on top
 
 git clone -q "$tmp/origin.git" "$tmp/home/repo"
 CLONE="$tmp/home/repo"
+# ensure_clone sets these on the real clone; a CI runner has no identity at all.
+git -C "$CLONE" config user.name t
+git -C "$CLONE" config user.email t@t
 fetch_all() { git -C "$CLONE" fetch -q origin '+refs/heads/*:refs/remotes/origin/*'; }
 
 echo "guarded_reason"
