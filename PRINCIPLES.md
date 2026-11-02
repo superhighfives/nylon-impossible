@@ -29,7 +29,7 @@ This page is the short, durable version of what Nylon is and how it behaves. Rea
 | Saving | Every edit saves instantly. No Save or Cancel anywhere |
 | Wide layout | Three time columns plus a fourth. The fourth shows Done unless you pick a list or open a todo |
 | Selecting on wide | One click selects. A second click, a double click or Enter opens the todo in the fourth column |
-| Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white |
+| Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. The one exception is the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move |
 | Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9 |
 | Case | Sentence case for every label, title and menu item: "This week", "New list", "Keyboard shortcuts" |
 
