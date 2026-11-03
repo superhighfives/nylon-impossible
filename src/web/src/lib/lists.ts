@@ -41,6 +41,10 @@ export async function ensureSystemLists(
     .where(and(eq(lists.userId, userId), eq(lists.systemKind, "today")));
   if (existing) return null;
 
+  // A new user's first page load fires several server functions at once, and
+  // each can pass the check above before any of them inserts. The unique index
+  // on (user_id, system_kind) lets only one insert win; the rest no-op and
+  // return null, so demo todos are still seeded once.
   const positions = generateNKeysBetween(null, null, SYSTEM_LISTS.length);
   const inserted = await db
     .insert(lists)
@@ -53,7 +57,9 @@ export async function ensureSystemLists(
         position: positions[i],
       })),
     )
+    .onConflictDoNothing()
     .returning({ id: lists.id, systemKind: lists.systemKind });
+  if (inserted.length === 0) return null;
   // systemKind is nullable on the column (custom lists have none), but every
   // row inserted above is one of SYSTEM_LISTS, which always sets it.
   return inserted.map((l) => ({
