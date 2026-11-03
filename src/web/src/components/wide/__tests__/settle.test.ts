@@ -72,6 +72,65 @@ describe("settleRows", () => {
     const still = columnOf("today", [["x", 0]]);
     expect(settleRows(still, "today", from, timing)).toBe(false);
   });
+
+  it("eases the dropped row from where it was let go, not its old slot", () => {
+    columnOf("today", [
+      ["a", 0],
+      ["b", 48],
+      ["c", 96],
+    ]);
+    const from = captureRows(["today"]);
+    document.body.innerHTML = "";
+    // c let go just under the top, and dropped first.
+    const landing = { id: "c", listId: "today", top: 6 };
+    const after = columnOf("today", [
+      ["c", 0],
+      ["a", 48],
+      ["b", 96],
+    ]);
+
+    expect(settleRows(after, "today", from, timing, landing)).toBe(true);
+    expect(animateOf(after, 0)).toHaveBeenCalledWith(
+      [{ transform: "translateY(6px)" }, { transform: "none" }],
+      timing,
+    );
+    expect(animateOf(after, 1)).toHaveBeenCalledWith(
+      [{ transform: "translateY(-48px)" }, { transform: "none" }],
+      timing,
+    );
+  });
+
+  it("waits while the dropped row is still in its old place", () => {
+    const before = columnOf("today", [
+      ["a", 0],
+      ["b", 48],
+      ["c", 96],
+    ]);
+    const from = captureRows(["today"]);
+    const landing = { id: "c", listId: "today", top: 6 };
+
+    expect(settleRows(before, "today", from, timing, landing)).toBe(false);
+    for (const i of [0, 1, 2])
+      expect(animateOf(before, i)).not.toHaveBeenCalled();
+  });
+
+  it("eases a row dropped into another column from where it was let go", () => {
+    columnOf("today", [["a", 0]]);
+    columnOf("week", [["w", 0]]);
+    const from = captureRows(["today", "week"]);
+    document.body.innerHTML = "";
+    const landing = { id: "a", listId: "week", top: 52 };
+    const after = columnOf("week", [
+      ["w", 0],
+      ["a", 48],
+    ]);
+
+    expect(settleRows(after, "week", from, timing, landing)).toBe(true);
+    expect(animateOf(after, 1)).toHaveBeenCalledWith(
+      [{ transform: "translateY(4px)" }, { transform: "none" }],
+      timing,
+    );
+  });
 });
 
 describe("settleTiming", () => {

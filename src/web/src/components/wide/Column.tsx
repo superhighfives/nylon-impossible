@@ -6,7 +6,7 @@ import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
 import { ICON_BUTTON } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
-import { type SettleFrom, settleRows, settleTiming } from "./settle";
+import { type Settle, settleRows, settleTiming } from "./settle";
 
 /** Droppable ids for columns, distinct from sidebar entries. */
 export const columnDropId = (listId: string) => `col:${listId}`;
@@ -286,7 +286,7 @@ export function Column({
   selectedId: string | null;
   indicator: DropIndicator | null;
   /** Where rows sat at a drop, so they ease into the new order. */
-  settle?: SettleFrom | null;
+  settle?: Settle | null;
   composer: ReactNode;
   /** Today's overnight pill, in the header's reserved space. */
   banner?: ReactNode;
@@ -308,14 +308,17 @@ export function Column({
   });
   const headingId = `column-${listId}-title`;
   const listRef = useRef<HTMLUListElement>(null);
-  const settled = useRef<SettleFrom | null>(null);
+  const settled = useRef<Settle | null>(null);
   // Runs as `rows` changes, so it catches the render where the drop's new
   // order lands, then plays once per drop.
   useLayoutEffect(() => {
     const list = listRef.current;
     if (!settle || settled.current === settle || !list || !rows.length) return;
     const timing = settleTiming();
-    if (timing && settleRows(list, listId, settle, timing)) {
+    if (
+      timing &&
+      settleRows(list, listId, settle.from, timing, settle.landing)
+    ) {
       settled.current = settle;
     }
   }, [settle, rows, listId]);

@@ -15,7 +15,13 @@ import type { TodoWithUrls } from "@/types/database";
 import { columnRows } from "./boardDom";
 import type { DropIndicator } from "./Column";
 import { resolveDrop } from "./drop";
-import { captureRows, type SettleFrom } from "./settle";
+import {
+  captureRows,
+  landAt,
+  previewRect,
+  SETTLE_TTL_MS,
+  type Settle,
+} from "./settle";
 
 /** Where the line goes in an empty column, from the top of its row list. */
 const EMPTY_LINE_Y = 8;
@@ -48,7 +54,7 @@ export function useBoardDrag({
   const { reducedMotion } = useHints();
   const [dragging, setDragging] = useState<TodoWithUrls | null>(null);
   const [indicator, setIndicator] = useState<DropIndicator | null>(null);
-  const [settle, setSettle] = useState<SettleFrom | null>(null);
+  const [settle, setSettle] = useState<Settle | null>(null);
   // The line as last drawn, which is where a release drops. A ref, so a
   // release in the same tick as the last move still sees it.
   const shown = useRef<DropIndicator | null>(null);
@@ -67,7 +73,7 @@ export function useBoardDrag({
   // later changes to the columns shouldn't animate from the old places.
   useEffect(() => {
     if (!settle) return;
-    const done = setTimeout(() => setSettle(null), 1000);
+    const done = setTimeout(() => setSettle(null), SETTLE_TTL_MS);
     return () => clearTimeout(done);
   }, [settle]);
 
@@ -150,6 +156,8 @@ export function useBoardDrag({
     const overId = e.over?.id;
     const line = shown.current;
     const y = pointer.current ?? pointerY(e);
+    // Read before the preview unmounts.
+    const preview = previewRect();
     onDragCancel();
     if (!todo || typeof overId !== "string") return;
     let slot = 0;
@@ -165,7 +173,11 @@ export function useBoardDrag({
     if (drop?.kind === "move") actions.move(todo, drop.listId);
     else if (drop?.kind === "place") {
       if (reducedMotion !== "reduce") {
-        setSettle(captureRows([todo.listId, drop.listId]));
+        const from = captureRows([todo.listId, drop.listId]);
+        const landing = preview
+          ? landAt(from, todo.id, drop.listId, preview)
+          : null;
+        setSettle({ from, landing });
       }
       actions.place(todo, drop.listId, drop.position);
     }
@@ -184,7 +196,10 @@ export function useBoardDrag({
 /** What follows the pointer while a row is dragged. */
 export function DragPreview({ todo }: { todo: TodoWithUrls }) {
   return (
-    <div className="flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5">
+    <div
+      data-drag-preview
+      className="flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5"
+    >
       <span
         aria-hidden="true"
         className="mt-px size-[1.375rem] shrink-0 rounded-[6px] border-[1.75px] border-n-ink"
