@@ -67,6 +67,40 @@ Deploy migrates the shared D1 database before the workers roll out, so never
 tighten a constraint in one step: add it nullable, deploy the code that fills
 it, then make it strict in a later migration. Details: `d1-migrations` skill.
 
+## Reviewing UI changes
+
+For reviewers, `control-room-review` included. When the diff touches
+`src/web/src`, `src/ios`, `src/gmail-addon`, `src/shared/design` or
+`src/shared/copy`, read PRINCIPLES.md (and its `## States` section, the state
+matrix, once it exists) and check the changed lines against it. Flag:
+
+- a done todo that moves to another section, column or page instead of
+  leaving (principle 3, Settled "Completing a todo"). Two written
+  exceptions: Gmail's card, where a ticked todo stays, crossed out, until it
+  refreshes; and the wide layout's fourth column, which shows Done by default
+  (Settled "Wide layout");
+- visible controls on rows: handles, toolbars, chevrons, per-row buttons
+  (principle 4);
+- layout that jumps: space for a banner or the fourth column that's added and
+  removed rather than kept (principle 8);
+- colours, type, spacing, radii or motion hard-coded instead of coming from
+  `src/shared/design/tokens.json` (Visual);
+- a word from the Vocabulary table's "Not" column in UI copy ("task",
+  "Completed", "Sometime"…), or a label, title or menu item that isn't in
+  sentence case (Vocabulary, Copy, Settled "Case"). "Subtasks" is the
+  Vocabulary's own word, not a "task";
+- a change to how any Settled row behaves;
+- an interaction state that doesn't match the state matrix.
+
+Cite the principle number, Settled row or section by name in each finding, so
+it can be argued. Only flag what a line of PRINCIPLES.md supports; a taste
+call that no line covers isn't a principles finding.
+
+Severity: a principles finding is ⚠️, so the review is at best 🟡. That stops
+the foreman, which merges only on 🟢, without blocking the owner's own PRs. A
+change to a Settled row's behaviour is ⛔ (principle 9): it needs the owner and
+a written reason.
+
 ## Work tracking
 
 There's no `plans/` directory any more (retired October 2026; its documents

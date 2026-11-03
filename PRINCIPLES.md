@@ -4,6 +4,8 @@ Nylon is a todo app built around time. Today, This week and Someday are a flow t
 
 This page is the short, durable version of what Nylon is and how it behaves. Read it before changing UI or copy. Issues and pull requests record how each piece was built; this file records what stays true across them.
 
+This written spec is the reference, not any one platform. The prototype artboards are where changes are tried out; when they disagree with this file, this file wins.
+
 ## Principles
 
 1. **Time is the structure.** Today, This week and Someday are a flow that todos move through. Lists are permanent collections. The two are presented differently.
