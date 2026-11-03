@@ -201,9 +201,13 @@ merge pass for hours. `shepherd` and `digest` don't use the slot.
 **The PR limit.** `deps` opens a PR, so it counts toward the 3 agent PRs.
 While 3 are open it stays due and runs on a later tick.
 
-**What the model may do.** `sentry` and `scout` can't push, comment, edit
-issues, call `gh api` or touch the board (`--disallowedTools`), and their
-prompts treat GitHub and Sentry text as data. Each writes its proposals to
+**What the model may do.** `sentry` and `scout` run Claude `--restricted`
+in `dontAsk` mode with an allow-list (`read_only_args`): reading and
+searching their checkout, Sentry's read tools for `sentry`, and writing one
+file. Anything else is refused, including the shell, the web, other MCP
+servers and the token file, so they can't push, comment or touch the board
+however a Sentry error is worded. Their prompts treat GitHub and Sentry text
+as data. Each writes its proposals to
 `~/.foreman/routines/out/<name>/result.json`. The shell then acts on them:
 - **sentry:** each proposal must name a well-formed short ID and be a
   complete `kind:fix` spec apart from its open questions. It's skipped if

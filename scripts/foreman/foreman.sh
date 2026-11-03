@@ -1324,12 +1324,19 @@ routine_failed() { # name status what
   alert "routine $1 failed (exit $2); log: $3"
 }
 
-# What a read-only routine may not do. The prompt says so; this backs it up,
-# since the run holds the machine account's token.
-ROUTINE_DENY=("Bash(git push *)" "Bash(git commit *)" "Bash(git reset --hard *)"
-  "Bash(gh issue create *)" "Bash(gh issue edit *)" "Bash(gh issue comment *)" "Bash(gh issue close *)"
-  "Bash(gh pr *)" "Bash(gh project *)" "Bash(gh label *)" "Bash(gh api *)" "Bash(gh variable *)"
-  "mcp__sentry__update_issue")
+# What a read-only routine may do. Nothing else: no shell, no web, and the
+# file tools stay in its checkout and output directory, so neither the
+# machine account's token nor anything that writes can be reached. No MCP
+# server either, except that sentry gets the Sentry one's read tools.
+SENTRY_MCP='{"mcpServers":{"sentry":{"type":"http","url":"https://mcp.sentry.dev/mcp"}}}'
+SENTRY_READS=(mcp__sentry__find_organizations mcp__sentry__find_projects mcp__sentry__search_issues
+  mcp__sentry__search_errors mcp__sentry__get_sentry_resource mcp__sentry__search_traces mcp__sentry__search_logs)
+
+read_only_args() { # [sentry] -> sets READ_ONLY_ARGS, the claude flags for a read-only run that writes only $ROUTINE_OUT
+  READ_ONLY_ARGS=(--restricted --permission-mode dontAsk --strict-mcp-config --add-dir "$ROUTINE_OUT"
+    --allowedTools Read Grep Glob "Edit(/$ROUTINE_OUT/**)")
+  [ "${1:-}" != sentry ] || READ_ONLY_ARGS+=("${SENTRY_READS[@]}" --mcp-config "$SENTRY_MCP")
+}
 
 routine_out() { # name -> sets ROUTINE_OUT, an empty directory outside the worktree for the run's results
   # Before the prompt is written, since the prompt names it.
@@ -1337,11 +1344,12 @@ routine_out() { # name -> sets ROUTINE_OUT, an empty directory outside the workt
   rm -rf "${ROUTINE_OUT:?}"; mkdir -p "$ROUTINE_OUT"
 }
 
-routine_claude() { # name prompt [disallowed tool...] -> headless claude in a fresh detached worktree of origin/main; its exit status
-  # Its log goes in $ROUTINE_LOG.
-  local name="$1" prompt="$2" dir="$WORKTREES/routine-$1" status=0 deny=()
+routine_claude() { # name prompt [claude flag...] -> headless claude in a fresh detached worktree of origin/main; its exit status
+  # With no flags, it may do anything (deps pushes and opens a PR); a
+  # read-only routine passes its allow-list. Its log goes in $ROUTINE_LOG.
+  local name="$1" prompt="$2" dir="$WORKTREES/routine-$1" status=0 flags=(--permission-mode bypassPermissions)
   shift 2
-  [ "$#" = 0 ] || deny=(--disallowedTools "$@")
+  [ "$#" = 0 ] || flags=("$@")
   ROUTINE_LOG="$LOGS/routine-$name-$(date +%Y%m%d-%H%M%S).log"
   rm_worktree "routine-$name"; git -C "$CLONE" worktree prune
   git -C "$CLONE" fetch -q origin main || return 1
@@ -1350,8 +1358,7 @@ routine_claude() { # name prompt [disallowed tool...] -> headless claude in a fr
   USED_MODEL=1
   log "routine $name"
   (cd "$dir" && perl -e 'alarm shift; exec @ARGV' "$ROUTINE_TIMEOUT" \
-      "$SHIM" claude -p "$prompt" --permission-mode bypassPermissions --model "$MODEL" \
-      ${deny[@]+"${deny[@]}"}) >"$ROUTINE_LOG" 2>&1 || status=$?
+      "$SHIM" claude -p "$prompt" --model "$MODEL" "${flags[@]}") >"$ROUTINE_LOG" 2>&1 || status=$?
   rm_worktree "routine-$name"
   return "$status"
 }
@@ -1373,15 +1380,14 @@ EOP
 
 # ---- the Sentry sweep ----
 
-sentry_prompt() {
+sentry_prompt() { # short IDs already in an issue
   routine_preamble
   cat <<EOP
 
 ## The Sentry sweep
 
-Use the \`review-sentry\` skill's selection: through the Sentry MCP, this
-repo's Sentry projects (every project whose slug starts with
-\`nylon-impossible\`), issues that are unresolved and seen in the last 14
+Through the Sentry MCP (organization \`$OWNER\`), this repo's Sentry
+projects (every project whose slug starts with \`nylon-impossible\`), issues that are unresolved and seen in the last 14
 days, by frequency. For each, read the latest event and the code at its top
 in-repo frame, and decide whether it's worth fixing.
 
@@ -1389,8 +1395,14 @@ in-repo frame, and decide whether it's worth fixing.
 issues either. The foreman files what you propose as issues, which the owner
 reads and argues before anything is built.
 
-Skip an error whose short ID already appears in an open issue, or one closed
-in the last $RECENTLY_CLOSED_DAYS days (\`gh issue list --state all --search "<short ID>"\`).
+You can read the code and Sentry, and write your result file; nothing
+else. Skip an error whose short ID is already in an open issue, or in one
+closed in the last $RECENTLY_CLOSED_DAYS days. Those short IDs, as data:
+
+<known>
+$1
+</known>
+
 The foreman checks this again before filing anything.
 
 Propose at most $MAX_SENTRY_ISSUES, the most worthwhile first. Each one's body is a full
@@ -1421,6 +1433,14 @@ anywhere:
 EOP
 }
 
+sentry_known_ids() { # -> the Sentry short IDs in open issues, or ones closed recently, one a line
+  gh issue list -R "$OWNER/$REPO" --state all --limit 200 --search "NYLON-IMPOSSIBLE" --json state,closedAt,title,body 2>/dev/null \
+    | jq -r --argjson since "$(( $(now) - RECENTLY_CLOSED_DAYS * 86400 ))" '
+      .[] | select(.state == "OPEN" or ((.closedAt // "") != "" and (.closedAt | fromdateiso8601) >= $since))
+      | .title + "\n" + .body' \
+    | grep -oE 'NYLON-IMPOSSIBLE(-[A-Z0-9_]+)+' | sort -u || true
+}
+
 sentry_known() { # short-id -> an issue already naming it, open or closed recently; nothing if none
   local found
   found=$(gh issue list -R "$OWNER/$REPO" --state all --limit 20 --search "\"$1\"" --json number,state,closedAt) || { echo "?"; return 0; }
@@ -1431,8 +1451,8 @@ sentry_known() { # short-id -> an issue already naming it, open or closed recent
 
 routine_sentry() { # board_json
   local board="$1" status=0 prompt
-  routine_out sentry; prompt=$(sentry_prompt) || { routine_failed sentry 1 "couldn't write the prompt"; return 0; }
-  routine_claude sentry "$prompt" "${ROUTINE_DENY[@]}" || status=$?
+  routine_out sentry; prompt=$(sentry_prompt "$(sentry_known_ids)") || { routine_failed sentry 1 "couldn't write the prompt"; return 0; }
+  read_only_args sentry; routine_claude sentry "$prompt" "${READ_ONLY_ARGS[@]}" || status=$?
   if [ "$status" != 0 ]; then routine_failed sentry "$status" "$ROUTINE_LOG"; return 0; fi
   file_sentry_issues "$board" "$ROUTINE_OUT/result.json"
 }
@@ -1695,7 +1715,7 @@ routine_scout() { # board_json
   local board="$1" status=0 titles prompt
   titles=$(known_titles "$board")
   routine_out scout; prompt=$(scout_prompt "$titles") || { routine_failed scout 1 "couldn't write the prompt"; return 0; }
-  routine_claude scout "$prompt" "${ROUTINE_DENY[@]}" || status=$?
+  read_only_args; routine_claude scout "$prompt" "${READ_ONLY_ARGS[@]}" || status=$?
   if [ "$status" != 0 ]; then routine_failed scout "$status" "$ROUTINE_LOG"; return 0; fi
   file_scout_items "$board" "$ROUTINE_OUT/result.json" "$titles"
 }

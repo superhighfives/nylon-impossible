@@ -891,7 +891,7 @@ echo "routine prompts"
 prompt_of() { # routine -> its prompt, written the way the routine writes it
   set -u; unset ROUTINE_OUT; routine_out "$1"
   case "$1" in
-    sentry) sentry_prompt ;;
+    sentry) sentry_prompt "NYLON-IMPOSSIBLE-API-1" ;;
     scout)  scout_prompt "A title" ;;
     deps)   deps_prompt foreman/deps-2026-11-02 "#1 Bump x" ;;
   esac
@@ -900,6 +900,17 @@ for r in sentry scout deps; do
   out=$( (prompt_of "$r") 2>&1 )
   expect "the $r prompt is whole and names its result file"  "yes"  "$(grep -qF "$ROUTINES/out/$r/result.json" <<<"$out" && ! grep -q 'unbound variable' <<<"$out" && echo yes)"
 done
+
+echo "read-only routines"
+
+flags_of() { (set -u; routine_out "$1"; read_only_args "$@"; printf '%s\n' "${READ_ONLY_ARGS[@]}") 2>&1; }
+for r in sentry scout; do
+  out=$(flags_of "$r")
+  expect "$r runs restricted, with no bypass"  "yes"  "$(grep -qx -- --restricted <<<"$out" && grep -qx dontAsk <<<"$out" && ! grep -q bypassPermissions <<<"$out" && echo yes)"
+  expect "$r may write only its result directory"  "Edit(/$ROUTINES/out/$r/**)"  "$(grep '^Edit' <<<"$out")"
+  expect "$r gets no shell, web or Sentry write tool"  ""  "$(grep -E '^(Bash|WebFetch|Write)|execute_sentry_tool|update_issue' <<<"$out")"
+done
+expect "only sentry gets the Sentry MCP"  "1 0"  "$(flags_of sentry | grep -c mcp.sentry.dev) $(flags_of scout | grep -c mcp.sentry.dev || true)"
 
 echo "the Sentry sweep"
 

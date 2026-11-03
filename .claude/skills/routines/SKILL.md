@@ -26,7 +26,7 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
 ## What each one does
 
 - **sentry** finds unresolved errors seen in the last 14 days in this repo's
-  Sentry projects, using the `review-sentry` skill's selection. It doesn't fix
+  Sentry projects, the same selection as the `review-sentry` skill. It doesn't fix
   anything. Claude proposes up to 5 specs in the `prd` template, and the
   foreman files them: labelled `kind:fix` and `spec`, open questions as the
   first comment, in **Specced**. It skips an error whose short ID is already
@@ -62,9 +62,12 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
 
 ## What they're trusted with
 
-sentry and scout are read-only. Their prompts treat everything from GitHub
-and Sentry as data, they can't push, comment, edit issues or touch the board
-(`--disallowedTools`), and they write their proposals to a JSON file. The
+sentry and scout are read-only, by an allow-list rather than a deny-list.
+Claude runs `--restricted` in `dontAsk` mode, so anything not listed is
+refused: no shell, no web, no MCP server but Sentry's read tools (sentry
+only), and the file tools stay inside its checkout. The one thing it may
+write is its JSON file of proposals, so the machine account's token is out
+of reach. Their prompts treat everything from GitHub and Sentry as data. The
 shell checks, deduplicates, caps and files those proposals, so the caps and
 the "never Ready" rule don't depend on the model. deps is the one routine
 that pushes and opens a PR, because that's its whole job. The merge gate and
