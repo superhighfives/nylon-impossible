@@ -48,10 +48,11 @@ export const TINTED = "bg-n-surface";
  * the keys know which column you're in, and shows nothing; with the keyboard
  * in use (the board root's `data-keyboard`) it takes the sidebar cursor's
  * soft tint. Gated on the board's own modality rather than `:focus-visible`,
- * whose guess after a programmatic `focus()` varies by browser.
+ * whose guess after a programmatic `focus()` varies by browser. Forced
+ * colours drop the tint, so there it gets a system-coloured outline instead.
  */
 export const HEAD_FOCUS =
-  "outline-none transition-colors duration-(--n-duration-fast) group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)]";
+  "outline-none transition-colors duration-(--n-duration-fast) group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)] forced-colors:group-data-[keyboard]/board:focus:outline-2 forced-colors:group-data-[keyboard]/board:focus:outline-solid";
 
 const MENU_ITEM =
   "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";
