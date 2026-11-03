@@ -1710,7 +1710,7 @@ file_scout_items() { # board_json result.json known-titles -> draft items in Ide
   while IFS= read -r item; do
     [ "$count" -lt "$MAX_SCOUT_ITEMS" ] || break
     title=$(jq -r '.title // ""' <<<"$item" | head -1 | cut -c1-120); body=$(jq -r '.body // ""' <<<"$item")
-    [ -n "$title" ] && [ -n "$body" ] || continue
+    if [ -z "$title" ] || [ -z "$body" ]; then continue; fi
     if grep -qxF "$(norm_title <<<"$title")" <<<"$known"; then log "scout: \"$title\" is already there"; continue; fi
     known="$known
 $(norm_title <<<"$title")"
