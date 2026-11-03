@@ -24,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { ICON_BUTTON } from "@/components/ui/styles";
+import { ICON_BUTTON, ROW_HOVER } from "@/components/ui/styles";
 import {
   useAddTodoUrl,
   useCreateTodo,
@@ -566,7 +566,7 @@ function PropertyRow({
     <button
       type="button"
       {...props}
-      className={`-mx-2.5 flex min-h-11 w-[calc(100%+1.25rem)] cursor-pointer items-center gap-4 rounded-n-field px-2.5 text-left text-[0.9375rem] n-focus-inset transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))] ${
+      className={`-mx-2.5 flex min-h-11 w-[calc(100%+1.25rem)] cursor-pointer items-center gap-4 rounded-n-field px-2.5 text-left text-[0.9375rem] n-focus-inset transition-colors duration-(--n-duration-fast) ${ROW_HOVER} ${
         overdue
           ? "font-medium text-n-overdue"
           : set
@@ -639,7 +639,7 @@ function Subtasks({
             key={s.id}
             className={
               column
-                ? "-mx-2.5 flex items-start gap-3 rounded-n-field px-2.5 pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
+                ? `-mx-2.5 flex items-start gap-3 rounded-n-field px-2.5 transition-colors duration-(--n-duration-fast) ${ROW_HOVER}`
                 : "flex min-h-11 items-center gap-3"
             }
           >
@@ -869,7 +869,7 @@ function LinkCard({
     <li
       className={
         column
-          ? "-mx-2.5 flex items-start gap-1 rounded-n-field pl-2.5 pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
+          ? `-mx-2.5 flex items-start gap-1 rounded-n-field pl-2.5 transition-colors duration-(--n-duration-fast) ${ROW_HOVER}`
           : "flex items-center gap-1 rounded-[0.75rem] border border-n-hairline"
       }
     >

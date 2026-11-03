@@ -17,6 +17,7 @@ import {
   useEffect,
   useRef,
 } from "react";
+import { ROW_HOVER } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { displayTitle, type MetaPart, metaSummary, rowMeta } from "./model";
 
@@ -318,10 +319,7 @@ function WideTodoRow({
           onMenu(todo, { x: e.clientX, y: e.clientY });
         }}
         className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-clip rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
-          selected || highlighted
-            ? "bg-n-fill"
-            : //`surface`, or `fill` in the tinted fourth column (TINTED).
-              "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
+          selected || highlighted ? "bg-n-fill" : ROW_HOVER
         }`}
       >
         <CheckButton

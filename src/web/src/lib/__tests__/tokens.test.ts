@@ -37,6 +37,32 @@ describe("design token generator", () => {
     expect(dark).not.toContain("--n-color-brand:");
   });
 
+  it("maps every highContrast colour to prefers-contrast: more, light and dark", () => {
+    const css = renderCss(tokens);
+    const media = css.slice(css.indexOf("@media (prefers-contrast: more) {"));
+    expect(media.length).toBeLessThan(css.length);
+    const dark = media.slice(media.indexOf(".dark {"));
+    const light = media.slice(0, media.indexOf(".dark {"));
+    type HighContrast = { highContrast?: { light: string; dark: string } };
+    const high = (
+      Object.entries(tokens.color) as [string, HighContrast][]
+    ).flatMap(([name, c]) =>
+      !name.startsWith("$") && c.highContrast
+        ? [[name, c.highContrast] as const]
+        : [],
+    );
+    expect(high.map(([name]) => name)).toContain("hairline");
+    for (const [name, c] of high) {
+      const prop = `--n-color-${name.replace(/[A-Z]/g, (ch) => `-${ch.toLowerCase()}`)}`;
+      expect(light, name).toContain(`${prop}: ${c.light.toLowerCase()};`);
+      expect(dark, name).toContain(`${prop}: ${c.dark.toLowerCase()};`);
+    }
+    // After the base rules, so it wins in both modes.
+    expect(css.indexOf("@media (prefers-contrast: more)")).toBeGreaterThan(
+      css.indexOf(".dark {"),
+    );
+  });
+
   it("emits the spec's motion and radius values", () => {
     const css = renderCss(tokens);
     expect(css).toContain("--n-duration-fast: 150ms;");

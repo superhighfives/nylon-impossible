@@ -1,6 +1,7 @@
 import { Check } from "lucide-react";
 import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import { SelectionBar } from "@/components/phone/TodoRow";
+import { ROW_HOVER } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { ColumnHeader, isColumnBackground, TINTED } from "./Column";
 import { SkeletonRows } from "./Skeleton";
@@ -123,9 +124,7 @@ function DoneRow({
         data-row-container
         data-selected={selected ? "" : undefined}
         className={`-mx-2.5 flex items-start gap-3 rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) ${
-          selected
-            ? "bg-n-fill"
-            : "pointer-fine:hover:bg-[var(--n-row-hover,var(--color-n-surface))]"
+          selected ? "bg-n-fill" : ROW_HOVER
         }`}
       >
         <button
