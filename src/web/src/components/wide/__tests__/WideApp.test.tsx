@@ -1,3 +1,4 @@
+import type { DndContextProps } from "@dnd-kit/core";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -63,8 +64,10 @@ vi.mock("@/hooks/useTodos", () => ({
   useProcessTodo: () => ({ mutate: vi.fn() }),
   useUpdateUrlPreview: () => ({ mutate: vi.fn() }),
 }));
+/** The client's Reduce motion hint; the drag tests turn it off. */
+let reducedMotion = "reduce";
 vi.mock("@/hooks/useHints", () => ({
-  useHints: () => ({ timeZone: "UTC", reducedMotion: "reduce" }),
+  useHints: () => ({ timeZone: "UTC", reducedMotion }),
 }));
 vi.mock("@/hooks/useLocalMidnightTick", () => ({
   useLocalMidnightTick: () => {},
@@ -95,6 +98,21 @@ vi.mock("@/lib/toast", async (importOriginal) => ({
     dismiss: vi.fn(),
   },
 }));
+
+// The real DndContext, with its handlers kept so tests can drive a drag:
+// jsdom has no layout for dnd-kit's own pointer maths.
+let dnd: DndContextProps;
+vi.mock("@dnd-kit/core", async (importOriginal) => {
+  const mod = await importOriginal<typeof import("@dnd-kit/core")>();
+  const { createElement } = await import("react");
+  return {
+    ...mod,
+    DndContext: (props: DndContextProps) => {
+      dnd = props;
+      return createElement(mod.DndContext, props);
+    },
+  };
+});
 
 import { toast } from "@/lib/toast";
 import { WideApp } from "../WideApp";
@@ -1092,6 +1110,249 @@ describe("WideApp", () => {
       expect.objectContaining({ name: "Studio B" }),
       expect.anything(),
     );
+  });
+});
+
+describe("WideApp drag and drop", () => {
+  const ROW = 48;
+  const box = (top: number, height: number) =>
+    ({
+      top,
+      bottom: top + height,
+      height,
+      left: 0,
+      right: 300,
+      width: 300,
+      x: 0,
+      y: top,
+      toJSON: () => ({}),
+    }) as DOMRect;
+
+  /**
+   * Lays out a column: its "+ Add" composer `composer` px tall from y 100,
+   * then the rows' wrapper, with each row 48px tall. Returns the wrapper's top.
+   */
+  const layOut = (name: string, composer = 60) => {
+    const col = column(name);
+    const body = col.querySelector<HTMLElement>("[data-column-body]");
+    const area = col.querySelector<HTMLElement>("[data-drop-area]");
+    if (!body || !area) throw new Error(`${name} isn't laid out`);
+    const top = 100 + composer + 8;
+    (body.firstElementChild as HTMLElement).getBoundingClientRect = () =>
+      box(100, composer);
+    area.getBoundingClientRect = () => box(top, 400);
+    col.querySelectorAll("li").forEach((li, i) => {
+      li.getBoundingClientRect = () => box(top + i * ROW, ROW);
+    });
+    return top;
+  };
+
+  const todo = (id: string) => todos.find((t) => t.id === id) as TodoWithUrls;
+  const pointerAt = (y: number) =>
+    window.dispatchEvent(new MouseEvent("pointermove", { clientY: y }));
+  const event = (id: string, over: string | null, deltaY = 0) =>
+    ({
+      active: { id, data: { current: { todo: todo(id) } } },
+      over: over ? { id: over } : null,
+      activatorEvent: new MouseEvent("pointerdown", { clientY: 0 }),
+      delta: { x: 0, y: deltaY },
+    }) as never;
+  const start = (id: string) => act(() => dnd.onDragStart?.(event(id, null)));
+  const move = (id: string, over: string | null, y: number) => {
+    pointerAt(y);
+    act(() => dnd.onDragMove?.(event(id, over)));
+  };
+  const end = (id: string, over: string | null) =>
+    act(() => dnd.onDragEnd?.(event(id, over)));
+  const line = () =>
+    document.querySelector<HTMLElement>("[data-drop-indicator]");
+
+  beforeEach(() => {
+    update.mockReset();
+    todos = [
+      ["t1", "Review PR", "list-today", "a0"],
+      ["t2", "Call Mum", "list-today", "a1"],
+      ["t3", "Water plants", "list-today", "a2"],
+      ["w1", "Send invoice", "list-week", "a0"],
+      ["w2", "Renew passport", "list-week", "a1"],
+      ["g1", "Parmesan", "list-groceries", "a0"],
+    ].map(([id, title, listId, position]) =>
+      makeTodo({ id, title, listId, position }),
+    );
+  });
+
+  it("draws a yellow line between rows, measured from the rows, not the composer", () => {
+    render(<WideApp />);
+    let top = layOut("Today", 60);
+    start("t3");
+    // Below Review PR's middle: between it and Call Mum.
+    move("t3", "col:list-today", top + 30);
+    expect(line()).toHaveStyle({ top: `${ROW}px` });
+    expect(line()).toHaveClass("bg-n-brand");
+
+    // A taller composer moves the rows, not the line within them.
+    top = layOut("Today", 140);
+    move("t3", "col:list-today", top + 30);
+    expect(line()).toHaveStyle({ top: `${ROW}px` });
+
+    // Above the first row, and below the last.
+    move("t1", "col:list-today", top + 2);
+    expect(line()).toHaveStyle({ top: "0px" });
+  });
+
+  it("follows the real pointer when the column has scrolled", () => {
+    render(<WideApp />);
+    const top = layOut("Today");
+    start("t1");
+    // dnd-kit's delta includes the scroll; the pointer is just under Call Mum's middle.
+    pointerAt(top + ROW + 30);
+    act(() => dnd.onDragMove?.(event("t1", "col:list-today", 900)));
+    // Its own slot is 0; Call Mum's bottom half points at the gap after it.
+    expect(line()).toHaveStyle({ top: `${2 * ROW}px` });
+  });
+
+  it("drops exactly where the line last showed", () => {
+    render(<WideApp />);
+    const top = layOut("Today");
+    start("t3");
+    move("t3", "col:list-today", top + 5);
+    expect(line()).toHaveStyle({ top: "0px" });
+    // The pointer moves on before the release, with no move event between.
+    pointerAt(top + 2 * ROW + 40);
+    end("t3", "col:list-today");
+    expect(line()).toBeNull();
+    expect(update).toHaveBeenCalledTimes(1);
+    const { id, input } = update.mock.calls[0][0];
+    expect(id).toBe("t3");
+    expect(input.position < "a0").toBe(true);
+  });
+
+  it("changes nothing when dropped on the row's own faded slot", () => {
+    render(<WideApp />);
+    const top = layOut("Today");
+    start("t2");
+    // Over the top half of Call Mum's own row: the line is at its top edge.
+    move("t2", "col:list-today", top + ROW + 12);
+    expect(line()).toHaveStyle({ top: `${ROW}px` });
+    // The bottom half: its bottom edge.
+    move("t2", "col:list-today", top + ROW + 40);
+    expect(line()).toHaveStyle({ top: `${2 * ROW}px` });
+    end("t2", "col:list-today");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("drops into another column at the line's slot", () => {
+    render(<WideApp />);
+    layOut("Today");
+    const top = layOut("This week");
+    start("t1");
+    // Between Send invoice and Renew passport.
+    move("t1", "col:list-week", top + 30);
+    expect(
+      column("This week").querySelector("[data-drop-indicator]"),
+    ).toHaveStyle({ top: `${ROW}px` });
+    expect(column("Today").querySelector("[data-drop-indicator]")).toBeNull();
+    end("t1", "col:list-week");
+    const { id, input } = update.mock.calls[0][0];
+    expect(id).toBe("t1");
+    expect(input.listId).toBe("list-week");
+    expect(input.position > "a0" && input.position < "a1").toBe(true);
+  });
+
+  it("moves to a sidebar list with no line", () => {
+    render(<WideApp />);
+    const top = layOut("Today");
+    start("t1");
+    move("t1", "col:list-today", top + 30);
+    move("t1", "side:list-groceries", top + 30);
+    expect(line()).toBeNull();
+    end("t1", "side:list-groceries");
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-groceries" }),
+      }),
+    );
+  });
+
+  describe("easing rows into place", () => {
+    const animate = vi.fn();
+    const realAnimate = Element.prototype.animate;
+    const realOffsetTop = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      "offsetTop",
+    );
+
+    beforeEach(() => {
+      animate.mockReset();
+      Element.prototype.animate = animate;
+      // jsdom has no layout: a row sits at its index × ROW in its list.
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+        configurable: true,
+        get(this: HTMLElement) {
+          const parent = this.parentElement;
+          return parent ? [...parent.children].indexOf(this) * ROW : 0;
+        },
+      });
+      document.documentElement.style.setProperty("--n-duration-base", "220ms");
+      document.documentElement.style.setProperty(
+        "--n-ease-out-strong",
+        "cubic-bezier(0.23, 1, 0.32, 1)",
+      );
+      // The drop lands as the server's answer would.
+      update.mockImplementation(({ id, input }) => {
+        todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
+      });
+    });
+
+    afterEach(() => {
+      reducedMotion = "reduce";
+      Element.prototype.animate = realAnimate;
+      if (realOffsetTop) {
+        Object.defineProperty(
+          HTMLElement.prototype,
+          "offsetTop",
+          realOffsetTop,
+        );
+      }
+      document.documentElement.removeAttribute("style");
+    });
+
+    const dropFirst = () => {
+      const { rerender } = render(<WideApp />);
+      const top = layOut("Today");
+      start("t3");
+      move("t3", "col:list-today", top + 5);
+      end("t3", "col:list-today");
+      expect(update).toHaveBeenCalledTimes(1);
+      rerender(<WideApp />);
+    };
+
+    it("eases the rows from where they were dropped", () => {
+      reducedMotion = "no-preference";
+      dropFirst();
+      const rows = [...column("Today").querySelectorAll("li")];
+      // Water plants rises from the bottom; the two above it step down.
+      expect(rows[0]).toHaveTextContent("Water plants");
+      expect(animate.mock.contexts).toEqual(rows);
+      expect(animate.mock.calls.map(([frames]) => frames[0])).toEqual([
+        { transform: `translateY(${2 * ROW}px)` },
+        { transform: `translateY(${-ROW}px)` },
+        { transform: `translateY(${-ROW}px)` },
+      ]);
+      expect(animate).toHaveBeenCalledWith(expect.anything(), {
+        duration: 220,
+        easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+      });
+    });
+
+    it("doesn't under reduced motion", () => {
+      dropFirst();
+      expect(column("Today").querySelector("li")).toHaveTextContent(
+        "Water plants",
+      );
+      expect(animate).not.toHaveBeenCalled();
+    });
   });
 });
 

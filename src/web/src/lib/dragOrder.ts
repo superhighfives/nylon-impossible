@@ -87,3 +87,41 @@ export function slotAt(mids: number[], y: number): number {
   const i = mids.findIndex((mid) => y < mid);
   return i === -1 ? mids.length : i;
 }
+
+/** A row's vertical extent, in any one coordinate space. */
+export interface RowSpan {
+  top: number;
+  bottom: number;
+}
+
+/**
+ * Where the drop line for `slot` goes: the boundary between the two rows a
+ * todo dropped there lands between, in the same coordinates as `rows`. Above
+ * the first row for slot 0, below the last for the end slot. Null when there
+ * are no rows.
+ *
+ * `rows` is every row in the column, top to bottom, including the dragged one
+ * at `dragged` (-1 when it's in another column), which keeps its space while
+ * faded. `slot` counts the *other* rows, as `slotAt` and `dropPlacement` do,
+ * so the dragged row's own slot has two edges: the line takes whichever is
+ * nearer the pointer at `y`.
+ */
+export function dropLineY(
+  rows: RowSpan[],
+  slot: number,
+  dragged: number,
+  y: number,
+): number | null {
+  if (rows.length === 0) return null;
+  // The gap in `rows` the line marks: just before rows[gap].
+  let gap = dragged < 0 || slot < dragged ? slot : slot + 1;
+  if (slot === dragged) {
+    const own = rows[dragged];
+    gap = y - own.top <= own.bottom - y ? dragged : dragged + 1;
+  }
+  const above = rows[gap - 1];
+  const below = rows[gap];
+  if (!above) return below.top;
+  if (!below) return above.bottom;
+  return (above.bottom + below.top) / 2;
+}

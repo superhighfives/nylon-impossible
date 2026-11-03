@@ -1,11 +1,12 @@
 import { Menu } from "@base-ui/react/menu";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Ellipsis, X } from "lucide-react";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
 import { ICON_BUTTON } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
+import { type Settle, settleRows, settleTiming } from "./settle";
 
 /** Droppable ids for columns, distinct from sidebar entries. */
 export const columnDropId = (listId: string) => `col:${listId}`;
@@ -27,7 +28,7 @@ export function isColumnBackground(target: EventTarget | null): boolean {
 export interface DropIndicator {
   listId: string;
   index: number;
-  /** Offset from the top of the column's row list, in px. */
+  /** Offset from the top of the column's row list (`data-drop-area`), in px. */
   y: number;
 }
 
@@ -261,6 +262,7 @@ export function Column({
   highlightedId,
   selectedId,
   indicator,
+  settle = null,
   composer,
   banner,
   empty,
@@ -283,6 +285,8 @@ export function Column({
   highlightedId: string | null;
   selectedId: string | null;
   indicator: DropIndicator | null;
+  /** Where rows sat at a drop, so they ease into the new order. */
+  settle?: Settle | null;
   composer: ReactNode;
   /** Today's overnight pill, in the header's reserved space. */
   banner?: ReactNode;
@@ -303,6 +307,21 @@ export function Column({
     data: { listId },
   });
   const headingId = `column-${listId}-title`;
+  const listRef = useRef<HTMLUListElement>(null);
+  const settled = useRef<Settle | null>(null);
+  // Runs as `rows` changes, so it catches the render where the drop's new
+  // order lands, then plays once per drop.
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!settle || settled.current === settle || !list || !rows.length) return;
+    const timing = settleTiming();
+    if (
+      timing &&
+      settleRows(list, listId, settle.from, timing, settle.landing)
+    ) {
+      settled.current = settle;
+    }
+  }, [settle, rows, listId]);
   // One tab stop per column: its selected row, else its first.
   const tabStopId = rows.some((r) => r.id === selectedId)
     ? selectedId
@@ -345,7 +364,7 @@ export function Column({
         ) : error ? (
           error
         ) : (
-          <div className="relative min-h-24">
+          <div data-drop-area={listId} className="relative min-h-24">
             {rows.length === 0 ? (
               <p
                 className={`m-0 pt-4 font-n-display text-[1.125rem] font-semibold tracking-[-0.01em] transition-colors duration-(--n-duration-fast) ${
@@ -355,7 +374,11 @@ export function Column({
                 {empty}
               </p>
             ) : (
-              <ul data-row-list={listId} className="m-0 list-none p-0">
+              <ul
+                ref={listRef}
+                data-row-list={listId}
+                className="m-0 list-none p-0"
+              >
                 {rows.map((todo) => (
                   <DraggableRow
                     key={todo.id}
@@ -377,7 +400,7 @@ export function Column({
                 aria-hidden="true"
                 data-drop-indicator
                 style={{ top: indicator.y }}
-                className="pointer-events-none absolute -inset-x-1 h-0.5 -translate-y-1/2 rounded-full bg-n-ink"
+                className="pointer-events-none absolute -inset-x-2.5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
               />
             )}
           </div>

@@ -573,6 +573,7 @@ export function WideApp({
         highlightedId={menu?.id ?? null}
         selectedId={selectedId}
         indicator={drag.indicator}
+        settle={drag.settle}
         loading={loading}
         error={errorView}
         empty={EMPTY_COPY[kind ?? ""] ?? "Nothing here yet."}
