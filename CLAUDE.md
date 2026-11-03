@@ -127,8 +127,10 @@ of these hold:
 - no unresolved review threads from the owner;
 - on the foreman's `foreman/*` PRs, the owner added `verified` after the
   head commit was pushed (for now, every kind; it will be dropped kind by
-  kind, each with a written reason). The cloud routines' PRs don't wait for
-  it;
+  kind, each with a written reason). The dependency bundle's
+  `foreman/deps-*` PRs don't wait for it: green CI and a 🟢 review on the
+  head commit are the proof for a dependency bump. A bump under `.github/`
+  is still guarded, so the owner merges it;
 - it touches none of the guarded areas below.
 
 Guarded areas wait for the owner to merge. A rename counts as touching both
@@ -156,7 +158,8 @@ The rest lives in `.claude/skills/` and loads when the work comes up:
   Fix-shots are best-effort, like the marketing captures: never make them fail
   the run. Never merge, rebase, force-push or delete the orphan
   **`feedback-assets`** branch; every old feedback issue's images live there.
-- `cloud-routines`: the Sentry sweep, dependabot bundle and PR shepherd.
+- `routines`: what the foreman runs on a schedule (Sentry sweep, dependabot
+  bundle, pastor shepherd, scout, daily digest), and how to turn each off.
 - `prd`: the spec template, what makes a question open, and how Decisions
   are recorded. Load it before drafting or revising any spec.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Tests for the foreman's merge gate, spec check, feedback intake, shots and
-# token handling, against a throwaway git repo and a stubbed `gh`. The gate is the only thing between an
+# Tests for the foreman's merge gate, spec check, feedback intake, shots,
+# token handling and routines, against a throwaway git repo and a stubbed `gh`. The gate is the only thing between an
 # agent's PR and main, so every way it could wrongly say "merge" gets a case
 # here.
 #
@@ -13,7 +13,9 @@ tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 export FOREMAN_HOME="$tmp/home"
 export FOREMAN_MERGEABLE_RETRY_SECONDS=0
-export FOREMAN_NOW=1793520000 # 2026-11-01T08:00:00Z
+export FOREMAN_NOW=1793520000 # 2026-11-01T08:00:00Z, a Sunday
+export TZ=UTC # the routines' schedules are in local time
+export FOREMAN_PASTOR_PLISTS="$tmp/LaunchAgents"
 # shellcheck source=SCRIPTDIR/foreman.sh
 source "$here/foreman.sh"
 set +e
@@ -237,12 +239,28 @@ expect "an unreadable activity log waits"                 "wait: couldn't read w
 reset; API_FAIL=events
 expect "unreadable label events wait"                     "wait: couldn't read the label's events"  "$(gate 7)"
 
+# The dependency bundle: CI and a 🟢 review are the proof, not `verified`.
+deps_view() { jq -c '.labels = [] | .headRefName = "foreman/deps-2026-11-02"' <<<"$VIEW"; }
+reset; VIEW=$(deps_view)
+expect "a green, 🟢 dependency bundle merges without verified"  "merge $HEAD_SHA"  "$(gate 7)"
+reset; VIEW=$(deps_view); REVIEW="[$(review "$HEAD_SHA" "🟡 Approved with comments" 2026-11-01T09:00:00Z)]"
+expect "but not on a 🟡"                                         "wait: review isn't all-green"  "$(gate 7)"
+reset; VIEW=$(jq -c '.statusCheckRollup = [{"status":"COMPLETED","conclusion":"FAILURE"}]' <<<"$(deps_view)")
+expect "nor with red checks"                                     "wait: checks red"  "$(gate 7)"
+reset; VIEW=$(jq -c '.labels = [] | .headRefName = "foreman/12-deps-thing"' <<<"$VIEW")
+expect "other foreman/* PRs still wait for verified"             "wait: not verified"  "$(gate 7)"
+
 MIG_SHA="$(case_sha add-migration)"
 reset; VIEW=$(view "$MIG_SHA" "$GREEN_CHECKS"); REVIEW="[$(review "$MIG_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$MIG_SHA"
 expect_prefix "a green migration is the owner's"       "guarded: touches a migration"    "$(gate 7)"
 VIEW=$(jq -c '.labels = []' <<<"$VIEW")
 expect_prefix "even before it's verified"              "guarded: touches a migration"    "$(gate 7)"
+WF_SHA="$(case_sha workflow)"
+reset; VIEW=$(jq -c '.labels = [] | .headRefName = "foreman/deps-2026-11-02"' <<<"$(view "$WF_SHA" "$GREEN_CHECKS")")
+REVIEW="[$(review "$WF_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
+git -C "$tmp/origin.git" update-ref refs/pull/7/head "$WF_SHA"
+expect_prefix "a bundle that bumps a workflow is the owner's"  "guarded: touches CI"  "$(gate 7)"
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$HEAD_SHA"
 
 # UNKNOWN for two reads, then MERGEABLE: the gate asks again rather than waiting a tick.
@@ -442,6 +460,14 @@ BOARD='{"id":"P","field":{"id":"F","options":[{"id":"o-ideas","name":"Ideas"},{"
 ]}}'
 expect "Ready: the owner's, without needs-decision, in board order"  "11 16 18"  "$(ready_issues "$BOARD" | paste -sd' ' -)"
 expect "spec runs: the owner's spec issues not yet Ready"           "14 17"     "$(spec_issues "$BOARD" | paste -sd' ' -)"
+# The Sentry sweep files issues as the machine account; nobody else's count.
+AUTHOR_BOARD=$(jq -c '.items.nodes += [
+  {id:"I19", status:{name:"Ready"}, content:{__typename:"Issue", number:19, state:"OPEN", author:{login:"nylon-foreman"}, labels:{nodes:[]}}},
+  {id:"I20", status:{name:"Specced"}, content:{__typename:"Issue", number:20, state:"OPEN", author:{login:"nylon-foreman"}, labels:{nodes:[{name:"spec"}]}}},
+  {id:"I21", status:{name:"Ready"}, content:{__typename:"Issue", number:21, state:"OPEN", author:{login:"nylon-foreman-bot"}, labels:{nodes:[]}}},
+  {id:"I22", status:{name:"Specced"}, content:{__typename:"Issue", number:22, state:"OPEN", author:{login:"stranger"}, labels:{nodes:[{name:"spec"}]}}}]' <<<"$BOARD")
+expect "Ready also takes the machine account's issues, and nobody else's"  "11 16 18 19"  "$(ready_issues "$AUTHOR_BOARD" | paste -sd' ' -)"
+expect "so do spec runs"                                                   "14 17 20"     "$(spec_issues "$AUTHOR_BOARD" | paste -sd' ' -)"
 
 SPEC_BODY="" SPEC_LABELS="" COMMENT_IDS=""
 gh() {
@@ -736,6 +762,312 @@ out=$( (use_token) 2>&1 ); status=$?
 expect "an expired token stops the foreman"  "1"  "$status"
 expect_prefix "with a clear message"       "foreman: the nylon-foreman token in $TOKEN_FILE expired on 2026-10-31; make a new one"  "$out"
 expect "and an alert"                      "yes"  "$(called 'alert stopped: the nylon-foreman token')"
+
+# ---- routines ----------------------------------------------------------------
+
+echo "routine schedules"
+
+H=3600 D=86400
+SUN8=$FOREMAN_NOW SUN3=$((FOREMAN_NOW - 5 * 3600))
+MON9=$((SUN8 + D + H)) THU3=$((SUN3 + 4 * D))
+rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
+due() { # name now last-run (empty: never) -> yes or no
+  if [ -n "$3" ]; then echo "$3" > "$ROUTINES/$1"; else rm -f "${ROUTINES:?}/${1:?}"; fi
+  if FOREMAN_NOW=$2 routine_due "$1"; then echo yes; else echo no; fi
+}
+expect "digest: due at 08:00"                         yes "$(due digest "$SUN8" $((SUN8 - D + 300)))"
+expect "digest: not at 07:59"                         no  "$(due digest $((SUN8 - 60)) $((SUN8 - D + 300)))"
+expect "digest: once a window, across ticks"          no  "$(due digest $((SUN8 + 2 * H)) $((SUN8 + 600)))"
+expect "digest: due again the next morning"           yes "$(due digest $((SUN8 + D)) $((SUN8 + 600)))"
+expect "never run: due"                               yes "$(due digest "$SUN8" "")"
+expect "sentry: due from 03:00"                       yes "$(due sentry "$SUN3" $((SUN3 - D + 600)))"
+expect "sentry: not at 02:59"                         no  "$(due sentry $((SUN3 - 60)) $((SUN3 - D + 600)))"
+expect "sentry: ran at 03:10, so not again that day"  no  "$(due sentry $((SUN3 + 20 * H)) $((SUN3 + 600)))"
+expect "deps: not on a Sunday"                        no  "$(due deps "$SUN8" $((MON9 - 7 * D + 600)))"
+expect "deps: not at 08:59 on Monday"                 no  "$(due deps $((MON9 - 60)) $((MON9 - 7 * D + 600)))"
+expect "deps: Monday at 09:00"                        yes "$(due deps "$MON9" $((MON9 - 7 * D + 600)))"
+expect "deps: a Monday missed runs on Tuesday"        yes "$(due deps $((MON9 + D)) $((MON9 - 7 * D + 600)))"
+expect "deps: once that week"                         no  "$(due deps $((MON9 + 3 * D)) $((MON9 + 600)))"
+expect "scout: Thursday at 03:00"                     yes "$(due scout "$THU3" $((THU3 - 7 * D + 600)))"
+expect "scout: not on Wednesday"                      no  "$(due scout $((THU3 - D)) $((THU3 - 7 * D + 600)))"
+expect "shepherd: every tick"                         yes "$(due shepherd "$SUN8" "$SUN8")"
+expect "the next digest is tomorrow at 08:00"         $((SUN8 + D))  "$(sched_time $((SUN8 + 600)) 8 '*' next)"
+expect "the next bundle is Monday at 09:00"           "$MON9"        "$(sched_time "$SUN8" 9 1 next)"
+# 2026-11-01 is the day the US leaves daylight time: 03:00 is still 03:00.
+expect "local time, across a clock change"  "2026-11-01 03:00" \
+  "$(TZ=America/Los_Angeles perl -MPOSIX=strftime -e 'print strftime("%F %H:%M", localtime shift)' "$(TZ=America/Los_Angeles sched_time $((SUN8 + 12 * H)) 3 '*' prev)")"
+
+echo "routine off switch"
+
+rm -f "${ROUTINES:?}"/*.off
+off() { if routine_off "$1" "$2"; then echo off; else echo on; fi; }
+expect "FOREMAN_ROUTINES_OFF turns off the named one"  off "$(off digest 'sentry, digest')"
+expect "and not the others"                            on  "$(off deps 'sentry, digest')"
+expect "names match exactly"                           on  "$(off sentry 'sentry-old')"
+expect "an empty variable turns nothing off"           on  "$(off sentry '')"
+cmd_routine scout off >/dev/null
+expect "foreman routine scout off turns it off here"   off "$(off scout '')"
+expect "and only it"                                   on  "$(off sentry '')"
+cmd_routine scout on >/dev/null
+expect "and on turns it back on"                       on  "$(off scout '')"
+expect "an unknown routine is refused"                 1   "$( (cmd_routine nope off) >/dev/null 2>&1; echo $?)"
+
+echo "routines pass"
+
+# What ran, in order, with the routines themselves stubbed out.
+pass_run() { # now off-variable open-agent-PRs -> the routines that ran
+  (
+    OFFV=$2 OPENV=$3
+    routines_off_var() { echo "$OFFV"; }
+    agent_pr_count() { echo "$OPENV"; }
+    run_routine() { echo "$2" >> "$tmp/ran"; now > "$ROUTINES/$2"; if model_routine "$2"; then USED_MODEL=1; fi; }
+    deps_tidy() { echo tidy >> "$tmp/ran"; }
+    : > "$tmp/ran"
+    FOREMAN_NOW=$1 routines_pass '{}' >/dev/null
+    paste -sd' ' "$tmp/ran"
+  )
+}
+rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
+expect "one model-driven routine a tick; the shell ones as well"  "shepherd sentry digest tidy"  "$(pass_run "$SUN8" "" 0)"
+expect "with 3 agent PRs open, the bundle waits"                  "shepherd scout tidy"          "$(pass_run "$SUN8" "" 3)"
+expect "and stays due"                                            "shepherd tidy"                "$(pass_run "$SUN8" "" 3)"
+expect "until there's room"                                       "shepherd deps tidy"           "$(pass_run "$SUN8" "" 2)"
+expect "then nothing more in this window"                         "shepherd tidy"                "$(pass_run "$SUN8" "" 0)"
+rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
+expect "the variable stops exactly the ones it names"             "sentry"                       "$(pass_run "$SUN8" "shepherd,digest,deps" 0)"
+expect "and they stay due"                                        "no"                           "$([ -e "$ROUTINES/digest" ] && echo yes || echo no)"
+touch "$ROUTINES/scout.off"
+expect "a local off marker stops exactly that one"                "shepherd deps digest tidy"    "$(pass_run "$SUN8" "" 0)"
+rm -f "${ROUTINES:?}/scout.off"
+
+tick_routines() { # paused-variable -> whether a tick reached the routines
+  (
+    PAUSEDV=$1
+    use_token() { :; }; ensure_clone() { :; }; self_update() { :; }; board_json() { echo '{}'; }
+    merge_pass() { :; }; cleanup_worktrees() { :; }; spec_pass() { :; }; agent_pr_count() { echo 3; }
+    gh() { case "$*" in "variable get FOREMAN_PAUSED"*) echo "$PAUSEDV" ;; esac; }
+    routines_pass() { touch "$tmp/tick-routines"; }
+    rm -f "$tmp/tick-routines"
+    cmd_tick >/dev/null 2>&1
+    [ -e "$tmp/tick-routines" ] && echo yes || echo no
+  )
+}
+expect "FOREMAN_PAUSED stops every routine"   no  "$(tick_routines 1)"
+expect "otherwise a tick runs them"           yes "$(tick_routines "")"
+
+echo "agent PRs"
+
+PRS_JSON='[{"number":80,"headRefName":"foreman/12-x","author":{"login":"nylon-foreman"}},
+  {"number":81,"headRefName":"feedback/568","author":{"login":"superhighfives"}},
+  {"number":82,"headRefName":"foreman/13-y","author":{"login":"stranger"}},
+  {"number":83,"headRefName":"dependabot/bun/x","author":{"login":"app/dependabot"}},
+  {"number":84,"headRefName":"foreman/deps-2026-11-02","author":{"login":"nylon-foreman"}}]'
+expect "foreman/* and feedback/*, by the owner or the machine account"  "80 81 84"  "$(pick_agent_prs <<<"$PRS_JSON" | cut -f1 | paste -sd' ' -)"
+
+echo "shepherd"
+
+(
+  AGENT_PRS=$'80\tforeman/12-x\n81\tfeedback/568' AGENT_FAIL=""
+  agent_prs() { [ -z "$AGENT_FAIL" ] || return 1; echo "$AGENT_PRS"; }
+  shepherd_worktree() { echo "$tmp/wt-$1"; }
+  pastor() { echo "pastor $*" >> "$CALLS"; }
+  : > "$CALLS"; rm -rf "${SHEPHERD:?}" "${FOREMAN_PASTOR_PLISTS:?}"; mkdir -p "$FOREMAN_PASTOR_PLISTS" "$SHEPHERD"
+  touch "$FOREMAN_PASTOR_PLISTS/com.pastor.superhighfives-nylon-impossible-80.plist" "$SHEPHERD/70"
+  shepherd >/dev/null
+  expect "pastor goes on an agent PR without a job"      yes "$(called "pastor install 81 -C $tmp/wt-81")"
+  expect "not on one that has one"                       no  "$(called 'pastor install 80')"
+  expect "and it's remembered as the shepherd's"         yes "$([ -e "$SHEPHERD/81" ] && echo yes)"
+  expect "a closed PR's job is stopped"                  yes "$(called 'pastor stop superhighfives-nylon-impossible-70 --purge')"
+  expect "and forgotten"                                 no  "$([ -e "$SHEPHERD/70" ] && echo yes || echo no)"
+  : > "$CALLS"; AGENT_FAIL=1
+  shepherd >/dev/null
+  expect "when GitHub can't say what's open, no job is touched"  no  "$(called 'pastor')"
+)
+
+echo "routine prompts"
+
+# Each prompt names the file its results go in; set -u catches a prompt
+# written before that's known, which would otherwise reach Claude cut short.
+prompt_of() { # routine -> its prompt, written the way the routine writes it
+  set -u; unset ROUTINE_OUT; routine_out "$1"
+  case "$1" in
+    sentry) sentry_prompt ;;
+    scout)  scout_prompt "A title" ;;
+    deps)   deps_prompt foreman/deps-2026-11-02 "#1 Bump x" ;;
+  esac
+}
+for r in sentry scout deps; do
+  out=$( (prompt_of "$r") 2>&1 )
+  expect "the $r prompt is whole and names its result file"  "yes"  "$(grep -qF "$ROUTINES/out/$r/result.json" <<<"$out" && ! grep -q 'unbound variable' <<<"$out" && echo yes)"
+done
+
+echo "the Sentry sweep"
+
+sentry_item() { # short-id [incomplete|nameless] -> one proposed issue
+  local body="${SPEC_OK/It breaks./$1 crashes the app for 12 users.}"
+  body="${body/None./1. Retry, or fail?}"
+  case "${2:-}" in incomplete) body="${body/How to verify/Verify}" ;; nameless) body="${SPEC_OK/None./1. ?}" ;; esac
+  jq -cn --arg s "$1" --arg b "$body" '{short_id:$s, title:("Crash: " + $s), body:$b, questions:"1. Retry, or fail? Recommend retry."}'
+}
+SENTRY_RESULT="$tmp/sentry.json"
+jq -n --argjson items "[$(sentry_item NYLON-API-1),$(sentry_item NYLON-API-2),$(sentry_item NYLON-API-3),$(sentry_item NYLON-API-4),
+  $(sentry_item NYLON-API-9 incomplete),$(sentry_item NYLON-API-10 nameless),$(sentry_item lowercase-1),$(sentry_item NYLON-API-1),
+  $(sentry_item NYLON-API-5),$(sentry_item NYLON-API-6),$(sentry_item NYLON-API-7),$(sentry_item NYLON-API-8)]" \
+  '{issues:$items, skipped:[{short_id:"NYLON-WEB-3", reason:"a browser extension"}]}' > "$SENTRY_RESULT"
+(
+  echo 600 > "$tmp/issue-n"
+  gh() {
+    echo "$*" >> "$CALLS"
+    case "$1 $2" in
+      "issue list")
+        case "$*" in
+          *NYLON-API-2*) echo '[{"number":77,"state":"OPEN","closedAt":null}]' ;;
+          *NYLON-API-3*) echo '[{"number":78,"state":"CLOSED","closedAt":"2026-10-20T00:00:00Z"}]' ;;
+          *NYLON-API-4*) echo '[{"number":79,"state":"CLOSED","closedAt":"2026-08-01T00:00:00Z"}]' ;;
+          *) echo '[]' ;;
+        esac ;;
+      "issue create") local n; n=$(( $(cat "$tmp/issue-n") + 1 )); echo "$n" > "$tmp/issue-n"; echo "https://github.com/superhighfives/nylon-impossible/issues/$n" ;;
+      "project item-add") echo ITEM ;;
+      *) return 0 ;;
+    esac
+  }
+  : > "$CALLS"; : > "$EVENTS"; rm -rf "${SPECS:?}"
+  file_sentry_issues "$FB_BOARD" "$SENTRY_RESULT" >/dev/null
+  expect "at most 5 issues a night"                        5    "$(grep -c '^issue create' "$CALLS")"
+  expect "the ones it filed"                               "NYLON-API-1 NYLON-API-4 NYLON-API-5 NYLON-API-6 NYLON-API-7" \
+    "$(jq -r 'select(.event == "routine") | .filed[] | sub("^#[0-9]+ Crash: "; "")' "$EVENTS" | paste -sd' ' -)"
+  expect "labelled kind:fix and spec"                      yes  "$(called 'issue create -R superhighfives/nylon-impossible --title Crash: NYLON-API-1 --label kind:fix --label spec')"
+  expect "its questions are its first comment"             yes  "$(called 'issue comment 601')"
+  expect "marked as drafted, so the spec pass waits"       0    "$(cat "$SPECS/601")"
+  expect "and it lands in Specced"                         5    "$(grep -c 'single-select-option-id o-specced' "$CALLS")"
+  expect "never Ready"                                     no   "$(called 'o-ready')"
+  note=$(jq -r 'select(.event == "routine") | .note' "$EVENTS")
+  expect "an open issue with its short ID: skipped"        yes  "$(grep -qF 'NYLON-API-2: already in #77' <<<"$note" && echo yes)"
+  expect "and one closed recently"                         yes  "$(grep -qF 'NYLON-API-3: already in #78' <<<"$note" && echo yes)"
+  expect "a spec missing a section isn't filed"            yes  "$(grep -qF 'NYLON-API-9: not a complete spec' <<<"$note" && echo yes)"
+  expect "nor one whose body doesn't name its short ID"    yes  "$(grep -qF "NYLON-API-10: the body doesn't name it" <<<"$note" && echo yes)"
+  expect "won't-fix reasons go in the event"               yes  "$(grep -qF "won't fix: NYLON-WEB-3: a browser extension" <<<"$note" && echo yes)"
+  expect "not on GitHub"                                   no   "$(called 'browser extension')"
+  : > "$CALLS"; DRY=1
+  file_sentry_issues "$FB_BOARD" "$SENTRY_RESULT" >/dev/null
+  DRY=0
+  expect "a dry run files nothing"                         no   "$(called 'issue create')"
+)
+
+echo "the scout"
+
+(
+  gh() { echo "$*" >> "$CALLS"; case "$1 $2" in "project item-create") echo "DI_$RANDOM" ;; *) return 0 ;; esac; }
+  scout_item() { jq -cn --arg t "$1" '{title:$t, body:"src/web/a.ts:12 and src/ios/A.swift:30 disagree."}'; }
+  jq -n --argjson items "[$(scout_item 'Drop the unused Pill styles'),$(scout_item '  fix   REORDERING on the web board'),$(scout_item ''),
+    $(scout_item 'One'),$(scout_item 'Two'),$(scout_item 'Three'),$(scout_item 'Four'),$(scout_item 'Five')]" '{items:$items}' > "$tmp/scout.json"
+  : > "$CALLS"; : > "$EVENTS"
+  file_scout_items "$FB_BOARD" "$tmp/scout.json" "Fix reordering on the web board" >/dev/null
+  expect "at most 5 draft items a week"                   5    "$(grep -c '^project item-create' "$CALLS")"
+  expect "none matching a title already there"            no   "$(called 'REORDERING')"
+  expect "drafts in Ideas"                                5    "$(grep -c 'single-select-option-id o-ideas' "$CALLS")"
+  expect "no issues, no labels"                           no   "$(called 'issue ')"
+  expect "what it filed is in the event"                  "Drop the unused Pill styles|One|Two|Three|Four"  "$(jq -r '.filed | join("|")' "$EVENTS")"
+)
+
+echo "the bundle"
+
+MERGED_JSON='[{"number":90,"headRefName":"foreman/deps-2026-10-26","author":{"login":"nylon-foreman"},"body":"- #55 Bump x\n- #56 Bump y","mergedAt":"2026-10-27T00:00:00Z"},
+  {"number":91,"headRefName":"foreman/deps-2026-11-02","author":{"login":"stranger"},"body":"- #57","mergedAt":"2026-11-02T00:00:00Z"},
+  {"number":92,"headRefName":"foreman/12-x","author":{"login":"nylon-foreman"},"body":"- #58","mergedAt":"2026-11-02T00:00:00Z"}]'
+expect "the bundle that named the PR"                 90  "$(bundle_for 55 <<<"$MERGED_JSON")"
+expect "#5 isn't #55"                                 ""  "$(bundle_for 5 <<<"$MERGED_JSON")"
+expect "only the machine account's foreman/deps-*"    ""  "$(bundle_for 57 <<<"$MERGED_JSON")$(bundle_for 58 <<<"$MERGED_JSON")"
+
+g checkout -q main
+g pull -q origin main 2>/dev/null
+echo "lock 1" > "$tmp/seed/bun.lock"; g add -A && g commit -qm lock && g push -q origin HEAD:main
+g checkout -q -B dependabot/x
+echo "dep 2.0" >> "$tmp/seed/src/web/app.ts"; echo "lock 2" > "$tmp/seed/bun.lock"
+g commit -qam "Bump dep" && g push -q origin HEAD:refs/heads/dependabot/x
+DEP_SHA=$(g rev-parse HEAD)
+g checkout -q -B lockonly main && echo "lock 9" > "$tmp/seed/bun.lock" && g commit -qam lock-only && g push -q origin HEAD:refs/heads/lockonly
+LOCK_SHA=$(g rev-parse HEAD)
+fetch_all
+superseded "$DEP_SHA"
+expect "a bump main doesn't have isn't superseded"    1  "$?"
+g checkout -q main && echo "dep 2.0" >> "$tmp/seed/src/web/app.ts" && echo "lock 3" > "$tmp/seed/bun.lock"
+g commit -qam "Bundle" && g push -q origin HEAD:main
+fetch_all
+superseded "$DEP_SHA"
+expect "once the bundle is on main, it is, whatever the lockfile says"  0  "$?"
+superseded "$LOCK_SHA"
+expect "a lockfile-only change is never closed"      1  "$?"
+
+echo "the digest"
+
+cat > "$EVENTS" <<'JSONL'
+{"ts":"2026-10-30T09:00:00Z","event":"failed","issue":1,"pr":null,"note":"exit 1"}
+{"ts":"2026-10-31T09:00:00Z","event":"failed","issue":40,"pr":null,"note":"exit 2"}
+{"ts":"2026-10-31T10:00:00Z","event":"spec_failed","issue":41,"pr":null,"note":"exit 1"}
+{"ts":"2026-10-31T11:00:00Z","event":"round_stalled","issue":42,"pr":142,"note":""}
+{"ts":"2026-10-31T12:00:00Z","event":"routine","issue":null,"pr":null,"routine":"deps","outcome":"failed","note":"exit 124","filed":[]}
+{"ts":"2026-10-31T13:00:00Z","event":"routine","issue":null,"pr":null,"routine":"scout","outcome":"ok","note":"1 idea(s)","filed":["Drop the unused Pill styles"]}
+{"ts":"2026-10-29T03:10:00Z","event":"routine","issue":null,"pr":null,"routine":"scout","outcome":"ok","note":"","filed":["An old idea"]}
+{"ts":"2026-10-31T14:00:00Z","event":"merged","issue":43,"pr":143,"note":""}
+{"ts":"2026-11-01T03:10:00Z","event":"routine","issue":null,"pr":null,"routine":"sentry","outcome":"ok","note":"X: won't fix","filed":["#601 Crash on save"]}
+{"ts":"2026-11-01T03:20:00Z","event":"routine","issue":null,"pr":null,"routine":"shepherd","outcome":"ok","note":"","filed":["#80"]}
+JSONL
+DAY_AGO=$((SUN8 - 86400))
+expect "found: what the Sentry sweep and the scout filed, in the last day" \
+  "- Scout, in Ideas: Drop the unused Pill styles|- Sentry: #601 Crash on save" "$(digest_found "$DAY_AGO" | paste -sd'|' -)"
+expect "problems: failed builds, spec runs, rounds and routines, in the last day" \
+  "- The build of #40 stopped without a PR (exit 2)|- The spec run for #41 failed (exit 1)|- A review round on #142 changed nothing|- Routine deps failed (exit 124)" \
+  "$(digest_problems "$DAY_AGO" | paste -sd'|' -)"
+expect "and a token about to expire"  "- Token: expires soon"  "$(digest_problems "$DAY_AGO" "expires soon" | tail -1)"
+
+DIGEST_BOARD=$(jq -c '.items.nodes = [
+  {id:"I51", status:{name:"Specced"}, content:{__typename:"Issue", number:51, title:"Crash on save", state:"OPEN", author:{login:"nylon-foreman"}, labels:{nodes:[{name:"spec"},{name:"kind:fix"}]}}},
+  {id:"I52", status:{name:"Specced"}, content:{__typename:"Issue", number:52, title:"Pick a colour", state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"},{name:"needs-decision"}]}}}]' <<<"$FB_BOARD")
+D_MERGED='[{"number":143,"title":"Fix save","body":"Closes #43.\n\nAlso fixes #44","mergedAt":"2026-10-31T14:00:00Z"},
+  {"number":140,"title":"Old","body":"","mergedAt":"2026-10-30T00:00:00Z"}]'
+D_ND='[{"number":52,"title":"Pick a colour"}]' D_OM='[{"number":144,"title":"Bundle dependabot updates"}]' D_DIGEST='[]'
+gh() { # applies --jq itself, like gh
+  local out jqf="" prev="" a
+  for a in "$@"; do [ "$prev" = --jq ] && jqf="$a"; prev="$a"; done
+  echo "$*" >> "$CALLS"
+  case "$1 $2" in
+    "pr list")
+      case "$*" in *"--state merged"*) out="$D_MERGED" ;; *owner-merge*) out="$D_OM" ;; *) out='[]' ;; esac ;;
+    "issue list")
+      case "$*" in *needs-decision*) out="$D_ND" ;; *in:title*) out="$D_DIGEST" ;; *) out='[]' ;; esac ;;
+    "issue view") out=$(jq -cn --arg b "${SPEC_OK/None./1. Retry?}" '{body:$b}') ;;
+    "issue create") echo "https://github.com/superhighfives/nylon-impossible/issues/700"; return 0 ;;
+    "issue comment") echo "https://github.com/superhighfives/nylon-impossible/issues/${3}#issuecomment-1"; return 0 ;;
+    *) return 0 ;;
+  esac
+  if [ -n "$jqf" ]; then jq -r "$jqf" <<<"$out"; else echo "$out"; fi
+}
+rm -rf "${VERIFY:?}"; mkdir -p "$VERIFY"
+TOKEN_CODE=0
+body=$(digest_body "$DIGEST_BOARD")
+expect "four sections"                         "### Merged|### Waiting on you|### Found|### Problems"  "$(grep '^### ' <<<"$body" | paste -sd'|' -)"
+expect "merged in the last day, with issues"   "- #143 Fix save (#43, #44)"  "$(sed -n '/### Merged/,/###/p' <<<"$body" | grep '^- ')"
+expect "waiting: decisions, merges and specs"  "- #52 Pick a colour: needs your decision|- #144 Bundle dependabot updates: yours to merge|- #51 Crash on save: its spec has questions for you" \
+  "$(sed -n '/### Waiting on you/,/### Found/p' <<<"$body" | grep '^- ' | paste -sd'|' -)"
+
+: > "$CALLS"
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "the first digest opens the issue"      yes  "$(called "issue create -R superhighfives/nylon-impossible --title $DIGEST_TITLE")"
+expect "pins it"                               yes  "$(called 'issue pin 700')"
+expect "and comments on it"                    yes  "$(called 'issue comment 700')"
+expect "with an alert linking the comment"     yes  "$(called "alert today's digest: https://github.com/superhighfives/nylon-impossible/issues/700#issuecomment-1")"
+: > "$CALLS"; D_DIGEST='[{"number":650,"title":"Foreman digest"}]'
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "after that, it comments on the same one"  "no yes"  "$(called 'issue create') $(called 'issue comment 650')"
+
+: > "$EVENTS"; D_MERGED='[]' D_ND='[]' D_OM='[]'
+EMPTY_BOARD=$(jq -c '.items.nodes = []' <<<"$FB_BOARD")
+: > "$CALLS"
+expect "nothing to say: no body"               ""   "$(digest_body "$EMPTY_BOARD")"
+routine_digest "$EMPTY_BOARD" >/dev/null
+expect "so no comment"                         no   "$(called 'issue comment')"
+expect "and no alert"                          no   "$(called 'alert ')"
 
 echo
 echo "$pass passed, $fail failed"
