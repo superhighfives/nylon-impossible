@@ -3,8 +3,9 @@ import { z } from "zod/v4";
 /** Images are committed as-is, so this caps what lands in the inbox repo. */
 export const MAX_FEEDBACK_IMAGES = 4;
 /**
- * Label that sets the feedback workflow on an issue. Filed with it only when
- * the reporter is an admin; on anyone else's, the repo owner adds it by hand.
+ * Label that clears an issue for the foreman to triage and fix. Filed with it
+ * only when the reporter is an admin; on anyone else's, the repo owner adds it
+ * by hand.
  */
 export const AUTO_FIX_LABEL = "auto-fix";
 /** Orphan branch screenshots are committed to; created once, by hand. */
@@ -163,7 +164,7 @@ export async function fileFeedback(
     repo: string;
     token: string;
     userId: string;
-    /** Add AUTO_FIX_LABEL so the feedback workflow picks the issue up. */
+    /** Add AUTO_FIX_LABEL so the foreman picks the issue up. */
     autoFix: boolean;
     now?: Date;
     id?: () => string;

@@ -101,6 +101,11 @@ the source of truth:
   `verified` after trying it; a later push clears it.
 - At most **3 agent PRs** are open at once. Finish or close one before
   starting another.
+- **Feedback reports reach the board through the foreman.** A `feedback`
+  issue the owner has cleared with `auto-fix` is triaged on the foreman's
+  next run, ahead of Ready items: a clear report is built straight away, with
+  a light spec in a comment; an unclear one becomes a spec in Specced, argued
+  like any other. `feedback-flow` skill.
 - `needs-decision` on an issue or PR means it's waiting on the owner. Leave a
   comment that says exactly what the decision is.
 - **The agents have their own GitHub account,** `nylon-foreman`. The
@@ -147,15 +152,15 @@ The rest lives in `.claude/skills/` and loads when the work comes up:
 - `d1-migrations`: expand/contract, and the outage that made it a rule.
 - `marketing-screenshots`: the capture pipeline, its best-effort rules,
   `--parity` and `audit.ts`.
-- `feedback-flow`: feedback issues, `feedback.yml` rounds, fix-shots. Fix-shots
-  are best-effort, like the marketing captures: never make them fail the run.
-  Never merge, rebase or delete the orphan **`feedback-assets`** branch; every
-  old feedback issue's images live there.
+- `feedback-flow`: feedback issues, how the foreman triages them, fix-shots.
+  Fix-shots are best-effort, like the marketing captures: never make them fail
+  the run. Never merge, rebase, force-push or delete the orphan
+  **`feedback-assets`** branch; every old feedback issue's images live there.
 - `cloud-routines`: the Sentry sweep, dependabot bundle and PR shepherd.
 - `prd`: the spec template, what makes a question open, and how Decisions
   are recorded. Load it before drafting or revising any spec.
 
-**Pastor on `feedback/*` and `foreman/*` PRs:** `feedback.yml` and the foreman
-own `control-room-review` findings there, so don't fix or defer them (a
+**Pastor on `foreman/*` PRs:** the foreman owns `control-room-review`
+findings there, so don't fix or defer them (a
 deferred 🟡 never reaches the 🟢 the foreman merges on). Watch CI, handle the
 owner's own comments and decisions, and send the ready-to-merge notice.

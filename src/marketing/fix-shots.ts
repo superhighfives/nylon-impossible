@@ -1,13 +1,14 @@
 #!/usr/bin/env tsx
 /**
- * Before/after screenshots for a feedback fix PR (feedback.yml).
+ * Before/after screenshots for an Apple fix PR, taken by the foreman
+ * (scripts/foreman/foreman.sh, `fix_shots`) on the Mac mini.
  *
  * Usage:
  *   npx tsx fix-shots.ts capture --plan <plan.json> --as before|after --out <dir>
  *   npx tsx fix-shots.ts report --plan <plan.json> --out <dir> --base <url>
  *       [--before-sha <sha>] [--after-sha <sha>]
  *
- * Claude writes the plan while fixing the issue: which DEBUG screen routes
+ * Claude writes the plan while building the fix: which DEBUG screen routes
  * (`-NylonScreen`, see ScreenRoute.swift) show the change, on which device,
  * in which appearance — or why there's nothing a still image could show.
  *
@@ -15,10 +16,11 @@
  *                 "note": "The close button sits clear of the grabber" }] }
  *   { "skip": "Gesture fix: a still image looks the same before and after." }
  *
- * The workflow runs `capture` on the fix branch (`--as after`) and on main
+ * The foreman runs `capture` on the fix branch (`--as after`) and on main
  * (`--as before`) — same derived data, so the second build is incremental —
  * then commits the PNGs to feedback-assets and puts `report`'s Markdown in
- * the PR body, with the plan in a hidden comment so a capture-only rerun can
+ * the PR's "Try it" section, with the plan in a hidden comment so a retake
+ * (a review round that changes src/ios, or `foreman.sh shots <pr>`) can
  * reuse it. Capture is best-effort per shot: a failure is recorded in
  * <dir>/status-<as>.json and shown in the report, never thrown.
  *
@@ -423,7 +425,7 @@ function report(): void {
       .filter(Boolean)
       .join(" and ");
     lines.push(
-      `_DEBUG screen routes on sample data${from ? `, from ${from}` : ""}. Captured by the Feedback workflow._`,
+      `_DEBUG screen routes on sample data${from ? `, from ${from}` : ""}. Captured by the foreman._`,
       "",
       "| | Before | After |",
       "| --- | --- | --- |",
@@ -446,7 +448,7 @@ function report(): void {
       lines.push(`| ${label} | ${cell("before")} | ${cell("after")} |`);
     });
   }
-  // The validated plan, for a capture-only rerun (feedback.yml reads it back).
+  // The validated plan, for a retake (the foreman reads it back).
   // Escaping < and > keeps it valid JSON that can't close the comment early.
   const saved = JSON.stringify(plan).replace(/</g, "\\u003c").replace(/>/g, "\\u003e");
   lines.push("", `<!-- fix-shots:plan ${saved} -->`);
