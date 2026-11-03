@@ -59,12 +59,18 @@ function rowSpans(list: HTMLElement): RowSpan[] {
   }));
 }
 
+/** A touch event, without `instanceof`: desktop Firefox has no `TouchEvent`. */
+const isTouch = (e: Event): e is TouchEvent => "touches" in e;
+
 /** Where a drag started, in client coordinates, from its first event. */
 function startY(e: Event | null): number {
   if (!e) return 0;
-  if ("touches" in e) return (e as TouchEvent).touches[0]?.clientY ?? 0;
-  return (e as MouseEvent).clientY ?? 0;
+  if (isTouch(e)) return e.touches[0]?.clientY ?? 0;
+  return e instanceof MouseEvent ? e.clientY : 0;
 }
+
+/** What a phone row hands its drag: dnd-kit types `data.current` loosely. */
+type RowDragData = { todo?: TodoWithUrls; listId?: string } | undefined;
 
 /** A pointer sensor for everything but touch, which long-presses instead. */
 class NonTouchPointerSensor extends PointerSensor {
@@ -151,8 +157,9 @@ export function usePhoneDrag({
   };
 
   const onDragStart = (e: DragStartEvent) => {
-    const todo = e.active.data.current?.todo as TodoWithUrls | undefined;
-    const listId = e.active.data.current?.listId as string | undefined;
+    const data: RowDragData = e.active.data.current;
+    const todo = data?.todo;
+    const listId = data?.listId;
     const list = listId ? rowList(listId) : null;
     if (!todo || !listId || !list) return;
     const rows = showing(listId);
