@@ -170,7 +170,8 @@ final class TodoViewModel {
 
     /// Cross-list move — the context menu or the detail sheet's List chip.
     /// Appends to the end of the target list's own incomplete todos,
-    /// mirroring web's cross-list drag-drop-at-end behavior (`TodoGrid.handleDragEnd`'s `insertIndex === targetOrder.length`
+    /// mirroring web's cross-list drag-drop-at-end behavior
+    /// (`TodoGrid.handleDragEnd`'s `insertIndex === targetOrder.length`
     /// case), since there's no drop-index equivalent from a picker.
     /// `position`, when given, places it instead (a board drop, which works
     /// out a spot between its new neighbours).
