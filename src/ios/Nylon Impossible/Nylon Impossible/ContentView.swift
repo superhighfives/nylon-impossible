@@ -198,7 +198,6 @@ struct ContentView: View {
                 avatarURL: screenRoute == nil ? authService.userImageURL : nil,
                 initials: initials,
                 onSelect: select,
-                onDrop: drop,
                 onAvatar: { showsAccount = true }
             )
             if case .error(let message) = syncService.state {

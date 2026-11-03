@@ -34,6 +34,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 | Dropping with a pointer | The todo lands in the gap nearest the pointer, shown by the drop line. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
 | Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. Two exceptions: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move; and the composer's 3px focus ring, where its `surface` fill and the caret also mark focus |
 | Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9 |
+| Moving between lists by drag | Wide layouts only: the web board, iPad and Mac. On a phone layout a todo moves through its menu (Move to) |
 | Case | Sentence case for every label, title and menu item: "This week", "New list", "Keyboard shortcuts" |
 
 ## Vocabulary

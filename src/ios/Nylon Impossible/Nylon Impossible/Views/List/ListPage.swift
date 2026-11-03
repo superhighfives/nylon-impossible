@@ -5,10 +5,9 @@
 //  One list's page: the masthead, then its rows, or a written empty line.
 //  Used for the three time lists and for a pushed collection.
 //
-//  Rows reorder with `List.onMove` (long-press, then drag). The same drag can
-//  leave the list and land on a switcher title, because each row also vends
-//  its id through `itemProvider`. Long-press without moving opens the context
-//  menu instead.
+//  Rows reorder with `List.onMove` (long-press, then drag), and the drag
+//  stays inside the list: on a phone a todo moves to another list through its
+//  menu (Move to). Long-press without moving opens the context menu instead.
 //
 
 import SwiftUI
@@ -51,7 +50,6 @@ struct ListPage<Header: View>: View {
                 .listRowSeparator(.hidden)
                 .listRowBackground(Theme.Colors.canvas)
                 .contextMenu { TodoContextMenu(todo: todo, lists: lists, actions: actions) }
-                .itemProvider { NSItemProvider(object: todo.id.uuidString as NSString) }
             }
             .onMove { source, destination in
                 actions.viewModel.moveTodo(from: source, to: destination, in: rows)

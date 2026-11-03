@@ -3,10 +3,11 @@
 //  Nylon Impossible
 //
 //  A dragged row carries its id as plain text. Anything that takes a todo —
-//  the phone's switcher titles and the iPad's and Mac's sidebar entries —
-//  reads it back with `todoDropTarget`. A board column, which also needs the
-//  pointer to place the todo, uses its own delegate (BoardColumn) over the
-//  same `TodoDropLoader`.
+//  the iPad's and Mac's sidebar entries — reads it back with
+//  `todoDropTarget`. A board column, which also needs the pointer to place
+//  the todo, uses its own delegate (BoardColumn) over the same
+//  `TodoDropLoader`. Phones don't drag between lists; a todo moves through
+//  its menu (Move to).
 //
 //  A column also takes text and links dragged in from other apps (a Safari
 //  tab, a line from Notes, a selection in Mail): `onExternal` gets the text,
