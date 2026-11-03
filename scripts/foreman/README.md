@@ -144,6 +144,10 @@ arrived). The foreman times each wait, per PR, in `~/.foreman/waits/<pr>`: when
 it started, the head commit, and the reason.
 
 - **The clock restarts** when the reason changes or a new commit is pushed.
+  A count or a `(STATE)` changing within the reason (`2 unresolved
+  thread(s)` to `1`, `not mergeable (UNKNOWN)` to `(CONFLICTING)`) doesn't
+  count as a change, and nor does a failed read (`couldn't …`, `fetch
+  failed`) while a clock is running: it keeps timing the reason it had.
 - **After 2 hours on the same reason,** you get one alert naming the PR and
   the reason, and a `stalled` event goes to `events.jsonl`. It doesn't repeat
   for that wait. `checks pending` gets **12 hours**, so a slow run never trips

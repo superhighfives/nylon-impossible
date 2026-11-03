@@ -451,6 +451,25 @@ expect "a new head with the same reason restarts the clock"  "$((T0 + 7000))|$SH
 at 7200; mp >/dev/null
 expect "so 2h after the first push is quiet"      "0"    "$(alerts)"
 
+fresh; GATE="wait: 2 unresolved thread(s) from superhighfives"; mp >/dev/null
+at 3600; GATE="wait: 1 unresolved thread(s) from superhighfives"; mp >/dev/null
+expect "a changed count keeps the clock"          "$T0"  "$(head -1 "$WAITS/7")"
+fresh; GATE="wait: not mergeable (UNKNOWN)"; mp >/dev/null
+at 3600; GATE="wait: not mergeable (CONFLICTING)"; mp >/dev/null
+at 7200; GATE="wait: not mergeable (UNKNOWN)"; mp >/dev/null
+expect "a flapping state still alerts at 2h"      "1"    "$(alerts)"
+fresh; GATE="wait: checks red"; mp >/dev/null
+at 3600; GATE="wait: couldn't read review threads"; mp >/dev/null
+at 4200; GATE="wait: checks red"; mp >/dev/null
+expect "a failed read keeps the clock"            "$T0|checks red"  "$(sed -n '1p;3p' "$WAITS/7" | paste -sd'|' -)"
+fresh; GATE="wait: couldn't read review threads"; mp >/dev/null
+at 7200; mp >/dev/null
+expect "but one that keeps failing alerts"        "1"    "$(alerts)"
+fresh; GATE="wait: checks red"; mp >/dev/null
+at 600
+expect "a failed PR list says so"                 "couldn't list the open PRs"  "$( (gh() { return 1; }; merge_pass '{}') | sed -E 's/^[0-9-]+ [0-9:]+ //')"
+expect "and keeps every clock"                    "yes"  "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+
 fresh; GATE="wait: checks pending"; mp >/dev/null
 at 7200; mp >/dev/null
 expect "pending checks are quiet at 2h"           "0"    "$(alerts)"

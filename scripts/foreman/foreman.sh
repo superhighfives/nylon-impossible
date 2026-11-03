@@ -455,21 +455,30 @@ wait_limit() { # reason -> how long it may last before it's a stall
   case "$1" in "checks pending") echo "$PENDING_ALERT_SECONDS" ;; *) echo "$WAIT_ALERT_SECONDS" ;; esac
 }
 
+wait_key() { # reason -> what the clock compares: without counts or a (STATE), which change while the PR is stuck
+  sed -E 's/ *\([^)]*\)//g; s/[0-9]+//g' <<<"$1"
+}
+
 track_wait() { # pr issue head reason -> starts or keeps the clock; one alert and a `stalled` event once it's a stall
-  local f="$WAITS/$1" since="" head="" reason=""
+  local f="$WAITS/$1" since="" head="" reason="" now_reason="$4"
   if [ -s "$f" ]; then since=$(sed -n 1p "$f"); head=$(sed -n 2p "$f"); reason=$(sed -n 3p "$f"); fi
-  if [ -z "$since" ] || [ "$head" != "$3" ] || [ "$reason" != "$4" ]; then
+  # A failed read says nothing about the PR, so it doesn't restart a running
+  # clock; one that keeps failing on its own is still timed.
+  if [ -n "$since" ] && [ "$head" = "$3" ]; then
+    case "$4" in "couldn't "*|"fetch failed"|"gate printed nothing") now_reason="$reason" ;; esac
+  fi
+  if [ -z "$since" ] || [ "$head" != "$3" ] || [ "$(wait_key "$reason")" != "$(wait_key "$now_reason")" ]; then
     dry && return 0
     mkdir -p "$WAITS"; rm -f "$f.alerted"
-    printf '%s\n%s\n%s\n' "$(now)" "$3" "$4" > "$f"; return 0
+    printf '%s\n%s\n%s\n' "$(now)" "$3" "$now_reason" > "$f"; return 0
   fi
   local waited=$(( $(now) - since ))
-  [ "$waited" -ge "$(wait_limit "$4")" ] || return 0
+  [ "$waited" -ge "$(wait_limit "$now_reason")" ] || return 0
   [ -e "$f.alerted" ] && return 0
-  dry && { log "would alert #$1 stalled on \"$4\""; return 0; }
+  dry && { log "would alert #$1 stalled on \"$now_reason\""; return 0; }
   touch "$f.alerted"
-  event stalled "$2" "$1" "$4"
-  alert "#$1 has waited $(( waited / 3600 ))h on \"$4\": https://github.com/$OWNER/$REPO/pull/$1"
+  event stalled "$2" "$1" "$now_reason"
+  alert "#$1 has waited $(( waited / 3600 ))h on \"$now_reason\": https://github.com/$OWNER/$REPO/pull/$1"
 }
 
 clear_wait() { # pr -> stops its clock
