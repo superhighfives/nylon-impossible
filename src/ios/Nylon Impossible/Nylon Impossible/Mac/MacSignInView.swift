@@ -132,9 +132,11 @@ struct MacSignInView: View {
 
     /// Shown once a sign-in looks stuck: cancel the session in place (the
     /// sheet stays, so the person can pick again) and, when the default
-    /// browser isn't Safari, a way to change it.
+    /// browser isn't Safari, a way to change it. Boxed, so it reads as one
+    /// aside instead of more body text between the buttons and Cancel.
     private func stalledHelp(_ handoff: MacSignInHandoff) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s2) {
+        let box = RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+        return VStack(alignment: .leading, spacing: Theme.Space.s3) {
             Text(handoff.helpMessage)
                 .textStyle(Theme.Fonts.Role.meta)
                 .foregroundStyle(Theme.Colors.ink)
@@ -148,6 +150,10 @@ struct MacSignInView: View {
                 }
             }
         }
+        .padding(Theme.Space.s4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Colors.surface, in: box)
+        .overlay(box.strokeBorder(Theme.Colors.hairline))
     }
 
     private var lastUsedBadge: some View {
