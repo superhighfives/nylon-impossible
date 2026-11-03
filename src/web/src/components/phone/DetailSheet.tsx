@@ -71,6 +71,10 @@ const COLUMN_ADD = "flex min-h-11 items-center gap-4 text-n-ink-muted";
 const COLUMN_LABEL =
   "mb-1 block text-[0.8125rem] font-semibold text-n-ink-muted";
 
+/** The footer's "Created …" and "Edited …", each kept whole after a "·". */
+const STAMP =
+  "whitespace-nowrap before:inline-block before:w-3 before:text-center before:content-['·']";
+
 function stamp(iso: string, now: Date, timeZone: string): string {
   const key = dayKeyIn(new Date(iso), timeZone);
   const today = dayKeyIn(now, timeZone);
@@ -348,21 +352,31 @@ function DetailBody({
   );
 
   const footer = (className: string, deleteClass: string) => (
-    <div className={`flex items-center justify-between ${className}`}>
+    <div className={`flex items-center justify-between gap-4 ${className}`}>
       <button
         type="button"
         onClick={() => {
           onClose();
           actions.destroy(todo);
         }}
-        className={`-ml-2 min-h-11 cursor-pointer rounded-n-chip px-2 font-medium text-n-overdue n-focus ${deleteClass}`}
+        className={`-ml-2 min-h-11 shrink-0 cursor-pointer rounded-n-chip px-2 font-medium text-n-overdue n-focus ${deleteClass}`}
       >
         Delete
       </button>
-      <span className="text-[0.8125rem] text-n-ink-muted">
-        Created {stamp(todo.createdAt, now, timeZone)} · Edited{" "}
-        {stamp(todo.updatedAt, now, timeZone)}
-      </span>
+      {/* Each stamp stays whole, and Edited wraps onto its own line when
+          both don't fit. Every stamp carries its "·" in front, and the
+          negative margin pushes the one starting each line into the
+          clipped edge. */}
+      <div className="min-w-0 overflow-hidden text-[0.8125rem] text-n-ink-muted">
+        <div className="-ml-3 flex flex-wrap">
+          <span className={STAMP}>
+            Created {stamp(todo.createdAt, now, timeZone)}
+          </span>
+          <span className={STAMP}>
+            Edited {stamp(todo.updatedAt, now, timeZone)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 
