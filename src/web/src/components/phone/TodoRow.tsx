@@ -8,6 +8,7 @@ import {
   Repeat,
 } from "lucide-react";
 import {
+  type CSSProperties,
   type HTMLAttributes,
   type KeyboardEvent,
   memo,
@@ -17,14 +18,17 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { ROW_HOVER } from "@/components/ui/styles";
+import { RAISED, ROW_HOVER } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { displayTitle, type MetaPart, metaSummary, rowMeta } from "./model";
 
-/** Hold this long without moving to open the context menu. */
+/** Hold this long without moving to open the context menu (touch). */
 export const LONG_PRESS_MS = 450;
-/** Movement (px) that turns a press into a scroll and cancels it. */
-const LONG_PRESS_SLOP = 10;
+/**
+ * Movement (px) that turns a press into a scroll and cancels it, or, once
+ * the row has lifted, turns the menu into a drag.
+ */
+export const LONG_PRESS_SLOP = 10;
 
 const META_ICONS = {
   pin: Pin,
@@ -94,23 +98,34 @@ function MetaLine({ parts, links }: { parts: MetaPart[]; links?: boolean }) {
   );
 }
 
-/** The row's slot: collapses out when done, fades while being dragged. */
+/**
+ * The row's slot: collapses out when done, fades while being dragged, and
+ * rises above the others while lifted.
+ */
 function RowShell({
   collapsing,
   dragging,
+  lifted = false,
   rowRef,
+  style,
   children,
 }: {
   collapsing: boolean;
   dragging: boolean;
+  lifted?: boolean;
   rowRef?: Ref<HTMLLIElement>;
+  style?: CSSProperties;
   children: ReactNode;
 }) {
   return (
     <li
       ref={rowRef}
       data-phone-row
+      data-lifted={lifted ? "" : undefined}
+      style={style}
       className={`relative grid transition-[grid-template-rows,opacity] duration-(--n-duration-base) ease-n-out ${
+        lifted ? "z-10" : ""
+      } ${
         collapsing
           ? "grid-rows-[0fr] opacity-0"
           : dragging
@@ -209,8 +224,15 @@ export interface TodoRowProps {
    * inside its column's gutter, and no long-press (a pointer drags instead).
    */
   density?: "phone" | "wide";
-  /** Being dragged: the original stays in place, faded. */
+  /** Being dragged by a pointer: the original stays in place, faded. */
   dragging?: boolean;
+  /**
+   * Phone: lifted by a long-press, with the context menu preview's raised
+   * look. A touch drag moves the row itself, so it doesn't fade.
+   */
+  lifted?: boolean;
+  /** Phone: the row's slot's style, for a drag's offsets. */
+  rowStyle?: CSSProperties;
   /** Extra props for the row's main button — drag listeners, data hooks. */
   bodyProps?: HTMLAttributes<HTMLButtonElement> &
     Record<`data-${string}`, string>;
@@ -371,6 +393,8 @@ function PhoneTodoRow({
   onOpen,
   onMenu,
   dragging = false,
+  lifted = false,
+  rowStyle,
   bodyProps,
   bodyRef,
   rowRef,
@@ -398,6 +422,8 @@ function PhoneTodoRow({
     if (e.button !== 0) return;
     suppressClick.current = false;
     endPress();
+    // A mouse, trackpad or pen drags instead, and right-clicks for the menu.
+    if (e.pointerType !== "touch") return;
     press.current = {
       x: e.clientX,
       y: e.clientY,
@@ -422,10 +448,20 @@ function PhoneTodoRow({
   };
 
   return (
-    <RowShell collapsing={collapsing} dragging={dragging} rowRef={rowRef}>
+    <RowShell
+      collapsing={collapsing}
+      dragging={dragging}
+      lifted={lifted}
+      rowRef={rowRef}
+      style={rowStyle}
+    >
       <div
-        className={`flex min-h-0 items-start gap-3 overflow-clip px-5 transition-colors duration-(--n-duration-fast) ${
-          highlighted ? "bg-n-fill" : "pointer-fine:hover:bg-n-surface"
+        className={`flex min-h-0 items-start gap-3 overflow-clip px-5 transition-[background-color,box-shadow] duration-(--n-duration-fast) ${
+          lifted
+            ? RAISED
+            : highlighted
+              ? "bg-n-fill"
+              : "pointer-fine:hover:bg-n-surface"
         }`}
       >
         <CheckButton

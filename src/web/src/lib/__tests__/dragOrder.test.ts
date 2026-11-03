@@ -4,6 +4,7 @@ import {
   dropLineY,
   dropPlacement,
   insertInTier,
+  partOffset,
   positionAt,
   slotAt,
 } from "../dragOrder";
@@ -189,5 +190,40 @@ describe("dropping on the dragged row's own faded slot", () => {
     expect(index).toBe(1);
     expect(position).toBe("a1");
     expect(dropLineY(rects, index, 1, y)).toBe(line);
+  });
+});
+
+describe("parting the rows around a touch drag", () => {
+  // Five rows, 40 tall; the one at index 1 is dragged.
+  const offsets = (slot: number) =>
+    [0, 1, 2, 3, 4].map((i) => partOffset(1, slot, i, 40));
+
+  it("moves nothing while it's over its own slot", () => {
+    expect(offsets(1).every((dy) => dy === 0)).toBe(true);
+  });
+
+  it("lifts the rows it passes going down", () => {
+    expect(offsets(3)).toEqual([0, 0, -40, -40, 0]);
+  });
+
+  it("drops the rows it passes going up", () => {
+    expect(offsets(0)).toEqual([40, 0, 0, 0, 0]);
+  });
+
+  it("parts only within the tier the slot was clamped to", () => {
+    // Two pinned rows, then three: a pinned row dragged to the bottom is
+    // clamped to slot 1, after the other pinned row.
+    const items = [
+      row("p1", "a0", true),
+      row("p2", "a1", true),
+      row("a", "a0"),
+      row("b", "a1"),
+      row("c", "a2"),
+    ];
+    const { index } = dropPlacement(items, items[0], 4);
+    expect(index).toBe(1);
+    expect([0, 1, 2, 3, 4].map((i) => partOffset(0, index, i, 40))).toEqual([
+      0, -40, 0, 0, 0,
+    ]);
   });
 });

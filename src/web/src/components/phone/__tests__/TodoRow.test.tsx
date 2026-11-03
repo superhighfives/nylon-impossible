@@ -74,7 +74,12 @@ describe("TodoRow", () => {
   it("long-press opens the menu and swallows the click that follows", () => {
     vi.useFakeTimers();
     const { props, body } = setup();
-    fireEvent.pointerDown(body, { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerDown(body, {
+      button: 0,
+      pointerType: "touch",
+      clientX: 10,
+      clientY: 10,
+    });
     act(() => vi.advanceTimersByTime(LONG_PRESS_MS));
     expect(props.onMenu).toHaveBeenCalledWith(props.todo);
     fireEvent.pointerUp(body);
@@ -82,10 +87,38 @@ describe("TodoRow", () => {
     expect(props.onOpen).not.toHaveBeenCalled();
   });
 
+  it("a mouse press never long-presses: it drags, and right-clicks for the menu", () => {
+    vi.useFakeTimers();
+    const { props, body } = setup();
+    fireEvent.pointerDown(body, { button: 0, pointerType: "mouse" });
+    act(() => vi.advanceTimersByTime(LONG_PRESS_MS * 2));
+    expect(props.onMenu).not.toHaveBeenCalled();
+    fireEvent.pointerUp(body);
+    fireEvent.click(body);
+    expect(props.onOpen).toHaveBeenCalledWith(props.todo);
+  });
+
+  it("a lifted row is raised like the menu's preview, not faded", () => {
+    setup({ lifted: true });
+    const li = document.querySelector("[data-phone-row]");
+    expect(li).toHaveAttribute("data-lifted");
+    expect(li).toHaveClass("z-10");
+    expect(li).not.toHaveClass("opacity-35");
+    expect(li?.firstElementChild).toHaveClass(
+      "bg-n-canvas",
+      "rounded-[0.875rem]",
+    );
+  });
+
   it("moving during the press cancels it (it's a scroll or a swipe)", () => {
     vi.useFakeTimers();
     const { props, body } = setup();
-    fireEvent.pointerDown(body, { button: 0, clientX: 10, clientY: 10 });
+    fireEvent.pointerDown(body, {
+      button: 0,
+      pointerType: "touch",
+      clientX: 10,
+      clientY: 10,
+    });
     fireEvent.pointerMove(body, { clientX: 40, clientY: 12 });
     act(() => vi.advanceTimersByTime(LONG_PRESS_MS * 2));
     expect(props.onMenu).not.toHaveBeenCalled();

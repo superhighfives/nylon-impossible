@@ -125,3 +125,20 @@ export function dropLineY(
   if (!below) return above.bottom;
   return (above.bottom + below.top) / 2;
 }
+
+/**
+ * How far the row at `index` shifts while a touch drag parts the rows: the
+ * dragged row (from `from`, `height` tall) is headed for `slot` among the
+ * others, so the rows between give up its space. Zero for the dragged row
+ * itself, which follows the finger.
+ */
+export function partOffset(
+  from: number,
+  slot: number,
+  index: number,
+  height: number,
+): number {
+  if (index > from && index <= slot) return -height;
+  if (index < from && index >= slot) return height;
+  return 0;
+}

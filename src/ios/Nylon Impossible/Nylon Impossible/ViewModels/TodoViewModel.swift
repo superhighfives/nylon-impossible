@@ -173,16 +173,21 @@ final class TodoViewModel {
     /// incomplete todos, mirroring web's cross-list drag-drop-at-end
     /// behavior (`TodoGrid.handleDragEnd`'s `insertIndex === targetOrder.length`
     /// case), since there's no drop-index equivalent from a picker.
-    func moveTodoToList(_ todo: TodoItem, to listId: String, allTodos: [TodoItem]) {
+    /// `position`, when given, places it instead (a board drop, which works
+    /// out a spot between its new neighbours).
+    func moveTodoToList(_ todo: TodoItem, to listId: String, allTodos: [TodoItem], position: String? = nil) {
         guard todo.listKey != listId else { return }
-        let targetIncomplete = allTodos
-            .filter {
-                $0.listKey == listId && !$0.isSoftDeleted && !$0.isEffectivelyCompleted
-                    && $0.parentId == nil
-            }
-            .sorted { $0.position < $1.position }
-
-        todo.position = generateKeyBetween(targetIncomplete.last?.position, nil)
+        if let position {
+            todo.position = position
+        } else {
+            let targetIncomplete = allTodos
+                .filter {
+                    $0.listKey == listId && !$0.isSoftDeleted && !$0.isEffectivelyCompleted
+                        && $0.parentId == nil
+                }
+                .sorted { $0.position < $1.position }
+            todo.position = generateKeyBetween(targetIncomplete.last?.position, nil)
+        }
         todo.listKey = listId
         todo.listEnteredAt = Date()
         todo.markModified()
