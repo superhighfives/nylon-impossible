@@ -39,10 +39,19 @@ type RowCallbacks = Pick<
 
 /**
  * The fourth column's tint, whatever it shows (your list, Done or a todo),
- * so it reads as distinct from the three time columns. Rows inside hover
- * with `fill` instead of `surface`, which would vanish against it.
+ * so it reads as distinct from the three time columns.
  */
-export const TINTED = "bg-n-surface [--n-row-hover:var(--color-n-fill)]";
+export const TINTED = "bg-n-surface";
+
+/**
+ * A focused column head. A click on the column's empty space focuses it so
+ * the keys know which column you're in, and shows nothing; with the keyboard
+ * in use (the board root's `data-keyboard`) it takes the sidebar cursor's
+ * soft tint. Gated on the board's own modality rather than `:focus-visible`,
+ * whose guess after a programmatic `focus()` varies by browser.
+ */
+export const HEAD_FOCUS =
+  "outline-none transition-colors duration-(--n-duration-fast) group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)]";
 
 const MENU_ITEM =
   "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";
@@ -113,7 +122,7 @@ export function ColumnHeader({
           id={headingId}
           tabIndex={-1}
           data-column-head={listId}
-          className={`m-0 line-clamp-2 min-w-0 flex-1 rounded-n-chip wrap-break-word n-focus ${titleClass}`}
+          className={`m-0 -mx-1 line-clamp-2 min-w-0 flex-1 rounded-n-chip px-1 wrap-break-word ${HEAD_FOCUS} ${titleClass}`}
         >
           {renaming ? (
             <input

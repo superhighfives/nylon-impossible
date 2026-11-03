@@ -39,6 +39,20 @@ describe("TodoRow", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
+  it("on wide, hovers with 60% fill; a selected row is the full fill", () => {
+    const { body } = setup({ density: "wide" });
+    const container = body.closest("[data-row-container]");
+    expect(container).toHaveClass("pointer-fine:hover:bg-n-fill/60");
+    expect(container).not.toHaveClass("bg-n-fill");
+  });
+
+  it("on wide, a selected row drops the hover for the full fill", () => {
+    const { body } = setup({ density: "wide", selected: true });
+    const container = body.closest("[data-row-container]");
+    expect(container).toHaveClass("bg-n-fill");
+    expect(container).not.toHaveClass("pointer-fine:hover:bg-n-fill/60");
+  });
+
   it("tapping the checkbox marks done; tapping the row opens it", () => {
     const { props, body } = setup();
     fireEvent.click(

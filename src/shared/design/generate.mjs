@@ -96,6 +96,29 @@ export function renderCss(tokens) {
     }
   }
   out.push("}", "");
+  const high = entries(tokens.color).filter(([, c]) => c.highContrast);
+  if (high.length > 0) {
+    out.push(
+      "/* Increase Contrast (macOS, iOS) and its equivalents reach the web as",
+      "   `prefers-contrast: more`: every colour with a highContrast value takes",
+      "   it, as the Apple apps do. After the rules above, so it wins in both",
+      "   modes; every highContrast has a light and a dark value. */",
+      "@media (prefers-contrast: more) {",
+      "  :root {",
+    );
+    for (const [name, c] of high) {
+      out.push(
+        `    --n-color-${kebab(name)}: ${c.highContrast.light.toLowerCase()};`,
+      );
+    }
+    out.push("  }", "", "  .dark {");
+    for (const [name, c] of high) {
+      out.push(
+        `    --n-color-${kebab(name)}: ${c.highContrast.dark.toLowerCase()};`,
+      );
+    }
+    out.push("  }", "}", "");
+  }
   return out.join("\n");
 }
 

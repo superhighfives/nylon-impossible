@@ -282,6 +282,37 @@ describe("WideApp", () => {
     );
   });
 
+  it("rows hover with the same 60% fill in every column and the open todo", async () => {
+    const HOVER = "pointer-fine:hover:bg-n-fill/60";
+    const container = (title: string) =>
+      rowButton(title).closest("[data-row-container]");
+    render(<WideApp />);
+    expect(container("Review PR")).toHaveClass(HOVER);
+    // Done, in the tinted fourth column: no surface hover to vanish into it.
+    const done = within(column("Done"))
+      .getByText("Ship the zine")
+      .closest("[data-row-container]");
+    expect(done).toHaveClass(HOVER);
+    // Opening your list selects its first row: the full fill instead, so
+    // hovered and selected differ.
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    await userEvent.click(
+      within(nav).getByRole("button", { name: /Groceries/ }),
+    );
+    expect(container("Parmesan")).toHaveClass("bg-n-fill");
+    expect(container("Parmesan")).not.toHaveClass(HOVER);
+    // The open todo's rows.
+    act(() => rowButton("Send invoice").focus());
+    await userEvent.keyboard("{Enter}");
+    const detail = screen.getByRole("dialog");
+    expect(
+      within(detail)
+        .getAllByRole("button")
+        .some((b) => b.classList.contains(HOVER)),
+    ).toBe(true);
+    expect(detail.innerHTML).not.toContain("n-row-hover");
+  });
+
   it("opens one of your lists in the fourth column, swaps it, and × goes back to Done", async () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
@@ -582,6 +613,40 @@ describe("WideApp", () => {
     press("ArrowDown");
     expect(document.activeElement?.closest("[data-column]")).toBe(column);
     expect(document.activeElement?.hasAttribute("data-row-id")).toBe(true);
+  });
+
+  it("a click on a column's empty space shows no ring, even after key presses", async () => {
+    const { container } = render(<WideApp />);
+    const board = container.querySelector("[data-wide-ready]");
+    act(() => rowButton("Send invoice").focus());
+    press("ArrowDown");
+    press("ArrowUp");
+    expect(board).toHaveAttribute("data-keyboard");
+    const someday =
+      column("Someday").querySelector<HTMLElement>("[data-column-body]");
+    await userEvent.click(someday as HTMLElement);
+    const head = document.activeElement as HTMLElement;
+    expect(head).toHaveAttribute("data-column-head", "list-someday");
+    expect(board).not.toHaveAttribute("data-keyboard");
+    // Its only focus look waits for the keyboard: no ring of its own.
+    expect(head).not.toHaveClass("n-focus");
+    expect(head.className).toMatch(
+      /(^| )group-data-\[keyboard\]\/board:focus:bg-/,
+    );
+  });
+
+  it("→ into an empty column tints its head", () => {
+    todos = todos.filter((t) => t.listId !== "list-someday");
+    const { container } = render(<WideApp />);
+    const board = container.querySelector("[data-wide-ready]");
+    act(() => rowButton("Send invoice").focus());
+    press("ArrowRight");
+    const head = document.activeElement as HTMLElement;
+    expect(head).toHaveAttribute("data-column-head", "list-someday");
+    expect(board).toHaveAttribute("data-keyboard");
+    expect(head.className).toContain(
+      "group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)]",
+    );
   });
 
   it("⇧-digits jump to columns and lists, back to where you were", () => {
@@ -1257,6 +1322,34 @@ describe("WideApp drag and drop", () => {
     expect(id).toBe("t1");
     expect(input.listId).toBe("list-week");
     expect(input.position > "a0" && input.position < "a1").toBe(true);
+  });
+
+  it("fades the dragged row and fills a sidebar list yellow while it's over it", () => {
+    render(<WideApp />);
+    // A real pointer drag through dnd-kit, so its own active and over state
+    // (which the row's fade and the entry's fill read) is set.
+    const entry = document.querySelector<HTMLElement>(
+      '[data-sidebar-list="list-groceries"]',
+    ) as HTMLElement;
+    (entry.closest("li") as HTMLElement).getBoundingClientRect = () =>
+      box(500, 40);
+    const shell = rowButton("Review PR").closest("li") as HTMLElement;
+    const container = shell.querySelector("[data-row-container]") as Element;
+    const at = (y: number) => ({
+      clientX: 100,
+      clientY: y,
+      isPrimary: true,
+      button: 0,
+    });
+    fireEvent.pointerDown(container, at(100));
+    fireEvent.pointerMove(document, at(130));
+    fireEvent.pointerMove(document, at(520));
+    expect(shell).toHaveClass("opacity-35");
+    expect(entry).toHaveClass("bg-n-brand", "text-n-brand-ink");
+    expect(document.querySelector("[data-drag-preview]")).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    expect(shell).not.toHaveClass("opacity-35");
+    expect(entry).not.toHaveClass("bg-n-brand");
   });
 
   it("moves to a sidebar list with no line", () => {

@@ -95,3 +95,29 @@
   --n-color-notice: #ff9a4d;
   --n-color-notice-fill: #2b1a0c;
 }
+
+/* Increase Contrast (macOS, iOS) and its equivalents reach the web as
+   `prefers-contrast: more`: every colour with a highContrast value takes
+   it, as the Apple apps do. After the rules above, so it wins in both
+   modes; every highContrast has a light and a dark value. */
+@media (prefers-contrast: more) {
+  :root {
+    --n-color-fill: #e3e3e3;
+    --n-color-hairline: #8d8d8d;
+    --n-color-ink: #000000;
+    --n-color-ink-muted: #3f3f3f;
+    --n-color-ink-subtle: #5c5c5c;
+    --n-color-overdue: #a11c21;
+    --n-color-destructive: #a11c21;
+  }
+
+  .dark {
+    --n-color-fill: #2e2e2e;
+    --n-color-hairline: #6e6e6e;
+    --n-color-ink: #ffffff;
+    --n-color-ink-muted: #d4d4d4;
+    --n-color-ink-subtle: #a8a8a8;
+    --n-color-overdue: #ffb8b5;
+    --n-color-destructive: #ffb8b5;
+  }
+}
