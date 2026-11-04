@@ -84,6 +84,40 @@ export function placeholderTitleForUrl(url: string): string {
   return domain ? `Check ${domain}` : url;
 }
 
+/** The API's `URL_REGEX` (src/api/src/lib/create-todo.ts). */
+const CREATE_URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+const CREATE_TRAILING_PUNCTUATION = /[.,;:!?)]+$/;
+
+/**
+ * What smart-create will make of a line, for the row that stands in until the
+ * server answers: the links it attaches (each fetched in the background) and,
+ * for a bare link, the "Check {domain}" title. Mirrors `createInitialTodo` in
+ * src/api/src/lib/create-todo.ts, so the row shows its links as fetching from
+ * the moment it's added rather than as a raw URL.
+ */
+export function smartCreatePreview(text: string): {
+  title: string;
+  urls: string[];
+} {
+  const trimmed = text.trim();
+  const urls = Array.from(
+    new Set(
+      (trimmed.match(CREATE_URL_REGEX) ?? [])
+        .map((raw) => raw.replace(CREATE_TRAILING_PUNCTUATION, ""))
+        .filter((url) => extractDomain(url) !== null),
+    ),
+  );
+  const first = trimmed.match(CREATE_URL_REGEX)?.[0];
+  const bare =
+    first !== undefined &&
+    urls[0] === first.replace(CREATE_TRAILING_PUNCTUATION, "") &&
+    !/[\p{L}\p{N}]/u.test(trimmed.replace(first, ""));
+  return {
+    title: bare ? placeholderTitleForUrl(urls[0]) : trimmed,
+    urls: bare ? [urls[0]] : urls,
+  };
+}
+
 const EMBEDDED_URL_REGEX = /(\s*)([([]?)(https?:\/\/[^\s]+)/g;
 const TRAILING_URL_PUNCTUATION = /[.,;:!?)\]]+$/;
 const CLOSING_BRACKET: Record<string, string> = { "(": ")", "[": "]" };

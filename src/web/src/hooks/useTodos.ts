@@ -7,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { generateKeyBetween } from "fractional-indexing";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import { useEffect } from "react";
 import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
@@ -15,6 +15,7 @@ import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
+import { smartCreatePreview } from "@/lib/url-display";
 import {
   createTodo,
   deleteTodo,
@@ -440,15 +441,26 @@ export function useSmartCreate() {
           null,
         );
 
+      // The links it'll attach go on as pending, so the row shows them being
+      // fetched (and a bare link reads "Check {domain}") from the start.
+      const preview = smartCreatePreview(text);
+      const now = new Date().toISOString();
+      const id = `temp-${crypto.randomUUID()}`;
+      const urlPositions = generateNKeysBetween(
+        null,
+        null,
+        preview.urls.length,
+      );
+
       const optimisticTodo: TodoWithUrls = {
-        id: `temp-${crypto.randomUUID()}`,
+        id,
         userId: userId ?? "",
         parentId: null,
         // Smart-create defaults to Today server-side when no listId is given;
         // the placeholder is reconciled wholesale by the onSettled refetch
         // regardless.
         listId: listId ?? "",
-        title: text.trim(),
+        title: preview.title,
         notes: null,
         completed: false,
         completedAt: null,
@@ -456,9 +468,24 @@ export function useSmartCreate() {
         dueDate: dueDate?.toISOString() ?? null,
         recurrence: null,
         pinned: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        urls: [],
+        createdAt: now,
+        updatedAt: now,
+        urls: preview.urls.map((url, i) => ({
+          id: `temp-${crypto.randomUUID()}`,
+          todoId: id,
+          url,
+          title: null,
+          description: null,
+          siteName: null,
+          favicon: null,
+          image: null,
+          showPreview: true,
+          position: urlPositions[i],
+          fetchStatus: "pending",
+          fetchedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        })),
       };
 
       queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [
