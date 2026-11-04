@@ -5,6 +5,7 @@ export * from "./due-date";
 export * from "./link";
 export * from "./recurrence";
 export * from "./schema";
+export * from "./smart-create";
 export * from "./timezone";
 export * from "./todo-date";
 export * from "./todo-text";

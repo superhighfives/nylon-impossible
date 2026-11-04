@@ -1,4 +1,8 @@
-import { parseTodoDate, splitTodoText } from "@nylon-impossible/shared";
+import {
+  createInitialTodo,
+  normalizeHttpUrl,
+  parseTodoDate,
+} from "@nylon-impossible/shared";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
@@ -7,7 +11,6 @@ import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 import { pinnedResponseFields } from "./pinned";
 import { finishTodoLinks } from "./process-todo";
-import { cleanUrlString, createFallbackFromUrl } from "./url-helpers";
 import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
@@ -29,77 +32,6 @@ export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
     ...pinnedResponseFields(todo.pinned),
     createdAt: todo.createdAt.toISOString(),
     updatedAt: todo.updatedAt.toISOString(),
-  };
-}
-
-/** URL regex to extract URLs from text */
-const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
-
-/** Common trailing punctuation that shouldn't be part of URLs */
-const TRAILING_PUNCT = /[.,;:!?)]+$/;
-
-/**
- * Normalize a raw URL string to an `http:`/`https:` href, or null if it's not a
- * valid web URL. This is the single gate every URL we persist passes through, so
- * a `javascript:`/`data:` (or otherwise malformed) value can never reach the
- * `todoUrls.url` column and later render as a clickable link.
- */
-function normalizeHttpUrl(raw: string): string | null {
-  const cleaned = raw.replace(TRAILING_PUNCT, "");
-  try {
-    const parsed = new URL(cleaned);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-      return parsed.href;
-    }
-  } catch {
-    // Invalid URL, skip
-  }
-  return null;
-}
-
-/**
- * Create initial todo data from input text.
- * Handles URL-only input specially by extracting domain for title.
- */
-function createInitialTodo(text: string): {
-  title: string;
-  notes: string | null;
-  urls: string[];
-  /** Whether `title` is the input's whole first line, so it can be parsed. */
-  titleIsTyped: boolean;
-} {
-  // A bare link (nothing but the URL, bar stray punctuation) is named after its
-  // domain. Any words alongside it are the user's title, however long the URL.
-  const urlMatch = text.match(URL_REGEX);
-  if (urlMatch && !/[\p{L}\p{N}]/u.test(text.replace(urlMatch[0], ""))) {
-    const cleanedUrl = cleanUrlString(urlMatch[0]);
-    const fallback = createFallbackFromUrl(cleanedUrl);
-    if (fallback) {
-      return {
-        title: fallback.title,
-        notes: null,
-        urls: [fallback.url],
-        titleIsTyped: false,
-      };
-    }
-  }
-
-  // Extract any URLs from text
-  const rawMatches = text.match(URL_REGEX) ?? [];
-  const urls = rawMatches
-    .map(normalizeHttpUrl)
-    .filter((url): url is string => url !== null);
-
-  // Text that won't fit a title (or spans lines) keeps the overflow in notes
-  // rather than being truncated away.
-  const { title, notes } = splitTodoText(text);
-  return {
-    title,
-    notes,
-    urls: Array.from(new Set(urls)),
-    // A clipped title ("…") or a hostname fallback isn't what was typed, so
-    // its "end" isn't the end of the user's words.
-    titleIsTyped: title === text.trim().split("\n")[0].trim(),
   };
 }
 

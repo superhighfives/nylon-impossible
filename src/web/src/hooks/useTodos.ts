@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/tanstack-react-start";
-import { toDueDay } from "@nylon-impossible/shared";
+import { createInitialTodo, toDueDay } from "@nylon-impossible/shared";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import {
   useMutation,
@@ -7,7 +7,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { generateKeyBetween } from "fractional-indexing";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import { useEffect } from "react";
 import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
@@ -440,25 +440,52 @@ export function useSmartCreate() {
           null,
         );
 
+      // Built the way the API builds it (title, notes, links), with each link
+      // pending, so the row shows them being fetched (and a bare link reads
+      // "Check {domain}") from the start.
+      const preview = createInitialTodo(text.trim());
+      const now = new Date().toISOString();
+      const id = `temp-${crypto.randomUUID()}`;
+      const urlPositions = generateNKeysBetween(
+        null,
+        null,
+        preview.urls.length,
+      );
+
       const optimisticTodo: TodoWithUrls = {
-        id: `temp-${crypto.randomUUID()}`,
+        id,
         userId: userId ?? "",
         parentId: null,
         // Smart-create defaults to Today server-side when no listId is given;
         // the placeholder is reconciled wholesale by the onSettled refetch
         // regardless.
         listId: listId ?? "",
-        title: text.trim(),
-        notes: null,
+        title: preview.title,
+        notes: preview.notes,
         completed: false,
         completedAt: null,
         position: generateKeyBetween(null, minPosition),
         dueDate: dueDate?.toISOString() ?? null,
         recurrence: null,
         pinned: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        urls: [],
+        createdAt: now,
+        updatedAt: now,
+        urls: preview.urls.map((url, i) => ({
+          id: `temp-${crypto.randomUUID()}`,
+          todoId: id,
+          url,
+          title: null,
+          description: null,
+          siteName: null,
+          favicon: null,
+          image: null,
+          showPreview: true,
+          position: urlPositions[i],
+          fetchStatus: "pending",
+          fetchedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        })),
       };
 
       queryClient.setQueryData<TodoWithUrls[]>(TODOS_QUERY_KEY, [

@@ -1,6 +1,9 @@
-import { describe, expect, it } from "vitest";
 import {
   createFallbackFromUrl,
+  createInitialTodo,
+} from "@nylon-impossible/shared";
+import { describe, expect, it } from "vitest";
+import {
   extractDomain,
   isPlaceholderTitle,
   titleFromUrlMetadata,
@@ -331,5 +334,46 @@ describe("titleFromUrlMetadata", () => {
         siteName: null,
       }),
     ).toBeNull();
+  });
+});
+
+describe("createInitialTodo", () => {
+  it("names a bare link after its domain", () => {
+    expect(createInitialTodo("https://www.yoox.com/us/men.")).toEqual({
+      title: "Check yoox.com",
+      notes: null,
+      urls: ["https://www.yoox.com/us/men"],
+      titleIsTyped: false,
+    });
+  });
+
+  it("keeps the words and lists each normalized link once", () => {
+    expect(
+      createInitialTodo(
+        "Compare https://a.com/x and https://a.com/x, https://b.com",
+      ),
+    ).toEqual({
+      title: "Compare https://a.com/x and https://a.com/x, https://b.com",
+      notes: null,
+      urls: ["https://a.com/x", "https://b.com/"],
+      titleIsTyped: true,
+    });
+  });
+
+  it("keeps a second line in notes", () => {
+    expect(createInitialTodo("Read this\nhttps://example.com/a")).toEqual({
+      title: "Read this",
+      notes: "https://example.com/a",
+      urls: ["https://example.com/a"],
+      titleIsTyped: true,
+    });
+  });
+
+  it("has no links for plain text or a URL with no host", () => {
+    expect(createInitialTodo("Buy milk").urls).toEqual([]);
+    expect(createInitialTodo("https://")).toMatchObject({
+      title: "https://",
+      urls: [],
+    });
   });
 });

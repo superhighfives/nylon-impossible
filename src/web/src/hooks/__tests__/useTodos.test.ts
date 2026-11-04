@@ -3,11 +3,13 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { displayTitle, rowMeta } from "@/components/phone/model";
 import type { TodoWithUrls } from "@/types/database";
 import {
   useCreateTodo,
   useDeleteTodo,
   usePendingTodoIds,
+  useSmartCreate,
   useTodos,
   useUpdateTodo,
 } from "../useTodos";
@@ -354,5 +356,69 @@ describe("usePendingTodoIds", () => {
     await waitFor(() =>
       expect(result.current.pending.updating.has("a")).toBe(false),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useSmartCreate
+// ---------------------------------------------------------------------------
+
+describe("useSmartCreate", () => {
+  /** Add `text` with the request left in flight, and return the stand-in row. */
+  async function optimisticRow(text: string): Promise<TodoWithUrls> {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => new Promise<Response>(() => {})),
+    );
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(["todos"], []);
+    const { result } = renderHook(() => useSmartCreate(), {
+      wrapper: Wrapper,
+    });
+    result.current.mutate({ text });
+    let row: TodoWithUrls | undefined;
+    await waitFor(() => {
+      row = queryClient.getQueryData<TodoWithUrls[]>(["todos"])?.[0];
+      expect(row).toBeDefined();
+    });
+    vi.unstubAllGlobals();
+    return row as TodoWithUrls;
+  }
+
+  const now = new Date("2026-11-03T12:00:00Z");
+
+  it("shows a bare link as being fetched while the request is in flight", async () => {
+    const row = await optimisticRow("https://www.yoox.com/us/men");
+    expect(displayTitle(row)).toBe("Check yoox.com");
+    expect(rowMeta(row, [], now, "UTC")).toEqual([
+      {
+        kind: "link",
+        text: "yoox.com",
+        href: "https://www.yoox.com/us/men",
+        more: 0,
+        fetching: true,
+      },
+    ]);
+  });
+
+  it("keeps the words and shows the link as fetching when there's text too", async () => {
+    const row = await optimisticRow("Read https://example.com/a later");
+    expect(displayTitle(row)).toBe("Read later");
+    expect(rowMeta(row, [], now, "UTC")).toMatchObject([
+      { kind: "link", text: "example.com", fetching: true },
+    ]);
+  });
+
+  it("keeps a second line in notes, as the API does", async () => {
+    const row = await optimisticRow("Read this\nhttps://example.com/a");
+    expect(row.title).toBe("Read this");
+    expect(row.notes).toBe("https://example.com/a");
+    expect(row.urls.map((u) => u.fetchStatus)).toEqual(["pending"]);
+  });
+
+  it("adds a plain todo with no links", async () => {
+    const row = await optimisticRow("Buy milk");
+    expect(row.title).toBe("Buy milk");
+    expect(row.urls).toEqual([]);
   });
 });
