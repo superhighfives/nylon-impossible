@@ -81,31 +81,20 @@ extension ContentView {
         }
     }
 
-    /// ← → inside a column: the same place in the next one. Add goes to Add
-    /// (Done has none, so its first todo); a row keeps its position. ← from
-    /// the first column goes into the sidebar, → from the last to the open
-    /// todo.
+    /// ← → inside a column (see `BoardSections.across`).
     func across(from column: String, at spot: ColumnSpot, by offset: Int) {
-        let columns = keyColumns
-        guard let index = columns.firstIndex(of: column) else { return }
-        if offset < 0, index == 0 {
+        let board = KeyBoard(columns: keyColumns, rows: keyRows, done: Self.doneColumn, hasDetail: detailTodo != nil)
+        let move = BoardSections.across(from: column, at: spot, by: offset, in: board)
+        switch move {
+        case .sidebar(let column):
             enterSidebar(at: column)
-            return
-        }
-        if offset > 0, index == columns.count - 1 {
-            if detailTodo != nil { moveSection(to: .detail) }
-            return
-        }
-        let next = columns[BoardNavigator.column(index, by: offset, count: columns.count)]
-        let target = keyRows(next)
-        let hasAdd = next != Self.doneColumn
-        if next != Self.doneColumn { scrollColumnId = next }
-        switch spot {
-        case .add:
-            place(hasAdd ? .add : BoardSections.stepIn(rows: target, hasAdd: false), in: next)
-        case .row(let id):
-            let row = BoardNavigator.across(from: keyRows(column), current: id, to: target)
-            place(row.map(ColumnSpot.row) ?? (hasAdd ? .add : nil), in: next)
+        case .detail:
+            moveSection(to: .detail)
+        case .column(let next, let spot):
+            if next != Self.doneColumn { scrollColumnId = next }
+            place(spot, in: next)
+        case .none:
+            break
         }
     }
 
@@ -187,8 +176,13 @@ extension ContentView {
                 showsDueCalendar = true
             }
         case .delete:
-            if fromDetail { closeDetail() }
-            selectedTodoId = neighbor
+            if fromDetail {
+                // Back in the column, on the todo that took its place.
+                closeDetail()
+                place(neighbor.map(ColumnSpot.row), in: column)
+            } else {
+                selectedTodoId = neighbor
+            }
             actions.delete(todo)
         case .moveTo:
             palette = .move(todo.id)

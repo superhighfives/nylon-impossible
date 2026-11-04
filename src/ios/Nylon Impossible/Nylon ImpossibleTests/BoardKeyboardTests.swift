@@ -203,3 +203,48 @@ struct ColumnSpotTests {
         #expect(BoardSections.vertical(rows: [a, b], from: .row(a), by: -1, hasAdd: false) == .row(a))
     }
 }
+
+@Suite("Board: across columns")
+struct AcrossMoveTests {
+    private let today = "today", week = "week", done = "done"
+    private let a = UUID(), b = UUID(), c = UUID(), d = UUID()
+    private var columns: [String] { [today, week, done] }
+
+    private func move(
+        from column: String, at spot: ColumnSpot, by offset: Int,
+        rows: [String: [UUID]], hasDetail: Bool = false
+    ) -> AcrossMove {
+        let board = KeyBoard(columns: columns, rows: { rows[$0] ?? [] }, done: done, hasDetail: hasDetail)
+        return BoardSections.across(from: column, at: spot, by: offset, in: board)
+    }
+
+    @Test("A row keeps its position, or the last row of a shorter column")
+    func rowKeepsPosition() {
+        let rows = [today: [a, b], week: [c, d]]
+        #expect(move(from: today, at: .row(b), by: 1, rows: rows) == .column(week, .row(d)))
+        #expect(move(from: week, at: .row(c), by: -1, rows: rows) == .column(today, .row(a)))
+        #expect(move(from: today, at: .row(b), by: 1, rows: [today: [a, b], week: [c]]) == .column(week, .row(c)))
+    }
+
+    @Test("Into an empty column: its Add, or the column itself for an empty Done")
+    func intoAnEmptyColumn() {
+        #expect(move(from: today, at: .row(a), by: 1, rows: [today: [a]]) == .column(week, .add))
+        #expect(move(from: week, at: .row(a), by: 1, rows: [week: [a]]) == .column(done, nil))
+    }
+
+    @Test("Add goes to Add; Done has none, so its first todo")
+    func addToAdd() {
+        #expect(move(from: today, at: .add, by: 1, rows: [week: [c]]) == .column(week, .add))
+        #expect(move(from: week, at: .add, by: 1, rows: [done: [d]]) == .column(done, .row(d)))
+        #expect(move(from: week, at: .add, by: 1, rows: [:]) == .column(done, nil))
+    }
+
+    @Test("← from the first column enters the sidebar; → from the last reaches the open todo")
+    func ends() {
+        let rows = [today: [a], done: [d]]
+        #expect(move(from: today, at: .row(a), by: -1, rows: rows) == .sidebar(column: today))
+        #expect(move(from: done, at: .row(d), by: 1, rows: rows) == .none)
+        #expect(move(from: done, at: .row(d), by: 1, rows: rows, hasDetail: true) == .detail)
+        #expect(move(from: "gone", at: .add, by: 1, rows: rows) == .none)
+    }
+}

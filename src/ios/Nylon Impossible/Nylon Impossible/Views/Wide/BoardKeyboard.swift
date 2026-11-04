@@ -212,6 +212,27 @@ enum SectionMove: Equatable {
     case none
 }
 
+/// The columns as the keyboard sees them, for `BoardSections.across`.
+struct KeyBoard {
+    /// Left to right, by key (Done's is `done`).
+    let columns: [String]
+    let rows: (String) -> [UUID]
+    let done: String
+    let hasDetail: Bool
+}
+
+/// Where ← → inside a column take the keyboard.
+enum AcrossMove: Equatable {
+    /// ← from the first column: the sidebar, on that column's item.
+    case sidebar(column: String)
+    /// → from the last column, with a todo open.
+    case detail
+    /// The next column, at a spot in it (nil: on the column).
+    case column(String, ColumnSpot?)
+    /// → from the last column with nothing open.
+    case none
+}
+
 /// Section arithmetic, kept apart from the view so it can be tested.
 enum BoardSections {
     /// Tab order: the sidebar, the columns left to right (the fourth is your
@@ -266,6 +287,27 @@ enum BoardSections {
     static func stepIn(rows: [UUID], hasAdd: Bool) -> ColumnSpot? {
         if let first = rows.first { return .row(first) }
         return hasAdd ? .add : nil
+    }
+
+    /// ← → inside a column: the same place in the next one. Add goes to Add
+    /// (Done has none, so its first todo); a row keeps its position. ← from
+    /// the first column goes into the sidebar, → from the last to the open
+    /// todo.
+    static func across(from column: String, at spot: ColumnSpot, by offset: Int, in board: KeyBoard) -> AcrossMove {
+        let columns = board.columns
+        guard let index = columns.firstIndex(of: column) else { return .none }
+        if offset < 0, index == 0 { return .sidebar(column: column) }
+        if offset > 0, index == columns.count - 1 { return board.hasDetail ? .detail : .none }
+        let next = columns[BoardNavigator.column(index, by: offset, count: columns.count)]
+        let target = board.rows(next)
+        let hasAdd = next != board.done
+        switch spot {
+        case .add:
+            return .column(next, hasAdd ? .add : stepIn(rows: target, hasAdd: false))
+        case .row(let id):
+            let row = BoardNavigator.across(from: board.rows(column), current: id, to: target)
+            return .column(next, row.map(ColumnSpot.row) ?? (hasAdd ? .add : nil))
+        }
     }
 
     /// ↑ ↓ inside a column, where Add sits above the first todo: ↑ from the
