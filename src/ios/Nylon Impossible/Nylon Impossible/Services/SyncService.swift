@@ -223,7 +223,9 @@ final class SyncService {
         // One fetch up front, then lookups by id. Querying per todo (three
         // times over) hung the main thread for seconds on a full list, on
         // every client at once, since each edit makes them all sync.
-        var todosById = try modelContext.fetch(FetchDescriptor<TodoItem>())
+        var allTodos = FetchDescriptor<TodoItem>()
+        allTodos.relationshipKeyPathsForPrefetching = [\.urls]
+        var todosById = try modelContext.fetch(allTodos)
             .reduce(into: [UUID: TodoItem]()) { dict, todo in
                 if dict[todo.id] == nil { dict[todo.id] = todo }
             }
@@ -295,6 +297,13 @@ final class SyncService {
             let remoteUrls = remote.urls ?? []
             let remoteUrlIds = Set(remoteUrls.map { $0.id })
             let existingById = todo.urls.reduce(into: [:]) { dict, url in dict[url.id] = url }
+
+            // Most syncs change no links at all. Writing them anyway marks
+            // every todo dirty, so the save rewrites the whole list.
+            if remoteUrlIds == Set(existingById.keys),
+               remoteUrls.allSatisfy({ existingById[$0.id]?.updatedAt == $0.updatedAt }) {
+                continue
+            }
 
             // Delete URLs no longer present on the server
             for url in todo.urls where !remoteUrlIds.contains(url.id) {
