@@ -151,7 +151,8 @@ struct BoardPalette: View {
         for _ in 0..<10 where !fieldFocused {
             await Task.yield()
             fieldFocused = true
-            try? await Task.sleep(for: .milliseconds(30))
+            // Sleep throws once the palette closes and cancels the task; stop then.
+            do { try await Task.sleep(for: .milliseconds(30)) } catch { return }
         }
     }
 
