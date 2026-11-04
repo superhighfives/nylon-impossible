@@ -2,7 +2,7 @@
 //  ContentView+Actions.swift
 //  Nylon Impossible
 //
-//  What the shell does in response to taps, drops and the composer, split
+//  What the shell does in response to taps and the composer, split
 //  from ContentView.swift to keep each file to a readable length.
 //
 
@@ -29,11 +29,6 @@ extension ContentView {
         withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
             viewModel.openCollectionId = nil
         }
-    }
-
-    func drop(_ page: Page, _ id: UUID) {
-        guard let todo = todos.first(where: { $0.id == id }), let list = timeList(page) else { return }
-        actions.move(todo, toList: list.id)
     }
 
     func add(_ listId: String?, _ parseDates: Bool) {

@@ -6,8 +6,8 @@
 //  and the avatar on the right. The current title is in ink with a yellow
 //  underline that follows the pager as you swipe; the others are muted. Done
 //  is the last page: its check turns yellow instead, and the underline fades
-//  out on the way to it. The three time titles are drop targets — dropping a
-//  dragged row on "This week" moves it there.
+//  out on the way to it. The titles only switch pages: on a phone a todo
+//  moves to another list through its menu (Move to), not by dragging.
 //
 
 import SwiftUI
@@ -22,12 +22,9 @@ struct Switcher: View {
     let avatarURL: URL?
     let initials: String
     let onSelect: (Page) -> Void
-    /// A todo id dropped on one of the time titles.
-    let onDrop: (Page, UUID) -> Void
     let onAvatar: () -> Void
 
     @State private var frames: [Page: CGRect] = [:]
-    @State private var targeted: Page?
 
     var body: some View {
         HStack(spacing: Theme.Space.s1) {
@@ -114,19 +111,11 @@ struct Switcher: View {
         } label: {
             Text(page.title)
                 .textStyle(Theme.Fonts.Role.control, tracking: Theme.Tracking.title)
-                .foregroundStyle(isCurrent || targeted == page ? Theme.Colors.ink : Theme.Colors.inkMuted)
+                .foregroundStyle(isCurrent ? Theme.Colors.ink : Theme.Colors.inkMuted)
                 .lineLimit(1)
                 .fixedSize()
                 .frame(minHeight: Theme.Phone.switcherHeight)
-                .padding(.horizontal, targeted == page ? Theme.Space.s2 : 0)
-                .background(
-                    RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
-                        .fill(Theme.Colors.fill)
-                        .opacity(targeted == page ? 1 : 0)
-                        .padding(.vertical, Theme.Space.s1)
-                )
                 .contentShape(Rectangle())
-                .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: targeted)
         }
         .buttonStyle(.plain)
         .onGeometryChange(for: CGRect.self) { proxy in
@@ -138,8 +127,6 @@ struct Switcher: View {
             Text(page.title)
         }
         .accessibilityAddTraits(isCurrent ? [.isSelected, .isHeader] : [])
-        .accessibilityHint(page.systemKind == nil ? "" : "Drop a todo here to move it")
-        .modifier(DropTarget(page: page, targeted: $targeted, onDrop: onDrop))
     }
 
     private var underline: some View {
@@ -182,35 +169,6 @@ private struct SwitcherUnderline: View {
                 .opacity(opacity)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
-        }
-    }
-}
-
-/// The time titles accept a dragged row (its id, as plain text). Lists isn't a
-/// list, so it isn't a target.
-private struct DropTarget: ViewModifier {
-    let page: Switcher.Page
-    @Binding var targeted: Switcher.Page?
-    let onDrop: (Switcher.Page, UUID) -> Void
-
-    func body(content: Content) -> some View {
-        if page.systemKind == nil {
-            content
-        } else {
-            content.todoDropTarget(
-                isTargeted: Binding(
-                    get: { targeted == page },
-                    set: { isOver in
-                        if isOver {
-                            targeted = page
-                        } else if targeted == page {
-                            targeted = nil
-                        }
-                    }
-                )
-            ) { id in
-                onDrop(page, id)
-            }
         }
     }
 }
