@@ -220,17 +220,19 @@ final class SyncService {
 
         let remoteIds = Set(remoteTodos.compactMap { UUID(uuidString: $0.id) })
 
+        // One fetch up front, then lookups by id. Querying per todo (three
+        // times over) hung the main thread for seconds on a full list, on
+        // every client at once, since each edit makes them all sync.
+        var todosById = try modelContext.fetch(FetchDescriptor<TodoItem>())
+            .reduce(into: [UUID: TodoItem]()) { dict, todo in
+                if dict[todo.id] == nil { dict[todo.id] = todo }
+            }
+
         // Step 1: Apply remote changes
         for remote in remoteTodos {
             guard let remoteId = UUID(uuidString: remote.id) else { continue }
 
-            // Try to find existing local todo
-            let descriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.id == remoteId }
-            )
-            let existing = try modelContext.fetch(descriptor).first
-
-            if let local = existing {
+            if let local = todosById[remoteId] {
                 // Skip items that are locally soft-deleted and pending sync.
                 // The local delete intent should be preserved until the server
                 // processes it (which it already has in this sync cycle).
@@ -247,16 +249,14 @@ final class SyncService {
                 // New remote item - create locally
                 let todo = TodoItem(remote: remote, id: remoteId, userId: userId)
                 modelContext.insert(todo)
+                todosById[remoteId] = todo
             }
         }
 
         // Step 2: Mark all local changes as synced and clear pending URLs
         for changeId in localChangeIds {
             guard let uuid = UUID(uuidString: changeId) else { continue }
-            let descriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.id == uuid }
-            )
-            if let todo = try modelContext.fetch(descriptor).first {
+            if let todo = todosById[uuid] {
                 todo.isSynced = true
                 todo.pendingUrls = []
             }
@@ -272,6 +272,7 @@ final class SyncService {
         for local in localSyncedTodos {
             if !remoteIds.contains(local.id) {
                 modelContext.delete(local)
+                todosById[local.id] = nil
             }
         }
 
@@ -283,16 +284,13 @@ final class SyncService {
 
         for todo in toDelete {
             modelContext.delete(todo)
+            todosById[todo.id] = nil
         }
 
         // Step 5: Sync URLs (server is authoritative — upsert to avoid momentary disappearance)
         for remote in remoteTodos {
-            guard let remoteId = UUID(uuidString: remote.id) else { continue }
-
-            let itemDescriptor = FetchDescriptor<TodoItem>(
-                predicate: #Predicate { $0.id == remoteId }
-            )
-            guard let todo = try modelContext.fetch(itemDescriptor).first else { continue }
+            guard let remoteId = UUID(uuidString: remote.id),
+                  let todo = todosById[remoteId] else { continue }
 
             let remoteUrls = remote.urls ?? []
             let remoteUrlIds = Set(remoteUrls.map { $0.id })
