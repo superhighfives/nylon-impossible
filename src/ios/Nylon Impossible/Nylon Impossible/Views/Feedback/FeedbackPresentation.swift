@@ -103,9 +103,10 @@ private struct FeedbackPresentationModifier: ViewModifier {
                 }
             }
             #else
+            // Feedback turning off reads as nil here, so an open sheet
+            // closes with it rather than outliving the flag.
             .onChange(of: active?.isPresented) { _, presented in
-                guard let active else { return }
-                if presented == true {
+                if presented == true, let active {
                     FeedbackPresenter.present(active)
                 } else {
                     FeedbackPresenter.dismiss()
