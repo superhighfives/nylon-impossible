@@ -21,6 +21,9 @@ concurrency:
 
 jobs:
   test:
+    # Test Web has a job called `test` too, and a required check on main is
+    # matched by name alone, so this one needs its own.
+    name: deploy-test
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

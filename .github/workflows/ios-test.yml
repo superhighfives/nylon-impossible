@@ -9,27 +9,47 @@ on:
       - "src/shared/src/todo-date-fixtures.json"
       - "src/shared/design/**"
       - ".github/workflows/ios-test.yml"
+  # Every PR, not only iOS ones: `ios-ok` below is a required check on main,
+  # and a required check that never starts holds the PR forever. `changes`
+  # decides whether the simulators run; the paths match push's above.
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - "src/ios/**"
-      - "src/shared/src/todo-date-fixtures.json"
-      - "src/shared/design/**"
-      - ".github/workflows/ios-test.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
+  pull-requests: read
 
 concurrency:
   group: ios-tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      ios: ${{ steps.diff.outputs.ios }}
+    steps:
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          # Pushes and manual runs were already filtered by `paths`, or asked for.
+          if [ "$GITHUB_EVENT_NAME" != pull_request ]; then echo "ios=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')
+          if grep -qE '^(src/ios/|src/shared/design/|src/shared/src/todo-date-fixtures\.json$|\.github/workflows/ios-test\.yml$)' <<<"$files"; then
+            echo "ios=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ios=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
     if: >-
-      github.event_name != 'pull_request'
-      || github.event.pull_request.head.repo.full_name == github.repository
+      needs.changes.outputs.ios == 'true'
+      && (github.event_name != 'pull_request'
+        || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: macos-26
     timeout-minutes: 20
     # The app is universal and lays out differently on iPad (regular width),
@@ -206,3 +226,22 @@ jobs:
           path: src/ios/Nylon Impossible/TestResults.xcresult
           retention-days: 7
           if-no-files-found: ignore
+
+  # The one check main requires from this workflow. It passes when the tests
+  # passed, or when the PR doesn't touch iOS and they didn't need to run. A
+  # fork's iOS change fails it: the tests don't run there, and skipped isn't
+  # passed.
+  ios-ok:
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          IOS: ${{ needs.changes.outputs.ios }}
+          TEST: ${{ needs.test.result }}
+        run: |
+          echo "changes=$CHANGES ios=$IOS test=$TEST"
+          [ "$CHANGES" = success ] || exit 1
+          [ "$IOS" = false ] && exit 0
+          [ "$TEST" = success ]
