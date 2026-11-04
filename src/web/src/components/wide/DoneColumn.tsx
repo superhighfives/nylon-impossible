@@ -72,7 +72,7 @@ export function DoneColumn({
             <SkeletonRows count={3} />
           </>
         ) : groups.length === 0 ? (
-          <div className="text-n-ink-muted">
+          <div className="text-n-ink-subtle">
             {/* The composer's height: Done has no "+ Add", so its line sits
                 level with the first row in the columns beside it. */}
             <div aria-hidden="true" className="h-10" />

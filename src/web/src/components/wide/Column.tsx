@@ -379,7 +379,7 @@ export function Column({
             {rows.length === 0 ? (
               <div
                 className={`transition-colors duration-(--n-duration-fast) ${
-                  isOver ? "text-n-ink" : "text-n-ink-muted"
+                  isOver ? "text-n-ink" : "text-n-ink-subtle"
                 }`}
               >
                 <EmptyLine text={empty} density="wide" />

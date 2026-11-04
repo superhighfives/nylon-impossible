@@ -6,7 +6,7 @@ import { DonePage } from "@/components/phone/DonePage";
 import { Column } from "../Column";
 import { DoneColumn } from "../DoneColumn";
 
-/** The line's words and the decorative circle beside them. */
+/** The line's words and the decorative squiggle beside them. */
 function emptyLine(text: string) {
   const words = screen.getByText(text);
   const line = words.closest("[data-empty-line]");
@@ -20,7 +20,7 @@ function expectRowLine(text: string, size: string) {
   expect(words).toHaveClass(size);
   expect(line.outerHTML).not.toContain("font-n-display");
   expect(line.outerHTML).not.toContain("font-semibold");
-  // The circle is decorative; the words are all that's read out.
+  // The squiggle is decorative; the words are all that's read out.
   const icon = line.querySelector("svg");
   expect(icon).not.toBeNull();
   expect(icon?.closest('[aria-hidden="true"]')).not.toBeNull();
@@ -57,7 +57,7 @@ describe("empty line", () => {
     expectRowLine("Nothing here yet.", "text-[0.9375rem]");
     const { line } = emptyLine("Nothing here yet.");
     // Muted until something's dragged over it.
-    expect(line.parentElement).toHaveClass("text-n-ink-muted");
+    expect(line.parentElement).toHaveClass("text-n-ink-subtle");
   });
 
   it("keeps the composer's height above Done's line, so it sits level with the columns beside it", () => {

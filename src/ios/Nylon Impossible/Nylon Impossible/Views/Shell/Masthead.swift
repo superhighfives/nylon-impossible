@@ -94,40 +94,52 @@ extension Masthead where Accessory == EmptyView {
     }
 }
 
-/// The written empty state, drawn as a row: a muted dashed circle in the
-/// check's slot and "Nothing today." at a row title's size, so it sits where
-/// the first todo will and that todo takes its place without moving
-/// anything. When there's somewhere to go, "4 waiting in This week →" sits
-/// under the words.
+/// A tilde, drawn: there's no SF Symbol for one. Used for the empty line's
+/// mark, the web's `EmptyLine` squiggle.
+private struct Squiggle: Shape {
+    func path(in rect: CGRect) -> Path {
+        let sx = rect.width / 16
+        let sy = rect.height / 8
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: rect.minX + x * sx, y: rect.minY + y * sy)
+        }
+        var path = Path()
+        path.move(to: point(1, 4))
+        path.addCurve(to: point(8, 4), control1: point(2.5, 0.5), control2: point(5.5, 0.5))
+        path.addCurve(to: point(15, 4), control1: point(10.5, 7.5), control2: point(13.5, 7.5))
+        return path
+    }
+}
+
+/// The written empty state, drawn as a row: a squiggle in the "+ Add"
+/// composer's icon slot and "Nothing today." at a row title's size, so it sits
+/// where the first todo will and that todo takes its place without moving
+/// anything. Nothing here can be tapped, so the squiggle and the words are
+/// subtle, lighter than a row. When there's somewhere to go,
+/// "4 waiting in This week →" sits under the words.
 struct EmptyLine: View {
     let text: String
     var link: (text: String, action: () -> Void)?
 
     @Environment(\.isWideLayout) private var isWide
-    /// Grows the circle with Dynamic Type, as `Checkbox` grows its box.
-    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
 
-    /// The circle's size: the checkbox's drawn box.
-    private var drawn: CGFloat { Theme.Phone.checkbox * min(max(scale, 1), 1.6) }
-    /// Where a row's title starts: the checkbox's slot (its box plus what
-    /// its target overhangs on the trailing side), then the row's spacing.
-    private var textInset: CGFloat { drawn + Theme.Space.s1 + Theme.Space.s3 }
+    /// Where the words start: the composer's, after its icon slot.
+    private var textInset: CGFloat { Theme.Phone.checkbox + Theme.Space.s3 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: Theme.Space.s3) {
-                Image(systemName: Theme.Icon.empty)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: drawn, height: drawn)
-                    .padding(.trailing, Theme.Space.s1)
+            HStack(alignment: .center, spacing: Theme.Space.s3) {
+                Squiggle()
+                    .stroke(style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+                    .frame(width: 16, height: 8)
+                    .frame(width: Theme.Phone.checkbox)
                     .accessibilityHidden(true)
                 Text(text)
                     .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle)
                     .fontWeight(.regular)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .foregroundStyle(Theme.Colors.inkMuted)
+            .foregroundStyle(Theme.Colors.inkSubtle)
             .padding(.vertical, Theme.Space.s3)
             .frame(minHeight: Theme.Space.rowMinHeight)
             if let link {

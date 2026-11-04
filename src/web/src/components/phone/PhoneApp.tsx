@@ -385,13 +385,13 @@ export function PhoneApp({
     return (
       // Where the first row would sit (PhoneRows' top), the link under the
       // line's words.
-      <div className="px-5 pt-2 pb-7 text-n-ink-muted">
+      <div className="px-5 pt-2 pb-7 text-n-ink-subtle">
         <EmptyLine text={next?.text ?? "Nothing here yet."} density="phone" />
         {next && waiting > 0 && (
           <button
             type="button"
             onClick={() => goTo(next.index)}
-            className="ml-9.5 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
+            className="ml-[2.875rem] inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
           >
             {waiting} waiting in {next.name}
             <ArrowRight size={15} aria-hidden="true" />

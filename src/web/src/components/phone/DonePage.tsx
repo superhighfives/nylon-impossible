@@ -37,7 +37,7 @@ export function DonePage({
           Loading…
         </p>
       ) : groups.length === 0 ? (
-        <div className="px-5 pt-2 text-n-ink-muted">
+        <div className="px-5 pt-2 text-n-ink-subtle">
           <EmptyLine text="Nothing done yet." density="phone" />
         </div>
       ) : (
