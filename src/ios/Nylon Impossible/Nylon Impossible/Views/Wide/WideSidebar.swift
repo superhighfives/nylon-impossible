@@ -4,7 +4,8 @@
 //
 //  The board's sidebar (iPad and Mac): the wordmark; Today, This week and
 //  Someday with counts; a small "Lists" heading, your lists with counts and
-//  "New list"; then Done and Settings at the foot. Every list entry — time
+//  "New list"; then Done, Settings and Keyboard shortcuts at the foot, with
+//  your avatar and name (the account menu) last. Every list entry — time
 //  lists included — takes a dropped todo and moves it there without
 //  scrolling. New list, Done and Settings don't.
 //
@@ -125,8 +126,6 @@ struct WideSidebar: View {
                     .softFocus(cursor == .done)
                 plainRow("Settings", action: onSettings)
                     .softFocus(cursor == .settings)
-                account
-                    .padding(.top, Theme.Space.s2)
                 Button(action: onShortcuts) {
                     HStack {
                         Text("Keyboard shortcuts")
@@ -144,6 +143,9 @@ struct WideSidebar: View {
                 .accessibilityShowsLargeContentViewer { Text("Keyboard shortcuts") }
                 .softFocus(cursor == .shortcuts)
                 .accessibilityHint("Lists the board's keys")
+                // Last, under everything you navigate with.
+                account
+                    .padding(.top, Theme.Space.s2)
             }
         }
         .padding(.vertical, 28)
