@@ -119,6 +119,18 @@ struct ContentView: View {
     @State var showsDueCalendar = false
     @State var lastKey: (key: BoardKey, at: Date)?
     @FocusState var boardFocused: Bool
+    /// The section the keyboard last moved to (or a click put it in); nil
+    /// before either, which is Today. See `currentSection`.
+    @State var keySection: BoardSection?
+    /// The last column the keyboard was on, so Return on the sidebar lands
+    /// on its item.
+    @State var lastColumnSection: String?
+    /// The keyboard is on a column's Add field, not typing in it.
+    @State var addCursor: String?
+    /// Return on the open todo: put the cursor in its title.
+    @State var detailFocusRequest = false
+    /// One of the open todo's fields is being edited.
+    @State var detailEditing = false
 
     // MARK: Mac state
     @State var sidebarVisibility: NavigationSplitViewVisibility = .all

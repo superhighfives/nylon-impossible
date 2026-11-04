@@ -43,14 +43,16 @@ enum BoardMenuCommand: Hashable {
             case .up: return "Previous"
             case .left: return "Column left"
             case .right: return "Column right"
+            case .nextSection: return "Next section"
+            case .previousSection: return "Previous section"
             case .done: return "Mark done"
-            case .open: return "Open"
+            case .open: return "Open, or step in"
             case .pin: return "Pin"
             case .due: return "Due…"
             case .delete: return "Delete"
             case .new: return "New todo"
             case .move(let kind): return "Move to \(kind.title)"
-            case .back: return "Back out: close, then the sidebar"
+            case .back: return "Step out"
             case .moveTo: return "Move to a list…"
             case .openLink: return "Open link"
             case .newList: return "New list"
@@ -115,6 +117,7 @@ enum BoardMenuCommand: Hashable {
         if shortcut.modifiers.contains(.command) { text += "⌘" }
         switch shortcut.key {
         case .return: text += "↵"
+        case .tab: text += "⇥"
         case .delete: text += "⌫"
         case .escape: text += "Esc"
         default: text += String(shortcut.key.character).uppercased()
@@ -124,7 +127,10 @@ enum BoardMenuCommand: Hashable {
 
     /// The Keyboard shortcuts sheet, in order.
     static let shortcutSections: [(title: String, commands: [BoardMenuCommand])] = [
-        ("Move around", [.key(.down), .key(.up), .key(.left), .key(.right), .key(.open), .key(.back)]),
+        ("Move around", [
+            .key(.nextSection), .key(.previousSection), .key(.down), .key(.up), .key(.left), .key(.right),
+            .key(.open), .key(.back)
+        ]),
         ("Todo", [
             .key(.done), .key(.move(.today)), .key(.move(.thisWeek)), .key(.move(.someday)),
             .key(.moveTo), .key(.openLink), .key(.pin), .key(.due), .key(.delete)
@@ -156,7 +162,7 @@ enum BoardMenuCommand: Hashable {
         nil,
         .key(.done), .key(.open), .key(.pin), .key(.due), .key(.delete), .key(.moveTo), .key(.openLink),
         nil,
-        .key(.down), .key(.up), .key(.left), .key(.right),
+        .key(.nextSection), .key(.previousSection), .key(.down), .key(.up), .key(.left), .key(.right),
         nil,
         .key(.jump(.time(.today))), .key(.jump(.time(.thisWeek))), .key(.jump(.time(.someday))),
         .key(.jump(.done)),
@@ -194,6 +200,8 @@ extension BoardKey {
         case .up: return S(key: "k", modifiers: [])
         case .left: return S(key: "h", modifiers: [])
         case .right: return S(key: "l", modifiers: [])
+        case .nextSection: return S(key: .tab, modifiers: [])
+        case .previousSection: return S(key: .tab, modifiers: .shift)
         case .done: return S(key: "x", modifiers: [])
         case .open: return S(key: .return, modifiers: [])
         case .back: return S(key: .escape, modifiers: [])

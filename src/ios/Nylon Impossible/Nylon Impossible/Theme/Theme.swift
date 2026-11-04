@@ -118,6 +118,8 @@ enum Theme {
         static let ink = dynamic(light: 0x202020, dark: 0xEEEEEE, lightHighContrast: 0x000000, darkHighContrast: 0xFFFFFF)
         /// Secondary text, meta line, a selected row's keyboard bar (gray-11)
         static let inkMuted = dynamic(light: 0x646464, dark: 0xB4B4B4, lightHighContrast: 0x3F3F3F, darkHighContrast: 0xD4D4D4)
+        /// The 4pt outline inside the wide board's section with the keyboard (the sidebar, a column, the open todo). A frame, not a selection; never brand (gray-12 (ink) at 8%)
+        static let sectionOutline = dynamic(light: 0x202020, dark: 0xEEEEEE).opacity(0.08)
         /// Placeholders, disabled (gray-10)
         static let inkSubtle = dynamic(light: 0x838383, dark: 0x7B7B7B, lightHighContrast: 0x5C5C5C, darkHighContrast: 0xA8A8A8)
         /// Overdue text ("3 days overdue") (red-11)

@@ -14,6 +14,7 @@
   --n-color-hairline: #d9d9d9;
   --n-color-ink: #202020;
   --n-color-ink-muted: #646464;
+  --n-color-section-outline: #20202014;
   --n-color-ink-subtle: #838383;
   --n-color-overdue: #ce2c31;
   --n-color-destructive: #ce2c31;
@@ -88,6 +89,7 @@
   --n-color-hairline: #3a3a3a;
   --n-color-ink: #eeeeee;
   --n-color-ink-muted: #b4b4b4;
+  --n-color-section-outline: #eeeeee14;
   --n-color-ink-subtle: #7b7b7b;
   --n-color-overdue: #ff9592;
   --n-color-destructive: #ff9592;

@@ -212,6 +212,10 @@ extension ContentView {
         guard let route = screenRoute else { return }
         switch route {
         case .today, .overnight, .board, .loading, .empty, .syncerror, .perf: viewModel.page = .today
+        case .keys:
+            viewModel.page = .today
+            // As after a key press: the outline on Today, nothing selected.
+            selectsByKeyboard = true
         case .link, .share, .sharetext, .widgets, .signin, .menubar: break
         case .column:
             openColumnId = collections.first?.id

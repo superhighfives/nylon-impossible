@@ -3,13 +3,25 @@
 //  Nylon Impossible
 //
 //  The board's hardware-keyboard map (iPad and Mac), the same keys as wide
-//  web:
+//  web. The keyboard is either on a section (the sidebar, a column, the open
+//  todo), which shows a light outline, or in it:
 //
-//    j / k, ↓ / ↑     move through rows, or the sidebar's items
-//    h / l, ← / →     move across columns; ← from the first goes to the
-//                     sidebar, → from the sidebar goes back in
-//    Return           open (in the sidebar: go into that column)
-//    Esc              close the open todo, else go to the sidebar
+//    Tab / ⇧Tab       next / previous section, wrapping around: the
+//                     sidebar, Today, This week, Someday, the fourth column,
+//                     then the open todo
+//    Return           step in: a column's first todo (its Add when it's
+//                     empty), the sidebar's item for the column you came
+//                     from, the open todo's title. In a column: open the
+//                     todo, or start typing in Add. In the sidebar: go into
+//                     that column
+//    Esc              step out one level: out of a field, out of a column or
+//                     the sidebar, then close the open todo. On a column it
+//                     goes to the sidebar, on that column's item
+//    h / l, ← / →     on a section: the adjacent section. In a column: the
+//                     same place in the next column; ← from the first goes
+//                     to the sidebar
+//    j / k, ↓ / ↑     move through rows, or the sidebar's items. Add sits
+//                     above a column's first todo
 //    x                done
 //    1 / 2 / 3        move to Today / This week / Someday
 //    m                move to a list…
@@ -17,14 +29,19 @@
 //    p                pin
 //    d                due
 //    Delete           delete, with Undo
-//    n / ⇧N           new todo (quick add) / new list
+//    n                new todo: typing in this column's Add, or quick add
+//                     where there's no Add (the sidebar, Done, the open todo)
+//    ⇧N               new list
 //    ⇧1 ⇧2 ⇧3         go to Today / This week / Someday
 //    ⇧4 … ⇧9, ⇧0      go to your lists, in sidebar order / Done
 //    g, then t w s d  go to Today / This week / Someday / Done
 //    g, then l        go to a list (the palette, lists only)
 //    ?                keyboard shortcuts
 //    ⌘K               search and commands (works while typing, too)
-//    ⌘N               new todo (works while typing, too)
+//    ⌘N               new todo in quick add (works while typing, too)
+//
+//  The row keys (x, p, d, m, o, 1/2/3, Delete) act on the selected row, or
+//  on the open todo while the keyboard is on it.
 //
 //  ⇧-digits are read from the character they type ("!" for ⇧1): SwiftUI's
 //  key presses don't carry a physical key code. On a non-US layout the
@@ -48,6 +65,8 @@ enum BoardJump: Equatable, Hashable {
 
 enum BoardKey: Equatable, Hashable {
     case down, up, left, right
+    /// Tab and ⇧Tab: the next or previous section.
+    case nextSection, previousSection
     case done, open, pin, due, delete, new
     case move(SystemListKind)
     case back, moveTo, newList, go, goToList, shortcuts, openLink
@@ -84,8 +103,11 @@ enum BoardKey: Equatable, Hashable {
         case .return: return .open
         case .escape: return .back
         case .delete, .deleteForward: return .delete
+        case .tab: return modifiers.contains(.shift) ? .previousSection : .nextSection
         default: break
         }
+        // ⇧Tab can arrive as a back-tab character rather than Tab with Shift.
+        if characters == "\u{19}" { return .previousSection }
         if let first = characters.first, characters.count == 1, let jump = shiftedDigits[first] {
             return .jump(jump)
         }
@@ -157,6 +179,107 @@ enum BoardNavigator {
     static func column(_ current: Int, by offset: Int, count: Int) -> Int {
         guard count > 0 else { return 0 }
         return min(max(current + offset, 0), count - 1)
+    }
+}
+
+/// A part of the board the keyboard can be on. Tab and ⇧Tab visit them in
+/// order, and the one with the keyboard is outlined.
+enum BoardSection: Hashable {
+    case sidebar
+    /// A column, by its key: a list's id, or `done` (ContentView.doneColumn).
+    case column(String)
+    /// The open todo's detail, in the fourth column.
+    case detail
+}
+
+/// Where the keyboard is inside a column: on its Add field, or on a row.
+enum ColumnSpot: Equatable {
+    case add
+    case row(UUID)
+}
+
+/// What a key does while the keyboard is on a section, with nothing inside
+/// it selected.
+enum SectionMove: Equatable {
+    /// Onto another section (Tab, ⇧Tab, ← →).
+    case section(BoardSection)
+    /// Return: into the section.
+    case stepIn
+    /// Esc on a column: into the sidebar, on that column's item.
+    case sidebar(column: String)
+    /// Esc on the open todo: close it, back to its row.
+    case closeDetail
+    case none
+}
+
+/// Section arithmetic, kept apart from the view so it can be tested.
+enum BoardSections {
+    /// Tab order: the sidebar, the columns left to right (the fourth is your
+    /// list or Done, when no todo covers it), then the open todo.
+    static func order(columns: [String], hasDetail: Bool) -> [BoardSection] {
+        [.sidebar] + columns.map(BoardSection.column) + (hasDetail ? [.detail] : [])
+    }
+
+    /// Tab and ⇧Tab: the section `offset` away, wrapping around.
+    static func cycle(_ current: BoardSection, by offset: Int, in order: [BoardSection]) -> BoardSection {
+        guard !order.isEmpty else { return current }
+        let index = order.firstIndex(of: current) ?? 0
+        let count = order.count
+        return order[((index + offset) % count + count) % count]
+    }
+
+    /// ← and →: the adjacent section, stopping at the ends.
+    static func adjacent(_ current: BoardSection, by offset: Int, in order: [BoardSection]) -> BoardSection {
+        guard let index = order.firstIndex(of: current) else { return order.first ?? current }
+        return order[BoardNavigator.column(index, by: offset, count: order.count)]
+    }
+
+    /// The column whose Add field n types in, or nil for quick add: the
+    /// sidebar, Done and the open todo have no Add.
+    static func addColumn(for section: BoardSection, done: String) -> String? {
+        guard case .column(let id) = section, id != done else { return nil }
+        return id
+    }
+
+    /// A key while the keyboard is on `section`, with nothing inside it
+    /// selected. Keys that aren't about sections (n, the jumps, the row
+    /// keys) are left to the board.
+    static func onSection(_ key: BoardKey, section: BoardSection, order: [BoardSection]) -> SectionMove {
+        switch key {
+        case .nextSection: return .section(cycle(section, by: 1, in: order))
+        case .previousSection: return .section(cycle(section, by: -1, in: order))
+        case .left: return .section(adjacent(section, by: -1, in: order))
+        case .right: return .section(adjacent(section, by: 1, in: order))
+        case .open: return .stepIn
+        case .back:
+            switch section {
+            case .sidebar: return .none
+            case .column(let id): return .sidebar(column: id)
+            case .detail: return .closeDetail
+            }
+        default: return .none
+        }
+    }
+
+    /// Return (or ↓) into a column: its first todo, else its Add, else
+    /// nothing (an empty Done).
+    static func stepIn(rows: [UUID], hasAdd: Bool) -> ColumnSpot? {
+        if let first = rows.first { return .row(first) }
+        return hasAdd ? .add : nil
+    }
+
+    /// ↑ ↓ inside a column, where Add sits above the first todo: ↑ from the
+    /// first todo reaches Add, ↓ from Add the first todo. Elsewhere the
+    /// selection steps and stops at the ends.
+    static func vertical(rows: [UUID], from spot: ColumnSpot, by offset: Int, hasAdd: Bool) -> ColumnSpot {
+        switch spot {
+        case .add:
+            guard offset > 0, let first = rows.first else { return .add }
+            return .row(first)
+        case .row(let id):
+            if offset < 0, hasAdd, rows.first == id { return .add }
+            return BoardNavigator.step(rows, from: id, by: offset).map(ColumnSpot.row) ?? (hasAdd ? .add : spot)
+        }
     }
 }
 

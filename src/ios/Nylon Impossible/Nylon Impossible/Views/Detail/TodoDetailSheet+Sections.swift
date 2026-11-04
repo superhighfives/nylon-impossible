@@ -137,6 +137,7 @@ extension TodoDetailSheet {
                     .textStyle(isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.subtask)
                     .foregroundStyle(Theme.Colors.ink)
                     .focused($focus, equals: .link)
+                    .modifier(DetailTabWrap(field: .link, isColumn: isColumn, focus: $focus))
                     .textContentType(.URL)
                     #if os(iOS)
                     .keyboardType(.URL)

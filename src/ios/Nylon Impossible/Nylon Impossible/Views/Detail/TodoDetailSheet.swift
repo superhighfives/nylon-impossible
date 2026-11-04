@@ -29,6 +29,11 @@ struct TodoDetailSheet: View {
     /// Set when the detail is the iPad inspector rather than a sheet, so ×
     /// and Delete close the panel instead of dismissing a presentation.
     var onClose: (() -> Void)?
+    /// The board's Return on the open todo: put the cursor in the title.
+    var focusTitle: Binding<Bool> = .constant(false)
+    /// Told when editing starts (a field takes the cursor) and stops, so the
+    /// board stands its keys down meanwhile and takes the keyboard back after.
+    var onEditingChange: ((Bool) -> Void)?
 
     @Environment(\.dismiss) var dismiss
     /// In the board's fourth column, which is tinted; a sheet sits on canvas.
@@ -56,10 +61,14 @@ struct TodoDetailSheet: View {
         apiService: APIService?,
         userId: String?,
         showsCalendar: Bool = false,
-        onClose: (() -> Void)? = nil
+        onClose: (() -> Void)? = nil,
+        focusTitle: Binding<Bool> = .constant(false),
+        onEditingChange: ((Bool) -> Void)? = nil
     ) {
         self.todo = todo
         self.onClose = onClose
+        self.focusTitle = focusTitle
+        self.onEditingChange = onEditingChange
         _showsDatePicker = State(initialValue: showsCalendar)
         self.actions = actions
         self.lists = lists
@@ -89,14 +98,24 @@ struct TodoDetailSheet: View {
     /// The board's fourth column rather than a sheet.
     var isColumn: Bool { onClose != nil && isWide }
 
-    @ViewBuilder
     var body: some View {
-        if isColumn {
-            columnBody
-        } else {
-            sheetBody
+        Group {
+            if isColumn {
+                columnBody
+            } else {
+                sheetBody
+            }
+        }
+        .onChange(of: focus) { old, new in
+            if (old == nil) != (new == nil) { onEditingChange?(new != nil) }
+        }
+        .onChange(of: focusTitle.wrappedValue, initial: true) { _, requested in
+            guard requested else { return }
+            focusTitle.wrappedValue = false
+            focus = .title
         }
     }
+
 
     var sheetBody: some View {
         ScrollView {
@@ -160,6 +179,7 @@ struct TodoDetailSheet: View {
             )
             .foregroundStyle(Theme.Colors.ink)
             .focused($focus, equals: .title)
+            .modifier(DetailTabWrap(field: .title, isColumn: isColumn, focus: $focus))
             .submitLabel(.done)
             .padding(.bottom, isColumn ? 0 : Theme.Space.s4)
             .onChange(of: title) { _, newValue in
@@ -332,6 +352,30 @@ extension TodoDetailSheet {
         if todo.recurrence != nil {
             Divider()
             Button("Don’t repeat", role: .destructive) { setRepeat(nil) }
+        }
+    }
+}
+
+/// Tab and ⇧Tab in the board's open todo go from field to field as in any
+/// form, but wrap at the ends: ⇧Tab on the title goes to the links field,
+/// Tab on the links field to the title, so they never leave the form for
+/// another column's Add field. Elsewhere Tab is the system's, so the due and
+/// repeat rows take their turn where the system gives buttons one.
+struct DetailTabWrap: ViewModifier {
+    let field: TodoDetailSheet.Field
+    let isColumn: Bool
+    let focus: FocusState<TodoDetailSheet.Field?>.Binding
+
+    func body(content: Content) -> some View {
+        content.onKeyPress(keys: [.tab], phases: .down) { press in
+            guard isColumn else { return .ignored }
+            let back = press.modifiers.contains(.shift)
+            switch (field, back) {
+            case (.title, true): focus.wrappedValue = .link
+            case (.link, false): focus.wrappedValue = .title
+            default: return .ignored
+            }
+            return .handled
         }
     }
 }

@@ -17,7 +17,8 @@
 //  iPhone sizes, small, medium and Lock Screen, from the sample data — simctl's openurl
 //  stops at a system "Open in Nylon?" prompt a script can't answer). On iPad: board,
 //  column (a list open as the fourth column), inspector (the detail panel),
-//  menu (a row selected, ready for a long-press). `-NylonLandscape YES`
+//  menu (a row selected, ready for a long-press), keys (the keyboard on an
+//  empty Today, outlined, as after a key press). `-NylonLandscape YES`
 //  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
@@ -44,6 +45,9 @@ enum ScreenRoute: String, CaseIterable {
     case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
     case share, sharetext, widgets
     case board, column, inspector, menu
+    /// The board with the keyboard on an empty Today, so its section
+    /// outline shows without a key press.
+    case keys
     case signin, loading, empty, syncerror, perf
     /// macOS: the menu bar extra's quick-add, drawn in the window.
     case menubar
@@ -242,7 +246,7 @@ enum SampleData {
         let container = try! ModelContainer(for: schema, configurations: [configuration])
         switch route {
         case .loading: break
-        case .empty: seedEmptyToday(container.mainContext)
+        case .empty, .keys: seedEmptyToday(container.mainContext)
         case .perf: seedMany(container.mainContext)
         default: seed(container.mainContext)
         }

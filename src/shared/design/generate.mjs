@@ -38,6 +38,15 @@ export function loadTokens() {
 }
 
 const kebab = (name) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+/** A colour value as CSS hex, with the token's alpha (if any) as a fourth byte. */
+const cssHex = (hex, c) => {
+  const base = hex.toLowerCase();
+  if (c.alpha === undefined) return base;
+  const byte = Math.round(c.alpha * 255)
+    .toString(16)
+    .padStart(2, "0");
+  return `${base}${byte}`;
+};
 const entries = (obj) =>
   Object.entries(obj).filter(([key]) => !key.startsWith("$"));
 
@@ -58,7 +67,7 @@ export function renderCss(tokens) {
     ":root {",
   );
   for (const [name, c] of entries(tokens.color)) {
-    out.push(`  --n-color-${kebab(name)}: ${c.light.toLowerCase()};`);
+    out.push(`  --n-color-${kebab(name)}: ${cssHex(c.light, c)};`);
   }
   out.push("");
   for (const [name] of entries(tokens.font)) {
@@ -92,7 +101,7 @@ export function renderCss(tokens) {
   out.push("}", "", ".dark {");
   for (const [name, c] of entries(tokens.color)) {
     if (c.dark.toLowerCase() !== c.light.toLowerCase()) {
-      out.push(`  --n-color-${kebab(name)}: ${c.dark.toLowerCase()};`);
+      out.push(`  --n-color-${kebab(name)}: ${cssHex(c.dark, c)};`);
     }
   }
   out.push("}", "");
@@ -108,13 +117,13 @@ export function renderCss(tokens) {
     );
     for (const [name, c] of high) {
       out.push(
-        `    --n-color-${kebab(name)}: ${c.highContrast.light.toLowerCase()};`,
+        `    --n-color-${kebab(name)}: ${cssHex(c.highContrast.light, c)};`,
       );
     }
     out.push("  }", "", "  .dark {");
     for (const [name, c] of high) {
       out.push(
-        `    --n-color-${kebab(name)}: ${c.highContrast.dark.toLowerCase()};`,
+        `    --n-color-${kebab(name)}: ${cssHex(c.highContrast.dark, c)};`,
       );
     }
     out.push("  }", "}", "");
@@ -268,7 +277,7 @@ export function renderSwift(tokens) {
       ? `, lightHighContrast: ${swiftHex(c.highContrast.light)}, darkHighContrast: ${swiftHex(c.highContrast.dark)}`
       : "";
     out.push(
-      `        static let ${name} = dynamic(light: ${swiftHex(c.light)}, dark: ${swiftHex(c.dark)}${high})`,
+      `        static let ${name} = dynamic(light: ${swiftHex(c.light)}, dark: ${swiftHex(c.dark)}${high})${c.alpha === undefined ? "" : `.opacity(${c.alpha})`}`,
     );
   }
   out.push("    }", "");

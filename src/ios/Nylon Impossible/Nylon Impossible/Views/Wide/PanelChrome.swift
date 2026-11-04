@@ -59,6 +59,9 @@ struct WidePanel: View {
     let userId: String?
     let showsCalendar: Bool
     let onClose: () -> Void
+    /// See `TodoDetailSheet.focusTitle` and `onEditingChange`.
+    var focusTitle: Binding<Bool> = .constant(false)
+    var onEditingChange: ((Bool) -> Void)?
 
     var body: some View {
         if let todo {
@@ -69,7 +72,9 @@ struct WidePanel: View {
                 apiService: apiService,
                 userId: userId,
                 showsCalendar: showsCalendar,
-                onClose: onClose
+                onClose: onClose,
+                focusTitle: focusTitle,
+                onEditingChange: onEditingChange
             )
             .id("\(todo.id)-\(showsCalendar)")
             .unbezeledControls()

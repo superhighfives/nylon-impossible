@@ -14,7 +14,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 4. **Rows carry information, not controls.** Actions live in gestures, context menus and the keyboard. Rows have no visible handles, toolbars or chevrons.
 5. **One design, many densities.** Phone, wide screen, the menu bar and the Gmail card share the same structure, the same order and the same words.
 6. **Editorial type, native behavior.** Archivo display type and hairline rules provide the hierarchy. Each platform keeps its own conventions: sheets, swipe, haptics, Dynamic Type, keyboard shortcuts. Native means native to the input, not the device. Touch works the same on every touch layout: long-press to drag, rows that part to make room, immediate feedback. A pointer works the same wherever there's one: a drop line, hover, a click to select.
-7. **Keyboard first where there's a keyboard.** On wide screens and the Mac, everything you can click you can also reach from the keyboard, and the same letter does the same thing everywhere.
+7. **Keyboard first where there's a keyboard.** On wide screens and the Mac, everything you can click you can also reach from the keyboard, and the same letter does the same thing everywhere. The keyboard is either on a section (the sidebar, a column, the open todo) or in it. Tab, ⇧Tab and ← → move between sections; Return steps in and Esc steps out. Inside, the arrow keys move through items, and in a form, keys do ordinary form things. The section with the keyboard has a light outline.
 8. **Things don't jump.** Space that something might need (a banner, the fourth column) is kept whether or not it's showing, so titles and columns stay put.
 9. **Settled stays settled.** Decisions below need a written reason to reopen, not a polish pass.
 
@@ -79,7 +79,7 @@ How the wide board (web, iPad and the Mac, with a pointer and keyboard) shows ea
 | Hover (pointer only) | `fill` at 60%, in every column, tinted or not | Rename button: `fill` | `surface` (web) / `fill` at 70% (Apple) | `surface` | Moves the highlight |
 | Pressed | Nothing extra: the click selects, and the selection is the feedback | — | — | — | — |
 | Selected by click | `fill`, chip radius | — | Open list: `fill`, semibold | — | — |
-| Selected by keyboard | `fill` plus a 3px `inkMuted` bar, inset 6 | — | — | — | `fill` |
+| Selected by keyboard | `fill` plus a 3px `inkMuted` bar, inset 6 | — | — | On Add, not typing: as a row, `fill` plus the `inkMuted` bar | `fill` |
 | Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface` plus the 3px `brand` ring | — |
 | Focused by click | Same as selected by click | Nothing visible | Nothing extra | Same as by keyboard | — |
 | Column holds the selection | — | — | 3px `ink` bar | — | — |
@@ -88,6 +88,7 @@ How the wide board (web, iPad and the Mac, with a pointer and keyboard) shows ea
 | Dragging (source) | The original row stays, faded to 35% | — | — | — | — |
 | Drag preview | `surface` card, `hairline` border, field radius, checkbox and title | — | — | — | — |
 
+- **Section with the keyboard.** The sidebar, a column or the open todo that has the keyboard shows a 4pt/4px `sectionOutline` (ink at 8%) drawn inside its edges: a frame, not a selection, and never `brand`. It shows whether the keyboard is on the section or in it, follows "Keyboard or pointer", and changes none of the looks inside it. At launch the keyboard is on Today, with the outline hidden until the first key press.
 - **Two bars, two roles.** The row's keyboard bar is `inkMuted`; the sidebar's bar for the column holding the selection is `ink`.
 - **Keyboard or pointer** is the last input: a key press (not a modifier alone) turns the keyboard looks on, a pointer press turns them off. The rows' bar and the column head's tint follow it, not the browser's own guess at `:focus-visible`.
 - **Dropping.** The whole column accepts a drop, and the line always shows where the todo will land: over a row, the gap its nearer half points to; below the rows or in an empty column, after the last row. Releasing puts the todo where the line was. Done and an open todo aren't drop targets, and nothing draws a line over the sidebar.
