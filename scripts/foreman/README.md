@@ -136,6 +136,32 @@ owner merges it either way.
 - **Relaxing it** means dropping it for one kind at a time, with a written
   reason in CLAUDE.md, and a change to the gate here.
 
+## Stalls
+
+Most of the gate's `wait:` reasons have no action in the merge pass, so a PR
+can sit on one indefinitely (#563 waited 8 hours on a review that had already
+arrived). The foreman times each wait, per PR, in `~/.foreman/waits/<pr>`: when
+it started, the head commit, and the reason.
+
+- **The clock restarts** when the reason changes or a new commit is pushed.
+  A count or a `(STATE)` changing within the reason (`2 unresolved
+  thread(s)` to `1`, `not mergeable (UNKNOWN)` to `(CONFLICTING)`) doesn't
+  count as a change, and nor does a failed read (`couldn't …`, `fetch
+  failed`) while a clock is running: it keeps timing the reason it had.
+- **After 2 hours on the same reason,** you get one alert naming the PR and
+  the reason, and a `stalled` event goes to `events.jsonl`. It doesn't repeat
+  for that wait. `checks pending` gets **12 hours**, so a slow run never trips
+  it, but a required check that never starts does.
+- **What's timed:** every other `wait:` reason, including a 🟡 review whose
+  round has already answered, the owner's unresolved threads, and a merge the
+  gate passed but GitHub refused (`merge refused`).
+- **What isn't:** `needs-decision`, `guarded:` (`owner-merge`), `not
+  verified` (it has its own reminder) and drafts. These, and a merge, stop the
+  clock, and so does the PR closing.
+- `foreman status` lists each open PR past its threshold as `stalled:`, and
+  the daily digest lists them under Problems. `tick --dry-run` writes no
+  clock and logs `would alert` instead.
+
 ## Review rounds
 
 `control-room-review` reviews every push. The foreman merges only on 🟢, so
@@ -237,7 +263,8 @@ something.
 
 **The digest** is `jq` over the last 24 hours of `events.jsonl`, plus `gh`
 queries for merged PRs, `needs-decision`, `owner-merge`, Specced specs whose
-open questions aren't "None.", and `~/.foreman/verify/`. It comments on the
+open questions aren't "None.", `~/.foreman/verify/`, and `~/.foreman/waits/`
+for open stalls. It comments on the
 open "Foreman digest" issue by `nylon-foreman`, opening and pinning it the
 first time, then sends a Discord alert linking the comment. When all four
 sections are empty, it posts and alerts nothing.
@@ -298,7 +325,7 @@ comment and an alert, and waits for you. The comment points to CLAUDE.md's
 
 `scripts/foreman/test.sh` (`bun run foreman:test`) runs the gate against a
 throwaway repo with `gh` stubbed: renames, deletes, every guarded path, each
-way the gate has to wait, `verified` and its reminders, the spec check,
+way the gate has to wait, `verified` and its reminders, stalls, the spec check,
 feedback intake (whose `auto-fix` counts) and triage's outcomes, the shots'
 place in the PR body and their push to `feedback-assets`, the token's
 expiry, and the routines: schedules either side of each time, the off
@@ -372,7 +399,7 @@ repo and to the Nylon project. Its classic token (scopes `repo`, `workflow`,
   account's token in place (above).
 - Alerts use pastor's Discord webhook, if one is set.
 - Everything else lives in `~/.foreman`: a clone tracking `main`, the
-  worktrees, logs, `rounds/`, `specs/`, `verify/`, `feedback/`, `shots/`,
+  worktrees, logs, `rounds/`, `specs/`, `verify/`, `waits/`, `feedback/`, `shots/`,
   `routines/`, `shepherd/`, and `events.jsonl`, one line per merge, PR,
   question, spec run, triage, set of shots, routine run or failure. The
   daily digest reads `events.jsonl`.

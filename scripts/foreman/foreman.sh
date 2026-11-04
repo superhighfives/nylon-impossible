@@ -35,6 +35,8 @@ MERGEABLE_RETRY_SECONDS="${FOREMAN_MERGEABLE_RETRY_SECONDS:-5}"
 AGENT="${FOREMAN_AGENT:-nylon-foreman}" # the machine account the foreman acts as
 TOKEN_WARN_DAYS=7
 VERIFY_REMIND_SECONDS=86400 # how long a PR waits for `verified` before a reminder
+WAIT_ALERT_SECONDS=7200 # how long a PR waits for the same reason before an alert
+PENDING_ALERT_SECONDS=43200 # the same, for `checks pending`
 SHOTS_TIMEOUT="${FOREMAN_SHOTS_TIMEOUT:-2700}" # seconds per side of the before/after shots
 ROUTINE_TIMEOUT="${FOREMAN_ROUTINE_TIMEOUT:-3600}" # seconds per model-driven routine run
 ROUTINES_ALL="shepherd sentry deps scout digest" # the order a tick considers them in
@@ -53,6 +55,7 @@ LOCK="$HOME_DIR/lock"
 ROUNDS="$HOME_DIR/rounds" # per PR: the id of the last review a round answered
 SPECS="$HOME_DIR/specs"   # per issue: the id of the owner's last comment a spec run answered
 VERIFY="$HOME_DIR/verify" # per PR: when it started waiting for `verified`
+WAITS="$HOME_DIR/waits"   # per PR: when its current wait started, the head commit and the reason
 FEEDBACK="$HOME_DIR/feedback" # per issue: when the foreman triaged that report
 SHOTS="$HOME_DIR/shots"   # per PR: its shot plan and the images being captured
 ONCE="$HOME_DIR/once"     # markers for alerts that go out once
@@ -355,9 +358,13 @@ gate() { # pr -> "merge <head-sha>", "wait: <why>" or "guarded: <why>"
 }
 
 merge_pass() { # board_json
-  local board="$1" pr branch verdict issue head
-  while IFS=$'\t' read -r pr branch; do
+  local board="$1" pr branch sha verdict issue head list open=""
+  list=$(gh pr list -R "$OWNER/$REPO" --state open --json number,headRefName,headRefOid,author \
+           --jq ".[] | select(.headRefName | startswith(\"foreman/\")) | select(.author.login == \"$AGENT\") | [.number, .headRefName, .headRefOid] | @tsv") \
+    || { log "couldn't list the open PRs"; return 0; }
+  while IFS=$'\t' read -r pr branch sha; do
     [ -n "$pr" ] || continue
+    open="$open $pr"
     issue=$(issue_of "$branch") # none for the dependency bundle
     verdict=$(gate "$pr")
     case "$verdict" in
@@ -366,13 +373,15 @@ merge_pass() { # board_json
         if dry; then log "would merge #$pr at ${head:0:7}"; continue; fi
         # Pinned to the commit the gate checked: pastor may push in between.
         if ! gh pr merge "$pr" -R "$OWNER/$REPO" --squash --delete-branch --match-head-commit "$head" >/dev/null; then
-          log "merge of #$pr refused; will retry next tick"; event merge_refused "$issue" "$pr"; continue
+          log "merge of #$pr refused; will retry next tick"; event merge_refused "$issue" "$pr"
+          track_wait "$pr" "$issue" "$head" "merge refused"; continue
         fi
         log "merged #$pr"; event merged "$issue" "$pr"
-        rm -f "$VERIFY/$pr" "$VERIFY/$pr.reminded"
+        rm -f "$VERIFY/$pr" "$VERIFY/$pr.reminded" "$WAITS/$pr" "$WAITS/$pr.alerted"
         [ -z "$issue" ] || { set_status "$board" "$issue" Done || true; rm_worktree "$issue"; } ;;
       guarded:*)
         log "#$pr $verdict"
+        clear_wait "$pr"
         if ! gh pr view "$pr" -R "$OWNER/$REPO" --json labels --jq '[.labels[].name] | index("owner-merge")' | grep -q '[0-9]'; then
           dry && { log "would label #$pr owner-merge"; continue; }
           gh pr edit "$pr" -R "$OWNER/$REPO" --add-label owner-merge >/dev/null || true
@@ -385,17 +394,26 @@ merge_pass() { # board_json
         # checks both before this): the foreman owns the round. Pastor
         # leaves these findings alone.
         log "#$pr $verdict"
+        track_wait "$pr" "$issue" "$sha" "${verdict#wait: }"
         review_round "$pr" "$branch" "$issue" ;;
       "wait: not verified")
         log "#$pr $verdict"
+        clear_wait "$pr"
         verify_reminder "$pr" "$issue" ;;
       "wait: verified before the latest push")
         log "#$pr $verdict"
+        track_wait "$pr" "$issue" "$sha" "${verdict#wait: }"
         clear_verified "$pr" "$issue" ;;
-      *) log "#$pr ${verdict:-wait: gate printed nothing}" ;;
+      "wait: needs-decision"|"wait: draft")
+        log "#$pr $verdict"
+        clear_wait "$pr" ;;
+      *)
+        verdict="${verdict:-wait: gate printed nothing}"
+        log "#$pr $verdict"
+        track_wait "$pr" "$issue" "$sha" "${verdict#wait: }" ;;
     esac
-  done < <(gh pr list -R "$OWNER/$REPO" --state open --json number,headRefName,author \
-             --jq ".[] | select(.headRefName | startswith(\"foreman/\")) | select(.author.login == \"$AGENT\") | [.number, .headRefName] | @tsv")
+  done <<<"$list"
+  prune_waits "$open"
 }
 
 issue_of() { # branch -> the issue a foreman/<n>-<slug> branch builds, or nothing
@@ -424,6 +442,75 @@ clear_verified() { # pr issue -> removes a `verified` that predates the head com
   rm -f "$VERIFY/$1" "$VERIFY/$1.reminded" # the wait, and its one reminder, restart from this push
   gh pr comment "$1" -R "$OWNER/$REPO" --body "A push landed after \`verified\`, so I've removed it: what merges should be what you tried. Try the latest commit and add it again." >/dev/null || true
   event verified_cleared "$2" "$1"
+}
+
+# ---- stalls ------------------------------------------------------------------
+# A wait the merge pass has no action for can go on forever, and #563 did, for
+# 8 hours. Each one is timed per PR, keyed on the reason and the head commit,
+# and alerts once when it's lasted too long. The waits that already alert, or
+# that wait on the owner (needs-decision, not verified, draft, guarded),
+# aren't timed.
+
+wait_limit() { # reason -> how long it may last before it's a stall
+  case "$1" in "checks pending") echo "$PENDING_ALERT_SECONDS" ;; *) echo "$WAIT_ALERT_SECONDS" ;; esac
+}
+
+wait_key() { # reason -> what the clock compares: without counts or a (STATE), which change while the PR is stuck
+  sed -E 's/ *\([^)]*\)//g; s/[0-9]+//g' <<<"$1"
+}
+
+track_wait() { # pr issue head reason -> starts or keeps the clock; one alert and a `stalled` event once it's a stall
+  local f="$WAITS/$1" since="" head="" reason="" now_reason="$4"
+  if [ -s "$f" ]; then since=$(sed -n 1p "$f"); head=$(sed -n 2p "$f"); reason=$(sed -n 3p "$f"); fi
+  # A failed read says nothing about the PR, so it doesn't restart a running
+  # clock; one that keeps failing on its own is still timed.
+  if [ -n "$since" ] && [ "$head" = "$3" ]; then
+    case "$4" in "couldn't "*|"fetch failed"|"gate printed nothing") now_reason="$reason" ;; esac
+  fi
+  if [ -z "$since" ] || [ "$head" != "$3" ] || [ "$(wait_key "$reason")" != "$(wait_key "$now_reason")" ]; then
+    dry && return 0
+    mkdir -p "$WAITS"; rm -f "$f.alerted"
+    printf '%s\n%s\n%s\n' "$(now)" "$3" "$now_reason" > "$f"; return 0
+  fi
+  local waited=$(( $(now) - since ))
+  [ "$waited" -ge "$(wait_limit "$now_reason")" ] || return 0
+  [ -e "$f.alerted" ] && return 0
+  dry && { log "would alert #$1 stalled on \"$now_reason\""; return 0; }
+  touch "$f.alerted"
+  event stalled "$2" "$1" "$now_reason"
+  alert "#$1 has waited $(( waited / 3600 ))h on \"$now_reason\": https://github.com/$OWNER/$REPO/pull/$1"
+}
+
+clear_wait() { # pr -> stops its clock
+  dry && return 0
+  rm -f "$WAITS/$1" "$WAITS/$1.alerted"
+}
+
+prune_waits() { # open-prs -> removes the clocks of PRs that are no longer open
+  local f pr
+  dry && return 0
+  for f in "$WAITS"/*; do
+    [ -e "$f" ] || continue
+    pr=$(basename "$f" .alerted)
+    case " $1 " in *" $pr "*) ;; *) rm -f "$f" ;; esac
+  done
+}
+
+stalled_prs() { # the open PRs past their stall threshold, oldest first
+  local f pr open since reason
+  [ -n "$(ls -A "$WAITS" 2>/dev/null)" ] || return 0
+  open=$(gh pr list -R "$OWNER/$REPO" --state open --json number --jq '.[].number') || return 0
+  for f in "$WAITS"/*; do
+    pr=$(basename "$f")
+    case "$pr" in *[!0-9]*|"") continue ;; esac
+    grep -qx "$pr" <<<"$open" || continue
+    since=$(sed -n 1p "$f"); reason=$(sed -n 3p "$f")
+    case "$since" in *[!0-9]*|"") continue ;; esac
+    [ $(( $(now) - since )) -ge "$(wait_limit "$reason")" ] || continue
+    printf '%s\t%s\t%s\n' "$since" "$pr" "$reason"
+  done | sort -n | while IFS=$'\t' read -r since pr reason; do
+    echo "stalled: #$pr on \"$reason\" since $(jq -rn --argjson t "$since" '$t | todate')"
+  done
 }
 
 # ---- review rounds -----------------------------------------------------------
@@ -1769,6 +1856,7 @@ digest_problems() { # since-epoch token-note -> "- " lines: what failed, and the
     elif .event == "rounds_exhausted" then "- #\(.pr) is still not 🟢 after its review rounds"
     elif .event == "routine" and .outcome == "failed" then "- Routine \(.routine) failed (\(.note))"
     else empty end'
+  stalled_prs | sed -E 's/^stalled: (#[0-9]+) on (".*") since (.*)$/- \1 has waited on \2 since \3/'
   [ -z "${2:-}" ] || echo "- Token: $2"
 }
 
@@ -2076,6 +2164,7 @@ cmd_status() {
   [ -d "$LOCK" ] && echo "tick running: pid $(cat "$LOCK/pid" 2>/dev/null)"
   echo "agent PRs open: $(agent_pr_count)/$MAX_AGENT_PRS"
   waiting_for_verified
+  stalled_prs
   routines_status
   echo "recent events:"
   if [ -s "$EVENTS" ]; then tail -n 10 "$EVENTS" | sed 's/^/  /'; else echo "  none"; fi

@@ -393,6 +393,133 @@ expect "a stale verified is removed"            "yes"  "$(called '--remove-label
 expect "and the owner is told why"              "yes"  "$(called 'pr comment 7')"
 expect "and the wait restarts from the push"    "no no" "$([ -e "$VERIFY/7" ] && echo yes || echo no) $([ -e "$VERIFY/7.reminded" ] && echo yes || echo no)"
 
+# ---- stalls ------------------------------------------------------------------
+
+echo "stalls"
+
+# merge_pass in a subshell, so its stubs don't leak: GATE is the verdict,
+# OPEN_PRS what `gh pr list` prints (after its --jq), MERGE_FAIL refuses merges.
+T0=$FOREMAN_NOW
+SHA_A=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa SHA_B=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+GATE="" MERGE_FAIL="" OPEN_PRS=""
+open_pr() { printf '7\tforeman/1-x\t%s\n' "$1"; }
+mp() { # [--dry-run] -> merge_pass's log
+  (
+    [ "${1:-}" = --dry-run ] && DRY=1
+    gate() { echo "$GATE"; }
+    gh() {
+      echo "$*" >> "$CALLS"
+      case "$1 $2" in
+        "pr list") printf '%s' "$OPEN_PRS" ;;
+        "pr merge") [ -z "$MERGE_FAIL" ] ;;
+        "pr view") echo null ;;
+        *) return 0 ;;
+      esac
+    }
+    event() { echo "event $*" >> "$CALLS"; }
+    review_round() { :; }; verify_reminder() { :; }; clear_verified() { :; }
+    set_status() { :; }; rm_worktree() { :; }
+    merge_pass '{}'
+  ) | sed -E 's/^[0-9-]+ [0-9:]+ //'
+}
+at() { FOREMAN_NOW=$((T0 + $1)); }
+alerts() { grep -c '^alert ' "$CALLS"; }
+stalls() { grep -c '^event stalled ' "$CALLS"; }
+fresh() { rm -rf "$WAITS"; : > "$CALLS"; FOREMAN_NOW=$T0; OPEN_PRS=$(open_pr "$SHA_A"); MERGE_FAIL=""; }
+
+NO_REVIEW="wait: no control-room-review[bot] review of the head commit yet"
+fresh; GATE="$NO_REVIEW"; mp >/dev/null
+expect "a tracked wait starts the clock"          "$T0|$SHA_A|${NO_REVIEW#wait: }"  "$(paste -sd'|' - < "$WAITS/7")"
+at 7199; mp >/dev/null
+expect "2h minus a second is quiet"               "0 0"  "$(alerts) $(stalls)"
+at 7200; mp >/dev/null
+expect "at 2h: one alert and one stalled event"   "1 1"  "$(alerts) $(stalls)"
+expect "the alert says which PR and why"          "yes"  "$(called "alert #7 has waited 2h on \"${NO_REVIEW#wait: }\": https://github.com/superhighfives/nylon-impossible/pull/7")"
+expect "the event carries the reason"             "yes"  "$(called "event stalled 1 7 ${NO_REVIEW#wait: }")"
+at 20000; mp >/dev/null
+expect "only once for that wait"                  "1 1"  "$(alerts) $(stalls)"
+
+at 21000; GATE="wait: checks red"; mp >/dev/null
+expect "a changed reason restarts the clock"      "$((T0 + 21000))"  "$(head -1 "$WAITS/7")"
+expect "and re-arms the alert"                    "no"   "$([ -e "$WAITS/7.alerted" ] && echo yes || echo no)"
+at $((21000 + 7200)); mp >/dev/null
+expect "so the new reason alerts after 2h"        "2"    "$(alerts)"
+
+fresh; GATE="wait: checks red"; mp >/dev/null
+at 7000; OPEN_PRS=$(open_pr "$SHA_B"); mp >/dev/null
+expect "a new head with the same reason restarts the clock"  "$((T0 + 7000))|$SHA_B"  "$(sed -n 1,2p "$WAITS/7" | paste -sd'|' -)"
+at 7200; mp >/dev/null
+expect "so 2h after the first push is quiet"      "0"    "$(alerts)"
+
+fresh; GATE="wait: 2 unresolved thread(s) from superhighfives"; mp >/dev/null
+at 3600; GATE="wait: 1 unresolved thread(s) from superhighfives"; mp >/dev/null
+expect "a changed count keeps the clock"          "$T0"  "$(head -1 "$WAITS/7")"
+fresh; GATE="wait: not mergeable (UNKNOWN)"; mp >/dev/null
+at 3600; GATE="wait: not mergeable (CONFLICTING)"; mp >/dev/null
+at 7200; GATE="wait: not mergeable (UNKNOWN)"; mp >/dev/null
+expect "a flapping state still alerts at 2h"      "1"    "$(alerts)"
+fresh; GATE="wait: checks red"; mp >/dev/null
+at 3600; GATE="wait: couldn't read review threads"; mp >/dev/null
+at 4200; GATE="wait: checks red"; mp >/dev/null
+expect "a failed read keeps the clock"            "$T0|checks red"  "$(sed -n '1p;3p' "$WAITS/7" | paste -sd'|' -)"
+fresh; GATE="wait: couldn't read review threads"; mp >/dev/null
+at 7200; mp >/dev/null
+expect "but one that keeps failing alerts"        "1"    "$(alerts)"
+fresh; GATE="wait: checks red"; mp >/dev/null
+at 600
+expect "a failed PR list says so"                 "couldn't list the open PRs"  "$( (gh() { return 1; }; merge_pass '{}') | sed -E 's/^[0-9-]+ [0-9:]+ //')"
+expect "and keeps every clock"                    "yes"  "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+
+fresh; GATE="wait: checks pending"; mp >/dev/null
+at 7200; mp >/dev/null
+expect "pending checks are quiet at 2h"           "0"    "$(alerts)"
+at 43200; mp >/dev/null
+expect "and alert at 12h"                         "1"    "$(alerts)"
+
+for v in "wait: needs-decision" "wait: not verified" "wait: draft"; do
+  fresh; GATE="$v"; mp >/dev/null
+  expect "${v#wait: } never starts a clock"       "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+done
+fresh; GATE="wait: checks red"; mp >/dev/null; GATE="wait: needs-decision"; mp >/dev/null
+expect "and needs-decision stops one"             "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+fresh; GATE="wait: checks red"; mp >/dev/null; GATE="guarded: touches a migration (x)"; mp >/dev/null
+expect "a guarded verdict clears the clock"       "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+fresh; GATE="wait: checks red"; mp >/dev/null; GATE="merge $SHA_A"; mp >/dev/null
+expect "a merge clears it"                        "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+
+fresh; GATE="merge $SHA_A"; MERGE_FAIL=1; mp >/dev/null
+expect "a refused merge is tracked"               "merge refused"  "$(sed -n 3p "$WAITS/7")"
+at 7200; mp >/dev/null
+expect "and alerts after 2h"                      "yes"  "$(called 'alert #7 has waited 2h on "merge refused"')"
+
+fresh; GATE="wait: checks red"; mp >/dev/null; at 7200; mp >/dev/null
+OPEN_PRS=""; at 7800; mp >/dev/null
+expect "a merged or closed PR's files are removed"  ""  "$(ls -A "$WAITS")"
+
+fresh; GATE="wait: checks red"; mp --dry-run >/dev/null
+expect "a dry run writes no clock"                "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+mp >/dev/null; at 7200
+expect "and alerts nothing, but says it would"    "would alert #7 stalled on \"checks red\""  "$(mp --dry-run | grep 'would alert')"
+expect "nor marks it"                             "0 no" "$(alerts) $([ -e "$WAITS/7.alerted" ] && echo yes || echo no)"
+FOREMAN_NOW=$T0
+
+# status: a fixture waits/ directory. #8 is past 2h, #9 past 2h but pending
+# (quiet until 12h), #10 isn't open, #11 is the oldest.
+rm -rf "$WAITS"; mkdir -p "$WAITS"
+printf '%s\n%s\n%s\n' $((T0 - 10800)) "$SHA_A" "checks red" > "$WAITS/8"
+printf '%s\n%s\n%s\n' $((T0 - 10800)) "$SHA_A" "checks pending" > "$WAITS/9"
+printf '%s\n%s\n%s\n' $((T0 - 10800)) "$SHA_A" "checks red" > "$WAITS/10"
+printf '%s\n%s\n%s\n' $((T0 - 50000)) "$SHA_A" "merge refused" > "$WAITS/11"
+touch "$WAITS/11.alerted"
+gh() { echo "$*" >> "$CALLS"; printf '8\n9\n11\n'; }
+expect "status lists open stalls, oldest first" \
+  "stalled: #11 on \"merge refused\" since 2026-10-31T18:06:40Z|stalled: #8 on \"checks red\" since 2026-11-01T05:00:00Z" \
+  "$(stalled_prs | paste -sd'|' -)"
+expect "and the digest lists them under Problems" \
+  "- #11 has waited on \"merge refused\" since 2026-10-31T18:06:40Z|- #8 has waited on \"checks red\" since 2026-11-01T05:00:00Z" \
+  "$(EVENTS=/dev/null digest_problems 0 | paste -sd'|' -)"
+rm -rf "$WAITS"
+
 # ---- specs -------------------------------------------------------------------
 
 echo "spec check"
