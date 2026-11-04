@@ -137,7 +137,17 @@ struct FeedbackTests {
         let encoded = try #require(FeedbackImageEncoder.encode(image))
         #expect(encoded.contentType == "image/png")
         #expect(encoded.pixelSize == CGSize(width: 40, height: 20))
+        #expect(encoded.thumbnail.width == 40)
         #expect(FeedbackImageEncoder.encode(data: encoded.data)?.pixelSize == CGSize(width: 40, height: 20))
+    }
+
+    @Test("A large screenshot keeps a small thumbnail for the sheet")
+    func thumbnail() throws {
+        let image = try #require(Self.solidImage(width: 3000, height: 1500))
+        let encoded = try #require(FeedbackImageEncoder.encode(image))
+        #expect(encoded.pixelSize == CGSize(width: 2400, height: 1200))
+        #expect(encoded.thumbnail.width == 480)
+        #expect(encoded.thumbnail.height == 240)
     }
 
     // MARK: - Service
@@ -147,7 +157,8 @@ struct FeedbackTests {
         let api = MockAPIService()
         let feedback = FeedbackService(apiService: api)
         feedback.screen = "Today"
-        feedback.present(with: Self.solidImage(width: 10, height: 10))
+        feedback.present()
+        await feedback.add(try #require(Self.solidImage(width: 10, height: 10)))
         feedback.text = "  The tick jumps  "
         #expect(feedback.isPresented)
         #expect(feedback.images.count == 1)
@@ -187,10 +198,10 @@ struct FeedbackTests {
     }
 
     @Test("No more than four images")
-    func imageLimit() throws {
+    func imageLimit() async throws {
         let feedback = FeedbackService(apiService: MockAPIService())
         let image = try #require(Self.solidImage(width: 4, height: 4))
-        for _ in 0..<6 { feedback.add(image) }
+        for _ in 0..<6 { await feedback.add(image) }
         #expect(feedback.images.count == FeedbackService.maxImages)
         #expect(feedback.canAddImages == false)
     }
