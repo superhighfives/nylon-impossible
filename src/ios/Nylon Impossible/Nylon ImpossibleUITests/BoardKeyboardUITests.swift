@@ -226,12 +226,30 @@ final class BoardKeyboardUITests: NylonUITestCase {
     }
 
     func testCommandKSearchesAndGoesToATodo() {
-        press("k", .command)
         let field = app.textFields["Search todos, lists and commands…"].firstMatch
+        let focused = NSPredicate(format: "hasKeyboardFocus == true")
+        press("k", .command)
         waitFor(field)
+        expectation(for: focused, evaluatedWith: field)
+        waitForExpectations(timeout: 3)
+        // ⌘K again closes it; a third time opens a fresh field, focused too.
+        press("k", .command)
+        XCTAssertTrue(field.waitForNonExistence(timeout: 3))
+        press("k", .command)
+        waitFor(field)
+        expectation(for: focused, evaluatedWith: field)
+        waitForExpectations(timeout: 3)
         app.typeText("parm\n")
         waitFor(row("Parmesan"))
         XCTAssertEqual(selectedRow.label, "Parmesan")
+    }
+
+    func testSearchButtonFocusesTheField() {
+        app.buttons["Search and commands"].firstMatch.tap()
+        let field = app.textFields["Search todos, lists and commands…"].firstMatch
+        waitFor(field)
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == true"), evaluatedWith: field)
+        waitForExpectations(timeout: 3)
     }
 
     func testMMovesTheSelectionToAList() {
