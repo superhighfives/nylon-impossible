@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/tanstack-react-start";
-import { toDueDay } from "@nylon-impossible/shared";
+import { createInitialTodo, toDueDay } from "@nylon-impossible/shared";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import {
   useMutation,
@@ -15,7 +15,6 @@ import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
-import { smartCreatePreview } from "@/lib/url-display";
 import {
   createTodo,
   deleteTodo,
@@ -441,9 +440,10 @@ export function useSmartCreate() {
           null,
         );
 
-      // The links it'll attach go on as pending, so the row shows them being
-      // fetched (and a bare link reads "Check {domain}") from the start.
-      const preview = smartCreatePreview(text);
+      // Built the way the API builds it (title, notes, links), with each link
+      // pending, so the row shows them being fetched (and a bare link reads
+      // "Check {domain}") from the start.
+      const preview = createInitialTodo(text.trim());
       const now = new Date().toISOString();
       const id = `temp-${crypto.randomUUID()}`;
       const urlPositions = generateNKeysBetween(
@@ -461,7 +461,7 @@ export function useSmartCreate() {
         // regardless.
         listId: listId ?? "",
         title: preview.title,
-        notes: null,
+        notes: preview.notes,
         completed: false,
         completedAt: null,
         position: generateKeyBetween(null, minPosition),

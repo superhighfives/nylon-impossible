@@ -409,6 +409,13 @@ describe("useSmartCreate", () => {
     ]);
   });
 
+  it("keeps a second line in notes, as the API does", async () => {
+    const row = await optimisticRow("Read this\nhttps://example.com/a");
+    expect(row.title).toBe("Read this");
+    expect(row.notes).toBe("https://example.com/a");
+    expect(row.urls.map((u) => u.fetchStatus)).toEqual(["pending"]);
+  });
+
   it("adds a plain todo with no links", async () => {
     const row = await optimisticRow("Buy milk");
     expect(row.title).toBe("Buy milk");

@@ -6,7 +6,6 @@ import {
   getUrlDisplay,
   isPlaceholderTitle,
   placeholderTitleForUrl,
-  smartCreatePreview,
   stripLinkedUrlsFromTitle,
 } from "../url-display";
 
@@ -228,36 +227,5 @@ describe("buildFaviconErrorHandler", () => {
     handler(event);
 
     expect(img.style.display).toBe("none");
-  });
-});
-
-describe("smartCreatePreview", () => {
-  it("names a bare link after its domain, as the API does", () => {
-    expect(smartCreatePreview("  https://www.yoox.com/us/men. ")).toEqual({
-      title: "Check yoox.com",
-      urls: ["https://www.yoox.com/us/men"],
-    });
-  });
-
-  it("keeps the words and lists each link once", () => {
-    expect(
-      smartCreatePreview(
-        "Compare https://a.com/x and https://a.com/x, https://b.com",
-      ),
-    ).toEqual({
-      title: "Compare https://a.com/x and https://a.com/x, https://b.com",
-      urls: ["https://a.com/x", "https://b.com"],
-    });
-  });
-
-  it("has no links for plain text or a URL with no host", () => {
-    expect(smartCreatePreview("Buy milk")).toEqual({
-      title: "Buy milk",
-      urls: [],
-    });
-    expect(smartCreatePreview("https://")).toEqual({
-      title: "https://",
-      urls: [],
-    });
   });
 });
