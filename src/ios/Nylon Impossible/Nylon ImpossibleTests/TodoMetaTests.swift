@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Nylon_Impossible
 
@@ -140,5 +141,26 @@ struct TodoMetaTests {
         #expect(MastheadCopy.todos(4) == "4 todos")
         #expect(MastheadCopy.lists(count: 2) == "2 lists · never age")
         #expect(MastheadCopy.today(count: 4, now: Self.now, locale: Self.locale) == "Sunday, October 18 · 4 todos")
+    }
+
+    @Test("A todo that was never inserted isn't gone; a deleted one is")
+    func isGoneSeparatesUninsertedFromDeleted() throws {
+        let loose = TodoItem(title: "Loose")
+        #expect(!loose.isGone)
+
+        let container = try ModelContainer(
+            for: TodoItem.self, TodoUrl.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = ModelContext(container)
+        let todo = TodoItem(title: "Saved")
+        context.insert(todo)
+        try context.save()
+        #expect(!todo.isGone)
+
+        context.delete(todo)
+        #expect(todo.isGone)
+        try context.save()
+        #expect(todo.isGone)
     }
 }
