@@ -3,27 +3,11 @@
  */
 
 import {
+  normalizeHttpUrl,
   URL_TRAILING_PUNCTUATION as TRAILING_PUNCT,
   TEXT_URL_REGEX as URL_REGEX,
 } from "@nylon-impossible/shared";
 import { isSocialPostUrl, type UrlMetadata } from "./url-metadata";
-
-/**
- * Validate and clean a URL string.
- * Returns null if the URL is invalid.
- */
-function cleanUrl(urlString: string): string | null {
-  const cleaned = urlString.replace(TRAILING_PUNCT, "");
-  try {
-    const parsed = new URL(cleaned);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-    return parsed.href;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Extract and validate all URLs from a text string.
@@ -34,7 +18,7 @@ export function extractUrlsFromText(text: string): string[] {
   const seen = new Set<string>();
   const urls: string[] = [];
   for (const match of rawMatches) {
-    const cleaned = cleanUrl(match);
+    const cleaned = normalizeHttpUrl(match);
     if (cleaned && !seen.has(cleaned)) {
       seen.add(cleaned);
       urls.push(cleaned);
@@ -143,7 +127,8 @@ function withoutTrailingSlash(url: string): string {
 
 /**
  * Whether `title` is one of the placeholders we generate for a captured link —
- * the raw URL, or `createFallbackFromUrl`'s "Check {domain}".
+ * the raw URL, or `createFallbackFromUrl`'s "Check {domain}"
+ * (`@nylon-impossible/shared`).
  *
  * This is the guard on rewriting a title from fetched metadata: a placeholder
  * is ours to replace, anything the user typed is not.

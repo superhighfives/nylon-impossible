@@ -62,7 +62,7 @@ function extractDomain(url: string): string | null {
 
 /**
  * Whether `title` is one of the placeholders generated for a captured link —
- * the raw URL itself, or the API's `createFallbackFromUrl` "Check {domain}" —
+ * the raw URL itself, or the shared `createFallbackFromUrl` "Check {domain}" —
  * rather than something the user actually typed. Mirrors the API's own
  * `isPlaceholderTitle` (src/api/src/lib/url-helpers.ts), which gates whether
  * fetched metadata is allowed to overwrite the title.
@@ -76,7 +76,7 @@ export function isPlaceholderTitle(title: string, url: string): boolean {
 
 /**
  * A short placeholder title for a bare captured link — "Check {domain}",
- * matching the API's `createFallbackFromUrl`, or the raw URL if it's
+ * matching the shared `createFallbackFromUrl`, or the raw URL if it's
  * malformed and has no domain to name.
  */
 export function placeholderTitleForUrl(url: string): string {
