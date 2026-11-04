@@ -35,6 +35,13 @@ struct TodoRow: View {
     private var gutter: CGFloat { isWide ? Theme.Wide.gutter : Theme.Phone.gutter }
 
     var body: some View {
+        // A sync can delete this todo a beat before the list drops it.
+        if !todo.isGone {
+            row
+        }
+    }
+
+    @ViewBuilder private var row: some View {
         let checked = actions.isChecked(todo)
         let parts = TodoMeta.parts(for: todo, subtasks: subtasks)
 

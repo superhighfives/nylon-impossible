@@ -142,5 +142,12 @@ final class TodoItem {
         guard let dueDate = dueDate, !isEffectivelyCompleted else { return false }
         return DueDay.isOverdue(dueDate)
     }
-    
+
+    /// Deleted from the store: by a sync, or by another window. On the Mac
+    /// each board column is its own view graph, so a row can redraw with a
+    /// deleted todo before the query drops it, and reading an attribute it
+    /// hadn't loaded yet traps (NYLON-IMPOSSIBLE-APPLE-Y). Check this first.
+    var isGone: Bool {
+        isDeleted || modelContext == nil
+    }
 }
