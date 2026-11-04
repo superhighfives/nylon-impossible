@@ -20,6 +20,7 @@ import { Composer } from "./Composer";
 import { ContextMenu } from "./ContextMenu";
 import { DetailSheet } from "./DetailSheet";
 import { DonePage } from "./DonePage";
+import { EmptyLine } from "./EmptyLine";
 import { BackButton, Masthead } from "./Masthead";
 import {
   boardViewKey,
@@ -382,15 +383,15 @@ export function PhoneApp({
           : null;
     const waiting = next ? rowsFor(byKind[next.kind]?.id).length : 0;
     return (
-      <div className="px-5 py-7">
-        <p className="m-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
-          {next?.text ?? "Nothing here yet."}
-        </p>
+      // Where the first row would sit (PhoneRows' top), the link under the
+      // line's words.
+      <div className="px-5 pt-2 pb-7 text-n-ink-muted">
+        <EmptyLine text={next?.text ?? "Nothing here yet."} density="phone" />
         {next && waiting > 0 && (
           <button
             type="button"
             onClick={() => goTo(next.index)}
-            className="mt-2 -ml-0.5 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
+            className="ml-9.5 inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
           >
             {waiting} waiting in {next.name}
             <ArrowRight size={15} aria-hidden="true" />

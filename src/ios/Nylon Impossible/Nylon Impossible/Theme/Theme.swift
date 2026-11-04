@@ -234,6 +234,7 @@ enum Theme {
         static let add = "plus" // lucide: Plus
         static let done = "checkmark" // lucide: Check
         static let doneCircle = "checkmark.circle" // lucide: CheckCircle2
+        static let empty = "circle.dashed" // lucide: CircleDashed
         static let close = "xmark" // lucide: X
         static let remove = "minus" // lucide: Minus
         static let pin = "pin.fill" // lucide: Pin

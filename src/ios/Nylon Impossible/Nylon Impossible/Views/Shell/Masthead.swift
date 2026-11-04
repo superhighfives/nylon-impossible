@@ -94,19 +94,42 @@ extension Masthead where Accessory == EmptyView {
     }
 }
 
-/// The written empty state: "Nothing today." and, when there's somewhere to
-/// go, "4 waiting in This week →".
+/// The written empty state, drawn as a row: a muted dashed circle in the
+/// check's slot and "Nothing today." at a row title's size, so it sits where
+/// the first todo will and that todo takes its place without moving
+/// anything. When there's somewhere to go, "4 waiting in This week →" sits
+/// under the words.
 struct EmptyLine: View {
     let text: String
     var link: (text: String, action: () -> Void)?
 
     @Environment(\.isWideLayout) private var isWide
+    /// Grows the circle with Dynamic Type, as `Checkbox` grows its box.
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
+
+    /// The circle's size: the checkbox's drawn box.
+    private var drawn: CGFloat { Theme.Phone.checkbox * min(max(scale, 1), 1.6) }
+    /// Where a row's title starts: the checkbox's slot (its box plus what
+    /// its target overhangs on the trailing side), then the row's spacing.
+    private var textInset: CGFloat { drawn + Theme.Space.s1 + Theme.Space.s3 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s2) {
-            Text(text)
-                .textStyle(Theme.Fonts.Role.listName, tracking: Theme.Tracking.title)
-                .foregroundStyle(Theme.Colors.ink)
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: Theme.Space.s3) {
+                Image(systemName: Theme.Icon.empty)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: drawn, height: drawn)
+                    .padding(.trailing, Theme.Space.s1)
+                    .accessibilityHidden(true)
+                Text(text)
+                    .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle)
+                    .fontWeight(.regular)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .foregroundStyle(Theme.Colors.inkMuted)
+            .padding(.vertical, Theme.Space.s3)
+            .frame(minHeight: Theme.Space.rowMinHeight)
             if let link {
                 Button(action: link.action) {
                     HStack(spacing: Theme.Space.s1) {
@@ -121,10 +144,11 @@ struct EmptyLine: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .padding(.leading, textInset)
             }
         }
         .padding(.horizontal, isWide ? Theme.Wide.gutter : Theme.Phone.gutter)
-        .padding(.vertical, Theme.Space.s6)
+        .padding(.bottom, link == nil ? 0 : Theme.Space.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

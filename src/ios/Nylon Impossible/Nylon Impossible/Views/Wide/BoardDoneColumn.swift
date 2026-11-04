@@ -56,6 +56,14 @@ struct BoardDoneColumn: View {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     let groups = groups
                     if groups.isEmpty {
+                        // The "+ Add" row's height: Done has no composer, so
+                        // its line sits level with the first row beside it.
+                        Text(verbatim: " ")
+                            .textStyle(Theme.Fonts.Role.bodyWide)
+                            .padding(.vertical, Theme.Space.s3)
+                            .frame(minHeight: Theme.Space.rowMinHeight)
+                            .hidden()
+                            .accessibilityHidden(true)
                         EmptyLine(text: "Nothing done yet.")
                     }
                     ForEach(groups) { group in

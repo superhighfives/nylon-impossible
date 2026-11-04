@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
 import type { TodoWithUrls } from "@/types/database";
+import { EmptyLine } from "./EmptyLine";
 import { Masthead } from "./Masthead";
 import { displayTitle, groupDoneByDay, mastheadSubline } from "./model";
 
@@ -36,9 +37,9 @@ export function DonePage({
           Loading…
         </p>
       ) : groups.length === 0 ? (
-        <p className="mx-5 mt-7 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink">
-          Nothing done yet.
-        </p>
+        <div className="px-5 pt-2 text-n-ink-muted">
+          <EmptyLine text="Nothing done yet." density="phone" />
+        </div>
       ) : (
         groups.map((group) => (
           <section key={group.label} className="px-5 pt-[1.125rem] pb-1">
