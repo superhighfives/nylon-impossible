@@ -63,42 +63,62 @@ private struct FeedbackPresentationModifier: ViewModifier {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.openURL) private var openURL
+    @State private var viewport: CGSize?
 
+    /// The service while feedback is on, nil while it's off.
+    private var active: FeedbackService? { isEnabled ? feedback : nil }
+
+    /// One view tree whether feedback is on or off. `isAdmin` only arrives
+    /// with `/users/me`, after the first sync, so an `if` here would swap
+    /// the whole screen out under you a second after launch, and the
+    /// composer's keyboard with it (#568).
     func body(content: Content) -> some View {
-        if let feedback, isEnabled {
-            content
-                .onChange(of: screen, initial: true) { _, screen in feedback.screen = screen }
-                .onChange(of: colorScheme, initial: true) { _, scheme in feedback.colorScheme = scheme }
-                .onGeometryChange(for: CGSize.self) { $0.size } action: { feedback.viewport = $0 }
-                .onChange(of: feedback.lastFiled) { _, filed in
-                    guard let filed else { return }
-                    feedback.lastFiled = nil
-                    toasts.show("Filed #\(filed.issueNumber)", actionLabel: "View", action: {
-                        openURL(filed.issueUrl)
-                    })
-                }
-                #if os(macOS)
-                .sheet(isPresented: Bindable(feedback).isPresented) {
+        content
+            .onChange(of: isEnabled, initial: true) { _, _ in
+                guard let active else { return }
+                active.screen = screen
+                active.colorScheme = colorScheme
+                if let viewport { active.viewport = viewport }
+            }
+            .onChange(of: screen) { _, screen in active?.screen = screen }
+            .onChange(of: colorScheme) { _, scheme in active?.colorScheme = scheme }
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+                viewport = size
+                active?.viewport = size
+            }
+            .onChange(of: active?.lastFiled) { _, filed in
+                guard let active, let filed else { return }
+                active.lastFiled = nil
+                toasts.show("Filed #\(filed.issueNumber)", actionLabel: "View", action: {
+                    openURL(filed.issueUrl)
+                })
+            }
+            #if os(macOS)
+            .sheet(isPresented: Binding(
+                get: { active?.isPresented ?? false },
+                set: { active?.isPresented = $0 }
+            )) {
+                if let feedback {
                     FeedbackSheet(feedback: feedback) { feedback.isPresented = false }
                 }
-                #else
-                .onChange(of: feedback.isPresented) { _, presented in
-                    if presented {
-                        FeedbackPresenter.present(feedback)
-                    } else {
-                        FeedbackPresenter.dismiss()
-                    }
+            }
+            #else
+            // Feedback turning off reads as nil here, so an open sheet
+            // closes with it rather than outliving the flag.
+            .onChange(of: active?.isPresented) { _, presented in
+                if presented == true, let active {
+                    FeedbackPresenter.present(active)
+                } else {
+                    FeedbackPresenter.dismiss()
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
-                    guard !feedback.isPresented, let snapshot = FeedbackPresenter.snapshotKeyWindow() else { return }
-                    FeedbackPill.show {
-                        feedback.present(with: snapshot.image, viewport: snapshot.size)
-                    }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
+                guard let active, !active.isPresented, let snapshot = FeedbackPresenter.snapshotKeyWindow() else { return }
+                FeedbackPill.show {
+                    active.present(with: snapshot.image, viewport: snapshot.size)
                 }
-                #endif
-        } else {
-            content
-        }
+            }
+            #endif
     }
 }
 
