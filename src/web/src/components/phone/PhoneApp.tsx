@@ -1,3 +1,4 @@
+import { DndContext, DragOverlay } from "@dnd-kit/core";
 import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, Check, ChevronRight, Plus } from "lucide-react";
@@ -9,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { DragPreview } from "@/components/wide/useBoardDrag";
 import { useHints } from "@/hooks/useHints";
 import { useCreateList } from "@/hooks/useLists";
 import type { TodoWithUrls } from "@/types/database";
@@ -30,9 +32,10 @@ import {
   viewForKey,
 } from "./model";
 import { OvernightPill, useOvernightNote } from "./OvernightNote";
+import { PhoneRows } from "./PhoneRows";
 import { SettingsScreen } from "./SettingsScreen";
-import { TodoRow } from "./TodoRow";
 import { useBoardData } from "./useBoardData";
+import { usePhoneDrag } from "./usePhoneDrag";
 
 const EMPTY: TodoWithUrls[] = [];
 
@@ -102,6 +105,12 @@ export function PhoneApp({
    * trackpad takes over, or the scroll ends somewhere else.
    */
   const scrollingTo = useRef<number | null>(null);
+
+  const drag = usePhoneDrag({
+    rowsFor,
+    place: actions.place,
+    onLiftMove: () => setMenuId(null),
+  });
 
   const now = new Date();
   const overnight = useOvernightNote(todos, byKind.today?.id);
@@ -302,7 +311,7 @@ export function PhoneApp({
   }, [detailId, detailTodo, todosLoading]);
 
   const renderRows = (listId: string | undefined, emptyFor: PageKey | null) => {
-    const rows = rowsFor(listId);
+    const rows = listId ? drag.ordered(listId, rowsFor(listId)) : EMPTY;
     if (loading) {
       return (
         <p
@@ -330,25 +339,26 @@ export function PhoneApp({
         </div>
       );
     }
-    if (rows.length === 0) return renderEmpty(emptyFor);
+    if (!listId || rows.length === 0) return renderEmpty(emptyFor);
     return (
-      <ul className="pt-2">
-        {rows.map((todo) => (
-          <TodoRow
-            key={todo.id}
-            todo={todo}
-            subtasks={subtasksOf(todo.id)}
-            now={now}
-            timeZone={timeZone}
-            checked={actions.checked.has(todo.id)}
-            collapsing={actions.collapsing.has(todo.id)}
-            highlighted={menuId === todo.id}
-            onCheck={actions.complete}
-            onOpen={(t) => setDetailId(t.id)}
-            onMenu={(t) => setMenuId(t.id)}
-          />
-        ))}
-      </ul>
+      <PhoneRows
+        listId={listId}
+        rows={rows}
+        drag={drag.drag}
+        settleFrom={drag.settleFrom(listId)}
+        animate={reducedMotion !== "reduce"}
+        subtasksOf={subtasksOf}
+        checked={actions.checked}
+        collapsing={actions.collapsing}
+        highlightedId={menuId}
+        now={now}
+        timeZone={timeZone}
+        onCheck={actions.complete}
+        onOpen={(t) => {
+          if (!drag.justDragged.current) setDetailId(t.id);
+        }}
+        onMenu={(t) => setMenuId(t.id)}
+      />
     );
   };
 
@@ -611,31 +621,43 @@ export function PhoneApp({
           />
         </div>
 
-        <div
-          ref={pagerRef}
-          onScroll={onPagerScroll}
-          onPointerDown={releaseScroll}
-          onWheel={releaseScroll}
-          onScrollEnd={releaseScroll}
-          data-phone-ready={loading ? undefined : ""}
-          // Nothing to swipe to while loading, and a scroller with nothing
-          // focusable in it is a dead end for the keyboard.
-          className={`flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-            loading ? "overflow-x-hidden" : "overflow-x-auto"
-          }`}
+        <DndContext
+          sensors={drag.sensors}
+          // Pages scroll up and down under a drag; the pager never swipes.
+          autoScroll={{ threshold: { x: 0, y: 0.2 } }}
+          {...drag.handlers}
         >
-          {PAGES.map((p, i) => (
-            <section
-              key={p.key}
-              id={`phone-page-${p.key}`}
-              aria-label={p.label}
-              inert={i !== pageIndex}
-              className="h-full w-full shrink-0 snap-start snap-always overflow-y-auto overscroll-y-contain pb-40 [scrollbar-width:none]"
-            >
-              {renderPage(p.key)}
-            </section>
-          ))}
-        </div>
+          <div
+            ref={pagerRef}
+            onScroll={onPagerScroll}
+            onPointerDown={releaseScroll}
+            onWheel={releaseScroll}
+            onScrollEnd={releaseScroll}
+            data-phone-ready={loading ? undefined : ""}
+            // Nothing to swipe to while loading, and a scroller with nothing
+            // focusable in it is a dead end for the keyboard.
+            className={`flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+              loading ? "overflow-x-hidden" : "overflow-x-auto"
+            }`}
+          >
+            {PAGES.map((p, i) => (
+              <section
+                key={p.key}
+                id={`phone-page-${p.key}`}
+                aria-label={p.label}
+                inert={i !== pageIndex}
+                className="h-full w-full shrink-0 snap-start snap-always overflow-y-auto overscroll-y-contain pb-40 [scrollbar-width:none]"
+              >
+                {renderPage(p.key)}
+              </section>
+            ))}
+          </div>
+          <DragOverlay dropAnimation={null}>
+            {drag.drag?.mode === "pointer" ? (
+              <DragPreview todo={drag.drag.todo} />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
 
       {currentListId && !detailTodo && (

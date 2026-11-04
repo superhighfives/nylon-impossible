@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { RAISED } from "@/components/ui/styles";
 import type { SystemListKind, TodoWithUrls } from "@/types/database";
 import { Calendar } from "./Calendar";
 import { displayTitle, dueChoices, dueLabel } from "./model";
@@ -83,8 +84,7 @@ const ITEM_CLASS =
 const COMPACT_ITEM_CLASS =
   "flex h-10 w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-3.5 text-left text-[0.9375rem] first:border-t-0 n-focus-soft active:bg-n-fill pointer-fine:hover:bg-n-surface";
 
-const CARD =
-  "overflow-clip rounded-[0.875rem] bg-n-canvas shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] dark:bg-n-fill";
+const CARD = `overflow-clip ${RAISED}`;
 
 const MENU_WIDTH = 288;
 
@@ -230,7 +230,7 @@ export function ContextMenu({
           {current && (
             <>
               <div
-                className={`${compact ? "mb-1.5 px-3.5 py-2.5" : "mb-2.5 px-4 py-3.5"} rounded-[0.875rem] bg-n-canvas shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] dark:bg-n-fill`}
+                className={`${compact ? "mb-1.5 px-3.5 py-2.5" : "mb-2.5 px-4 py-3.5"} ${RAISED}`}
               >
                 <Dialog.Title
                   className={`line-clamp-3 leading-[1.35] font-medium ${compact ? "text-[0.9375rem]" : "text-[1.0625rem]"}`}

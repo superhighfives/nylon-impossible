@@ -12,3 +12,10 @@ export const ICON_BUTTON =
  * `transition-colors`.
  */
 export const ROW_HOVER = "pointer-fine:hover:bg-n-fill/60";
+
+/**
+ * The context menu's raised card: its row preview and item groups, and a
+ * phone row lifted by a long-press.
+ */
+export const RAISED =
+  "rounded-[0.875rem] bg-n-canvas shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] dark:bg-n-fill";

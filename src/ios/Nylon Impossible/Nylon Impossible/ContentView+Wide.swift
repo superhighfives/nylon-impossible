@@ -351,7 +351,7 @@ extension ContentView {
                 composer: composer,
                 onSelect: clickSelect,
                 onOpen: clickOpen,
-                onDrop: { id, row in dropWide(id, on: row, into: list) },
+                onDrop: { id, slot in dropWide(id, at: slot, into: list) },
                 onExternalDrop: { addDropped($0, to: list) },
                 onBackgroundTap: { softFocus(list.id) }
             )
@@ -376,7 +376,7 @@ extension ContentView {
                     get: { renamingColumnId == list.id },
                     set: { renamingColumnId = $0 ? list.id : nil }
                 ),
-                onDrop: { id, row in dropWide(id, on: row, into: list) },
+                onDrop: { id, slot in dropWide(id, at: slot, into: list) },
                 onExternalDrop: { addDropped($0, to: list) },
                 onBackgroundTap: { softFocus(list.id) }
             ) {
@@ -488,19 +488,27 @@ extension ContentView {
         }
     }
 
-    /// A drop on a column moves the todo there; a drop on a row also places
-    /// it just above that row, which is how a column reorders.
-    func dropWide(_ id: UUID, on row: TodoItem?, into list: TodoListModel) {
+    /// A todo dropped on a column, at `slot` among its other rows (unclamped;
+    /// BoardColumn's pointer rule). It lands in that gap, clamped to its
+    /// pinned or unpinned tier, which is also how a column reorders; from
+    /// another column it moves here too, with the toast a move has. Nil is
+    /// the header or the composer: a todo from another column goes to the
+    /// end of its tier, one from this column stays put. A drop that wouldn't
+    /// change the order does nothing.
+    func dropWide(_ id: UUID, at slot: Int?, into list: TodoListModel) {
         guard let todo = todos.first(where: { $0.id == id }) else { return }
-        if todo.listKey?.lowercased() != list.id.lowercased() {
-            actions.move(todo, toList: list.id)
+        let isHere = todo.listKey?.lowercased() == list.id.lowercased()
+        guard let slot = slot ?? (isHere ? nil : Int.max) else { return }
+        let items = rows(list).map { BoardDrop.Item(id: $0.id, pinned: $0.pinned, position: $0.position) }
+        let dragged = BoardDrop.Item(id: todo.id, pinned: todo.pinned, position: todo.position)
+        guard let placement = BoardDrop.placement(items: items, dragged: dragged, slot: slot) else { return }
+        guard isHere else {
+            actions.move(todo, toList: list.id, position: placement.position)
+            return
         }
-        guard let row, row.id != id else { return }
-        let current = rows(list)
-        guard let from = current.firstIndex(where: { $0.id == id }),
-              let to = current.firstIndex(where: { $0.id == row.id }) else { return }
         withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
-            actions.viewModel.moveTodo(from: IndexSet(integer: from), to: to, in: current)
+            todo.position = placement.position
+            todo.markModified()
         }
         actions.edited()
     }

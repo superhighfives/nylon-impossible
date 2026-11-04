@@ -314,11 +314,12 @@ final class TodoActions {
 
     /// Move to another list. `announce` toasts with Undo (the context menu and
     /// drops); the detail sheet's own List chip already shows where it went.
-    func move(_ todo: TodoItem, toList listId: String, announce: Bool = true) {
+    /// `position` places it (a board drop); without one it goes last.
+    func move(_ todo: TodoItem, toList listId: String, position: String? = nil, announce: Bool = true) {
         guard todo.listKey?.lowercased() != listId.lowercased() else { return }
         let snapshot = TodoSnapshot(todo)
         withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
-            viewModel.moveTodoToList(todo, to: listId, allTodos: allTodos())
+            viewModel.moveTodoToList(todo, to: listId, allTodos: allTodos(), position: position)
         }
         save()
         onMutate()
