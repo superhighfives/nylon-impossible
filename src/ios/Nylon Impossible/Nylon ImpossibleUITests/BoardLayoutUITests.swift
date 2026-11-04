@@ -5,7 +5,8 @@
 //  The board's layout, clicked for real: four columns whose fourth rests on
 //  Done, one click selects and a second opens the todo there, the detail
 //  follows the selection, your list opens in the fourth column (and × goes
-//  back to Done), and deleting a list happens straight away with Undo.
+//  back to Done), deleting a list happens straight away with Undo, and the
+//  account sits at the foot of the sidebar, under Keyboard shortcuts.
 //  iPad only; skipped on iPhone.
 //
 
@@ -29,6 +30,16 @@ final class BoardLayoutUITests: NylonUITestCase {
     func testTheFourthColumnRestsOnDone() {
         waitFor(app.staticTexts["Finished todos, by day"])
         XCTAssertTrue(sidebar("Done").isSelected)
+    }
+
+    func testTheAccountSitsUnderKeyboardShortcuts() {
+        // "Keyboard shortcuts, ?" and "Account, <name>": each button reads
+        // its whole label.
+        let shortcuts = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Keyboard shortcuts")).firstMatch
+        let account = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Account")).firstMatch
+        waitFor(shortcuts)
+        waitFor(account)
+        XCTAssertGreaterThanOrEqual(account.frame.minY, shortcuts.frame.maxY)
     }
 
     func testOneClickSelectsAndASecondOpens() {
