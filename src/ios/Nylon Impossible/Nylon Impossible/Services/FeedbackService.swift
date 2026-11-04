@@ -279,6 +279,9 @@ final class FeedbackService {
     var isPresented = false
     var text = ""
     private(set) var images: [FeedbackImage] = []
+    /// Changes when the draft is discarded, so an image still encoding for
+    /// the old one doesn't land in the next.
+    private(set) var draft = UUID()
     private(set) var isSubmitting = false
     var errorMessage: String?
     /// The issue just filed, for the "Filed #N" toast. Cleared once shown.
@@ -308,23 +311,25 @@ final class FeedbackService {
     }
 
     func add(_ image: CGImage) async {
+        let draft = draft
         guard canAddImages, let encoded = await Self.encode(image) else { return }
-        append(encoded)
+        append(encoded, to: draft)
     }
 
     func add(data: Data) async {
+        let draft = draft
         guard canAddImages else { return }
         guard let encoded = await Self.encode(data: data) else {
-            errorMessage = "That image couldn’t be read."
+            if draft == self.draft { errorMessage = "That image couldn’t be read." }
             return
         }
-        append(encoded)
+        append(encoded, to: draft)
     }
 
     /// Checked again here: other images may have landed while this one was
-    /// encoding.
-    private func append(_ image: FeedbackImage) {
-        guard canAddImages else { return }
+    /// encoding, and the draft it was added to may have been discarded.
+    func append(_ image: FeedbackImage, to draft: UUID) {
+        guard draft == self.draft, canAddImages else { return }
         images.append(image)
     }
 
@@ -363,6 +368,7 @@ final class FeedbackService {
     func discard() {
         text = ""
         images = []
+        draft = UUID()
         errorMessage = nil
         isPresented = false
     }

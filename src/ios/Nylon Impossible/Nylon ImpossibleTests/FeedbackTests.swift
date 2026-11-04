@@ -206,6 +206,29 @@ struct FeedbackTests {
         #expect(feedback.canAddImages == false)
     }
 
+    @Test("An image still encoding when the draft is discarded doesn't land in the next one")
+    func lateImageAfterDiscard() async throws {
+        let feedback = FeedbackService(apiService: MockAPIService())
+        let image = try #require(Self.solidImage(width: 4, height: 4))
+        let encoded = try #require(FeedbackImageEncoder.encode(image))
+        let staleDraft = feedback.draft
+        feedback.discard()
+        feedback.append(encoded, to: staleDraft)
+        #expect(feedback.images.isEmpty)
+        feedback.append(encoded, to: feedback.draft)
+        #expect(feedback.images.count == 1)
+    }
+
+    @Test("Images added at once stop at four")
+    func concurrentImageLimit() async throws {
+        let feedback = FeedbackService(apiService: MockAPIService())
+        let image = try #require(Self.solidImage(width: 4, height: 4))
+        await withTaskGroup(of: Void.self) { group in
+            for _ in 0..<8 { group.addTask { await feedback.add(image) } }
+        }
+        #expect(feedback.images.count == FeedbackService.maxImages)
+    }
+
     private static func solidImage(width: Int, height: Int) -> CGImage? {
         guard let context = CGContext(
             data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
