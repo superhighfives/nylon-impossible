@@ -147,9 +147,9 @@ final class TodoItem {
     /// each board column is its own view graph, so a row can redraw with a
     /// deleted todo before the query drops it, and reading an attribute it
     /// hadn't loaded yet traps (NYLON-IMPOSSIBLE-APPLE-Y). Check this first.
-    /// A todo that was never inserted has no context either, but its id is
-    /// still temporary, so it isn't gone.
+    /// A todo that was never inserted has no context either, but its id has no
+    /// store identifier yet, so it isn't gone.
     var isGone: Bool {
-        isDeleted || (modelContext == nil && !persistentModelID.isTemporary)
+        isDeleted || (modelContext == nil && persistentModelID.storeIdentifier != nil)
     }
 }
