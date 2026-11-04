@@ -65,7 +65,7 @@ struct FeedbackSheet: View {
             Task {
                 for item in items {
                     if let data = try? await item.loadTransferable(type: Data.self) {
-                        feedback.add(data: data)
+                        await feedback.add(data: data)
                     }
                 }
             }

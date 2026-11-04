@@ -152,20 +152,30 @@ struct FeedbackResult: Decodable, Equatable, Sendable {
 // MARK: - Images
 
 /// A screenshot ready to send, already encoded within the API's limits.
-struct FeedbackImage: Identifiable, Equatable {
+nonisolated struct FeedbackImage: Identifiable, Equatable, Sendable {
     let id = UUID()
     let data: Data
     let contentType: String
     let pixelSize: CGSize
+    /// A small copy for the sheet, decoded once. Drawing `data` instead
+    /// decoded the full screenshot on every redraw of the sheet, which is
+    /// every keystroke, and hung the Mac (NYLON-IMPOSSIBLE-APPLE-E).
+    let thumbnail: CGImage
+
+    static func == (lhs: FeedbackImage, rhs: FeedbackImage) -> Bool { lhs.id == rhs.id }
 }
 
 /// Screenshots go up as PNG — text stays crisp — unless that's over the
 /// API's 5 MB cap, when they go as JPEG. Anything with a long edge over
 /// 2400px is scaled down first; a 6.9" iPhone screenshot is 2868px tall.
-enum FeedbackImageEncoder {
+/// Encoding takes a while, so `FeedbackService` runs it off the main actor.
+nonisolated enum FeedbackImageEncoder {
     static let maxBytes = 5 * 1024 * 1024
     static let maxLongEdge: CGFloat = 2400
     static let jpegQuality: CGFloat = 0.85
+    /// The thumbnail's long edge: the sheet shows it 160pt tall, so this
+    /// stays sharp at 2x and 3x.
+    static let thumbnailLongEdge: CGFloat = 480
 
     /// The size to draw `size` at: unchanged if it fits, otherwise scaled so
     /// the long edge is `maxLongEdge`.
@@ -197,7 +207,14 @@ enum FeedbackImageEncoder {
             png: write(scaled, type: .png, quality: nil),
             jpeg: { write(scaled, type: .jpeg, quality: $0) }
         ) else { return nil }
-        return FeedbackImage(data: chosen.data, contentType: chosen.contentType, pixelSize: target)
+        let thumbnailSize = targetSize(for: target, maxLongEdge: thumbnailLongEdge)
+        guard let thumbnail = thumbnailSize == target ? scaled : resize(scaled, to: thumbnailSize) else { return nil }
+        return FeedbackImage(
+            data: chosen.data,
+            contentType: chosen.contentType,
+            pixelSize: target,
+            thumbnail: thumbnail
+        )
     }
 
     /// Image data from the Photos picker, the pasteboard or a drop. Decoded
@@ -244,11 +261,7 @@ enum FeedbackImageEncoder {
 
 extension Image {
     init(feedbackImage: FeedbackImage) {
-        #if os(macOS)
-        self.init(nsImage: NSImage(data: feedbackImage.data) ?? NSImage())
-        #else
-        self.init(uiImage: UIImage(data: feedbackImage.data) ?? UIImage())
-        #endif
+        self.init(decorative: feedbackImage.thumbnail, scale: 1)
     }
 }
 
@@ -266,6 +279,9 @@ final class FeedbackService {
     var isPresented = false
     var text = ""
     private(set) var images: [FeedbackImage] = []
+    /// Changes when the draft is discarded, so an image still encoding for
+    /// the old one doesn't land in the next.
+    private(set) var draft = UUID()
     private(set) var isSubmitting = false
     var errorMessage: String?
     /// The issue just filed, for the "Filed #N" toast. Cleared once shown.
@@ -286,26 +302,43 @@ final class FeedbackService {
         !isSubmitting && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Open the sheet, attaching `image` (a window snapshot) if there is one.
-    func present(with image: CGImage? = nil, viewport: CGSize? = nil) {
-        if let image { add(image) }
+    /// Open the sheet. A window snapshot goes through `add(_:)` after, so
+    /// the sheet doesn't wait for it to encode.
+    func present(viewport: CGSize? = nil) {
         if let viewport { self.viewport = viewport }
         errorMessage = nil
         isPresented = true
     }
 
-    func add(_ image: CGImage) {
-        guard canAddImages, let encoded = FeedbackImageEncoder.encode(image) else { return }
-        images.append(encoded)
+    func add(_ image: CGImage) async {
+        let draft = draft
+        guard canAddImages, let encoded = await Self.encode(image) else { return }
+        append(encoded, to: draft)
     }
 
-    func add(data: Data) {
+    func add(data: Data) async {
+        let draft = draft
         guard canAddImages else { return }
-        guard let encoded = FeedbackImageEncoder.encode(data: data) else {
-            errorMessage = "That image couldn’t be read."
+        guard let encoded = await Self.encode(data: data) else {
+            if draft == self.draft { errorMessage = "That image couldn’t be read." }
             return
         }
-        images.append(encoded)
+        append(encoded, to: draft)
+    }
+
+    /// Checked again here: other images may have landed while this one was
+    /// encoding, and the draft it was added to may have been discarded.
+    func append(_ image: FeedbackImage, to draft: UUID) {
+        guard draft == self.draft, canAddImages else { return }
+        images.append(image)
+    }
+
+    @concurrent private nonisolated static func encode(_ image: CGImage) async -> FeedbackImage? {
+        FeedbackImageEncoder.encode(image)
+    }
+
+    @concurrent private nonisolated static func encode(data: Data) async -> FeedbackImage? {
+        FeedbackImageEncoder.encode(data: data)
     }
 
     /// Images from the pasteboard or a drop. Loaded one at a time, in order.
@@ -314,7 +347,7 @@ final class FeedbackService {
         guard !images.isEmpty else { return }
         Task { [weak self] in
             for provider in images {
-                if let data = await Self.imageData(from: provider) { self?.add(data: data) }
+                if let data = await Self.imageData(from: provider) { await self?.add(data: data) }
             }
         }
     }
@@ -335,6 +368,7 @@ final class FeedbackService {
     func discard() {
         text = ""
         images = []
+        draft = UUID()
         errorMessage = nil
         isPresented = false
     }

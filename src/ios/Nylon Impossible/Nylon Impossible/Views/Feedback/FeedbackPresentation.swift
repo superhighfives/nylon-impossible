@@ -51,7 +51,8 @@ extension FeedbackService {
         #else
         let snapshot = FeedbackPresenter.snapshotKeyWindow()
         #endif
-        present(with: snapshot?.image, viewport: snapshot?.size)
+        present(viewport: snapshot?.size)
+        if let image = snapshot?.image { Task { await add(image) } }
     }
 }
 
@@ -115,7 +116,8 @@ private struct FeedbackPresentationModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.userDidTakeScreenshotNotification)) { _ in
                 guard let active, !active.isPresented, let snapshot = FeedbackPresenter.snapshotKeyWindow() else { return }
                 FeedbackPill.show {
-                    active.present(with: snapshot.image, viewport: snapshot.size)
+                    active.present(viewport: snapshot.size)
+                    Task { await active.add(snapshot.image) }
                 }
             }
             #endif
