@@ -2,7 +2,13 @@
 export interface Tokens {
   color: Record<
     string,
-    { light: string; dark: string; source: string; usage: string }
+    {
+      light: string;
+      dark: string;
+      alpha?: number;
+      source: string;
+      usage: string;
+    }
   >;
   // biome-ignore lint/suspicious/noExplicitAny: the rest of the token tree is only read by the generator
   [key: string]: any;

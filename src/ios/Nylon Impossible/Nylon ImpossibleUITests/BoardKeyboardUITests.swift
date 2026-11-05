@@ -120,7 +120,7 @@ final class BoardKeyboardUITests: NylonUITestCase {
         XCTAssertEqual(app.textFields["Title"].firstMatch.value as? String, "Review PR for the sync engine")
     }
 
-    func testNOpensQuickAddAndTypingIsNotAShortcut() {
+    func testNTypesInTheColumnsAddAndTypingIsNotAShortcut() {
         // Known: Esc doesn't reach the app when XCUITest simulates it on
         // iPad, as with Return and Backspace below. Log markers showed no Esc
         // at onKeyPress, and the board's Esc key command (`EscapeKey`) didn't
@@ -128,12 +128,11 @@ final class BoardKeyboardUITests: NylonUITestCase {
         // Expected to fail until then; it passes if fixed.
         XCTExpectFailure("Esc isn't delivered to the app under XCUITest", strict: false)
         press("j")
+        // n is "add here": typing in Today's Add, not quick add.
         press("n")
-        let field = app.textFields["New todo"].firstMatch
+        let field = app.textFields.matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
         waitFor(field)
-        let focused = NSPredicate(format: "hasKeyboardFocus == true")
-        expectation(for: focused, evaluatedWith: field)
-        waitForExpectations(timeout: 3)
+        XCTAssertFalse(app.staticTexts["Return adds and keeps this open · Esc closes"].exists)
 
         // j, k, x, p, 1 are letters here, not commands.
         app.typeText("jkxp1")
@@ -142,12 +141,20 @@ final class BoardKeyboardUITests: NylonUITestCase {
         // would match the sidebar's Done entry.)
         XCTAssertFalse(app.buttons["Undo"].exists)
 
-        // Escape closes quick add and hands the keyboard back to the board.
+        // Esc stops typing and stays on Add; ↓ goes on to the first todo.
         press(XCUIKeyboardKey.escape.rawValue)
-        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: field)
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == false"), evaluatedWith: field)
         waitForExpectations(timeout: 3)
         press("j")
         waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+    }
+
+    func testNInDoneOpensQuickAdd() {
+        // Today, then This week, Someday and Done.
+        for _ in 0..<3 { press(XCUIKeyboardKey.tab.rawValue) }
+        press("n")
+        waitFor(app.staticTexts["Return adds and keeps this open · Esc closes"])
     }
 
     // MARK: - Two levels, jumps, palette
@@ -176,7 +183,7 @@ final class BoardKeyboardUITests: NylonUITestCase {
         XCTAssertEqual(selectedRow.label, first)
     }
 
-    func testEscapeClosesTheTodoThenGoesToTheSidebar() {
+    func testEscapeClosesTheTodoThenStepsOutOfTheColumn() {
         // Known: Esc doesn't reach the app when XCUITest simulates it on
         // iPad, as with Return and Backspace below. Log markers showed no Esc
         // at onKeyPress, and the board's Esc key command (`EscapeKey`) didn't
@@ -191,14 +198,16 @@ final class BoardKeyboardUITests: NylonUITestCase {
         press(XCUIKeyboardKey.escape.rawValue)
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: detail)
         waitForExpectations(timeout: 3)
-        // The selection stays; Esc again goes to the sidebar and deselects.
+        // Back on its row; Esc again steps out to the column, deselecting.
         XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
         press(XCUIKeyboardKey.escape.rawValue)
         expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: selectedRow)
         waitForExpectations(timeout: 3)
-        press("j")
+        // On Today: ← is the sidebar, and → comes back to Today.
+        press("h")
         press("l")
-        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
     }
 
     func testShiftDigitsJumpToColumnsAndLists() {
@@ -263,10 +272,118 @@ final class BoardKeyboardUITests: NylonUITestCase {
 
     func testCommandNWorksWhileTyping() {
         press("n")
-        let field = app.textFields["New todo"].firstMatch
+        let field = app.textFields.matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
         waitFor(field)
         app.typeText("Buy stamps")
+        // ⌘N is always quick add, even from a column's Add.
         press("n", .command)
-        XCTAssertEqual(field.value as? String, "Buy stamps")
+        waitFor(app.staticTexts["Return adds and keeps this open · Esc closes"])
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "value == 'Buy stamps'")).firstMatch.exists)
+    }
+
+    // MARK: - Sections
+
+    private func tab(_ times: Int = 1, back: Bool = false) {
+        for _ in 0..<times { press(XCUIKeyboardKey.tab.rawValue, back ? .shift : []) }
+    }
+
+    func testTabVisitsTheSectionsInOrderAndWraps() {
+        // On Today at launch. Each Tab lands on a section with nothing
+        // selected; j steps in at its first todo.
+        tab()
+        press("j")
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+        tab()
+        XCTAssertFalse(selectedRow.exists)
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Repaint the hallway")
+        // Done, the sidebar, then round to Today and This week: six in all.
+        tab(3)
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+        tab()
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+    }
+
+    func testShiftTabGoesBackAndWraps() {
+        // From Today: the sidebar, Done, then Someday.
+        tab(3, back: true)
+        press("j")
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Repaint the hallway")
+        tab(back: true)
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+        tab(back: true)
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+        // The sixth goes round to the sidebar; → from it is Today.
+        tab(back: true)
+        XCTAssertFalse(selectedRow.exists)
+        press("l")
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+    }
+
+    func testLeftAndRightOnASectionMoveToTheNextSection() {
+        // This week, then ← to Today and → back.
+        tab()
+        press("h")
+        press("j")
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Review PR for the sync engine")
+    }
+
+    func testUpFromTheFirstTodoReachesAddAndDownComesBack() {
+        tab()
+        press("j")
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+        // ↑ to Add: no row is selected.
+        press("k")
+        XCTAssertFalse(selectedRow.exists)
+        press("j")
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+    }
+
+    func testNOnASectionTypesInItsAdd() {
+        tab()
+        press("n")
+        let field = app.textFields.matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch
+        waitFor(field)
+        app.typeText("Stamps")
+        XCTAssertEqual(field.value as? String, "Stamps")
+    }
+
+    func testReturnOpensTheTodoWithoutEditingItAndRowKeysActOnIt() {
+        // Known: Return doesn't reach the board under XCUITest on iPad (see
+        // testReturnOpensTheDetail). Expected to fail until then.
+        XCTExpectFailure("Return/Esc are taken by the system before the board", strict: false)
+        tab()
+        press(XCUIKeyboardKey.return.rawValue)
+        waitFor(selectedRow)
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
+        press(XCUIKeyboardKey.return.rawValue)
+        let title = app.textFields["Title"].firstMatch
+        waitFor(title)
+        // On the todo, not in it: p pins and nothing is typed.
+        XCTAssertFalse(NSPredicate(format: "hasKeyboardFocus == true").evaluate(with: title))
+        press("p")
+        expectation(for: NSPredicate(format: "value BEGINSWITH 'Pinned'"), evaluatedWith: row("Send invoice to Pika"))
+        waitForExpectations(timeout: 3)
+        XCTAssertEqual(title.value as? String, "Send invoice to Pika")
+        // Return steps in to the title; Esc out; Esc again closes, on the row.
+        press(XCUIKeyboardKey.return.rawValue)
+        expectation(for: NSPredicate(format: "hasKeyboardFocus == true"), evaluatedWith: title)
+        waitForExpectations(timeout: 3)
+        press(XCUIKeyboardKey.tab.rawValue)
+        XCTAssertFalse(NSPredicate(format: "hasKeyboardFocus == true").evaluate(with: title))
+        press(XCUIKeyboardKey.escape.rawValue)
+        press(XCUIKeyboardKey.escape.rawValue)
+        expectation(for: NSPredicate(format: "exists == false"), evaluatedWith: title)
+        waitForExpectations(timeout: 3)
+        XCTAssertEqual(selectedRow.label, "Send invoice to Pika")
     }
 }

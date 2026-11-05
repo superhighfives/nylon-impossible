@@ -53,6 +53,9 @@ struct Composer: View {
     /// list below (`onDown`).
     var menuBarKeys = false
     var onDown: (() -> Void)?
+    /// The board's Tab and ⇧Tab (true) while typing: stop, and go to the
+    /// next or previous section.
+    var onTab: ((_ back: Bool) -> Void)?
 
     @State private var keepWords = false
     @State private var wasFocused = false
@@ -154,6 +157,11 @@ struct Composer: View {
                 return .handled
             }
             .onKeyPress(keys: [.tab], phases: .down) { press in
+                if let onTab {
+                    isFocused = false
+                    onTab(press.modifiers.contains(.shift))
+                    return .handled
+                }
                 guard menuBarKeys, hasDraft, !lists.isEmpty else { return .ignored }
                 let at = lists.firstIndex { $0.id == targetId } ?? 0
                 let step = press.modifiers.contains(.shift) ? -1 : 1

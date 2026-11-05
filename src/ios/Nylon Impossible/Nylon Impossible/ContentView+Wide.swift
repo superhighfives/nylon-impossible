@@ -179,6 +179,7 @@ extension ContentView {
                 #endif
             } : nil
         )
+        .sectionOutline(showsOutline(.sidebar))
     }
 
     var board: some View {
@@ -212,6 +213,7 @@ extension ContentView {
                         HStack(spacing: 0) {
                             if index > 0 { VerticalHairline() }
                             column(list, derived: derived)
+                                .sectionOutline(showsOutline(.column(list.id)))
                         }
                         // Sized in layout, not in body: resizing the window or
                         // collapsing the sidebar animates the width every
@@ -274,6 +276,8 @@ extension ContentView {
         .focusEffectDisabled()
         .onKeyPress(phases: .down) { press in
             guard editingColumnId == nil, renamingColumnId == nil, palette == nil else { return .ignored }
+            // Editing the open todo, its fields have the keys; only Esc is the board's.
+            guard !detailEditing || press.key == .escape else { return .ignored }
             if let key = takeGo(press.characters) {
                 perform(key)
                 return .handled
@@ -311,16 +315,25 @@ extension ContentView {
                 apiService: syncService.apiService,
                 userId: authService.userId,
                 showsCalendar: showsDueCalendar,
-                onClose: closeDetail
+                onClose: closeDetail,
+                focusTitle: $detailFocusRequest,
+                onEditingChange: detailEditingChanged
             )
             .background(Theme.Colors.surface)
-            // Esc closes the open todo even while its fields have focus.
+            // Esc while a field has focus steps out to the todo.
             .onKeyPress(.escape) {
-                closeDetail()
+                perform(.back)
                 return .handled
             }
+            #if os(iOS)
+            // A tap in the detail is a pointer press (the Mac's monitor
+            // sees its clicks).
+            .simultaneousGesture(TapGesture().onEnded { selectsByKeyboard = false })
+            #endif
+            .sectionOutline(showsOutline(.detail))
         } else if let list = openList {
             column(list, derived: derived)
+                .sectionOutline(showsOutline(.column(list.id)))
         } else {
             BoardDoneColumn(
                 todos: doneTodos,
@@ -329,6 +342,24 @@ extension ContentView {
                 onSelect: clickSelect,
                 onRestore: { actions.restoreFromDone($0) }
             )
+            .sectionOutline(showsOutline(.column(Self.doneColumn)))
+        }
+    }
+
+    /// One of the open todo's fields took the cursor, or let go of it.
+    func detailEditingChanged(_ editing: Bool) {
+        detailEditing = editing
+        if editing {
+            sidebarCursor = nil
+            keySection = .detail
+            return
+        }
+        // Return in the title, or Esc: the board takes the keyboard back,
+        // unless the cursor went on to another field (a column's Add).
+        Task { @MainActor in
+            guard !detailEditing, editingColumnId == nil, renamingColumnId == nil, palette == nil,
+                  !showsQuickAdd, newListAnchor == nil else { return }
+            boardFocused = true
         }
     }
 
@@ -349,6 +380,7 @@ extension ContentView {
                 overnight: kind == .today ? overnightText.map { ($0, seeOvernight, dismissOvernight) } : nil,
                 empty: wideEmpty(kind, counts: derived.counts),
                 composer: composer,
+                addSelected: addSelected(list.id),
                 onSelect: clickSelect,
                 onOpen: clickOpen,
                 onDrop: { id, slot in dropWide(id, at: slot, into: list) },
@@ -369,6 +401,7 @@ extension ContentView {
                 overnight: nil,
                 empty: ("Nothing here yet.", nil),
                 composer: composer,
+                addSelected: addSelected(list.id),
                 onSelect: clickSelect,
                 onOpen: clickOpen,
                 onRename: { rename(list, to: $0) },
@@ -395,6 +428,11 @@ extension ContentView {
         }
     }
 
+    /// The keyboard is on this column's Add, not typing in it.
+    func addSelected(_ id: String) -> Bool {
+        addCursor == id && editingColumnId != id && selectsByKeyboard && currentSection == .column(id)
+    }
+
     func columnComposer(_ list: TodoListModel) -> Composer {
         let id = list.id
         return Composer(
@@ -412,12 +450,24 @@ extension ContentView {
                 if focused {
                     editingColumnId = id
                     focusedColumnId = id
+                    // The keyboard is on this Add, typing; Esc leaves it there.
+                    sidebarCursor = nil
+                    selectedTodoId = nil
+                    addCursor = id
+                    keySection = .column(id)
                 } else if editingColumnId == id {
                     editingColumnId = nil
                     boardFocused = true
                 }
             },
-            showsListChips: false
+            showsListChips: false,
+            // The field's Esc stops typing and stays on Add: the board's own
+            // Esc (a key command too) mustn't also step out of the column.
+            onEscape: { lastKey = (.back, Date()) },
+            onTab: { back in
+                selectsByKeyboard = true
+                moveSection(to: BoardSections.cycle(.column(id), by: back ? -1 : 1, in: sectionOrder))
+            }
         )
     }
 

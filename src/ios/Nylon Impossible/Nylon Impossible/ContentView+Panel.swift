@@ -26,7 +26,19 @@ extension ContentView {
             .onChange(of: PanelTodoState(id: detailTodo?.id, done: detailTodo?.isEffectivelyCompleted ?? false)) { old, new in
                 if new.done, !old.done, old.id == new.id { closeDetail() }
             }
-            .onChange(of: selectedTodoId) { _, id in followSelection(id) }
+            .onChange(of: selectedTodoId) { _, id in
+                followSelection(id)
+                // However the selection moved (the palette, a jump), the
+                // keyboard is in its column; the open todo keeps it.
+                if id != nil, keySection != .detail, let column = selectionColumn {
+                    keySection = .column(column)
+                    addCursor = nil
+                }
+            }
+            .onChange(of: keySection) { _, section in
+                if case .column(let id) = section { lastColumnSection = id }
+            }
+            .onPointerPress { selectsByKeyboard = false }
     }
 
     // MARK: - Panel and fourth column
@@ -57,6 +69,8 @@ extension ContentView {
     func closeDetail() {
         detailTodo = nil
         showsDueCalendar = false
+        detailEditing = false
+        if keySection == .detail { keySection = nil }
         boardFocused = true
     }
 
@@ -72,7 +86,10 @@ extension ContentView {
         if let column {
             lastSelected[column] = todo.id
             if column != Self.doneColumn { focusedColumnId = column }
+            keySection = .column(column)
         }
+        sidebarCursor = nil
+        addCursor = nil
         boardFocused = true
     }
 
@@ -89,11 +106,13 @@ extension ContentView {
         openWide(todo)
     }
 
-    /// Open a todo in the fourth column (a second click, or Return).
+    /// Open a todo in the fourth column (a second click, or Return). The
+    /// keyboard follows it there, on the todo rather than in its fields.
     func openWide(_ todo: TodoItem) {
         selectWide(todo)
         showsDueCalendar = false
         detailTodo = todo
+        keySection = .detail
     }
 
     /// While a todo is open, the detail follows the selection.
@@ -108,6 +127,8 @@ extension ContentView {
     func focusColumn(_ id: String) {
         focusedColumnId = id
         scrollColumnId = id
+        keySection = .column(id)
+        addCursor = nil
         boardFocused = true
         guard let list = orderedLists.first(where: { $0.id == id }) else { return }
         let ids = rows(list).map(\.id)
@@ -119,7 +140,9 @@ extension ContentView {
     func softFocus(_ id: String) {
         selectsByKeyboard = false
         sidebarCursor = nil
+        addCursor = nil
         focusedColumnId = id
+        keySection = .column(id)
         selectedTodoId = nil
         boardFocused = true
     }
@@ -146,7 +169,9 @@ extension ContentView {
     var commandHandler: BoardCommandHandler {
         BoardCommandHandler(
             keysEnabled: keyboardEnabled,
-            hasSelection: selectedTodoId.map { id in todos.contains { $0.id == id } } ?? false,
+            // On the open todo the row keys act on it.
+            hasSelection: (selectedTodoId.map { id in todos.contains { $0.id == id } } ?? false)
+                || (currentSection == .detail && detailTodo != nil),
             collections: collections.map { (id: $0.id, name: $0.name) },
             focusedListName: focusedColumn?.name,
             perform: { perform($0) },

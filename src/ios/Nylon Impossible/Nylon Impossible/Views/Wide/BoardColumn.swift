@@ -37,6 +37,9 @@ struct BoardColumn<Accessory: View>: View {
     var overnight: (text: String, see: () -> Void, dismiss: () -> Void)?
     var empty: (text: String, link: (text: String, action: () -> Void)?)
     let composer: Composer
+    /// The keyboard is on Add without typing: it shows as a row selected by
+    /// keyboard does.
+    var addSelected = false
     let onSelect: (TodoItem) -> Void
     let onOpen: (TodoItem) -> Void
     /// Your list's column: rename in place, and Rename in its ⋯ menu.
@@ -69,6 +72,7 @@ struct BoardColumn<Accessory: View>: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     composer
+                        .background { addHighlight }
                         .padding(.horizontal, Theme.Wide.gutter)
                         .onGeometryChange(for: CGFloat.self) {
                             $0.frame(in: .named(Self.rowsSpace)).maxY
@@ -130,6 +134,18 @@ struct BoardColumn<Accessory: View>: View {
             },
             accessory: accessory
         )
+    }
+
+    /// A row's keyboard selection, the `fill` and the `inkMuted` bar,
+    /// behind Add while the keyboard is on it.
+    private var addHighlight: some View {
+        RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
+            .fill(Theme.Colors.fill)
+            .opacity(addSelected ? 1 : 0)
+            .padding(.horizontal, -10)
+            .overlay(alignment: .leading) { RowSelectionBar(isOn: addSelected) }
+            .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: addSelected)
+            .accessibilityHidden(true)
     }
 
     private func row(_ todo: TodoItem) -> some View {
@@ -286,6 +302,7 @@ extension BoardColumn where Accessory == EmptyView {
         overnight: (text: String, see: () -> Void, dismiss: () -> Void)?,
         empty: (text: String, link: (text: String, action: () -> Void)?),
         composer: Composer,
+        addSelected: Bool = false,
         onSelect: @escaping (TodoItem) -> Void,
         onOpen: @escaping (TodoItem) -> Void,
         onDrop: @escaping (UUID, Int?) -> Void,
@@ -295,7 +312,7 @@ extension BoardColumn where Accessory == EmptyView {
         self.init(
             list: list, title: title, subline: subline, rows: rows, subtasks: subtasks, lists: lists,
             actions: actions, selectedId: selectedId, isTinted: false, overnight: overnight, empty: empty,
-            composer: composer, onSelect: onSelect, onOpen: onOpen, onDrop: onDrop,
+            composer: composer, addSelected: addSelected, onSelect: onSelect, onOpen: onOpen, onDrop: onDrop,
             onExternalDrop: onExternalDrop, onBackgroundTap: onBackgroundTap
         ) { EmptyView() }
     }
