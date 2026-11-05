@@ -134,6 +134,14 @@ struct BoardDropOtherColumnTests {
         #expect(empty.drop(foreign, at: nil) != nil)
         #expect(BoardDrop.lineY(rows: [], slot: 0, dragged: foreign.id, y: 300) == nil)
     }
+
+    @Test("An empty column draws the line under the composer, not a fill")
+    func emptyLine() {
+        // Anywhere in the column, the header and composer included.
+        for y in [DropColumn.top - 40, DropColumn.top, 300] as [CGFloat] {
+            #expect(BoardDrop.line(rows: [], dragged: foreign.id, pinned: false, y: y, rowsTop: DropColumn.top) == DropColumn.top)
+        }
+    }
 }
 
 @Suite("Board drop: pinned tier")
@@ -174,10 +182,7 @@ struct BoardDropLineTests {
     let column = DropColumn(unpinned: 3)
 
     private func line(_ dragged: BoardDrop.Item, at y: CGFloat) -> CGFloat? {
-        guard let slot = BoardDrop.target(
-            rows: column.rows, dragged: dragged.id, pinned: dragged.pinned, y: y, rowsTop: DropColumn.top
-        ) else { return nil }
-        return BoardDrop.lineY(rows: column.rows, slot: slot, dragged: dragged.id, y: y)
+        BoardDrop.line(rows: column.rows, dragged: dragged.id, pinned: dragged.pinned, y: y, rowsTop: DropColumn.top)
     }
 
     @Test("From another column: the gap the pointer's half points to")
@@ -199,9 +204,18 @@ struct BoardDropLineTests {
         #expect(line(middle, at: column.upper(0)) == 100)
     }
 
-    @Test("None over the header or the composer")
+    @Test("Over the header or the composer: at the end from another column, none from this one")
     func header() {
-        #expect(line(foreign, at: DropColumn.top - 1) == nil)
+        #expect(line(foreign, at: DropColumn.top - 1) == 220)
+        #expect(line(column.items[0], at: DropColumn.top - 1) == nil)
+    }
+
+    @Test("Over the header, a pinned todo's line ends the pinned rows")
+    func headerPinned() {
+        let tiers = DropColumn(pinned: 2, unpinned: 2)
+        #expect(BoardDrop.line(
+            rows: tiers.rows, dragged: foreignPinned.id, pinned: true, y: DropColumn.top - 1, rowsTop: DropColumn.top
+        ) == 180)
     }
 
     @Test("Rows scrolled out of the lazy stack are placed by order")

@@ -120,6 +120,21 @@ enum BoardDrop {
         }
     }
 
+    /// Where the drop line goes while `dragged` is over a column at `y`:
+    /// the gap it would land in. Over the header or the composer, a todo
+    /// from another column lands at the end of its tier, so the line goes
+    /// there; one from this column stays put, so there's none. In an empty
+    /// column it sits at `rowsTop`. Nil: no line.
+    static func line(rows: [Row], dragged: UUID, pinned: Bool, y: CGFloat, rowsTop: CGFloat) -> CGFloat? {
+        let isHere = rows.contains { $0.id == dragged }
+        let others = rows.filter { $0.id != dragged }.map(\.pinned)
+        guard let slot = target(rows: rows, dragged: dragged, pinned: pinned, y: y, rowsTop: rowsTop)
+            ?? (isHere ? nil : clampToTier(othersPinned: others, pinned: pinned, index: others.count))
+        else { return nil }
+        if rows.isEmpty { return rowsTop }
+        return lineY(rows: rows, slot: slot, dragged: dragged, y: y)
+    }
+
     // MARK: - The new order
 
     /// Where `dragged`, dropped at `slot` of a column whose rows are `items`

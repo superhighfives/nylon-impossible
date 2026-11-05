@@ -11,11 +11,11 @@
 //  todo), into the gap nearest the pointer (BoardDrop): over a row's upper
 //  half, above it; over its lower half, below it; under the last row,
 //  including the bottom padding, last. That's also how rows reorder within a
-//  column. A 2pt line marks the gap while the todo is over the rows; an
-//  empty column, or the header and composer, tint instead, and a drop there
-//  moves a todo from another column to the end and leaves one from this
-//  column where it is. Rows open the wide context menu on long-press or
-//  right-click.
+//  column. A drop on the header or the composer moves a todo from another
+//  column to the end and leaves one from this column where it is. A 2pt
+//  line marks where it will land, and the column itself never tints
+//  (PRINCIPLES.md, States: "Column as a drop target"). Rows open the wide
+//  context menu on long-press or right-click.
 //
 
 import SwiftUI
@@ -56,7 +56,6 @@ struct BoardColumn<Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isTargeted = false
     /// Where the drop line is, in the rows' coordinates; nil for none.
     @State private var dropLine: CGFloat?
     @State private var geometry = DropGeometry()
@@ -100,15 +99,10 @@ struct BoardColumn<Accessory: View>: View {
             } action: { geometry.viewportTop = $0 }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        // The line says where it lands; with no line (an empty column, the
-        // header or the composer) the column tints.
-        .background(isTargeted && dropLine == nil
-            ? Theme.Colors.fill
-            : (isTinted ? Theme.Colors.surface : Theme.Colors.canvas))
+        .background(isTinted ? Theme.Colors.surface : Theme.Colors.canvas)
         .background {
             Color.clear.contentShape(Rectangle()).onTapGesture(perform: onBackgroundTap)
         }
-        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: isTargeted)
         .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.text)
         .coordinateSpace(.named(Self.columnSpace))
         .onDrop(
@@ -204,23 +198,18 @@ struct BoardColumn<Accessory: View>: View {
     }
 
     /// A drag moved over the column (at `location`, in its coordinates), or
-    /// left it (nil). `ours` is false for something from another app.
+    /// left it (nil). `ours` is false for something from another app. Once
+    /// our drag has landed its session is over, so an update that arrives
+    /// after the drop clears the line rather than redrawing it.
     private func hover(_ location: CGPoint?, ours: Bool) {
-        guard let location else {
-            isTargeted = false
-            dropLine = nil
-            return
-        }
-        isTargeted = true
-        guard ours, let drag = TodoDragSession.current else {
+        guard let location, ours, let drag = TodoDragSession.current else {
             dropLine = nil
             return
         }
         let rows = dropRows
         let y = location.y - geometry.rowsOrigin
         let pinned = rows.first { $0.id == drag.id }?.pinned ?? drag.pinned
-        let line = BoardDrop.target(rows: rows, dragged: drag.id, pinned: pinned, y: y, rowsTop: rowsTop)
-            .flatMap { BoardDrop.lineY(rows: rows, slot: $0, dragged: drag.id, y: y) }
+        let line = BoardDrop.line(rows: rows, dragged: drag.id, pinned: pinned, y: y, rowsTop: rowsTop)
         if line != dropLine { dropLine = line }
     }
 
@@ -229,6 +218,7 @@ struct BoardColumn<Accessory: View>: View {
         switch item {
         case .todo(let id):
             TodoDragSession.end()
+            dropLine = nil
             let y = location.y - geometry.rowsOrigin
             onDrop(id, BoardDrop.slot(rows: dropRows, dragged: id, y: y, rowsTop: rowsTop))
         case .drafts(let text):
