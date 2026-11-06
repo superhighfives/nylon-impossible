@@ -15,7 +15,7 @@ export FOREMAN_HOME="$tmp/home"
 export FOREMAN_MERGEABLE_RETRY_SECONDS=0
 export FOREMAN_NOW=1793520000 # 2026-11-01T08:00:00Z, a Sunday
 export TZ=UTC # the routines' schedules are in local time
-export FOREMAN_PASTOR_PLISTS="$tmp/LaunchAgents"
+export FOREMAN_OPERATOR_PLISTS="$tmp/LaunchAgents"
 # shellcheck source=SCRIPTDIR/foreman.sh
 source "$here/foreman.sh"
 set +e
@@ -917,7 +917,7 @@ expect "deps: a Monday missed runs on Tuesday"        yes "$(due deps $((MON9 + 
 expect "deps: once that week"                         no  "$(due deps $((MON9 + 3 * D)) $((MON9 + 600)))"
 expect "scout: Thursday at 03:00"                     yes "$(due scout "$THU3" $((THU3 - 7 * D + 600)))"
 expect "scout: not on Wednesday"                      no  "$(due scout $((THU3 - D)) $((THU3 - 7 * D + 600)))"
-expect "shepherd: every tick"                         yes "$(due shepherd "$SUN8" "$SUN8")"
+expect "dispatch: every tick"                         yes "$(due dispatch "$SUN8" "$SUN8")"
 expect "the next digest is tomorrow at 08:00"         $((SUN8 + D))  "$(sched_time $((SUN8 + 600)) 8 '*' next)"
 expect "the next bundle is Monday at 09:00"           "$MON9"        "$(sched_time "$SUN8" 9 1 next)"
 # 2026-11-01 is the day the US leaves daylight time: 03:00 is still 03:00.
@@ -938,6 +938,13 @@ expect "and only it"                                   on  "$(off sentry '')"
 cmd_routine scout on >/dev/null
 expect "and on turns it back on"                       on  "$(off scout '')"
 expect "an unknown routine is refused"                 1   "$( (cmd_routine nope off) >/dev/null 2>&1; echo $?)"
+expect "dispatch's old name, shepherd, is still off in the variable"  off "$(off dispatch 'shepherd')"
+touch "$ROUTINES/shepherd.off"
+expect "and with an old off marker here"               off "$(off dispatch '')"
+rm -f "$ROUTINES/shepherd.off"
+cmd_routine shepherd off >/dev/null
+expect "foreman routine shepherd off turns dispatch off"  off "$(off dispatch '')"
+cmd_routine shepherd on >/dev/null
 
 echo "routines pass"
 
@@ -955,16 +962,16 @@ pass_run() { # now off-variable open-agent-PRs -> the routines that ran
   )
 }
 rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
-expect "one model-driven routine a tick; the shell ones as well"  "shepherd sentry digest tidy"  "$(pass_run "$SUN8" "" 0)"
-expect "with 3 agent PRs open, the bundle waits"                  "shepherd scout tidy"          "$(pass_run "$SUN8" "" 3)"
-expect "and stays due"                                            "shepherd tidy"                "$(pass_run "$SUN8" "" 3)"
-expect "until there's room"                                       "shepherd deps tidy"           "$(pass_run "$SUN8" "" 2)"
-expect "then nothing more in this window"                         "shepherd tidy"                "$(pass_run "$SUN8" "" 0)"
+expect "one model-driven routine a tick; the shell ones as well"  "dispatch sentry digest tidy"  "$(pass_run "$SUN8" "" 0)"
+expect "with 3 agent PRs open, the bundle waits"                  "dispatch scout tidy"          "$(pass_run "$SUN8" "" 3)"
+expect "and stays due"                                            "dispatch tidy"                "$(pass_run "$SUN8" "" 3)"
+expect "until there's room"                                       "dispatch deps tidy"           "$(pass_run "$SUN8" "" 2)"
+expect "then nothing more in this window"                         "dispatch tidy"                "$(pass_run "$SUN8" "" 0)"
 rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
-expect "the variable stops exactly the ones it names"             "sentry"                       "$(pass_run "$SUN8" "shepherd,digest,deps" 0)"
+expect "the variable stops exactly the ones it names"             "sentry"                       "$(pass_run "$SUN8" "dispatch,digest,deps" 0)"
 expect "and they stay due"                                        "no"                           "$([ -e "$ROUTINES/digest" ] && echo yes || echo no)"
 touch "$ROUTINES/scout.off"
-expect "a local off marker stops exactly that one"                "shepherd deps digest tidy"    "$(pass_run "$SUN8" "" 0)"
+expect "a local off marker stops exactly that one"                "dispatch deps digest tidy"    "$(pass_run "$SUN8" "" 0)"
 rm -f "${ROUTINES:?}/scout.off"
 
 tick_routines() { # paused-variable -> whether a tick reached the routines
@@ -991,24 +998,66 @@ PRS_JSON='[{"number":80,"headRefName":"foreman/12-x","author":{"login":"nylon-fo
   {"number":84,"headRefName":"foreman/deps-2026-11-02","author":{"login":"nylon-foreman"}}]'
 expect "foreman/* and feedback/*, by the owner or the machine account"  "80 81 84"  "$(pick_agent_prs <<<"$PRS_JSON" | cut -f1 | paste -sd' ' -)"
 
-echo "shepherd"
+echo "dispatch"
 
+operator_job() { # pr working-dir [token-file] -> an operator plist for the PR, as `operator install` writes it
+  local env=""
+  [ -z "${3:-}" ] || env="<key>OPERATOR_GH_TOKEN_FILE</key><string>$3</string>"
+  printf '<plist><dict><key>EnvironmentVariables</key><dict><key>PATH</key><string>/bin</string>%s</dict><key>WorkingDirectory</key><string>%s</string></dict></plist>\n' \
+    "$env" "$2" > "$FOREMAN_OPERATOR_PLISTS/com.operator.superhighfives-nylon-impossible-$1.plist"
+}
 (
-  AGENT_PRS=$'80\tforeman/12-x\n81\tfeedback/568' AGENT_FAIL=""
+  AGENT_PRS=$'79\tforeman/11-w\n80\tforeman/12-x\n81\tfeedback/568' AGENT_FAIL=""
   agent_prs() { [ -z "$AGENT_FAIL" ] || return 1; echo "$AGENT_PRS"; }
-  shepherd_worktree() { echo "$tmp/wt-$1"; }
-  pastor() { echo "pastor $*" >> "$CALLS"; }
-  : > "$CALLS"; rm -rf "${SHEPHERD:?}" "${FOREMAN_PASTOR_PLISTS:?}"; mkdir -p "$FOREMAN_PASTOR_PLISTS" "$SHEPHERD"
-  touch "$FOREMAN_PASTOR_PLISTS/com.pastor.superhighfives-nylon-impossible-80.plist" "$SHEPHERD/70"
-  shepherd >/dev/null
-  expect "pastor goes on an agent PR without a job"      yes "$(called "pastor install 81 -C $tmp/wt-81")"
-  expect "not on one that has one"                       no  "$(called 'pastor install 80')"
-  expect "and it's remembered as the shepherd's"         yes "$([ -e "$SHEPHERD/81" ] && echo yes)"
-  expect "a closed PR's job is stopped"                  yes "$(called 'pastor stop superhighfives-nylon-impossible-70 --purge')"
-  expect "and forgotten"                                 no  "$([ -e "$SHEPHERD/70" ] && echo yes || echo no)"
+  dispatch_worktree() { echo "$tmp/wt-$1"; }
+  operator() { echo "operator $*" >> "$CALLS"; }
+  : > "$CALLS"; rm -rf "${DISPATCH:?}" "$FOREMAN_HOME/shepherd" "${FOREMAN_OPERATOR_PLISTS:?}"
+  mkdir -p "$FOREMAN_OPERATOR_PLISTS" "$FOREMAN_HOME/shepherd" "$tmp/wt-79"
+  operator_job 80 "$tmp/wt-80" "$TOKEN_FILE"
+  operator_job 79 "$tmp/wt-79" # from before the token flag
+  touch "$FOREMAN_HOME/shepherd/70" # the shepherd's state, from before the rename
+  dispatch >/dev/null
+  expect "the shepherd's state moves to dispatch"         "no yes"  "$([ -e "$FOREMAN_HOME/shepherd" ] && echo yes || echo no) $([ -d "$DISPATCH" ] && echo yes)"
+  expect "an operator goes on an agent PR without a job, as the machine account" \
+    yes "$(called "operator install 81 -C $tmp/wt-81 --runner claude --gh-token-file $TOKEN_FILE")"
+  expect "not on one that has one"                        no  "$(called 'operator install 80')"
+  expect "a job without the token is rewritten, in its own checkout" \
+    yes "$(called "operator install 79 -C $tmp/wt-79 --runner claude --gh-token-file $TOKEN_FILE")"
+  expect "but isn't counted as dispatch's"                no  "$([ -e "$DISPATCH/79" ] && echo yes || echo no)"
+  expect "and it's remembered as dispatch's"              yes "$([ -e "$DISPATCH/81" ] && echo yes)"
+  expect "a closed PR's job is stopped"                   yes "$(called 'operator stop superhighfives-nylon-impossible-70 --purge')"
+  expect "and forgotten"                                  no  "$([ -e "$DISPATCH/70" ] && echo yes || echo no)"
+  : > "$CALLS"; operator_job 79 "$tmp/wt-79" "$TOKEN_FILE"
+  dispatch >/dev/null
+  expect "once it has the token, it's left alone"         no  "$(called 'operator install 79')"
   : > "$CALLS"; AGENT_FAIL=1
-  shepherd >/dev/null
-  expect "when GitHub can't say what's open, no job is touched"  no  "$(called 'pastor')"
+  dispatch >/dev/null
+  expect "when GitHub can't say what's open, no job is touched"  no  "$(called 'operator')"
+)
+
+echo "shots after any push"
+
+mk ios-change 'mkdir -p src/ios && echo x > src/ios/App.swift'
+g push -q -f origin "$(case_sha ios-change):refs/heads/foreman/90-ios" "$(case_sha plain):refs/heads/foreman/91-web"
+SHOTS_BODY=$'## Try it\n\n<!-- fix-shots:start -->\n### Before / after\n\n_From `main` at 1111111 and this branch at '"${BASE:0:7}"$'._\n\n<!-- fix-shots:plan {"shots":[]} -->\n<!-- fix-shots:end -->'
+(
+  gh() { # pr list: two agent PRs whose shots were taken at base
+    jq -cn --arg b "$SHOTS_BODY" --arg ios "$(case_sha ios-change)" --arg web "$(case_sha plain)" '[
+      {number:90, headRefName:"foreman/90-ios", headRefOid:$ios, author:{login:"nylon-foreman"}, body:$b},
+      {number:91, headRefName:"foreman/91-web", headRefOid:$web, author:{login:"nylon-foreman"}, body:$b},
+      {number:92, headRefName:"foreman/92-none", headRefOid:$ios, author:{login:"nylon-foreman"}, body:"No shots."}]'
+  }
+  retake_shots() { echo "retake $*" >> "$CALLS"; }
+  : > "$CALLS"; rm -rf "${SHOTS:?}"
+  expect "the shots' commit is read from the PR body"    "${BASE:0:7}"  "$(shots_sha <<<"$SHOTS_BODY")"
+  shots_pass >/dev/null
+  expect "a push that changed src/ios retakes the shots"  yes "$(called 'retake 90 90 foreman/90-ios')"
+  expect "one that didn't, doesn't"                       no  "$(called 'retake 91')"
+  expect "nor does a PR with no shots"                    no  "$(called 'retake 92')"
+  : > "$CALLS"
+  shots_pass >/dev/null
+  expect "once per head commit"                           no  "$(called 'retake 90')"
+  expect "a feedback branch's issue is its number"        568 "$(pr_issue feedback/568)"
 )
 
 echo "routine prompts"

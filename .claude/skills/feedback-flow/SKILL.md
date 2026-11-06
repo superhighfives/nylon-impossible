@@ -38,7 +38,7 @@ GitHub any more: `feedback.yml` and the `feedback/*` branches are retired.
     `needs-decision` comes off once **Open questions** reads "None.". The
     owner moves it to Ready, and it's built like any other item.
 - **After that it's the foreman's ordinary loop:** review rounds until 🟢,
-  the merge gate, and the owner's `verified`. Pastor leaves
+  the merge gate, and the owner's `verified`. The operator leaves
   `control-room-review` findings on these PRs to the foreman.
 
 When the Mac mini is off, reports wait. There's no hosted fallback.

@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016 # GraphQL $variables stay unexpanded in single quotes
 # foreman: triages the owner's feedback reports, builds Ready items from the
 # Nylon project board, merges its own PRs when CLAUDE.md's "Merging" rules
-# allow, and runs the routines (Sentry, Dependabot, shepherd, scout, digest).
+# allow, and runs the routines (Sentry, Dependabot, dispatch, scout, digest).
 # See scripts/foreman/README.md.
 #
 #   foreman install [--interval sec]   launchd job, every 10 minutes by default
@@ -39,7 +39,7 @@ WAIT_ALERT_SECONDS=7200 # how long a PR waits for the same reason before an aler
 PENDING_ALERT_SECONDS=43200 # the same, for `checks pending`
 SHOTS_TIMEOUT="${FOREMAN_SHOTS_TIMEOUT:-2700}" # seconds per side of the before/after shots
 ROUTINE_TIMEOUT="${FOREMAN_ROUTINE_TIMEOUT:-3600}" # seconds per model-driven routine run
-ROUTINES_ALL="shepherd sentry deps scout digest" # the order a tick considers them in
+ROUTINES_ALL="dispatch sentry deps scout digest" # the order a tick considers them in
 MAX_SENTRY_ISSUES=5 # per night
 MAX_SCOUT_ITEMS=5   # per week
 RECENTLY_CLOSED_DAYS=30 # a Sentry short ID in an issue closed this recently isn't filed again
@@ -60,12 +60,14 @@ FEEDBACK="$HOME_DIR/feedback" # per issue: when the foreman triaged that report
 SHOTS="$HOME_DIR/shots"   # per PR: its shot plan and the images being captured
 ONCE="$HOME_DIR/once"     # markers for alerts that go out once
 ROUTINES="$HOME_DIR/routines" # per routine: when it last ran, and <name>.off to turn it off here
-SHEPHERD="$HOME_DIR/shepherd" # per PR: a pastor job the shepherd installed
-PASTOR_PLISTS="${FOREMAN_PASTOR_PLISTS:-$HOME/Library/LaunchAgents}" # where pastor's jobs live
+DISPATCH="$HOME_DIR/dispatch" # per PR: an operator job dispatch started (was shepherd/)
+OPERATOR_PLISTS="${FOREMAN_OPERATOR_PLISTS:-$HOME/Library/LaunchAgents}" # where the operator's jobs live
 TOKEN_FILE="${FOREMAN_TOKEN_FILE:-$HOME_DIR/github-token}" # $AGENT's token, chmod 600
 LABEL=com.foreman.nylon-impossible
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-SHIM="$HOME/.config/pastor/exec.sh" # resolves the Claude token; see `pastor help`
+SHIM="${FOREMAN_SHIM:-$HOME/.config/operator/exec.sh}" # resolves the Claude token; see `operator help`
+# Until `operator migrate` has run on this Mac, only pastor's shim exists.
+[ -x "$SHIM" ] || [ ! -x "$HOME/.config/pastor/exec.sh" ] || SHIM="$HOME/.config/pastor/exec.sh"
 
 DRY=0
 
@@ -79,9 +81,10 @@ event() { # event issue pr note
     '{ts:$ts, event:$e, issue:($i|tonumber? // null), pr:($p|tonumber? // null), note:$n}' >> "$EVENTS"
 }
 
-alert() { # one-way Discord push, if pastor's webhook is configured
-  local hook="${PASTOR_DISCORD_WEBHOOK:-}"
-  [ -z "$hook" ] && [ -r "$HOME/.config/pastor/webhook" ] && hook="$(cat "$HOME/.config/pastor/webhook")"
+alert() { # one-way Discord push, if the operator's webhook is configured
+  local hook="${OPERATOR_DISCORD_WEBHOOK:-}"
+  [ -z "$hook" ] && [ -r "$HOME/.config/operator/webhook" ] && hook="$(cat "$HOME/.config/operator/webhook")"
+  [ -z "$hook" ] && [ -r "$HOME/.config/pastor/webhook" ] && hook="$(cat "$HOME/.config/pastor/webhook")" # before `operator migrate`
   [ -z "$hook" ] && return 0
   curl -fsS -H 'Content-Type: application/json' \
     -d "$(jq -cn --arg c "🏗️ foreman: $*" '{content:$c}')" "$hook" >/dev/null || true
@@ -371,7 +374,7 @@ merge_pass() { # board_json
       merge\ *)
         head="${verdict#merge }"
         if dry; then log "would merge #$pr at ${head:0:7}"; continue; fi
-        # Pinned to the commit the gate checked: pastor may push in between.
+        # Pinned to the commit the gate checked: the operator may push in between.
         if ! gh pr merge "$pr" -R "$OWNER/$REPO" --squash --delete-branch --match-head-commit "$head" >/dev/null; then
           log "merge of #$pr refused; will retry next tick"; event merge_refused "$issue" "$pr"
           track_wait "$pr" "$issue" "$head" "merge refused"; continue
@@ -391,8 +394,8 @@ merge_pass() { # board_json
         fi ;;
       "wait: review isn't all-green")
         # Checks are green and the 🟡/🔴 review is on the head commit (the gate
-        # checks both before this): the foreman owns the round. Pastor
-        # leaves these findings alone.
+        # checks both before this): the foreman owns the round. The
+        # operator leaves these findings alone.
         log "#$pr $verdict"
         track_wait "$pr" "$issue" "$sha" "${verdict#wait: }"
         review_round "$pr" "$branch" "$issue" ;;
@@ -586,7 +589,7 @@ review_round() { # pr branch issue
   if dry; then log "would run review round $round on #$pr"; return 0; fi
 
   # A detached checkout of its own, so it never shares a working tree with
-  # pastor's job on the same branch. Nothing is recorded until it exists, so
+  # the operator's job on the same branch. Nothing is recorded until it exists, so
   # a failed fetch is retried next tick rather than burning the round.
   dir="$WORKTREES/round-$pr"
   rm -rf "$dir"; git -C "$CLONE" worktree prune
@@ -678,7 +681,7 @@ EOF
 # ---- building ----------------------------------------------------------------
 
 # Agent PRs: foreman/* and feedback/* branches, opened by the owner or $AGENT.
-# The limit of 3 counts these, and the shepherd watches them.
+# The limit of 3 counts these, and dispatch gives each an operator.
 agent_prs() { # -> "<pr>\t<branch>" per open agent PR; non-zero if GitHub can't be read
   local all
   all=$(gh pr list -R "$OWNER/$REPO" --state open --limit 100 --json number,headRefName,author) || return 1
@@ -1014,13 +1017,13 @@ build() { # board_json issue
   fi
 }
 
-opened_pr() { # board_json issue branch dir -> 0 if the run opened a PR: it goes to In review, gets pastor, and its shots
+opened_pr() { # board_json issue branch dir -> 0 if the run opened a PR: it goes to In review, gets an operator, and its shots
   local pr
   pr=$(gh pr list -R "$OWNER/$REPO" --state open --head "$3" --json number --jq '.[0].number // empty')
   [ -n "$pr" ] || return 1
   log "#$2 -> PR #$pr"; event pr_opened "$2" "$pr"
   set_status "$1" "$2" "In review" || true
-  pastor install "$pr" -C "$4" --runner claude >/dev/null 2>&1 || log "pastor install failed for #$pr"
+  install_operator "$pr" "$4" || log "operator install failed for #$pr"
   if [ -s "$4/.fix-shots/plan.json" ]; then
     mkdir -p "$SHOTS"; cp "$4/.fix-shots/plan.json" "$SHOTS/$pr.json"
     fix_shots "$pr" "$2" "$3" "$SHOTS/$pr.json"
@@ -1315,12 +1318,49 @@ retake_shots() { # pr issue branch -> fix_shots again, from the plan saved in th
   fix_shots "$1" "$2" "$3" "$SHOTS/$1.json"
 }
 
+shots_sha() { # PR body (stdin) -> the branch commit its current shots show, or nothing
+  perl -0777 -ne 'if (/<!-- fix-shots:start -->(.*?)<!-- fix-shots:end -->/s) { my $b = $1;
+    print $1 if $b =~ /this branch at `?([0-9a-f]{7,40})/ }'
+}
+
+pr_issue() { sed -nE 's#^(foreman|feedback)/([0-9]+).*#\2#p' <<<"$1"; } # branch -> its issue number
+
+shots_pass() { # retakes one PR's shots if its app changed since they were taken, whoever pushed
+  local prs pr branch head body shot
+  # Review rounds retake after their own pushes; this catches the operator's
+  # and the owner's. Best-effort: nothing here fails the tick.
+  prs=$(gh pr list -R "$OWNER/$REPO" --state open --limit 100 --json number,headRefName,headRefOid,author,body 2>/dev/null) || return 0
+  while IFS=$'\t' read -r pr branch; do
+    [ -n "$pr" ] || continue
+    head=$(jq -r --argjson n "$pr" '.[] | select(.number == $n) | .headRefOid' <<<"$prs")
+    body=$(jq -r --argjson n "$pr" '.[] | select(.number == $n) | .body' <<<"$prs")
+    [ -n "$(saved_plan <<<"$body")" ] || continue
+    shot=$(shots_sha <<<"$body")
+    [ -n "$shot" ] || continue
+    case "$head" in "$shot"*) continue ;; esac
+    # Once per head commit, even if the retake fails.
+    [ "$(cat "$SHOTS/$pr.checked" 2>/dev/null)" = "$head" ] && continue
+    git -C "$CLONE" fetch -q origin "+refs/heads/$branch:refs/remotes/origin/$branch" 2>/dev/null || continue
+    if dry; then
+      git -C "$CLONE" diff --name-only "$shot" "$head" -- src/ios 2>/dev/null | grep -q . \
+        && log "would retake #$pr's shots: src/ios changed since ${shot:0:7}"
+      continue
+    fi
+    mkdir -p "$SHOTS"; echo "$head" > "$SHOTS/$pr.checked"
+    git -C "$CLONE" diff --name-only "$shot" "$head" -- src/ios 2>/dev/null | grep -q . || continue
+    log "#$pr: src/ios changed since its shots (${shot:0:7}); retaking them"
+    retake_shots "$pr" "$(pr_issue "$branch")" "$branch"
+    return 0 # one a tick: each side can take $SHOTS_TIMEOUT
+  done < <(pick_agent_prs <<<"$prs")
+  return 0
+}
+
 # ---- routines ----------------------------------------------------------------
 # Work that runs on a schedule rather than off the board. A routine runs on the
 # first tick after its scheduled time, if it hasn't run since; the time it
 # last ran is in $ROUTINES/<name>. The model-driven ones (sentry, deps, scout)
 # take at most one slot a tick, so a tick can't stall the merge pass for
-# hours; shepherd and digest are shell and run whenever they're due.
+# hours; dispatch and digest are shell and run whenever they're due.
 #
 # The model-driven runs only ever write files: what to file or create comes
 # back as JSON, and the shell checks it, caps it and acts on it. The bundle is
@@ -1328,7 +1368,7 @@ retake_shots() { # pr issue branch -> fix_shots again, from the plan saved in th
 
 routine_schedule() { # name -> "<hour> <weekday 0-6, or *>" in the Mini's local time, "tick", or nothing
   case "$1" in
-    shepherd) echo tick ;;
+    dispatch) echo tick ;;
     sentry)   echo "3 *" ;;
     deps)     echo "9 1" ;;
     scout)    echo "3 4" ;;
@@ -1337,6 +1377,7 @@ routine_schedule() { # name -> "<hour> <weekday 0-6, or *>" in the Mini's local 
 }
 
 is_routine() { case " $ROUTINES_ALL " in *" $1 "*) [ -n "$1" ] ;; *) return 1 ;; esac; }
+routine_name() { [ "$1" = shepherd ] && echo dispatch || echo "$1"; } # dispatch was "shepherd"
 model_routine() { case "$1" in sentry|deps|scout) return 0 ;; *) return 1 ;; esac; }
 opens_pr() { [ "$1" = deps ]; }
 
@@ -1363,8 +1404,11 @@ routines_off_var() { gh variable get FOREMAN_ROUTINES_OFF -R "$OWNER/$REPO" 2>/d
 
 routine_off() { # name repo-variable -> 0 if it's off, here or in the variable; OFF_WHY says where
   OFF_WHY=""
-  if [ -e "$ROUTINES/$1.off" ]; then OFF_WHY="on this Mac (foreman routine $1 on)"; return 0; fi
-  if tr ',' '\n' <<<"$2" | sed 's/[[:space:]]//g' | grep -qxF "$1"; then OFF_WHY="FOREMAN_ROUTINES_OFF"; return 0; fi
+  local alias=""; [ "$1" = dispatch ] && alias=shepherd # an old off switch still holds
+  if [ -e "$ROUTINES/$1.off" ] || { [ -n "$alias" ] && [ -e "$ROUTINES/$alias.off" ]; }; then
+    OFF_WHY="on this Mac (foreman routine $1 on)"; return 0
+  fi
+  if tr ',' '\n' <<<"$2" | sed 's/[[:space:]]//g' | grep -qxF -e "$1" ${alias:+-e "$alias"}; then OFF_WHY="FOREMAN_ROUTINES_OFF"; return 0; fi
   return 1
 }
 
@@ -1374,7 +1418,7 @@ routines_pass() { # board_json -> runs what's due: shell routines, and at most o
   for name in $ROUTINES_ALL; do
     routine_due "$name" || continue
     if routine_off "$name" "$off"; then
-      [ "$name" = shepherd ] || log "routine $name is due, but off ($OFF_WHY)"
+      [ "$name" = dispatch ] || log "routine $name is due, but off ($OFF_WHY)"
       continue
     fi
     if model_routine "$name"; then
@@ -1396,7 +1440,7 @@ routines_pass() { # board_json -> runs what's due: shell routines, and at most o
 run_routine() { # board_json name -> runs it now; a live run counts as its run for this window, even if it fails
   if ! dry; then mkdir -p "$ROUTINES"; now > "$ROUTINES/$2"; fi
   case "$2" in
-    shepherd) shepherd ;;
+    dispatch) dispatch ;;
     sentry)   routine_sentry "$1" ;;
     deps)     routine_deps ;;
     scout)    routine_scout "$1" ;;
@@ -1706,16 +1750,31 @@ deps_tidy() {
   done <<<"$open"
 }
 
-# ---- the shepherd ----
-# Pastor on every agent PR. Builds install it themselves (opened_pr); this
-# catches the rest: feedback/* PRs, the bundle, and any install that failed.
+# ---- dispatch ----
+# An operator on every agent PR (dispatch was "shepherd", the operator was
+# "pastor"). Builds install one themselves (opened_pr); this catches the rest:
+# feedback/* PRs, the bundle, and any install that failed.
+#
+# Each job gets $AGENT's token file, so its comments, like its pushes from
+# these worktrees, come from $AGENT rather than the owner's gh login.
 
-has_pastor() { [ -e "$PASTOR_PLISTS/com.pastor.$OWNER-$REPO-$1.plist" ]; }
+operator_plist() { echo "$OPERATOR_PLISTS/com.operator.$OWNER-$REPO-$1.plist"; }
+has_operator() { [ -e "$(operator_plist "$1")" ]; }
 
-shepherd_worktree() { # pr branch -> a checkout of the branch for pastor to work in
-  local dir="$WORKTREES/shepherd-$1" existing
-  # A build's worktree already has the branch: use it, since git won't check
-  # one branch out twice.
+plist_string() { # plist key -> the <string> after <key>key</key>, or nothing (XML plists, as operator writes them)
+  KEY="$2" perl -0777 -ne 'print $1 if m{<key>\Q$ENV{KEY}\E</key>\s*<string>([^<]*)</string>}' "$1" 2>/dev/null
+}
+
+operator_has_token() { [ -n "$(plist_string "$(operator_plist "$1")" OPERATOR_GH_TOKEN_FILE)" ]; } # pr -> 0 if its job comments as $AGENT
+
+install_operator() { # pr dir -> starts (or rewrites) the PR's operator job, acting as $AGENT
+  operator install "$1" -C "$2" --runner claude --gh-token-file "$TOKEN_FILE" >/dev/null 2>&1
+}
+
+dispatch_worktree() { # pr branch -> a checkout of the branch for the operator to work in
+  local dir="$WORKTREES/dispatch-$1" existing
+  # A build's worktree (or an older shepherd-<pr> one) already has the
+  # branch: use it, since git won't check one branch out twice.
   existing=$(git -C "$CLONE" worktree list --porcelain \
     | awk -v want="branch refs/heads/$2" '/^worktree / {w = substr($0, 10)} $0 == want {print w; exit}')
   [ -z "$existing" ] || { echo "$existing"; return 0; }
@@ -1726,31 +1785,46 @@ shepherd_worktree() { # pr branch -> a checkout of the branch for pastor to work
   echo "$dir"
 }
 
-shepherd() {
+dispatch() {
   local prs pr branch dir f installed=() removed=()
+  # Its state was kept in shepherd/ before the rename.
+  if [ -d "$HOME_DIR/shepherd" ] && [ ! -e "$DISPATCH" ] && ! dry; then mv "$HOME_DIR/shepherd" "$DISPATCH"; fi
   prs=$(agent_prs) || return 0 # can't tell what's open: leave every job alone
   while IFS=$'\t' read -r pr branch; do
     [ -n "$pr" ] || continue
-    has_pastor "$pr" && continue
-    if dry; then log "would install pastor on #$pr ($branch)"; continue; fi
-    dir=$(shepherd_worktree "$pr" "$branch") || { log "couldn't check out $branch for pastor; retrying next tick"; continue; }
-    if pastor install "$pr" -C "$dir" --runner claude >/dev/null 2>&1; then
-      mkdir -p "$SHEPHERD"; touch "$SHEPHERD/$pr"; log "pastor on #$pr"; installed+=("#$pr")
+    if has_operator "$pr"; then
+      # A job from before the token flag still comments as the owner: rewrite
+      # it once, in the checkout it already uses.
+      operator_has_token "$pr" && continue
+      dir=$(plist_string "$(operator_plist "$pr")" WorkingDirectory)
+      if dry; then log "would give #$pr's operator the $AGENT token"; continue; fi
+      if [ -n "$dir" ] && [ -d "$dir" ] && install_operator "$pr" "$dir"; then
+        log "operator on #$pr now acts as $AGENT"
+      else
+        log "couldn't give #$pr's operator the $AGENT token; retrying next tick"
+      fi
+      continue
+    fi
+    if dry; then log "would start an operator on #$pr ($branch)"; continue; fi
+    dir=$(dispatch_worktree "$pr" "$branch") || { log "couldn't check out $branch for the operator; retrying next tick"; continue; }
+    if install_operator "$pr" "$dir"; then
+      mkdir -p "$DISPATCH"; touch "$DISPATCH/$pr"; log "operator on #$pr"; installed+=("#$pr")
     else
-      log "pastor install failed for #$pr"
+      log "operator install failed for #$pr"
     fi
   done <<<"$prs"
-  for f in "$SHEPHERD"/*; do
+  for f in "$DISPATCH"/*; do
     [ -e "$f" ] || continue
     pr=$(basename "$f")
     awk -F'\t' -v p="$pr" '$1 == p {found = 1} END {exit !found}' <<<"$prs" && continue
-    if dry; then log "would stop pastor on #$pr (closed)"; continue; fi
-    pastor stop "$OWNER-$REPO-$pr" --purge >/dev/null 2>&1 || true
-    rm_worktree "shepherd-$pr"; rm -f "$f"; log "stopped pastor on #$pr (closed)"; removed+=("#$pr")
+    if dry; then log "would stop the operator on #$pr (closed)"; continue; fi
+    operator stop "$OWNER-$REPO-$pr" --purge >/dev/null 2>&1 || true
+    rm_worktree "dispatch-$pr"; rm_worktree "shepherd-$pr"; rm -f "$f"
+    log "stopped the operator on #$pr (closed)"; removed+=("#$pr")
   done
-  if dry; then log "shepherd: $(grep -c . <<<"$prs" || true) agent PR(s) open; the rest already have pastor"; fi
+  if dry; then log "dispatch: $(grep -c . <<<"$prs" || true) agent PR(s) open; the rest already have an operator"; fi
   if [ "${#installed[@]}" -gt 0 ] || [ "${#removed[@]}" -gt 0 ]; then
-    routine_event shepherd ok "installed: ${installed[*]:-none}; removed: ${removed[*]:-none}" ${installed[@]+"${installed[@]}"}
+    routine_event dispatch ok "installed: ${installed[*]:-none}; removed: ${removed[*]:-none}" ${installed[@]+"${installed[@]}"}
   fi
 }
 
@@ -1971,7 +2045,7 @@ ensure_clone() {
   # Only main, and blobs on demand: feedback-assets alone is hundreds of MB of
   # screenshots. PR heads are fetched one at a time by the gate.
   [ -d "$CLONE/.git" ] || gh repo clone "$OWNER/$REPO" "$CLONE" -- -q --single-branch --branch main --filter=blob:none
-  # Everything pushed from here (builds, rounds, and pastor's jobs in these
+  # Everything pushed from here (builds, rounds, and the operator's jobs in these
   # worktrees) goes as $AGENT over HTTPS, with its token as the credential,
   # never as the owner's SSH key or keychain login.
   git -C "$CLONE" remote set-url origin "https://github.com/$OWNER/$REPO.git"
@@ -2006,7 +2080,7 @@ cleanup_worktrees() { # remove worktrees whose issue no longer has an open PR or
   for d in "$WORKTREES"/*; do
     [ -d "$d" ] || continue
     n=$(basename "$d")
-    case "$n" in shepherd-*) continue ;; esac # the shepherd removes its own
+    case "$n" in dispatch-*|shepherd-*) continue ;; esac # dispatch removes its own
     if gh pr list -R "$OWNER/$REPO" --state open --json headRefName \
          --jq ".[] | select(.headRefName | startswith(\"foreman/$n-\")) | 1" | grep -q .; then continue; fi
     dry && { log "would remove worktree $n"; continue; }
@@ -2031,6 +2105,7 @@ cmd_tick() {
   cleanup_worktrees
   spec_pass "$board"
   routines_pass "$board"
+  shots_pass
 
   local open; open=$(agent_pr_count)
   if [ "$open" -ge "$MAX_AGENT_PRS" ]; then log "$open agent PRs open; not starting another"; return 0; fi
@@ -2092,7 +2167,7 @@ cmd_shots() {
 cmd_gate() { use_token; ensure_clone; gate "${1:?pr number}"; }
 
 cmd_routine() {
-  local name="${1:-}" open
+  local name; name=$(routine_name "${1:-}"); local open
   is_routine "$name" || die "which routine? one of: $ROUTINES_ALL"
   case "${2:-}" in
     off) mkdir -p "$ROUTINES"; touch "$ROUTINES/$name.off"; echo "$name: off on this Mac"; return 0 ;;
@@ -2117,8 +2192,8 @@ cmd_routine() {
 cmd_install() {
   local interval=600
   [ "${1:-}" = --interval ] && interval="${2:?seconds}"
-  [ -x "$SHIM" ] || die "missing $SHIM; run \`pastor setup\` and \`pastor token\` first"
-  command -v claude gh jq bun pastor >/dev/null || die "needs claude, gh, jq, bun and pastor on PATH"
+  [ -x "$SHIM" ] || die "missing $SHIM; run \`operator setup\` and \`operator token\` first"
+  command -v claude gh jq bun operator >/dev/null || die "needs claude, gh, jq, bun and operator on PATH"
   use_token
   ensure_clone
   cp "${BASH_SOURCE[0]}" "$BIN"; chmod +x "$BIN"
