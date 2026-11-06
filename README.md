@@ -290,6 +290,8 @@ All scripts are also available per-package with `web:*`, `api:*`, and `ios:*` pr
 
 Ideas, specs and work in progress live on the project's GitHub Project board,
 as draft items, issues and PRs. The old `plans/` directory is in git history.
+The agents that build from it (the foreman, the operator, dispatch) are
+introduced in [scripts/foreman/README.md](scripts/foreman/README.md#whos-who).
 
 ## CI/CD
 

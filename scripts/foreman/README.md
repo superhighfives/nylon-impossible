@@ -8,6 +8,16 @@ Mac) as a launchd job, every 10 minutes.
 It acts on GitHub as its own machine account, `nylon-foreman` (below), so
 the PR history shows who did what.
 
+## Who's who
+
+| Name | What it is |
+| --- | --- |
+| **foreman** | This script. Builds from the board, opens PRs, runs review rounds, merges. |
+| **operator** | Watches one PR: answers comments, fixes CI, rebases, says when it's ready. A CLI from the owner's dotfiles and a skill from their skills repo. Its comments start with 🎛️. It was called **pastor**, and its old comments start with 🐑. |
+| **dispatch** | The foreman routine that starts an operator on every agent PR and stops it when the PR closes. It was called **shepherd**. |
+| **control-room** | The owner's baseline rules, and `control-room-review`, the reviewer whose 🟢 the foreman merges on. |
+| **`nylon-foreman`** | The GitHub account all of the foreman's work acts as, including the operator's comments and pushes on agent PRs. Local sessions act as the owner. |
+
 Each tick:
 
 1. **Merge.** For each open `foreman/*` PR by `nylon-foreman`, run the merge
@@ -28,7 +38,7 @@ Each tick:
    - It runs headless `claude` in a fresh worktree, with the issue body and
      the trusted comments as the prompt.
    - The result is a PR, with a **Try it** section, which then goes to In
-     review and gets pastor watching it, and its before/after shots if it
+     review and gets an operator watching it, and its before/after shots if it
      changes the Apple app (below).
    - Or the result is a question: the issue gets `needs-decision` and goes
      back to Specced.
@@ -112,8 +122,12 @@ After the run, the foreman captures them here with
 
 It's best-effort. A shot that fails reads "not captured", and the PR says how
 many failed and where the log is (`~/.foreman/logs/shots-<pr>-*.log`). Nothing
-here can fail the build. A review round that changes `src/ios` retakes them
-from the plan saved in the PR body, and so does `foreman shots <pr>`.
+here can fail the build. Any push that changes `src/ios` retakes them from
+the plan saved in the PR body, whoever made it: a review round retakes them
+straight after its push, and for other pushes (the operator's, the owner's)
+the tick compares the head with the commit the shots show. That's once per
+head commit and one PR a tick, and `~/.foreman/shots/<pr>.checked` holds the
+head it last looked at. `foreman shots <pr>` retakes them by hand.
 
 ## Verified
 
@@ -165,7 +179,7 @@ it started, the head commit, and the reason.
 ## Review rounds
 
 `control-room-review` reviews every push. The foreman merges only on 🟢, so
-it owns the rounds on its own PRs. Pastor leaves those findings alone
+it owns the rounds on its own PRs. The operator leaves those findings alone
 (CLAUDE.md says so).
 
 A round starts when a `foreman/*` PR's checks are green and its latest review
@@ -205,7 +219,7 @@ each one is for is in the `routines` skill (`.claude/skills/routines/SKILL.md`).
 
 | Routine | When (the Mini's local time) | Runs |
 | --- | --- | --- |
-| `shepherd` | every tick | shell |
+| `dispatch` | every tick | shell |
 | `sentry` | nightly, from 03:00 | Claude, read-only, with the Sentry MCP |
 | `deps` | Mondays, from 09:00 | Claude, `dependabot-bundle` skill |
 | `scout` | Thursdays, from 03:00 | Claude, read-only |
@@ -222,7 +236,7 @@ Mac that was asleep, runs it on the next tick.
 `claude` in a fresh detached worktree of `origin/main`, within
 `FOREMAN_ROUTINE_TIMEOUT` (an hour). If more than one is due, the first in the
 table runs and the others wait for later ticks, so a tick can't hold up the
-merge pass for hours. `shepherd` and `digest` don't use the slot.
+merge pass for hours. `dispatch` and `digest` don't use the slot.
 
 **The PR limit.** `deps` opens a PR, so it counts toward the 3 agent PRs.
 While 3 are open it stays due and runs on a later tick.
@@ -252,14 +266,19 @@ closes one only if a merged `foreman/deps-*` PR by `nylon-foreman` names it
 and every change it makes outside `bun.lock` is already on main. That's
 checked by reverse-applying its diff to main in a scratch index.
 
-**The shepherd** installs pastor on each open agent PR without a job (a
-`com.pastor.superhighfives-nylon-impossible-<pr>` plist). It uses the
-build's worktree if one has the branch, or makes
-`~/.foreman/worktrees/shepherd-<pr>`. It remembers the jobs it started in
-`~/.foreman/shepherd/`, and stops them (`pastor stop --purge`) and removes
-their worktrees once the PR closes. If GitHub can't say what's open, it
-leaves every job alone. It logs an event only when it installs or stops
-something.
+**Dispatch** starts an operator on each open agent PR without a job (a
+`com.operator.superhighfives-nylon-impossible-<pr>` plist), with
+`--gh-token-file ~/.foreman/github-token`, so the job's comments come from
+`nylon-foreman`. A job from before that flag, with no
+`OPERATOR_GH_TOKEN_FILE` in its plist, is reinstalled once in the checkout
+it already uses. Dispatch uses the build's worktree if one has the branch, or
+makes `~/.foreman/worktrees/dispatch-<pr>`. It remembers the jobs it started
+in `~/.foreman/dispatch/`, and stops them (`operator stop --purge`) and
+removes their worktrees once the PR closes. If GitHub can't say what's open,
+it leaves every job alone. It logs an event only when it installs or stops
+something. It was called `shepherd`: its old state directory is moved on the
+first run, old `shepherd-<pr>` worktrees keep working, and `shepherd` still
+works as its name in the off switches.
 
 **The digest** is `jq` over the last 24 hours of `events.jsonl`, plus `gh`
 queries for merged PRs, `needs-decision`, `owner-merge`, Specced specs whose
@@ -273,7 +292,7 @@ sections are empty, it posts and alerts nothing.
 off switch, but not the PR limit. `--dry-run` changes nothing on GitHub. For
 `sentry` and `scout` it still runs Claude, which is read-only anyway, and
 prints what would be filed. For `deps` it lists what would be bundled. For
-`shepherd` and `digest` it prints the installs and the comment.
+`dispatch` and `digest` it prints the installs and the comment.
 `foreman.sh status` lists each routine's last run, next run, and whether it's
 off.
 
@@ -316,7 +335,7 @@ hold:
   - `scripts/foreman/` itself.
 
 The merge is pinned to the commit the gate checked (`--match-head-commit`), so
-a fixup pastor pushes in between can't slip through unreviewed. A refused
+a fixup the operator pushes in between can't slip through unreviewed. A refused
 merge is logged and retried on the next tick.
 
 A PR that's green apart from a guarded area gets the `owner-merge` label, a
@@ -330,7 +349,7 @@ feedback intake (whose `auto-fix` counts) and triage's outcomes, the shots'
 place in the PR body and their push to `feedback-assets`, the token's
 expiry, and the routines: schedules either side of each time, the off
 switches and pause, the PR limit, the Sentry and scout filing rules, the
-shepherd, closing superseded dependabot PRs, and the digest's sections from
+dispatch, retaking shots after a push, closing superseded dependabot PRs, and the digest's sections from
 a fixture `events.jsonl`. CI runs it whenever `scripts/foreman/` changes.
 
 ## What it trusts
@@ -383,8 +402,9 @@ repo and to the Nylon project. Its classic token (scopes `repo`, `workflow`,
   `nylon-foreman`'s.
 - Its clone pushes over HTTPS with that token as the credential (a
   repo-local credential helper), and commits as `nylon-foreman`, unsigned.
-  That covers pushes from pastor's jobs in its worktrees too. Pastor's
-  comments still come from the owner's `gh` login.
+  That covers pushes from the operator's jobs in its worktrees too, and
+  dispatch gives those jobs the token file, so their comments are
+  `nylon-foreman`'s as well.
 - It checks the token at the start of every command. **Seven days before it
   expires** you get an alert (once per token) and a ⚠️ line in
   `foreman status`. **Once it has expired** (or is missing, or belongs to
@@ -394,13 +414,14 @@ repo and to the Nylon project. Its classic token (scopes `repo`, `workflow`,
   scopes, and write it to `~/.foreman/github-token`. The next tick uses it.
 
 **Setup and state:**
-- Claude's credentials come from pastor's shim (`~/.config/pastor/exec.sh`),
-  so run `pastor setup` and `pastor token` first, and put the machine
-  account's token in place (above).
-- Alerts use pastor's Discord webhook, if one is set.
+- Claude's credentials come from the operator's shim
+  (`~/.config/operator/exec.sh`), so run `operator setup` and
+  `operator token` first, and put the machine account's token in place
+  (above).
+- Alerts use the operator's Discord webhook, if one is set.
 - Everything else lives in `~/.foreman`: a clone tracking `main`, the
   worktrees, logs, `rounds/`, `specs/`, `verify/`, `waits/`, `feedback/`, `shots/`,
-  `routines/`, `shepherd/`, and `events.jsonl`, one line per merge, PR,
+  `routines/`, `dispatch/`, and `events.jsonl`, one line per merge, PR,
   question, spec run, triage, set of shots, routine run or failure. The
   daily digest reads `events.jsonl`.
 - **It runs under macOS's `/bin/bash` 3.2**, so no associative arrays or

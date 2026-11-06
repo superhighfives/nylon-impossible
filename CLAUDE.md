@@ -201,11 +201,13 @@ The rest lives in `.claude/skills/` and loads when the work comes up:
   the run. Never merge, rebase, force-push or delete the orphan
   **`feedback-assets`** branch; every old feedback issue's images live there.
 - `routines`: what the foreman runs on a schedule (Sentry sweep, dependabot
-  bundle, pastor shepherd, scout, daily digest), and how to turn each off.
+  bundle, dispatch, scout, daily digest), and how to turn each off.
 - `prd`: the spec template, what makes a question open, and how Decisions
   are recorded. Load it before drafting or revising any spec.
 
-**Pastor on `foreman/*` PRs:** the foreman owns `control-room-review`
-findings there, so don't fix or defer them (a
-deferred 🟡 never reaches the 🟢 the foreman merges on). Watch CI, handle the
-owner's own comments and decisions, and send the ready-to-merge notice.
+**The operator on `foreman/*` PRs** (it was called pastor, and dispatch,
+which starts it, was the shepherd): it acts as `nylon-foreman` there, in
+comments and pushes alike. The foreman owns `control-room-review` findings
+there, so don't fix or defer them (a deferred 🟡 never reaches the 🟢 the
+foreman merges on). Watch CI, handle the owner's own comments and decisions,
+and send the ready-to-merge notice.
