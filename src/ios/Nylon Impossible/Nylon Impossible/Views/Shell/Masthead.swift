@@ -163,6 +163,7 @@ struct EmptyLine: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// Board columns: the quiet row, only drawn wide.
     private var row: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Theme.Space.s3) {
@@ -172,7 +173,7 @@ struct EmptyLine: View {
                     .frame(width: Theme.Phone.checkbox)
                     .accessibilityHidden(true)
                 Text(text)
-                    .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle)
+                    .textStyle(Theme.Fonts.Role.rowTitleWide)
                     .fontWeight(.regular)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -196,7 +197,7 @@ struct EmptyLine: View {
                 .padding(.leading, textInset)
             }
         }
-        .padding(.horizontal, isWide ? Theme.Wide.gutter : Theme.Phone.gutter)
+        .padding(.horizontal, Theme.Wide.gutter)
         .padding(.bottom, link == nil ? 0 : Theme.Space.s4)
         .frame(maxWidth: .infinity, alignment: .leading)
     }

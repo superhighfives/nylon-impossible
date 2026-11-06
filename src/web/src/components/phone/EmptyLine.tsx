@@ -15,8 +15,7 @@ export function EmptyLine({
   /** `wide` is the board's row; `phone` the phone pages'. */
   density: "phone" | "wide";
 }) {
-  const wide = density === "wide";
-  if (!wide) {
+  if (density === "phone") {
     // Pages have room: a large centred squiggle over the words. Still
     // subtle, so it reads as a note, not something to press.
     return (
@@ -43,15 +42,12 @@ export function EmptyLine({
     );
   }
   return (
-    <p
-      data-empty-line
-      className={`m-0 flex items-start ${wide ? "gap-3" : "gap-2.5"}`}
-    >
+    <p data-empty-line className="m-0 flex items-start gap-3">
       {/* Same width and left edge as the composer's plus, centred on the
           words' first line. */}
       <span
         aria-hidden="true"
-        className={`flex w-4 shrink-0 items-center ${wide ? "ml-[3px] h-10" : "h-[2.8125rem]"}`}
+        className="ml-[3px] flex h-10 w-4 shrink-0 items-center"
       >
         <svg
           width="16"
@@ -66,13 +62,7 @@ export function EmptyLine({
           <path d="M1 4C2.5 0.5 5.5 0.5 8 4S13.5 7.5 15 4" />
         </svg>
       </span>
-      <span
-        className={`min-w-0 flex-1 wrap-anywhere ${
-          wide
-            ? "py-2.5 text-[0.9375rem] leading-[1.4]"
-            : "py-[0.6875rem] text-[1.0625rem] leading-[1.35]"
-        }`}
-      >
+      <span className="min-w-0 flex-1 wrap-anywhere py-2.5 text-[0.9375rem] leading-[1.4]">
         {text}
       </span>
     </p>
