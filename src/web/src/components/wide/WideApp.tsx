@@ -197,7 +197,9 @@ export function WideApp({
 
   // The sheet stays drawn while it slides away, so the open todo's state is
   // kept a render longer than `detailTodo`. Adjusted while rendering, so
-  // the sheet never drops out of the row for a frame.
+  // the sheet never drops out of the row for a frame. It compares the todo
+  // itself, not its id: an edit or a move to another list arrives as a new
+  // object, and the sheet has to draw it (and follow it to its new column).
   const [sheet, setSheet] = useState<ShownSheet | null>(null);
   if (detailTodo) {
     if (sheet?.todo !== detailTodo || sheet.leaving) {
@@ -336,6 +338,11 @@ export function WideApp({
   // While you're in one of your lists, the URL names it.
 
   const urlKey = boardViewKey(view, lists);
+  // The URL the board has already acted on. Both effects below write it:
+  // the first when a new URL arrives, the second just before it navigates,
+  // so the URL it asks for is already "applied" when it lands and the first
+  // doesn't move focus again. They run in this order in the same commit
+  // (the lists arriving), so the first has to stay above the second.
   const appliedUrlKey = useRef<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes, once lists are in
