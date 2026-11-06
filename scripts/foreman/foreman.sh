@@ -827,15 +827,15 @@ convert_drafts() { # board_json -> each draft in the spec column becomes an issu
   while IFS=$'\t' read -r id title; do
     [ -n "$id" ] || continue
     if dry; then log "would convert draft \"$title\""; continue; fi
-    [ -n "$repo" ] || repo=$(gh repo view "$OWNER/$REPO" --json id --jq .id) && [ -n "$repo" ] \
-      || { log "couldn't read the repo's id; converting drafts next tick"; return 0; }
+    [ -n "$repo" ] || repo=$(gh repo view "$OWNER/$REPO" --json id --jq .id) || repo=""
+    if [ -z "$repo" ]; then log "couldn't read the repo's id; converting drafts next tick"; return 0; fi
     n=$(gh api graphql -f query='
       mutation($item: ID!, $repo: ID!) {
         convertProjectV2DraftIssueItemToIssue(input: {itemId: $item, repositoryId: $repo}) {
           item { content { ... on Issue { number } } }
         }
-      }' -f item="$id" -f repo="$repo" --jq '.data.convertProjectV2DraftIssueItemToIssue.item.content.number') \
-      && [[ "$n" =~ ^[0-9]+$ ]] || { log "couldn't convert draft \"$title\"; retrying next tick"; continue; }
+      }' -f item="$id" -f repo="$repo" --jq '.data.convertProjectV2DraftIssueItemToIssue.item.content.number') || n=""
+    if ! [[ "$n" =~ ^[0-9]+$ ]]; then log "couldn't convert draft \"$title\"; retrying next tick"; continue; fi
     log "converted draft \"$title\" -> #$n"; event converted_draft "$n" "" "$title"
     # The kind:* label comes from the draft run (apply_kind).
     if ! jq -r --arg id "$id" '.items.nodes[] | select(.id == $id) | .content.body // ""' <<<"$board" | draft_body \
