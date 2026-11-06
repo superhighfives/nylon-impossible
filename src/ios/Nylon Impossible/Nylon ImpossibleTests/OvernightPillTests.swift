@@ -12,11 +12,11 @@ import UIKit
 @Suite("Overnight pill: one line")
 @MainActor
 struct OvernightPillTests {
-    private let twoDigits = "12 moved to This week overnight"
-    private let bothLists = "2 moved to This week, 1 to Someday overnight"
+    private let twoDigits = OvernightNote.line(movedToThisWeek: 12, movedToSomeday: 0)!
+    private let bothLists = OvernightNote.line(movedToThisWeek: 2, movedToSomeday: 1)!
 
-    private func pill(_ text: String) -> some View {
-        OvernightPill(text: text, onSee: {}, onDismiss: {}).environment(\.isWideLayout, true)
+    private func pill(_ line: OvernightNote.Line) -> some View {
+        OvernightPill(line: line, onSee: {}, onDismiss: {}).environment(\.isWideLayout, true)
     }
 
     private func size<V: View>(_ view: V, width: CGFloat) -> CGSize {
@@ -33,7 +33,7 @@ struct OvernightPillTests {
     private func room(_ column: CGFloat) -> CGFloat { column - 2 * Theme.Wide.gutter }
 
     /// A pill that's one line for sure.
-    private var oneLine: CGFloat { size(pill("1 moved to Someday overnight"), width: 400).height }
+    private var oneLine: CGFloat { size(pill(OvernightNote.line(movedToThisWeek: 0, movedToSomeday: 1)!), width: 400).height }
 
     @Test("A 240pt column shows one line for both texts")
     func narrowColumn() {
@@ -52,10 +52,10 @@ struct OvernightPillTests {
     /// and within a 400pt column's, so that gets the full text.
     @Test("The full text shows at 400pt and the short form at 240pt")
     func whichForm() {
-        for text in [twoDigits, bothLists] {
-            let natural = size(pill(text).fixedSize(), width: 1000).width
-            #expect(natural > room(240), "\(text) fits a 240pt column in full, so it never needs the short form there")
-            #expect(natural <= room(400), "\(text) doesn't fit a 400pt column in full")
+        for line in [twoDigits, bothLists] {
+            let natural = size(pill(line).fixedSize(), width: 1000).width
+            #expect(natural > room(240), "\(line.text) fits a 240pt column in full, so it never needs the short form there")
+            #expect(natural <= room(400), "\(line.text) doesn't fit a 400pt column in full")
         }
     }
 }

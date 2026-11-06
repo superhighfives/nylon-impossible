@@ -387,7 +387,7 @@ extension ContentView {
                 lists: derived.lists,
                 actions: actions,
                 selectedId: selectedTodoId,
-                overnight: kind == .today ? overnightText.map { ($0, seeOvernight, dismissOvernight) } : nil,
+                overnight: kind == .today ? overnightLine.map { ($0, seeOvernight, dismissOvernight) } : nil,
                 empty: wideEmpty(kind, counts: derived.counts),
                 composer: composer,
                 addSelected: addSelected(list.id),

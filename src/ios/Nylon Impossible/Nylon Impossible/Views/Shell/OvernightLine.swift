@@ -16,7 +16,7 @@ import SwiftUI
 /// otherwise the short form ("4 moved"), with the full text for VoiceOver and
 /// the hover tooltip.
 struct OvernightPill: View {
-    let text: String
+    let line: OvernightNote.Line
     let onSee: () -> Void
     let onDismiss: () -> Void
 
@@ -24,7 +24,7 @@ struct OvernightPill: View {
 
     /// "2 moved to This week": the moon says when.
     private var fullText: String {
-        text.hasSuffix(" overnight") ? String(text.dropLast(" overnight".count)) : text
+        line.text.hasSuffix(" overnight") ? String(line.text.dropLast(" overnight".count)) : line.text
     }
 
     var body: some View {
@@ -35,7 +35,7 @@ struct OvernightPill: View {
             Button(action: onSee) {
                 ViewThatFits(in: .horizontal) {
                     Text(fullText)
-                    Text(OvernightNote.shortText(text))
+                    Text(line.short)
                 }
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)

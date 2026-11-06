@@ -100,13 +100,19 @@ enum OvernightNote {
         }
     }
 
-    /// The pill's short form when the full text doesn't fit a column on one
-    /// line: the total moved, "4 moved", "3 moved" for "2 moved to This
-    /// week, 1 to Someday". Read back from `text`, whose numbers are the
-    /// counts.
-    static func shortText(_ text: String) -> String {
-        let total = text.split { !$0.isNumber }.compactMap { Int($0) }.reduce(0, +)
-        return "\(total) moved"
+    /// The note in both its forms.
+    struct Line: Equatable {
+        /// "2 moved to This week, 1 to Someday overnight".
+        let text: String
+        /// The pill's form when `text` doesn't fit a column on one line: the
+        /// total moved, "3 moved".
+        let short: String
+    }
+
+    /// Both forms from the counts, so the short one never depends on the
+    /// wording of the long one; nil when nothing moved.
+    static func line(movedToThisWeek week: Int, movedToSomeday someday: Int) -> Line? {
+        text(movedToThisWeek: week, movedToSomeday: someday).map { Line(text: $0, short: "\(week + someday) moved") }
     }
 
     /// Whether the sweep ran on the user's current local day, in the zone the
@@ -119,16 +125,16 @@ enum OvernightNote {
     }
 
     /// The line to show on Today, or nil.
-    static func visibleText(
+    static func visibleLine(
         _ sweep: LastSweep?,
         now: Date = Date(),
         timeZone: TimeZone,
         dismissedAt: String?
-    ) -> String? {
+    ) -> Line? {
         guard let sweep,
               sweep.atString != dismissedAt,
               isToday(sweep.at, now: now, timeZone: timeZone) else { return nil }
-        return text(movedToThisWeek: sweep.movedToThisWeek, movedToSomeday: sweep.movedToSomeday)
+        return line(movedToThisWeek: sweep.movedToThisWeek, movedToSomeday: sweep.movedToSomeday)
     }
 
     /// The account's zone, falling back to the device's for an unknown name.

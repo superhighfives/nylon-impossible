@@ -87,10 +87,11 @@ struct OvernightCopyTests {
 
     @Test("The short form is the count, or the total when both lists got some")
     func shortForm() {
-        #expect(OvernightNote.shortText("4 moved to This week overnight") == "4 moved")
-        #expect(OvernightNote.shortText("12 moved to This week overnight") == "12 moved")
-        #expect(OvernightNote.shortText("1 moved to Someday overnight") == "1 moved")
-        #expect(OvernightNote.shortText("2 moved to This week, 1 to Someday overnight") == "3 moved")
+        #expect(OvernightNote.line(movedToThisWeek: 4, movedToSomeday: 0)?.short == "4 moved")
+        #expect(OvernightNote.line(movedToThisWeek: 12, movedToSomeday: 0)?.short == "12 moved")
+        #expect(OvernightNote.line(movedToThisWeek: 0, movedToSomeday: 1)?.short == "1 moved")
+        #expect(OvernightNote.line(movedToThisWeek: 2, movedToSomeday: 1)?.short == "3 moved")
+        #expect(OvernightNote.line(movedToThisWeek: 0, movedToSomeday: 0) == nil)
     }
 }
 
@@ -125,20 +126,20 @@ struct OvernightDayTests {
     @Test("Yesterday's sweep doesn't show")
     func yesterday() {
         let sweep = LastSweep(at: date("2026-10-19T07:00:00Z"), movedToThisWeek: 2, movedToSomeday: 0)
-        #expect(OvernightNote.visibleText(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("America/Los_Angeles"), dismissedAt: nil) == nil)
+        #expect(OvernightNote.visibleLine(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("America/Los_Angeles"), dismissedAt: nil) == nil)
     }
 
     @Test("Today's sweep shows")
     func today() {
         let sweep = LastSweep(at: date("2026-10-20T07:00:00Z"), movedToThisWeek: 2, movedToSomeday: 1)
-        #expect(OvernightNote.visibleText(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("America/Los_Angeles"), dismissedAt: nil)
-            == "2 moved to This week, 1 to Someday overnight")
+        #expect(OvernightNote.visibleLine(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("America/Los_Angeles"), dismissedAt: nil)
+            == OvernightNote.Line(text: "2 moved to This week, 1 to Someday overnight", short: "3 moved"))
     }
 
     @Test("A sweep that moved nothing doesn't show")
     func movedNothing() {
         let sweep = LastSweep(at: date("2026-10-20T07:00:00Z"), movedToThisWeek: 0, movedToSomeday: 0)
-        #expect(OvernightNote.visibleText(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("UTC"), dismissedAt: nil) == nil)
+        #expect(OvernightNote.visibleLine(sweep, now: date("2026-10-20T15:00:00Z"), timeZone: zone("UTC"), dismissedAt: nil) == nil)
     }
 
     @Test("An unknown zone name falls back to the device's")
@@ -162,10 +163,10 @@ struct OvernightDismissalTests {
     func hides() {
         let dismissal = store()
         let sweep = LastSweep(at: now.addingTimeInterval(-3600), atString: "2026-10-20T14:00:00.000Z", movedToThisWeek: 2, movedToSomeday: 0)
-        #expect(OvernightNote.visibleText(sweep, now: now, timeZone: utc, dismissedAt: dismissal.dismissedAt) != nil)
+        #expect(OvernightNote.visibleLine(sweep, now: now, timeZone: utc, dismissedAt: dismissal.dismissedAt) != nil)
         dismissal.dismiss(sweep)
         #expect(dismissal.dismissedAt == "2026-10-20T14:00:00.000Z")
-        #expect(OvernightNote.visibleText(sweep, now: now, timeZone: utc, dismissedAt: dismissal.dismissedAt) == nil)
+        #expect(OvernightNote.visibleLine(sweep, now: now, timeZone: utc, dismissedAt: dismissal.dismissedAt) == nil)
     }
 
     @Test("The next sweep shows again")
@@ -174,7 +175,7 @@ struct OvernightDismissalTests {
         let first = LastSweep(at: now.addingTimeInterval(-3600), atString: "2026-10-20T14:00:00.000Z", movedToThisWeek: 2, movedToSomeday: 0)
         dismissal.dismiss(first)
         let second = LastSweep(at: now.addingTimeInterval(-60), atString: "2026-10-20T14:59:00.000Z", movedToThisWeek: 0, movedToSomeday: 1)
-        #expect(OvernightNote.visibleText(second, now: now, timeZone: utc, dismissedAt: dismissal.dismissedAt) == "1 moved to Someday overnight")
+        #expect(OvernightNote.visibleLine(second, now: now, timeZone: utc, dismissedAt: dismissal.dismissedAt)?.text == "1 moved to Someday overnight")
     }
 
     @Test("Clear forgets the dismissal")
