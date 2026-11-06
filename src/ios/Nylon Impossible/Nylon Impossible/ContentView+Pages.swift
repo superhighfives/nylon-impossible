@@ -27,14 +27,14 @@ extension ContentView {
                         title: page.title,
                         subline: subline(page, count: rows.count),
                         keepsBanner: true,
-                        banner: page == .today ? overnightText.map { text in
+                        banner: page == .today ? overnightLine.map { line in
                             AnyView(
-                                OvernightPill(text: text, onSee: seeOvernight, onDismiss: dismissOvernight)
+                                OvernightPill(line: line, onSee: seeOvernight, onDismiss: dismissOvernight)
                                     .transition(.opacity)
                             )
                         } : nil
                     )
-                    .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnightText)
+                    .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnightLine)
                 }
             } else {
                 loading(page.title)

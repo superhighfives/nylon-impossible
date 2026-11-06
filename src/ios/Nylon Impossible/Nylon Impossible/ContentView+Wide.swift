@@ -112,6 +112,16 @@ extension ContentView {
         .navigationSubtitle(windowSubtitle)
         .toolbar { macToolbar }
         .background(Theme.Colors.canvas.ignoresSafeArea())
+        // The sidebar hides in a narrow window and comes back in a wide one,
+        // as Mail's and Notes' do. Measured on the window, not the board, so
+        // hiding it can't widen the board back over the line. Runs only when
+        // the window crosses the line (and once when it opens), so the
+        // toolbar's toggle and ⌃⌘S win until the next crossing.
+        .onGeometryChange(for: Bool.self) { proxy in
+            proxy.size.width < Theme.Wide.sidebarMinWindowWidth
+        } action: { narrow in
+            sidebarVisibility = narrow ? .detailOnly : .all
+        }
         .focusedSceneValue(\.board, commandHandler)
         .onChange(of: actions.toasts.current) { undoBridge.sync(actions.toasts, undoManager: undoManager) }
         #else
@@ -377,7 +387,7 @@ extension ContentView {
                 lists: derived.lists,
                 actions: actions,
                 selectedId: selectedTodoId,
-                overnight: kind == .today ? overnightText.map { ($0, seeOvernight, dismissOvernight) } : nil,
+                overnight: kind == .today ? overnightLine.map { ($0, seeOvernight, dismissOvernight) } : nil,
                 empty: wideEmpty(kind, counts: derived.counts),
                 composer: composer,
                 addSelected: addSelected(list.id),

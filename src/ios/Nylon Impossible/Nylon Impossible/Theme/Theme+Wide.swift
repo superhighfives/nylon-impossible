@@ -17,6 +17,10 @@ extension Theme {
         static let gutter = Theme.Space.s6
         /// The sidebar's width.
         static let sidebarWidth: CGFloat = 248
+        /// A Mac window narrower than this hides its sidebar on its own, and
+        /// one this wide or wider shows it: without the sidebar, four
+        /// columns at `columnMinWidth` fit.
+        static let sidebarMinWindowWidth: CGFloat = 960
         /// The narrowest a column gets before the board scrolls sideways.
         static let columnMinWidth: CGFloat = 240
         /// The same at accessibility text sizes.

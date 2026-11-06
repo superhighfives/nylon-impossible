@@ -402,8 +402,8 @@ extension ContentView {
     }
 
     /// Today's "2 moved to This week overnight" line, or nil.
-    var overnightText: String? {
-        OvernightNote.visibleText(
+    var overnightLine: OvernightNote.Line? {
+        OvernightNote.visibleLine(
             preferences.lastSweep,
             timeZone: OvernightNote.timeZone(named: preferences.timezone),
             dismissedAt: overnightDismissedAt

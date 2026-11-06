@@ -66,7 +66,7 @@ extension ContentView {
 
     /// Adding anything to Today retires the overnight note.
     func noteAdded(_ created: [TodoItem], to listId: String?) {
-        guard !created.isEmpty, overnightText != nil else { return }
+        guard !created.isEmpty, overnightLine != nil else { return }
         let today = timeList(.today)?.id.lowercased()
         if listId == nil || listId?.lowercased() == today { dismissOvernight() }
     }
