@@ -230,7 +230,7 @@ extension ContentView {
             viewModel.page = .thisWeek
             viewModel.newTaskText = "Call the dentist friday"
             focusComposer = true
-        case .detail, .done, .settings, .inspector, .menu:
+        case .detail, .done, .settings, .inspector, .menu, .shortcuts:
             Task {
                 try? await Task.sleep(for: .milliseconds(400))
                 switch route {
@@ -249,6 +249,9 @@ extension ContentView {
                     try? await Task.sleep(for: .milliseconds(1200))
                     ScreenRouteMenu.present()
                     #endif
+                case .shortcuts:
+                    viewModel.page = .today
+                    showsShortcuts = true
                 case .done where isWide:
                     showDone()
                 case .settings where isWide:

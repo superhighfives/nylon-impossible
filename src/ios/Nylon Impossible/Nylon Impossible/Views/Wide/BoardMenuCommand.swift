@@ -109,6 +109,13 @@ enum BoardMenuCommand: Hashable {
         }
     }
 
+    /// `keyLabel` as the shortcuts sheet draws it: one array per
+    /// alternative, one string per key cap. "⇧1 or G T" is
+    /// `[["⇧1"], ["G", "T"]]`.
+    var keyCaps: [[String]] {
+        keyLabel.components(separatedBy: " or ").map { $0.split(separator: " ").map(String.init) }
+    }
+
     static func label(_ shortcut: Shortcut) -> String {
         var text = ""
         if shortcut.modifiers.contains(.control) { text += "⌃" }
@@ -142,6 +149,20 @@ enum BoardMenuCommand: Hashable {
         ("Create", [.key(.new), .key(.newList)]),
         ("Help", [.key(.shortcuts)])
     ]
+
+    /// The sheet's two columns, in order: the first ends after the section
+    /// that comes closest to splitting the rows in half.
+    static var shortcutColumns: [[(title: String, commands: [BoardMenuCommand])]] {
+        let total = shortcutSections.reduce(0) { $0 + $1.commands.count }
+        var rows = 0
+        var split = (index: 0, gap: Int.max)
+        for (index, section) in shortcutSections.enumerated() {
+            rows += section.commands.count
+            let gap = abs(total - 2 * rows)
+            if gap < split.gap { split = (index, gap) }
+        }
+        return [Array(shortcutSections[...split.index]), Array(shortcutSections[(split.index + 1)...])]
+    }
 
     /// Commands that act on the selected row.
     var needsSelection: Bool {

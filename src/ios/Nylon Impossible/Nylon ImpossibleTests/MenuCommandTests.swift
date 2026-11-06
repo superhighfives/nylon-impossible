@@ -125,6 +125,23 @@ struct MenuCommandTests {
         #expect(BoardKey.afterGo("x") == nil)
     }
 
+    @Test("The shortcuts sheet draws a cap per key, with alternatives apart")
+    func keyCaps() {
+        #expect(BoardMenuCommand.key(.done).keyCaps == [["X"]])
+        #expect(BoardMenuCommand.key(.down).keyCaps == [["J"], ["↓"]])
+        #expect(BoardMenuCommand.key(.jump(.time(.today))).keyCaps == [["⇧1"], ["G", "T"]])
+        #expect(BoardMenuCommand.key(.jump(.list(0))).keyCaps == [["⇧4–9"]])
+        #expect(BoardMenuCommand.key(.goToList).keyCaps == [["G", "L"]])
+        #expect(BoardMenuCommand.search.keyCaps == [["⌘K"]])
+    }
+
+    @Test("The shortcuts sheet's two columns keep every section, in order")
+    func shortcutColumns() {
+        let columns = BoardMenuCommand.shortcutColumns
+        #expect(columns.map { $0.map(\.title) } == [["Move around", "Todo"], ["Go to", "Create", "Help"]])
+        #expect(columns.flatMap { $0.flatMap(\.commands) } == BoardMenuCommand.shortcutSections.flatMap(\.commands))
+    }
+
     @Test("The shortcuts sheet shows each command's keys")
     func keyLabels() {
         #expect(BoardMenuCommand.key(.done).keyLabel == "X")
