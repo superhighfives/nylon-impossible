@@ -18,7 +18,8 @@
 //  stops at a system "Open in Nylon?" prompt a script can't answer). On iPad: board,
 //  column (a list open as the fourth column), inspector (the detail panel),
 //  menu (a row selected, ready for a long-press), keys (the keyboard on an
-//  empty Today, outlined, as after a key press). `-NylonLandscape YES`
+//  empty Today, outlined, as after a key press), shortcuts (the Keyboard
+//  shortcuts sheet open over the board; on a Mac too). `-NylonLandscape YES`
 //  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
@@ -48,6 +49,8 @@ enum ScreenRoute: String, CaseIterable {
     /// The board with the keyboard on an empty Today, so its section
     /// outline shows without a key press.
     case keys
+    /// The board with the Keyboard shortcuts sheet open.
+    case shortcuts
     case signin, loading, empty, syncerror, perf
     /// macOS: the menu bar extra's quick-add, drawn in the window.
     case menubar

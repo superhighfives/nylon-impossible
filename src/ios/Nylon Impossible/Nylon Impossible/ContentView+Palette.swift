@@ -300,40 +300,93 @@ struct KeyCap: View {
     }
 }
 
-/// `?`: the board's keys, from `BoardMenuCommand.shortcutSections`.
+/// `?`: the board's keys, from `BoardMenuCommand.shortcutSections`, as
+/// cards in two columns, or one when the sheet is too narrow for both.
 struct KeyboardShortcutsView: View {
     var showsFeedback = false
     let onClose: () -> Void
 
     var body: some View {
         PanelChrome(onClose: onClose) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Space.s4) {
-                    Text("Keyboard shortcuts")
-                        .textStyle(Theme.Fonts.Wide.title)
-                        .foregroundStyle(Theme.Colors.ink)
-                        .accessibilityAddTraits(.isHeader)
-                    ForEach(BoardMenuCommand.shortcutSections, id: \.title) { section in
-                        VStack(alignment: .leading, spacing: 6) {
-                            SectionLabel(text: section.title)
-                            ForEach(section.commands, id: \.self) { command in
-                                HStack {
-                                    Text(command.title)
-                                        .foregroundStyle(Theme.Colors.ink)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                    Text(command.keyLabel)
-                                        .foregroundStyle(Theme.Colors.inkMuted)
-                                }
-                                .textStyle(Theme.Fonts.Role.bodyWide)
-                                .accessibilityElement(children: .combine)
-                            }
-                        }
-                    }
-                }
-                .padding(Theme.Wide.gutter)
+            // At its full height when there's room, so the Mac sheet opens
+            // to fit it; scrolling when the window is shorter.
+            ViewThatFits(in: .vertical) {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                ScrollView { content }
             }
         }
         .frame(minWidth: 420, minHeight: 520)
         .presentationBackground(Theme.Colors.canvas)
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s4) {
+            Text("Keyboard shortcuts")
+                .textStyle(Theme.Fonts.Wide.title)
+                .foregroundStyle(Theme.Colors.ink)
+                .accessibilityAddTraits(.isHeader)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: Theme.Space.s4) {
+                    ForEach(BoardMenuCommand.shortcutColumns.indices, id: \.self) { index in
+                        cards(BoardMenuCommand.shortcutColumns[index])
+                            .frame(minWidth: Theme.Wide.columnMinWidth)
+                    }
+                }
+                cards(BoardMenuCommand.shortcutSections)
+            }
+        }
+        .padding(Theme.Wide.gutter)
+    }
+
+    private func cards(_ sections: [(title: String, commands: [BoardMenuCommand])]) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Space.s4) {
+            ForEach(sections, id: \.title) { section in
+                VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                    SectionLabel(text: section.title)
+                    ForEach(section.commands, id: \.self) { command in
+                        HStack(spacing: Theme.Space.s3) {
+                            Text(command.title)
+                                .foregroundStyle(Theme.Colors.ink)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            KeyCaps(alternatives: command.keyCaps)
+                        }
+                        .textStyle(Theme.Fonts.Role.bodyWide)
+                        // One element, "title, key", as before the caps.
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(command.title)
+                        .accessibilityValue(command.keyLabel)
+                    }
+                }
+                .padding(Theme.Space.s4)
+                .background(Theme.Colors.surface, in: RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.field, style: .continuous)
+                        .strokeBorder(Theme.Colors.hairline)
+                )
+            }
+        }
+    }
+}
+
+/// A command's keys: a `KeyCap` per key, "or" between alternatives.
+struct KeyCaps: View {
+    let alternatives: [[String]]
+
+    var body: some View {
+        HStack(spacing: Theme.Space.s1) {
+            ForEach(alternatives.indices, id: \.self) { index in
+                if index > 0 {
+                    Text("or")
+                        .textStyle(Theme.Fonts.Role.meta)
+                        .foregroundStyle(Theme.Colors.inkMuted)
+                        .padding(.horizontal, Theme.Space.s1)
+                }
+                ForEach(alternatives[index].indices, id: \.self) { key in
+                    KeyCap(alternatives[index][key])
+                }
+            }
+        }
+        .fixedSize()
     }
 }
