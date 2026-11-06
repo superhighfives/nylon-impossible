@@ -120,6 +120,7 @@ the source of truth:
 | --- | --- |
 | Ideas | Draft items: a line or a paragraph. Anyone, agents included, may add one |
 | Specced | An issue whose body is a spec (`prd` skill), being argued until its Open questions are "None." |
+| Blocked | Waiting on something outside the repo (MacStadium, a vendor, an OS release). The body's first line says `Blocked on: …`. Waiting on the owner is `needs-decision`, not this. The foreman skips it |
 | Ready | Argued out and cleared to build by the owner. An agent may pick it up |
 | In progress | Someone (or an agent) has a branch for it |
 | In review | A PR is open |
