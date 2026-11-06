@@ -12,7 +12,9 @@ import SwiftUI
 /// The overnight note as a small orange pill, above Today's title in the
 /// space every board column header and top-level phone page keeps for it (so
 /// titles don't move when it comes or goes). Its text goes to the list they
-/// moved to; × dismisses it. Up to two lines, then truncated.
+/// moved to; × dismisses it. Always one line: the full text when it fits,
+/// otherwise the short form ("4 moved"), with the full text for VoiceOver and
+/// the hover tooltip.
 struct OvernightPill: View {
     let text: String
     let onSee: () -> Void
@@ -21,7 +23,7 @@ struct OvernightPill: View {
     @Environment(\.isWideLayout) private var isWide
 
     /// "2 moved to This week": the moon says when.
-    private var shortText: String {
+    private var fullText: String {
         text.hasSuffix(" overnight") ? String(text.dropLast(" overnight".count)) : text
     }
 
@@ -31,10 +33,12 @@ struct OvernightPill: View {
                 .font(.system(size: 12, weight: .semibold))
                 .accessibilityHidden(true)
             Button(action: onSee) {
-                Text(shortText)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                ViewThatFits(in: .horizontal) {
+                    Text(fullText)
+                    Text(OvernightNote.shortText(text))
+                }
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
                     // A 44pt target around a one-line pill, without making
                     // the pill taller.
                     .padding(.vertical, 14)
@@ -42,6 +46,8 @@ struct OvernightPill: View {
             }
             .buttonStyle(.plain)
             .padding(.vertical, -14)
+            .help(fullText)
+            .accessibilityLabel(fullText)
             .accessibilityHint(isWide ? "Selects the first of them" : "Shows them")
             Button(action: onDismiss) {
                 Image(systemName: Theme.Icon.close)

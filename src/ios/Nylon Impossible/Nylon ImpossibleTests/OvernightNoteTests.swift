@@ -84,6 +84,14 @@ struct OvernightCopyTests {
     func nothing() {
         #expect(OvernightNote.text(movedToThisWeek: 0, movedToSomeday: 0) == nil)
     }
+
+    @Test("The short form is the count, or the total when both lists got some")
+    func shortForm() {
+        #expect(OvernightNote.shortText("4 moved to This week overnight") == "4 moved")
+        #expect(OvernightNote.shortText("12 moved to This week overnight") == "12 moved")
+        #expect(OvernightNote.shortText("1 moved to Someday overnight") == "1 moved")
+        #expect(OvernightNote.shortText("2 moved to This week, 1 to Someday overnight") == "3 moved")
+    }
 }
 
 @Suite("Overnight note: is it today?")

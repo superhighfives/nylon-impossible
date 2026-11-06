@@ -100,6 +100,15 @@ enum OvernightNote {
         }
     }
 
+    /// The pill's short form when the full text doesn't fit a column on one
+    /// line: the total moved, "4 moved", "3 moved" for "2 moved to This
+    /// week, 1 to Someday". Read back from `text`, whose numbers are the
+    /// counts.
+    static func shortText(_ text: String) -> String {
+        let total = text.split { !$0.isNumber }.compactMap { Int($0) }.reduce(0, +)
+        return "\(total) moved"
+    }
+
     /// Whether the sweep ran on the user's current local day, in the zone the
     /// sweep itself uses (their timezone setting, which may not be the
     /// device's).

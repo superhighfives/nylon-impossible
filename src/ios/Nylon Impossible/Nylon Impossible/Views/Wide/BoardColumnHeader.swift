@@ -28,7 +28,9 @@ struct BoardColumnHeader<Accessory: View>: View {
     @ViewBuilder var accessory: () -> Accessory
 
     @ScaledMetric(relativeTo: .largeTitle) private var headerHeight = Theme.Wide.columnHeader + 44
-    /// Two lines of the pill's text.
+    /// Two lines of the pill's text. The pill is one line now, but the web
+    /// keeps two lines too, and shrinking it happens on every platform at
+    /// once (#516).
     @ScaledMetric(relativeTo: .footnote) private var bannerHeight: CGFloat = 44
     /// The tallest header and subline on the board, so all of them match.
     @Environment(\.boardHeaderHeights) private var shared
