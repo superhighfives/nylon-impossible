@@ -140,6 +140,20 @@ struct BoardPalette: View {
             .accessibilityLabel(title ?? "Search and commands")
         }
         .onAppear { fieldFocused = true }
+        .task { await takeFocus() }
+    }
+
+    /// The palette fades in over the board, which still has the keyboard,
+    /// and on the Mac a focus request made before the field is in the window
+    /// is dropped, so ⌘K sometimes left no caret. Keep asking, for a
+    /// moment, until it takes.
+    private func takeFocus() async {
+        for _ in 0..<10 where !fieldFocused {
+            await Task.yield()
+            fieldFocused = true
+            // Sleep throws once the palette closes and cancels the task; stop then.
+            do { try await Task.sleep(for: .milliseconds(30)) } catch { return }
+        }
     }
 
     private func row(_ item: PaletteItem, selected: Bool) -> some View {
