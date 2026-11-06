@@ -15,6 +15,13 @@ Bun workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
 and `bun run lint` fan out to those three. Per-package variants are prefixed
 (`bun run api:test`, `bun run web:typecheck`).
 
+## Xcode builds
+
+A build with its own `-derivedDataPath` (one per PR, or per iOS/Mac pair, so parallel builds don't fight
+over Xcode's lock) leaves 3-4GB behind, and nothing clears `/tmp`. A week of those filled the owner's disk
+(55GB, 2026-11). Put the folder in your session's scratchpad, and delete it once the build or test run is
+done, pass or fail. Without a reason to keep builds apart, use Xcode's default DerivedData instead.
+
 ## Bun
 
 Bun is the package manager and script runner; Node still runs the tools.
