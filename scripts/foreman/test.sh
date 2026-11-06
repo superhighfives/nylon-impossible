@@ -596,6 +596,22 @@ AUTHOR_BOARD=$(jq -c '.items.nodes += [
 expect "Ready also takes the machine account's issues, and nobody else's"  "11 16 18 19"  "$(ready_issues "$AUTHOR_BOARD" | paste -sd' ' -)"
 expect "so do spec runs"                                                   "14 17 20"     "$(spec_issues "$AUTHOR_BOARD" | paste -sd' ' -)"
 
+# The owner may rename the spec column "Define" on the board at any time.
+define() { # board_json -> the same board, its spec column renamed Define
+  jq -c '(.field.options[] | select(.name == "Specced")) |= {id:"o-define", name:"Define"}
+    | .items.nodes |= map(if .status.name? == "Specced" then .status.name = "Define" else . end)' <<<"$1"
+}
+on_board() { # board_json command... -> the command, with SPEC_COL read from that board
+  ( spec_column "$1"; "${@:2}" )
+}
+DEFINE_BOARD=$(define "$AUTHOR_BOARD")
+expect "the spec column is Specced on a board that has it"   "Specced"  "$(spec_column "$BOARD"; echo "$SPEC_COL")"
+expect "and Define once it's renamed"                        "Define"   "$(spec_column "$DEFINE_BOARD"; echo "$SPEC_COL")"
+expect "Define wins if the board has both"                   "Define"   "$(spec_column "$(jq -c '.field.options += [{id:"o-define", name:"Define"}]' <<<"$BOARD")"; echo "$SPEC_COL")"
+out=$( (spec_column "$(jq -c '.field.options |= map(select(.name != "Specced"))' <<<"$BOARD")"; echo "carried on") 2>&1 )
+expect "neither stops the run"                               "1 foreman: no status called 'Define' or 'Specced' on the board" "$? $out"
+expect "spec runs on a Define board"                         "14 17 20"  "$(on_board "$DEFINE_BOARD" spec_issues "$DEFINE_BOARD" | paste -sd' ' -)"
+
 SPEC_BODY="" SPEC_LABELS="" COMMENT_IDS=""
 gh() {
   echo "$*" >> "$CALLS"
@@ -631,6 +647,10 @@ spec_ready "$BOARD" 11 >/dev/null
 expect "a dry run refuses without touching it"  "1 no"  "$? $(called 'issue edit')"
 DRY=0
 
+: > "$CALLS"; SPEC_LABELS="kind:fix"
+on_board "$(define "$BOARD")" spec_ready "$(define "$BOARD")" 11 >/dev/null
+expect "on a Define board, back to Define"      "yes no"  "$(called '--single-select-option-id o-define') $(called 'o-specced')"
+
 echo "spec rounds"
 rm -rf "$SPECS"; mkdir -p "$SPECS"; DRY=1
 COMMENT_IDS=""
@@ -646,6 +666,101 @@ expect "one run per reply"                        ""                            
 DRY=0
 # The comments call filters by the owner's login: only their replies start a run.
 expect "only the owner's comments are asked for"  "yes"  "$(called 'select(.user.login == "superhighfives") | .id')"
+
+echo "drafts in the spec column"
+
+DRAFT_BOARD=$(jq -c '.items.nodes = [
+  {id:"DI_1", status:{name:"Ideas"}, content:{__typename:"DraftIssue", title:"Left in Ideas", body:"Not yet."}},
+  {id:"DI_2", status:{name:"Specced"}, content:{__typename:"DraftIssue", title:"Web: sort positions by code point", body:"localeCompare sorts \"a\" after \"B\".\n\nSee src/web/a.ts."}},
+  {id:"DI_3", status:{name:"Ready"}, content:{__typename:"DraftIssue", title:"Dragged to Ready", body:"x"}},
+  {id:"DI_4", status:null, content:{__typename:"DraftIssue", title:"No column", body:"x"}},
+  {id:"DI_5", status:{name:"Specced"}, content:{__typename:"DraftIssue", title:"Just a title", body:""}},
+  {id:"I30", status:{name:"Specced"}, content:{__typename:"Issue", number:30, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"kind:fix"}]}}},
+  {id:"I31", status:{name:"Specced"}, content:{__typename:"Issue", number:31, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"}]}}},
+  {id:"I32", status:{name:"Ready"}, content:{__typename:"Issue", number:32, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[]}}},
+  {id:"I33", status:{name:"Specced"}, content:{__typename:"Issue", number:33, state:"OPEN", author:{login:"stranger"}, labels:{nodes:[]}}},
+  {id:"I34", status:{name:"Specced"}, content:{__typename:"Issue", number:34, state:"CLOSED", author:{login:"superhighfives"}, labels:{nodes:[]}}},
+  {id:"I35", status:{name:"Ideas"}, content:{__typename:"Issue", number:35, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[]}}}]' <<<"$BOARD")
+draft_run() { # board_json -> convert_drafts and label_unspecced against it, with SPEC_COL read from it
+  (
+    echo 700 > "$tmp/issue-n"; rm -f "$tmp"/edit-body-*
+    event() { echo "event $*" >> "$CALLS"; }
+    gh() {
+      echo "$*" >> "$CALLS"
+      case "$1 $2" in
+        "repo view") echo R_1 ;;
+        "api graphql") local n; n=$(( $(cat "$tmp/issue-n") + 1 )); echo "$n" > "$tmp/issue-n"; echo "$n" ;;
+        "issue edit") case "$*" in *--body-file*) cat > "$tmp/edit-body-$3" ;; esac ;;
+        *) return 0 ;;
+      esac
+    }
+    spec_column "$1"; convert_drafts "$1"; label_unspecced "$1"
+  ) | sed -E 's/^[0-9-]+ [0-9:]+ //'
+}
+for b in Specced Define; do
+  board="$DRAFT_BOARD"; [ "$b" = Define ] && board=$(define "$DRAFT_BOARD")
+  : > "$CALLS"
+  out=$(draft_run "$board")
+  expect "$b: drafts in the column are converted, in board order"  "item=DI_2|item=DI_5" \
+    "$(grep -oE 'item=DI_[0-9]+' "$CALLS" | paste -sd'|' -)"
+  expect "$b: by the convert mutation, into this repo"             "yes yes"  "$(called 'convertProjectV2DraftIssueItemToIssue') $(called 'repo=R_1')"
+  expect "$b: drafts in Ideas, Ready or no column aren't"          "no no no" "$(called DI_1) $(called DI_3) $(called DI_4)"
+  expect "$b: each gets spec"                                      "yes yes"  "$(called 'issue edit 701 -R superhighfives/nylon-impossible --add-label spec --body-file -') $(called 'issue edit 702 -R superhighfives/nylon-impossible --add-label spec --body-file -')"
+  expect "$b: and no kind yet, nor a board move"                   "no no"    "$(called 'kind:') $(called 'item-edit')"
+  expect "$b: the draft's text, quoted under Problem" \
+    "## Problem||> localeCompare sorts \"a\" after \"B\".|>|> See src/web/a.ts." "$(paste -sd'|' - < "$tmp/edit-body-701")"
+  expect "$b: a draft with only a title says so" \
+    "## Problem||(The draft had only its title.)" "$(paste -sd'|' - < "$tmp/edit-body-702")"
+  expect "$b: logged" \
+    "converted draft \"Web: sort positions by code point\" -> #701|converted draft \"Just a title\" -> #702" "$(grep '^converted' <<<"$out" | paste -sd'|' -)"
+  expect "$b: with an event"                                       "yes yes"  "$(called 'event converted_draft 701') $(called 'event converted_draft 702')"
+  expect "$b: the owner's issue in the column without spec gets it" "yes"     "$(called 'issue edit 30 -R superhighfives/nylon-impossible --add-label spec')"
+  expect "$b: not one with spec, elsewhere, closed or a stranger's" "no no no no no" \
+    "$(called 'issue edit 31') $(called 'issue edit 32') $(called 'issue edit 33') $(called 'issue edit 34') $(called 'issue edit 35')"
+done
+: > "$CALLS"; DRY=1
+expect "a dry run says what it would do" "would convert draft \"Web: sort positions by code point\"|would convert draft \"Just a title\"|would label #30 spec" \
+  "$(draft_run "$DRAFT_BOARD" | paste -sd'|' -)"
+DRY=0
+expect "and does nothing"                "no no"  "$(called 'api graphql') $(called 'issue edit')"
+: > "$CALLS"
+failed_convert() {
+  gh() { echo "$*" >> "$CALLS"; if [ "$1 $2" = "repo view" ]; then echo R_1; else return 1; fi; }
+  spec_column "$DRAFT_BOARD"; convert_drafts "$DRAFT_BOARD"
+}
+expect "a failed conversion is retried next tick" "couldn't convert draft \"Just a title\"; retrying next tick" \
+  "$( (failed_convert) | sed -E 's/^[0-9-]+ [0-9:]+ //' | tail -1)"
+expect "and nothing is labelled" "no" "$(called 'issue edit')"
+# The issue a conversion makes is the machine account's, which spec runs take.
+CONVERTED_BOARD=$(jq -c '.items.nodes = [{id:"DI_2", status:{name:"Specced"}, content:{__typename:"Issue", number:701, state:"OPEN", author:{login:"nylon-foreman"}, labels:{nodes:[{name:"spec"}]}}}]' <<<"$BOARD")
+expect "the converted issue gets spec runs"           "701"  "$(spec_issues "$CONVERTED_BOARD")"
+expect "on a Define board too"                        "701"  "$(on_board "$(define "$CONVERTED_BOARD")" spec_issues "$(define "$CONVERTED_BOARD")")"
+rm -rf "${SPECS:?}"; mkdir -p "$SPECS"; DRY=1; COMMENT_IDS=""
+expect "a draft run first"  "would draft the spec for #701"  "$( (gh() { return 0; }; spec_pass "$CONVERTED_BOARD") | sed -E 's/^[0-9-]+ [0-9:]+ //')"
+DRY=0
+
+echo "the kind a draft picks"
+
+(
+  gh() { echo "$*" >> "$CALLS"; }
+  kind() { echo "$1" > "$tmp/kind.json"; : > "$CALLS"; apply_kind 701 "$tmp/kind.json" >/dev/null; }
+  kind '{"kind":"fix"}'
+  expect "the run's kind becomes the label"     "yes"  "$(called 'issue edit 701 -R superhighfives/nylon-impossible --add-label kind:fix')"
+  expect "and the result file is gone"          "no"   "$([ -e "$tmp/kind.json" ] && echo yes || echo no)"
+  kind '{"kind":"kind:a11y"}'
+  expect "written with its prefix, too"         "yes"  "$(called '--add-label kind:a11y')"
+  kind '{"kind":"bug"}'
+  expect "not one of the six: no label"         "no"   "$(called 'issue edit')"
+  kind $'{"kind":"fix\\nbogus"}'
+  expect "nor anything with more in it"         "no"   "$(called 'issue edit')"
+  rm -f "$tmp/kind.json"; : > "$CALLS"; apply_kind 701 "$tmp/kind.json" >/dev/null
+  expect "no result file: no label"             "no"   "$(called 'issue edit')"
+  trusted_comments() { :; }
+  expect "the prompt asks for one when there's a file"  "yes"  "$(spec_prompt 701 draft "$tmp/kind.json" | grep -qF "write \`{\"kind\": \"<kind>\"}\` to" && echo yes)"
+  # shellcheck disable=SC2016 # the backticks are markdown
+  expect "with all six"                                 "yes"  "$(spec_prompt 701 draft "$tmp/kind.json" | tr '\n' ' ' | grep -qF '`feature`, `fix`, `refactor`, `a11y`, `test` or `chore`' && echo yes)"
+  expect "and not otherwise"                            "no"   "$(spec_prompt 701 revise "" | grep -qF 'kind:*' && echo yes || echo no)"
+)
 
 # ---- feedback ----------------------------------------------------------------
 
@@ -972,6 +1087,7 @@ tick_routines() { # paused-variable -> whether a tick reached the routines
     PAUSEDV=$1
     use_token() { :; }; ensure_clone() { :; }; self_update() { :; }; board_json() { echo '{}'; }
     merge_pass() { :; }; cleanup_worktrees() { :; }; spec_pass() { :; }; agent_pr_count() { echo 3; }
+    spec_column() { :; }; convert_drafts() { :; }; label_unspecced() { :; }
     gh() { case "$*" in "variable get FOREMAN_PAUSED"*) echo "$PAUSEDV" ;; esac; }
     routines_pass() { touch "$tmp/tick-routines"; }
     rm -f "$tmp/tick-routines"
@@ -1188,6 +1304,8 @@ expect "four sections"                         "### Merged|### Waiting on you|##
 expect "merged in the last day, with issues"   "- #143 Fix save (#43, #44)"  "$(sed -n '/### Merged/,/###/p' <<<"$body" | grep '^- ')"
 expect "waiting: decisions, merges and specs"  "- #52 Pick a colour: needs your decision|- #144 Bundle dependabot updates: yours to merge|- #51 Crash on save: its spec has questions for you" \
   "$(sed -n '/### Waiting on you/,/### Found/p' <<<"$body" | grep '^- ' | paste -sd'|' -)"
+expect "the same on a Define board"            "- #51 Crash on save: its spec has questions for you" \
+  "$(on_board "$(define "$DIGEST_BOARD")" digest_waiting "$(define "$DIGEST_BOARD")" | grep spec)"
 
 : > "$CALLS"
 routine_digest "$DIGEST_BOARD" >/dev/null

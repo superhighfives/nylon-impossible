@@ -118,8 +118,8 @@ the source of truth:
 
 | Status | What's there |
 | --- | --- |
-| Ideas | Draft items: a line or a paragraph. Anyone, agents included, may add one |
-| Specced | An issue whose body is a spec (`prd` skill), being argued until its Open questions are "None." |
+| Ideas | Draft items: a line or a paragraph. Anyone, agents included, may add one. Drag a draft to Define to have it specced |
+| Define | An issue whose body is a spec (`prd` skill), being argued until its Open questions are "None." |
 | Blocked | Waiting on something outside the repo (MacStadium, a vendor, an OS release). The body's first line says `Blocked on: …`. Waiting on the owner is `needs-decision`, not this. The foreman skips it |
 | Ready | Argued out and cleared to build by the owner. An agent may pick it up |
 | In progress | Someone (or an agent) has a branch for it |
@@ -136,7 +136,14 @@ the source of truth:
   on its own; in a local session, write the result back to the issue.
 - **Only the owner moves an item into Ready,** for every kind, for now. The
   foreman refuses to build one with a missing section or open questions: it
-  comments, adds `needs-spec` and moves it back to Specced.
+  comments, adds `needs-spec` and moves it back to Define.
+- **Define** may still show as "Specced" on the board until the owner
+  renames it; the foreman works with either name. The `spec` and
+  `needs-spec` labels and the `prd` skill keep their names.
+- **A draft dragged to Define is the instruction to spec it.** The foreman
+  converts it into an issue labelled `spec` on its next run, and the draft
+  run picks the `kind:*` label. Agents add drafts to Ideas but never move
+  them out of it: the owner picks which get specced.
 - **The owner tries agent PRs before they merge.** Each PR's body has a
   **Try it** section (preview URL, steps, Apple before/after shots, and each
   acceptance criterion with its proof). On the foreman's PRs, the owner adds
@@ -146,7 +153,7 @@ the source of truth:
 - **Feedback reports reach the board through the foreman.** A `feedback`
   issue the owner has cleared with `auto-fix` is triaged on the foreman's
   next run, ahead of Ready items: a clear report is built straight away, with
-  a light spec in a comment; an unclear one becomes a spec in Specced, argued
+  a light spec in a comment; an unclear one becomes a spec in Define, argued
   like any other. `feedback-flow` skill.
 - `needs-decision` on an issue or PR means it's waiting on the owner. Leave a
   comment that says exactly what the decision is.

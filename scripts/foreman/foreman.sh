@@ -44,6 +44,10 @@ MAX_SENTRY_ISSUES=5 # per night
 MAX_SCOUT_ITEMS=5   # per week
 RECENTLY_CLOSED_DAYS=30 # a Sentry short ID in an issue closed this recently isn't filed again
 DIGEST_TITLE="Foreman digest"
+# The column specs are argued in. The owner may rename it "Define" on the
+# board at any time, so each run reads which one it has (spec_column).
+SPEC_COL="Specced" SPEC_OLD="Specced"
+KINDS="feature fix refactor a11y test chore" # the kind:* labels
 
 HOME_DIR="${FOREMAN_HOME:-$HOME/.foreman}"
 CLONE="$HOME_DIR/repo"
@@ -174,7 +178,7 @@ board_json() { # every item, in board order, with status and issue details
           content { __typename
             ... on Issue { number title state author { login } labels(first: 20) { nodes { name } } }
             ... on PullRequest { number state }
-            ... on DraftIssue { title }
+            ... on DraftIssue { title body }
           }
         } }
       } }
@@ -191,6 +195,12 @@ set_status() { # board_json issue-or-pr-number status-name
   fi
   if dry; then log "would set #$number to $name"; return 0; fi
   set_item_status "$board" "$item" "$name"
+}
+
+spec_column() { # board_json -> sets SPEC_COL to the board's name for the spec column: "Define", or else the old one
+  SPEC_COL=$(jq -er --arg old "$SPEC_OLD" '[.field.options[].name] as $o
+    | if ($o | index("Define")) then "Define" elif ($o | index($old)) then $old else empty end' <<<"$1") \
+    || die "no status called 'Define' or '$SPEC_OLD' on the board"
 }
 
 set_item_status() { # board_json item-id status-name
@@ -745,7 +755,7 @@ $FEATURE_SECTIONS" ;; esac
   fi
 }
 
-spec_ready() { # board_json issue -> 0 if it can be built; otherwise sends it back to Specced, non-zero
+spec_ready() { # board_json issue -> 0 if it can be built; otherwise sends it back to $SPEC_COL, non-zero
   local board="$1" n="$2" issue labels problems
   issue=$(gh issue view "$n" -R "$OWNER/$REPO" --json body,labels) || { log "couldn't read #$n's spec; skipping it"; return 1; }
   labels=$(jq -r '[.labels[].name] | join(",")' <<<"$issue")
@@ -758,7 +768,7 @@ spec_ready() { # board_json issue -> 0 if it can be built; otherwise sends it ba
   fi
   log "#$n isn't ready to build: $(paste -sd' ' - <<<"$problems")"
   dry && return 1
-  # Already labelled means it was already told: if the move back to Specced
+  # Already labelled means it was already told: if the move back to $SPEC_COL
   # failed last tick, don't comment again on every tick until it works.
   case ",$labels," in
     *,needs-spec,*) ;;
@@ -770,7 +780,7 @@ $(awk '{print "- " $0}' <<<"$problems")
 
 The template is in the \`prd\` skill (\`.claude/skills/prd/SKILL.md\`). Once the spec is complete and its open questions are \"None.\", move it back to Ready." >/dev/null || true ;;
   esac
-  set_status "$board" "$n" Specced || true
+  set_status "$board" "$n" "$SPEC_COL" || true
   event spec_refused "$n" "" "$(paste -sd' ' - <<<"$problems")"
   return 1
 }
@@ -782,16 +792,79 @@ trusted_comments() { # issue -> comments by the owner, $AGENT and claude[bot], a
     --jq ".[] | select(.user.login == \"$OWNER\" or .user.login == \"$AGENT\" or .user.login == \"claude[bot]\") | \"**\(.user.login)**, \(.created_at):\n\n\(.body)\n\n---\""
 }
 
-spec_issues() { # board_json -> open issues labelled spec, by the owner or $AGENT, still in Ideas or Specced, in board order
+spec_issues() { # board_json -> open issues labelled spec, by the owner or $AGENT, still in Ideas or $SPEC_COL, in board order
   # A feedback report's spec carries needs-decision while it has questions
   # (see triage), and the owner's reply is what answers them.
-  jq -r --arg owner "$OWNER" --arg agent "$AGENT" '
+  jq -r --arg owner "$OWNER" --arg agent "$AGENT" --arg col "$SPEC_COL" '
     .items.nodes[]
     | select(.content.__typename == "Issue" and .content.state == "OPEN")
     | select(.content.author.login == $owner or .content.author.login == $agent)
-    | select((.status.name // "Ideas") | . == "Ideas" or . == "Specced")
+    | select((.status.name // "Ideas") | . == "Ideas" or . == $col)
     | select([.content.labels.nodes[].name] | index("spec") and ((index("needs-decision") | not) or index("feedback")))
     | .content.number' <<<"$1"
+}
+
+# A draft card dragged from Ideas to the spec column is the whole
+# instruction: it becomes an issue labelled `spec`, in the same place, and the
+# spec pass drafts it. Drafts anywhere else are left alone. Agents only ever
+# add drafts to Ideas, so one there was moved by the owner.
+spec_drafts() { # board_json -> "item-id<TAB>title" for each draft in the spec column, in board order
+  jq -r --arg col "$SPEC_COL" '
+    .items.nodes[]
+    | select(.content.__typename == "DraftIssue" and .status.name == $col)
+    | [.id, (.content.title | gsub("[\t\r\n]"; " "))] | @tsv' <<<"$1"
+}
+
+draft_body() { # the draft's text (stdin) -> the issue's first body: that text, quoted under Problem
+  local text
+  text=$(tr -d '\r')
+  printf '## Problem\n\n'
+  if [ -n "$text" ]; then sed -E 's/^/> /; s/^> $/>/' <<<"$text"; else echo "(The draft had only its title.)"; fi
+}
+
+convert_drafts() { # board_json -> each draft in the spec column becomes an issue labelled spec, keeping its board item
+  local board="$1" id title repo="" n
+  while IFS=$'\t' read -r id title; do
+    [ -n "$id" ] || continue
+    if dry; then log "would convert draft \"$title\""; continue; fi
+    [ -n "$repo" ] || repo=$(gh repo view "$OWNER/$REPO" --json id --jq .id) && [ -n "$repo" ] \
+      || { log "couldn't read the repo's id; converting drafts next tick"; return 0; }
+    n=$(gh api graphql -f query='
+      mutation($item: ID!, $repo: ID!) {
+        convertProjectV2DraftIssueItemToIssue(input: {itemId: $item, repositoryId: $repo}) {
+          item { content { ... on Issue { number } } }
+        }
+      }' -f item="$id" -f repo="$repo" --jq '.data.convertProjectV2DraftIssueItemToIssue.item.content.number') \
+      && [[ "$n" =~ ^[0-9]+$ ]] || { log "couldn't convert draft \"$title\"; retrying next tick"; continue; }
+    log "converted draft \"$title\" -> #$n"; event converted_draft "$n" "" "$title"
+    # The kind:* label comes from the draft run (apply_kind).
+    if ! jq -r --arg id "$id" '.items.nodes[] | select(.id == $id) | .content.body // ""' <<<"$board" | draft_body \
+         | gh issue edit "$n" -R "$OWNER/$REPO" --add-label spec --body-file - >/dev/null; then
+      log "couldn't label #$n spec"
+      alert "draft \"$title\" is now #$n, but couldn't be labelled spec. Add it, and the spec pass takes it from there: https://github.com/$OWNER/$REPO/issues/$n"
+    fi
+  done < <(spec_drafts "$board")
+}
+
+# An issue the owner put in the spec column without `spec` would sit there
+# unseen (#516, #517). Its next pass is a draft run, which rewrites the body
+# into the template and keeps what was there under Problem.
+unspecced_issues() { # board_json -> the owner's open issues in the spec column without spec, in board order
+  jq -r --arg owner "$OWNER" --arg col "$SPEC_COL" '
+    .items.nodes[]
+    | select(.status.name == $col and .content.__typename == "Issue" and .content.state == "OPEN")
+    | select(.content.author.login == $owner)
+    | select([.content.labels.nodes[].name] | index("spec") | not)
+    | .content.number' <<<"$1"
+}
+
+label_unspecced() { # board_json
+  local n
+  for n in $(unspecced_issues "$1"); do
+    if dry; then log "would label #$n spec"; continue; fi
+    gh issue edit "$n" -R "$OWNER/$REPO" --add-label spec >/dev/null || { log "couldn't label #$n spec"; continue; }
+    log "labelled #$n spec: it's in $SPEC_COL"; event spec_labelled "$n"
+  done
 }
 
 owner_last_comment() { # issue -> id of the owner's newest comment, or 0; non-zero if GitHub can't be read
@@ -817,8 +890,11 @@ SPEC_DENY=("Bash(git push *)" "Bash(git commit *)" "Bash(git reset --hard *)"
   "Bash(gh pr *)" "Bash(gh project *)" "Bash(gh label *)")
 
 spec_round() { # board_json issue owner-comment-id draft|revise
-  local board="$1" n="$2" dir out status=0 body
+  local board="$1" n="$2" dir out status=0 body kinds kind_file=""
   if dry; then log "would $4 the spec for #$n"; return 0; fi
+  # A draft of an issue with no kind:* picks one; when it can't tell, it isn't asked.
+  kinds=$(gh issue view "$n" -R "$OWNER/$REPO" --json labels --jq '[.labels[].name | select(startswith("kind:"))] | length') || kinds=1
+  if [ "$4" = draft ] && [ "$kinds" = 0 ]; then kind_file="$SPECS/$n.kind.json"; rm -f "$kind_file"; fi
   dir="$WORKTREES/spec-$n"
   rm -rf "$dir"; git -C "$CLONE" worktree prune
   git -C "$CLONE" worktree add -q --detach "$dir" origin/main || { log "couldn't check out main for #$n's spec; retrying next tick"; return 0; }
@@ -829,15 +905,16 @@ spec_round() { # board_json issue owner-comment-id draft|revise
   log "spec for #$n ($4)"; event spec "$n" "" "$4"
   out="$LOGS/spec-$n-$(date +%Y%m%d-%H%M%S).log"
   (cd "$dir" && perl -e 'alarm shift; exec @ARGV' "$BUILD_TIMEOUT" \
-      "$SHIM" claude -p "$(spec_prompt "$n" "$4")" --permission-mode bypassPermissions --model "$MODEL" \
+      "$SHIM" claude -p "$(spec_prompt "$n" "$4" "$kind_file")" --permission-mode bypassPermissions --model "$MODEL" \
       --disallowedTools "${SPEC_DENY[@]}") \
     >"$out" 2>&1 || status=$?
   rm_worktree "spec-$n"
-  set_status "$board" "$n" Specced || true
+  set_status "$board" "$n" "$SPEC_COL" || true
   if [ "$status" != 0 ]; then
     event spec_failed "$n" "" "exit $status"
     alert "the spec run for #$n failed (exit $status); log: $out"; return 0
   fi
+  [ -z "$kind_file" ] || apply_kind "$n" "$kind_file"
   local issue labels open=0
   issue=$(gh issue view "$n" -R "$OWNER/$REPO" --json body,labels) || return 0
   body=$(jq -r .body <<<"$issue"); labels=$(jq -r '[.labels[].name] | join(",")' <<<"$issue")
@@ -856,11 +933,27 @@ spec_round() { # board_json issue owner-comment-id draft|revise
   fi
 }
 
-spec_prompt() { # issue draft|revise -> the prompt for a spec run
-  local n="$1" issue comments
+apply_kind() { # issue result-file -> labels the issue with the kind:* its draft run picked, if it's one of $KINDS
+  local kind
+  kind=$(jq -r '.kind // empty' "$2" 2>/dev/null) || kind=""
+  kind="${kind#kind:}"; rm -f "$2"
+  if ! [[ "$kind" =~ ^[a-z0-9]+$ ]] || [[ " $KINDS " != *" $kind "* ]]; then
+    log "#$1's draft picked no kind (${kind:-nothing}); it's left for the owner"; return 0
+  fi
+  gh issue edit "$1" -R "$OWNER/$REPO" --add-label "kind:$kind" >/dev/null || { log "couldn't label #$1 kind:$kind"; return 0; }
+  log "#$1 is kind:$kind"
+}
+
+spec_prompt() { # issue draft|revise [kind-file] -> the prompt for a spec run
+  local n="$1" issue comments kind=""
   issue=$(gh issue view "$n" -R "$OWNER/$REPO" --json title,body,labels \
     --jq '"# #'"$n"': \(.title)\n\nLabels: \([.labels[].name] | join(", "))\n\n\(.body)"')
   comments=$(trusted_comments "$n")
+  [ -z "${3:-}" ] || kind="
+- It has no \`kind:*\` label yet. Pick exactly one of
+  $(sed -E 's/([a-z0-9]+)/`\1`/g; s/ /, /g; s/, ([^,]*)$/ or \1/' <<<"$KINDS"), write the
+  spec with that kind's sections, and write \`{\"kind\": \"<kind>\"}\` to
+  \`$3\`. The foreman adds the label; the owner can change it."
   cat <<EOF
 You are the foreman for superhighfives/nylon-impossible, running unattended on
 the owner's Mac mini. Issue #$n is labelled \`spec\`, so your job is its spec,
@@ -890,7 +983,7 @@ ${comments:-None.}
 - Write the whole spec into the body with
   \`gh issue edit $n --body-file <file>\`. For a revision, move each question
   the owner answered into **Decisions**, dated $(date +%F), and take it out
-  of **Open questions**.
+  of **Open questions**.$kind
 - Then post one comment on #$n with what's still open, numbered, each with
   your recommendation. If nothing is, set **Open questions** to "None." and
   say it's ready for the owner to move to Ready.
@@ -1002,14 +1095,14 @@ build() { # board_json issue
 
   if gh issue view "$n" -R "$OWNER/$REPO" --json labels --jq '[.labels[].name] | index("needs-decision")' | grep -q '[0-9]'; then
     log "#$n needs a decision"; event needs_decision "$n"
-    set_status "$board" "$n" Specced || true
+    set_status "$board" "$n" "$SPEC_COL" || true
     alert "#$n needs your decision: https://github.com/$OWNER/$REPO/issues/$n"
     rm_worktree "$n"
   else
     log "#$n: no PR and no question (exit $status); see $out"; event failed "$n" "" "exit $status"
     gh issue edit "$n" -R "$OWNER/$REPO" --add-label needs-decision >/dev/null || true
     gh issue comment "$n" -R "$OWNER/$REPO" --body "The foreman's build stopped without a PR or a question (exit $status). Log on the Mac mini: \`$out\`. Remove \`needs-decision\` and move it back to Ready to retry." >/dev/null || true
-    set_status "$board" "$n" Specced || true
+    set_status "$board" "$n" "$SPEC_COL" || true
     alert "build of #$n failed (exit $status)"
   fi
 }
@@ -1110,7 +1203,7 @@ triage() { # board_json issue
     gh issue edit "$n" -R "$OWNER/$REPO" --add-label spec >/dev/null || true
     # Spec runs start from the owner's next reply, not this one.
     if last=$(owner_last_comment "$n"); then mkdir -p "$SPECS"; echo "$last" > "$SPECS/$n"; fi
-    set_status "$board" "$n" Specced || true
+    set_status "$board" "$n" "$SPEC_COL" || true
     event triaged_spec "$n"
     if [ -n "$(spec_problems "$labels" <<<"$body")" ]; then
       gh issue edit "$n" -R "$OWNER/$REPO" --add-label needs-decision >/dev/null || true
@@ -1579,14 +1672,14 @@ file_sentry_issues() { # board_json result.json -> files what the run proposed: 
     # The spec pass waits for the owner's first reply before revising it.
     mkdir -p "$SPECS"; echo 0 > "$SPECS/$n"
     gh issue comment "$n" -R "$OWNER/$REPO" --body-file - >/dev/null <<<"${questions:-No open questions: move it to Ready if you agree.}" || true
-    set_status "$board" "$n" Specced || true
+    set_status "$board" "$n" "$SPEC_COL" || true
     log "filed #$n for $sid"; filed+=("#$n $title")
   done < <(jq -c '.issues[]' "$result")
   notes="$notes$(jq -r '[.skipped[]? | "\(.short_id): \(.reason)"] | if length > 0 then "; won'"'"'t fix: " + join("; ") else "" end' "$result")"
   notes="${notes#; }"
   dry && { [ -z "$notes" ] || log "skipped: $notes"; return 0; }
   routine_event sentry ok "${notes:0:2000}" ${filed[@]+"${filed[@]}"}
-  [ "$count" = 0 ] || alert "the Sentry sweep filed $count issue(s) in Specced for you to read: ${filed[*]%% *}"
+  [ "$count" = 0 ] || alert "the Sentry sweep filed $count issue(s) in $SPEC_COL for you to read: ${filed[*]%% *}"
 }
 
 # ---- the Dependabot bundle ----
@@ -1884,9 +1977,9 @@ digest_waiting() { # board_json -> "- " lines: what's waiting on the owner
     [ -n "$n" ] || continue
     body=$(gh issue view "$n" -R "$OWNER/$REPO" --json body --jq .body 2>/dev/null) || continue
     spec_problems "" <<<"$body" | grep -qF '"## Open questions"' && echo "- #$n $title: its spec has questions for you"
-  done < <(jq -r --arg owner "$OWNER" --arg agent "$AGENT" '
+  done < <(jq -r --arg owner "$OWNER" --arg agent "$AGENT" --arg col "$SPEC_COL" '
     .items.nodes[]
-    | select(.status.name == "Specced" and .content.__typename == "Issue" and .content.state == "OPEN")
+    | select(.status.name == $col and .content.__typename == "Issue" and .content.state == "OPEN")
     | select(.content.author.login == $owner or .content.author.login == $agent)
     | select([.content.labels.nodes[].name] | index("spec") and (index("needs-decision") | not))
     | "\(.content.number)\t\(.content.title)"' <<<"$board")
@@ -2027,8 +2120,13 @@ cmd_tick() {
   dry || self_update
 
   local board; board=$(board_json)
+  spec_column "$board"
   merge_pass "$board"
   cleanup_worktrees
+  # No model, so every waiting draft converts now; their spec runs start
+  # next tick, one per tick, from a board that shows them as issues.
+  convert_drafts "$board"
+  label_unspecced "$board"
   spec_pass "$board"
   routines_pass "$board"
 
@@ -2039,7 +2137,7 @@ cmd_tick() {
   n=$(feedback_next "$board") || n=""
   if [ -n "$n" ]; then triage "$board" "$n"; return 0; fi
   for n in $(ready_issues "$board"); do
-    # One that fails the spec check goes back to Specced; try the next.
+    # One that fails the spec check goes back to $SPEC_COL; try the next.
     if spec_ready "$board" "$n"; then build "$board" "$n"; return 0; fi
   done
   log "nothing Ready"
@@ -2058,6 +2156,7 @@ cmd_build() {
   trap 'rm -rf "$LOCK"' EXIT
   ensure_clone
   local board; board=$(board_json)
+  spec_column "$board"
   spec_ready "$board" "$n" || die "#$n's spec isn't ready to build; see the comment on it"
   build "$board" "$n"
 }
@@ -2074,7 +2173,9 @@ cmd_triage() {
   take_lock || die "a tick is running; try again when it's done"
   trap 'rm -rf "$LOCK"' EXIT
   ensure_clone
-  triage "$(board_json)" "$n"
+  local board; board=$(board_json)
+  spec_column "$board"
+  triage "$board" "$n"
 }
 
 cmd_shots() {
@@ -2111,7 +2212,9 @@ cmd_routine() {
     [ "$open" -lt "$MAX_AGENT_PRS" ] || die "$open agent PRs are open; $name opens one, so it waits (CLAUDE.md, \"Work tracking\")"
   fi
   # The schedule and the off switch are the tick's; asking by name runs it.
-  run_routine "$(board_json)" "$name"
+  local board; board=$(board_json)
+  spec_column "$board"
+  run_routine "$board" "$name"
 }
 
 cmd_install() {
