@@ -1,4 +1,5 @@
 import { Check } from "lucide-react";
+import { EmptyLine } from "@/components/phone/EmptyLine";
 import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import { SelectionBar } from "@/components/phone/TodoRow";
 import { ROW_HOVER } from "@/components/ui/styles";
@@ -71,9 +72,12 @@ export function DoneColumn({
             <SkeletonRows count={3} />
           </>
         ) : groups.length === 0 ? (
-          <p className="m-0 pt-4 font-n-display text-[1.125rem] font-semibold tracking-[-0.01em] text-n-ink-muted">
-            Nothing done yet.
-          </p>
+          <div className="text-n-ink-subtle">
+            {/* The composer's height: Done has no "+ Add", so its line sits
+                level with the first row in the columns beside it. */}
+            <div aria-hidden="true" className="h-10" />
+            <EmptyLine text="Nothing done yet." density="wide" />
+          </div>
         ) : (
           groups.map((group) => (
             <section key={group.label} className="pt-2 pb-1">

@@ -2,6 +2,7 @@ import { Menu } from "@base-ui/react/menu";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Ellipsis, X } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
+import { EmptyLine } from "@/components/phone/EmptyLine";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
 import { ICON_BUTTON } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
@@ -376,13 +377,13 @@ export function Column({
         ) : (
           <div data-drop-area={listId} className="relative min-h-24">
             {rows.length === 0 ? (
-              <p
-                className={`m-0 pt-4 font-n-display text-[1.125rem] font-semibold tracking-[-0.01em] transition-colors duration-(--n-duration-fast) ${
-                  isOver ? "text-n-ink" : "text-n-ink-muted"
+              <div
+                className={`transition-colors duration-(--n-duration-fast) ${
+                  isOver ? "text-n-ink" : "text-n-ink-subtle"
                 }`}
               >
-                {empty}
-              </p>
+                <EmptyLine text={empty} density="wide" />
+              </div>
             ) : (
               <ul
                 ref={listRef}

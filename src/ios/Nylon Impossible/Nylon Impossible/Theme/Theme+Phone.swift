@@ -27,7 +27,7 @@ extension Theme.Fonts {
         static let sheetTitle = Style(
             size: 32, lineHeight: 35, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .title1
         )
-        /// Collection names on the Lists page and the empty-state line.
+        /// Collection names on the Lists page.
         static let listName = Phone.title
         /// A todo's title in a row.
         static let rowTitle = Style(
