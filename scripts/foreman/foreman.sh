@@ -2171,7 +2171,8 @@ cmd_routine() {
   is_routine "$name" || die "which routine? one of: $ROUTINES_ALL"
   case "${2:-}" in
     off) mkdir -p "$ROUTINES"; touch "$ROUTINES/$name.off"; echo "$name: off on this Mac"; return 0 ;;
-    on)  rm -f "$ROUTINES/$name.off"; echo "$name: on here (FOREMAN_ROUTINES_OFF can still turn it off)"; return 0 ;;
+    on)  rm -f "$ROUTINES/$name.off"; [ "$name" = dispatch ] && rm -f "$ROUTINES/shepherd.off" # its old off switch
+         echo "$name: on here (FOREMAN_ROUTINES_OFF can still turn it off)"; return 0 ;;
     --dry-run) DRY=1 ;;
     "") ;;
     *) die "usage: foreman routine <name> [--dry-run | off | on]" ;;

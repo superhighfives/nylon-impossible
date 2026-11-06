@@ -945,6 +945,9 @@ rm -f "$ROUTINES/shepherd.off"
 cmd_routine shepherd off >/dev/null
 expect "foreman routine shepherd off turns dispatch off"  off "$(off dispatch '')"
 cmd_routine shepherd on >/dev/null
+touch "$ROUTINES/shepherd.off"
+cmd_routine dispatch on >/dev/null
+expect "dispatch on clears the old shepherd off marker" on "$(off dispatch '')"
 
 echo "routines pass"
 
