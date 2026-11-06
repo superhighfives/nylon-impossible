@@ -848,13 +848,15 @@ convert_drafts() { # board_json -> each draft in the spec column becomes an issu
 
 # An issue the owner put in the spec column without `spec` would sit there
 # unseen (#516, #517). Its next pass is a draft run, which rewrites the body
-# into the template and keeps what was there under Problem.
-unspecced_issues() { # board_json -> the owner's open issues in the spec column without spec, in board order
+# into the template and keeps what was there under Problem. One with
+# needs-decision is waiting on the owner, often a build that stopped on a
+# question and came back here; spec_issues would draft a feedback one at once.
+unspecced_issues() { # board_json -> the owner's open issues in the spec column without spec or needs-decision, in board order
   jq -r --arg owner "$OWNER" --arg col "$SPEC_COL" '
     .items.nodes[]
     | select(.status.name == $col and .content.__typename == "Issue" and .content.state == "OPEN")
     | select(.content.author.login == $owner)
-    | select([.content.labels.nodes[].name] | index("spec") | not)
+    | select([.content.labels.nodes[].name] | (index("spec") or index("needs-decision")) | not)
     | .content.number' <<<"$1"
 }
 

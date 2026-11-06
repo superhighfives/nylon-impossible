@@ -680,7 +680,8 @@ DRAFT_BOARD=$(jq -c '.items.nodes = [
   {id:"I32", status:{name:"Ready"}, content:{__typename:"Issue", number:32, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[]}}},
   {id:"I33", status:{name:"Specced"}, content:{__typename:"Issue", number:33, state:"OPEN", author:{login:"stranger"}, labels:{nodes:[]}}},
   {id:"I34", status:{name:"Specced"}, content:{__typename:"Issue", number:34, state:"CLOSED", author:{login:"superhighfives"}, labels:{nodes:[]}}},
-  {id:"I35", status:{name:"Ideas"}, content:{__typename:"Issue", number:35, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[]}}}]' <<<"$BOARD")
+  {id:"I35", status:{name:"Ideas"}, content:{__typename:"Issue", number:35, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[]}}},
+  {id:"I36", status:{name:"Specced"}, content:{__typename:"Issue", number:36, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"feedback"},{name:"needs-decision"}]}}}]' <<<"$BOARD")
 draft_run() { # board_json -> convert_drafts and label_unspecced against it, with SPEC_COL read from it
   (
     echo 700 > "$tmp/issue-n"; rm -f "$tmp"/edit-body-*
@@ -717,6 +718,7 @@ for b in Specced Define; do
   expect "$b: the owner's issue in the column without spec gets it" "yes"     "$(called 'issue edit 30 -R superhighfives/nylon-impossible --add-label spec')"
   expect "$b: not one with spec, elsewhere, closed or a stranger's" "no no no no no" \
     "$(called 'issue edit 31') $(called 'issue edit 32') $(called 'issue edit 33') $(called 'issue edit 34') $(called 'issue edit 35')"
+  expect "$b: nor one waiting on needs-decision"                    "no"      "$(called 'issue edit 36')"
 done
 : > "$CALLS"; DRY=1
 expect "a dry run says what it would do" "would convert draft \"Web: sort positions by code point\"|would convert draft \"Just a title\"|would label #30 spec" \
