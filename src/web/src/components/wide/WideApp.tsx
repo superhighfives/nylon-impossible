@@ -1,7 +1,13 @@
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Composer } from "@/components/phone/Composer";
 import {
   ContextMenu,
@@ -25,7 +31,12 @@ import { useHints } from "@/hooks/useHints";
 import { useCreateList, useUpdateList } from "@/hooks/useLists";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
-import { createBoard } from "./board";
+import {
+  boardSlots,
+  createBoard,
+  revealSpan,
+  sheetScrollTarget,
+} from "./board";
 import { columnRows, rowById } from "./boardDom";
 import { Column } from "./Column";
 import { CommandPalette } from "./CommandPalette";
@@ -36,6 +47,8 @@ import { type PaletteState, paletteGroups } from "./paletteGroups";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
 import { Sidebar } from "./Sidebar";
 import { SkeletonComposer } from "./Skeleton";
+import { settleTiming } from "./settle";
+import { holdLeavingSheet, type Placed, slideColumns, spanOf } from "./slide";
 import { Toolbar } from "./Toolbar";
 import { DragPreview, useBoardDrag } from "./useBoardDrag";
 import { useBoardKeys } from "./useBoardKeys";
@@ -56,12 +69,20 @@ const EMPTY_COPY: Record<string, string> = {
   someday: "Nothing here yet.",
 };
 
-/** A column to focus once it renders: a row, its Add field, or its title. */
+/** Bring a row into view within its column, without scrolling the board. */
+function revealInColumn(row: HTMLElement) {
+  const body = row.closest<HTMLElement>("[data-column-body]");
+  const box = (row.closest("li") ?? row).getBoundingClientRect();
+  if (!body) return;
+  const view = body.getBoundingClientRect();
+  if (box.top < view.top) body.scrollTop -= view.top - box.top;
+  else if (box.bottom > view.bottom) body.scrollTop += box.bottom - view.bottom;
+}
+
+/** A column to focus once it renders: its Add field, or its title. */
 interface PendingFocus {
   column: string;
-  target: "row" | "composer" | "head";
-  /** `row`: this todo's row rather than the remembered one. */
-  rowId?: string;
+  target: "composer" | "head";
 }
 
 interface MenuState {
@@ -70,25 +91,37 @@ interface MenuState {
   view: MenuView;
 }
 
+/** The sheet as drawn: the open todo, or the last one while it slides away. */
+interface ShownSheet {
+  todo: TodoWithUrls;
+  /** The column it's laid beside. */
+  column: string;
+  leaving: boolean;
+}
+
+/** How long a closing sheet may take before it's taken away regardless. */
+const SHEET_EXIT_MS = 1000;
+
 /**
- * The wide layout (web 1024px and up): the sidebar, a toolbar, then four
- * columns that never change width: Today, This week, Someday, and a fourth
- * that shows the open todo's detail, else the list picked in the sidebar,
- * else Done.
+ * The wide layout (web 1024px and up): the sidebar, a toolbar, then one row
+ * of columns that scrolls sideways: Today, This week, Someday, every one of
+ * your lists in the sidebar's order, then Done. Nothing is swapped in or
+ * out, and every column keeps its width.
  *
  * Selection is state, not DOM focus. Focusing a row selects it; one click
- * selects, a second click, a double click or Enter opens it in the fourth
- * column, and while a todo is open the detail follows the selection. Rows,
- * menus, the composer and the detail are the phone's components at board
- * density, driven by the same `useBoardData`.
+ * selects, a second click, a double click or Enter opens it in a sheet laid
+ * on the board right after its column, and while a todo is open the sheet
+ * follows the selection. The columns after it slide along to make room.
+ * Rows, menus, the composer and the detail are the phone's components at
+ * board density, driven by the same `useBoardData`.
  */
 export function WideApp({
   view = null,
   onNavigate,
 }: {
-  /** The view the URL names: `/list/:id` opens that list's column. */
+  /** The view the URL names: `/list/:id` goes to that list's column. */
   view?: BoardView | null;
-  /** Keeps the URL in step as your list's column opens and closes. */
+  /** Keeps the URL naming your list while the selection is in it. */
   onNavigate?: (view: BoardView | null) => void;
 } = {}) {
   const { reducedMotion } = useHints();
@@ -114,17 +147,17 @@ export function WideApp({
   const createList = useCreateList();
   const updateList = useUpdateList();
 
-  const [openListId, setOpenListId] = useState<string | null>(() =>
-    view?.kind === "list" ? view.id : null,
-  );
   const [detailId, setDetailId] = useState<string | null>(null);
+  /** The column last gone to or selected in, which the URL names. */
+  const [urlColumn, setUrlColumn] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [settings, setSettings] = useState(false);
   const [quickAdd, setQuickAdd] = useState(false);
   const [newListOpen, setNewListOpen] = useState(false);
   const [palette, setPalette] = useState<PaletteState | null>(null);
-  const [fourthEl, setFourthEl] = useState<HTMLElement | null>(null);
+  const [sheetEl, setSheetEl] = useState<HTMLElement | null>(null);
+  const boardRow = useRef<HTMLElement>(null);
   const [shortcuts, setShortcuts] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const canSendFeedback = useCanSendFeedback();
@@ -133,6 +166,7 @@ export function WideApp({
     rowsFor,
     actions,
     onStart: () => setMenu(null),
+    board: () => boardRow.current,
   });
   const go = useGoSequence();
   const pendingFocus = useRef<PendingFocus | null>(null);
@@ -144,9 +178,8 @@ export function WideApp({
   const timeLists = TIME_KINDS.map((kind) => byKind[kind]).filter(
     (l): l is SerializedList => l !== undefined,
   );
-  const openList = openListId
-    ? collections.find((l) => l.id === openListId)
-    : undefined;
+  /** Every list, in the board's (and the sidebar's) order. */
+  const boardLists = [...timeLists, ...collections];
   const todoById = useCallback(
     (id: string | null | undefined) =>
       id ? todos.find((t) => t.id === id && !t.completed) : undefined,
@@ -158,14 +191,35 @@ export function WideApp({
     [doneTodos],
   );
   const detailTodo = detailId ? (todoById(detailId) ?? null) : null;
-  /** What the fourth column shows: the detail, else your list, else Done. */
-  const fourth = detailTodo ? "detail" : openList ? "list" : "done";
-  // The columns with rows, left to right; the detail has none.
-  const columnIds = [
-    ...timeLists.map((l) => l.id),
-    ...(fourth === "list" && openList ? [openList.id] : []),
-    ...(fourth === "done" ? [DONE_COLUMN] : []),
-  ];
+  // The columns with rows, left to right; the sheet has none.
+  const columnIds = [...boardLists.map((l) => l.id), DONE_COLUMN];
+  const animated = reducedMotion !== "reduce";
+
+  // The sheet stays drawn while it slides away, so the open todo's state is
+  // kept a render longer than `detailTodo`. Adjusted while rendering, so
+  // the sheet never drops out of the row for a frame. It compares the todo
+  // itself, not its id: an edit or a move to another list arrives as a new
+  // object, and the sheet has to draw it (and follow it to its new column).
+  const [sheet, setSheet] = useState<ShownSheet | null>(null);
+  if (detailTodo) {
+    if (sheet?.todo !== detailTodo || sheet.leaving) {
+      setSheet({ todo: detailTodo, column: detailTodo.listId, leaving: false });
+    }
+  } else if (sheet && !sheet.leaving) {
+    setSheet(animated ? { ...sheet, leaving: true } : null);
+  }
+  /** The column whose todo is open, while it's open. */
+  const sheetColumn = sheet && !sheet.leaving ? sheet.column : null;
+  const sheetGone = useCallback(
+    () => setSheet((s) => (s?.leaving ? null : s)),
+    [],
+  );
+  // In case its exit never reports back (its column went with it).
+  useEffect(() => {
+    if (!sheet?.leaving) return;
+    const gone = setTimeout(sheetGone, SHEET_EXIT_MS);
+    return () => clearTimeout(gone);
+  }, [sheet?.leaving, sheetGone]);
   const todayId = byKind.today?.id ?? null;
   const listKind = (listId: string) =>
     timeLists.find((l) => l.id === listId)?.systemKind ?? null;
@@ -181,17 +235,61 @@ export function WideApp({
       ? selectionColumn
       : todayId;
 
-  // Your list was deleted elsewhere: close its column.
-  useEffect(() => {
-    if (openListId && !loading && !openList) setOpenListId(null);
-  }, [openListId, openList, loading]);
+  // --- Board motion -------------------------------------------------------
+  // After every render: the closing sheet leaves the row, the columns that
+  // moved slide to their new places, and a todo that opened or changed
+  // column brings its column and sheet into view together.
+
+  const placed = useRef<Placed>(new Map());
+  const revealedFor = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const row = boardRow.current;
+    if (!row) return;
+    holdLeavingSheet(sheetEl, !!sheet?.leaving);
+    slideColumns(row, placed.current, animated ? settleTiming() : null);
+    if (sheetColumn === revealedFor.current) return;
+    if (!sheetColumn) {
+      revealedFor.current = null;
+      return;
+    }
+    const section = row.querySelector<HTMLElement>(
+      `:scope > [data-column="${CSS.escape(sheetColumn)}"]`,
+    );
+    // The sheet's element arrives a render after it does.
+    if (!section || !sheetEl) return;
+    revealedFor.current = sheetColumn;
+    const left = sheetScrollTarget(
+      { scrollLeft: row.scrollLeft, width: row.clientWidth },
+      spanOf(section),
+      spanOf(sheetEl),
+    );
+    if (left !== row.scrollLeft) {
+      row.scrollTo?.({ left, behavior: animated ? "smooth" : "auto" });
+    }
+  });
 
   // --- Focus ----------------------------------------------------------------
+
+  /** Scroll the board the least that shows a column whole. */
+  const revealColumn = useCallback(
+    (section: HTMLElement) => {
+      const row = boardRow.current;
+      if (!row) return;
+      const left = revealSpan(
+        { scrollLeft: row.scrollLeft, width: row.clientWidth },
+        spanOf(section),
+      );
+      if (left !== row.scrollLeft) {
+        row.scrollTo?.({ left, behavior: animated ? "smooth" : "auto" });
+      }
+    },
+    [animated],
+  );
 
   /**
    * Focus (and so select) a row in a column: `rowId`, else `index`, else
    * the column's last-selected todo, else its first. Its title when it has
-   * no rows.
+   * no rows. The board scrolls to show the column.
    */
   const focusColumn = useCallback(
     (listId: string, index?: number, rowId?: string) => {
@@ -199,11 +297,8 @@ export function WideApp({
         `[data-column="${CSS.escape(listId)}"]`,
       );
       if (!section) return false;
-      section.scrollIntoView({
-        inline: "nearest",
-        block: "nearest",
-        behavior: reducedMotion === "reduce" ? "auto" : "smooth",
-      });
+      revealColumn(section);
+      setUrlColumn(listId);
       const rows = columnRows(listId);
       const remembered = rowId ?? lastSelected.current.get(listId);
       const target =
@@ -212,68 +307,77 @@ export function WideApp({
           : rows[Math.min(index, rows.length - 1)]) ??
         rows[0] ??
         section.querySelector<HTMLElement>("[data-column-head]");
-      target?.focus({ preventScroll: rows.length === 0 });
+      // The board scrolls itself, smoothly; the focus only brings the row
+      // into view within its column.
+      target?.focus({ preventScroll: true });
+      if (target && rows.length > 0) revealInColumn(target);
       return true;
     },
-    [reducedMotion],
+    [revealColumn],
   );
 
-  // A column opened from the sidebar takes focus once it renders.
+  // A column that's about to render (a new list) or move (beside a deleted
+  // one) takes focus once it has.
   useEffect(() => {
     const pending = pendingFocus.current;
     if (!pending || !columnIds.includes(pending.column)) return;
     pendingFocus.current = null;
-    if (pending.target === "composer") {
-      composers.current.get(pending.column)?.focus();
-    } else if (pending.target === "head") {
-      document
-        .querySelector<HTMLElement>(
-          `[data-column-head="${CSS.escape(pending.column)}"]`,
-        )
-        ?.focus();
-    } else {
-      focusColumn(pending.column, undefined, pending.rowId);
-    }
+    const section = document.querySelector<HTMLElement>(
+      `[data-column="${CSS.escape(pending.column)}"]`,
+    );
+    if (section) revealColumn(section);
+    const target =
+      pending.target === "composer"
+        ? composers.current.get(pending.column)
+        : section?.querySelector<HTMLElement>("[data-column-head]");
+    target?.focus({ preventScroll: true });
   });
 
   // --- URL ------------------------------------------------------------------
-  // `/list/:id` is your list's column; the time lists' URLs focus their
-  // column on arrival. Opening and closing a column rewrites the URL.
+  // `/list/:id` and the time lists' URLs go to their column on arrival.
+  // While you're in one of your lists, the URL names it.
 
   const urlKey = boardViewKey(view, lists);
+  // The URL the board has already acted on. Both effects below write it:
+  // the first when a new URL arrives, the second just before it navigates,
+  // so the URL it asks for is already "applied" when it lands and the first
+  // doesn't move focus again. They run in this order in the same commit
+  // (the lists arriving), so the first has to stay above the second.
   const appliedUrlKey = useRef<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes, once lists are in
   useEffect(() => {
     if (loading || urlKey === appliedUrlKey.current) return;
     appliedUrlKey.current = urlKey;
-    if (urlKey.startsWith("list:")) {
-      const id = urlKey.slice(5);
-      if (openListId !== id) setOpenListId(id);
-      pendingFocus.current = { column: id, target: "row" };
-      return;
-    }
-    if (openListId) setOpenListId(null);
     const kind = TIME_KINDS.find((k) => k === urlKey);
-    const id = kind ? byKind[kind]?.id : undefined;
+    const id = urlKey.startsWith("list:")
+      ? urlKey.slice(5)
+      : kind
+        ? byKind[kind]?.id
+        : undefined;
     // Only an explicit `/this-week` moves focus; `/` leaves the page alone.
-    if (view && id) focusColumn(id);
-  }, [urlKey, loading]);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the column opens or closes
-  useEffect(() => {
-    if (loading) return;
-    // A list that isn't there is about to close (above); pointing the URL at
-    // it would reopen it and loop.
-    if (openListId && !openList) return;
-    if (openListId) {
-      if (urlKey !== `list:${openListId}`) {
-        onNavigate?.({ kind: "list", id: openListId });
-      }
-    } else if (urlKey.startsWith("list:")) {
+    if (!view || !id) return;
+    // A list that's gone: back to `/`.
+    if (!focusColumn(id) && urlKey.startsWith("list:")) {
+      appliedUrlKey.current = boardViewKey(null, lists);
       onNavigate?.(null);
     }
-  }, [openListId, loading]);
+  }, [urlKey, loading]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when you go to another column
+  useEffect(() => {
+    if (loading || !urlColumn) return;
+    if (collections.some((l) => l.id === urlColumn)) {
+      const key = `list:${urlColumn}`;
+      if (urlKey === key) return;
+      // Already there: don't go to it again when the URL arrives.
+      appliedUrlKey.current = key;
+      onNavigate?.({ kind: "list", id: urlColumn });
+    } else if (urlKey.startsWith("list:")) {
+      appliedUrlKey.current = boardViewKey(null, lists);
+      onNavigate?.(null);
+    }
+  }, [urlColumn, loading]);
 
   /** Before a row leaves its column, hand focus to its neighbour. */
   const focusNeighbour = (row: HTMLElement) => {
@@ -297,10 +401,12 @@ export function WideApp({
     const column = todo.completed ? DONE_COLUMN : todo.listId;
     lastSelected.current.set(column, todo.id);
     setSelectedId(todo.id);
-    // While a todo is open, the detail follows the selection.
-    if (!todo.completed) {
-      setDetailId((open) => (open && open !== todo.id ? todo.id : open));
-    }
+    setUrlColumn(column);
+    // While a todo is open, the sheet follows the selection; Done's todos
+    // don't open, so going into Done closes it.
+    setDetailId((open) =>
+      open && todo.completed ? null : open && open !== todo.id ? todo.id : open,
+    );
   }, []);
 
   const selectedRow = () => rowById(selectedId);
@@ -312,31 +418,12 @@ export function WideApp({
   };
 
   // --- Sidebar --------------------------------------------------------------
+  // Every list is on the board: an entry scrolls to its column and goes in.
 
-  /** Your list in the fourth column, its first todo selected. */
-  const openCollection = (
-    list: SerializedList,
-    target: PendingFocus["target"] = "row",
-    rowId?: string,
-  ) => {
-    // Already showing: nothing re-renders, so go straight in.
-    if (fourth === "list" && openListId === list.id && target === "row") {
-      focusColumn(list.id, undefined, rowId);
-      return;
-    }
+  /** Done: its column, closing the open todo. */
+  const showDone = (rowId?: string) => {
     setDetailId(null);
-    setOpenListId(list.id);
-    pendingFocus.current = { column: list.id, target, rowId };
-  };
-
-  const showDone = (target: PendingFocus["target"] = "row", rowId?: string) => {
-    if (fourth === "done" && target === "row") {
-      focusColumn(DONE_COLUMN, undefined, rowId);
-      return;
-    }
-    setDetailId(null);
-    setOpenListId(null);
-    pendingFocus.current = { column: DONE_COLUMN, target, rowId };
+    focusColumn(DONE_COLUMN, undefined, rowId);
   };
 
   const addList = (name: string) => {
@@ -344,20 +431,26 @@ export function WideApp({
     createList.mutate(
       { name, position: generateKeyBetween(last?.position ?? null, null) },
       {
-        // Open it and put the cursor in its Add field.
-        onSuccess: (created) => openCollection(created, "composer"),
+        // Its column arrives in place; put the cursor in its Add field.
+        onSuccess: (created) => {
+          pendingFocus.current = { column: created.id, target: "composer" };
+        },
       },
     );
   };
 
+  /** Delete your list; the column it leaves beside takes the keyboard. */
+  const deleteList = (list: SerializedList) => {
+    const at = columnIds.indexOf(list.id);
+    if (detailTodo?.listId === list.id) setDetailId(null);
+    actions.destroyList(list);
+    const before = columnIds[at - 1];
+    if (before) pendingFocus.current = { column: before, target: "head" };
+  };
+
   /** "View" on an "Added to …" toast. */
   const viewList = (listId: string) => {
-    if (columnIds.includes(listId)) {
-      focusColumn(listId);
-      return;
-    }
-    const list = collections.find((l) => l.id === listId);
-    if (list) openCollection(list);
+    focusColumn(listId);
   };
 
   // --- Keyboard -------------------------------------------------------------
@@ -365,21 +458,15 @@ export function WideApp({
 
   /** Go into a column: its remembered row, or `rowId` when given. */
   const jump = (target: JumpTarget, rowId?: string) => {
-    if (target.kind === "done") return showDone("row", rowId);
-    if (target.kind === "list") {
-      const list = collections[target.index];
-      if (list) openCollection(list, "row", rowId);
-      return;
-    }
-    const list = byKind[target.list];
+    if (target.kind === "done") return showDone(rowId);
+    const list =
+      target.kind === "list" ? collections[target.index] : byKind[target.list];
     if (list) focusColumn(list.id, undefined, rowId);
   };
 
-  /** A todo chosen in the palette: its column, opened if need be, and it. */
+  /** A todo chosen in the palette: its column, and it. */
   const goToTodo = (todo: TodoWithUrls) => {
-    if (todo.completed) return jump({ kind: "done" }, todo.id);
-    const index = collections.findIndex((l) => l.id === todo.listId);
-    if (index !== -1) return jump({ kind: "list", index }, todo.id);
+    if (todo.completed) return showDone(todo.id);
     focusColumn(todo.listId, undefined, todo.id);
   };
 
@@ -466,7 +553,6 @@ export function WideApp({
         admin: canSendFeedback,
         board,
         goToColumn: (list) => focusColumn(list.id),
-        openList: (list) => openCollection(list),
         showDone: () => showDone(),
         goToTodo,
         moveTodo: (todo, listId) => {
@@ -549,6 +635,7 @@ export function WideApp({
    */
   const softFocus = (listId: string) => {
     setSelectedId(null);
+    setUrlColumn(listId);
     document
       .querySelector<HTMLElement>(
         `[data-column="${CSS.escape(listId)}"] [data-column-head]`,
@@ -565,7 +652,7 @@ export function WideApp({
         onBackgroundClick={() => softFocus(list.id)}
         title={list.name}
         subline={columnSubline(kind, now, timeZone)}
-        tinted={!kind}
+        sheetOpen={sheetColumn === list.id}
         rows={rowsFor(list.id)}
         subtasksOf={subtasksOf}
         checked={actions.checked}
@@ -577,20 +664,12 @@ export function WideApp({
         loading={loading}
         error={errorView}
         empty={EMPTY_COPY[kind ?? ""] ?? "Nothing here yet."}
-        onClose={kind ? undefined : () => showDone("head")}
         onRename={
           kind
             ? undefined
             : (name) => updateList.mutate({ id: list.id, input: { name } })
         }
-        onDelete={
-          kind
-            ? undefined
-            : () => {
-                actions.destroyList(list);
-                showDone("head");
-              }
-        }
+        onDelete={kind ? undefined : () => deleteList(list)}
         banner={
           kind === "today" && overnight.text ? (
             <OvernightPill
@@ -659,6 +738,21 @@ export function WideApp({
   );
   const skeleton = loading && timeLists.length === 0;
 
+  const renderDone = () => (
+    <DoneColumn
+      key={DONE_COLUMN}
+      todos={doneTodos}
+      listName={listName}
+      now={now}
+      timeZone={timeZone}
+      selectedId={selectedId}
+      onSelect={select}
+      onRestore={actions.restore}
+      onBackgroundClick={() => softFocus(DONE_COLUMN)}
+      loading={loading}
+    />
+  );
+
   return (
     <div
       data-wide-ready={loading ? undefined : ""}
@@ -670,18 +764,21 @@ export function WideApp({
         sensors={drag.sensors}
         collisionDetection={pointerWithin}
         {...drag.handlers}
-        autoScroll={{ layoutShiftCompensation: false }}
+        // The board's sideways scroll is the drag's own (`useBoardDrag`),
+        // from its edges; dnd-kit scrolls the columns up and down.
+        autoScroll={{
+          layoutShiftCompensation: false,
+          canScroll: (el) => el !== boardRow.current,
+        }}
       >
         <Sidebar
           timeLists={timeLists}
           collections={collections}
           countFor={(id) => rowsFor(id).length}
-          openListId={fourth === "list" && openList ? openList.id : null}
           selectionColumn={selectionColumn}
-          doneShowing={fourth === "done"}
           doneCount={doneCount}
           onTimeList={(list) => focusColumn(list.id)}
-          onCollection={(list) => openCollection(list)}
+          onCollection={(list) => focusColumn(list.id)}
           onCreateList={addList}
           onDone={() => showDone()}
           onSettings={() => setSettings(true)}
@@ -713,35 +810,32 @@ export function WideApp({
               onCreate: addList,
             }}
           />
+          {/* One row of columns that scrolls sideways; each child is named
+              by `data-slide` so it slides when the row changes. */}
           <main
+            ref={boardRow}
             aria-label="Board"
-            className="flex min-h-0 flex-1 overflow-x-auto"
+            className="relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {skeleton
-              ? TIME_KINDS.map(renderSkeletonColumn)
-              : timeLists.map((list) => renderColumn(list))}
-            {fourth === "detail" ? (
-              <section
-                ref={setFourthEl}
-                aria-label="Todo"
-                data-column-detail
-                className="relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline"
-              />
-            ) : fourth === "list" && openList ? (
-              renderColumn(openList)
-            ) : (
-              <DoneColumn
-                todos={doneTodos}
-                listName={listName}
-                now={now}
-                timeZone={timeZone}
-                selectedId={selectedId}
-                onSelect={select}
-                onRestore={actions.restore}
-                onBackgroundClick={() => softFocus(DONE_COLUMN)}
-                loading={loading}
-              />
-            )}
+              ? [...TIME_KINDS.map(renderSkeletonColumn), renderDone()]
+              : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
+                  slot.kind === "list" ? (
+                    renderColumn(slot.list)
+                  ) : slot.kind === "done" ? (
+                    renderDone()
+                  ) : (
+                    // The open todo's sheet: laid over its column's right
+                    // edge, above the columns around it.
+                    <div
+                      key="sheet"
+                      ref={setSheetEl}
+                      data-slide="sheet"
+                      data-board-sheet
+                      className="relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) w-(--n-sheet-width) shrink-0"
+                    />
+                  ),
+                )}
           </main>
         </div>
         <DragOverlay dropAnimation={null}>
@@ -790,9 +884,12 @@ export function WideApp({
 
       <DetailSheet
         variant="column"
-        container={fourth === "detail" ? fourthEl : null}
-        todo={detailTodo}
-        subtasks={detailTodo ? subtasksOf(detailTodo.id) : []}
+        container={sheetEl}
+        todo={sheet?.todo ?? null}
+        open={!!sheet && !sheet.leaving}
+        onExited={sheetGone}
+        animated={animated}
+        subtasks={sheet ? subtasksOf(sheet.todo.id) : []}
         listTargets={targets}
         listName={listName}
         timeZone={timeZone}

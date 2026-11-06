@@ -108,7 +108,7 @@ enum Theme {
 
         /// App background (white / graydark-1)
         static let canvas = dynamic(light: 0xFFFFFF, dark: 0x111111)
-        /// Raised areas: sheets, the composer (hover and focus), the drag preview, the fourth column's tint (gray-2)
+        /// Raised areas: sheets (the wide board's open todo included), the composer (hover and focus), the drag preview, Done's tint (gray-2)
         static let surface = dynamic(light: 0xF9F9F9, dark: 0x191919)
         /// Soft fills: chips, selected rows; 60% for row hover (gray-3)
         static let fill = dynamic(light: 0xF0F0F0, dark: 0x222222, lightHighContrast: 0xE3E3E3, darkHighContrast: 0x2E2E2E)
@@ -218,6 +218,23 @@ enum Theme {
     enum Radius {
         static let chip: CGFloat = 6
         static let field: CGFloat = 10
+    }
+
+    /// The open todo on the wide board: a sheet after its todo's column.
+    enum Sheet {
+        static let width: CGFloat = 400
+        static let radius: CGFloat = 14
+        static let inset: CGFloat = 8
+        static let overlap: CGFloat = 48
+        static let slide: CGFloat = 32
+        /// The todo's column while the sheet is open, bar its selected row.
+        static let recede: Double = 0.8
+        /// Cast left, ink-black at the appearance's opacity.
+        static let shadowX: CGFloat = -8
+        static let shadowY: CGFloat = 0
+        static let shadowRadius: CGFloat = 12
+        static let shadowOpacityLight: Double = 0.08
+        static let shadowOpacityDark: Double = 0.4
     }
 
     enum Motion {

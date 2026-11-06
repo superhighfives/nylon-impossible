@@ -5,8 +5,8 @@
  *   /today  /this-week  /someday   a time list (phone: that page; wide: its
  *                                  column, focused)
  *   /lists                         the phone's Lists page (wide: the board)
- *   /list/:id                      one list by id (phone: pushed; wide: the
- *                                  fourth column). A time list's id resolves
+ *   /list/:id                      one list by id (phone: pushed; wide: its
+ *                                  column, focused). A time list's id resolves
  *                                  to its own page.
  *   /                              the board, starting at Today
  */

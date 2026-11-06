@@ -110,13 +110,21 @@ export interface DetailSheetProps {
   onClose: () => void;
   /**
    * `sheet` (phone): full height from the bottom, over a dimmed backdrop.
-   * `column` (wide): fills the board's fourth column (`container`), which
-   * stays live — the detail follows the selection, and focus stays where it
-   * was, so arrowing through rows shows each one.
+   * `column` (wide): a sheet laid on the board beside its todo's column
+   * (`container`). The board stays live — the detail follows the selection,
+   * and focus stays where it was, so arrowing through rows shows each one.
    */
   variant?: "sheet" | "column";
   /** `column`: the element the detail renders into. */
   container?: HTMLElement | null;
+  /**
+   * `column`: whether it's showing. False while `todo` is still drawn,
+   * sliding out; `onExited` follows once it has gone.
+   */
+  open?: boolean;
+  onExited?: () => void;
+  /** `column`: slide and fade in and out, unless motion is reduced. */
+  animated?: boolean;
 }
 
 /**
@@ -126,23 +134,41 @@ export interface DetailSheetProps {
  * closing is the only way to finish.
  */
 export function DetailSheet(props: DetailSheetProps) {
-  const { todo, onClose, variant = "sheet", container } = props;
+  const {
+    todo,
+    onClose,
+    variant = "sheet",
+    container,
+    open = !!todo,
+    onExited,
+    animated = true,
+  } = props;
   if (variant === "column") {
     return (
       <Dialog.Root
-        open={!!todo && !!container}
+        open={open && !!todo && !!container}
         modal={false}
         disablePointerDismissal
-        onOpenChange={(open) => {
-          if (!open) onClose();
+        onOpenChange={(next) => {
+          if (!next) onClose();
+        }}
+        onOpenChangeComplete={(next) => {
+          if (!next) onExited?.();
         }}
       >
         <Dialog.Portal container={container}>
+          {/* A sheet of paper on the board: inset from its slot's top,
+              right and bottom, its left edge over the todo's column, with
+              a shadow cast left. It slides in from the left as it fades. */}
           <Dialog.Popup
             data-detail-column
             initialFocus={false}
             finalFocus={false}
-            className="absolute inset-0 z-10 flex flex-col bg-n-surface text-n-ink outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0"
+            className={`absolute top-(--n-sheet-inset) right-(--n-sheet-inset) bottom-(--n-sheet-inset) left-0 flex flex-col overflow-clip rounded-(--n-sheet-radius) bg-n-surface text-n-ink shadow-(--n-sheet-shadow) outline-none ${
+              animated
+                ? "transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:-translate-x-(--n-sheet-slide) data-ending-style:opacity-0 data-starting-style:-translate-x-(--n-sheet-slide) data-starting-style:opacity-0"
+                : ""
+            }`}
           >
             {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
           </Dialog.Popup>
@@ -388,7 +414,9 @@ function DetailBody({
         <Dialog.Title className="sr-only">Todo</Dialog.Title>
         {/* Built like a column's header: the title on the shared baseline,
             the list as its subline, × in the corner where a list's sits. */}
-        <header className="relative flex min-h-[10.5rem] shrink-0 flex-col justify-end px-6 pt-14 pb-[1.125rem]">
+        {/* Less the sheet's inset, so its title sits on the columns'
+            baseline. */}
+        <header className="relative flex min-h-[calc(10.5rem-var(--n-sheet-inset))] shrink-0 flex-col justify-end px-6 pt-12 pb-[1.125rem]">
           {titleField("text-[1.75rem] leading-[1.1] tracking-[-0.025em]")}
           <p className="m-0 mt-2.5 truncate text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
             In {listName(todo.listId)}

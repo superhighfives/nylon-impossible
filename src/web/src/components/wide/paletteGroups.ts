@@ -29,8 +29,8 @@ export interface PaletteSource {
   /** Send feedback, for admins. */
   admin: boolean;
   board: Board;
+  /** Scroll to a list's column and go in. */
   goToColumn: (list: SerializedList) => void;
-  openList: (list: SerializedList) => void;
   showDone: () => void;
   goToTodo: (todo: TodoWithUrls) => void;
   moveTodo: (todo: TodoWithUrls, listId: string) => void;
@@ -52,7 +52,7 @@ function goToItems(s: PaletteSource): PaletteItem[] {
       label: l.name,
       meta: String(s.countFor(l.id)),
       hint: index < 6 ? `⇧${index + 4}` : undefined,
-      run: () => s.openList(l),
+      run: () => s.goToColumn(l),
     })),
     {
       id: "go:done",

@@ -32,15 +32,12 @@ function SelectionBar({ on }: { on: boolean }) {
 function ListEntry({
   list,
   count,
-  open,
   current,
   strong,
   onSelect,
 }: {
   list: SerializedList;
   count: number;
-  /** Your list is showing in the fourth column: grey fill, semibold. */
-  open?: boolean;
   /** The selection is in this list's column: the ink bar. */
   current: boolean;
   /** The time lists read heavier than your own. */
@@ -59,10 +56,9 @@ function ListEntry({
         data-sidebar-list={list.id}
         data-sidebar-nav
         aria-describedby={`sidebar-count-${list.id}`}
-        aria-current={open ? "true" : undefined}
         onClick={() => onSelect(list)}
-        className={`${ENTRY} ${strong || open ? "font-semibold" : "font-medium"} ${
-          dropping ? "bg-n-brand text-n-brand-ink" : open ? "bg-n-fill" : ""
+        className={`${ENTRY} ${strong ? "font-semibold" : "font-medium"} ${
+          dropping ? "bg-n-brand text-n-brand-ink" : ""
         }`}
       >
         <SelectionBar on={current} />
@@ -90,17 +86,15 @@ const TIME_PLACEHOLDERS = ["Today", "This week", "Someday"];
  * a "Lists" heading, your lists and New list; then Done, Settings, Send
  * feedback (admins) and Keyboard shortcuts. Every list is a drop target.
  *
- * Two indicators, which can combine: the grey fill marks the list open in
- * the fourth column (Done never takes it; its label goes from muted to ink
- * instead), and the ink bar marks the column the selection is in.
+ * Every list and Done are always columns on the board, so an entry scrolls
+ * to its column rather than opening it. The ink bar marks the column the
+ * selection is in.
  */
 export function Sidebar({
   timeLists,
   collections,
   countFor,
-  openListId,
   selectionColumn,
-  doneShowing,
   doneCount,
   onTimeList,
   onCollection,
@@ -114,11 +108,8 @@ export function Sidebar({
   timeLists: SerializedList[];
   collections: SerializedList[];
   countFor: (listId: string) => number;
-  openListId: string | null;
   /** The column the selection is in: a list id, `done`, or none. */
   selectionColumn: string | null;
-  /** Done is what the fourth column is showing. */
-  doneShowing: boolean;
   doneCount: number;
   onTimeList: (list: SerializedList) => void;
   onCollection: (list: SerializedList) => void;
@@ -177,7 +168,6 @@ export function Sidebar({
               key={list.id}
               list={list}
               count={countFor(list.id)}
-              open={openListId === list.id}
               current={selectionColumn === list.id}
               onSelect={onCollection}
             />
@@ -205,7 +195,6 @@ export function Sidebar({
         <SidebarButton
           onClick={onDone}
           describedBy="sidebar-done-count"
-          current={doneShowing}
           item="done"
         >
           <SelectionBar on={selectionColumn === "done"} />
@@ -258,15 +247,12 @@ function SidebarButton({
   onClick,
   describedBy,
   keyShortcut,
-  current,
   item,
   children,
 }: {
   onClick: () => void;
   describedBy?: string;
   keyShortcut?: string;
-  /** Done only: showing in the fourth column, so ink rather than muted. */
-  current?: boolean;
   /** Names a column item for the keyboard: `done`. */
   item?: string;
   children: ReactNode;
@@ -278,9 +264,8 @@ function SidebarButton({
       data-sidebar-item={item}
       aria-describedby={describedBy}
       aria-keyshortcuts={keyShortcut}
-      aria-current={current ? "true" : undefined}
       onClick={onClick}
-      className={`${ENTRY} font-medium ${current === false ? "text-n-ink-muted" : ""}`}
+      className={`${ENTRY} font-medium`}
     >
       {children}
     </button>
