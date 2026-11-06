@@ -26,7 +26,9 @@ Each tick:
    review is 🟡 or 🔴, run a review round (below). If it's waiting for
    `verified`, see "Verified" below.
 2. **Tidy.** Remove worktrees whose PR has merged or closed.
-3. **Spec.** Draft or revise at most one spec (below).
+3. **Spec.** Turn every draft in **Define** into an issue labelled `spec`,
+   label `spec` on the owner's open issues there without it, then draft or
+   revise at most one spec (below).
 4. **Routines.** Run the routines that are due: the shell ones, and at most
    one model-driven one (below).
 5. **Feedback.** If fewer than 3 agent PRs (`foreman/*` and `feedback/*`) are open, triage
@@ -41,30 +43,52 @@ Each tick:
      review and gets an operator watching it, and its before/after shots if it
      changes the Apple app (below).
    - Or the result is a question: the issue gets `needs-decision` and goes
-     back to Specced.
+     back to Define.
 
 ## Specs
 
 The template and the rules for arguing it are in the `prd` skill
-(`.claude/skills/prd/SKILL.md`).
+(`.claude/skills/prd/SKILL.md`). Specs are argued in the **Define** column.
+The board may still show it as "Specced" until the owner renames it in the
+board settings: each run reads which of the two the board has
+(`spec_column`), and stops if it has neither.
+
+**From a draft.** Drag a draft card from Ideas to Define to have it specced.
+On its next tick the foreman converts it into an issue in this repo
+(`convertProjectV2DraftIssueItemToIssue`), which keeps its board item and so
+its column. The title stays; the draft's text is quoted under `## Problem`,
+and it's labelled `spec`. It's `nylon-foreman`'s issue, so its draft run and
+the owner's replies work as below. Every waiting draft converts on the same
+tick, since that takes no model; their spec runs still go one per tick.
+Drafts anywhere else, Ideas included, are left alone, and the foreman and the
+scout never move one out of Ideas: agents add ideas, and the owner picks
+which get specced.
+
+An open issue of the owner's in Define without `spec` gets it the same way,
+so its next pass is a draft run, which rewrites the body into the template
+and keeps what was there under Problem.
 
 **The check.** Before building, the foreman reads the issue body. Every spec
 needs `## Problem`, `## Acceptance criteria`, `## How to verify`,
 `## Open questions` and `## Decisions`; a `kind:feature` also needs
 `## Outcome`, `## Behaviour`, `## Non-goals` and `## Principles`. **Open
 questions** must read exactly `None.`. If not, the issue gets `needs-spec`, a
-comment listing what's wrong, and goes back to Specced, and the foreman
+comment listing what's wrong, and goes back to Define, and the foreman
 tries the next Ready issue. A spec that passes loses `needs-spec`.
 
-**Drafting and revising.** The owner's open issues labelled `spec`, in Ideas
-or Specced, get a spec run:
-- a **draft** the first time the foreman sees one;
+**Drafting and revising.** Open issues labelled `spec`, by the owner or
+`nylon-foreman`, in Ideas or Define, get a spec run:
+- a **draft** the first time the foreman sees one. An issue with no `kind:*`
+  label gets one here: the run picks exactly one of `feature`, `fix`,
+  `refactor`, `a11y`, `test` or `chore`, writes the spec to that kind's
+  sections and names it in `~/.foreman/specs/<issue>.kind.json`, and the
+  foreman adds the label. The owner can change it;
 - a **revision** each time the owner comments after that. Only the owner's
   comments start one; the prompt includes the owner's, `nylon-foreman`'s and
   `claude[bot]`'s.
 
 Claude writes the spec into the issue body, posts its questions as a
-comment, and doesn't touch code. The issue moves to Specced, and you get an
+comment, and doesn't touch code. The issue moves to Define, and you get an
 alert: either it has questions for you, or it has none left and is ready for
 you to move to Ready. One run per tick, and one per reply, even if it fails:
 the id of the reply it answered is kept in `~/.foreman/specs/<issue>`.
@@ -96,7 +120,7 @@ comments in the prompt. It decides:
   review and `Closes #n`; the issue goes In progress, then In review.
 - **Unclear, or bigger than a fix:** it writes a spec into the issue body and
   posts its questions. The foreman adds `spec` and `needs-decision` and moves
-  it to Specced. From there it's the spec argument below: the owner's replies
+  it to Define. From there it's the spec argument below: the owner's replies
   start revisions even though it has `needs-decision`, which comes off when
   **Open questions** reads "None.", so moving it to Ready builds it.
 - **Neither** (a failed run): `needs-decision`, a comment with the log's
@@ -254,7 +278,7 @@ as data. Each writes its proposals to
   its short ID is in an open issue or one closed in the last 30 days. At
   most 5 are filed, labelled `kind:fix` and `spec`, with the questions as the
   first comment, `0` in `~/.foreman/specs/<n>` (so the spec pass waits for
-  the owner's reply), and set to Specced. Skips and won't-fix reasons go in
+  the owner's reply), and set to Define. Skips and won't-fix reasons go in
   the event's `note`.
 - **scout:** at most 5 draft items, set to Ideas, skipping any whose title
   (ignoring case and spacing) is already on the board or an open issue.
@@ -281,7 +305,7 @@ first run, old `shepherd-<pr>` worktrees keep working, and `shepherd` still
 works as its name in the off switches.
 
 **The digest** is `jq` over the last 24 hours of `events.jsonl`, plus `gh`
-queries for merged PRs, `needs-decision`, `owner-merge`, Specced specs whose
+queries for merged PRs, `needs-decision`, `owner-merge`, specs in Define whose
 open questions aren't "None.", `~/.foreman/verify/`, and `~/.foreman/waits/`
 for open stalls. It comments on the
 open "Foreman digest" issue by `nylon-foreman`, opening and pinning it the

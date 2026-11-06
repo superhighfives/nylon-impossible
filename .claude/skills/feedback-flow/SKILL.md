@@ -33,7 +33,8 @@ GitHub any more: `feedback.yml` and the `feedback/*` branches are retired.
     `Closes #n`. The item goes to In progress, then In review.
   - **Unclear, or bigger than a fix:** it writes a spec into the issue body
     (the report stays under **Problem**) and posts its questions. The
-    foreman adds `spec` and `needs-decision` and moves it to Specced. The
+    foreman adds `spec` and `needs-decision` and moves it to Define (which
+    the board may still show as "Specced" until the owner renames it). The
     owner's replies start spec runs, as for any spec (`prd` skill), and
     `needs-decision` comes off once **Open questions** reads "None.". The
     owner moves it to Ready, and it's built like any other item.

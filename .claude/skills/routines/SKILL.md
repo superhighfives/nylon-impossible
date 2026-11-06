@@ -13,7 +13,7 @@ stop it.
 
 | Routine | When (the Mini's local time) | Runs | Output |
 | --- | --- | --- | --- |
-| `sentry` | Nightly, from 03:00 | Claude, with the Sentry MCP | Up to 5 issues in Specced |
+| `sentry` | Nightly, from 03:00 | Claude, with the Sentry MCP | Up to 5 issues in Define |
 | `deps` | Mondays, from 09:00 | Claude, `dependabot-bundle` skill | One `foreman/deps-<date>` PR |
 | `dispatch` | Every tick | Shell | An operator job on every agent PR |
 | `scout` | Thursdays, from 03:00 | Claude | Up to 5 draft items in Ideas |
@@ -29,7 +29,8 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
   Sentry projects, the same selection as the `review-sentry` skill. It doesn't fix
   anything. Claude proposes up to 5 specs in the `prd` template, and the
   foreman files them: labelled `kind:fix` and `spec`, open questions as the
-  first comment, in **Specced**. It skips an error whose short ID is already
+  first comment, in **Define** (the board may still show it as "Specced"
+  until the owner renames it). It skips an error whose short ID is already
   in an open issue, or one closed in the last 30 days, and any body that
   isn't a complete spec or doesn't name its short ID. Won't-fix reasons go in
   the event, not on GitHub. The spec pass revises these specs after the
@@ -54,7 +55,8 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
   "One design, many densities" and Vocabulary). The foreman adds up to 5
   findings to **Ideas** as draft items (a title and a paragraph naming files
   and lines), skipping any whose title is already on the board or in an open
-  issue. It never edits files or opens a branch or PR.
+  issue. It never edits files or opens a branch or PR, and never moves a
+  draft out of Ideas: the owner drags the ones worth speccing to Define.
 - **digest** covers the last 24 hours: **Merged**, **Waiting on you**
   (`needs-decision`, `owner-merge`, PRs waiting for `verified`, specs with
   questions), **Found** (what sentry and scout filed) and **Problems** (failed

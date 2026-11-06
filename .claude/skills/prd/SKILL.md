@@ -11,7 +11,7 @@ nothing in it is open. The arguing is the point, not the paperwork.
 
 The foreman won't build an issue whose body is missing a section below, or
 whose **Open questions** isn't exactly `None.`. It comments, adds
-`needs-spec`, and moves the item back to Specced
+`needs-spec`, and moves the item back to Define
 (`spec_problems` in `scripts/foreman/foreman.sh`, which matches these
 headings exactly).
 
@@ -112,9 +112,19 @@ to contradict a decision, ask; don't pick.
 
 **Where it happens:**
 - **On the issue.** The foreman drafts and revises specs for issues labelled
-  `spec` that are in Ideas or Specced. A new issue gets a draft; after that,
-  each new comment from the owner starts a revision. It reads only the
+  `spec` that are in Ideas or Define (the board may still show that column
+  as "Specced" until the owner renames it). A new issue gets a draft; after
+  that, each new comment from the owner starts a revision. It reads only the
   owner's, its own and `claude[bot]`'s comments.
+- **From a draft.** The owner drags a draft card from Ideas to Define. The
+  foreman turns it into an issue labelled `spec`, with the draft's text
+  quoted under **Problem**, and drafts the spec from there. An owner's issue
+  in Define without `spec` gets it too, and its draft rewrites the body into
+  the template, keeping what was there under **Problem**.
+- **The kind.** A draft of an issue with no `kind:*` label picks exactly one
+  (`feature`, `fix`, `refactor`, `a11y`, `test` or `chore`) and writes the
+  sections that kind needs. The foreman tells the run where to write its
+  choice and adds the label; the owner can change it during the argument.
 - **In a local session.** Argue in the session, then write the result back
   to the issue body (`gh issue edit <n> --body-file <file>`) and record the
   decisions there, so the issue stays the single source.
