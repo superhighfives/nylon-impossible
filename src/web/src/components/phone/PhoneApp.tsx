@@ -391,7 +391,7 @@ export function PhoneApp({
           <button
             type="button"
             onClick={() => goTo(next.index)}
-            className="ml-[2.875rem] inline-flex min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
+            className="mx-auto flex w-fit min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
           >
             {waiting} waiting in {next.name}
             <ArrowRight size={15} aria-hidden="true" />

@@ -79,7 +79,7 @@ describe("empty line", () => {
     expect(spacer).toHaveAttribute("aria-hidden", "true");
   });
 
-  it("draws the phone's Done page at the phone's row size", () => {
+  it("draws the phone's Done page as a large centred squiggle over the words", () => {
     render(
       <DonePage
         todos={[]}
@@ -88,6 +88,9 @@ describe("empty line", () => {
         onRestore={vi.fn()}
       />,
     );
-    expectRowLine("Nothing done yet.", "text-[1.0625rem]");
+    const { words, line } = emptyLine("Nothing done yet.");
+    expect(line).toHaveClass("items-center", "text-center");
+    expect(words).toHaveClass("text-[1.0625rem]");
+    expect(line.querySelector("svg")).toHaveAttribute("width", "96");
   });
 });

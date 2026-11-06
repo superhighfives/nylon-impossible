@@ -127,6 +127,43 @@ struct EmptyLine: View {
     private var textInset: CGFloat { Theme.Phone.checkbox + Theme.Space.s3 }
 
     var body: some View {
+        if isWide { row } else { centred }
+    }
+
+    /// Pages have room: a large centred squiggle over the words, still subtle.
+    private var centred: some View {
+        VStack(spacing: Theme.Space.s4) {
+            Squiggle()
+                .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .frame(width: 96, height: 48)
+                .accessibilityHidden(true)
+            Text(text)
+                .textStyle(Theme.Fonts.Role.rowTitle)
+                .fontWeight(.regular)
+                .multilineTextAlignment(.center)
+            if let link {
+                Button(action: link.action) {
+                    HStack(spacing: Theme.Space.s1) {
+                        Text(link.text)
+                        Image(systemName: "arrow.right")
+                            .imageScale(.small)
+                    }
+                    .textStyle(Theme.Fonts.Role.control)
+                    .fontWeight(.regular)
+                    .foregroundStyle(Theme.Colors.inkMuted)
+                    .frame(minHeight: Theme.Space.rowMinHeight)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .foregroundStyle(Theme.Colors.inkSubtle)
+        .padding(.top, Theme.Space.s8)
+        .padding(.horizontal, Theme.Phone.gutter)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var row: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Theme.Space.s3) {
                 Squiggle()

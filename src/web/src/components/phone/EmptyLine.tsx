@@ -16,6 +16,32 @@ export function EmptyLine({
   density: "phone" | "wide";
 }) {
   const wide = density === "wide";
+  if (!wide) {
+    // Pages have room: a large centred squiggle over the words. Still
+    // subtle, so it reads as a note, not something to press.
+    return (
+      <p
+        data-empty-line
+        className="m-0 flex flex-col items-center gap-4 pt-16 pb-6 text-center"
+      >
+        <svg
+          width="96"
+          height="48"
+          viewBox="0 0 16 8"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="0.5"
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <path d="M1 4C2.5 0.5 5.5 0.5 8 4S13.5 7.5 15 4" />
+        </svg>
+        <span className="min-w-0 wrap-anywhere text-[1.0625rem] leading-[1.35]">
+          {text}
+        </span>
+      </p>
+    );
+  }
   return (
     <p
       data-empty-line
