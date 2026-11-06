@@ -161,7 +161,7 @@ enum BoardMenuCommand: Hashable {
             let gap = abs(total - 2 * rows)
             if gap < split.gap { split = (index, gap) }
         }
-        return [Array(shortcutSections[...split.index]), Array(shortcutSections[(split.index + 1)...])]
+        return [Array(shortcutSections.prefix(split.index + 1)), Array(shortcutSections.dropFirst(split.index + 1))]
     }
 
     /// Commands that act on the selected row.

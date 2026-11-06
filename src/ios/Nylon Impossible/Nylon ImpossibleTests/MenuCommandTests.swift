@@ -142,6 +142,18 @@ struct MenuCommandTests {
         #expect(columns.flatMap { $0.flatMap(\.commands) } == BoardMenuCommand.shortcutSections.flatMap(\.commands))
     }
 
+    #if os(macOS)
+    /// The Mac sheet opens at its content's natural size, so this is the
+    /// size it opens at: two columns, every row visible, short enough for
+    /// a 1470×923 window once the title bar and sheet inset are taken off.
+    @Test("The Mac shortcuts sheet opens in two columns, without scrolling")
+    func shortcutsSheetSize() {
+        let size = NSHostingView(rootView: KeyboardShortcutsView(onClose: {})).fittingSize
+        #expect(size.width >= 2 * Theme.Wide.columnMinWidth)
+        #expect(size.height <= 923 - 60)
+    }
+    #endif
+
     @Test("The shortcuts sheet shows each command's keys")
     func keyLabels() {
         #expect(BoardMenuCommand.key(.done).keyLabel == "X")
