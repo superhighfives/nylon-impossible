@@ -76,6 +76,14 @@
   --n-radius-chip: 0.375rem;
   --n-radius-field: 0.625rem;
 
+  --n-sheet-width: 25rem;
+  --n-sheet-radius: 0.875rem;
+  --n-sheet-inset: 0.5rem;
+  --n-sheet-overlap: 3rem;
+  --n-sheet-slide: 2rem;
+  --n-sheet-recede: 0.8;
+  --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 8%, transparent);
+
   --n-duration-fast: 150ms;
   --n-duration-base: 220ms;
   --n-duration-slow: 320ms;
@@ -96,6 +104,7 @@
   --n-color-destructive-fill: #3b1219;
   --n-color-notice: #ff9a4d;
   --n-color-notice-fill: #2b1a0c;
+  --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 40%, transparent);
 }
 
 /* Increase Contrast (macOS, iOS) and its equivalents reach the web as

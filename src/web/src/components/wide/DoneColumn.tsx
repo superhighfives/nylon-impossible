@@ -4,14 +4,19 @@ import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import { SelectionBar } from "@/components/phone/TodoRow";
 import { ROW_HOVER } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
-import { ColumnHeader, isColumnBackground, TINTED } from "./Column";
+import {
+  COLUMN_WIDTH,
+  ColumnHeader,
+  isColumnBackground,
+  TINTED,
+} from "./Column";
 import { SkeletonRows } from "./Skeleton";
 
-/** Done's column id: the fourth column's resting state, not a list. */
+/** Done's column id: always the board's last column, not a list. */
 export const DONE_COLUMN = "done";
 
 /**
- * Done as the board's fourth column: finished todos grouped by day. Rows
+ * Done as the board's last column: finished todos grouped by day. Rows
  * select like any column's; the check, Enter, Space or X puts one back, and
  * Delete removes it (both handled by the board's keys, bar Enter and Space,
  * which press the row).
@@ -51,10 +56,11 @@ export function DoneColumn({
     <section
       aria-labelledby={headingId}
       data-column={DONE_COLUMN}
+      data-slide={DONE_COLUMN}
       onClick={(e) => {
         if (isColumnBackground(e.target)) onBackgroundClick?.();
       }}
-      className={`relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline ${TINTED}`}
+      className={`relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline ${TINTED}`}
     >
       <ColumnHeader
         listId={DONE_COLUMN}

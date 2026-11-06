@@ -252,7 +252,7 @@ async function auditWide(browser: Browser, mode: Mode) {
   checks[`wide-${mode}-list-url`] = page.url();
   await axe(page, "list-column", L, mode);
 
-  // One click selects, a second opens the detail in the fourth column.
+  // One click selects, a second opens the todo in a sheet beside its column.
   await (await firstRow(page, L)).dblclick();
   await page.locator("[data-detail-column]").waitFor();
   await axe(page, "detail", L, mode);
@@ -293,7 +293,7 @@ async function auditWide(browser: Browser, mode: Mode) {
   await axe(page, "quick-add", L, mode);
   await escapeCloses(page, `wide-${mode}-quick-add`, "[role=dialog]");
 
-  // Done is the fourth column's resting state, not a dialog.
+  // Done is the board's last column, not a dialog.
   await page
     .getByRole("navigation", { name: "More" })
     .getByRole("button", { name: "Done" })

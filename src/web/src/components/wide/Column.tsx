@@ -1,6 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { Ellipsis, X } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { EmptyLine } from "@/components/phone/EmptyLine";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
@@ -8,6 +8,15 @@ import { ICON_BUTTON } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
+
+/**
+ * The rows beside the open sheet: all but the selected one recede, and the
+ * selected row's fill runs on under the sheet's edge (a copy of the fill,
+ * offset by the overlap, so its text keeps its width), so the row and the
+ * sheet read as joined.
+ */
+const SHEET_ROWS =
+  "[&_[data-row-container]]:transition-[color,background-color,opacity] [&_[data-row-container]:not([data-selected])]:opacity-(--n-sheet-recede) [&_[data-row-container][data-selected]]:shadow-[var(--n-sheet-overlap)_0_0_var(--n-color-fill)]";
 
 /** Droppable ids for columns, distinct from sidebar entries. */
 export const columnDropId = (listId: string) => `col:${listId}`;
@@ -38,11 +47,26 @@ type RowCallbacks = Pick<
   "now" | "timeZone" | "onCheck" | "onOpen" | "onMenu" | "onSelect"
 >;
 
-/**
- * The fourth column's tint, whatever it shows (your list, Done or a todo),
- * so it reads as distinct from the three time columns.
- */
+/** Done's tint: the only column with a style of its own. */
 export const TINTED = "bg-n-surface";
+
+/**
+ * Every column's width. Columns never stretch or squeeze: the board is one
+ * row that scrolls sideways when they don't all fit.
+ */
+export const COLUMN_WIDTH = "w-[17rem] shrink-0";
+
+/**
+ * A column's side padding: 24px, or out to the sheet's overlap on the right
+ * while its todo is open, so nothing in it sits under the sheet.
+ */
+const columnPadding = (sheetOpen: boolean) =>
+  `pl-6 duration-(--n-duration-base) ease-n-out ${
+    sheetOpen ? "pr-(--n-sheet-overlap)" : "pr-6"
+  }`;
+
+/** Behind the open sheet, the column recedes; its selected row doesn't. */
+const RECEDE = "opacity-(--n-sheet-recede)";
 
 /**
  * A focused column head. A click on the column's empty space focuses it so
@@ -60,8 +84,8 @@ const MENU_ITEM =
 
 /**
  * A column's title and subline on the shared baseline. Your lists' titles
- * rename in place (Enter or blur saves, Esc cancels) and carry a ⋯ menu and
- * a × that closes the column.
+ * rename in place (Enter or blur saves, Esc cancels) and carry a ⋯ menu.
+ * There's no ×: every list is always on the board.
  */
 export function ColumnHeader({
   listId,
@@ -71,7 +95,7 @@ export function ColumnHeader({
   banner,
   onRename,
   onDelete,
-  onClose,
+  sheetOpen = false,
 }: {
   listId: string;
   title: string;
@@ -85,7 +109,8 @@ export function ColumnHeader({
   banner?: ReactNode;
   onRename?: (name: string) => void;
   onDelete?: () => void;
-  onClose?: () => void;
+  /** The column's todo is open: clear of the sheet, and receded. */
+  sheetOpen?: boolean;
 }) {
   const [renaming, setRenamingState] = useState(false);
   // Set once Enter, Esc or blur has finished a rename, so the blur that
@@ -112,7 +137,11 @@ export function ColumnHeader({
   };
 
   return (
-    <header className="relative flex h-[10.5rem] shrink-0 flex-col justify-end px-6 pb-[1.125rem]">
+    <header
+      className={`relative flex h-[10.5rem] shrink-0 flex-col justify-end pb-[1.125rem] transition-[padding,opacity] ${columnPadding(sheetOpen)} ${
+        sheetOpen ? RECEDE : ""
+      }`}
+    >
       <div
         data-banner-slot
         className="mb-5 flex h-[2.75rem] min-w-0 flex-col justify-end"
@@ -163,8 +192,12 @@ export function ColumnHeader({
         </h2>
       </div>
       {/* In the header's top corner, so the title keeps the column's full
-          width: a list name at 40px doesn't fit beside two buttons. */}
-      <div className="absolute top-3 right-4 flex items-center gap-0.5">
+          width: a list name at 40px doesn't fit beside a button. */}
+      <div
+        className={`absolute top-3 flex items-center gap-0.5 transition-[right] duration-(--n-duration-base) ease-n-out ${
+          sheetOpen ? "right-(--n-sheet-overlap)" : "right-4"
+        }`}
+      >
         {onDelete && (
           <Menu.Root>
             <Menu.Trigger
@@ -200,16 +233,6 @@ export function ColumnHeader({
               </Menu.Positioner>
             </Menu.Portal>
           </Menu.Root>
-        )}
-        {onClose && (
-          <button
-            type="button"
-            aria-label={`Close ${title}`}
-            onClick={onClose}
-            className={ICON_BUTTON}
-          >
-            <X size={16} aria-hidden="true" />
-          </button>
         )}
       </div>
       <p className="m-0 mt-2.5 truncate text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
@@ -259,13 +282,14 @@ function DraggableRow({
 /**
  * One board column: an Archivo title and subline on the shared baseline, a
  * hairline, the "+ Add" composer, then the rows. The whole column accepts a
- * dropped todo; `indicator` marks the slot it would land in.
+ * dropped todo; `indicator` marks the slot it would land in. While its todo
+ * is open (`sheetOpen`) the sheet lies over its right edge: the contents
+ * move in clear of it, and everything but the selected row recedes.
  */
 export function Column({
   listId,
   title,
   subline,
-  tinted = false,
   rows,
   subtasksOf,
   checked,
@@ -279,16 +303,15 @@ export function Column({
   empty,
   loading,
   error,
-  onClose,
   onRename,
   onDelete,
   onBackgroundClick,
+  sheetOpen = false,
   ...rowCallbacks
 }: RowCallbacks & {
   listId: string;
   title: string;
   subline: string;
-  tinted?: boolean;
   rows: TodoWithUrls[];
   subtasksOf: (id: string) => TodoWithUrls[];
   checked: ReadonlySet<string>;
@@ -304,14 +327,14 @@ export function Column({
   empty: string;
   loading: boolean;
   error: ReactNode;
-  /** Your list's column: × closes it, back to Done. */
-  onClose?: () => void;
   /** Your list's column: rename in place. */
   onRename?: (name: string) => void;
   /** Your list's column: Delete list, in the ⋯ menu. */
   onDelete?: () => void;
   /** A click on the column's empty space: focus it, select nothing. */
   onBackgroundClick?: () => void;
+  /** Its todo is open, in the sheet beside it. */
+  sheetOpen?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnDropId(listId),
@@ -343,12 +366,12 @@ export function Column({
       ref={setNodeRef}
       aria-labelledby={headingId}
       data-column={listId}
+      data-slide={listId}
       onClick={(e) => {
         if (isColumnBackground(e.target)) onBackgroundClick?.();
       }}
-      className={`relative flex h-full min-w-[17rem] flex-1 basis-0 flex-col border-l border-n-hairline first:border-l-0 ${
-        tinted ? TINTED : ""
-      }`}
+      data-sheet-open={sheetOpen ? "" : undefined}
+      className={`relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline first:border-l-0`}
     >
       <ColumnHeader
         listId={listId}
@@ -357,14 +380,26 @@ export function Column({
         banner={banner}
         onRename={onRename}
         onDelete={onDelete}
-        onClose={onClose}
+        sheetOpen={sheetOpen}
       />
-      <div aria-hidden="true" className="mx-6 h-px shrink-0 bg-n-hairline" />
+      <div
+        aria-hidden="true"
+        className={`ml-6 h-px shrink-0 bg-n-hairline transition-[margin,opacity] duration-(--n-duration-base) ease-n-out ${
+          sheetOpen ? `mr-(--n-sheet-overlap) ${RECEDE}` : "mr-6"
+        }`}
+      />
       <div
         data-column-body={listId}
-        className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-gutter:stable] [scrollbar-width:thin]"
+        className={`min-h-0 flex-1 overflow-y-auto pt-2.5 pb-10 transition-[padding] [scrollbar-gutter:stable] [scrollbar-width:thin] ${columnPadding(sheetOpen)}`}
       >
-        {composer}
+        <div
+          data-column-composer
+          className={`transition-opacity duration-(--n-duration-base) ${
+            sheetOpen ? RECEDE : ""
+          }`}
+        >
+          {composer}
+        </div>
         {loading ? (
           <>
             <p className="sr-only" aria-live="polite">
@@ -388,7 +423,7 @@ export function Column({
               <ul
                 ref={listRef}
                 data-row-list={listId}
-                className="m-0 list-none p-0"
+                className={`m-0 list-none p-0 ${sheetOpen ? SHEET_ROWS : ""}`}
               >
                 {rows.map((todo) => (
                   <DraggableRow

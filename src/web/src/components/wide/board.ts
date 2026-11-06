@@ -16,9 +16,74 @@ import {
 } from "./boardDom";
 import type { Board, JumpTarget } from "./commands";
 
+/** One place on the wide board's row, left to right. */
+export type BoardSlot =
+  | { kind: "list"; list: SerializedList }
+  | { kind: "done" }
+  | { kind: "sheet" };
+
+/**
+ * The wide board's row: `lists` (the time lists, then yours in the
+ * sidebar's order), then Done. Nothing is swapped in or out. With a todo
+ * open, its sheet goes straight after the todo's column (`sheetAfter`), and
+ * the columns after it keep their order.
+ */
+export function boardSlots(
+  lists: SerializedList[],
+  sheetAfter: string | null,
+): BoardSlot[] {
+  const slots: BoardSlot[] = [];
+  for (const list of lists) {
+    slots.push({ kind: "list", list });
+    if (list.id === sheetAfter) slots.push({ kind: "sheet" });
+  }
+  slots.push({ kind: "done" });
+  return slots;
+}
+
+/** A horizontal stretch of the board, in its scrolled content's px. */
+export interface Span {
+  left: number;
+  right: number;
+}
+
+/** The board's scrolled viewport. */
+export interface BoardView {
+  scrollLeft: number;
+  width: number;
+}
+
+/**
+ * The least scroll that shows `span` whole: unchanged if it already shows,
+ * else just far enough. A span wider than the view shows its start.
+ */
+export function revealSpan(view: BoardView, span: Span): number {
+  if (span.left < view.scrollLeft) return Math.max(0, span.left);
+  if (span.right > view.scrollLeft + view.width) {
+    return Math.max(0, Math.min(span.left, span.right - view.width));
+  }
+  return view.scrollLeft;
+}
+
+/**
+ * Where to scroll the board so the open todo's whole column and its whole
+ * sheet show, by the least amount. If both don't fit, the sheet wins: it
+ * sits against the right edge, with as much of its column as fits beside.
+ */
+export function sheetScrollTarget(
+  view: BoardView,
+  column: Span,
+  sheet: Span,
+): number {
+  if (sheet.right - column.left <= view.width) {
+    return revealSpan(view, { left: column.left, right: sheet.right });
+  }
+  return Math.max(0, Math.min(sheet.left, sheet.right - view.width));
+}
+
 /** What the commands need from the board, as `WideApp` has it this render. */
 export interface BoardContext {
-  /** The columns with rows, left to right (not the detail). */
+  /** The columns with rows, left to right (not the sheet). */
   columnIds: string[];
   /** The selection's column if it's on screen, else Today. */
   currentColumn: string | null;

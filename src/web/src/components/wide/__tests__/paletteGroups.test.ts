@@ -26,7 +26,6 @@ function source(): PaletteSource {
     admin: false,
     board: {} as Board,
     goToColumn: vi.fn(),
-    openList: vi.fn(),
     showDone: vi.fn(),
     goToTodo: vi.fn(),
     moveTodo: vi.fn(),
