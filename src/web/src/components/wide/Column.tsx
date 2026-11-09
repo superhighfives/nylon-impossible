@@ -4,7 +4,7 @@ import { Ellipsis } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { EmptyLine } from "@/components/phone/EmptyLine";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
-import { ICON_BUTTON } from "@/components/ui/styles";
+import { ICON_BUTTON, SUBLINE } from "@/components/ui/styles";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
@@ -92,6 +92,7 @@ export function ColumnHeader({
   title,
   subline,
   muted = false,
+  icon,
   banner,
   onRename,
   onDelete,
@@ -102,6 +103,11 @@ export function ColumnHeader({
   subline: string;
   /** Done's title reads like a subline: it's the resting state. */
   muted?: boolean;
+  /**
+   * Your list's column: marks it as a list at the start of the subline, as
+   * the open todo's sheet marks a todo. Today and the others have none.
+   */
+  icon?: ReactNode;
   /**
    * Today's overnight pill. Every column keeps its space (two lines, 20px
    * clear of the title) whether or not it's showing, so titles don't move.
@@ -235,8 +241,9 @@ export function ColumnHeader({
           </Menu.Root>
         )}
       </div>
-      <p className="m-0 mt-2.5 truncate text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
-        {subline}
+      <p className={SUBLINE}>
+        {icon}
+        <span className="truncate">{subline}</span>
       </p>
     </header>
   );
@@ -299,6 +306,7 @@ export function Column({
   indicator,
   settle = null,
   composer,
+  icon,
   banner,
   empty,
   loading,
@@ -322,6 +330,8 @@ export function Column({
   /** Where rows sat at a drop, so they ease into the new order. */
   settle?: Settle | null;
   composer: ReactNode;
+  /** Your list's column: the list icon at the start of the subline. */
+  icon?: ReactNode;
   /** Today's overnight pill, in the header's reserved space. */
   banner?: ReactNode;
   empty: string;
@@ -377,6 +387,7 @@ export function Column({
         listId={listId}
         title={title}
         subline={subline}
+        icon={icon}
         banner={banner}
         onRename={onRename}
         onDelete={onDelete}

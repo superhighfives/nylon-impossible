@@ -14,6 +14,7 @@ import {
   Calendar as CalendarIcon,
   Check,
   ChevronDown,
+  Circle,
   Link2,
   List,
   Loader2,
@@ -24,7 +25,7 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { ICON_BUTTON, ROW_HOVER } from "@/components/ui/styles";
+import { ICON_BUTTON, ROW_HOVER, SUBLINE } from "@/components/ui/styles";
 import {
   useAddTodoUrl,
   useCreateTodo,
@@ -418,8 +419,11 @@ function DetailBody({
             baseline. */}
         <header className="relative flex min-h-[calc(10.5rem-var(--n-sheet-inset))] shrink-0 flex-col justify-end px-6 pt-12 pb-[1.125rem]">
           {titleField("text-[1.75rem] leading-[1.1] tracking-[-0.025em]")}
-          <p className="m-0 mt-2.5 truncate text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
-            In {listName(todo.listId)}
+          <p className={SUBLINE}>
+            {/* A todo, at a glance: the shape of a row's checkbox, where
+                your list's column has the list icon. */}
+            <Circle size={16} aria-hidden="true" data-icon="todo" />
+            <span className="truncate">In {listName(todo.listId)}</span>
           </p>
           <div className="absolute top-3 right-4">
             <Dialog.Close aria-label="Close" className={ICON_BUTTON}>

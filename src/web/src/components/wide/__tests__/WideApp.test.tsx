@@ -879,6 +879,33 @@ describe("WideApp", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  it("marks your lists' columns with the list icon, and the time columns and Done with none", () => {
+    render(<WideApp />);
+    for (const name of ["Groceries", "Studio"]) {
+      const icons = column(name).querySelectorAll("header [data-icon]");
+      expect([...icons].map((i) => i.getAttribute("data-icon"))).toEqual([
+        "list",
+      ]);
+      expect(icons[0]).toHaveAttribute("aria-hidden", "true");
+    }
+    for (const name of ["Today", "This week", "Someday", "Done"]) {
+      expect(column(name).querySelector("[data-icon]")).toBeNull();
+    }
+  });
+
+  it("the open todo's header marks it as a todo, on the line where a list's has its icon", async () => {
+    render(<WideApp />);
+    await userEvent.dblClick(rowButton("Parmesan"));
+    const detail = await screen.findByRole("dialog");
+    const icon = detail.querySelector("header [data-icon]");
+    expect(icon).toHaveAttribute("data-icon", "todo");
+    expect(icon?.parentElement).toHaveTextContent("In Groceries");
+    expect(icon?.parentElement?.className).toBe(
+      column("Groceries").querySelector("header [data-icon]")?.parentElement
+        ?.className,
+    );
+  });
+
   it("one click selects, a second click opens the todo in a sheet right after its column", async () => {
     render(<WideApp />);
     await userEvent.click(rowButton("Call Mum"));

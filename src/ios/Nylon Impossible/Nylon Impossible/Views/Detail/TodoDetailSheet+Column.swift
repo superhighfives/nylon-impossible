@@ -141,10 +141,9 @@ struct DetailColumnHeader<Title: View>: View {
             title()
                 // Clear of the × in the corner.
                 .padding(.trailing, Theme.Space.s8)
-            Text(subline)
-                .textStyle(Theme.Fonts.Role.meta)
-                .foregroundStyle(Theme.Colors.inkMuted)
-                .fixedSize(horizontal: false, vertical: true)
+            // A todo, at a glance: the shape of a row's checkbox, where your
+            // list's column has the list icon.
+            ColumnSubline(text: subline, icon: Theme.Icon.todo)
                 .frame(minHeight: shared.subline, alignment: .topLeading)
                 .padding(.top, 10)
         }

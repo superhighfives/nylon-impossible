@@ -17,6 +17,9 @@ struct BoardColumnHeader<Accessory: View>: View {
     let title: String
     let subline: String
     var isMuted = false
+    /// Your list's column: `Theme.Icon.list` at the start of the subline, as
+    /// the open todo's header has `Theme.Icon.todo`. Nil for the rest.
+    var icon: String?
     /// Your list's column: the title is a button that renames in place.
     var onRename: ((String) -> Void)?
     /// Set from outside too, by Rename in the ⋯ menu.
@@ -51,10 +54,7 @@ struct BoardColumnHeader<Accessory: View>: View {
             // at AX5 in a quarter of an iPad takes three lines. Every
             // subline takes the longest one's height, so the titles above
             // them stay level.
-            Text(subline)
-                .textStyle(Theme.Fonts.Role.meta)
-                .foregroundStyle(Theme.Colors.inkMuted)
-                .fixedSize(horizontal: false, vertical: true)
+            ColumnSubline(text: subline, icon: icon)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { measured.subline = $0 }
                 .frame(minHeight: shared.subline, alignment: .topLeading)
                 .padding(.top, 10)
@@ -135,6 +135,28 @@ extension BoardColumnHeader where Accessory == EmptyView {
         self.init(title: title, subline: subline, isMuted: isMuted, onRename: nil, isRenaming: .constant(false), banner: nil) {
             EmptyView()
         }
+    }
+}
+
+/// A header's subline, with an optional icon at its start: in the subline's
+/// text style and colour, on its first line when it wraps, and hidden from
+/// VoiceOver (the column's name, or "Todo", already says what it is).
+struct ColumnSubline: View {
+    let text: String
+    var icon: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s2) {
+            if let icon {
+                // Inside a Text, so it has a baseline to sit on.
+                Text(Image(systemName: icon))
+                    .accessibilityHidden(true)
+            }
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .textStyle(Theme.Fonts.Role.meta)
+        .foregroundStyle(Theme.Colors.inkMuted)
     }
 }
 

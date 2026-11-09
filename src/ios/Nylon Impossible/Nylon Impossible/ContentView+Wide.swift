@@ -408,6 +408,7 @@ extension ContentView {
                 actions: actions,
                 selectedId: selectedTodoId,
                 isTinted: true,
+                icon: Theme.Icon.list,
                 overnight: nil,
                 empty: ("Nothing here yet.", nil),
                 composer: composer,

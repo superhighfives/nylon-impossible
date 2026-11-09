@@ -44,4 +44,44 @@ describe("DetailSheet", () => {
       "shrink-0",
     );
   });
+
+  it("marks the open todo as a todo at the start of its subline, on wide", () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    render(
+      <DetailSheet
+        todo={makeTodo({ title: "Camera", listId: "list-today" })}
+        subtasks={[]}
+        listTargets={[]}
+        listName={() => "Today"}
+        timeZone="UTC"
+        actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
+        onClose={vi.fn()}
+        variant="column"
+        container={container}
+        animated={false}
+      />,
+    );
+    const subline = screen.getByText("In Today").parentElement;
+    const icon = subline?.firstElementChild;
+    expect(icon).toHaveAttribute("data-icon", "todo");
+    expect(icon).toHaveAttribute("aria-hidden", "true");
+    expect(icon).toHaveAttribute("width", "16");
+    container.remove();
+  });
+
+  it("leaves the phone sheet's subline without an icon", () => {
+    render(
+      <DetailSheet
+        todo={makeTodo({ title: "Camera" })}
+        subtasks={[]}
+        listTargets={[]}
+        listName={() => "Today"}
+        timeZone="UTC"
+        actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(document.querySelector("[data-icon]")).toBeNull();
+  });
 });
