@@ -33,8 +33,8 @@ struct BoardColumn<Accessory: View>: View {
     var selectedId: UUID?
     /// A collection column has a faint tint, like the prototype.
     var isTinted = false
-    /// Today's overnight pill: its text, what its text does, and dismiss.
-    var overnight: (text: String, see: () -> Void, dismiss: () -> Void)?
+    /// Today's overnight pill: its line, what its text does, and dismiss.
+    var overnight: (line: OvernightNote.Line, see: () -> Void, dismiss: () -> Void)?
     var empty: (text: String, link: (text: String, action: () -> Void)?)
     let composer: Composer
     /// The keyboard is on Add without typing: it shows as a row selected by
@@ -103,7 +103,7 @@ struct BoardColumn<Accessory: View>: View {
         .background {
             Color.clear.contentShape(Rectangle()).onTapGesture(perform: onBackgroundTap)
         }
-        .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.text)
+        .animation(Theme.Motion.moving(reduceMotion: reduceMotion), value: overnight?.line)
         .coordinateSpace(.named(Self.columnSpace))
         .onDrop(
             of: TodoDropLoader.types(external: onExternalDrop != nil),
@@ -124,7 +124,7 @@ struct BoardColumn<Accessory: View>: View {
             onRename: onRename,
             isRenaming: isRenaming,
             banner: overnight.map { note in
-                AnyView(OvernightPill(text: note.text, onSee: note.see, onDismiss: note.dismiss).transition(.opacity))
+                AnyView(OvernightPill(line: note.line, onSee: note.see, onDismiss: note.dismiss).transition(.opacity))
             },
             accessory: accessory
         )
@@ -289,7 +289,7 @@ extension BoardColumn where Accessory == EmptyView {
         lists: [TodoListModel],
         actions: TodoActions,
         selectedId: UUID?,
-        overnight: (text: String, see: () -> Void, dismiss: () -> Void)?,
+        overnight: (line: OvernightNote.Line, see: () -> Void, dismiss: () -> Void)?,
         empty: (text: String, link: (text: String, action: () -> Void)?),
         composer: Composer,
         addSelected: Bool = false,
