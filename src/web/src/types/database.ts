@@ -7,6 +7,10 @@ export type {
   User,
 } from "@/lib/schema";
 
+import type {
+  SerializedTodo,
+  SerializedTodoUrl as SharedSerializedTodoUrl,
+} from "@nylon-impossible/shared/serialize";
 import type { Recurrence } from "@/lib/schema";
 
 export interface CreateTodoInput {
@@ -64,40 +68,8 @@ export interface SerializedList {
 /** Fetch status for URL metadata */
 export type FetchStatus = "pending" | "fetched" | "failed";
 
-/** Serialized URL metadata from the API */
-export interface SerializedTodoUrl {
-  id: string;
-  todoId: string;
-  url: string;
-  title: string | null;
-  description: string | null;
-  siteName: string | null;
-  favicon: string | null;
-  image: string | null;
-  /** When false, clients render just the raw URL instead of the fetched preview. */
-  showPreview: boolean;
-  position: string;
-  fetchStatus: FetchStatus;
-  fetchedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
+/** Serialized URL metadata from the API (the shared `serializeUrl`). */
+export type SerializedTodoUrl = SharedSerializedTodoUrl;
 
-/** A todo with its associated URLs */
-export interface TodoWithUrls {
-  id: string;
-  userId: string;
-  parentId: string | null;
-  listId: string;
-  title: string;
-  notes: string | null;
-  completed: boolean;
-  completedAt: string | null;
-  position: string;
-  dueDate: string | null;
-  recurrence: Recurrence | null;
-  pinned: boolean;
-  createdAt: string;
-  updatedAt: string;
-  urls: SerializedTodoUrl[];
-}
+/** A todo with its associated URLs, as `getTodos` returns it. */
+export type TodoWithUrls = SerializedTodo & { urls: SerializedTodoUrl[] };

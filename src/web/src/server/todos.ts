@@ -3,13 +3,17 @@
  */
 
 import { toDueDay } from "@nylon-impossible/shared";
-import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
+import {
+  loadUrlsByTodoId,
+  serializeTodo,
+  serializeUrl,
+} from "@nylon-impossible/shared/serialize";
 import { createServerFn } from "@tanstack/react-start";
-import { and, asc, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { Effect } from "effect";
 import { generateKeyBetween } from "fractional-indexing";
 import {
@@ -18,7 +22,6 @@ import {
   ValidationError,
 } from "@/lib/errors";
 import { getSystemListId, verifyListOwnership } from "@/lib/lists";
-import type { Todo, TodoUrl } from "@/lib/schema";
 import { todos, todoUrls } from "@/lib/schema";
 import { getUserTimezone } from "@/lib/user-timezone";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
@@ -30,51 +33,9 @@ import {
 } from "@/lib/validation";
 import type {
   CreateTodoInput,
-  SerializedTodoUrl,
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
-
-/** Serialize a todo URL for JSON response */
-function serializeUrl(url: TodoUrl): SerializedTodoUrl {
-  return {
-    id: url.id,
-    todoId: url.todoId,
-    url: url.url,
-    title: url.title,
-    description: url.description,
-    siteName: url.siteName,
-    favicon: url.favicon,
-    image: url.image,
-    showPreview: url.showPreview,
-    position: url.position,
-    fetchStatus: url.fetchStatus,
-    fetchedAt: url.fetchedAt?.toISOString() ?? null,
-    createdAt: url.createdAt.toISOString(),
-    updatedAt: url.updatedAt.toISOString(),
-  };
-}
-
-/** Serialize a todo with URLs for JSON response */
-function serializeTodoWithUrls(todo: Todo, urls: TodoUrl[]): TodoWithUrls {
-  return {
-    id: todo.id,
-    userId: todo.userId,
-    parentId: todo.parentId ?? null,
-    listId: todo.listId,
-    title: todo.title,
-    notes: todo.notes,
-    completed: todo.completed,
-    completedAt: todo.completedAt?.toISOString() ?? null,
-    position: todo.position,
-    dueDate: todo.dueDate?.toISOString() ?? null,
-    recurrence: todo.recurrence,
-    pinned: todo.pinned,
-    createdAt: todo.createdAt.toISOString(),
-    updatedAt: todo.updatedAt.toISOString(),
-    urls: urls.map(serializeUrl),
-  };
-}
 
 /**
  * Get all todos for the authenticated user, including their URLs
@@ -98,48 +59,31 @@ export const getTodos = createServerFn({ method: "GET" }).handler(async () => {
       });
 
       // Fetch all URLs for the user's todos
-      const todoIds = userTodos.map((t) => t.id);
-      let allUrls: TodoUrl[] = [];
-      if (todoIds.length > 0) {
-        // Batch the id list so each statement stays within D1's bound-param
-        // cap. A given todoId lands in exactly one batch, so per-todo ordering
-        // (urls by position) is preserved once results are grouped by todoId
-        // below.
-        const idBatches = chunkForD1(todoIds);
-        allUrls = yield* Effect.tryPromise({
-          try: () =>
-            Promise.all(
-              idBatches.map((ids) =>
-                db
-                  .select()
-                  .from(todoUrls)
-                  .where(inArray(todoUrls.todoId, ids))
-                  .orderBy(asc(todoUrls.position)),
-              ),
-            ).then((batches) => batches.flat()),
-          catch: (error) =>
-            new DatabaseError({
-              operation: "getTodoUrls",
-              cause: error,
-            }),
-        });
-      }
-
-      // Group URLs by todoId
-      const urlsByTodoId = new Map<string, TodoUrl[]>();
-      for (const url of allUrls) {
-        const existing = urlsByTodoId.get(url.todoId) ?? [];
-        existing.push(url);
-        urlsByTodoId.set(url.todoId, existing);
-      }
+      const urlsByTodoId = yield* Effect.tryPromise({
+        try: () =>
+          loadUrlsByTodoId(
+            db,
+            userTodos.map((t) => t.id),
+          ),
+        catch: (error) =>
+          new DatabaseError({
+            operation: "getTodoUrls",
+            cause: error,
+          }),
+      });
 
       yield* Effect.log(
         `Fetched ${userTodos.length} todos for user ${user.id}`,
       );
 
       // Return todos with their URLs
-      return userTodos.map((todo) =>
-        serializeTodoWithUrls(todo, urlsByTodoId.get(todo.id) ?? []),
+      return userTodos.map(
+        (todo): TodoWithUrls => ({
+          ...serializeTodo(todo),
+          urls: (urlsByTodoId.get(todo.id.toLowerCase()) ?? []).map(
+            serializeUrl,
+          ),
+        }),
       );
     }),
   );

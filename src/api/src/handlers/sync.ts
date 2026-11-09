@@ -4,6 +4,11 @@ import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
+import {
+  loadUrlsByTodoId,
+  serializeTodo,
+  serializeUrl,
+} from "@nylon-impossible/shared/serialize";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -16,7 +21,6 @@ import {
   inArray,
   isNotNull,
   type Todo,
-  type TodoUrl,
   todos,
   todoUrls,
 } from "../lib/db";
@@ -24,11 +28,7 @@ import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
-import {
-  pinnedRequestFields,
-  pinnedResponseFields,
-  resolvePinned,
-} from "../lib/pinned";
+import { pinnedRequestFields, resolvePinned } from "../lib/pinned";
 import { finishTodoLinks } from "../lib/process-todo";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import { getUserTimezone } from "../lib/user-timezone";
@@ -90,50 +90,6 @@ function sortChangesForApply(
         ? a.originalIndex - b.originalIndex
         : aRank - bRank;
     });
-}
-
-// Serialize a URL with explicit ISO8601 dates and lowercase IDs
-function serializeUrl(url: TodoUrl) {
-  return {
-    id: url.id.toLowerCase(),
-    todoId: url.todoId.toLowerCase(),
-    url: url.url,
-    title: url.title,
-    description: url.description,
-    siteName: url.siteName,
-    favicon: url.favicon,
-    image: url.image ?? null,
-    showPreview: url.showPreview,
-    position: url.position,
-    fetchStatus: url.fetchStatus,
-    fetchedAt: url.fetchedAt?.toISOString() ?? null,
-    createdAt: url.createdAt.toISOString(),
-    updatedAt: url.updatedAt.toISOString(),
-  };
-}
-
-// Serialize a todo with explicit ISO8601 dates and lowercase ID
-function serializeTodo(
-  todo: typeof todos.$inferSelect,
-  urls: ReturnType<typeof serializeUrl>[] = [],
-) {
-  return {
-    id: todo.id.toLowerCase(),
-    userId: todo.userId,
-    parentId: todo.parentId?.toLowerCase() ?? null,
-    listId: todo.listId,
-    title: todo.title,
-    notes: todo.notes,
-    completed: todo.completed,
-    completedAt: todo.completedAt?.toISOString() ?? null,
-    position: todo.position,
-    dueDate: todo.dueDate?.toISOString() ?? null,
-    recurrence: todo.recurrence,
-    ...pinnedResponseFields(todo.pinned),
-    createdAt: todo.createdAt.toISOString(),
-    updatedAt: todo.updatedAt.toISOString(),
-    urls,
-  };
 }
 
 // POST /todos/sync - Bidirectional sync
@@ -568,35 +524,16 @@ export async function syncTodos(c: Context<Env>) {
   }
 
   // 3. Fetch all URLs for the returned todos
-  const todoIds = serverTodos.map((t) => t.id);
-  const allUrls: TodoUrl[] = [];
-  if (todoIds.length > 0) {
-    // Batch by D1's bound-param cap: one `inArray` param per todoId, so a user
-    // with >100 todos would otherwise overflow a single statement. Each todoId
-    // lands in one batch, so per-todo ordering survives grouping below.
-    for (const chunkIds of chunkForD1(todoIds)) {
-      const urls = await db
-        .select()
-        .from(todoUrls)
-        .where(inArray(todoUrls.todoId, chunkIds))
-        .orderBy(asc(todoUrls.position));
-      allUrls.push(...urls);
-    }
-  }
-
-  // Group URLs by todoId
-  const urlsByTodoId = new Map<string, ReturnType<typeof serializeUrl>[]>();
-  for (const url of allUrls) {
-    const serialized = serializeUrl(url);
-    const existing = urlsByTodoId.get(url.todoId) ?? [];
-    existing.push(serialized);
-    urlsByTodoId.set(url.todoId, existing);
-  }
+  const urlsByTodoId = await loadUrlsByTodoId(
+    db,
+    serverTodos.map((t) => t.id),
+  );
 
   return c.json({
-    todos: serverTodos.map((todo) =>
-      serializeTodo(todo, urlsByTodoId.get(todo.id) ?? []),
-    ),
+    todos: serverTodos.map((todo) => ({
+      ...serializeTodo(todo),
+      urls: (urlsByTodoId.get(todo.id.toLowerCase()) ?? []).map(serializeUrl),
+    })),
     syncedAt: syncedAt.toISOString(),
     conflicts,
   });

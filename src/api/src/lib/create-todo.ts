@@ -3,37 +3,18 @@ import {
   normalizeHttpUrl,
   parseTodoDate,
 } from "@nylon-impossible/shared";
+import { serializeTodo } from "@nylon-impossible/shared/serialize";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
-import { pinnedResponseFields } from "./pinned";
 import { finishTodoLinks } from "./process-todo";
 import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
-
-/** Serialized todo shape returned by the smart-create path. */
-export function serializeCreatedTodo(todo: typeof todos.$inferSelect) {
-  return {
-    id: todo.id.toLowerCase(),
-    userId: todo.userId,
-    parentId: todo.parentId?.toLowerCase() ?? null,
-    listId: todo.listId,
-    title: todo.title,
-    notes: todo.notes,
-    completed: todo.completed,
-    position: todo.position,
-    dueDate: todo.dueDate?.toISOString() ?? null,
-    recurrence: todo.recurrence,
-    ...pinnedResponseFields(todo.pinned),
-    createdAt: todo.createdAt.toISOString(),
-    updatedAt: todo.updatedAt.toISOString(),
-  };
-}
 
 export interface CreateSmartTodoOptions {
   /**
@@ -89,7 +70,7 @@ export interface CreateSmartTodoOptions {
 }
 
 export interface CreateSmartTodoResult {
-  todo: ReturnType<typeof serializeCreatedTodo>;
+  todo: ReturnType<typeof serializeTodo>;
 }
 
 /**
@@ -286,7 +267,7 @@ export async function createSmartTodo(
 
   await notifySync(env, userId);
 
-  return { todo: serializeCreatedTodo(created) };
+  return { todo: serializeTodo(created) };
 }
 
 /**
