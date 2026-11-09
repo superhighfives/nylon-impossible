@@ -69,15 +69,25 @@ extension View {
 
 /// Hides the system's line under the window toolbar, in this window and every
 /// new one, so the board's own hairline is the only one there. The window's
-/// style overrides the split view items' own.
+/// style overrides the split view items' own. Watched rather than set once:
+/// if SwiftUI or AppKit sets a style again on a later layout (a sidebar
+/// toggle, #601), it goes straight back to none.
 struct TitlebarSeparatorHidden: NSViewRepresentable {
     func makeNSView(context: Context) -> NSView { WindowView() }
     func updateNSView(_ nsView: NSView, context: Context) {}
 
     final class WindowView: NSView {
+        private var separatorObservation: NSKeyValueObservation?
+
         override func viewDidMoveToWindow() {
             super.viewDidMoveToWindow()
-            window?.titlebarSeparatorStyle = .none
+            separatorObservation = window?.observe(\.titlebarSeparatorStyle, options: [.initial]) { window, _ in
+                MainActor.assumeIsolated {
+                    if window.titlebarSeparatorStyle != .none {
+                        window.titlebarSeparatorStyle = .none
+                    }
+                }
+            }
         }
     }
 }
