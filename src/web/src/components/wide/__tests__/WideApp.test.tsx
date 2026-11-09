@@ -132,8 +132,86 @@ const focusedTitle = () =>
 const press = (key: string) =>
   fireEvent.keyDown(document.activeElement ?? window, { key });
 
+/** The board row's children, left to right: columns and the sheet. */
+const slides = () =>
+  [
+    ...document.querySelectorAll<HTMLElement>(
+      'main[aria-label="Board"] > [data-slide]',
+    ),
+  ].map((el) => el.dataset.slide);
+
+/**
+ * Lays the board out `width` px wide, unscrolled: each column 272px (17rem)
+ * and the sheet 400px, overlapping its column by 48px. jsdom has no layout.
+ */
+const layOutBoard = (width: number) => {
+  const board = screen.getByRole("main", { name: "Board" });
+  const widthOf = (el: HTMLElement) =>
+    el.dataset.slide === "sheet" ? 400 : 272;
+  Object.defineProperty(board, "clientWidth", {
+    configurable: true,
+    value: width,
+  });
+  board.scrollLeft = 0;
+  board.scrollTo = vi.fn();
+  board.scrollBy = vi.fn();
+  board.getBoundingClientRect = () =>
+    ({
+      left: 240,
+      right: 240 + width,
+      top: 50,
+      bottom: 850,
+      width,
+      height: 800,
+    }) as DOMRect;
+  const leftOf = (el: HTMLElement) => {
+    let x = 0;
+    let sheet = el.dataset.slide === "sheet";
+    for (
+      let sib = el.previousElementSibling as HTMLElement | null;
+      sib;
+      sib = sib.previousElementSibling as HTMLElement | null
+    ) {
+      x += widthOf(sib);
+      if (sib.dataset.slide === "sheet") sheet = true;
+    }
+    return sheet ? x - 48 : x;
+  };
+  const restore = [
+    ["offsetLeft", (el: HTMLElement) => leftOf(el)],
+    ["offsetWidth", (el: HTMLElement) => widthOf(el)],
+  ] as const;
+  for (const [prop, get] of restore) {
+    Object.defineProperty(HTMLElement.prototype, prop, {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.parentElement === board && this.dataset.slide
+          ? get(this)
+          : 0;
+      },
+    });
+  }
+  return board;
+};
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
+});
+
+const jsdomLayout = (["offsetLeft", "offsetWidth"] as const).map(
+  (prop) =>
+    [
+      prop,
+      Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop),
+    ] as const,
+);
+afterEach(() => {
+  // `layOutBoard`'s layout, back to jsdom's none.
+  for (const [prop, descriptor] of jsdomLayout) {
+    if (descriptor) {
+      Object.defineProperty(HTMLElement.prototype, prop, descriptor);
+    }
+  }
 });
 
 describe("WideApp", () => {
@@ -218,8 +296,8 @@ describe("WideApp", () => {
     ).toHaveAccessibleDescription("2 todos");
     const groceries = within(nav).getByRole("button", { name: "Groceries" });
     expect(groceries).toHaveAccessibleDescription("1 todo");
+    // No list is "the open one": every list is on the board.
     expect(groceries).not.toHaveAttribute("aria-current");
-    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
   });
 
   it("draws the board's shape while it loads, instead of Done across it", () => {
@@ -266,20 +344,34 @@ describe("WideApp", () => {
     }
   });
 
-  it("always has a fourth column, Done by default, with no ×", () => {
+  it("lays out the time lists, every list in the sidebar's order, then Done", () => {
     render(<WideApp />);
     expect(
       screen.getAllByRole("region").map((r) => r.getAttribute("data-column")),
-    ).toEqual(["list-today", "list-week", "list-someday", "done"]);
+    ).toEqual([
+      "list-today",
+      "list-week",
+      "list-someday",
+      "list-groceries",
+      "list-studio",
+      "done",
+    ]);
     expect(
       within(column("Done")).getByText("Ship the zine"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Close Done" })).toBeNull();
+    // Nothing to close: no column has a ×.
+    expect(screen.queryAllByRole("button", { name: /^Close / })).toEqual([]);
+    // Every column keeps one width; only Done has a tint.
+    for (const region of screen.getAllByRole("region")) {
+      expect(region).toHaveClass("w-[17rem]", "shrink-0");
+      expect(region.classList.contains("bg-n-surface")).toBe(
+        region === column("Done"),
+      );
+    }
     const more = screen.getByRole("navigation", { name: "More" });
-    expect(within(more).getByRole("button", { name: "Done" })).toHaveAttribute(
-      "aria-current",
-      "true",
-    );
+    expect(
+      within(more).getByRole("button", { name: "Done" }),
+    ).not.toHaveAttribute("aria-current");
   });
 
   it("rows hover with the same 60% fill in every column and the open todo", async () => {
@@ -293,7 +385,7 @@ describe("WideApp", () => {
       .getByText("Ship the zine")
       .closest("[data-row-container]");
     expect(done).toHaveClass(HOVER);
-    // Opening your list selects its first row: the full fill instead, so
+    // Going to your list selects its first row: the full fill instead, so
     // hovered and selected differ.
     const nav = screen.getByRole("navigation", { name: "Lists" });
     await userEvent.click(
@@ -313,31 +405,35 @@ describe("WideApp", () => {
     expect(detail.innerHTML).not.toContain("n-row-hover");
   });
 
-  it("opens one of your lists in the fourth column, swaps it, and × goes back to Done", async () => {
+  it("the sidebar scrolls a narrow board the least that shows the column, and goes in", async () => {
     render(<WideApp />);
+    const board = layOutBoard(600);
     const nav = screen.getByRole("navigation", { name: "Lists" });
-    await userEvent.click(
-      within(nav).getByRole("button", { name: /Groceries/ }),
-    );
-    expect(column("Groceries")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Done" })).toBeNull();
-    expect(
-      within(nav).getByRole("button", { name: "Groceries" }),
-    ).toHaveAttribute("aria-current", "true");
-    expect(focusedTitle()).toContain("Parmesan");
-
+    // Studio is the fifth column: 1088–1360px.
     await userEvent.click(within(nav).getByRole("button", { name: /Studio/ }));
-    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
-    expect(column("Studio")).toBeInTheDocument();
-
-    // Clicking the open list again goes into it; it doesn't close it.
-    await userEvent.click(within(nav).getByRole("button", { name: /Studio/ }));
-    expect(column("Studio")).toBeInTheDocument();
+    expect(board.scrollTo).toHaveBeenLastCalledWith({
+      left: 1360 - 600,
+      behavior: "auto",
+    });
     expect(focusedTitle()).toContain("Mix the EP");
-
-    await userEvent.click(screen.getByRole("button", { name: "Close Studio" }));
-    expect(screen.queryByRole("region", { name: "Studio" })).toBeNull();
+    // Nothing was swapped to get there.
+    expect(column("Groceries")).toBeInTheDocument();
     expect(column("Done")).toBeInTheDocument();
+
+    // Back to Today, at the start.
+    board.scrollLeft = 760;
+    await userEvent.click(within(nav).getByRole("button", { name: /Today/ }));
+    expect(board.scrollTo).toHaveBeenLastCalledWith({
+      left: 0,
+      behavior: "auto",
+    });
+    // Already in view: no scroll.
+    board.scrollLeft = 0;
+    vi.mocked(board.scrollTo).mockClear();
+    await userEvent.click(
+      within(nav).getByRole("button", { name: /This week/ }),
+    );
+    expect(board.scrollTo).not.toHaveBeenCalled();
   });
 
   it("goes into a time list from the sidebar, back to its last selection", async () => {
@@ -783,24 +879,137 @@ describe("WideApp", () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("one click selects, a second click opens the detail in the fourth column", async () => {
+  it("one click selects, a second click opens the todo in a sheet right after its column", async () => {
     render(<WideApp />);
     await userEvent.click(rowButton("Call Mum"));
     expect(
       rowButton("Call Mum").closest("[data-row-container]"),
     ).toHaveAttribute("data-selected");
     expect(screen.queryByRole("dialog")).toBeNull();
+    expect(slides()).not.toContain("sheet");
 
     await userEvent.click(rowButton("Call Mum"));
     const detail = await screen.findByRole("dialog");
     expect(detail).toHaveAttribute("data-detail-column");
-    expect(detail.closest("[data-column-detail]")).toBeInTheDocument();
+    expect(detail.closest("[data-board-sheet]")).toBeInTheDocument();
     expect(within(detail).getByRole("textbox", { name: "Title" })).toHaveValue(
       "Call Mum",
     );
-    // The time columns stay; the detail took Done's place.
-    expect(column("Today")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Done" })).toBeNull();
+    // Laid in after Today; everything after it keeps its order.
+    expect(slides()).toEqual([
+      "list-today",
+      "sheet",
+      "list-week",
+      "list-someday",
+      "list-groceries",
+      "list-studio",
+      "done",
+    ]);
+  });
+
+  it("a todo open in a list puts the sheet after that list, before the rest", async () => {
+    render(<WideApp />);
+    await userEvent.dblClick(rowButton("Parmesan"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(slides()).toEqual([
+      "list-today",
+      "list-week",
+      "list-someday",
+      "list-groceries",
+      "sheet",
+      "list-studio",
+      "done",
+    ]);
+  });
+
+  it("the open todo's column recedes, bar its selected row, and nothing else does", async () => {
+    const RECEDE = "opacity-(--n-sheet-recede)";
+    render(<WideApp />);
+    await userEvent.dblClick(rowButton("Read Piranesi"));
+    await screen.findByRole("dialog");
+    const someday = column("Someday");
+    expect(someday).toHaveAttribute("data-sheet-open");
+    // Its header and Add field recede, and its contents move in clear of
+    // the sheet's overlap.
+    expect(someday.querySelector("header")).toHaveClass(
+      RECEDE,
+      "pr-(--n-sheet-overlap)",
+    );
+    expect(someday.querySelector("[data-column-composer]")).toHaveClass(RECEDE);
+    expect(someday.querySelector("[data-column-body]")).toHaveClass(
+      "pr-(--n-sheet-overlap)",
+    );
+    // The rows recede unless selected; the selected row's fill runs on
+    // under the sheet.
+    const rows = someday.querySelector("[data-row-list]");
+    expect(rows?.className).toContain(
+      `[&_[data-row-container]:not([data-selected])]:${RECEDE}`,
+    );
+    expect(rows?.className).toContain(
+      "[&_[data-row-container][data-selected]]:shadow-",
+    );
+    expect(
+      rowButton("Read Piranesi").closest("[data-row-container]"),
+    ).toHaveAttribute("data-selected");
+    // No other column recedes.
+    for (const region of screen.getAllByRole("region")) {
+      if (region === someday) continue;
+      expect(region).not.toHaveAttribute("data-sheet-open");
+      expect(region.innerHTML).not.toContain(RECEDE);
+    }
+  });
+
+  it("the sheet follows the selection to a list from the sidebar, and Done closes it", async () => {
+    render(<WideApp />);
+    await userEvent.dblClick(rowButton("Review PR"));
+    await screen.findByRole("dialog");
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    await userEvent.click(
+      within(nav).getByRole("button", { name: /Groceries/ }),
+    );
+    expect(
+      within(screen.getByRole("dialog")).getByRole("textbox", {
+        name: "Title",
+      }),
+    ).toHaveValue("Parmesan");
+    expect(slides().indexOf("sheet")).toBe(
+      slides().indexOf("list-groceries") + 1,
+    );
+    expect(column("Groceries")).toHaveAttribute("data-sheet-open");
+    expect(column("Today")).not.toHaveAttribute("data-sheet-open");
+
+    const more = screen.getByRole("navigation", { name: "More" });
+    await userEvent.click(within(more).getByRole("button", { name: /Done/ }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(slides()).not.toContain("sheet");
+  });
+
+  it("opening a todo scrolls its column and the sheet into view together", async () => {
+    render(<WideApp />);
+    const board = layOutBoard(700);
+    // Studio, 1088–1360px; its sheet overlaps it by 48px, to 1712px.
+    await userEvent.dblClick(rowButton("Mix the EP"));
+    await screen.findByRole("dialog");
+    expect(board.scrollTo).toHaveBeenLastCalledWith({
+      left: 1712 - 700,
+      behavior: "auto",
+    });
+  });
+
+  it("Esc from inside the sheet closes it and leaves the selection on its row", async () => {
+    render(<WideApp />);
+    await userEvent.dblClick(rowButton("Send invoice"));
+    const title = within(await screen.findByRole("dialog")).getByRole(
+      "textbox",
+      { name: "Title" },
+    );
+    act(() => title.focus());
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    await act(async () => {
+      await new Promise((r) => requestAnimationFrame(r));
+    });
+    expect(document.activeElement).toBe(rowButton("Send invoice"));
   });
 
   it("a double click opens straight away", async () => {
@@ -832,7 +1041,7 @@ describe("WideApp", () => {
     expect(column("Done")).toBeInTheDocument();
   });
 
-  it("closing a todo returns to the list it covered", async () => {
+  it("closing the sheet takes it off the board and leaves the selection on its row", async () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });
     await userEvent.click(
@@ -840,13 +1049,19 @@ describe("WideApp", () => {
     );
     await userEvent.keyboard("{Enter}");
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+    // The list it came from stays in view beside it.
+    expect(column("Groceries")).toBeInTheDocument();
     await userEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
         name: "Close",
       }),
     );
-    expect(column("Groceries")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(slides()).not.toContain("sheet");
+    expect(column("Groceries")).not.toHaveAttribute("data-sheet-open");
+    expect(
+      rowButton("Parmesan").closest("[data-row-container]"),
+    ).toHaveAttribute("data-selected");
   });
 
   it("Done's rows select; X puts one back and Delete removes one", () => {
@@ -1352,6 +1567,49 @@ describe("WideApp drag and drop", () => {
     expect(entry).not.toHaveClass("bg-n-brand");
   });
 
+  it("scrolls the board near its side edges, so a todo drops into a list off screen", () => {
+    vi.useFakeTimers();
+    try {
+      render(<WideApp />);
+      // 240–840px across; Studio is off to the right.
+      const board = layOutBoard(600);
+      const scrolled = () =>
+        vi
+          .mocked(board.scrollBy)
+          .mock.calls.map(([arg]) => (arg as ScrollToOptions).left ?? 0);
+      const pointer = (x: number) =>
+        window.dispatchEvent(
+          new MouseEvent("pointermove", { clientX: x, clientY: 300 }),
+        );
+      start("t1");
+      pointer(830);
+      act(() => vi.advanceTimersByTime(100));
+      expect(scrolled().length).toBeGreaterThan(0);
+      expect(scrolled().every((left) => left > 0)).toBe(true);
+      // Away from the edges, it stays put; near the left, it goes back.
+      vi.mocked(board.scrollBy).mockClear();
+      pointer(500);
+      act(() => vi.advanceTimersByTime(100));
+      expect(scrolled()).toEqual([]);
+      pointer(250);
+      act(() => vi.advanceTimersByTime(100));
+      expect(scrolled().every((left) => left < 0)).toBe(true);
+
+      end("t1", "col:list-studio");
+      expect(update).toHaveBeenCalledWith({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-studio" }),
+      });
+      // The drag is over: no more scrolling.
+      vi.mocked(board.scrollBy).mockClear();
+      pointer(830);
+      act(() => vi.advanceTimersByTime(100));
+      expect(scrolled()).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("moves to a sidebar list with no line", () => {
     render(<WideApp />);
     const top = layOut("Today");
@@ -1457,7 +1715,7 @@ describe("WideApp URLs", () => {
     ];
   });
 
-  it("opens /list/:id as the fourth column and clears the URL on close", async () => {
+  it("goes to /list/:id's column, and clears the URL on leaving it", async () => {
     const onNavigate = vi.fn();
     render(
       <WideApp
@@ -1465,11 +1723,20 @@ describe("WideApp URLs", () => {
         onNavigate={onNavigate}
       />,
     );
-    expect(column("Groceries")).toBeInTheDocument();
-    await userEvent.click(
-      screen.getByRole("button", { name: "Close Groceries" }),
+    expect(focusedTitle()).toContain("Parmesan");
+    expect(onNavigate).not.toHaveBeenCalled();
+    await userEvent.click(rowButton("Send invoice"));
+    expect(onNavigate).toHaveBeenLastCalledWith(null);
+  });
+
+  it("sends a /list/:id that's gone back to /", () => {
+    const onNavigate = vi.fn();
+    render(
+      <WideApp
+        view={{ kind: "list", id: "list-gone" }}
+        onNavigate={onNavigate}
+      />,
     );
-    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
     expect(onNavigate).toHaveBeenLastCalledWith(null);
   });
 

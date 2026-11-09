@@ -50,6 +50,13 @@ const cssHex = (hex, c) => {
 const entries = (obj) =>
   Object.entries(obj).filter(([key]) => !key.startsWith("$"));
 
+/** The sheet's shadow at one appearance's opacity. */
+const cssSheetShadow = (sheet, mode) => {
+  const { x, y, blur } = sheet.shadow;
+  const pct = Math.round(sheet.shadowOpacity[mode] * 100);
+  return `${x / 16}rem ${y / 16}rem ${blur / 16}rem color-mix(in srgb, black ${pct}%, transparent)`;
+};
+
 function cssFontFamily(tokens, fontKey) {
   const font = tokens.font[fontKey];
   const system = "ui-sans-serif, system-ui, -apple-system, sans-serif";
@@ -93,6 +100,13 @@ export function renderCss(tokens) {
     out.push(`  --n-radius-${kebab(name)}: ${px / 16}rem;`);
   }
   out.push("");
+  const { sheet } = tokens;
+  for (const name of ["width", "radius", "inset", "overlap", "slide"]) {
+    out.push(`  --n-sheet-${name}: ${sheet[name] / 16}rem;`);
+  }
+  out.push(`  --n-sheet-recede: ${sheet.recede};`);
+  out.push(`  --n-sheet-shadow: ${cssSheetShadow(sheet, "light")};`);
+  out.push("");
   const curve = tokens.motion.easeOutStrong.join(", ");
   for (const name of ["fast", "base", "slow"]) {
     out.push(`  --n-duration-${name}: ${tokens.motion[name]}ms;`);
@@ -104,6 +118,7 @@ export function renderCss(tokens) {
       out.push(`  --n-color-${kebab(name)}: ${cssHex(c.dark, c)};`);
     }
   }
+  out.push(`  --n-sheet-shadow: ${cssSheetShadow(sheet, "dark")};`);
   out.push("}", "");
   const high = entries(tokens.color).filter(([, c]) => c.highContrast);
   if (high.length > 0) {
@@ -358,6 +373,28 @@ export function renderSwift(tokens) {
     out.push(`        static let ${name}: CGFloat = ${px}`);
   }
   out.push("    }", "");
+
+  // The wide board's sheet
+  const { sheet } = tokens;
+  out.push(
+    "    /// The open todo on the wide board: a sheet after its todo's column.",
+    "    enum Sheet {",
+  );
+  for (const name of ["width", "radius", "inset", "overlap", "slide"]) {
+    out.push(`        static let ${name}: CGFloat = ${sheet[name]}`);
+  }
+  out.push(
+    "        /// The todo's column while the sheet is open, bar its selected row.",
+    `        static let recede: Double = ${sheet.recede}`,
+    "        /// Cast left, ink-black at the appearance's opacity.",
+    `        static let shadowX: CGFloat = ${sheet.shadow.x}`,
+    `        static let shadowY: CGFloat = ${sheet.shadow.y}`,
+    `        static let shadowRadius: CGFloat = ${sheet.shadow.blur / 2}`,
+    `        static let shadowOpacityLight: Double = ${sheet.shadowOpacity.light}`,
+    `        static let shadowOpacityDark: Double = ${sheet.shadowOpacity.dark}`,
+    "    }",
+    "",
+  );
 
   // Motion
   const [x1, y1, x2, y2] = tokens.motion.easeOutStrong;

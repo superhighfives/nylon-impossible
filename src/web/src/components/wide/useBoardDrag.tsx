@@ -26,6 +26,35 @@ import {
 /** Where the line goes in an empty column, from the top of its row list. */
 const EMPTY_LINE_Y = 8;
 
+/** How near the board's side edges a dragged todo scrolls it, in px. */
+const EDGE = 64;
+/** How far each tick scrolls with the pointer right at the edge, in px. */
+const EDGE_SPEED = 18;
+const EDGE_TICK_MS = 16;
+
+/**
+ * How far one tick scrolls the board (`rect`) sideways with a dragged todo
+ * at `pointer`: leftward (negative) near its left edge, rightward near its
+ * right, faster the nearer it is, and 0 anywhere else. So a todo can reach a
+ * list that's off screen.
+ */
+export function edgeScrollStep(
+  pointer: { x: number; y: number },
+  rect: Pick<DOMRect, "left" | "right" | "top" | "bottom">,
+): number {
+  const { x, y } = pointer;
+  if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+    return 0;
+  }
+  if (x < rect.left + EDGE) {
+    return -Math.ceil(EDGE_SPEED * (1 - (x - rect.left) / EDGE));
+  }
+  if (x > rect.right - EDGE) {
+    return Math.ceil(EDGE_SPEED * (1 - (rect.right - x) / EDGE));
+  }
+  return 0;
+}
+
 /**
  * Pointer y for a drag event: where it started plus how far it moved. Only a
  * fallback: once the column scrolls, `delta` includes the scroll as well.
@@ -38,18 +67,23 @@ function pointerY(e: DragMoveEvent | DragEndEvent) {
 /**
  * Drag and drop on the board: pick a row up from anywhere but its checkbox,
  * drop it between rows of any column (the indicator marks the slot) or on a
- * sidebar list. Spread `handlers` onto the `DndContext`, and pass `settle` to
- * the columns so their rows ease into a new order after a drop.
+ * sidebar list. Held near the board's left or right edge, it scrolls the
+ * board, so a list that's off screen can take it. Spread `handlers` onto the
+ * `DndContext`, and pass `settle` to the columns so their rows ease into a
+ * new order after a drop.
  */
 export function useBoardDrag({
   rowsFor,
   actions,
   onStart,
+  board,
 }: {
   rowsFor: (listId: string) => TodoWithUrls[];
   actions: Pick<TodoActions, "move" | "place">;
   /** A drag closes the context menu. */
   onStart: () => void;
+  /** The board's sideways-scrolling row of columns. */
+  board?: () => HTMLElement | null;
 }) {
   const { reducedMotion } = useHints();
   const [dragging, setDragging] = useState<TodoWithUrls | null>(null);
@@ -60,6 +94,7 @@ export function useBoardDrag({
   const shown = useRef<DropIndicator | null>(null);
   // The real pointer, tracked while dragging.
   const pointer = useRef<number | null>(null);
+  const pointerX = useRef<number | null>(null);
   const untrack = useRef<(() => void) | null>(null);
   // The pointer-up that ends a drag can land as a click on a row.
   const justDragged = useRef(false);
@@ -121,10 +156,22 @@ export function useBoardDrag({
     untrack.current?.();
     const track = (ev: PointerEvent) => {
       pointer.current = ev.clientY;
+      pointerX.current = ev.clientX;
     };
     window.addEventListener("pointermove", track, { capture: true });
-    untrack.current = () =>
+    // Scrolls while the pointer rests near an edge, not only as it moves.
+    const edge = setInterval(() => {
+      const el = board?.();
+      const x = pointerX.current;
+      const y = pointer.current;
+      if (!el || x === null || y === null) return;
+      const step = edgeScrollStep({ x, y }, el.getBoundingClientRect());
+      if (step) el.scrollBy({ left: step });
+    }, EDGE_TICK_MS);
+    untrack.current = () => {
       window.removeEventListener("pointermove", track, { capture: true });
+      clearInterval(edge);
+    };
     onStart();
   };
 
@@ -145,6 +192,7 @@ export function useBoardDrag({
     untrack.current?.();
     untrack.current = null;
     pointer.current = null;
+    pointerX.current = null;
     justDragged.current = true;
     setTimeout(() => {
       justDragged.current = false;
