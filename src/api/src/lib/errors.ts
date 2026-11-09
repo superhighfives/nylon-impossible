@@ -19,6 +19,7 @@ export const API_ERRORS = {
   todo_id_required: { status: 400, message: "Todo ID required" },
   user_id_required: { status: 400, message: "User ID required" },
   todo_not_found: { status: 404, message: "Todo not found" },
+  todo_id_taken: { status: 409, message: "That todo ID is already in use" },
   link_not_found: { status: 404, message: "Link not found" },
   invalid_url: { status: 400, message: "That doesn't look like a link." },
   invalid_parent_todo: {

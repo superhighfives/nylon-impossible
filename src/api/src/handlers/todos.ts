@@ -122,18 +122,31 @@ export async function createTodo(c: Context<Env>) {
     return apiError(c, "list_not_found");
   }
 
-  await db.insert(todos).values({
-    id,
-    userId,
-    listId,
-    listEnteredAt: now,
-    title: parsed.data.title,
-    completed: false,
-    createdAt: now,
-    updatedAt: now,
-  });
+  const [newTodo] = await db
+    .insert(todos)
+    .values({
+      id,
+      userId,
+      listId,
+      listEnteredAt: now,
+      title: parsed.data.title,
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
 
-  const [newTodo] = await db.select().from(todos).where(eq(todos.id, id));
+  // The id is already a row: a retry, or sync inserting it first. The
+  // caller's own todo comes back as it is (200); someone else's is a 409.
+  if (!newTodo) {
+    const [existing] = await db
+      .select()
+      .from(todos)
+      .where(and(eq(todos.id, id), eq(todos.userId, userId)));
+    if (!existing) return apiError(c, "todo_id_taken");
+    return c.json(serializeTodo(existing), 200);
+  }
 
   Sentry.addBreadcrumb({
     category: "todo",

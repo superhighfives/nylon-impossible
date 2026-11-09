@@ -443,6 +443,26 @@ describe("Todos CRUD", () => {
       expect(rows).toEqual([]);
     });
 
+    it("POST /todos with an existing id of the user's answers that todo", async () => {
+      await seedTodo(LOWER, "user_test_123", { title: "Synced first" });
+      const res = await createTodoViaAPI("From iOS", UPPER);
+      expect(res.status).toBe(200);
+      const body = await res.json<{ id: string; title: string }>();
+      expect(body).toMatchObject({ id: LOWER, title: "Synced first" });
+      const rows = await getDb(env.DB).select({ id: todos.id }).from(todos);
+      expect(rows).toEqual([{ id: LOWER }]);
+    });
+
+    it("POST /todos with another user's id is a 409", async () => {
+      await seedUser("user_other", "other@example.com");
+      await seedTodo(LOWER, "user_other");
+      const res = await createTodoViaAPI("From iOS", UPPER);
+      expect(res.status).toBe(409);
+      expect((await res.json<{ code: string }>()).code).toBe("todo_id_taken");
+      const [row] = await getDb(env.DB).select().from(todos);
+      expect(row.userId).toBe("user_other");
+    });
+
     it("finds a lowercase id too", async () => {
       await seedTodo(LOWER);
       const res = await SELF.fetch(`http://localhost/todos/${LOWER}`, {
