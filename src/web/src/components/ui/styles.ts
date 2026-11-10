@@ -8,10 +8,11 @@ export const ICON_BUTTON =
 /**
  * A column header's subline, and the open todo sheet's, on one line. An
  * icon at its start (16px, `aria-hidden`) fits in the line's height, so the
- * title above doesn't move.
+ * title above doesn't move. It never shrinks: a two-line title takes its
+ * room from the space above, not from this line.
  */
 export const SUBLINE =
-  "m-0 mt-2.5 flex min-w-0 items-center gap-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted [&>svg]:shrink-0";
+  "m-0 mt-2.5 flex min-w-0 shrink-0 items-center gap-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted [&>svg]:shrink-0";
 
 /**
  * A row's hover on the board, wherever it sits (a time column, your list,
