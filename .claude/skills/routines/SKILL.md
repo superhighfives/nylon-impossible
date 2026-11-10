@@ -34,12 +34,12 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
   in an open issue, or one closed in the last 30 days, and any body that
   isn't a complete spec or doesn't name its short ID. Won't-fix reasons go in
   the event, not on GitHub. The spec pass revises these specs after the
-  owner's reply. Only the owner moves one to Ready.
+  owner's reply, and moves it to Ready once its questions are settled.
 - **deps** bundles the open dependabot PRs into one PR on
   `foreman/deps-<YYYY-MM-DD>`. It leaves out failing or major bumps and says
   why in the PR. It does nothing when there are no dependabot PRs, while a
-  bundle is still open, or while 3 agent PRs are open. Its PR merges on green
-  CI and a 🟢 review, without `verified`. A bump under `.github/` makes it a
+  bundle is still open, or while 5 agent PRs are open. Its PR merges on green
+  CI and a 🟢 review, like any agent PR. A bump under `.github/` makes it a
   guarded PR, so the owner merges that one. After a bundle merges, a later
   tick closes each dependabot PR the bundle named, once main has all of its
   change.
@@ -58,8 +58,7 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
   issue. It never edits files or opens a branch or PR, and never moves a
   draft out of Ideas: the owner drags the ones worth speccing to Define.
 - **digest** covers the last 24 hours: **Merged**, **Waiting on you**
-  (`needs-decision`, `owner-merge`, PRs waiting for `verified`, specs with
-  questions), **Found** (what sentry and scout filed) and **Problems** (failed
+  (`needs-decision`, `owner-merge`, specs with questions), **Found** (what sentry and scout filed) and **Problems** (failed
   builds, rounds, spec runs and routines, and a token about to expire). It's
   built in shell from `events.jsonl` and GitHub's own fields, so no text on
   GitHub can steer it. It posts nothing when every section is empty.

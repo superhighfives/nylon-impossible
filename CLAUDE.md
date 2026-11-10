@@ -121,7 +121,7 @@ the source of truth:
 | Ideas | Draft items: a line or a paragraph. Anyone, agents included, may add one. Drag a draft to Define to have it specced |
 | Define | An issue whose body is a spec (`prd` skill), being argued until its Open questions are "None." |
 | Blocked | Waiting on something outside the repo (MacStadium, a vendor, an OS release). The body's first line says `Blocked on: …`. Waiting on the owner is `needs-decision`, not this. The foreman skips it |
-| Ready | Argued out and cleared to build by the owner. An agent may pick it up |
+| Ready | Argued out: Open questions reads "None.". The foreman builds it |
 | In progress | Someone (or an agent) has a branch for it |
 | In review | A PR is open |
 | Done | Merged, or closed with a reason |
@@ -129,14 +129,18 @@ the source of truth:
 - Every issue gets a `kind:*` label: `feature`, `fix`, `refactor`, `a11y`,
   `test` or `chore`.
 - **Specs are argued, not just written.** Claude drafts every spec into the
-  issue body with the `prd` skill's template and posts its questions; the
-  owner argues until **Open questions** reads "None.". Answers go into
-  **Decisions**, dated. The owner may edit the body directly, and the edited
-  body is the truth. The foreman drafts and revises issues labelled `spec`
-  on its own; in a local session, write the result back to the issue.
-- **Only the owner moves an item into Ready,** for every kind, for now. The
-  foreman refuses to build one with a missing section or open questions: it
-  comments, adds `needs-spec` and moves it back to Define.
+  issue body with the `prd` skill's template. It settles implementation
+  calls itself and asks the owner only about what they'd notice: behaviour,
+  layout, copy, PRINCIPLES.md, user data, cost and guarded areas (`prd`
+  skill). The owner argues until **Open questions** reads "None.". Answers
+  go into **Decisions**, dated. The owner may edit the body directly, and the
+  edited body is the truth. The foreman drafts and revises issues labelled
+  `spec` on its own; in a local session, write the result back to the issue.
+- **A settled spec goes to Ready by itself.** When a spec run leaves Open
+  questions at "None.", the foreman moves the item to Ready and builds it.
+  The owner can move items too. The foreman still refuses to build one with
+  a missing section or open questions: it comments, adds `needs-spec` and
+  moves it back to Define.
 - **Define** may still show as "Specced" on the board until the owner
   renames it; the foreman works with either name. The `spec` and
   `needs-spec` labels and the `prd` skill keep their names.
@@ -144,11 +148,11 @@ the source of truth:
   converts it into an issue labelled `spec` on its next run, and the draft
   run picks the `kind:*` label. Agents add drafts to Ideas but never move
   them out of it: the owner picks which get specced.
-- **The owner tries agent PRs before they merge.** Each PR's body has a
+- **The owner tries agent PRs once they're live.** Each PR's body has a
   **Try it** section (preview URL, steps, Apple before/after shots, and each
-  acceptance criterion with its proof). On the foreman's PRs, the owner adds
-  `verified` after trying it; a later push clears it.
-- At most **3 agent PRs** are open at once. Finish or close one before
+  acceptance criterion with its proof), and the foreman's merge alert links
+  to it. What's wrong gets reverted or fixed forward ("Rolling back").
+- At most **5 agent PRs** are open at once. Finish or close one before
   starting another.
 - **Feedback reports reach the board through the foreman.** A `feedback`
   issue the owner has cleared with `auto-fix` is triaged on the foreman's
@@ -167,19 +171,15 @@ the source of truth:
 ## Merging
 
 Agents may merge their own PRs in this repo. This is a deliberate exception
-to the owner's global "never merge" rule. Squash-merge, and only when **all**
-of these hold:
+to the owner's global "never merge" rule. The owner wants a living codebase,
+not a perfect one (2026-11-10): tests, the review and an easy rollback are
+the gate, not the owner trying each PR first. Squash-merge, and only when
+**all** of these hold:
 
 - every check is green, and the latest `control-room-review` review is 🟢
   on the head commit (🟡 "approved with comments" doesn't count);
 - the PR isn't a draft and has no `needs-decision` label;
 - no unresolved review threads from the owner;
-- on the foreman's `foreman/*` PRs, the owner added `verified` after the
-  head commit was pushed (for now, every kind; it will be dropped kind by
-  kind, each with a written reason). The dependency bundle's
-  `foreman/deps-*` PRs don't wait for it: green CI and a 🟢 review on the
-  head commit are the proof for a dependency bump. A bump under `.github/`
-  is still guarded, so the owner merges it;
 - it touches none of the guarded areas below.
 
 Guarded areas wait for the owner to merge. A rename counts as touching both
@@ -187,14 +187,31 @@ paths.
 
 - **The Settled table** in PRINCIPLES.md. Agents may edit the rest of
   PRINCIPLES.md carefully, and must say in the PR what changed and why.
-- **Migrations:** anything under `src/api/migrations/`.
 - **CI, deploys and releases:** anything under `.github/` (including the
   workflows that review and deploy), any `wrangler.jsonc`, Fastlane config,
   and version or build-number bumps.
-- **Agent instructions:** `.claude/`, and every `CLAUDE.md` and `AGENTS.md`,
-  this file included.
-- **The foreman:** `scripts/foreman/`, which enforces these rules (see its
-  README).
+- **The rules:** every `CLAUDE.md` and `AGENTS.md`, this file included, and
+  `scripts/foreman/`, which enforces them (see its README). Skills in
+  `.claude/` aren't guarded.
+
+Migrations aren't guarded, but deploy still migrates before the workers roll
+out, so expand/contract still applies (`d1-migrations` skill).
+
+## Rolling back
+
+- **A change that's wrong:** `gh pr revert <n>` opens a PR that reverts the
+  squash commit. Agents may open one and merge it under the same gate, or
+  fix forward instead.
+- **Workers:** web, API and admin deploy from `main` on every merge, so a
+  merged revert redeploys them. In an emergency, `wrangler rollback` puts
+  the previous version of a Worker back without waiting for CI.
+- **The database:** deploy applies migrations to production D1 first. If
+  one damages data, `wrangler d1 time-travel restore DB --timestamp=<before>`
+  (from `src/api`, within the last 30 days) restores it. That's the owner's
+  call, since it discards every write after that point.
+- **Apple:** a merge that touches `src/ios` uploads a TestFlight build, and a
+  revert uploads another. Only the owner's manual App Store release reaches
+  anyone else.
 
 ## Situational skills
 

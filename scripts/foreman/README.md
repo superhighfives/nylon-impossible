@@ -23,18 +23,19 @@ Each tick:
 1. **Merge.** For each open `foreman/*` PR by `nylon-foreman`, run the merge
    gate. Merge if it passes. If the only thing stopping it is a guarded
    area, label it `owner-merge`, comment once, and send an alert. If its
-   review is 🟡 or 🔴, run a review round (below). If it's waiting for
-   `verified`, see "Verified" below.
+   review is 🟡 or 🔴, run a review round (below). A merge alerts with a
+   link to the PR's **Try it** section, for the owner to try it once it's
+   live.
 2. **Tidy.** Remove worktrees whose PR has merged or closed.
 3. **Spec.** Turn every draft in **Define** into an issue labelled `spec`,
    label `spec` on the owner's open issues there without it, then draft or
    revise at most one spec (below).
 4. **Routines.** Run the routines that are due: the shell ones, and at most
    one model-driven one (below).
-5. **Feedback.** If fewer than 3 agent PRs (`foreman/*` and `feedback/*`) are open, triage
+5. **Feedback.** If fewer than 5 agent PRs (`foreman/*` and `feedback/*`) are open, triage
    the oldest new feedback report the owner has cleared (below), and stop
    there: a report goes ahead of Ready items.
-6. **Build.** Otherwise, if fewer than 3 agent PRs are open, take the first
+6. **Build.** Otherwise, if fewer than 5 agent PRs are open, take the first
    **Ready** issue in board order whose spec passes the check (below), and
    build it.
    - It runs headless `claude` in a fresh worktree, with the issue body and
@@ -88,10 +89,14 @@ tries the next Ready issue. A spec that passes loses `needs-spec`.
   `claude[bot]`'s.
 
 Claude writes the spec into the issue body, posts its questions as a
-comment, and doesn't touch code. The issue moves to Define, and you get an
-alert: either it has questions for you, or it has none left and is ready for
-you to move to Ready. One run per tick, and one per reply, even if it fails:
-the id of the reply it answered is kept in `~/.foreman/specs/<issue>`.
+comment, and doesn't touch code. It settles implementation calls itself
+(naming, file layout, tests, internal shapes) and records them under
+**Decisions** as `(foreman)`; it asks the owner only about what they'd
+notice (the `prd` skill has the list). After the run you get an alert:
+either it has questions for you, and stays in Define, or it has none left,
+and the foreman moves it to **Ready** (a `spec_settled` event) so the build
+pass takes it. One run per tick, and one per reply, even if it fails: the id
+of the reply it answered is kept in `~/.foreman/specs/<issue>`.
 
 ## Feedback
 
@@ -122,12 +127,12 @@ comments in the prompt. It decides:
   posts its questions. The foreman adds `spec` and `needs-decision` and moves
   it to Define. From there it's the spec argument below: the owner's replies
   start revisions even though it has `needs-decision`, which comes off when
-  **Open questions** reads "None.", so moving it to Ready builds it.
+  **Open questions** reads "None."; then it goes to Ready and is built. One
+  whose triage spec has no questions at all goes straight to Ready.
 - **Neither** (a failed run): `needs-decision`, a comment with the log's
   path, and back to Ideas. Removing `needs-decision` triages it again.
 
-Feedback PRs are ordinary `foreman/*` PRs: the same rounds, gate and
-`verified`.
+Feedback PRs are ordinary `foreman/*` PRs: the same rounds and gate.
 
 ## Before/after shots
 
@@ -153,26 +158,13 @@ the tick compares the head with the commit the shots show. That's once per
 head commit and one PR a tick, and `~/.foreman/shots/<pr>.checked` holds the
 head it last looked at. `foreman shots <pr>` retakes them by hand.
 
-## Verified
+## After the merge
 
-The gate waits for the owner's `verified` on every foreman PR, for now,
-except the dependency bundle's `foreman/deps-*` PRs: green CI and a 🟢
-review on the head commit are the proof for a dependency bump (CLAUDE.md,
-"Merging"). A bundle that bumps something under `.github/` is guarded, so the
-owner merges it either way.
-
-- **It counts only if you added it,** going by the label event's actor, and
-  only if you added it after the head commit was pushed (the repo's activity
-  log says when). If the label's latest event is anyone else's, it waits.
-- **A push after `verified` clears it.** The foreman removes the stale label
-  and comments, so what you tried is what merges. The reminder clock
-  restarts from that push.
-- **Reminders.** When a PR first waits only for `verified`, the clock starts
-  (`~/.foreman/verify/<pr>`, and an `awaiting_verified` event). After a day
-  you get one alert and one comment. `foreman status` lists every PR still
-  waiting, and so does the daily digest.
-- **Relaxing it** means dropping it for one kind at a time, with a written
-  reason in CLAUDE.md, and a change to the gate here.
+There's no `verified` any more (owner, 2026-11-10): the gate below is the
+whole gate, for every kind, and the owner tries changes once they're live.
+Each PR keeps its **Try it** section for that, and the merge alert links to
+it. What's wrong is reverted or fixed forward (CLAUDE.md, "Rolling back").
+A leftover `verified` label on an old PR changes nothing.
 
 ## Stalls
 
@@ -193,9 +185,8 @@ it started, the head commit, and the reason.
 - **What's timed:** every other `wait:` reason, including a 🟡 review whose
   round has already answered, the owner's unresolved threads, and a merge the
   gate passed but GitHub refused (`merge refused`).
-- **What isn't:** `needs-decision`, `guarded:` (`owner-merge`), `not
-  verified` (it has its own reminder) and drafts. These, and a merge, stop the
-  clock, and so does the PR closing.
+- **What isn't:** `needs-decision`, `guarded:` (`owner-merge`) and drafts.
+  These, and a merge, stop the clock, and so does the PR closing.
 - `foreman status` lists each open PR past its threshold as `stalled:`, and
   the daily digest lists them under Problems. `tick --dry-run` writes no
   clock and logs `would alert` instead.
@@ -262,7 +253,7 @@ Mac that was asleep, runs it on the next tick.
 table runs and the others wait for later ticks, so a tick can't hold up the
 merge pass for hours. `dispatch` and `digest` don't use the slot.
 
-**The PR limit.** `deps` opens a PR, so it counts toward the 3 agent PRs.
+**The PR limit.** `deps` opens a PR, so it counts toward the 5 agent PRs.
 While 3 are open it stays due and runs on a later tick.
 
 **What the model may do.** `sentry` and `scout` run Claude `--restricted`
@@ -344,19 +335,17 @@ hold:
 - the latest `control-room-review` review is for the head commit and is 🟢.
   🟡 "approved with comments" doesn't count;
 - there are no unresolved review threads started by the owner;
-- the owner added `verified` after the head commit was pushed (checked last,
-  so a guarded PR still gets `owner-merge` first). Not on `foreman/deps-*`;
 - it touches no **guarded area**. The check diffs with `--no-renames`, so
   moving a file out of a guarded path counts as touching it. The areas:
-  - `src/api/migrations/`;
   - anything under `.github/` (workflows, including the ones that review and
     deploy) and any `wrangler.jsonc`;
   - Fastlane config;
   - `MARKETING_VERSION` or `CURRENT_PROJECT_VERSION`;
   - PRINCIPLES.md's Settled table;
-  - anything that steers agents: `.claude/`, and every `CLAUDE.md` and
-    `AGENTS.md`;
+  - the rules agents work under: every `CLAUDE.md` and `AGENTS.md`;
   - `scripts/foreman/` itself.
+
+  Migrations and `.claude/` skills aren't guarded (2026-11-10).
 
 The merge is pinned to the commit the gate checked (`--match-head-commit`), so
 a fixup the operator pushes in between can't slip through unreviewed. A refused
@@ -368,7 +357,7 @@ comment and an alert, and waits for you. The comment points to CLAUDE.md's
 
 `scripts/foreman/test.sh` (`bun run foreman:test`) runs the gate against a
 throwaway repo with `gh` stubbed: renames, deletes, every guarded path, each
-way the gate has to wait, `verified` and its reminders, stalls, the spec check,
+way the gate has to wait, stalls, the spec check, a settled spec's move to Ready,
 feedback intake (whose `auto-fix` counts) and triage's outcomes, the shots'
 place in the PR body and their push to `feedback-assets`, the token's
 expiry, and the routines: schedules either side of each time, the off
@@ -382,18 +371,20 @@ The repo is public, so:
 
 - The foreman **polls**. It isn't a self-hosted runner, so nothing on GitHub
   can push work to the machine.
-- It only builds issues **opened by the owner or `nylon-foreman`** that the
-  owner moved to Ready. `foreman build <n>` applies the same rule, and the
-  spec check. `nylon-foreman`'s issues are the Sentry sweep's, which can carry
-  attacker-influenced text from error reports. The owner reads each spec
-  before moving it to Ready, and that move is the gate.
+- It only builds issues **opened by the owner or `nylon-foreman`** that are
+  in Ready. `foreman build <n>` applies the same rule, and the spec check.
+  `nylon-foreman`'s issues are the Sentry sweep's, which can carry
+  attacker-influenced text from error reports. One reaches Ready only when
+  the owner moves it, or after a spec run settles it, and a spec run only
+  starts from the owner's own reply: the owner engaging with the spec is the
+  gate.
 - It only triages feedback reports **opened as the owner** that the owner
   cleared with `auto-fix`, going by the label event's actor.
 - The prompts include only comments by the owner, `nylon-foreman` and
   `claude[bot]`, matched by exact login (and, in review threads, by account
   type), because anyone can register a login that starts with "claude".
-- Only the owner's `verified` counts, so the machine account can't verify its
-  own work.
+- The gate is code, not a model, so the machine account can't approve its
+  own work: it needs green checks and `control-room-review`'s 🟢.
 
 ## Running it
 
