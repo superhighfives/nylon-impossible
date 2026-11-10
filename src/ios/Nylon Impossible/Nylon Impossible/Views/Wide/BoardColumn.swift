@@ -33,6 +33,8 @@ struct BoardColumn<Accessory: View>: View {
     var selectedId: UUID?
     /// A collection column has a faint tint, like the prototype.
     var isTinted = false
+    /// Your list's column: the list icon at the start of the subline.
+    var icon: String?
     /// Today's overnight pill: its line, what its text does, and dismiss.
     var overnight: (line: OvernightNote.Line, see: () -> Void, dismiss: () -> Void)?
     var empty: (text: String, link: (text: String, action: () -> Void)?)
@@ -121,6 +123,7 @@ struct BoardColumn<Accessory: View>: View {
         BoardColumnHeader(
             title: title,
             subline: subline,
+            icon: icon,
             onRename: onRename,
             isRenaming: isRenaming,
             banner: overnight.map { note in

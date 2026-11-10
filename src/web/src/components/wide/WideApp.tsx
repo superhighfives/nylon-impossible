@@ -1,6 +1,7 @@
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
 import type { BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
+import { List } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -670,6 +671,11 @@ export function WideApp({
             : (name) => updateList.mutate({ id: list.id, input: { name } })
         }
         onDelete={kind ? undefined : () => deleteList(list)}
+        icon={
+          kind ? undefined : (
+            <List size={16} aria-hidden="true" data-icon="list" />
+          )
+        }
         banner={
           kind === "today" && overnight.text ? (
             <OvernightPill
