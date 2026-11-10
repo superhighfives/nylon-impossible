@@ -1,17 +1,17 @@
 import { TODO_TITLE_MAX, toDueDay } from "@nylon-impossible/shared";
-import { chunkForD1 } from "@nylon-impossible/shared/d1";
+import {
+  loadUrlsByTodoId,
+  serializeTodo,
+  serializeUrl,
+} from "@nylon-impossible/shared/serialize";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, asc, eq, getDb, inArray, todos, todoUrls } from "../lib/db";
+import { and, eq, getDb, todos, todoUrls } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { getSystemListId, verifyListOwnership } from "../lib/lists";
-import {
-  normalizePinned,
-  pinnedRequestFields,
-  pinnedResponseFields,
-} from "../lib/pinned";
+import { normalizePinned, pinnedRequestFields } from "../lib/pinned";
 import { InvalidListError, updateTodoCore } from "../lib/todos-core";
 import type { Env } from "../types";
 
@@ -44,45 +44,6 @@ const updateTodoSchema = z
   })
   .transform(normalizePinned);
 
-// Serialize a todo with ISO dates
-function serializeTodo(todo: typeof todos.$inferSelect) {
-  return {
-    id: todo.id.toLowerCase(),
-    userId: todo.userId,
-    parentId: todo.parentId?.toLowerCase() ?? null,
-    listId: todo.listId,
-    title: todo.title,
-    notes: todo.notes,
-    completed: todo.completed,
-    completedAt: todo.completedAt?.toISOString() ?? null,
-    position: todo.position,
-    dueDate: todo.dueDate?.toISOString() ?? null,
-    recurrence: todo.recurrence,
-    ...pinnedResponseFields(todo.pinned),
-    createdAt: todo.createdAt.toISOString(),
-    updatedAt: todo.updatedAt.toISOString(),
-  };
-}
-
-// Serialize a URL record with ISO dates
-export function serializeUrl(url: typeof todoUrls.$inferSelect) {
-  return {
-    id: url.id.toLowerCase(),
-    todoId: url.todoId.toLowerCase(),
-    url: url.url,
-    title: url.title,
-    description: url.description,
-    siteName: url.siteName,
-    favicon: url.favicon,
-    image: url.image,
-    position: url.position,
-    fetchStatus: url.fetchStatus,
-    fetchedAt: url.fetchedAt?.toISOString() ?? null,
-    createdAt: url.createdAt.toISOString(),
-    updatedAt: url.updatedAt.toISOString(),
-  };
-}
-
 // GET /todos - List all todos for user
 export async function listTodos(c: Context<Env>) {
   const db = getDb(c.env.DB);
@@ -94,32 +55,15 @@ export async function listTodos(c: Context<Env>) {
     .where(eq(todos.userId, userId))
     .orderBy(todos.createdAt);
 
-  const todoIds = userTodos.map((t) => t.id);
-  const allUrls: (typeof todoUrls.$inferSelect)[] = [];
-  if (todoIds.length > 0) {
-    for (const chunkIds of chunkForD1(todoIds)) {
-      const chunkUrls = await db
-        .select()
-        .from(todoUrls)
-        .where(inArray(todoUrls.todoId, chunkIds))
-        .orderBy(asc(todoUrls.position));
-      allUrls.push(...chunkUrls);
-    }
-  }
-
-  const urlsByTodoId = new Map<string, ReturnType<typeof serializeUrl>[]>();
-  for (const url of allUrls) {
-    const serialized = serializeUrl(url);
-    const normalizedTodoId = url.todoId.toLowerCase();
-    const existing = urlsByTodoId.get(normalizedTodoId) ?? [];
-    existing.push(serialized);
-    urlsByTodoId.set(normalizedTodoId, existing);
-  }
+  const urlsByTodoId = await loadUrlsByTodoId(
+    db,
+    userTodos.map((t) => t.id),
+  );
 
   return c.json(
     userTodos.map((todo) => ({
       ...serializeTodo(todo),
-      urls: urlsByTodoId.get(todo.id.toLowerCase()) ?? [],
+      urls: (urlsByTodoId.get(todo.id.toLowerCase()) ?? []).map(serializeUrl),
     })),
   );
 }
@@ -166,7 +110,9 @@ export async function createTodo(c: Context<Env>) {
 
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
-  const id = parsed.data.id ?? crypto.randomUUID();
+  // iOS sends `uuidString`, which is uppercase; every other writer and every
+  // lookup uses lowercase.
+  const id = (parsed.data.id ?? crypto.randomUUID()).toLowerCase();
   const now = new Date();
 
   const listId = parsed.data.listId
@@ -176,18 +122,31 @@ export async function createTodo(c: Context<Env>) {
     return apiError(c, "list_not_found");
   }
 
-  await db.insert(todos).values({
-    id,
-    userId,
-    listId,
-    listEnteredAt: now,
-    title: parsed.data.title,
-    completed: false,
-    createdAt: now,
-    updatedAt: now,
-  });
+  const [newTodo] = await db
+    .insert(todos)
+    .values({
+      id,
+      userId,
+      listId,
+      listEnteredAt: now,
+      title: parsed.data.title,
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
 
-  const [newTodo] = await db.select().from(todos).where(eq(todos.id, id));
+  // The id is already a row: a retry, or sync inserting it first. The
+  // caller's own todo comes back as it is (200); someone else's is a 409.
+  if (!newTodo) {
+    const [existing] = await db
+      .select()
+      .from(todos)
+      .where(and(eq(todos.id, id), eq(todos.userId, userId)));
+    if (!existing) return apiError(c, "todo_id_taken");
+    return c.json(serializeTodo(existing), 200);
+  }
 
   Sentry.addBreadcrumb({
     category: "todo",
@@ -201,7 +160,7 @@ export async function createTodo(c: Context<Env>) {
 
 // PUT /todos/:id - Update a todo
 export async function updateTodo(c: Context<Env>) {
-  const todoId = c.req.param("id");
+  const todoId = c.req.param("id")?.toLowerCase();
   if (!todoId) {
     return apiError(c, "todo_id_required");
   }
@@ -235,7 +194,7 @@ export async function updateTodo(c: Context<Env>) {
 
 // DELETE /todos/:id - Delete a todo
 export async function deleteTodo(c: Context<Env>) {
-  const todoId = c.req.param("id");
+  const todoId = c.req.param("id")?.toLowerCase();
   if (!todoId) {
     return apiError(c, "todo_id_required");
   }

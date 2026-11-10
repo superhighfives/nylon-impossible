@@ -1,4 +1,5 @@
 import { normalizeLink } from "@nylon-impossible/shared";
+import { serializeUrl } from "@nylon-impossible/shared/serialize";
 import { generateKeyBetween } from "fractional-indexing";
 import type { Context } from "hono";
 import { z } from "zod/v4";
@@ -7,7 +8,6 @@ import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { notifySync } from "../lib/notify-sync";
 import { finishTodoLinks } from "../lib/process-todo";
 import type { Env } from "../types";
-import { serializeUrl } from "./todos";
 
 // Adding a link from the detail's "Paste a link" field (web and iOS), and a
 // link's menu on the iOS detail sheet: Show as URL and Remove. (Web does
@@ -18,8 +18,8 @@ const updateTodoUrlSchema = z.object({ showPreview: z.boolean() });
 
 /** The link, if it belongs to this todo and the todo to this user. */
 async function findOwnedUrl(c: Context<Env>) {
-  const todoId = c.req.param("id");
-  const urlId = c.req.param("urlId");
+  const todoId = c.req.param("id")?.toLowerCase();
+  const urlId = c.req.param("urlId")?.toLowerCase();
   if (!todoId || !urlId) return null;
   const db = getDb(c.env.DB);
   const [row] = await db
@@ -58,7 +58,7 @@ export async function createTodoUrl(c: Context<Env>) {
   const href = normalizeLink(parsed.data.url);
   if (!href) return apiError(c, "invalid_url");
 
-  const todoId = c.req.param("id");
+  const todoId = c.req.param("id")?.toLowerCase();
   const userId = c.get("userId");
   const db = getDb(c.env.DB);
   const [todo] = todoId

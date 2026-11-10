@@ -35,7 +35,6 @@ export function normalizePinned<
   return pinned === undefined ? rest : { ...rest, pinned };
 }
 
-/** Both spellings for a response body. */
-export function pinnedResponseFields(pinned: boolean) {
-  return { pinned, sticky: pinned };
-}
+// Both spellings for a response body. Lives with the shared serializers, which
+// are its only response-side users.
+export { pinnedResponseFields } from "@nylon-impossible/shared/serialize";

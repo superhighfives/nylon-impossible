@@ -100,6 +100,7 @@ export function useCreateTodo() {
         dueDate: input.dueDate?.toISOString() ?? null,
         recurrence: input.recurrence ?? null,
         pinned: false,
+        sticky: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         urls: [],
@@ -232,7 +233,10 @@ export function useUpdateTodo() {
               ...(input.completedAt !== undefined && {
                 completedAt: input.completedAt?.toISOString() ?? null,
               }),
-              ...(input.pinned !== undefined && { pinned: input.pinned }),
+              ...(input.pinned !== undefined && {
+                pinned: input.pinned,
+                sticky: input.pinned,
+              }),
               // A move lands in its new list straight away, rather than
               // waiting for the refetch (the phone's "Move to …" relies on it).
               ...(input.listId !== undefined && { listId: input.listId }),
@@ -468,6 +472,7 @@ export function useSmartCreate() {
         dueDate: dueDate?.toISOString() ?? null,
         recurrence: null,
         pinned: false,
+        sticky: false,
         createdAt: now,
         updatedAt: now,
         urls: preview.urls.map((url, i) => ({

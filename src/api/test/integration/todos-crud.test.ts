@@ -393,6 +393,87 @@ describe("Todos CRUD", () => {
     });
   });
 
+  // iOS sends `uuidString`, which is uppercase. Rows are stored lowercase,
+  // and every route lowercases the ID in its path before looking it up.
+  describe("uppercase todo IDs", () => {
+    const LOWER = "550e8400-e29b-41d4-a716-4466554400aa";
+    const UPPER = LOWER.toUpperCase();
+
+    it("POST /todos stores an uppercase id lowercased", async () => {
+      const res = await createTodoViaAPI("From iOS", UPPER);
+      expect(res.status).toBe(201);
+      expect((await res.json<{ id: string }>()).id).toBe(LOWER);
+
+      const rows = await getDb(env.DB).select({ id: todos.id }).from(todos);
+      expect(rows).toEqual([{ id: LOWER }]);
+    });
+
+    it("GET /todos/:id finds the todo by its uppercase id", async () => {
+      await seedTodo(LOWER);
+      const res = await SELF.fetch(`http://localhost/todos/${UPPER}`, {
+        headers: AUTH_HEADER,
+      });
+      expect(res.status).toBe(200);
+      expect((await res.json<{ id: string }>()).id).toBe(LOWER);
+    });
+
+    it("PUT /todos/:id finds the todo by its uppercase id", async () => {
+      await seedTodo(LOWER);
+      const res = await SELF.fetch(`http://localhost/todos/${UPPER}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Renamed" }),
+      });
+      expect(res.status).toBe(200);
+      const [row] = await getDb(env.DB)
+        .select()
+        .from(todos)
+        .where(eq(todos.id, LOWER));
+      expect(row.title).toBe("Renamed");
+    });
+
+    it("DELETE /todos/:id finds the todo by its uppercase id", async () => {
+      await seedTodo(LOWER);
+      const res = await SELF.fetch(`http://localhost/todos/${UPPER}`, {
+        method: "DELETE",
+        headers: AUTH_HEADER,
+      });
+      expect(res.status).toBe(200);
+      const rows = await getDb(env.DB).select().from(todos);
+      expect(rows).toEqual([]);
+    });
+
+    it("POST /todos with an existing id of the user's answers that todo", async () => {
+      await seedTodo(LOWER, "user_test_123", { title: "Synced first" });
+      const res = await createTodoViaAPI("From iOS", UPPER);
+      expect(res.status).toBe(200);
+      const body = await res.json<{ id: string; title: string }>();
+      expect(body).toMatchObject({ id: LOWER, title: "Synced first" });
+      const rows = await getDb(env.DB).select({ id: todos.id }).from(todos);
+      expect(rows).toEqual([{ id: LOWER }]);
+    });
+
+    it("POST /todos with another user's id is a 409", async () => {
+      await seedUser("user_other", "other@example.com");
+      await seedTodo(LOWER, "user_other");
+      const res = await createTodoViaAPI("From iOS", UPPER);
+      expect(res.status).toBe(409);
+      expect((await res.json<{ code: string }>()).code).toBe("todo_id_taken");
+      const [row] = await getDb(env.DB).select().from(todos);
+      expect(row.userId).toBe("user_other");
+    });
+
+    it("finds a lowercase id too", async () => {
+      await seedTodo(LOWER);
+      const res = await SELF.fetch(`http://localhost/todos/${LOWER}`, {
+        method: "PUT",
+        headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Renamed" }),
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
   describe("full lifecycle", () => {
     it("create 3, update 1, delete 1, list returns 2", async () => {
       const r1 = await createTodoViaAPI("Todo 1");

@@ -170,4 +170,34 @@ describe("Todo links", () => {
     expect((await deleteUrl(TODO_ID, url.id)).status).toBe(404);
     expect((await storedUrl(url.id))?.showPreview).toBe(true);
   });
+
+  // iOS sends `uuidString`, which is uppercase; rows are stored lowercase.
+  describe("uppercase IDs in the path", () => {
+    const UPPER_TODO = TODO_ID.toUpperCase();
+
+    it("adds a link to the todo", async () => {
+      await seedTodo(TODO_ID);
+      const res = await addUrl(UPPER_TODO, { url: "https://example.com" });
+      expect(res.status).toBe(201);
+      expect((await res.json<{ todoId: string }>()).todoId).toBe(TODO_ID);
+    });
+
+    it("shows a link as its bare URL", async () => {
+      await seedTodo(TODO_ID);
+      const url = await seedTodoUrl(TODO_ID, "https://example.com");
+      const res = await patchUrl(UPPER_TODO, url.id.toUpperCase(), {
+        showPreview: false,
+      });
+      expect(res.status).toBe(200);
+      expect((await storedUrl(url.id))?.showPreview).toBe(false);
+    });
+
+    it("removes a link", async () => {
+      await seedTodo(TODO_ID);
+      const url = await seedTodoUrl(TODO_ID, "https://example.com");
+      const res = await deleteUrl(UPPER_TODO, url.id.toUpperCase());
+      expect(res.status).toBe(200);
+      expect(await storedUrl(url.id)).toBeUndefined();
+    });
+  });
 });

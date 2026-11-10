@@ -18,6 +18,7 @@ export function makeTodo(overrides: Partial<TodoWithUrls> = {}): TodoWithUrls {
     dueDate: null,
     recurrence: null,
     pinned: false,
+    sticky: false,
     createdAt: "2026-10-12T10:00:00.000Z",
     updatedAt: "2026-10-12T10:00:00.000Z",
     urls: [],
