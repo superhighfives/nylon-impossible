@@ -113,6 +113,18 @@ struct APITodoUrl: Codable, Sendable, Identifiable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
+
+    /// This link as `POST /todos/:id/process` is about to leave it: pending,
+    /// touched `now`, everything else as it was. Retry shows it at once, so
+    /// the card reads "Fetching title…" while the request is out.
+    func queuedForRetry(at now: Date = Date()) -> APITodoUrl {
+        APITodoUrl(
+            id: id, todoId: todoId, url: url, title: title, description: description,
+            siteName: siteName, favicon: favicon, image: image, showPreview: showPreview,
+            position: position, fetchStatus: .pending, fetchedAt: fetchedAt,
+            createdAt: createdAt, updatedAt: now
+        )
+    }
 }
 
 extension JSONDecoder {

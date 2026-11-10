@@ -67,18 +67,32 @@ extension TodoDetailSheet {
         }
     }
 
+    /// Retry re-fetches every saved link (the API refetches them all), so
+    /// they show as pending at once rather than when the request is back: a
+    /// site that refuses quickly has often failed again by then.
     func retryLinks() async {
         guard let apiService else { return linkUnavailable() }
+        let before = urls.filter { !$0.id.hasPrefix("pending-") }
+        let now = Date()
+        urls = urls.map { $0.id.hasPrefix("pending-") ? $0 : $0.queuedForRetry(at: now) }
         do {
-            guard try await apiService.processTodo(todoId: todoId) > 0 else { return }
+            guard try await apiService.processTodo(todoId: todoId) > 0 else { return restore(before) }
             await loadUrls()
             // Fetching runs in the background server-side; come back once
             // for the result, and let the next sync bring anything slower.
             try? await Task.sleep(for: .seconds(3))
             await loadUrls()
         } catch {
+            restore(before)
             actions.toasts.show("Couldn’t retry the link", action: nil)
         }
+    }
+
+    /// Puts back the links Retry marked pending, leaving any added or
+    /// removed since as they are.
+    private func restore(_ before: [APITodoUrl]) {
+        let byId = Dictionary(before.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        urls = urls.map { byId[$0.id] ?? $0 }
     }
 
     func remove(_ url: APITodoUrl) async {

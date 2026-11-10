@@ -27,7 +27,7 @@ struct LinkCard: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     /// A pending fetch untouched this long has almost certainly been lost.
-    private static let stalePending: TimeInterval = 30
+    static let stalePending: TimeInterval = 30
 
     private var isFailed: Bool {
         url.fetchStatus == .failed
