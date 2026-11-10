@@ -29,5 +29,18 @@ code deploys is what bites. Reordering CI to deploy-before-migrate just breaks
 it the other way (new code expects a column the migration hasn't added yet), so
 this is a migration-authoring discipline, not a CI tweak.
 
-Anything under `src/api/migrations/` is a guarded area: the owner merges it
-(CLAUDE.md, "Merging").
+Migrations aren't a guarded area any more (2026-11-10): an agent PR with one
+merges on the same gate as any other, so this discipline is what keeps a
+deploy safe. A migration that deletes or rewrites user data is still the
+owner's call before it's built (`prd` skill). That means any of these:
+
+- `DROP TABLE`, or dropping a column that holds data (in D1 that's a table
+  rebuild that leaves a column out);
+- `DELETE`, other than rows that are provably duplicates the spec names;
+- an `UPDATE` that overwrites values rather than filling a new column;
+- a rebuild that narrows a type or adds a constraint existing rows might
+  fail, so rows get dropped or rewritten to fit.
+
+Adding tables, columns and indexes, and backfilling a new column, aren't.
+If one goes wrong, D1 Time Travel can restore the database (CLAUDE.md,
+"Rolling back").

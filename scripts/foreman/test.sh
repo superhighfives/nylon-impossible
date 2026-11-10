@@ -70,7 +70,9 @@ mk add-migration     'echo "select 2;" > src/api/migrations/0002.sql'
 mk rename-migration  'git mv src/api/migrations/0001_init.sql src/web/notes.sql'
 mk delete-migration  'git rm -q src/api/migrations/0001_init.sql'
 mk workflow          'echo "on: pull_request" > .github/workflows/ci.yml'
+mk rename-workflow   'git mv .github/workflows/ci.yml src/web/ci.yml'
 mk claude-dir        'mkdir -p .claude/skills && echo x > .claude/skills/x.md'
+mk claude-settings   'mkdir -p .claude && echo {} > .claude/settings.json'
 mk claude-md         'echo "# rules" > CLAUDE.md'
 mk nested-agents     'echo "# web" > src/web/AGENTS.md'
 mk wrangler          'echo "{}" > src/web/wrangler.jsonc'
@@ -84,11 +86,13 @@ fetch_all
 
 reason() { guarded_reason "$BASE" "$(case_sha "$1")"; }
 expect "plain change isn't guarded"               ""                                                        "$(reason plain)"
-expect_prefix "adding a migration"                "touches a migration"                                     "$(reason add-migration)"
-expect_prefix "renaming a migration away"         "touches a migration"                                     "$(reason rename-migration)"
-expect_prefix "deleting a migration"              "touches a migration"                                     "$(reason delete-migration)"
+expect "adding a migration isn't guarded"         ""                                                        "$(reason add-migration)"
+expect "nor renaming one"                         ""                                                        "$(reason rename-migration)"
+expect "nor deleting one"                         ""                                                        "$(reason delete-migration)"
 expect_prefix "a workflow"                        "touches CI or repo automation"                           "$(reason workflow)"
-expect_prefix ".claude/"                          "changes agent instructions"                              "$(reason claude-dir)"
+expect_prefix "renaming a workflow away"          "touches CI or repo automation"                           "$(reason rename-workflow)"
+expect ".claude/ skills aren't guarded"           ""                                                        "$(reason claude-dir)"
+expect_prefix "the rest of .claude/ is"           "changes agent instructions"                              "$(reason claude-settings)"
 expect_prefix "CLAUDE.md"                         "changes agent instructions"                              "$(reason claude-md)"
 expect_prefix "a nested AGENTS.md"                "changes agent instructions"                              "$(reason nested-agents)"
 expect_prefix "a nested wrangler.jsonc"           "touches Worker bindings"                                 "$(reason wrangler)"
@@ -110,27 +114,19 @@ git -C "$tmp/origin.git" update-ref refs/pull/7/head "$HEAD_SHA"
 
 view() { # head checks-json
   jq -cn --arg h "$1" --arg b "$BASE" --argjson c "$2" \
-    '{state:"OPEN", isDraft:false, labels:[{name:"verified"}], mergeable:"MERGEABLE", headRefOid:$h, headRefName:"foreman/7-x", baseRefOid:$b, statusCheckRollup:$c}'
+    '{state:"OPEN", isDraft:false, labels:[], mergeable:"MERGEABLE", headRefOid:$h, headRefName:"foreman/7-x", baseRefOid:$b, statusCheckRollup:$c}'
 }
 GREEN_CHECKS='[{"status":"COMPLETED","conclusion":"SUCCESS"},{"state":"SUCCESS"},{"status":"COMPLETED","conclusion":"SKIPPED"}]'
 
 # The stub returns what real gh would print *after* its --jq filter.
-GH_FAIL="" VIEW="" REVIEW="" THREADS=0 ACTIVITY="" LABEL_EVENTS="" API_FAIL=""
+GH_FAIL="" VIEW="" REVIEW="" THREADS=0 API_FAIL=""
 review() { # commit-sha verdict-heading submitted-at [id] -> one raw review, as the API returns it
   jq -cn --arg c "$1" --arg b "## $2" --arg t "$3" --argjson id "${4:-1}" \
     '{id:$id, user:{login:"control-room-review[bot]"}, commit_id:$c, submitted_at:$t, body:($b + "\n\nfindings")}'
 }
-push() { # sha time -> one push, as the activity API returns it
-  jq -cn --arg a "$1" --arg t "$2" '{activity_type:"push", after:$a, timestamp:$t}'
-}
-labeled() { # id event actor time -> one `verified` label event, as the issue events API returns it
-  jq -cn --argjson id "$1" --arg e "$2" --arg a "$3" --arg t "$4" '{id:$id, event:$e, actor:{login:$a}, label:{name:"verified"}, created_at:$t}'
-}
 api_stub() { # the REST calls the gate makes
   case "$2" in
     */reviews*)  [ "$API_FAIL" = reviews ] && return 1; echo "$REVIEW" ;;
-    */events*)   [ "$API_FAIL" = events ] && return 1; echo "$LABEL_EVENTS" ;;
-    *activity*)  [ "$API_FAIL" = activity ] && return 1; echo "$ACTIVITY" ;;
     *) return 1 ;;
   esac
 }
@@ -147,9 +143,6 @@ reset() {
   GH_FAIL="" THREADS=0 API_FAIL=""
   VIEW=$(view "$HEAD_SHA" "$GREEN_CHECKS")
   REVIEW="[$(review "$HEAD_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
-  # Pushed at 08:00, verified by the owner at 09:30.
-  ACTIVITY="[$(push "$HEAD_SHA" 2026-11-01T08:00:00Z), $(push "$OLD_SHA" 2026-10-31T08:00:00Z)]"
-  LABEL_EVENTS="[$(labeled 1 labeled superhighfives 2026-11-01T09:30:00Z)]"
 }
 
 OLD_SHA=0000000000000000000000000000000000000000
@@ -201,63 +194,19 @@ expect "gh failing waits"                              "wait: couldn't read the 
 reset; VIEW=$(jq -c '.labels = [{name:"needs-decision"}]' <<<"$VIEW")
 expect "needs-decision waits"                          "wait: needs-decision"            "$(gate 7)"
 
-echo "verified"
-
-reset; VIEW=$(jq -c '.labels = []' <<<"$VIEW")
-expect "no verified waits"                                "wait: not verified"                    "$(gate 7)"
-
-reset; LABEL_EVENTS="[$(labeled 1 labeled "$AGENT" 2026-11-01T09:30:00Z)]"
-expect "verified added by the machine account waits"      "wait: verified wasn't added by superhighfives"  "$(gate 7)"
-
-reset; LABEL_EVENTS="[$(labeled 1 labeled someone 2026-11-01T09:30:00Z)]"
-expect "verified added by anyone else waits"              "wait: verified wasn't added by superhighfives"  "$(gate 7)"
-
-# The owner verified at 09:30, then a later push moved the head.
-reset; ACTIVITY="[$(push "$HEAD_SHA" 2026-11-01T10:00:00Z), $(push "$OLD_SHA" 2026-11-01T08:00:00Z)]"
-expect "a push after verified clears it"                  "wait: verified before the latest push"  "$(gate 7)"
-
-# Pushed, pushed away, then pushed back after the owner verified the old one.
-reset; ACTIVITY="[$(push "$HEAD_SHA" 2026-11-01T10:00:00Z), $(push "$OLD_SHA" 2026-11-01T09:00:00Z), $(push "$HEAD_SHA" 2026-11-01T08:00:00Z)]"
-expect "the head's latest arrival is the one that counts" "wait: verified before the latest push"  "$(gate 7)"
-
-reset; LABEL_EVENTS="[$(labeled 1 labeled superhighfives 2026-11-01T08:00:00Z)]"
-expect "verified in the same second as the push waits"    "wait: verified before the latest push"  "$(gate 7)"
-
-# The owner removed it and someone else put it back.
-reset; LABEL_EVENTS="[$(labeled 1 labeled superhighfives 2026-11-01T09:30:00Z), $(labeled 2 unlabeled superhighfives 2026-11-01T09:40:00Z), $(labeled 3 labeled someone 2026-11-01T09:50:00Z)]"
-expect "only the label's latest event counts"             "wait: verified wasn't added by superhighfives"  "$(gate 7)"
-
-reset; LABEL_EVENTS="[$(labeled 2 labeled superhighfives 2026-11-01T09:50:00Z), $(labeled 1 unlabeled superhighfives 2026-11-01T09:40:00Z)]"
-expect "events are ordered by id, not list order"         "merge $HEAD_SHA"                       "$(gate 7)"
-
-reset; ACTIVITY="[$(push "$OLD_SHA" 2026-11-01T08:00:00Z)]"
-expect "no record of the head's push waits"               "wait: couldn't tell when the head was pushed"  "$(gate 7)"
-
-reset; API_FAIL=activity
-expect "an unreadable activity log waits"                 "wait: couldn't read when the head was pushed"  "$(gate 7)"
-
-reset; API_FAIL=events
-expect "unreadable label events wait"                     "wait: couldn't read the label's events"  "$(gate 7)"
-
-# The dependency bundle: CI and a 🟢 review are the proof, not `verified`.
-deps_view() { jq -c '.labels = [] | .headRefName = "foreman/deps-2026-11-02"' <<<"$VIEW"; }
-reset; VIEW=$(deps_view)
-expect "a green, 🟢 dependency bundle merges without verified"  "merge $HEAD_SHA"  "$(gate 7)"
-reset; VIEW=$(deps_view); REVIEW="[$(review "$HEAD_SHA" "🟡 Approved with comments" 2026-11-01T09:00:00Z)]"
-expect "but not on a 🟡"                                         "wait: review isn't all-green"  "$(gate 7)"
-reset; VIEW=$(jq -c '.statusCheckRollup = [{"status":"COMPLETED","conclusion":"FAILURE"}]' <<<"$(deps_view)")
-expect "nor with red checks"                                     "wait: checks red"  "$(gate 7)"
-reset; VIEW=$(jq -c '.labels = [] | .headRefName = "foreman/12-deps-thing"' <<<"$VIEW")
-expect "other foreman/* PRs still wait for verified"             "wait: not verified"  "$(gate 7)"
+# No `verified` (owner, 2026-11-10): checks, the review and the guarded
+# areas are the whole gate, for every foreman/* PR alike.
+reset; VIEW=$(jq -c '.headRefName = "foreman/deps-2026-11-02"' <<<"$VIEW")
+expect "a green, 🟢 dependency bundle merges"          "merge $HEAD_SHA"                 "$(gate 7)"
+reset; VIEW=$(jq -c '.labels = [{name:"verified"}]' <<<"$VIEW")
+expect "a leftover verified label changes nothing"     "merge $HEAD_SHA"                 "$(gate 7)"
 
 MIG_SHA="$(case_sha add-migration)"
 reset; VIEW=$(view "$MIG_SHA" "$GREEN_CHECKS"); REVIEW="[$(review "$MIG_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$MIG_SHA"
-expect_prefix "a green migration is the owner's"       "guarded: touches a migration"    "$(gate 7)"
-VIEW=$(jq -c '.labels = []' <<<"$VIEW")
-expect_prefix "even before it's verified"              "guarded: touches a migration"    "$(gate 7)"
+expect "a green migration merges"                     "merge $MIG_SHA"                  "$(gate 7)"
 WF_SHA="$(case_sha workflow)"
-reset; VIEW=$(jq -c '.labels = [] | .headRefName = "foreman/deps-2026-11-02"' <<<"$(view "$WF_SHA" "$GREEN_CHECKS")")
+reset; VIEW=$(jq -c '.headRefName = "foreman/deps-2026-11-02"' <<<"$(view "$WF_SHA" "$GREEN_CHECKS")")
 REVIEW="[$(review "$WF_SHA" "🟢 Approved" 2026-11-01T09:00:00Z)]"
 git -C "$tmp/origin.git" update-ref refs/pull/7/head "$WF_SHA"
 expect_prefix "a bundle that bumps a workflow is the owner's"  "guarded: touches CI"  "$(gate 7)"
@@ -369,30 +318,6 @@ expect "drops a person whose login is 'claude'"    no  "$(has INJECT-FAKE-CLAUDE
 expect "drops resolved threads"                    no  "$(has RESOLVED-FINDING)"
 expect "drops threads a person started as the bot" no  "$(has FAKE-BOT-THREAD)"
 
-# ---- waiting for verified ----------------------------------------------------
-
-echo "verified reminders"
-
-: > "$CALLS"; rm -rf "$VERIFY"
-verify_reminder 7 1
-expect "the first wait only starts the clock"   "no"   "$(called 'alert ')"
-expect "and records when"                       "$FOREMAN_NOW"  "$(cat "$VERIFY/7")"
-FOREMAN_NOW=$((FOREMAN_NOW + 86399)) verify_reminder 7 1
-expect "a day minus a second is quiet"          "no"   "$(called 'alert ')"
-FOREMAN_NOW=$((FOREMAN_NOW + 86400)) verify_reminder 7 1
-expect "after a day it alerts"                  "yes"  "$(called 'alert #7 has waited a day')"
-expect "and comments"                           "yes"  "$(called 'pr comment 7')"
-: > "$CALLS"
-FOREMAN_NOW=$((FOREMAN_NOW + 200000)) verify_reminder 7 1
-expect "once: not again the next day"           "no"   "$(called 'alert ')"
-expect "nor another comment"                    "no"   "$(called 'pr comment')"
-
-: > "$CALLS"
-clear_verified 7 1
-expect "a stale verified is removed"            "yes"  "$(called '--remove-label verified')"
-expect "and the owner is told why"              "yes"  "$(called 'pr comment 7')"
-expect "and the wait restarts from the push"    "no no" "$([ -e "$VERIFY/7" ] && echo yes || echo no) $([ -e "$VERIFY/7.reminded" ] && echo yes || echo no)"
-
 # ---- stalls ------------------------------------------------------------------
 
 echo "stalls"
@@ -417,7 +342,7 @@ mp() { # [--dry-run] -> merge_pass's log
       esac
     }
     event() { echo "event $*" >> "$CALLS"; }
-    review_round() { :; }; verify_reminder() { :; }; clear_verified() { :; }
+    review_round() { :; }
     set_status() { :; }; rm_worktree() { :; }
     merge_pass '{}'
   ) | sed -E 's/^[0-9-]+ [0-9:]+ //'
@@ -476,16 +401,17 @@ expect "pending checks are quiet at 2h"           "0"    "$(alerts)"
 at 43200; mp >/dev/null
 expect "and alert at 12h"                         "1"    "$(alerts)"
 
-for v in "wait: needs-decision" "wait: not verified" "wait: draft"; do
+for v in "wait: needs-decision" "wait: draft"; do
   fresh; GATE="$v"; mp >/dev/null
   expect "${v#wait: } never starts a clock"       "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
 done
 fresh; GATE="wait: checks red"; mp >/dev/null; GATE="wait: needs-decision"; mp >/dev/null
 expect "and needs-decision stops one"             "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
-fresh; GATE="wait: checks red"; mp >/dev/null; GATE="guarded: touches a migration (x)"; mp >/dev/null
+fresh; GATE="wait: checks red"; mp >/dev/null; GATE="guarded: touches CI or repo automation (x)"; mp >/dev/null
 expect "a guarded verdict clears the clock"       "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
 fresh; GATE="wait: checks red"; mp >/dev/null; GATE="merge $SHA_A"; mp >/dev/null
 expect "a merge clears it"                        "no"   "$([ -e "$WAITS/7" ] && echo yes || echo no)"
+expect "and alerts with the Try it link"          "yes"  "$(called 'alert merged #7. Once it'"'"'s live, try it: https://github.com/superhighfives/nylon-impossible/pull/7#try-it')"
 
 fresh; GATE="merge $SHA_A"; MERGE_FAIL=1; mp >/dev/null
 expect "a refused merge is tracked"               "merge refused"  "$(sed -n 3p "$WAITS/7")"
@@ -667,6 +593,24 @@ DRY=0
 # The comments call filters by the owner's login: only their replies start a run.
 expect "only the owner's comments are asked for"  "yes"  "$(called 'select(.user.login == "superhighfives") | .id')"
 
+echo "spec outcomes"
+# Settled specs go to Ready on their own (owner, 2026-11-10).
+outcome() { # body labels -> spec_outcome's calls
+  ( SPEC_BODY="$1" SPEC_LABELS="$2"; : > "$CALLS"
+    set_status() { echo "set_status $2 $3" >> "$CALLS"; }
+    spec_outcome "$BOARD" 11 >/dev/null; cat "$CALLS" )
+}
+calls=$(outcome "$SPEC_OK" "kind:fix,spec")
+expect "a settled spec moves to Ready"            "yes"  "$(grep -qxF 'set_status 11 Ready' <<<"$calls" && echo yes || echo no)"
+expect "and says so"                              "yes"  "$(grep -qF "alert #11's spec is settled, so it's in Ready" <<<"$calls" && echo yes || echo no)"
+calls=$(outcome "${SPEC_OK/None./1. Which?}" "kind:fix,spec")
+expect "an open one stays put"                    "no"   "$(grep -qF 'set_status 11 Ready' <<<"$calls" && echo yes || echo no)"
+expect "and asks the owner"                       "yes"  "$(grep -qF "alert #11's spec has questions for you" <<<"$calls" && echo yes || echo no)"
+calls=$(outcome "${SPEC_OK/None./1. Which?}" "kind:fix,spec,feedback")
+expect "an open feedback spec gets needs-decision" "yes" "$(grep -qF -- '--add-label needs-decision' <<<"$calls" && echo yes || echo no)"
+calls=$(outcome "$SPEC_OK" "kind:fix,spec,feedback")
+expect "a settled one loses it, and goes to Ready" "yes yes" "$(grep -qF -- '--remove-label needs-decision' <<<"$calls" && echo yes || echo no) $(grep -qxF 'set_status 11 Ready' <<<"$calls" && echo yes || echo no)"
+
 echo "drafts in the spec column"
 
 DRAFT_BOARD=$(jq -c '.items.nodes = [
@@ -777,9 +721,9 @@ expect "nor by the machine account"                ""  "$(owner_added auto-fix <
 expect "the owner's, then removed, doesn't"        ""  "$(owner_added auto-fix <<<"[$(autofix 1 labeled superhighfives), $(autofix 2 unlabeled superhighfives)]")"
 expect "the owner's after someone else's does"     "2026-11-01T09:00:00Z"  "$(owner_added auto-fix <<<"[$(autofix 1 labeled stranger)]
 [$(autofix 2 unlabeled stranger), $(autofix 3 labeled superhighfives)]")"
-expect "another label's events don't count"        ""  "$(owner_added auto-fix <<<"[$(labeled 1 labeled superhighfives 2026-11-01T09:00:00Z)]")"
+expect "another label's events don't count"        ""  "$(owner_added auto-fix <<<"[$(autofix 1 labeled superhighfives | jq -c '.label.name = "spec"')]")"
 
-FB_BOARD='{"id":"P","field":{"id":"F","options":[{"id":"o-ideas","name":"Ideas"},{"id":"o-specced","name":"Specced"},{"id":"o-progress","name":"In progress"},{"id":"o-review","name":"In review"}]},"items":{"nodes":[
+FB_BOARD='{"id":"P","field":{"id":"F","options":[{"id":"o-ideas","name":"Ideas"},{"id":"o-specced","name":"Specced"},{"id":"o-ready","name":"Ready"},{"id":"o-progress","name":"In progress"},{"id":"o-review","name":"In review"}]},"items":{"nodes":[
   {"id":"I21","status":{"name":"Specced"},"content":{"__typename":"Issue","number":21,"state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"feedback"},{"name":"auto-fix"}]}}},
   {"id":"I22","status":{"name":"Ideas"},"content":{"__typename":"Issue","number":22,"state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"feedback"},{"name":"auto-fix"}]}}},
   {"id":"I23","status":null,"content":{"__typename":"Issue","number":23,"state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"feedback"},{"name":"auto-fix"}]}}}
@@ -1083,9 +1027,9 @@ pass_run() { # now off-variable open-agent-PRs -> the routines that ran
 }
 rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
 expect "one model-driven routine a tick; the shell ones as well"  "dispatch sentry digest tidy"  "$(pass_run "$SUN8" "" 0)"
-expect "with 3 agent PRs open, the bundle waits"                  "dispatch scout tidy"          "$(pass_run "$SUN8" "" 3)"
-expect "and stays due"                                            "dispatch tidy"                "$(pass_run "$SUN8" "" 3)"
-expect "until there's room"                                       "dispatch deps tidy"           "$(pass_run "$SUN8" "" 2)"
+expect "with 5 agent PRs open, the bundle waits"                  "dispatch scout tidy"          "$(pass_run "$SUN8" "" 5)"
+expect "and stays due"                                            "dispatch tidy"                "$(pass_run "$SUN8" "" 5)"
+expect "until there's room"                                       "dispatch deps tidy"           "$(pass_run "$SUN8" "" 4)"
 expect "then nothing more in this window"                         "dispatch tidy"                "$(pass_run "$SUN8" "" 0)"
 rm -rf "${ROUTINES:?}"; mkdir -p "$ROUTINES"
 expect "the variable stops exactly the ones it names"             "sentry"                       "$(pass_run "$SUN8" "dispatch,digest,deps" 0)"
@@ -1351,7 +1295,6 @@ gh() { # applies --jq itself, like gh
   esac
   if [ -n "$jqf" ]; then jq -r "$jqf" <<<"$out"; else echo "$out"; fi
 }
-rm -rf "${VERIFY:?}"; mkdir -p "$VERIFY"
 TOKEN_CODE=0
 body=$(digest_body "$DIGEST_BOARD")
 expect "four sections"                         "### Merged|### Waiting on you|### Found|### Problems"  "$(grep '^### ' <<<"$body" | paste -sd'|' -)"

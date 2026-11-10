@@ -70,19 +70,26 @@ Acceptance criteria, How to verify, Open questions, Decisions.
 ## What makes a question open
 
 A question is open when two careful builders could read the spec and build
-different things, and the difference would matter to the owner. In practice:
+different things, and the difference is something the owner would notice.
+Ask the owner only about:
 
-- a choice between behaviours, layouts, words or defaults the spec doesn't make;
-- a platform the change could reach that **Behaviour** doesn't mention;
-- an acceptance criterion that can't be checked, or names no test or shot;
-- anything touching the Settled table, a migration, a release, or what the
-  foreman and agents may do;
-- a cost, risk or dependency the owner hasn't seen.
+- user-visible behaviour, layout or copy the spec doesn't settle, on any
+  platform, including one **Behaviour** doesn't mention;
+- anything PRINCIPLES.md or its Settled table covers;
+- deleting or rewriting user data;
+- new paid services, cost or outside dependencies;
+- guarded areas, a release, or what the foreman and agents may do.
 
-It isn't open when the code, PRINCIPLES.md, CLAUDE.md or an earlier decision
-already answers it. Answer it in the spec and say where the answer came from.
-Implementation details a reviewer would judge (names, file layout) aren't
-questions either.
+If you're unsure whether something is user-visible, ask.
+
+**Settle the rest yourself** (owner, 2026-11-10): naming, file layout,
+whether to add a test and which kind, refactor scope inside the issue,
+internal API shapes no client sees, the order of the work, and an acceptance
+criterion's proof. Write the answer into the spec, and record it under
+**Decisions** as `- YYYY-MM-DD (foreman): <what>, because <why>` so the owner
+can see it and overrule it. A question the code, PRINCIPLES.md, CLAUDE.md or
+an earlier decision already answers isn't open either: answer it in the spec
+and say where the answer came from.
 
 Ask each question so it can be answered in a line: number it, give the
 options, and say which you'd pick and why. "Should completing a todo in
@@ -102,9 +109,11 @@ about Undo?".
    - Ask anything the answers opened up. Push back when an answer conflicts
      with PRINCIPLES.md, the Settled table or another decision; say what it
      conflicts with.
-   - Post a comment with what changed and what's still open.
-3. **Done** when **Open questions** reads exactly `None.`. Say so, and leave
-   moving it to Ready to the owner.
+   - Post a comment with what changed, what you settled yourself, and what's
+     still open.
+3. **Done** when **Open questions** reads exactly `None.`. Say so. The
+   foreman moves it to Ready after its run; in a local session, move it
+   yourself.
 
 **The body is the truth.** The owner may edit the spec directly. Work from
 their version, and don't revert or "tidy" what they wrote. If an edit seems
@@ -131,22 +140,26 @@ to contradict a decision, ask; don't pick.
 
 ## Ready
 
-Only the owner moves an item to Ready, for every kind, for now. That's the
-owner saying the argument is over. Before then:
+A spec is ready, and goes to Ready, when:
 
 - every required section is there, and **Open questions** is `None.`;
-- each acceptance criterion names its proof;
+- each acceptance criterion names its proof, a test wherever one can show it;
 - **How to verify** is concrete enough that the PR's **Try it** section can
   be written from it.
 
+The foreman moves a spec to Ready when its run leaves it like that, and the
+owner can move items too. It checks again before building, and sends back
+anything that doesn't pass.
+
 ## Verifying
 
-Every agent PR gets a **Try it** section: the web preview URL, the routes and
-steps, Apple before/after shots of the affected `-NylonScreen` routes, and
-each acceptance criterion with the test or shot that shows it. The owner
-tries it and adds `verified`. The foreman merges only with a `verified` the
-owner added after the head commit was pushed; a later push clears it.
+Tests and the review are the gate: an agent PR merges on green checks and a
+🟢 `control-room-review` of its head commit (CLAUDE.md, "Merging"). So each
+acceptance criterion's proof should be a test that fails without the change,
+wherever one can be written; a shot covers what a test can't.
 
-The plan is to drop `verified` for kinds where the tests are proof enough
-(likely `test`, `chore`, `refactor`), one kind at a time, each with a written
-reason in CLAUDE.md.
+Every agent PR still gets a **Try it** section: the web preview URL, the
+routes and steps, Apple before/after shots of the affected `-NylonScreen`
+routes, and each acceptance criterion with the test or shot that shows it.
+The owner reads it once the change is live, and what's wrong gets reverted
+or fixed forward (CLAUDE.md, "Rolling back").
