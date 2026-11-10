@@ -72,6 +72,7 @@ mk delete-migration  'git rm -q src/api/migrations/0001_init.sql'
 mk workflow          'echo "on: pull_request" > .github/workflows/ci.yml'
 mk rename-workflow   'git mv .github/workflows/ci.yml src/web/ci.yml'
 mk claude-dir        'mkdir -p .claude/skills && echo x > .claude/skills/x.md'
+mk claude-settings   'mkdir -p .claude && echo {} > .claude/settings.json'
 mk claude-md         'echo "# rules" > CLAUDE.md'
 mk nested-agents     'echo "# web" > src/web/AGENTS.md'
 mk wrangler          'echo "{}" > src/web/wrangler.jsonc'
@@ -91,6 +92,7 @@ expect "nor deleting one"                         ""                            
 expect_prefix "a workflow"                        "touches CI or repo automation"                           "$(reason workflow)"
 expect_prefix "renaming a workflow away"          "touches CI or repo automation"                           "$(reason rename-workflow)"
 expect ".claude/ skills aren't guarded"           ""                                                        "$(reason claude-dir)"
+expect_prefix "the rest of .claude/ is"           "changes agent instructions"                              "$(reason claude-settings)"
 expect_prefix "CLAUDE.md"                         "changes agent instructions"                              "$(reason claude-md)"
 expect_prefix "a nested AGENTS.md"                "changes agent instructions"                              "$(reason nested-agents)"
 expect_prefix "a nested wrangler.jsonc"           "touches Worker bindings"                                 "$(reason wrangler)"

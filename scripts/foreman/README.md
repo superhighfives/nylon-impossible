@@ -345,7 +345,8 @@ hold:
   - the rules agents work under: every `CLAUDE.md` and `AGENTS.md`;
   - `scripts/foreman/` itself.
 
-  Migrations and `.claude/` skills aren't guarded (2026-11-10).
+  Migrations and `.claude/skills/` aren't guarded (2026-11-10); the rest of
+  `.claude/` (settings, hooks, permissions, agents) is.
 
 The merge is pinned to the commit the gate checked (`--match-head-commit`), so
 a fixup the operator pushes in between can't slip through unreviewed. A refused

@@ -190,9 +190,10 @@ paths.
 - **CI, deploys and releases:** anything under `.github/` (including the
   workflows that review and deploy), any `wrangler.jsonc`, Fastlane config,
   and version or build-number bumps.
-- **The rules:** every `CLAUDE.md` and `AGENTS.md`, this file included, and
-  `scripts/foreman/`, which enforces them (see its README). Skills in
-  `.claude/` aren't guarded.
+- **The rules:** every `CLAUDE.md` and `AGENTS.md`, this file included,
+  `.claude/` (settings, hooks, permissions, agents), and `scripts/foreman/`,
+  which enforces them (see its README). Skills in `.claude/skills/` aren't
+  guarded.
 
 Migrations aren't guarded, but deploy still migrates before the workers roll
 out, so expand/contract still applies (`d1-migrations` skill).

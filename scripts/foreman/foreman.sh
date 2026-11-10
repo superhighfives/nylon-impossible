@@ -231,8 +231,10 @@ guarded_path() { # path -> why it's guarded, or nothing
     scripts/foreman/*)                         echo "changes the foreman itself ($1)" ;;
     # The rules the agents work under, merging included: the foreman runs
     # claude with bypassed permissions in worktrees cut from main. Skills
-    # (.claude/) aren't guarded; these files are (owner, 2026-11-10).
-    CLAUDE.md|*/CLAUDE.md|AGENTS.md|*/AGENTS.md) echo "changes agent instructions ($1)" ;;
+    # aren't guarded (owner, 2026-11-10); the rest of .claude/ (settings,
+    # hooks, permissions, agents) and these files are.
+    .claude/skills/*)                          ;;
+    .claude/*|CLAUDE.md|*/CLAUDE.md|AGENTS.md|*/AGENTS.md) echo "changes agent instructions ($1)" ;;
   esac
 }
 
