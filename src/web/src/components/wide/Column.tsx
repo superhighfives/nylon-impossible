@@ -111,6 +111,8 @@ export function ColumnHeader({
   /**
    * Today's overnight pill. Every column keeps its space (two lines, 20px
    * clear of the title) whether or not it's showing, so titles don't move.
+   * A list's two-line title rises into it: the slot is the part of the
+   * header that gives way, never the title or the subline.
    */
   banner?: ReactNode;
   onRename?: (name: string) => void;
@@ -150,11 +152,11 @@ export function ColumnHeader({
     >
       <div
         data-banner-slot
-        className="mb-5 flex h-[2.75rem] min-w-0 flex-col justify-end"
+        className="mb-5 flex h-[2.75rem] min-h-0 min-w-0 flex-col justify-end"
       >
         {banner}
       </div>
-      <div className="flex items-end">
+      <div className="flex shrink-0 items-end">
         <h2
           id={headingId}
           tabIndex={-1}
@@ -188,7 +190,9 @@ export function ColumnHeader({
               type="button"
               aria-description="Rename"
               onClick={() => setRenaming(true)}
-              className="-mx-1 max-w-full cursor-text rounded-n-chip px-1 text-left n-focus-soft pointer-fine:hover:bg-n-fill"
+              // A button is one box to the heading's clamp, so it clamps
+              // its own lines.
+              className="-mx-1 line-clamp-2 max-w-full cursor-text rounded-n-chip px-1 text-left n-focus-soft pointer-fine:hover:bg-n-fill"
             >
               {title}
             </button>
@@ -241,7 +245,7 @@ export function ColumnHeader({
           </Menu.Root>
         )}
       </div>
-      <p className={SUBLINE}>
+      <p data-subline className={SUBLINE}>
         {icon}
         <span className="truncate">{subline}</span>
       </p>
