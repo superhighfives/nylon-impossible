@@ -107,10 +107,19 @@ extension ContentView {
                     minWidth: Theme.Wide.columnMinWidth, maxWidth: .infinity,
                     minHeight: Self.boardMinHeight, maxHeight: .infinity
                 )
+                // The toolbar's bottom, as on the iPad. The system's own
+                // titlebar line is hidden (`TitlebarSeparatorHidden`), so
+                // it's drawn once.
+                .overlay(alignment: .top) { Hairline() }
         })
         .navigationTitle(focusedColumn?.name ?? "Nylon")
         .navigationSubtitle(windowSubtitle)
         .toolbar { macToolbar }
+        // The toolbar is the board's canvas, not the system's titlebar
+        // material. On macOS 26 that material started at the sidebar's edge
+        // at launch and ran behind it only after a sidebar toggle (#601);
+        // canvas on both sides of that edge looks the same either way.
+        .canvasWindowToolbar()
         .background(Theme.Colors.canvas.ignoresSafeArea())
         // The sidebar hides in a narrow window and comes back in a wide one,
         // as Mail's and Notes' do. Measured on the window, not the board, so

@@ -8,6 +8,7 @@
 //
 
 #if os(macOS)
+import AppKit
 import SwiftUI
 
 extension ContentView {
@@ -48,6 +49,45 @@ extension ContentView {
             }
             .help("New list (⇧⌘N)")
             .popover(isPresented: newListPopoverBinding, arrowEdge: .bottom) { newListForm }
+        }
+    }
+}
+extension View {
+    /// The window toolbar drawn in the board's canvas, always, with the
+    /// system's line under it hidden.
+    @ViewBuilder
+    func canvasWindowToolbar() -> some View {
+        let toolbar = toolbarBackground(Theme.Colors.canvas, for: .windowToolbar)
+            .background(TitlebarSeparatorHidden())
+        if #available(macOS 15, *) {
+            toolbar.toolbarBackgroundVisibility(.visible, for: .windowToolbar)
+        } else {
+            toolbar.toolbarBackground(.visible, for: .windowToolbar)
+        }
+    }
+}
+
+/// Hides the system's line under the window toolbar, in this window and every
+/// new one, so the board's own hairline is the only one there. The window's
+/// style overrides the split view items' own. Watched rather than set once:
+/// if SwiftUI or AppKit sets a style again on a later layout (a sidebar
+/// toggle, #601), it goes straight back to none.
+struct TitlebarSeparatorHidden: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { WindowView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class WindowView: NSView {
+        private var separatorObservation: NSKeyValueObservation?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            separatorObservation = window?.observe(\.titlebarSeparatorStyle, options: [.initial]) { window, _ in
+                MainActor.assumeIsolated {
+                    if window.titlebarSeparatorStyle != .none {
+                        window.titlebarSeparatorStyle = .none
+                    }
+                }
+            }
         }
     }
 }
