@@ -107,6 +107,14 @@ export function renderCss(tokens) {
   out.push(`  --n-sheet-recede: ${sheet.recede};`);
   out.push(`  --n-sheet-shadow: ${cssSheetShadow(sheet, "light")};`);
   out.push("");
+  const { board } = tokens;
+  for (const name of ["columnMinWidth", "columnMaxWidth"]) {
+    out.push(`  --n-board-${kebab(name)}: ${board[name] / 16}rem;`);
+  }
+  out.push(`  --n-board-hatch-spacing: ${board.hatch.spacing / 16}rem;`);
+  out.push(`  --n-board-hatch-angle: ${board.hatch.angle}deg;`);
+  out.push(`  --n-board-hatch-width: ${board.hatch.width / 16}rem;`);
+  out.push("");
   const curve = tokens.motion.easeOutStrong.join(", ");
   for (const name of ["fast", "base", "slow"]) {
     out.push(`  --n-duration-${name}: ${tokens.motion[name]}ms;`);
@@ -392,6 +400,21 @@ export function renderSwift(tokens) {
     `        static let shadowRadius: CGFloat = ${sheet.shadow.blur / 2}`,
     `        static let shadowOpacityLight: Double = ${sheet.shadowOpacity.light}`,
     `        static let shadowOpacityDark: Double = ${sheet.shadowOpacity.dark}`,
+    "    }",
+    "",
+  );
+
+  // The wide board's columns and what comes after them
+  const { board } = tokens;
+  out.push(
+    "    /// The wide board's columns: a quarter of the board, up to",
+    "    /// `columnMaxWidth`. The minimums are `Theme.Wide`'s. Past the last",
+    "    /// column, a hatch of `hairline` lines.",
+    "    enum Board {",
+    `        static let columnMaxWidth: CGFloat = ${board.columnMaxWidth}`,
+    `        static let hatchSpacing: CGFloat = ${board.hatch.spacing}`,
+    `        static let hatchAngle: Double = ${board.hatch.angle}`,
+    `        static let hatchWidth: CGFloat = ${board.hatch.width}`,
     "    }",
     "",
   );

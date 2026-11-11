@@ -223,7 +223,7 @@ extension ContentView {
                                 loadingColumn(page.title)
                             }
                             .containerRelativeFrame(.horizontal) { length, _ in
-                                max(minimum, length / 4)
+                                Theme.Wide.columnWidth(for: length, minimum: minimum)
                             }
                             .frame(maxHeight: .infinity)
                         }
@@ -243,25 +243,35 @@ extension ContentView {
                         // the container too is a cycle, and inside the Mac's
                         // split view it never settles (AppKit throws after
                         // too many constraint passes, at launch). Always a
-                        // quarter, so the columns never change width.
+                        // quarter, up to the maximum, so the columns never
+                        // change width.
                         .containerRelativeFrame(.horizontal) { length, _ in
-                            max(minimum, length / 4)
+                            Theme.Wide.columnWidth(for: length, minimum: minimum)
                         }
                         .frame(maxHeight: .infinity)
                         .id(list.id)
                     }
+                    // The last column closes on a hairline, where the
+                    // board's end begins.
                     HStack(spacing: 0) {
                         VerticalHairline()
                         fourthColumn(derived: derived)
+                        VerticalHairline()
                     }
                     .containerRelativeFrame(.horizontal) { length, _ in
-                        max(minimum, length / 4)
+                        Theme.Wide.columnWidth(for: length, minimum: minimum)
                     }
                     .frame(maxHeight: .infinity)
                     .id(openList?.id ?? Self.doneColumn)
                 }
                 .sharesBoardHeaderHeight()
+                // Covers the hatch behind, so it only shows past the last
+                // column.
+                .background(Theme.Colors.canvas.allowsHitTesting(false))
             }
+            // The rest of the board, when the columns stop short of its
+            // edge. Behind the scroll view, so it can't change its width.
+            .background { BoardHatch() }
             .scrollIndicators(.hidden)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
             .onChange(of: scrollColumnId) { _, id in

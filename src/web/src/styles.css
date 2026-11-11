@@ -179,6 +179,16 @@ p {
   }
 }
 
+/* What's left of the wide board past Done: `hairline` lines at the board
+   tokens' angle, width and spacing. Decorative, so forced colours drop it. */
+@utility n-board-hatch {
+  background-image: repeating-linear-gradient(
+    var(--n-board-hatch-angle),
+    var(--n-color-hairline) 0 var(--n-board-hatch-width),
+    transparent var(--n-board-hatch-width) var(--n-board-hatch-spacing)
+  );
+}
+
 /* The ring on a container whose field has keyboard focus: the composers,
    whose bare text fields draw no outline of their own. Yellow alone — the ink
    hairline reads as a second ring around a filled field. */

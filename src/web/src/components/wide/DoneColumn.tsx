@@ -19,7 +19,8 @@ export const DONE_COLUMN = "done";
  * Done as the board's last column: finished todos grouped by day. Rows
  * select like any column's; the check, Enter, Space or X puts one back, and
  * Delete removes it (both handled by the board's keys, bar Enter and Space,
- * which press the row).
+ * which press the row). A hairline closes its right edge, where the board's
+ * end begins.
  */
 export function DoneColumn({
   todos,
@@ -63,7 +64,7 @@ export function DoneColumn({
       onClick={(e) => {
         if (isColumnBackground(e.target)) onBackgroundClick?.();
       }}
-      className={`relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline ${TINTED}`}
+      className={`relative flex h-full ${COLUMN_WIDTH} flex-col border-x border-n-hairline ${TINTED}`}
     >
       <ColumnHeader
         listId={DONE_COLUMN}

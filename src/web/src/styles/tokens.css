@@ -84,6 +84,12 @@
   --n-sheet-recede: 0.8;
   --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 8%, transparent);
 
+  --n-board-column-min-width: 17rem;
+  --n-board-column-max-width: 26rem;
+  --n-board-hatch-spacing: 0.75rem;
+  --n-board-hatch-angle: 45deg;
+  --n-board-hatch-width: 0.0625rem;
+
   --n-duration-fast: 150ms;
   --n-duration-base: 220ms;
   --n-duration-slow: 320ms;

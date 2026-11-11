@@ -25,6 +25,14 @@ extension Theme {
         static let columnMinWidth: CGFloat = 240
         /// The same at accessibility text sizes.
         static let columnMinWidthLargeText: CGFloat = 380
+
+        /// A board column's width on a board `length` wide: a quarter of it,
+        /// from `minimum` up to `Theme.Board.columnMaxWidth`. It depends on
+        /// the board alone, so opening a todo or adding a list never resizes
+        /// a column.
+        static func columnWidth(for length: CGFloat, minimum: CGFloat) -> CGFloat {
+            min(Theme.Board.columnMaxWidth, max(minimum, length / 4))
+        }
         /// Header height above each column's hairline, so every title sits
         /// on the same baseline. Scaled with Dynamic Type where it's used.
         static let columnHeader: CGFloat = 140

@@ -51,10 +51,13 @@ type RowCallbacks = Pick<
 export const TINTED = "bg-n-surface";
 
 /**
- * Every column's width. Columns never stretch or squeeze: the board is one
- * row that scrolls sideways when they don't all fit.
+ * Every column's width: a quarter of the board (`main`, the size container),
+ * from the board tokens' minimum to their maximum. It follows the window
+ * only, never the column count or the open sheet, so columns don't squeeze:
+ * the board is one row that scrolls sideways when they don't all fit.
  */
-export const COLUMN_WIDTH = "w-[17rem] shrink-0";
+export const COLUMN_WIDTH =
+  "w-[clamp(var(--n-board-column-min-width),25cqi,var(--n-board-column-max-width))] shrink-0";
 
 /**
  * A column's side padding: 24px, or out to the sheet's overlap on the right
