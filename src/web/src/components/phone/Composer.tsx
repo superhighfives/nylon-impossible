@@ -16,6 +16,7 @@ import {
 } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { messageFromError, toast } from "@/lib/toast";
+import type { TodoWithUrls } from "@/types/database";
 import {
   draftDueDay,
   dueChipText,
@@ -63,6 +64,7 @@ export function Composer({
   variant = "floating",
   countFor,
   isVisible,
+  onAdded,
 }: {
   /** The list on screen — the default target. */
   currentListId: string;
@@ -80,6 +82,11 @@ export function Composer({
    * toast. Defaults to just `currentListId`.
    */
   isVisible?: (listId: string) => boolean;
+  /**
+   * A single todo saved (not a pasted list, and not a failed add). The
+   * board opens it beside its column; focus stays here.
+   */
+  onAdded?: (todo: TodoWithUrls) => void;
 }) {
   const inline = variant === "inline";
   const popover = variant === "popover";
@@ -153,14 +160,16 @@ export function Composer({
     // go back in the box, so sending again can't duplicate the ones that did.
     const failed = new Set<PlannedTodo>();
     let firstError: unknown = null;
+    let added: TodoWithUrls | undefined;
     for (const todo of [...planned].reverse()) {
       try {
-        await smartCreate.mutateAsync({
+        const saved = await smartCreate.mutateAsync({
           text: todo.text,
           listId,
           parseDate: false,
           dueDate: todo.dueDay,
         });
+        added = saved?.todos[0];
       } catch (err) {
         failed.add(todo);
         firstError ??= err;
@@ -176,6 +185,7 @@ export function Composer({
       );
       return;
     }
+    if (planned.length === 1 && added) onAdded?.(added);
     if (!(isVisible ? isVisible(listId) : listId === currentListId)) {
       const added = targets.find((t) => t.id === listId);
       const name = added ? inSentence(added) : "list";
@@ -281,7 +291,12 @@ export function Composer({
       void submit();
     }
     // The quick-add popover closes itself on Escape.
-    if (e.key === "Escape" && !popover) e.currentTarget.blur();
+    if (e.key === "Escape" && !popover) {
+      e.currentTarget.blur();
+      // On the board, Esc only steps out of Add; the open todo closes on
+      // the next one.
+      if (inline) e.stopPropagation();
+    }
   };
 
   if (popover) {

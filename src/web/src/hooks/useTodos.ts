@@ -395,8 +395,8 @@ export function useSmartCreate() {
 
       // Prepend a single placeholder so the row appears instantly. Smart-create
       // may expand one line into several todos and rewrite the title/URLs, so
-      // this is a stand-in reconciled wholesale by the onSettled refetch — not
-      // patched in place. Position sorts before the current top-level minimum so
+      // this is a stand-in, not patched in place: onSuccess swaps it for the
+      // saved todos, and the onSettled refetch reconciles the rest. Position sorts before the current top-level minimum so
       // it lands at the top of the incomplete list, matching the server prepend.
       const minPosition = (previousTodos ?? [])
         .filter((t) => t.parentId == null && !t.completed)
@@ -478,7 +478,21 @@ export function useSmartCreate() {
         );
       }
     },
-    onSuccess: () => {
+    onSuccess: (data, _input, context) => {
+      // Swap the stand-in for the saved todo straight away, so a caller can
+      // open it by its real id before the refetch lands.
+      const saved = new Set(data.todos.map((todo) => todo.id));
+      queryClient.setQueryData<TodoWithUrls[] | undefined>(
+        TODOS_QUERY_KEY,
+        (current) =>
+          current?.some((todo) => todo.id === context?.optimisticId)
+            ? current
+                .filter((todo) => !saved.has(todo.id))
+                .flatMap((todo) =>
+                  todo.id === context?.optimisticId ? data.todos : [todo],
+                )
+            : current,
+      );
       notifyChanged();
     },
     onSettled: () => {

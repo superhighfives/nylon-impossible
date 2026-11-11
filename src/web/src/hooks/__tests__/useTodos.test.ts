@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -381,5 +381,24 @@ describe("useSmartCreate", () => {
     const row = await optimisticRow("Buy milk");
     expect(row.title).toBe("Buy milk");
     expect(row.urls).toEqual([]);
+  });
+
+  it("swaps the stand-in for the saved todo once it saves", async () => {
+    const saved = makeTodo({ id: "todo-saved", title: "Buy milk" });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ todos: [saved] })),
+    );
+    const { queryClient, Wrapper } = createWrapper();
+    const existing = makeTodo({ id: "todo-old", position: "a5" });
+    queryClient.setQueryData(["todos"], [existing]);
+    const { result } = renderHook(() => useSmartCreate(), {
+      wrapper: Wrapper,
+    });
+    await act(() => result.current.mutateAsync({ text: "Buy milk" }));
+    vi.unstubAllGlobals();
+    expect(
+      queryClient.getQueryData<TodoWithUrls[]>(["todos"])?.map((t) => t.id),
+    ).toEqual(["todo-saved", "todo-old"]);
   });
 });
