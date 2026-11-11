@@ -29,7 +29,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 | Custom lists | Never age |
 | List membership | One list per todo. The three time lists and your lists are all lists; moving between them moves the todo |
 | Saving | Every edit saves instantly. No Save or Cancel anywhere |
-| Wide layout | One row of columns that scrolls sideways: Today, This week, Someday, every list, then Done. Opening a todo lays a sheet beside its column |
+| Wide layout | One row of columns that scrolls sideways: Today, This week, Someday, every list you haven't hidden, then Done. Hide or show a list from the sidebar. Opening a todo lays a sheet beside its column |
 | Selecting on wide | One click selects. A second click, a double click or Enter opens the todo in a sheet beside its column |
 | Dropping with a pointer | The todo lands in the gap nearest the pointer, shown by the drop line. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
 | Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. Two exceptions: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move; and the composer's 3px focus ring, where its `surface` fill and the caret also mark focus |

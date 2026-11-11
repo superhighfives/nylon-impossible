@@ -13,28 +13,11 @@ import {
   SystemListImmutableError,
   ValidationError,
 } from "@/lib/errors";
-import type { List } from "@/lib/schema";
+import { listUpdates, serializeList } from "@/lib/listShape";
 import { lists, todos } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import { createListSchema, updateListSchema } from "@/lib/validation";
-import type {
-  CreateListInput,
-  SerializedList,
-  UpdateListInput,
-} from "@/types/database";
-
-function serializeList(list: List): SerializedList {
-  return {
-    id: list.id,
-    userId: list.userId,
-    name: list.name,
-    kind: list.kind,
-    systemKind: list.systemKind,
-    position: list.position,
-    createdAt: list.createdAt.toISOString(),
-    updatedAt: list.updatedAt.toISOString(),
-  };
-}
+import type { CreateListInput, UpdateListInput } from "@/types/database";
 
 /** Get all of the user's lists (system + custom), in position order. */
 export const getLists = createServerFn({ method: "GET" }).handler(async () => {
@@ -100,7 +83,7 @@ interface UpdateListParams {
   input: UpdateListInput;
 }
 
-/** Rename/reposition a custom list. Rejects system lists. */
+/** Rename, reposition, hide or show a custom list. Rejects system lists. */
 export const updateList = createServerFn({ method: "POST" })
   .validator((data: UpdateListParams) => {
     const result = updateListSchema.safeParse(data.input);
@@ -133,10 +116,7 @@ export const updateList = createServerFn({ method: "POST" })
           return yield* new SystemListImmutableError({ id });
         }
 
-        const updates: Record<string, unknown> = {};
-        if (validated.name !== undefined) updates.name = validated.name;
-        if (validated.position !== undefined)
-          updates.position = validated.position;
+        const updates = listUpdates(validated);
 
         const [result] = yield* Effect.tryPromise({
           try: () =>

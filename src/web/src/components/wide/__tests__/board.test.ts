@@ -55,6 +55,28 @@ describe("boardSlots", () => {
     ]);
   });
 
+  it("leaves out the lists you've hidden, the rest closing up", () => {
+    const hidden = lists.map((l) =>
+      l.id === "groceries" ? { ...l, columnHidden: true } : l,
+    );
+    expect(
+      boardSlots(hidden, null).map((s) =>
+        s.kind === "list" ? s.list.id : s.kind,
+      ),
+    ).toEqual(["today", "week", "someday", "studio", "done", "end"]);
+  });
+
+  it("has no sheet beside a hidden column", () => {
+    const hidden = lists.map((l) =>
+      l.id === "groceries" ? { ...l, columnHidden: true } : l,
+    );
+    expect(
+      boardSlots(hidden, "groceries").map((s) =>
+        s.kind === "list" ? s.list.id : s.kind,
+      ),
+    ).not.toContain("sheet");
+  });
+
   it("has no sheet for a column that isn't on the board", () => {
     expect(names("gone")).not.toContain("sheet");
   });

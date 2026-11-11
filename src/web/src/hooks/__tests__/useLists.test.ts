@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SerializedList } from "@/types/database";
-import { useCreateList } from "../useLists";
+import { useCreateList, useUpdateList } from "../useLists";
 
 vi.mock("@/server/lists", () => ({
   getLists: vi.fn(),
@@ -21,6 +21,7 @@ import * as serverLists from "@/server/lists";
 
 const mockGetLists = vi.mocked(serverLists.getLists);
 const mockCreateList = vi.mocked(serverLists.createList);
+const mockUpdateList = vi.mocked(serverLists.updateList);
 
 function makeList(overrides?: Partial<SerializedList>): SerializedList {
   return {
@@ -30,6 +31,7 @@ function makeList(overrides?: Partial<SerializedList>): SerializedList {
     kind: "custom",
     systemKind: null,
     position: "a0",
+    columnHidden: false,
     createdAt: "2026-10-31T00:00:00.000Z",
     updatedAt: "2026-10-31T00:00:00.000Z",
     ...overrides,
@@ -112,5 +114,37 @@ describe("useCreateList", () => {
         queryClient.getQueryData<SerializedList[]>(["lists"])?.map((l) => l.id),
       ).toEqual(["list-existing"]),
     );
+  });
+});
+
+describe("useUpdateList", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // The column leaves the board at once, before the server answers.
+  it("hides a list's column in the cache straight away", async () => {
+    const list = makeList({ id: "list-vinyl" });
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData<SerializedList[]>(["lists"], [list]);
+    mockUpdateList.mockReturnValue(new Promise(() => {}));
+    mockGetLists.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(() => useUpdateList(), { wrapper: Wrapper });
+    act(() => {
+      result.current.mutate({
+        id: "list-vinyl",
+        input: { columnHidden: true },
+      });
+    });
+
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<SerializedList[]>(["lists"])?.[0].columnHidden,
+      ).toBe(true),
+    );
+    expect(mockUpdateList).toHaveBeenCalledWith({
+      data: { id: "list-vinyl", input: { columnHidden: true } },
+    });
   });
 });

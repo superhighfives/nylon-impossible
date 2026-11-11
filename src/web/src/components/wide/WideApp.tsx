@@ -40,6 +40,7 @@ import {
   createBoard,
   revealSpan,
   sheetScrollTarget,
+  shownColumns,
 } from "./board";
 import { columnRows, rowById } from "./boardDom";
 import { Column } from "./Column";
@@ -84,12 +85,12 @@ function revealInColumn(row: HTMLElement) {
 }
 
 /**
- * A column to focus once it renders: its Add field, its title, or a todo
- * that's on its way there.
+ * A column to go to once it renders: its Add field, its title, a todo that's
+ * on its way there (`row`, as `focusColumn`), or just into view.
  */
 type PendingFocus =
-  | { column: string; target: "composer" | "head" }
-  | { column: string; target: "row"; rowId: string };
+  | { column: string; target: "composer" | "head" | "reveal" }
+  | { column: string; target: "row"; rowId?: string };
 
 interface MenuState {
   id: string;
@@ -111,8 +112,8 @@ const SHEET_EXIT_MS = 1000;
 /**
  * The wide layout (web 1024px and up): the sidebar, a toolbar, then one row
  * of columns that scrolls sideways: Today, This week, Someday, every one of
- * your lists in the sidebar's order, then Done. Nothing is swapped in or
- * out, and every column keeps its width.
+ * your lists you haven't hidden, in the sidebar's order, then Done. Nothing
+ * else is swapped in or out, and every column keeps its width.
  *
  * Selection is state, not DOM focus. Focusing a row selects it; one click
  * selects, a second click, a double click or Enter opens it in a sheet laid
@@ -189,6 +190,8 @@ export function WideApp({
   );
   /** Every list, in the board's (and the sidebar's) order. */
   const boardLists = [...timeLists, ...collections];
+  /** The lists with a column: all but the ones you've hidden. */
+  const shownLists = shownColumns(boardLists);
   const todoById = useCallback(
     (id: string | null | undefined) =>
       id ? todos.find((t) => t.id === id && !t.completed) : undefined,
@@ -201,7 +204,7 @@ export function WideApp({
   );
   const detailTodo = detailId ? (todoById(detailId) ?? null) : null;
   // The columns with rows, left to right; the sheet has none.
-  const columnIds = [...boardLists.map((l) => l.id), DONE_COLUMN];
+  const columnIds = [...shownLists.map((l) => l.id), DONE_COLUMN];
   const animated = reducedMotion !== "reduce";
 
   // The sheet stays drawn while it slides away, so the open todo's state is
@@ -233,16 +236,15 @@ export function WideApp({
   const listKind = (listId: string) =>
     timeLists.find((l) => l.id === listId)?.systemKind ?? null;
   const selectedTodo = todoById(selectedId) ?? doneById(selectedId);
-  /** The column the selection is in: a list id, Done, or none. */
-  const selectionColumn = selectedTodo
+  const selectedIn = selectedTodo
     ? selectedTodo.completed
       ? DONE_COLUMN
       : selectedTodo.listId
     : null;
-  const currentColumn =
-    selectionColumn && columnIds.includes(selectionColumn)
-      ? selectionColumn
-      : todayId;
+  /** The column the selection is in: a list id, Done, or none (never hidden). */
+  const selectionColumn =
+    selectedIn && columnIds.includes(selectedIn) ? selectedIn : null;
+  const currentColumn = selectionColumn ?? todayId;
 
   // --- Board motion -------------------------------------------------------
   // After every render: the closing sheet leaves the row, the columns that
@@ -331,13 +333,17 @@ export function WideApp({
     const pending = pendingFocus.current;
     if (!pending || !columnIds.includes(pending.column)) return;
     const row =
-      pending.target === "row"
+      pending.target === "row" && pending.rowId
         ? columnRows(pending.column).find(
             (r) => r.dataset.rowId === pending.rowId,
           )
         : undefined;
-    if (pending.target === "row" && !row) return;
+    if (pending.target === "row" && pending.rowId && !row) return;
     pendingFocus.current = null;
+    if (pending.target === "row") {
+      focusColumn(pending.column, undefined, pending.rowId);
+      return;
+    }
     const section = document.querySelector<HTMLElement>(
       `[data-column="${CSS.escape(pending.column)}"]`,
     );
@@ -345,6 +351,7 @@ export function WideApp({
     if (section && !(row && sheetColumn === pending.column)) {
       revealColumn(section);
     }
+    if (pending.target === "reveal") return;
     const target =
       row ??
       (pending.target === "composer"
@@ -378,8 +385,8 @@ export function WideApp({
         : undefined;
     // Only an explicit `/this-week` moves focus; `/` leaves the page alone.
     if (!view || !id) return;
-    // A list that's gone: back to `/`.
-    if (!focusColumn(id) && urlKey.startsWith("list:")) {
+    // A list that's gone: back to `/`. A hidden one shows again.
+    if (!goTo(id) && urlKey.startsWith("list:")) {
       appliedUrlKey.current = boardViewKey(null, lists);
       onNavigate?.(null);
     }
@@ -473,8 +480,79 @@ export function WideApp({
     requestAnimationFrame(() => selectedRow()?.focus());
   };
 
+  // --- Hidden columns -------------------------------------------------------
+  // Your lists' columns can be hidden from the sidebar, the ⋯ menu and the
+  // palette. The list stays in the sidebar, muted, and going to it from
+  // anywhere shows its column again.
+
+  /**
+   * Take your list's column off the board. From the board (its ⋯ menu, the
+   * palette) the keyboard moves to the column before it; from the sidebar it
+   * stays there. Either way the selection and an open todo leave with it.
+   */
+  const hideColumn = (list: SerializedList, from: "board" | "sidebar") => {
+    const at = columnIds.indexOf(list.id);
+    if (list.systemKind || at === -1) return;
+    const before = columnIds[at - 1];
+    if (detailTodo?.listId === list.id) setDetailId(null);
+    if (selectionColumn === list.id) setSelectedId(null);
+    if (from === "board" && before) focusColumn(before);
+    else if (urlColumn === list.id) setUrlColumn(before ?? null);
+    updateList.mutate({ id: list.id, input: { columnHidden: true } });
+  };
+
+  /**
+   * Bring a hidden column back in its place, then go to it (`row`: as
+   * `focusColumn`, at `rowId`) or only scroll it into view (`reveal`).
+   */
+  const showColumn = (
+    list: SerializedList,
+    target: "row" | "reveal",
+    rowId?: string,
+  ) => {
+    pendingFocus.current = { column: list.id, target, rowId };
+    updateList.mutate(
+      { id: list.id, input: { columnHidden: false } },
+      {
+        onError: () => {
+          if (pendingFocus.current?.column === list.id) {
+            pendingFocus.current = null;
+          }
+        },
+      },
+    );
+  };
+
+  /** Right-click in the sidebar, or the palette: Hide or Show column. */
+  const toggleColumn = (list: SerializedList, from: "board" | "sidebar") => {
+    if (list.columnHidden)
+      showColumn(list, from === "board" ? "row" : "reveal");
+    else hideColumn(list, from);
+  };
+
+  /**
+   * Go to a list's column, at `rowId` if given, showing it first if it's
+   * hidden. False when there's no such list.
+   */
+  const goTo = (listId: string, rowId?: string) => {
+    const hidden = collections.find((l) => l.id === listId && l.columnHidden);
+    if (!hidden) return focusColumn(listId, undefined, rowId);
+    showColumn(hidden, "row", rowId);
+    return true;
+  };
+
+  // A hidden column takes its open todo's sheet with it, wherever it was
+  // hidden (another window included).
+  useEffect(() => {
+    const list = detailTodo
+      ? collections.find((l) => l.id === detailTodo.listId)
+      : undefined;
+    if (list?.columnHidden) setDetailId(null);
+  }, [detailTodo, collections]);
+
   // --- Sidebar --------------------------------------------------------------
-  // Every list is on the board: an entry scrolls to its column and goes in.
+  // Every list you haven't hidden is on the board: an entry scrolls to its
+  // column and goes in. A hidden list's entry shows its column first.
 
   /** Done: its column, closing the open todo. */
   const showDone = (rowId?: string) => {
@@ -506,7 +584,7 @@ export function WideApp({
 
   /** "View" on an "Added to …" toast. */
   const viewList = (listId: string) => {
-    focusColumn(listId);
+    goTo(listId);
   };
 
   // --- Keyboard -------------------------------------------------------------
@@ -517,13 +595,13 @@ export function WideApp({
     if (target.kind === "done") return showDone(rowId);
     const list =
       target.kind === "list" ? collections[target.index] : byKind[target.list];
-    if (list) focusColumn(list.id, undefined, rowId);
+    if (list) goTo(list.id, rowId);
   };
 
   /** A todo chosen in the palette: its column, and it. */
   const goToTodo = (todo: TodoWithUrls) => {
     if (todo.completed) return showDone(todo.id);
-    focusColumn(todo.listId, undefined, todo.id);
+    goTo(todo.listId, todo.id);
   };
 
   const board = createBoard({
@@ -601,9 +679,13 @@ export function WideApp({
           !actions.hidden.has(t.id) && !actions.hiddenLists.has(t.listId),
         listName,
         selected: todoById(selectedId) ?? null,
+        columnList:
+          collections.find((l) => l.id === (selectionColumn ?? urlColumn)) ??
+          null,
+        toggleColumn: (list) => toggleColumn(list, "board"),
         admin: canSendFeedback,
         board,
-        goToColumn: (list) => focusColumn(list.id),
+        goToColumn: (list) => goTo(list.id),
         showDone: () => showDone(),
         goToTodo,
         moveTodo: (todo, listId) => moveTodo(todo, listId),
@@ -723,6 +805,7 @@ export function WideApp({
             ? undefined
             : (name) => updateList.mutate({ id: list.id, input: { name } })
         }
+        onHide={kind ? undefined : () => hideColumn(list, "board")}
         onDelete={kind ? undefined : () => deleteList(list)}
         icon={
           kind ? undefined : (
@@ -852,7 +935,8 @@ export function WideApp({
           selectionColumn={selectionColumn}
           doneCount={doneCount}
           onTimeList={(list) => focusColumn(list.id)}
-          onCollection={(list) => focusColumn(list.id)}
+          onCollection={(list) => goTo(list.id)}
+          onToggleColumn={(list) => toggleColumn(list, "sidebar")}
           onCreateList={addList}
           onDone={() => showDone()}
           onSettings={() => setSettings(true)}

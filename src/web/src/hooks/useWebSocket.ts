@@ -11,6 +11,8 @@ import { WS_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 
 const TODOS_QUERY_KEY = ["todos"];
+// Lists change too (a rename, a column hidden on another computer).
+const LISTS_QUERY_KEY = ["lists"];
 
 const MAX_RECONNECT_DELAY = 30_000;
 const INITIAL_RECONNECT_DELAY = 1_000;
@@ -79,6 +81,7 @@ export function useWebSocketConnection(): WebSocketSync {
             const data = JSON.parse(event.data);
             if (data.type === "sync") {
               queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+              queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
             }
           } catch (error) {
             Sentry.captureException(error, {

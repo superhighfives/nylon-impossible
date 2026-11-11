@@ -37,6 +37,7 @@ export function useCreateList() {
         kind: "custom",
         systemKind: null,
         position: input.position ?? "a0",
+        columnHidden: false,
         createdAt: now,
         updatedAt: now,
       };
@@ -91,6 +92,9 @@ export function useUpdateList() {
                   ...(input.name !== undefined && { name: input.name }),
                   ...(input.position !== undefined && {
                     position: input.position,
+                  }),
+                  ...(input.columnHidden !== undefined && {
+                    columnHidden: input.columnHidden,
                   }),
                 }
               : list,

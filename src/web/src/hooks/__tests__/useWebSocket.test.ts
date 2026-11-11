@@ -198,6 +198,25 @@ describe("useWebSocketConnection", () => {
     );
   });
 
+  it("invalidates the lists query when a sync message is received", async () => {
+    const { queryClient, Wrapper } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+
+    renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+    await flushEffects();
+
+    act(() => {
+      lastCreatedWs?.simulateOpen();
+      invalidateSpy.mockClear();
+      lastCreatedWs?.simulateMessage({ type: "sync" });
+    });
+
+    // A column hidden on another computer leaves this board too.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["lists"] }),
+    );
+  });
+
   it("does not invalidate the query for messages with unknown types", async () => {
     const { queryClient, Wrapper } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
