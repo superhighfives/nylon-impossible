@@ -35,6 +35,7 @@ import {
   useUpdateTodo,
   useUpdateUrlPreview,
 } from "@/hooks/useTodos";
+import { byPosition } from "@/lib/dragOrder";
 import { getUrlDisplay } from "@/lib/url-display";
 import type { SerializedTodoUrl, TodoWithUrls } from "@/types/database";
 import { Calendar } from "./Calendar";
@@ -629,20 +630,14 @@ function Subtasks({
   const deleteTodo = useDeleteTodo();
   const [draft, setDraft] = useState("");
   const sorted = [...subtasks].sort((a, b) =>
-    a.completed !== b.completed
-      ? a.completed
-        ? 1
-        : -1
-      : a.position.localeCompare(b.position),
+    a.completed !== b.completed ? (a.completed ? 1 : -1) : byPosition(a, b),
   );
   const done = subtasks.filter((s) => s.completed).length;
 
   const add = () => {
     const title = draft.trim();
     if (!title) return;
-    const last = [...subtasks].sort((a, b) =>
-      a.position.localeCompare(b.position),
-    )[subtasks.length - 1];
+    const last = [...subtasks].sort(byPosition)[subtasks.length - 1];
     createTodo.mutate({
       title,
       parentId: parent.id,
@@ -783,9 +778,7 @@ function Links({
   const addUrl = useAddTodoUrl();
   const [draft, setDraft] = useState("");
   const [invalid, setInvalid] = useState(false);
-  const urls = [...todo.urls].sort((a, b) =>
-    a.position.localeCompare(b.position),
-  );
+  const urls = [...todo.urls].sort(byPosition);
   const errorId = `link-error-${todo.id}`;
 
   const add = () => {

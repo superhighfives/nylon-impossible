@@ -15,6 +15,7 @@ import {
   parseTodoDate,
   type Recurrence,
 } from "@nylon-impossible/shared";
+import { byPosition } from "@/lib/dragOrder";
 import {
   getFetchedPreviewTitle,
   isPlaceholderTitle,
@@ -132,9 +133,7 @@ export function rowMeta(
     parts.push({ kind: "subtasks", text: `${done}/${subtasks.length}` });
   }
   if (todo.notes?.trim()) parts.push({ kind: "notes", text: "Notes" });
-  const firstLink = [...todo.urls].sort((a, b) =>
-    a.position.localeCompare(b.position),
-  )[0];
+  const firstLink = [...todo.urls].sort(byPosition)[0];
   if (firstLink) {
     parts.push({
       kind: "link",
@@ -242,7 +241,7 @@ export function openRows(
     )
     .sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
-      return a.position < b.position ? -1 : a.position > b.position ? 1 : 0;
+      return byPosition(a, b);
     });
 }
 
@@ -329,7 +328,7 @@ export function splitLists(lists: SerializedList[] | undefined): {
     if (list.systemKind) byKind[list.systemKind] = list;
     else collections.push(list);
   }
-  collections.sort((a, b) => a.position.localeCompare(b.position));
+  collections.sort(byPosition);
   return { byKind, collections };
 }
 
