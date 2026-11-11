@@ -23,6 +23,7 @@ export function useCreateList() {
   const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
+    mutationKey: LISTS_QUERY_KEY,
     mutationFn: (input: CreateListInput) => createList({ data: input }),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: LISTS_QUERY_KEY });
@@ -75,6 +76,7 @@ export function useUpdateList() {
   const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
+    mutationKey: LISTS_QUERY_KEY,
     mutationFn: ({ id, input }: { id: string; input: UpdateListInput }) =>
       updateList({ data: { id, input } }),
     onMutate: async ({ id, input }) => {
@@ -123,6 +125,7 @@ export function useDeleteList() {
   const { notifyChanged } = useWebSocketSync();
 
   return useMutation({
+    mutationKey: LISTS_QUERY_KEY,
     mutationFn: (id: string) => deleteList({ data: id }),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: LISTS_QUERY_KEY });

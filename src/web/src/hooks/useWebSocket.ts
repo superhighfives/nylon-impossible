@@ -81,7 +81,12 @@ export function useWebSocketConnection(): WebSocketSync {
             const data = JSON.parse(event.data);
             if (data.type === "sync") {
               queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-              queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+              // While a list change of ours is in flight, a refetch could
+              // land before it's saved and undo its optimistic update (a
+              // hidden column flashing back). Its onSettled refetches anyway.
+              if (!queryClient.isMutating({ mutationKey: LISTS_QUERY_KEY })) {
+                queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+              }
             }
           } catch (error) {
             Sentry.captureException(error, {

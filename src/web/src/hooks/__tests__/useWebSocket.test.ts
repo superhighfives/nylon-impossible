@@ -217,6 +217,30 @@ describe("useWebSocketConnection", () => {
     );
   });
 
+  it("leaves lists alone on sync while a list change is in flight", async () => {
+    const { queryClient, Wrapper } = createWrapper();
+    const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");
+    vi.spyOn(queryClient, "isMutating").mockReturnValue(1);
+
+    renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+    await flushEffects();
+
+    act(() => {
+      lastCreatedWs?.simulateOpen();
+      invalidateSpy.mockClear();
+      lastCreatedWs?.simulateMessage({ type: "sync" });
+    });
+
+    // The hide's own onSettled refetches lists; an earlier refetch could
+    // bring the column back before the hide is saved.
+    expect(invalidateSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["todos"] }),
+    );
+    expect(invalidateSpy).not.toHaveBeenCalledWith(
+      expect.objectContaining({ queryKey: ["lists"] }),
+    );
+  });
+
   it("does not invalidate the query for messages with unknown types", async () => {
     const { queryClient, Wrapper } = createWrapper();
     const invalidateSpy = vi.spyOn(queryClient, "invalidateQueries");

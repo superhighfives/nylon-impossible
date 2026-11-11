@@ -1,3 +1,4 @@
+import { serializeList as serializeSharedList } from "@nylon-impossible/shared/serialize";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { and, count, eq, getDb, lists, todos } from "../lib/db";
@@ -7,17 +8,7 @@ import { notifySync } from "../lib/notify-sync";
 import type { Env } from "../types";
 
 function serializeList(list: typeof lists.$inferSelect) {
-  return {
-    id: list.id.toLowerCase(),
-    userId: list.userId,
-    name: list.name,
-    kind: list.kind,
-    systemKind: list.systemKind,
-    position: list.position,
-    columnHidden: list.columnHidden ?? false,
-    createdAt: list.createdAt.toISOString(),
-    updatedAt: list.updatedAt.toISOString(),
-  };
+  return { ...serializeSharedList(list), id: list.id.toLowerCase() };
 }
 
 // GET /lists - all of the user's lists (system + custom), position order

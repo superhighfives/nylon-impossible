@@ -1,5 +1,6 @@
+import { serializeList } from "@nylon-impossible/shared/serialize";
 import { describe, expect, it } from "vitest";
-import { listUpdates, serializeList } from "../listShape";
+import { listUpdates } from "../listShape";
 import type { List } from "../schema";
 
 const at = new Date("2026-11-11T09:30:00.000Z");

@@ -4,6 +4,7 @@
  * for the Worker REST API.
  */
 
+import { serializeList } from "@nylon-impossible/shared/serialize";
 import { createServerFn } from "@tanstack/react-start";
 import { and, count, eq } from "drizzle-orm";
 import { Effect } from "effect";
@@ -13,7 +14,7 @@ import {
   SystemListImmutableError,
   ValidationError,
 } from "@/lib/errors";
-import { listUpdates, serializeList } from "@/lib/listShape";
+import { listUpdates } from "@/lib/listShape";
 import { lists, todos } from "@/lib/schema";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import { createListSchema, updateListSchema } from "@/lib/validation";
