@@ -65,6 +65,16 @@
     // a secret — `wrangler secret put`.
     "FEEDBACK_REPO": "superhighfives/nylon-impossible",
   },
+  // Per-token rate limit for the public /v1 API (60 requests a minute), keyed
+  // on the personal API token's id. Counted per Cloudflare location, so it's
+  // approximate: a cheap guard that sets the 429 contract.
+  "ratelimits": [
+    {
+      "name": "V1_RATE_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 60, "period": 60 },
+    },
+  ],
   "observability": {
     "enabled": true,
   },
@@ -112,6 +122,13 @@
         },
       ],
     },
+    "ratelimits": [
+      {
+        "name": "V1_RATE_LIMIT",
+        "namespace_id": "1001",
+        "simple": { "limit": 60, "period": 60 },
+      },
+    ],
     "observability": {
       "enabled": true,
     },

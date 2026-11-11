@@ -3,6 +3,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { deleteUserAsAdmin, listUsers } from "./handlers/admin";
+import {
+  createApiToken,
+  deleteApiToken,
+  getApiToken,
+} from "./handlers/api-token";
 import { submitFeedback } from "./handlers/feedback";
 import {
   gmailAddonAddFromMessage,
@@ -24,13 +29,16 @@ import {
 } from "./handlers/todo-urls";
 import { getTodo, listTodos } from "./handlers/todos";
 import { deleteMe, getMe, updateMe } from "./handlers/users";
+import { v1List, v1Lists, v1ListTodos, v1Todo } from "./handlers/v1";
 import { clerkWebhook } from "./handlers/webhooks";
 import { verifyGoogleIdToken } from "./lib/addon-auth";
+import { tokenMiddleware } from "./lib/api-token";
 import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
 import { runListSweep } from "./lib/list-sweep";
 import { withRetry } from "./lib/retry";
+import { beforeSend } from "./lib/sentry";
 import type { Env } from "./types";
 
 export { UserSync } from "./durable-objects/UserSync";
@@ -99,6 +107,10 @@ app.use("/users/*", authMiddleware);
 app.use("/admin/*", authMiddleware, requireAdmin);
 app.use("/feedback", authMiddleware, requireAdmin);
 
+// The public read-only API: personal API tokens only, never a session token
+// (and the routes above never take a personal token). See handlers/v1.ts.
+app.use("/v1/*", tokenMiddleware);
+
 // Clerk webhooks (Svix signature is the auth — NOT wrapped in authMiddleware)
 app.post("/webhooks/clerk", clerkWebhook);
 
@@ -136,6 +148,16 @@ app.delete("/lists/:id", deleteList);
 app.get("/users/me", getMe);
 app.patch("/users/me", updateMe);
 app.delete("/users/me", deleteMe);
+// The personal API token, managed from web Settings.
+app.get("/users/me/api-token", getApiToken);
+app.post("/users/me/api-token", createApiToken);
+app.delete("/users/me/api-token", deleteApiToken);
+
+// Public read-only API, v1. Only grows; a breaking change ships as /v2.
+app.get("/v1/lists", v1Lists);
+app.get("/v1/lists/:id", v1List);
+app.get("/v1/lists/:id/todos", v1ListTodos);
+app.get("/v1/todos/:id", v1Todo);
 
 // Admin endpoints
 app.get("/admin/users", listUsers);
@@ -182,11 +204,7 @@ export default Sentry.withSentry<Env["Bindings"]>(
     dsn: env.SENTRY_DSN,
     environment: env.ENVIRONMENT ?? "production",
     tracesSampleRate: 0.1,
-    beforeSend(event) {
-      // Strip request body from events (may contain todo titles — PII)
-      if (event.request?.data) delete event.request.data;
-      return event;
-    },
+    beforeSend,
   }),
   handler,
 );
