@@ -98,6 +98,11 @@ and the foreman moves it to **Ready** (a `spec_settled` event) so the build
 pass takes it. One run per tick, and one per reply, even if it fails: the id
 of the reply it answered is kept in `~/.foreman/specs/<issue>`.
 
+A spec can also settle without a run, when the owner edits **Open
+questions** to "None." in the body. Every tick, the foreman checks the spec
+column for those and moves them to Ready the same way. It skips one with a
+reply no run has answered yet, since that run comes first.
+
 ## Feedback
 
 Reports from the apps' **Send feedback** are issues labelled `feedback` and

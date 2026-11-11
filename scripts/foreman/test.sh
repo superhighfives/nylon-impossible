@@ -611,6 +611,27 @@ expect "an open feedback spec gets needs-decision" "yes" "$(grep -qF -- '--add-l
 calls=$(outcome "$SPEC_OK" "kind:fix,spec,feedback")
 expect "a settled one loses it, and goes to Ready" "yes yes" "$(grep -qF -- '--remove-label needs-decision' <<<"$calls" && echo yes || echo no) $(grep -qxF 'set_status 11 Ready' <<<"$calls" && echo yes || echo no)"
 
+echo "settled specs outside a spec run"
+SETTLE_BOARD=$(jq -c '.items.nodes += [
+  {id:"I23", status:{name:"Specced"}, content:{__typename:"Issue", number:23, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"},{name:"needs-decision"}]}}},
+  {id:"I24", status:{name:"Specced"}, content:{__typename:"Issue", number:24, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"},{name:"needs-decision"},{name:"feedback"}]}}},
+  {id:"I25", status:{name:"Specced"}, content:{__typename:"Issue", number:25, state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[]}}}]' <<<"$AUTHOR_BOARD")
+expect "candidates: spec column only, needs-decision only on feedback" "14 20 24" "$(settled_specs "$SETTLE_BOARD" | paste -sd' ' -)"
+settle() { # body seen-id comment-ids -> settle_pass's calls on a board with only #14
+  ( SPEC_BODY="$1" SPEC_LABELS="spec" COMMENT_IDS="$3"; : > "$CALLS"
+    rm -rf "$SPECS"; mkdir -p "$SPECS"; [ -z "$2" ] || echo "$2" > "$SPECS/14"
+    settled_specs() { echo 14; }
+    set_status() { echo "set_status $2 $3" >> "$CALLS"; }
+    settle_pass "$BOARD" >/dev/null; cat "$CALLS" )
+}
+expect "an answered spec that reads None. goes to Ready"   "yes" "$(grep -qxF 'set_status 14 Ready' <<<"$(settle "$SPEC_OK" 502 "501 502")" && echo yes || echo no)"
+expect "one with open questions stays"                     "no"  "$(grep -qF 'set_status' <<<"$(settle "${SPEC_OK/None./1. Which?}" 502 "502")" && echo yes || echo no)"
+expect "one with an unanswered reply is spec_pass's"       "no"  "$(grep -qF 'set_status' <<<"$(settle "$SPEC_OK" 501 "501 502")" && echo yes || echo no)"
+expect "and so is one never drafted"                       "no"  "$(grep -qF 'set_status' <<<"$(settle "$SPEC_OK" "" "")" && echo yes || echo no)"
+DRY=1
+expect "a dry run only says so"                            "no"  "$(grep -qF 'set_status' <<<"$(settle "$SPEC_OK" 502 "502")" && echo yes || echo no)"
+DRY=0
+
 echo "drafts in the spec column"
 
 DRAFT_BOARD=$(jq -c '.items.nodes = [

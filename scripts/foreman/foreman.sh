@@ -839,6 +839,35 @@ spec_pass() { # board_json -> drafts or revises at most one spec: a new one, or 
   done
 }
 
+# spec_outcome only runs after a spec run, so a spec that reads "None." some
+# other way (the owner edits the body, or it settled before the move existed:
+# #616, #618) would wait in the spec column. This catches those. One that
+# spec_pass would run on (never drafted, or an unanswered reply) is left to
+# it, and one with needs-decision is waiting on the owner, unless it's
+# feedback, whose spec carries the label until it settles.
+settled_specs() { # board_json -> spec issues in the spec column that could be settled, in board order
+  jq -r --arg owner "$OWNER" --arg agent "$AGENT" --arg col "$SPEC_COL" '
+    .items.nodes[]
+    | select(.status.name == $col and .content.__typename == "Issue" and .content.state == "OPEN")
+    | select(.content.author.login == $owner or .content.author.login == $agent)
+    | select([.content.labels.nodes[].name] | index("spec") and ((index("needs-decision") | not) or index("feedback")))
+    | .content.number' <<<"$1"
+}
+
+settle_pass() { # board_json -> moves each settled spec to Ready
+  local board="$1" n issue labels last seen
+  for n in $(settled_specs "$board"); do
+    issue=$(gh issue view "$n" -R "$OWNER/$REPO" --json body,labels) || continue
+    labels=$(jq -r '[.labels[].name] | join(",")' <<<"$issue")
+    [ -z "$(jq -r .body <<<"$issue" | spec_problems "$labels")" ] || continue
+    last=$(owner_last_comment "$n") || continue
+    seen=$(cat "$SPECS/$n" 2>/dev/null || true)
+    [ "$last" = "$seen" ] || continue # otherwise spec_pass has a run to do
+    if dry; then log "would move #$n to Ready: its spec is settled"; continue; fi
+    spec_outcome "$board" "$n"
+  done
+}
+
 # A spec run only writes the issue. The prompt says so, and this backs it up,
 # since the run holds the machine account's token.
 SPEC_DENY=("Bash(git push *)" "Bash(git commit *)" "Bash(git reset --hard *)"
@@ -2180,6 +2209,7 @@ cmd_tick() {
   # next tick, one per tick, from a board that shows them as issues.
   convert_drafts "$board"
   label_unspecced "$board"
+  settle_pass "$board"
   spec_pass "$board"
   routines_pass "$board"
   shots_pass
