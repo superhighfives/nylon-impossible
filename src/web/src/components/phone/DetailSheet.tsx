@@ -107,6 +107,8 @@ export interface DetailSheetProps {
   subtasks: TodoWithUrls[];
   listTargets: { id: string; label: string }[];
   listName: (id: string) => string;
+  /** The list inside a sentence: "In this week". */
+  listInSentence: (id: string) => string;
   timeZone: string;
   actions: TodoActions;
   onClose: () => void;
@@ -201,6 +203,7 @@ function DetailBody({
   subtasks,
   listTargets,
   listName,
+  listInSentence,
   timeZone,
   actions,
   onClose,
@@ -424,7 +427,7 @@ function DetailBody({
             {/* A todo, at a glance: the shape of a row's checkbox, where
                 your list's column has the list icon. */}
             <Circle size={16} aria-hidden="true" data-icon="todo" />
-            <span className="truncate">In {listName(todo.listId)}</span>
+            <span className="truncate">In {listInSentence(todo.listId)}</span>
           </p>
           <div className="absolute top-3 right-4">
             <Dialog.Close aria-label="Close" className={ICON_BUTTON}>

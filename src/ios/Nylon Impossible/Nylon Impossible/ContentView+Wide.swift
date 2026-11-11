@@ -519,11 +519,11 @@ extension ContentView {
         switch kind {
         case .today:
             let waiting = count(.thisWeek)
-            let link = timeList(.thisWeek).map { list in ("\(waiting) waiting in This week", { focusColumn(list.id) }) }
+            let link = timeList(.thisWeek).map { list in ("\(waiting) waiting in this week", { focusColumn(list.id) }) }
             return ("Nothing today.", waiting > 0 ? link : nil)
         case .thisWeek:
             let waiting = count(.someday)
-            let link = timeList(.someday).map { list in ("\(waiting) waiting in Someday", { focusColumn(list.id) }) }
+            let link = timeList(.someday).map { list in ("\(waiting) waiting in someday", { focusColumn(list.id) }) }
             return ("A clear week.", waiting > 0 ? link : nil)
         case .someday:
             return ("Nothing here yet.", nil)
@@ -542,7 +542,7 @@ extension ContentView {
         let created = actions.add(draft: text, to: listId, parseDates: parseDates, userId: authService.userId)
         noteAdded(created, to: listId)
         guard !created.isEmpty, let listId, listId != columnId else { return }
-        let name = orderedLists.first { $0.id == listId }?.name ?? "List"
+        let name = orderedLists.first { $0.id == listId }?.nameInSentence ?? "List"
         let message = created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)"
         actions.toasts.show(message, actionLabel: "View") {
             showColumn(listId)

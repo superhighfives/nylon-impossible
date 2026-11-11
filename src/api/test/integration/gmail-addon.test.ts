@@ -444,10 +444,10 @@ describe("Gmail add-on", () => {
       const card = body.action.navigations[0].pushCard;
 
       expect(section(card, "Today").widgets[0].textParagraph.text).toBe(
-        "Nothing today. 1 waiting in This week.",
+        "Nothing today. 1 waiting in this week.",
       );
       expect(section(card, "Someday · 0").widgets[0].textParagraph.text).toBe(
-        "Nothing in Someday.",
+        "Nothing in someday.",
       );
     });
 
@@ -488,7 +488,7 @@ describe("Gmail add-on", () => {
       const today = section(card, "Today");
       expect(rowTitles(today)).toHaveLength(8);
       const more = today.widgets.at(-1).decoratedText;
-      expect(more.text).toBe("4 more in Today");
+      expect(more.text).toBe("4 more in today");
       expect(more.button.onClick.openLink.url).toMatch(/^https?:\/\//);
     });
   });
@@ -605,7 +605,7 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       // Action responses update the card and flash a toast.
       expect(body.renderActions.action.notification.text).toBe(
-        "Added to Today",
+        "Added to today",
       );
 
       const db = getDb(env.DB);
@@ -629,7 +629,7 @@ describe("Gmail add-on", () => {
       });
       const body = await res.json<any>();
       expect(body.renderActions.action.notification.text).toBe(
-        "Added to Today · due Tomorrow",
+        "Added to today · due Tomorrow",
       );
 
       const [row] = await getDb(env.DB)
@@ -660,6 +660,43 @@ describe("Gmail add-on", () => {
         .from(todos)
         .where(eq(todos.userId, "user_test_123"));
       expect(row.listId).toBe(somedayId);
+    });
+
+    it("quick-add to one of your lists names it as written, even one called Today", async () => {
+      await linkUser();
+      const db = getDb(env.DB);
+      await db.insert(lists).values([
+        {
+          id: "list-groceries",
+          userId: "user_test_123",
+          name: "Groceries",
+          kind: "custom",
+          position: "a5",
+        },
+        {
+          id: "list-mine",
+          userId: "user_test_123",
+          name: "Today",
+          kind: "custom",
+          position: "a6",
+        },
+      ]);
+      const token = await idToken();
+      for (const [listId, toast] of [
+        ["list-groceries", "Added to Groceries"],
+        ["list-mine", "Added to Today"],
+      ]) {
+        const res = await post("/gmail-addon/actions/quick-add", token, {
+          commonEventObject: {
+            formInputs: {
+              todoText: { stringInputs: { value: ["Buy stamps"] } },
+              listId: { stringInputs: { value: [listId] } },
+            },
+          },
+        });
+        const body = await res.json<any>();
+        expect(body.renderActions.action.notification.text).toBe(toast);
+      }
     });
 
     it("falls back to Today when the selected list isn't the user's own", async () => {
@@ -862,6 +899,25 @@ describe("Gmail add-on", () => {
       );
     });
 
+    it("toggle on a repeat that moves on says which list, lowercase", async () => {
+      await linkUser();
+      const todoId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeef";
+      await seedTodo(todoId, "user_test_123", {
+        title: "Call Mum",
+        dueDate: dueIn(0),
+        recurrence: { frequency: "weekly" },
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/toggle", token, {
+        commonEventObject: { parameters: { todoId } },
+      });
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toMatch(
+        /^Done · next .+, in this week$/,
+      );
+    });
+
     it("keeps a ticked todo on the card, struck through, until unticked", async () => {
       await linkUser();
       const todoId = "55555555-5555-5555-5555-555555555555";
@@ -894,7 +950,7 @@ describe("Gmail add-on", () => {
 
       // Untick: not done again.
       body = await (await toggle()).json<any>();
-      expect(body.renderActions.action.notification.text).toBe("Back in Today");
+      expect(body.renderActions.action.notification.text).toBe("Back in today");
       card = body.renderActions.action.navigations[0].updateCard;
       today = section(card, "Today");
       expect(today.header).toBe("Today · 2");
@@ -996,7 +1052,7 @@ describe("Gmail add-on", () => {
       const card = body.renderActions.action.navigations[0].updateCard;
       expect(card.header.title).toBe("Add to Nylon");
       const added = card.sections[0];
-      expect(added.header).toBe("Added to Today");
+      expect(added.header).toBe("Added to today");
       expect(added.widgets[0].decoratedText.text).toBe("Reply to Sam");
       const [open, undo] = added.widgets[1].buttonList.buttons;
       expect(open.text).toBe("Open in Nylon");

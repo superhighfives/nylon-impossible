@@ -114,9 +114,10 @@ final class TodoActions {
         allTodos().filter { $0.parentId == todo.id && !$0.isSoftDeleted }
     }
 
-    func listName(_ listId: String?) -> String {
-        guard let listId else { return "Today" }
-        return allLists().first { $0.id.lowercased() == listId.lowercased() }?.name ?? "List"
+    /// A list's name inside a toast: "Moved to this week", "Moved to Groceries".
+    func listNameInSentence(_ listId: String?) -> String {
+        guard let listId else { return SystemListKind.today.nameInSentence }
+        return allLists().first { $0.id.lowercased() == listId.lowercased() }?.nameInSentence ?? "List"
     }
 
     /// Whether a row is drawn checked: held, or a repeat already done today.
@@ -214,7 +215,7 @@ final class TodoActions {
             let label = DueLabel.text(for: next).text
             let moved = todo.listKey?.lowercased() != snapshot.listKey?.lowercased()
             text = moved
-                ? "Done · next \(label), in \(listName(todo.listKey))"
+                ? "Done · next \(label), in \(listNameInSentence(todo.listKey))"
                 : "Done · next \(label)"
         } else {
             text = "Done"
@@ -231,7 +232,7 @@ final class TodoActions {
         TodoCompletionService.toggle(todo, allTodos: allTodos(), lists: allLists())
         save()
         onMutate()
-        toasts.show("Back in \(listName(todo.listKey))", action: { [weak self] in
+        toasts.show("Back in \(listNameInSentence(todo.listKey))", action: { [weak self] in
             self?.undo(snapshot, todo: todo)
         })
     }
@@ -329,7 +330,7 @@ final class TodoActions {
             recentLists.record(listId)
         }
         guard announce else { return }
-        toasts.show("Moved to \(listName(listId))", action: { [weak self] in
+        toasts.show("Moved to \(listNameInSentence(listId))", action: { [weak self] in
             self?.undo(snapshot, todo: todo)
         })
     }

@@ -7,8 +7,8 @@
 //    "lastSweep": { "at": "2026-10-20T07:00:03.000Z",
 //                   "movedToThisWeek": 2, "movedToSomeday": 1 }   // or null
 //
-//  Today shows one quiet line about it the morning after — "2 moved to This
-//  Week, 1 to Someday overnight" — until it's dismissed or something is added
+//  Today shows one quiet line about it the morning after — "2 moved to this
+//  week, 1 to someday overnight" — until it's dismissed or something is added
 //  to Today. The rules for when it shows live in `OvernightNote`.
 //
 
@@ -89,20 +89,20 @@ extension APIUser {
 
 /// When and how Today mentions the overnight sweep.
 enum OvernightNote {
-    /// "2 moved to This week overnight", "2 moved to This week, 1 to Someday
-    /// overnight", "1 moved to Someday overnight"; nil when nothing moved.
+    /// "2 moved to this week overnight", "2 moved to this week, 1 to someday
+    /// overnight", "1 moved to someday overnight"; nil when nothing moved.
     static func text(movedToThisWeek week: Int, movedToSomeday someday: Int) -> String? {
         switch (week > 0, someday > 0) {
-        case (true, true): return "\(week) moved to This week, \(someday) to Someday overnight"
-        case (true, false): return "\(week) moved to This week overnight"
-        case (false, true): return "\(someday) moved to Someday overnight"
+        case (true, true): return "\(week) moved to this week, \(someday) to someday overnight"
+        case (true, false): return "\(week) moved to this week overnight"
+        case (false, true): return "\(someday) moved to someday overnight"
         case (false, false): return nil
         }
     }
 
     /// The note in both its forms.
     struct Line: Equatable {
-        /// "2 moved to This week, 1 to Someday overnight".
+        /// "2 moved to this week, 1 to someday overnight".
         let text: String
         /// The pill's form when `text` doesn't fit a column on one line: the
         /// total moved, "3 moved".

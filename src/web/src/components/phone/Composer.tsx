@@ -1,4 +1,8 @@
-import { splitTodoText } from "@nylon-impossible/shared";
+import {
+  type BoardTimeKind,
+  listNameInSentence,
+  splitTodoText,
+} from "@nylon-impossible/shared";
 import { ArrowUp, Calendar, Plus, X } from "lucide-react";
 import {
   type FocusEvent,
@@ -25,7 +29,13 @@ import { showActionToast } from "./useTodoActions";
 export interface ComposerTarget {
   id: string;
   label: string;
+  /** A time list's kind, so its name lowercases mid-sentence. */
+  kind?: BoardTimeKind | null;
 }
+
+/** "Add to today…", "Added to Groceries": the label inside a sentence. */
+const inSentence = (t: ComposerTarget) =>
+  listNameInSentence({ name: t.label, systemKind: t.kind });
 
 /** Keeps focus (and the keyboard) in the field when a chip is tapped. */
 const keepFocus = (e: SyntheticEvent) => e.preventDefault();
@@ -90,7 +100,9 @@ export function Composer({
     pickedTarget && targets.some((t) => t.id === pickedTarget)
       ? pickedTarget
       : currentListId;
-  const targetLabel = targets.find((t) => t.id === targetId)?.label ?? "Today";
+  const target = targets.find((t) => t.id === targetId);
+  const targetLabel = target?.label ?? "Today";
+  const targetInSentence = target ? inSentence(target) : "today";
 
   const now = new Date();
   const dueDay = keepDateWords ? null : draftDueDay(draft, { now, timeZone });
@@ -165,7 +177,8 @@ export function Composer({
       return;
     }
     if (!(isVisible ? isVisible(listId) : listId === currentListId)) {
-      const name = targets.find((t) => t.id === listId)?.label ?? "list";
+      const added = targets.find((t) => t.id === listId);
+      const name = added ? inSentence(added) : "list";
       const label =
         planned.length > 1
           ? `${plural(planned.length, "todo")} added to ${name}`
@@ -275,7 +288,7 @@ export function Composer({
     return (
       <form
         ref={rootRef}
-        aria-label={`Add a todo to ${targetLabel}`}
+        aria-label={`Add a todo to ${targetInSentence}`}
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
@@ -302,8 +315,8 @@ export function Composer({
             ref={setRefs}
             rows={1}
             value={draft}
-            aria-label={`New todo in ${targetLabel}`}
-            placeholder={`Add to ${targetLabel}…`}
+            aria-label={`New todo in ${targetInSentence}`}
+            placeholder={`Add to ${targetInSentence}…`}
             onChange={(e) => {
               setDraft(e.target.value);
               if (!e.target.value) setKeepDateWords(false);
@@ -336,7 +349,7 @@ export function Composer({
     return (
       <form
         ref={rootRef}
-        aria-label={`Add a todo to ${targetLabel}`}
+        aria-label={`Add a todo to ${targetInSentence}`}
         data-composer
         onSubmit={(e) => {
           e.preventDefault();
@@ -359,7 +372,7 @@ export function Composer({
             ref={setRefs}
             rows={1}
             value={draft}
-            aria-label={`New todo in ${targetLabel}`}
+            aria-label={`New todo in ${targetInSentence}`}
             placeholder="Add"
             onChange={(e) => {
               setDraft(e.target.value);
@@ -407,7 +420,7 @@ export function Composer({
           rows={1}
           value={draft}
           aria-label="New todo"
-          placeholder={`Add to ${targetLabel}…`}
+          placeholder={`Add to ${targetInSentence}…`}
           enterKeyHint="send"
           onChange={(e) => {
             setDraft(e.target.value);

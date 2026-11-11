@@ -28,7 +28,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 Masthead(title: "Settings", subline: "Synced across your devices")
                 section("Appearance") { appearance }
-                section("Timezone", footer: "Today moves to This week, and This week to Someday, at your local midnight. A todo gets at least a full day in Today.") {
+                section("Timezone", footer: "Today moves to this week, and this week to someday, at your local midnight. A todo gets at least a full day in today.") {
                     timezone
                 }
                 section("About") { about }

@@ -136,6 +136,7 @@ export function WideApp({
     byKind,
     collections,
     listName,
+    listInSentence,
     actions,
     subtasksOf,
     rowsFor,
@@ -752,6 +753,7 @@ export function WideApp({
       key={DONE_COLUMN}
       todos={doneTodos}
       listName={listName}
+      listInSentence={listInSentence}
       now={now}
       timeZone={timeZone}
       selectedId={selectedId}
@@ -901,6 +903,7 @@ export function WideApp({
         subtasks={sheet ? subtasksOf(sheet.todo.id) : []}
         listTargets={targets}
         listName={listName}
+        listInSentence={listInSentence}
         timeZone={timeZone}
         actions={actions}
         onClose={closeDetail}

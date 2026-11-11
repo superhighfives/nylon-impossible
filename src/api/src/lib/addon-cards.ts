@@ -16,6 +16,7 @@ import {
   type BoardView,
   boardUrl,
   dueLabel,
+  TIME_LIST_NAMES_IN_SENTENCE,
 } from "@nylon-impossible/shared";
 
 // ---------------------------------------------------------------------------
@@ -336,6 +337,16 @@ function overflowRow(text: string, url: string): Widget {
 }
 
 /**
+ * A section's name inside a sentence: a time list lowercase ("4 more in
+ * today"), chosen by the view's kind so your lists keep their names.
+ */
+function nameInSentence(name: string, view: BoardView): string {
+  return view.kind === "list" || view.kind === "lists"
+    ? name
+    : TIME_LIST_NAMES_IN_SENTENCE[view.kind];
+}
+
+/**
  * A section of tick rows, headed "Name · N" (N counts the open ones): up to
  * `limit` rows, a written `empty` line when there are none, and "N more in
  * <name>" with an Open link for the rest.
@@ -359,7 +370,10 @@ function todoSection(
   const hidden = rows.length - shown.length;
   if (hidden > 0) {
     widgets.push(
-      overflowRow(`${hidden} more in ${name}`, boardUrl(input.webUrl, view)),
+      overflowRow(
+        `${hidden} more in ${nameInSentence(name, view)}`,
+        boardUrl(input.webUrl, view),
+      ),
     );
   }
   const header = `${name} · ${rows.filter((todo) => !todo.done).length}`;
@@ -395,7 +409,7 @@ export function buildHomepageCard(
   const waiting = thisWeek.filter((todo) => !todo.done).length;
   const todayEmpty =
     waiting > 0
-      ? `Nothing today. ${waiting} waiting in This week.`
+      ? `Nothing today. ${waiting} waiting in this week.`
       : "Nothing today.";
 
   const sections: Section[] = [
@@ -443,7 +457,7 @@ export function buildHomepageCard(
     budget -= Math.min(limit, rows.length);
     return todoSection(baseUrl, input, name, view, rows, {
       limit,
-      empty: `Nothing in ${name}.`,
+      empty: `Nothing in ${nameInSentence(name, view)}.`,
       collapsed: true,
     });
   };
@@ -497,6 +511,7 @@ export const ADDON_MESSAGE_FALLBACK_TITLE = "Follow up on email";
 export interface AddonAdded {
   todoId: string;
   title: string;
+  /** As it reads in "Added to …": "today", "Groceries". */
   listName: string;
   /** Where Open in Nylon goes: the list it went into. */
   url: string;

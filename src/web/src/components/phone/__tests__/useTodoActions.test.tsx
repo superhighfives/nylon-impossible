@@ -1,3 +1,4 @@
+import { listNameInSentence } from "@nylon-impossible/shared";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,16 +31,24 @@ import {
 } from "../useTodoActions";
 import { dueIn, makeList, makeTodo, NOW, TZ } from "./fixtures";
 
-const names: Record<string, string> = {
-  "list-today": "Today",
-  "list-week": "This week",
-};
+const lists = [
+  makeList("list-today", "Today", "today"),
+  makeList("list-week", "This week", "thisWeek"),
+  makeList("list-groceries", "Groceries", null),
+  // One of yours, named like a time list: it keeps its capital
+  makeList("list-mine", "Today", null),
+];
 
 function setup(todos = [makeTodo()]) {
+  const byId = (id: string) => lists.find((l) => l.id === id);
   return renderHook(() =>
     useTodoActions({
       timeZone: TZ,
-      listName: (id) => names[id] ?? "List",
+      listName: (id) => byId(id)?.name ?? "List",
+      listInSentence: (id) => {
+        const list = byId(id);
+        return list ? listNameInSentence(list) : "List";
+      },
       allTodos: todos,
     }),
   );
@@ -131,7 +140,7 @@ describe("useTodoActions", () => {
       input: { completed: true },
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Done · next Oct 25, in This week",
+      "Done · next Oct 25, in this week",
       expect.anything(),
     );
     clickToastAction();
@@ -221,7 +230,7 @@ describe("useTodoActions", () => {
     expect(input.listId).toBe("list-week");
     expect(input.position < "a1").toBe(true);
     expect(toast.success).toHaveBeenCalledWith(
-      "Moved to This week",
+      "Moved to this week",
       expect.anything(),
     );
     clickToastAction();
@@ -229,6 +238,21 @@ describe("useTodoActions", () => {
       id: todo.id,
       input: { listId: "list-today", position: "a5" },
     });
+  });
+
+  it("a move to one of your lists names it as written", () => {
+    const todo = makeTodo();
+    const { result } = setup([todo]);
+    act(() => result.current.move(todo, "list-groceries"));
+    expect(toast.success).toHaveBeenLastCalledWith(
+      "Moved to Groceries",
+      expect.anything(),
+    );
+    act(() => result.current.move(todo, "list-mine"));
+    expect(toast.success).toHaveBeenLastCalledWith(
+      "Moved to Today",
+      expect.anything(),
+    );
   });
 
   it("pin toggles", () => {
@@ -246,6 +270,16 @@ describe("useTodoActions", () => {
     const { result } = setup([todo]);
     act(() => result.current.restore(todo));
     expect(update.mock.lastCall?.[0].input.completed).toBe(false);
+    expect(toast.success).toHaveBeenCalledWith(
+      "Back in today",
+      expect.anything(),
+    );
+  });
+
+  it("restoring to one of your lists named Today keeps its capital", () => {
+    const todo = makeTodo({ completed: true, listId: "list-mine" });
+    const { result } = setup([todo]);
+    act(() => result.current.restore(todo));
     expect(toast.success).toHaveBeenCalledWith(
       "Back in Today",
       expect.anything(),

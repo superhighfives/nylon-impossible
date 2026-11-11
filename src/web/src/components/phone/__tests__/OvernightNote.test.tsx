@@ -37,7 +37,7 @@ describe("useOvernightNote", () => {
 
   it("shows the sweep's counts on the morning after", () => {
     const { result } = renderHook(() => useOvernightNote([older], TODAY));
-    expect(result.current.text).toBe("2 moved to This week overnight");
+    expect(result.current.text).toBe("2 moved to this week overnight");
   });
 
   it("dismisses for that sweep and remembers it", () => {
@@ -98,14 +98,14 @@ describe("OvernightPill", () => {
     const onDismiss = vi.fn();
     render(
       <OvernightPill
-        text="2 moved to This week overnight"
+        text="2 moved to this week overnight"
         onSee={onSee}
         onDismiss={onDismiss}
       />,
     );
     expect(screen.getByRole("status")).toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole("button", { name: "2 moved to This week" }),
+      screen.getByRole("button", { name: "2 moved to this week" }),
     );
     expect(onSee).toHaveBeenCalled();
     await userEvent.click(

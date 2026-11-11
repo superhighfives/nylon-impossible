@@ -85,7 +85,7 @@ struct MacGeneralSettings: View {
                     }
                 }
             } footer: {
-                Text("Today moves to This week, and This week to Someday, at your local midnight. A todo gets at least a full day in Today.")
+                Text("Today moves to this week, and this week to someday, at your local midnight. A todo gets at least a full day in today.")
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }

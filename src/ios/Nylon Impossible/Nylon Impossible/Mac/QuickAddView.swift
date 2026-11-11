@@ -350,7 +350,8 @@ struct QuickAddView: View {
         text = ""
         let created = actions.add(draft: draft, to: listId, parseDates: parseDates, userId: userId)
         guard !created.isEmpty else { return }
-        let name = orderedLists.first { $0.id == (listId ?? todayList?.id) }?.name ?? "Today"
+        let name = orderedLists.first { $0.id == (listId ?? todayList?.id) }?.nameInSentence
+            ?? SystemListKind.today.nameInSentence
         actions.toasts.show(created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)", action: nil)
     }
 }

@@ -24,10 +24,10 @@ import { Composer } from "../Composer";
 import { dueIn, NOW, TZ } from "./fixtures";
 
 const TARGETS = [
-  { id: "today", label: "Today" },
-  { id: "week", label: "This week" },
-  { id: "someday", label: "Someday" },
-  { id: "groceries", label: "Groceries" },
+  { id: "today", label: "Today", kind: "today" as const },
+  { id: "week", label: "This week", kind: "thisWeek" as const },
+  { id: "someday", label: "Someday", kind: "someday" as const },
+  { id: "groceries", label: "Groceries", kind: null },
 ];
 
 function setup(currentListId = "today") {
@@ -54,7 +54,38 @@ describe("Composer", () => {
 
   it("aims at the list on screen", () => {
     const { field } = setup("week");
-    expect(field).toHaveAttribute("placeholder", "Add to This week…");
+    expect(field).toHaveAttribute("placeholder", "Add to this week…");
+  });
+
+  it("names a time list in lowercase mid-sentence, and your lists as written", async () => {
+    const user = userEvent.setup();
+    const { field } = setup("today");
+    expect(field).toHaveAttribute("placeholder", "Add to today…");
+    await user.click(field);
+    await user.click(screen.getByRole("button", { name: "Someday" }));
+    expect(field).toHaveAttribute("placeholder", "Add to someday…");
+    await user.type(field, "Learn the cello{Enter}");
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        "Added to someday",
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("keeps the capital on a list of yours named like a time list", () => {
+    render(
+      <Composer
+        currentListId="mine"
+        targets={[...TARGETS, { id: "mine", label: "Today", kind: null }]}
+        timeZone={TZ}
+        onView={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("New todo")).toHaveAttribute(
+      "placeholder",
+      "Add to Today…",
+    );
   });
 
   it("shows the list chips only while focused or drafting", async () => {

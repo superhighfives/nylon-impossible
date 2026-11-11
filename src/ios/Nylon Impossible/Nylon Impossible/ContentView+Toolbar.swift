@@ -44,7 +44,7 @@ extension ContentView {
         noteAdded(created, to: listId)
         guard !created.isEmpty, let listId,
               !boardColumns.contains(where: { $0.id.lowercased() == listId.lowercased() }) else { return }
-        let name = orderedLists.first { $0.id == listId }?.name ?? "List"
+        let name = orderedLists.first { $0.id == listId }?.nameInSentence ?? "List"
         let message = created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)"
         actions.toasts.show(message, actionLabel: "View") {
             showsQuickAdd = false

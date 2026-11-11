@@ -56,35 +56,35 @@ struct AddTaskIntentTests {
     func defaultsToToday() {
         let resolved = AddTaskIntent.resolve(TodoListEntity.today.target, lists: lists)
         #expect(resolved.listId == "T-1")
-        #expect(resolved.name == "Today")
+        #expect(resolved.nameInSentence == "today")
     }
 
     @Test("A time list resolves by kind to this account's row")
     func resolvesTimeList() {
         let resolved = AddTaskIntent.resolve(TodoListEntity.thisWeek.target, lists: lists)
         #expect(resolved.listId == "W-2")
-        #expect(resolved.name == "This week")
+        #expect(resolved.nameInSentence == "this week")
     }
 
     @Test("One of your lists resolves by id")
     func resolvesCustomList() {
         let resolved = AddTaskIntent.resolve(TodoListEntity(id: "G-4", name: "Groceries").target, lists: lists)
         #expect(resolved.listId == "G-4")
-        #expect(resolved.name == "Groceries")
+        #expect(resolved.nameInSentence == "Groceries")
     }
 
     @Test("A deleted list falls back to Today, and says so")
     func deletedListFallsBack() {
         let resolved = AddTaskIntent.resolve(.list("gone"), lists: lists)
         #expect(resolved.listId == "T-1")
-        #expect(resolved.name == "Today")
+        #expect(resolved.nameInSentence == "today")
     }
 
     @Test("Before the first sync there's no list id, and the server files it in Today")
     func noStoreYet() {
         let resolved = AddTaskIntent.resolve(.someday, lists: [])
         #expect(resolved.listId == nil)
-        #expect(resolved.name == "Today")
+        #expect(resolved.nameInSentence == "today")
     }
 
     // MARK: - Confirmation
@@ -98,8 +98,8 @@ struct AddTaskIntentTests {
         let parsed = TodoDateParser.parse("Send the invoice friday", now: now)
         let due = try #require(parsed.dueDay)
         #expect(parsed.title == "Send the invoice")
-        #expect(AddTaskIntent.confirmation(listName: "This week", dueDate: due, now: now) == "Added to This week · Due Fri")
-        #expect(AddTaskIntent.confirmation(listName: "Today", dueDate: nil, now: now) == "Added to Today")
+        #expect(AddTaskIntent.confirmation(listName: "this week", dueDate: due, now: now) == "Added to this week · Due Fri")
+        #expect(AddTaskIntent.confirmation(listName: "today", dueDate: nil, now: now) == "Added to today")
     }
 
     @Test("\"Pay rent tomorrow\" sets the due day through the composer's path")
@@ -120,6 +120,6 @@ struct AddTaskIntentTests {
         #expect(todo.title == "Pay rent")
         #expect(todo.listKey == "W-2")
         let due = try #require(todo.dueDate)
-        #expect(AddTaskIntent.confirmation(listName: destination.name, dueDate: due) == "Added to This week · Due Tomorrow")
+        #expect(AddTaskIntent.confirmation(listName: destination.nameInSentence, dueDate: due) == "Added to this week · Due Tomorrow")
     }
 }

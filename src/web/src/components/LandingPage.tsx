@@ -5,7 +5,7 @@ import { Button } from "./ui";
 
 /** The headline and subhead, kept together so they're easy to change. */
 export const LANDING_COPY = {
-  headline: "Today, This week, Someday.",
+  headline: "Today, this week, someday.",
   lead: "Nylon is a todo list shaped by time.",
   subhead:
     "Things you don't get to move along on their own, and done means gone. The same on the web, iPhone, iPad and Mac.",
@@ -17,11 +17,11 @@ export const LANDING_COPY = {
 const horizons = [
   {
     title: "Today",
-    body: "What you're doing now. Anything still here tomorrow moves on to This week by itself.",
+    body: "What you're doing now. Anything still here tomorrow moves on to this week by itself.",
   },
   {
     title: "This week",
-    body: "What's coming up. After seven days it settles into Someday, without you sorting it.",
+    body: "What's coming up. After seven days it settles into someday, without you sorting it.",
   },
   {
     title: "Someday",
@@ -60,7 +60,7 @@ const platforms = [
   },
   {
     title: "iPhone",
-    body: "Swipe to mark done, and a Today widget on your Home Screen.",
+    body: "Swipe to mark done, and a today widget on your Home Screen.",
   },
   {
     title: "iPad",
@@ -260,7 +260,7 @@ export function LandingPage() {
             <div className="hidden overflow-clip rounded-n-field border border-n-hairline sm:block">
               <Shot
                 name="board"
-                alt="Nylon on the web: Today, This week and Someday side by side, with a sidebar of lists."
+                alt="Nylon on the web: today, this week and someday side by side, with a sidebar of lists."
                 width={1600}
                 height={1000}
                 className="block h-auto w-full"
@@ -270,7 +270,7 @@ export function LandingPage() {
             <div className="mx-auto w-[72%] max-w-72 overflow-clip rounded-[14%/6.5%] border border-n-hairline bg-n-canvas sm:absolute sm:right-8 sm:bottom-6 sm:w-[30%] sm:max-w-64">
               <Shot
                 name="phone"
-                alt="Nylon on iPhone, showing Today."
+                alt="Nylon on iPhone, showing today."
                 width={660}
                 height={1434}
                 className="block h-auto w-full"

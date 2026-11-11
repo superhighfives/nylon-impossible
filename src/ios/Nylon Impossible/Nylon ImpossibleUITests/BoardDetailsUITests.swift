@@ -50,7 +50,7 @@ final class BoardDetailsUITests: NylonUITestCase {
 
     func testTheOvernightPillGoesToThisWeekAndDismisses() {
         launch("overnight")
-        let see = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "2 moved to This week")).firstMatch
+        let see = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "2 moved to this week")).firstMatch
         waitFor(see)
         see.tap()
         let selected = app.buttons.matching(NSPredicate(format: "isSelected == true AND value CONTAINS[c] 'done'")).firstMatch

@@ -71,6 +71,7 @@ export function PhoneApp({
     byKind,
     collections,
     listName,
+    listInSentence,
     actions,
     subtasksOf,
     rowsFor,
@@ -362,21 +363,21 @@ export function PhoneApp({
     );
   };
 
-  /** Written empty states: "Nothing today." and "4 waiting in This week →". */
+  /** Written empty states: "Nothing today." and "4 waiting in this week →". */
   function renderEmpty(kind: PageKey | null) {
     const next =
       kind === "today"
         ? {
             index: 1,
             kind: "thisWeek" as const,
-            name: "This week",
+            name: "this week",
             text: "Nothing today.",
           }
         : kind === "thisWeek"
           ? {
               index: 2,
               kind: "someday" as const,
-              name: "Someday",
+              name: "someday",
               text: "A clear week.",
             }
           : null;
@@ -433,6 +434,7 @@ export function PhoneApp({
           loading={loading}
           todos={todos}
           listName={listName}
+          listInSentence={listInSentence}
           timeZone={timeZone}
           onRestore={actions.restore}
         />
@@ -688,6 +690,7 @@ export function PhoneApp({
         subtasks={detailTodo ? subtasksOf(detailTodo.id) : EMPTY}
         listTargets={targets}
         listName={listName}
+        listInSentence={listInSentence}
         timeZone={timeZone}
         actions={actions}
         onClose={() => setDetailId(null)}

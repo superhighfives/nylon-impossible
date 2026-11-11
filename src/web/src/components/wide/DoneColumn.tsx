@@ -24,6 +24,7 @@ export const DONE_COLUMN = "done";
 export function DoneColumn({
   todos,
   listName,
+  listInSentence,
   now,
   timeZone,
   selectedId,
@@ -34,6 +35,8 @@ export function DoneColumn({
 }: {
   todos: TodoWithUrls[];
   listName: (id: string) => string;
+  /** The list inside a sentence: "Put “Milk” back in today". */
+  listInSentence: (id: string) => string;
   now: Date;
   timeZone: string;
   selectedId: string | null;
@@ -96,6 +99,7 @@ export function DoneColumn({
                     key={todo.id}
                     todo={todo}
                     where={listName(todo.listId)}
+                    whereInSentence={listInSentence(todo.listId)}
                     selected={selectedId === todo.id}
                     tabStop={tabStopId === todo.id}
                     onSelect={onSelect}
@@ -114,6 +118,7 @@ export function DoneColumn({
 function DoneRow({
   todo,
   where,
+  whereInSentence,
   selected,
   tabStop,
   onSelect,
@@ -121,6 +126,7 @@ function DoneRow({
 }: {
   todo: TodoWithUrls;
   where: string;
+  whereInSentence: string;
   selected: boolean;
   tabStop: boolean;
   onSelect: (todo: TodoWithUrls) => void;
@@ -140,7 +146,7 @@ function DoneRow({
         <button
           type="button"
           tabIndex={-1}
-          aria-label={`Put “${title}” back in ${where}`}
+          aria-label={`Put “${title}” back in ${whereInSentence}`}
           onClick={() => onRestore(todo)}
           className="-my-0.5 -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field n-focus-inset"
         >
@@ -153,7 +159,7 @@ function DoneRow({
           data-row-id={todo.id}
           data-row-list={DONE_COLUMN}
           tabIndex={tabStop ? 0 : -1}
-          aria-description={`Done, from ${where}. Enter puts it back.`}
+          aria-description={`Done, from ${whereInSentence}. Enter puts it back.`}
           onFocus={() => onSelect(todo)}
           // A pointer only selects; Enter and Space (a click with no
           // detail) put the todo back.

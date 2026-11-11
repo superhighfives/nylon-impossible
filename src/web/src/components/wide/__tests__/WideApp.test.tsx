@@ -496,7 +496,7 @@ describe("WideApp", () => {
       input: expect.objectContaining({ listId: "list-week" }),
     });
     expect(toast.success).toHaveBeenCalledWith(
-      "Moved to This week",
+      "Moved to this week",
       expect.anything(),
     );
     expect(focusedTitle()).toContain("Call Mum");
@@ -604,7 +604,7 @@ describe("WideApp", () => {
     press("n");
     const quick = await screen.findByRole("dialog", { name: "Quick add" });
     expect(
-      within(quick).getByRole("textbox", { name: "New todo in Someday" }),
+      within(quick).getByRole("textbox", { name: "New todo in someday" }),
     ).toBeInTheDocument();
     fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
     await act(async () => {});
@@ -790,7 +790,7 @@ describe("WideApp", () => {
 
   it("⌘K works while typing, searches todos first, and jumps to one", async () => {
     render(<WideApp />);
-    const field = screen.getByRole("textbox", { name: "New todo in Today" });
+    const field = screen.getByRole("textbox", { name: "New todo in today" });
     field.focus();
     fireEvent.keyDown(field, { key: "k", metaKey: true });
     const palette = await screen.findByRole("dialog", {
@@ -871,7 +871,7 @@ describe("WideApp", () => {
 
   it("leaves keys alone while typing", () => {
     render(<WideApp />);
-    const field = screen.getByRole("textbox", { name: "New todo in Today" });
+    const field = screen.getByRole("textbox", { name: "New todo in today" });
     field.focus();
     fireEvent.keyDown(field, { key: "j" });
     fireEvent.keyDown(field, { key: "x" });
@@ -1167,7 +1167,7 @@ describe("WideApp", () => {
     await userEvent.click(screen.getByRole("button", { name: "New todo" }));
     const popup = await screen.findByRole("dialog", { name: "Quick add" });
     expect(
-      within(popup).getByRole("textbox", { name: "New todo in Someday" }),
+      within(popup).getByRole("textbox", { name: "New todo in someday" }),
     ).toBeInTheDocument();
     expect(
       within(within(popup).getByRole("group", { name: "Add to list" }))
@@ -1179,7 +1179,7 @@ describe("WideApp", () => {
   it("the column composers have no list picker", async () => {
     render(<WideApp />);
     await userEvent.click(
-      screen.getByRole("textbox", { name: "New todo in Today" }),
+      screen.getByRole("textbox", { name: "New todo in today" }),
     );
     expect(screen.queryByRole("group", { name: "Add to list" })).toBeNull();
   });
@@ -1200,13 +1200,13 @@ describe("WideApp", () => {
       .find((s) => s.hasAttribute("data-overnight-note")) as HTMLElement;
     expect(pill.closest("header")).toBeInTheDocument();
     await userEvent.click(
-      within(pill).getByRole("button", { name: "3 moved to Someday" }),
+      within(pill).getByRole("button", { name: "3 moved to someday" }),
     );
     expect(focusedTitle()).toContain("Read Piranesi");
     await userEvent.click(
       within(pill).getByRole("button", { name: "Dismiss overnight note" }),
     );
-    expect(screen.queryByText("3 moved to Someday")).toBeNull();
+    expect(screen.queryByText("3 moved to someday")).toBeNull();
   });
 
   it("every column keeps the banner's space, so titles line up", () => {
@@ -1294,7 +1294,7 @@ describe("WideApp", () => {
     await userEvent.keyboard("{Enter}");
     const detail = screen.getByRole("dialog");
     // Built like a column: the list is the header's subline.
-    expect(within(detail).getByText("In Today")).toBeInTheDocument();
+    expect(within(detail).getByText("In today")).toBeInTheDocument();
 
     const list = within(detail).getByRole("button", { name: "List: Today" });
     expect(list).toHaveAttribute("aria-expanded", "false");

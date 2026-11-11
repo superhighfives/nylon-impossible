@@ -66,8 +66,9 @@ struct Composer: View {
 
     private var targetId: String? { chosenListId ?? currentListId }
 
+    /// "Add to today…", "Add to Groceries…": the target inside a sentence.
     private var targetName: String {
-        lists.first { $0.id == targetId }?.name ?? "Today"
+        lists.first { $0.id == targetId }?.nameInSentence ?? SystemListKind.today.nameInSentence
     }
 
     private var hasDraft: Bool {
@@ -322,7 +323,7 @@ struct Composer: View {
             ChipButton(text: list.name, isOn: list.id == targetId, strong: true) {
                 chosenListId = list.id == currentListId ? nil : list.id
             }
-            .accessibilityLabel("Add to \(list.name)")
+            .accessibilityLabel("Add to \(list.nameInSentence)")
             .id(list.id)
         }
     }

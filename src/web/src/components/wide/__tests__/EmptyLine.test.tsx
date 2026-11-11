@@ -65,6 +65,7 @@ describe("empty line", () => {
       <DoneColumn
         todos={[]}
         listName={() => "Today"}
+        listInSentence={() => "today"}
         now={NOW}
         timeZone={TZ}
         selectedId={null}
@@ -84,6 +85,7 @@ describe("empty line", () => {
       <DonePage
         todos={[]}
         listName={() => "Today"}
+        listInSentence={() => "today"}
         timeZone={TZ}
         onRestore={vi.fn()}
       />,

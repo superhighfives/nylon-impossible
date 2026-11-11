@@ -31,6 +31,7 @@ describe("DetailSheet", () => {
         subtasks={[]}
         listTargets={[]}
         listName={() => "Today"}
+        listInSentence={() => "today"}
         timeZone="UTC"
         actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
         onClose={vi.fn()}
@@ -56,6 +57,7 @@ describe("DetailSheet", () => {
         subtasks={[]}
         listTargets={[]}
         listName={() => "Today"}
+        listInSentence={() => "today"}
         timeZone="UTC"
         actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
         onClose={vi.fn()}
@@ -64,7 +66,7 @@ describe("DetailSheet", () => {
         animated={false}
       />,
     );
-    const subline = screen.getByText("In Today").parentElement;
+    const subline = screen.getByText("In today").parentElement;
     const icon = subline?.firstElementChild;
     expect(icon).toHaveAttribute("data-icon", "todo");
     expect(icon).toHaveAttribute("aria-hidden", "true");
@@ -79,6 +81,7 @@ describe("DetailSheet", () => {
         subtasks={[]}
         listTargets={[]}
         listName={() => "Today"}
+        listInSentence={() => "today"}
         timeZone="UTC"
         actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
         onClose={vi.fn()}
@@ -107,6 +110,7 @@ describe("DetailSheet", () => {
         ]}
         listTargets={[]}
         listName={() => "Today"}
+        listInSentence={() => "today"}
         timeZone="UTC"
         actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
         onClose={vi.fn()}

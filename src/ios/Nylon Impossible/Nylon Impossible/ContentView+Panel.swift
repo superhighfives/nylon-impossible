@@ -187,6 +187,6 @@ extension ContentView {
         let created = actions.add(draft: text, to: list.id, parseDates: true, userId: authService.userId)
         noteAdded(created, to: list.id)
         guard !created.isEmpty else { return }
-        actions.toasts.show(created.count > 1 ? "\(created.count) added to \(list.name)" : "Added to \(list.name)", action: nil)
+        actions.toasts.show(created.count > 1 ? "\(created.count) added to \(list.nameInSentence)" : "Added to \(list.nameInSentence)", action: nil)
     }
 }
