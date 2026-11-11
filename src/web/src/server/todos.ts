@@ -4,6 +4,11 @@
 
 import { toDueDay } from "@nylon-impossible/shared";
 import {
+  getSystemListId,
+  getUserTimezone,
+  verifyListOwnership,
+} from "@nylon-impossible/shared/queries";
+import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
@@ -21,9 +26,7 @@ import {
   TodoNotFoundError,
   ValidationError,
 } from "@/lib/errors";
-import { getSystemListId, verifyListOwnership } from "@/lib/lists";
 import { todos, todoUrls } from "@/lib/schema";
-import { getUserTimezone } from "@/lib/user-timezone";
 import { runEffect, withAuthenticatedUser } from "@/lib/utils";
 import {
   createTodoSchema,

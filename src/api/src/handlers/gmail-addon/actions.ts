@@ -1,4 +1,5 @@
 import { type BoardView, boardUrl, dueLabel } from "@nylon-impossible/shared";
+import { verifyListOwnership } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
 import {
@@ -13,7 +14,6 @@ import {
 } from "../../lib/addon-cards";
 import { createSmartTodo } from "../../lib/create-todo";
 import { and, eq, getDb, todos } from "../../lib/db";
-import { verifyListOwnership } from "../../lib/lists";
 import { notifySync } from "../../lib/notify-sync";
 import { listListsForUser, setTodoCompleted } from "../../lib/todos-core";
 import type { Env } from "../../types";

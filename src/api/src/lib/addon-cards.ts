@@ -10,7 +10,13 @@
  * HTTP-endpoint / alternate-runtime model), not Apps Script function names.
  */
 
-import { type BoardView, boardUrl, dueLabel } from "@nylon-impossible/shared";
+import {
+  BOARD_TIME_KINDS,
+  type BoardTimeKind,
+  type BoardView,
+  boardUrl,
+  dueLabel,
+} from "@nylon-impossible/shared";
 
 // ---------------------------------------------------------------------------
 // Card widget types (minimal subset we use)
@@ -162,12 +168,10 @@ export const QUICK_ADD_LIST_INPUT = "listId";
 /** Rows shown per section before the rest collapse to "N more". */
 export const ADDON_SECTION_LIMIT = 8;
 
-export type AddonSystemKind = "today" | "thisWeek" | "someday";
-
 export interface AddonListOption {
   id: string;
   name: string;
-  systemKind: AddonSystemKind | null;
+  systemKind: BoardTimeKind | null;
 }
 
 export interface AddonTodo {
@@ -198,11 +202,9 @@ export interface HomepageCardInput {
   timeZone: string;
 }
 
-const TIME_ORDER: AddonSystemKind[] = ["today", "thisWeek", "someday"];
-
 /** Today, This week, Someday, then your lists in their own order. */
 export function orderAddonLists(lists: AddonListOption[]): AddonListOption[] {
-  const time = TIME_ORDER.flatMap((kind) =>
+  const time = BOARD_TIME_KINDS.flatMap((kind) =>
     lists.filter((list) => list.systemKind === kind),
   );
   return [...time, ...lists.filter((list) => list.systemKind === null)];
@@ -384,7 +386,7 @@ export function buildHomepageCard(
 ): Card {
   const rowsFor = (id: string | undefined) =>
     id ? input.todos.filter((todo) => todo.listId === id) : [];
-  const idFor = (kind: AddonSystemKind) =>
+  const idFor = (kind: BoardTimeKind) =>
     input.lists.find((list) => list.systemKind === kind)?.id;
   const today = rowsFor(idFor("today"));
   const thisWeek = rowsFor(idFor("thisWeek"));

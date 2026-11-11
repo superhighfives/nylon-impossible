@@ -1,5 +1,5 @@
 import { DndContext, DragOverlay } from "@dnd-kit/core";
-import type { BoardView } from "@nylon-impossible/shared";
+import { BOARD_TIME_KINDS, type BoardView } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, Check, ChevronRight, Plus } from "lucide-react";
 import {
@@ -29,7 +29,6 @@ import {
   PAGES,
   type PageKey,
   plural,
-  TIME_KINDS,
   viewForKey,
 } from "./model";
 import { OvernightPill, useOvernightNote } from "./OvernightNote";
@@ -211,7 +210,7 @@ export function PhoneApp({
     (listId: string) => {
       const kind = lists?.find((l) => l.id === listId)?.systemKind;
       if (kind) {
-        goTo(TIME_KINDS.indexOf(kind));
+        goTo(BOARD_TIME_KINDS.indexOf(kind));
         return;
       }
       setCollectionId(listId);
@@ -529,7 +528,7 @@ export function PhoneApp({
             overnight.text && (
               <OvernightPill
                 text={overnight.text}
-                onSee={() => goTo(TIME_KINDS.indexOf(overnight.seeKind))}
+                onSee={() => goTo(BOARD_TIME_KINDS.indexOf(overnight.seeKind))}
                 onDismiss={overnight.dismiss}
               />
             )

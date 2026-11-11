@@ -1,7 +1,14 @@
-import { and, eq, type getDb, lists } from "./db";
+import { and, eq } from "drizzle-orm";
+import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
+import type { BoardTimeKind } from "./board-path";
+import { lists, users } from "./schema";
 
-type Db = ReturnType<typeof getDb>;
-export type SystemListKind = "today" | "thisWeek" | "someday";
+/**
+ * Any async SQLite drizzle client that can `select`: the web's
+ * `drizzle(db, { schema })` and the API's schema-less `drizzle(d1)` both fit,
+ * so neither app casts to call these.
+ */
+export type QueryDb = Pick<BaseSQLiteDatabase<"async", unknown>, "select">;
 
 /**
  * Look up one of a user's system list ids (Today/This week/Someday).
@@ -10,9 +17,9 @@ export type SystemListKind = "today" | "thisWeek" | "someday";
  * a normal case to handle gracefully.
  */
 export async function getSystemListId(
-  db: Db,
+  db: QueryDb,
   userId: string,
-  kind: SystemListKind,
+  kind: BoardTimeKind,
 ): Promise<string | null> {
   const [list] = await db
     .select({ id: lists.id })
@@ -38,7 +45,7 @@ export async function getSystemListId(
  * `userId`.
  */
 export async function verifyListOwnership(
-  db: Db,
+  db: QueryDb,
   userId: string,
   listId: string,
 ): Promise<string | null> {
@@ -47,4 +54,21 @@ export async function verifyListOwnership(
     .from(lists)
     .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
   return list?.id ?? null;
+}
+
+/**
+ * The user's IANA timezone from their settings, for deciding which calendar
+ * day "today" is (e.g. when a repeat rolls forward). Defaults to UTC, which
+ * is also the column default for accounts that never set one.
+ */
+export async function getUserTimezone(
+  db: QueryDb,
+  userId: string,
+): Promise<string> {
+  const [row] = await db
+    .select({ timezone: users.timezone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return row?.timezone ?? "UTC";
 }

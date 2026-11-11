@@ -5,6 +5,7 @@
  */
 import {
   BOARD_TIME_KINDS,
+  type BoardTimeKind,
   type BoardView,
   type DueLabel,
   dayKeyIn,
@@ -22,11 +23,7 @@ import {
   placeholderTitleForUrl,
   stripLinkedUrlsFromTitle,
 } from "@/lib/url-display";
-import type {
-  SerializedList,
-  SystemListKind,
-  TodoWithUrls,
-} from "@/types/database";
+import type { SerializedList, TodoWithUrls } from "@/types/database";
 
 /**
  * The pages the switcher pages between, in swipe order. The first four are
@@ -44,8 +41,6 @@ export const PAGES = [
 export const DONE_PAGE = PAGES.length - 1;
 
 export type PageKey = (typeof PAGES)[number]["key"];
-
-export const TIME_KINDS: SystemListKind[] = ["today", "thisWeek", "someday"];
 
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -319,10 +314,10 @@ export function mastheadSubline(
 
 /** System lists by kind, and the user's own lists in order. */
 export function splitLists(lists: SerializedList[] | undefined): {
-  byKind: Partial<Record<SystemListKind, SerializedList>>;
+  byKind: Partial<Record<BoardTimeKind, SerializedList>>;
   collections: SerializedList[];
 } {
-  const byKind: Partial<Record<SystemListKind, SerializedList>> = {};
+  const byKind: Partial<Record<BoardTimeKind, SerializedList>> = {};
   const collections: SerializedList[] = [];
   for (const list of lists ?? []) {
     if (list.systemKind) byKind[list.systemKind] = list;
@@ -410,7 +405,7 @@ export function dueChoices(now: Date, timeZone: string): DueChoice[] {
  * ages".
  */
 export function columnSubline(
-  kind: SystemListKind | null,
+  kind: BoardTimeKind | null,
   now: Date,
   timeZone: string,
 ): string {

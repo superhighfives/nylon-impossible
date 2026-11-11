@@ -1,5 +1,9 @@
 import { toDueDay } from "@nylon-impossible/shared";
 import {
+  getSystemListId,
+  getUserTimezone,
+} from "@nylon-impossible/shared/queries";
+import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
@@ -16,9 +20,7 @@ import {
   or,
   todos,
 } from "./db";
-import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
-import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];

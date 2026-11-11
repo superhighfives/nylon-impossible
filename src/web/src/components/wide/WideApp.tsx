@@ -1,5 +1,9 @@
 import { DndContext, DragOverlay, pointerWithin } from "@dnd-kit/core";
-import type { BoardView } from "@nylon-impossible/shared";
+import {
+  BOARD_TIME_KINDS,
+  type BoardTimeKind,
+  type BoardView,
+} from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { List } from "lucide-react";
 import {
@@ -20,7 +24,6 @@ import {
   boardViewKey,
   columnSubline,
   displayTitle,
-  TIME_KINDS,
 } from "@/components/phone/model";
 import {
   OvernightPill,
@@ -57,7 +60,7 @@ import { useGoSequence } from "./useGoSequence";
 import { useKeyboardModality } from "./useKeyboardModality";
 
 /** The time columns' names, known before the lists arrive. */
-const TIME_TITLES: Record<(typeof TIME_KINDS)[number], string> = {
+const TIME_TITLES: Record<BoardTimeKind, string> = {
   today: "Today",
   thisWeek: "This week",
   someday: "Someday",
@@ -176,7 +179,7 @@ export function WideApp({
 
   const now = new Date();
   const overnight = useOvernightNote(todos, byKind.today?.id);
-  const timeLists = TIME_KINDS.map((kind) => byKind[kind]).filter(
+  const timeLists = BOARD_TIME_KINDS.map((kind) => byKind[kind]).filter(
     (l): l is SerializedList => l !== undefined,
   );
   /** Every list, in the board's (and the sidebar's) order. */
@@ -350,7 +353,7 @@ export function WideApp({
   useEffect(() => {
     if (loading || urlKey === appliedUrlKey.current) return;
     appliedUrlKey.current = urlKey;
-    const kind = TIME_KINDS.find((k) => k === urlKey);
+    const kind = BOARD_TIME_KINDS.find((k) => k === urlKey);
     const id = urlKey.startsWith("list:")
       ? urlKey.slice(5)
       : kind
@@ -717,7 +720,7 @@ export function WideApp({
    * subline and banner space as the loaded column), with placeholder rows,
    * rather than Done filling the board. Nothing in it takes focus.
    */
-  const renderSkeletonColumn = (kind: (typeof TIME_KINDS)[number]) => (
+  const renderSkeletonColumn = (kind: BoardTimeKind) => (
     <Column
       key={`skeleton-${kind}`}
       listId={`skeleton-${kind}`}
@@ -824,7 +827,7 @@ export function WideApp({
             className="relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {skeleton
-              ? [...TIME_KINDS.map(renderSkeletonColumn), renderDone()]
+              ? [...BOARD_TIME_KINDS.map(renderSkeletonColumn), renderDone()]
               : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
                   slot.kind === "list" ? (
                     renderColumn(slot.list)

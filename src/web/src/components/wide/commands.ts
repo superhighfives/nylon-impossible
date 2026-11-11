@@ -1,4 +1,5 @@
-import type { SystemListKind, TodoWithUrls } from "@/types/database";
+import type { BoardTimeKind } from "@nylon-impossible/shared";
+import type { TodoWithUrls } from "@/types/database";
 
 /**
  * The wide board's one list of commands. The key handler, the shortcuts
@@ -8,7 +9,7 @@ import type { SystemListKind, TodoWithUrls } from "@/types/database";
 
 /** Where a jump lands. */
 export type JumpTarget =
-  | { kind: "time"; list: SystemListKind }
+  | { kind: "time"; list: BoardTimeKind }
   | { kind: "list"; index: number }
   | { kind: "done" };
 
@@ -20,7 +21,7 @@ export interface Board {
   open: () => void;
   openLink: () => void;
   done: () => void;
-  move: (kind: SystemListKind) => void;
+  move: (kind: BoardTimeKind) => void;
   moveTo: () => void;
   pin: () => void;
   due: () => void;

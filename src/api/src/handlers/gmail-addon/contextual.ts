@@ -1,9 +1,9 @@
+import { getUserTimezone } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
 import { buildContextualCard } from "../../lib/addon-cards";
 import { getDb } from "../../lib/db";
 import { listListsForUser } from "../../lib/todos-core";
-import { getUserTimezone } from "../../lib/user-timezone";
 import type { Env } from "../../types";
 import {
   cardResponse,

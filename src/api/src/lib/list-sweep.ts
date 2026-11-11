@@ -1,5 +1,5 @@
+import { getSystemListId } from "@nylon-impossible/shared/queries";
 import { and, eq, type getDb, lt, lte, todos, users } from "./db";
-import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 
 type Db = ReturnType<typeof getDb>;
