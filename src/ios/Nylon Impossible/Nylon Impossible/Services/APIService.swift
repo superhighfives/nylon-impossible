@@ -175,38 +175,10 @@ final class APIService: APIProviding {
         return try await post(path: "/todos/sync", body: request)
     }
 
-    // MARK: - CRUD (for direct operations if needed)
-
-    func listTodos() async throws -> [APITodo] {
-        return try await get(path: "/todos")
-    }
+    // MARK: - Todo
 
     func getTodo(id: UUID) async throws -> APITodoWithUrls {
         return try await get(path: "/todos/\(id.uuidString.lowercased())")
-    }
-
-    func createTodo(id: UUID, title: String) async throws -> APITodo {
-        struct CreateRequest: Codable {
-            let id: String
-            let title: String
-        }
-        return try await post(path: "/todos", body: CreateRequest(id: id.uuidString, title: title))
-    }
-
-    func updateTodo(id: UUID, title: String?, completed: Bool?, updatedAt: Date) async throws -> APITodo {
-        struct UpdateRequest: Codable {
-            let title: String?
-            let completed: Bool?
-            let updatedAt: Date
-        }
-        return try await put(
-            path: "/todos/\(id.uuidString)",
-            body: UpdateRequest(title: title, completed: completed, updatedAt: updatedAt)
-        )
-    }
-
-    func deleteTodo(id: UUID) async throws {
-        let _: EmptyResponse = try await delete(path: "/todos/\(id.uuidString)")
     }
 
     // MARK: - Process
@@ -308,13 +280,6 @@ final class APIService: APIProviding {
 
     private func post<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
         var request = try await buildRequest(path: path, method: "POST")
-        request.httpBody = try encoder.encode(body)
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        return try await execute(request)
-    }
-
-    private func put<T: Decodable, B: Encodable>(path: String, body: B) async throws -> T {
-        var request = try await buildRequest(path: path, method: "PUT")
         request.httpBody = try encoder.encode(body)
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return try await execute(request)

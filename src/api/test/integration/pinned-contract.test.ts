@@ -19,14 +19,6 @@ const AUTH_HEADER = {
 };
 const USER = "user_test_123";
 
-function put(id: string, body: object) {
-  return SELF.fetch(`http://localhost/todos/${id}`, {
-    method: "PUT",
-    headers: AUTH_HEADER,
-    body: JSON.stringify(body),
-  });
-}
-
 function sync(changes: object[]) {
   return SELF.fetch("http://localhost/todos/sync", {
     method: "POST",
@@ -49,34 +41,6 @@ describe("pinned/sticky dual contract", () => {
     mockVerifyToken.mockReset();
     mockVerifyToken.mockResolvedValue({ sub: USER });
     await seedUser();
-  });
-
-  describe("PUT /todos/:id", () => {
-    it("accepts pinned and echoes both keys", async () => {
-      const todo = await seedTodo(crypto.randomUUID(), USER);
-      const res = await put(todo.id, { pinned: true });
-      expect(res.status).toBe(200);
-      const body = await res.json<{ pinned: boolean; sticky: boolean }>();
-      expect(body.pinned).toBe(true);
-      expect(body.sticky).toBe(true);
-      expect(await storedPinned(todo.id)).toBe(true);
-    });
-
-    it("still accepts the legacy sticky key", async () => {
-      const todo = await seedTodo(crypto.randomUUID(), USER);
-      const res = await put(todo.id, { sticky: true });
-      expect(res.status).toBe(200);
-      const body = await res.json<{ pinned: boolean; sticky: boolean }>();
-      expect(body).toMatchObject({ pinned: true, sticky: true });
-    });
-
-    it("lets pinned win when both are sent", async () => {
-      const todo = await seedTodo(crypto.randomUUID(), USER);
-      await put(todo.id, { pinned: false, sticky: true });
-      expect(await storedPinned(todo.id)).toBe(false);
-      await put(todo.id, { pinned: true, sticky: false });
-      expect(await storedPinned(todo.id)).toBe(true);
-    });
   });
 
   describe("POST /todos/sync", () => {
@@ -108,8 +72,9 @@ describe("pinned/sticky dual contract", () => {
     });
 
     it("keeps the stored value when neither key is sent", async () => {
-      const todo = await seedTodo(crypto.randomUUID(), USER);
-      await put(todo.id, { pinned: true });
+      const todo = await seedTodo(crypto.randomUUID(), USER, {
+        pinned: true,
+      });
       await sync([
         {
           id: todo.id,
@@ -122,8 +87,9 @@ describe("pinned/sticky dual contract", () => {
   });
 
   it("GET /todos returns both keys", async () => {
-    const todo = await seedTodo(crypto.randomUUID(), USER);
-    await put(todo.id, { pinned: true });
+    const todo = await seedTodo(crypto.randomUUID(), USER, {
+      pinned: true,
+    });
     const res = await SELF.fetch("http://localhost/todos", {
       headers: AUTH_HEADER,
     });

@@ -2,16 +2,12 @@ import { env } from "cloudflare:test";
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, todos } from "../../src/lib/db";
-import {
-  listOpenTodos,
-  setTodoCompleted,
-  updateTodoCore,
-} from "../../src/lib/todos-core";
+import { listOpenTodos, setTodoCompleted } from "../../src/lib/todos-core";
 import { cleanDb, seedTodo, seedUser } from "../helpers";
 
 const USER = "user_test_123";
 
-describe("todos-core (shared by REST + Gmail add-on)", () => {
+describe("todos-core (the Gmail add-on's reads and completions)", () => {
   beforeEach(async () => {
     await cleanDb();
     await seedUser();
@@ -100,78 +96,6 @@ describe("todos-core (shared by REST + Gmail add-on)", () => {
       await setTodoCompleted(db, env, USER, parent, false);
       [childRow] = await db.select().from(todos).where(eq(todos.id, child));
       expect(childRow.completed).toBe(false);
-    });
-  });
-
-  describe("updateTodoCore", () => {
-    it("returns null for a todo the user doesn't own", async () => {
-      await seedUser("user_other", "other@example.com");
-      const id = "aaaaaaaa-1111-1111-1111-111111111111";
-      await seedTodo(id, "user_other");
-      const result = await updateTodoCore(getDb(env.DB), env, USER, id, {
-        title: "Hijacked",
-      });
-      expect(result).toBeNull();
-    });
-
-    it("applies a title/notes/dueDate/pinned patch", async () => {
-      const id = "aaaaaaaa-2222-2222-2222-222222222222";
-      await seedTodo(id, USER, { title: "Original" });
-      const dueDate = new Date("2026-09-01T00:00:00.000Z");
-
-      const updated = await updateTodoCore(getDb(env.DB), env, USER, id, {
-        title: "Renamed",
-        notes: "Some notes",
-        dueDate,
-        pinned: true,
-      });
-
-      expect(updated?.title).toBe("Renamed");
-      expect(updated?.notes).toBe("Some notes");
-      expect(updated?.dueDate?.getTime()).toBe(dueDate.getTime());
-      expect(updated?.pinned).toBe(true);
-    });
-
-    it("rolls a recurring todo's dueDate forward instead of completing it", async () => {
-      const id = "aaaaaaaa-3333-3333-3333-333333333333";
-      const due = new Date("2026-07-20T12:00:00.000Z");
-      await seedTodo(id, USER, {
-        title: "Water plants",
-        completed: false,
-        dueDate: due,
-        recurrence: { frequency: "daily" },
-      });
-
-      const updated = await updateTodoCore(getDb(env.DB), env, USER, id, {
-        completed: true,
-      });
-
-      expect(updated).not.toBeNull();
-      expect(updated?.completed).toBe(false);
-      expect(updated?.completedAt).not.toBeNull();
-      expect(updated?.dueDate?.getTime()).toBeGreaterThan(due.getTime());
-    });
-
-    it("cascades completion to subtasks", async () => {
-      const parent = "aaaaaaaa-4444-4444-4444-444444444444";
-      const child = "aaaaaaaa-5555-5555-5555-555555555555";
-      await seedTodo(parent, USER, { title: "Parent", completed: false });
-      await seedTodo(child, USER, {
-        title: "Child",
-        completed: false,
-        parentId: parent,
-      });
-
-      await updateTodoCore(getDb(env.DB), env, USER, parent, {
-        completed: true,
-      });
-
-      const db = getDb(env.DB);
-      const [childRow] = await db
-        .select()
-        .from(todos)
-        .where(eq(todos.id, child));
-      expect(childRow.completed).toBe(true);
     });
   });
 });

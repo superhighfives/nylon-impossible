@@ -26,10 +26,7 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 | `GET` | `/health` | Health check | No |
 | `GET` | `/ws` | WebSocket upgrade (real-time sync) | Token in query |
 | `GET` | `/todos` | List todos | Yes |
-| `POST` | `/todos` | Create todo | Yes |
 | `POST` | `/todos/sync` | Sync todos (bulk create/update/delete) | Yes |
-| `PUT` | `/todos/:id` | Update todo | Yes |
-| `DELETE` | `/todos/:id` | Delete todo | Yes |
 | `POST` | `/todos/:id/process` | Retry link fetching for a todo (backs a failed link's "Try again") | Yes |
 | `POST` | `/gmail-addon/homepage` | Gmail add-on homepage card | Google ID token |
 | `POST` | `/gmail-addon/contextual` | Gmail add-on message card | Google ID token |
@@ -134,7 +131,7 @@ src/api/
 │   ├── types.ts                  # Env bindings type definitions
 │   ├── db/seeds/                 # SQL seed data for local dev
 │   ├── handlers/
-│   │   ├── todos.ts              # CRUD endpoint handlers
+│   │   ├── todos.ts              # GET /todos and GET /todos/:id
 │   │   ├── sync.ts               # Sync endpoint with conflict resolution
 │   │   ├── users.ts              # Current-user endpoints
 │   │   ├── smart-create.ts       # Thin wrapper over createSmartTodo

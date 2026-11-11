@@ -214,14 +214,15 @@ export async function syncTodos(c: Context<Env>) {
             );
           }
         }
-        // Completing a pinned todo unpins it, same as the REST update path.
+        // Completing a pinned todo unpins it, same as the Gmail add-on's
+        // `setTodoCompleted` and the web's server functions.
         let pinnedToWrite = resolvePinned(change) ?? existing.pinned;
         if (completing && pinnedToWrite) pinnedToWrite = false;
         // A client-supplied listId only ever passes a UUID-format check at
         // the request boundary — verify it actually belongs to this user
         // before writing it, or a leaked/guessed list id from another
-        // account could be pointed at by this todo (see InvalidListError's
-        // doc in todos-core.ts for the cascade-delete consequence).
+        // account could be pointed at by this todo, and deleting that list
+        // would cascade-delete it.
         const ownedListId =
           change.listId !== undefined
             ? await verifyListOwnership(db, userId, change.listId)

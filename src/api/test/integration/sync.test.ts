@@ -29,11 +29,8 @@ describe("Sync endpoint", () => {
   });
 
   it("returns all todos on first sync (no lastSyncedAt)", async () => {
-    // Create a todo first via regular CRUD
-    await SELF.fetch("http://localhost/todos", {
-      method: "POST",
-      headers: { ...AUTH_HEADER, "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Existing todo" }),
+    await seedTodo(crypto.randomUUID(), "user_test_123", {
+      title: "Existing todo",
     });
 
     const res = await syncRequest({ changes: [] });

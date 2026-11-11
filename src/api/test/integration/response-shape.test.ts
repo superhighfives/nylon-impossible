@@ -76,22 +76,6 @@ describe("Response shape", () => {
     expectSeededTodo(await json<Todo>(await request(`/todos/${TODO_ID}`), 200));
   });
 
-  it("POST /todos", async () => {
-    const body = await json<Todo>(
-      await request("/todos", "POST", { title: "New" }),
-      201,
-    );
-    expect(body).toHaveProperty("completedAt", null);
-  });
-
-  it("PUT /todos/:id", async () => {
-    const body = await json<Todo>(
-      await request(`/todos/${TODO_ID}`, "PUT", { title: "Renamed" }),
-      200,
-    );
-    expect(body).toHaveProperty("completedAt", COMPLETED_AT);
-  });
-
   it("POST /todos/smart", async () => {
     const body = await json<{ todos: Todo[] }>(
       await request("/todos/smart", "POST", { text: "Call the bank" }),
