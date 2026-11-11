@@ -1,13 +1,15 @@
 import { Popover } from "@base-ui/react/popover";
 import type { ReactElement } from "react";
 import { Composer, type ComposerTarget } from "@/components/phone/Composer";
+import type { TodoWithUrls } from "@/types/database";
 import { POPOVER_CARD } from "./NewListPopover";
 
 /**
  * Quick add (New todo): the composer in a popover under the toolbar. It
  * starts on the selection's column (else Today), shows the target's name
  * and count, a chip per list and a due chip for typed dates. Enter adds and
- * keeps it open; Esc or a click outside closes it.
+ * keeps it open, with a single new todo open behind it; Esc or a click
+ * outside closes it.
  */
 export function QuickAdd({
   open,
@@ -19,6 +21,7 @@ export function QuickAdd({
   countFor,
   isVisible,
   onView,
+  onAdded,
   returnFocus,
 }: {
   open: boolean;
@@ -30,6 +33,8 @@ export function QuickAdd({
   countFor: (listId: string) => number;
   isVisible: (listId: string) => boolean;
   onView: (listId: string) => void;
+  /** A single todo saved: the board opens it behind the popover. */
+  onAdded: (todo: TodoWithUrls) => void;
   /** Where focus goes on close: back to the board's selection. */
   returnFocus?: () => HTMLElement | null;
 }) {
@@ -55,6 +60,7 @@ export function QuickAdd({
               timeZone={timeZone}
               countFor={countFor}
               isVisible={isVisible}
+              onAdded={onAdded}
               onView={(listId) => {
                 onOpenChange(false);
                 onView(listId);

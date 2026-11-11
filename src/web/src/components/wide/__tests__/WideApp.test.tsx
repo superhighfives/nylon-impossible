@@ -23,6 +23,7 @@ const remove = vi.fn();
 const createList = vi.fn();
 const updateList = vi.fn();
 const deleteList = vi.fn();
+const smartCreate = vi.fn();
 let lists = [
   makeList("list-today", "Today", "today", "a0"),
   makeList("list-week", "This week", "thisWeek", "a1"),
@@ -57,7 +58,7 @@ vi.mock("@/hooks/useTodos", () => ({
   }),
   useUpdateTodo: () => ({ mutate: update }),
   useDeleteTodo: () => ({ mutate: remove }),
-  useSmartCreate: () => ({ mutateAsync: vi.fn() }),
+  useSmartCreate: () => ({ mutateAsync: smartCreate }),
   useCreateTodo: () => ({ mutate: vi.fn() }),
   useDeleteTodoUrl: () => ({ mutate: vi.fn() }),
   useAddTodoUrl: () => ({ mutate: addUrl }),
@@ -223,7 +224,24 @@ describe("WideApp", () => {
     createList.mockReset();
     updateList.mockReset();
     deleteList.mockReset();
+    // Saves the todo as the API would, at the top of its list.
+    let added = 0;
+    smartCreate.mockReset();
+    smartCreate.mockImplementation(
+      async ({ text, listId }: { text: string; listId: string }) => {
+        added += 1;
+        const todo = makeTodo({
+          id: `added-${added}`,
+          title: text,
+          listId,
+          position: `0${100 - added}`,
+        });
+        todos = [todo, ...todos];
+        return { todos: [todo] };
+      },
+    );
     vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
     window.localStorage.clear();
     todos = [
       makeTodo({
@@ -1280,6 +1298,138 @@ describe("WideApp", () => {
       screen.getByRole("textbox", { name: "New todo in today" }),
     );
     expect(screen.queryByRole("group", { name: "Add to list" })).toBeNull();
+  });
+
+  describe("adding opens the new todo, and focus stays in Add", () => {
+    const sheet = () =>
+      document.querySelector<HTMLElement>("[data-detail-column]");
+    const sheetTitle = () =>
+      sheet() &&
+      within(sheet() as HTMLElement).getByRole<HTMLTextAreaElement>("textbox", {
+        name: "Title",
+      }).value;
+    /** Lets each add's save land, as the composer awaits them in turn. */
+    const settle = () => act(async () => {});
+
+    it("from Today's Add: beside Today, the next add replaces it, and Esc lands on it", async () => {
+      render(<WideApp />);
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.type(add, "Get Rex{Enter}");
+      await settle();
+      expect(sheetTitle()).toBe("Get Rex");
+      expect(slides().indexOf("sheet")).toBe(
+        slides().indexOf("list-today") + 1,
+      );
+      expect(document.activeElement).toBe(add);
+      expect(add).toHaveValue("");
+
+      await userEvent.type(add, "Walk dog{Enter}");
+      await settle();
+      expect(sheetTitle()).toBe("Walk dog");
+      expect(document.activeElement).toBe(add);
+
+      // Esc leaves Add, then closes the todo onto its row.
+      await userEvent.keyboard("{Escape}");
+      expect(document.activeElement).not.toBe(add);
+      expect(sheetTitle()).toBe("Walk dog");
+      press("Escape");
+      expect(sheet()).toBeNull();
+      expect(
+        rowButton("Walk dog").closest("[data-row-container]"),
+      ).toHaveAttribute("data-selected");
+    });
+
+    it("from one of your lists' Add: beside that list", async () => {
+      render(<WideApp />);
+      const add = screen.getByRole("textbox", {
+        name: "New todo in Groceries",
+      });
+      await userEvent.type(add, "Buy stamps{Enter}");
+      await settle();
+      expect(sheetTitle()).toBe("Buy stamps");
+      expect(slides().indexOf("sheet")).toBe(
+        slides().indexOf("list-groceries") + 1,
+      );
+      expect(column("Groceries")).toHaveAttribute("data-sheet-open");
+      expect(document.activeElement).toBe(add);
+    });
+
+    it("a pasted list opens nothing, and leaves an open todo open", async () => {
+      render(<WideApp />);
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.click(add);
+      await userEvent.paste("Eggs\nFlour");
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      expect(smartCreate).toHaveBeenCalledTimes(2);
+      expect(sheet()).toBeNull();
+
+      await userEvent.dblClick(rowButton("Send invoice"));
+      expect(sheetTitle()).toBe("Send invoice");
+      await userEvent.click(add);
+      await userEvent.paste("Milk\nButter");
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      expect(smartCreate).toHaveBeenCalledTimes(4);
+      expect(sheetTitle()).toBe("Send invoice");
+    });
+
+    it("an add that fails to save opens nothing", async () => {
+      smartCreate.mockRejectedValueOnce(new Error("Offline"));
+      render(<WideApp />);
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.type(add, "Get Rex{Enter}");
+      await settle();
+      expect(sheet()).toBeNull();
+      expect(add).toHaveValue("Get Rex");
+      expect(toast.error).toHaveBeenCalledWith("Offline");
+    });
+
+    it("from Quick add: behind the popover, which keeps focus, with no toast", async () => {
+      render(<WideApp />);
+      press("n");
+      const popup = await screen.findByRole("dialog", { name: "Quick add" });
+      await userEvent.click(
+        within(popup).getByRole("button", { name: "Groceries" }),
+      );
+      const field = within(popup).getByRole("textbox", {
+        name: "New todo in Groceries",
+      });
+      await userEvent.type(field, "Call vet{Enter}");
+      await settle();
+      expect(sheetTitle()).toBe("Call vet");
+      expect(slides().indexOf("sheet")).toBe(
+        slides().indexOf("list-groceries") + 1,
+      );
+      expect(screen.getByRole("dialog", { name: "Quick add" })).toBe(popup);
+      expect(document.activeElement).toBe(field);
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(
+        rowButton("Call vet").closest("[data-row-container]"),
+      ).toHaveAttribute("data-selected");
+
+      // A pasted list opens nothing new.
+      await userEvent.paste("Eggs\nFlour");
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      expect(smartCreate).toHaveBeenCalledTimes(3);
+      expect(sheetTitle()).toBe("Call vet");
+    });
+
+    it("a pasted list from Quick add opens nothing", async () => {
+      render(<WideApp />);
+      press("n");
+      const popup = await screen.findByRole("dialog", { name: "Quick add" });
+      await userEvent.click(
+        within(popup).getByRole("textbox", { name: "New todo in today" }),
+      );
+      await userEvent.paste("Eggs\nFlour");
+      await userEvent.keyboard("{Enter}");
+      await settle();
+      expect(smartCreate).toHaveBeenCalledTimes(2);
+      expect(sheet()).toBeNull();
+      expect(screen.getByRole("dialog", { name: "Quick add" })).toBe(popup);
+    });
   });
 
   it("? toggles the shortcuts overlay", async () => {
