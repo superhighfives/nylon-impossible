@@ -93,6 +93,19 @@ struct BoardNavigatorTests {
         #expect(BoardNavigator.neighbor(of: a, in: [a]) == nil)
     }
 
+    @Test("Done and Delete hand the selection on; a move keeps it, in the new column")
+    func selectionAfter() {
+        let gone = BoardNavigator.selection(after: .gone, of: a, in: "today", rows: [a, b, c])
+        #expect(gone.todo == b)
+        #expect(gone.column == "today")
+        let last = BoardNavigator.selection(after: .gone, of: a, in: "today", rows: [a])
+        #expect(last.todo == nil)
+
+        let moved = BoardNavigator.selection(after: .moved(to: "week"), of: a, in: "today", rows: [a, b, c])
+        #expect(moved.todo == a)
+        #expect(moved.column == "week")
+    }
+
     @Test("Across columns keeps the position where it can")
     func across() {
         let x = UUID(), y = UUID()

@@ -83,11 +83,13 @@ function revealInColumn(row: HTMLElement) {
   else if (box.bottom > view.bottom) body.scrollTop += box.bottom - view.bottom;
 }
 
-/** A column to focus once it renders: its Add field, or its title. */
-interface PendingFocus {
-  column: string;
-  target: "composer" | "head";
-}
+/**
+ * A column to focus once it renders: its Add field, its title, or a todo
+ * that's on its way there.
+ */
+type PendingFocus =
+  | { column: string; target: "composer" | "head" }
+  | { column: string; target: "row"; rowId: string };
 
 interface MenuState {
   id: string;
@@ -156,6 +158,8 @@ export function WideApp({
   /** The column last gone to or selected in, which the URL names. */
   const [urlColumn, setUrlColumn] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selectedIdNow = useRef(selectedId);
+  selectedIdNow.current = selectedId;
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [settings, setSettings] = useState(false);
   const [quickAdd, setQuickAdd] = useState(false);
@@ -322,20 +326,32 @@ export function WideApp({
   );
 
   // A column that's about to render (a new list) or move (beside a deleted
-  // one) takes focus once it has.
+  // one) takes focus once it has; a moved todo, once its row is there.
   useEffect(() => {
     const pending = pendingFocus.current;
     if (!pending || !columnIds.includes(pending.column)) return;
+    const row =
+      pending.target === "row"
+        ? columnRows(pending.column).find(
+            (r) => r.dataset.rowId === pending.rowId,
+          )
+        : undefined;
+    if (pending.target === "row" && !row) return;
     pendingFocus.current = null;
     const section = document.querySelector<HTMLElement>(
       `[data-column="${CSS.escape(pending.column)}"]`,
     );
-    if (section) revealColumn(section);
+    // An open todo's sheet brings its new column into view with it.
+    if (section && !(row && sheetColumn === pending.column)) {
+      revealColumn(section);
+    }
     const target =
-      pending.target === "composer"
+      row ??
+      (pending.target === "composer"
         ? composers.current.get(pending.column)
-        : section?.querySelector<HTMLElement>("[data-column-head]");
+        : section?.querySelector<HTMLElement>("[data-column-head]"));
     target?.focus({ preventScroll: true });
+    if (row) revealInColumn(row);
   });
 
   // --- URL ------------------------------------------------------------------
@@ -404,6 +420,11 @@ export function WideApp({
 
   const select = useCallback((todo: TodoWithUrls) => {
     const column = todo.completed ? DONE_COLUMN : todo.listId;
+    // Another todo chosen: a moved one no longer takes the keyboard back.
+    const pending = pendingFocus.current;
+    if (pending?.target === "row" && pending.rowId !== todo.id) {
+      pendingFocus.current = null;
+    }
     lastSelected.current.set(column, todo.id);
     setSelectedId(todo.id);
     setUrlColumn(column);
@@ -415,6 +436,36 @@ export function WideApp({
   }, []);
 
   const selectedRow = () => rowById(selectedId);
+
+  /** Select a todo, and give it the keyboard, once it's in `listId`. */
+  const followTodo = (todoId: string, listId: string) => {
+    pendingFocus.current = { column: listId, target: "row", rowId: todoId };
+  };
+
+  /**
+   * Move a todo by command (1/2/3, Move to…, the menu): unlike Done and
+   * Delete, the selection stays on it, in its new column, and on Undo (or
+   * a move the server refused) goes back with it.
+   */
+  const moveTodo = (todo: TodoWithUrls, listId: string, name?: string) => {
+    if (todo.listId === listId) return;
+    followTodo(todo.id, listId);
+    const followBack = () => {
+      if (selectedIdNow.current === todo.id) {
+        followTodo(todo.id, todo.listId);
+      } else if (
+        pendingFocus.current?.target === "row" &&
+        pendingFocus.current.rowId === todo.id
+      ) {
+        pendingFocus.current = null;
+      }
+    };
+    actions.move(todo, listId, {
+      name,
+      onUndo: followBack,
+      onFailed: followBack,
+    });
+  };
 
   const closeDetail = () => {
     setDetailId(null);
@@ -488,6 +539,7 @@ export function WideApp({
     focusColumn,
     clearSelection: () => setSelectedId(null),
     focusNeighbour: (row) => focusNeighbour(row),
+    moveTodo: (todo, listId) => moveTodo(todo, listId),
     open: (todo) => onOpen(todo),
     closeDetail: () => closeDetail(),
     openDueMenu: (todo, row) => {
@@ -528,14 +580,8 @@ export function WideApp({
     const last = collections[collections.length - 1];
     createList.mutate(
       { name, position: generateKeyBetween(last?.position ?? null, null) },
-      { onSuccess: (created) => actions.move(todo, created.id, { name }) },
+      { onSuccess: (created) => moveTodo(todo, created.id, name) },
     );
-  };
-
-  /** Moving from the palette hands the selection on, as 1/2/3 do. */
-  const leaveRow = (todo: TodoWithUrls) => {
-    const row = selectedRow();
-    if (row && selectedId === todo.id) focusNeighbour(row);
   };
 
   const paletteTodo =
@@ -560,14 +606,8 @@ export function WideApp({
         goToColumn: (list) => focusColumn(list.id),
         showDone: () => showDone(),
         goToTodo,
-        moveTodo: (todo, listId) => {
-          leaveRow(todo);
-          actions.move(todo, listId);
-        },
-        moveToNewList: (todo, name) => {
-          leaveRow(todo);
-          moveToNewList(todo, name);
-        },
+        moveTodo: (todo, listId) => moveTodo(todo, listId),
+        moveToNewList,
       },
       query,
     );
@@ -891,7 +931,7 @@ export function WideApp({
         listKind={menuTodo ? listKind(menuTodo.listId) : null}
         moveTargets={targets.filter((t) => t.id !== menuTodo?.listId)}
         onClose={() => setMenu(null)}
-        onMove={actions.move}
+        onMove={(todo, listId) => moveTodo(todo, listId)}
         onTogglePin={actions.togglePin}
         onDelete={actions.destroy}
         onSetDue={actions.setDue}

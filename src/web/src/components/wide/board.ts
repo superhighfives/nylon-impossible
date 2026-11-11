@@ -99,6 +99,8 @@ export interface BoardContext {
   clearSelection: () => void;
   /** Before a row leaves its column, hand focus (and the selection) on. */
   focusNeighbour: (row: HTMLElement) => void;
+  /** Move a todo to another list; the selection goes with it. */
+  moveTodo: (todo: TodoWithUrls, listId: string) => void;
   open: (todo: TodoWithUrls) => void;
   closeDetail: () => void;
   openDueMenu: (todo: TodoWithUrls, row: HTMLElement) => void;
@@ -201,11 +203,10 @@ export function createBoard(ctx: BoardContext): Board {
       }
     },
     move: (kind) => {
-      const { row, todo } = current();
+      const { todo } = current();
       const target = ctx.byKind[kind];
-      if (!row || !todo || !target || target.id === todo.listId) return;
-      ctx.focusNeighbour(row);
-      actions.move(todo, target.id);
+      if (!todo || !target || target.id === todo.listId) return;
+      ctx.moveTodo(todo, target.id);
     },
     moveTo: () => {
       const { todo } = current();

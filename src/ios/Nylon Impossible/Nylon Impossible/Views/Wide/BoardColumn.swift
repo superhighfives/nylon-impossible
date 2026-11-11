@@ -55,6 +55,8 @@ struct BoardColumn<Accessory: View>: View {
     var onExternalDrop: ((String) -> Void)?
     /// A click on the column's empty space: focus the column, select nothing.
     var onBackgroundTap: () -> Void = {}
+    /// The context menu's Move: the todo stays selected in its new column.
+    var onMove: ((TodoItem, String) -> Void)?
     @ViewBuilder var accessory: () -> Accessory
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -160,7 +162,7 @@ struct BoardColumn<Accessory: View>: View {
         #if DEBUG
         .screenRouteMenuTarget(selectedId == todo.id)
         #endif
-        .contextMenu { TodoContextMenu(todo: todo, lists: lists, actions: actions, style: .wide) }
+        .contextMenu { TodoContextMenu(todo: todo, lists: lists, actions: actions, style: .wide, onMove: onMove) }
         .todoDragSource(todo)
         .onGeometryChange(for: CGRect.self) {
             $0.frame(in: .named(Self.rowsSpace))
@@ -300,13 +302,14 @@ extension BoardColumn where Accessory == EmptyView {
         onOpen: @escaping (TodoItem) -> Void,
         onDrop: @escaping (UUID, Int?) -> Void,
         onExternalDrop: ((String) -> Void)? = nil,
-        onBackgroundTap: @escaping () -> Void = {}
+        onBackgroundTap: @escaping () -> Void = {},
+        onMove: ((TodoItem, String) -> Void)? = nil
     ) {
         self.init(
             list: list, title: title, subline: subline, rows: rows, subtasks: subtasks, lists: lists,
             actions: actions, selectedId: selectedId, isTinted: false, overnight: overnight, empty: empty,
             composer: composer, addSelected: addSelected, onSelect: onSelect, onOpen: onOpen, onDrop: onDrop,
-            onExternalDrop: onExternalDrop, onBackgroundTap: onBackgroundTap
+            onExternalDrop: onExternalDrop, onBackgroundTap: onBackgroundTap, onMove: onMove
         ) { EmptyView() }
     }
 }

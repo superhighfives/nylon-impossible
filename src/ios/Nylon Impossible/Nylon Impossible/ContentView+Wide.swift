@@ -414,7 +414,8 @@ extension ContentView {
                 onOpen: clickOpen,
                 onDrop: { id, slot in dropWide(id, at: slot, into: list) },
                 onExternalDrop: { addDropped($0, to: list) },
-                onBackgroundTap: { softFocus(list.id) }
+                onBackgroundTap: { softFocus(list.id) },
+                onMove: moveKeepingSelection
             )
         } else {
             BoardColumn(
@@ -441,7 +442,8 @@ extension ContentView {
                 ),
                 onDrop: { id, slot in dropWide(id, at: slot, into: list) },
                 onExternalDrop: { addDropped($0, to: list) },
-                onBackgroundTap: { softFocus(list.id) }
+                onBackgroundTap: { softFocus(list.id) },
+                onMove: moveKeepingSelection
             ) {
                 collectionMenu(list)
                 Button(action: showDone) {

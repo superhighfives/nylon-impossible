@@ -136,6 +136,7 @@ export function useTodoActions({
   todosRef.current = allTodos;
 
   const update = updateTodo.mutate;
+  const updateAsync = updateTodo.mutateAsync;
   const remove = deleteTodo.mutate;
   const removeList = deleteList.mutate;
 
@@ -260,23 +261,38 @@ export function useTodoActions({
     (
       todo: TodoWithUrls,
       listId: string,
-      // `name`: for a list too new to be in the cache yet.
-      { quiet = false, name }: { quiet?: boolean; name?: string } = {},
+      // `name`: for a list too new to be in the cache yet. `onUndo`: after
+      // the toast's Undo has put it back. `onFailed`: after a move the
+      // server refused has been rolled back.
+      {
+        quiet = false,
+        name,
+        onUndo,
+        onFailed,
+      }: {
+        quiet?: boolean;
+        name?: string;
+        onUndo?: () => void;
+        onFailed?: () => void;
+      } = {},
     ) => {
       if (todo.listId === listId) return;
       const from = { listId: todo.listId, position: todo.position };
-      update({
+      // The promise, not mutate's per-call onError: that runs only for the
+      // latest call, so a refused move pressed before another would be lost.
+      updateAsync({
         id: todo.id,
         input: { listId, position: topPosition(listId) },
-      });
+      }).catch(() => onFailed?.());
       onMoved?.(listId);
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
-      showUndoToast(`Moved to ${name ?? listInSentence(listId)}`, () =>
-        update({ id: todo.id, input: from }),
-      );
+      showUndoToast(`Moved to ${name ?? listInSentence(listId)}`, () => {
+        update({ id: todo.id, input: from });
+        onUndo?.();
+      });
     },
-    [listInSentence, topPosition, update, onMoved],
+    [listInSentence, topPosition, update, updateAsync, onMoved],
   );
 
   const togglePin = useCallback(

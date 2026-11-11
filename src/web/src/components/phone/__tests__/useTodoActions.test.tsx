@@ -6,7 +6,10 @@ const update = vi.fn();
 const remove = vi.fn();
 const removeList = vi.fn();
 vi.mock("@/hooks/useTodos", () => ({
-  useUpdateTodo: () => ({ mutate: update }),
+  useUpdateTodo: () => ({
+    mutate: update,
+    mutateAsync: async (vars: unknown) => update(vars),
+  }),
   useDeleteTodo: () => ({ mutate: remove }),
 }));
 vi.mock("@/hooks/useLists", () => ({
