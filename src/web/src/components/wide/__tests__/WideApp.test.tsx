@@ -55,7 +55,10 @@ vi.mock("@/hooks/useTodos", () => ({
     refetch: vi.fn(),
     isFetching: false,
   }),
-  useUpdateTodo: () => ({ mutate: update }),
+  useUpdateTodo: () => ({
+    mutate: update,
+    mutateAsync: async (vars: unknown) => update(vars),
+  }),
   useDeleteTodo: () => ({ mutate: remove }),
   useSmartCreate: () => ({ mutateAsync: vi.fn() }),
   useCreateTodo: () => ({ mutate: vi.fn() }),
@@ -616,10 +619,10 @@ describe("WideApp", () => {
     liveUpdates();
     rowButton("Review PR").focus();
     press("2");
-    expect(update).toHaveBeenCalledWith(
-      { id: "t1", input: expect.objectContaining({ listId: "list-week" }) },
-      expect.anything(),
-    );
+    expect(update).toHaveBeenCalledWith({
+      id: "t1",
+      input: expect.objectContaining({ listId: "list-week" }),
+    });
     expect(toast.success).toHaveBeenCalledWith(
       "Moved to this week",
       expect.anything(),
@@ -669,18 +672,36 @@ describe("WideApp", () => {
     expect(selection()).toEqual({ id: "t1", column: "list-today" });
   });
 
-  it("a move the server refuses goes back, still selected", () => {
+  it("a move the server refuses goes back, still selected", async () => {
     const { rerender } = render(<WideApp />);
     liveUpdates();
+    // The server refuses every move, and each is rolled back.
+    const refusals: (() => void)[] = [];
+    update.mockImplementation(
+      ({ id, input }: { id: string; input: Partial<TodoWithUrls> }) => {
+        const before = todos.find((t) => t.id === id);
+        todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
+        return new Promise((_, reject) => {
+          refusals.push(() => {
+            todos = todos.map((t) => (t.id === id && before ? before : t));
+            reject(new Error("refused"));
+          });
+        });
+      },
+    );
     rowButton("Review PR").focus();
     press("2");
     rerender(<WideApp />);
     expect(selection()).toEqual({ id: "t1", column: "list-week" });
-    // The optimistic move is rolled back, then the call's onError runs.
-    todos = todos.map((t) =>
-      t.id === "t1" ? { ...t, listId: "list-today", position: "a0" } : t,
-    );
-    update.mock.lastCall?.[1]?.onError?.();
+    // A second move before the first is refused: the first's refusal is
+    // still heard, not only the latest call's.
+    press("3");
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-someday" });
+    await act(async () => refusals[1]());
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-week" });
+    await act(async () => refusals[0]());
     rerender(<WideApp />);
     expect(selection()).toEqual({ id: "t1", column: "list-today" });
   });
@@ -1017,13 +1038,10 @@ describe("WideApp", () => {
       "Studio1",
     ]);
     await userEvent.type(within(dialog).getByRole("combobox"), "groc{Enter}");
-    expect(update).toHaveBeenCalledWith(
-      {
-        id: "t1",
-        input: expect.objectContaining({ listId: "list-groceries" }),
-      },
-      expect.anything(),
-    );
+    expect(update).toHaveBeenCalledWith({
+      id: "t1",
+      input: expect.objectContaining({ listId: "list-groceries" }),
+    });
     expect(toast.success).toHaveBeenCalledWith(
       "Moved to Groceries",
       expect.anything(),
@@ -1110,10 +1128,10 @@ describe("WideApp", () => {
       expect.objectContaining({ name: "Garden" }),
       expect.anything(),
     );
-    expect(update).toHaveBeenCalledWith(
-      { id: "t1", input: expect.objectContaining({ listId: "list-new" }) },
-      expect.anything(),
-    );
+    expect(update).toHaveBeenCalledWith({
+      id: "t1",
+      input: expect.objectContaining({ listId: "list-new" }),
+    });
     expect(toast.success).toHaveBeenCalledWith(
       "Moved to Garden",
       expect.anything(),
@@ -1929,7 +1947,6 @@ describe("WideApp drag and drop", () => {
         id: "t1",
         input: expect.objectContaining({ listId: "list-groceries" }),
       }),
-      expect.anything(),
     );
   });
 

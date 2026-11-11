@@ -136,6 +136,7 @@ export function useTodoActions({
   todosRef.current = allTodos;
 
   const update = updateTodo.mutate;
+  const updateAsync = updateTodo.mutateAsync;
   const remove = deleteTodo.mutate;
   const removeList = deleteList.mutate;
 
@@ -277,10 +278,12 @@ export function useTodoActions({
     ) => {
       if (todo.listId === listId) return;
       const from = { listId: todo.listId, position: todo.position };
-      update(
-        { id: todo.id, input: { listId, position: topPosition(listId) } },
-        { onError: () => onFailed?.() },
-      );
+      // The promise, not mutate's per-call onError: that runs only for the
+      // latest call, so a refused move pressed before another would be lost.
+      updateAsync({
+        id: todo.id,
+        input: { listId, position: topPosition(listId) },
+      }).catch(() => onFailed?.());
       onMoved?.(listId);
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
@@ -289,7 +292,7 @@ export function useTodoActions({
         onUndo?.();
       });
     },
-    [listInSentence, topPosition, update, onMoved],
+    [listInSentence, topPosition, update, updateAsync, onMoved],
   );
 
   const togglePin = useCallback(
