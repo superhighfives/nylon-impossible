@@ -1313,7 +1313,7 @@ describe("WideApp", () => {
 
     it("from Today's Add: beside Today, the next add replaces it, and Esc lands on it", async () => {
       render(<WideApp />);
-      const add = screen.getByRole("textbox", { name: "New todo in Today" });
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
       await userEvent.type(add, "Get Rex{Enter}");
       await settle();
       expect(sheetTitle()).toBe("Get Rex");
@@ -1356,7 +1356,7 @@ describe("WideApp", () => {
 
     it("a pasted list opens nothing, and leaves an open todo open", async () => {
       render(<WideApp />);
-      const add = screen.getByRole("textbox", { name: "New todo in Today" });
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
       await userEvent.click(add);
       await userEvent.paste("Eggs\nFlour");
       await userEvent.keyboard("{Enter}");
@@ -1377,7 +1377,7 @@ describe("WideApp", () => {
     it("an add that fails to save opens nothing", async () => {
       smartCreate.mockRejectedValueOnce(new Error("Offline"));
       render(<WideApp />);
-      const add = screen.getByRole("textbox", { name: "New todo in Today" });
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
       await userEvent.type(add, "Get Rex{Enter}");
       await settle();
       expect(sheet()).toBeNull();
@@ -1421,7 +1421,7 @@ describe("WideApp", () => {
       press("n");
       const popup = await screen.findByRole("dialog", { name: "Quick add" });
       await userEvent.click(
-        within(popup).getByRole("textbox", { name: "New todo in Today" }),
+        within(popup).getByRole("textbox", { name: "New todo in today" }),
       );
       await userEvent.paste("Eggs\nFlour");
       await userEvent.keyboard("{Enter}");
