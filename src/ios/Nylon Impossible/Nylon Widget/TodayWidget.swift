@@ -83,7 +83,7 @@ struct TodayWidget: Widget {
                 .containerBackground(Theme.Colors.canvas, for: .widget)
         }
         .configurationDisplayName("Today")
-        .description("Everything on your Today list, plus anything due or overdue. Tap + for a new todo.")
+        .description("Everything on your today list, plus anything due or overdue. Tap + for a new todo.")
         .supportedFamilies(Self.families)
     }
 

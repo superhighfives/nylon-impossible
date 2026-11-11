@@ -1,4 +1,7 @@
-import { toDueDay } from "@nylon-impossible/shared";
+import {
+  TIME_LIST_NAMES_IN_SENTENCE,
+  toDueDay,
+} from "@nylon-impossible/shared";
 import {
   nextDueDate,
   placementForDueDate,
@@ -71,7 +74,7 @@ export function showActionToast(
   return id;
 }
 
-/** "Done · Undo", "Moved to This week · Undo", "Deleted · Undo" … */
+/** "Done · Undo", "Moved to this week · Undo", "Deleted · Undo" … */
 export function showUndoToast(text: string, undo: () => void) {
   return showActionToast(text, "Undo", undo);
 }
@@ -105,11 +108,14 @@ function withId(set: ReadonlySet<string>, id: string, on: boolean) {
 export function useTodoActions({
   timeZone,
   listName,
+  listInSentence,
   allTodos,
   onMoved,
 }: {
   timeZone: string;
   listName: (listId: string) => string;
+  /** The name inside a toast: "Moved to this week", "Moved to Groceries". */
+  listInSentence: (listId: string) => string;
   allTodos: TodoWithUrls[];
   /** After any move, quiet ones included: where it went. */
   onMoved?: (listId: string) => void;
@@ -219,10 +225,11 @@ export function useTodoActions({
           if (todo.pinned) undo.pinned = true;
           // The server places the next occurrence by its due date, so the
           // row may leave this list. Say where it went when it does.
-          const nextList =
-            PLACEMENT_NAMES[placementForDueDate(next, now, timeZone)];
+          const placement = placementForDueDate(next, now, timeZone);
           const where =
-            nextList === listName(todo.listId) ? "" : `, in ${nextList}`;
+            PLACEMENT_NAMES[placement] === listName(todo.listId)
+              ? ""
+              : `, in ${TIME_LIST_NAMES_IN_SENTENCE[placement]}`;
           showUndoToast(
             `Done · next ${dueLabel(next, now, timeZone).text}${where}`,
             () => update({ id: todo.id, input: undo }),
@@ -265,11 +272,11 @@ export function useTodoActions({
       onMoved?.(listId);
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
-      showUndoToast(`Moved to ${name ?? listName(listId)}`, () =>
+      showUndoToast(`Moved to ${name ?? listInSentence(listId)}`, () =>
         update({ id: todo.id, input: from }),
       );
     },
-    [listName, topPosition, update, onMoved],
+    [listInSentence, topPosition, update, onMoved],
   );
 
   const togglePin = useCallback(
@@ -337,11 +344,11 @@ export function useTodoActions({
         id: todo.id,
         input: { completed: false, position: topPosition(todo.listId) },
       });
-      showUndoToast(`Back in ${listName(todo.listId)}`, () =>
+      showUndoToast(`Back in ${listInSentence(todo.listId)}`, () =>
         update({ id: todo.id, input: { completed: true } }),
       );
     },
-    [listName, topPosition, update],
+    [listInSentence, topPosition, update],
   );
 
   /**

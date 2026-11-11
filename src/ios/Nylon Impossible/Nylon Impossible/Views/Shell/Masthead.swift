@@ -116,7 +116,7 @@ private struct Squiggle: Shape {
 /// where the first todo will and that todo takes its place without moving
 /// anything. Nothing here can be tapped, so the squiggle and the words are
 /// subtle, lighter than a row. When there's somewhere to go,
-/// "4 waiting in This week →" sits under the words.
+/// "4 waiting in this week →" sits under the words.
 struct EmptyLine: View {
     let text: String
     var link: (text: String, action: () -> Void)?

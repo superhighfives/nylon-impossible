@@ -239,7 +239,7 @@ struct ToastUndoBridgeTests {
         let toasts = ToastCenter()
         let undoManager = UndoManager()
         let bridge = ToastUndoBridge()
-        toasts.show("Added to Someday", actionLabel: "View") {}
+        toasts.show("Added to someday", actionLabel: "View") {}
         bridge.sync(toasts, undoManager: undoManager)
         #expect(!undoManager.canUndo)
     }

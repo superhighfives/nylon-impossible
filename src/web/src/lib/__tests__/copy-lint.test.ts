@@ -46,7 +46,7 @@ describe("copy lint", () => {
     expect(rules("Completed")).toEqual(["vocabulary"]);
     expect(rules("Set a deadline")).toEqual(["vocabulary"]);
     expect(rules("Add subtask")).toEqual([]);
-    expect(rules("Moved to This week")).toEqual([]);
+    expect(rules("Moved to this week")).toEqual([]);
   });
 
   it("matches mixed-case terms as written", () => {
@@ -60,12 +60,20 @@ describe("copy lint", () => {
     expect(checkCase("New List")).toEqual(["List"]);
   });
 
+  it("lowercases the time lists mid-sentence", () => {
+    expect(rules("Moved to this week")).toEqual([]);
+    expect(rules("Moved to This week")).toEqual(["case"]);
+    expect(checkCase("Back in Today")).toEqual(["Today"]);
+    expect(checkCase("2 waiting in Someday")).toEqual(["Someday"]);
+    expect(checkCase("This week")).toEqual([]);
+  });
+
   it("lets proper nouns, acronyms and new sentences keep capitals", () => {
     expect(checkCase("Add to Nylon")).toEqual([]);
     expect(checkCase("Shows Done in the fourth column")).toEqual([]);
     expect(checkCase("Mark Done")).toEqual(["Done"]);
     expect(checkCase("Mark done")).toEqual([]);
-    expect(checkCase("Nothing today. 4 waiting in This week")).toEqual([]);
+    expect(checkCase("Nothing today. 4 waiting in this week")).toEqual([]);
     expect(checkCase("Copy API URL from GitHub")).toEqual([]);
     expect(checkCase("Enter adds · Esc closes")).toEqual([]);
     expect(checkCase("Tap “I’ve connected” to refresh")).toEqual([]);

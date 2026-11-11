@@ -61,12 +61,12 @@ final class BoardKeyboardUITests: NylonUITestCase {
     func testNumbersMoveBetweenTimeLists() {
         press("j")
         press("2")
-        waitFor(XCUIElement.toast("Moved to This week", in: app))
+        waitFor(XCUIElement.toast("Moved to this week", in: app))
         press("l")
         press("3")
-        waitFor(XCUIElement.toast("Moved to Someday", in: app))
+        waitFor(XCUIElement.toast("Moved to someday", in: app))
         press("1")
-        waitFor(XCUIElement.toast("Moved to Today", in: app))
+        waitFor(XCUIElement.toast("Moved to today", in: app))
     }
 
     func testPPins() {

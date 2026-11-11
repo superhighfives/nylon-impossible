@@ -1,4 +1,4 @@
-import { BOARD_TIME_KINDS } from "@nylon-impossible/shared";
+import { BOARD_TIME_KINDS, listNameInSentence } from "@nylon-impossible/shared";
 import { useCallback, useMemo } from "react";
 import { useHints } from "@/hooks/useHints";
 import { useLists } from "@/hooks/useLists";
@@ -33,6 +33,13 @@ export function useBoardData() {
     (id: string) => lists?.find((l) => l.id === id)?.name ?? "List",
     [lists],
   );
+  const listInSentence = useCallback(
+    (id: string) => {
+      const list = lists?.find((l) => l.id === id);
+      return list ? listNameInSentence(list) : "List";
+    },
+    [lists],
+  );
   // Your lists moved to feed the Move to menu's recents. Stable, so the
   // actions built on it (`move`) stay stable too.
   const onMoved = useCallback(
@@ -46,6 +53,7 @@ export function useBoardData() {
   const actions = useTodoActions({
     timeZone,
     listName,
+    listInSentence,
     allTodos: todos,
     onMoved,
   });
@@ -111,6 +119,7 @@ export function useBoardData() {
     byKind,
     collections,
     listName,
+    listInSentence,
     actions,
     subtasksOf,
     rowsFor,

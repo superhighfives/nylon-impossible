@@ -17,6 +17,17 @@ enum SystemListKind: String, Codable, CaseIterable {
     case today
     case thisWeek
     case someday
+
+    /// The name inside a sentence: "Moved to this week", "2 waiting in
+    /// someday". A time list keeps its capitals only where its name stands
+    /// alone (a column head, a menu item), which is the list's own `name`.
+    var nameInSentence: String {
+        switch self {
+        case .today: return "today"
+        case .thisWeek: return "this week"
+        case .someday: return "someday"
+        }
+    }
 }
 
 @Model
@@ -57,6 +68,11 @@ final class TodoListModel {
     }
 
     var isSystem: Bool { kind == "system" }
+
+    /// The list's name as it reads inside a sentence. A time list is chosen by
+    /// its kind, not its name, so a list of yours called "Today" keeps its
+    /// capital.
+    var nameInSentence: String { systemKind?.nameInSentence ?? name }
 
     /// Fixed display order: Today, This week, Someday, then custom lists
     /// (by `position`, handled separately since this only orders the three

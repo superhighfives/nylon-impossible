@@ -1,4 +1,9 @@
-import { type BoardView, boardUrl, dueLabel } from "@nylon-impossible/shared";
+import {
+  type BoardView,
+  boardUrl,
+  dueLabel,
+  listNameInSentence,
+} from "@nylon-impossible/shared";
 import { verifyListOwnership } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
 import { resolveNylonUser } from "../../lib/addon-auth";
@@ -55,14 +60,16 @@ async function refreshedHomepage(
   return cardResponse(c, card, { asAction: true, notification: text });
 }
 
-function listName(data: HomepageData, listId: string): string {
-  return data.lists.find((list) => list.id === listId)?.name ?? "Nylon";
+/** A list's name inside a toast: "Back in today", "Back in Groceries". */
+function listInSentence(data: HomepageData, listId: string): string {
+  const list = data.lists.find((l) => l.id === listId);
+  return list ? listNameInSentence(list) : "Nylon";
 }
 
-/** "Added to Today", or "Added to Today · due Fri" when a date was typed. */
+/** "Added to today", or "Added to today · due Fri" when a date was typed. */
 function addedToast(created: { listId: string; dueDate: string | null }) {
   return (data: HomepageData, now: Date) => {
-    const where = `Added to ${listName(data, created.listId)}`;
+    const where = `Added to ${listInSentence(data, created.listId)}`;
     if (!created.dueDate) return where;
     return `${where} · due ${dueLabel(created.dueDate, now, data.timeZone).text}`;
   };
@@ -201,7 +208,7 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
   const card = buildContextualCard(requestBaseUrl(c), message, lists, {
     todoId: todo.id,
     title: todo.title,
-    listName: list?.name ?? "Nylon",
+    listName: list ? listNameInSentence(list) : "Nylon",
     url: boardUrl(webBaseUrl(c), listView(list, todo.listId)),
   });
   // The homepage behind this card now lacks the todo; have Gmail refetch it.
@@ -280,7 +287,7 @@ export async function gmailAddonToggle(c: Context<Env>) {
     return refreshedHomepage(
       c,
       resolved.userId,
-      (data) => `Back in ${listName(data, listId)}`,
+      (data) => `Back in ${listInSentence(data, listId)}`,
     );
   }
 
@@ -293,7 +300,7 @@ export async function gmailAddonToggle(c: Context<Env>) {
     const where =
       updated.listId === before.listId
         ? ""
-        : `, in ${listName(data, updated.listId)}`;
+        : `, in ${listInSentence(data, updated.listId)}`;
     return `Done · next ${next}${where}`;
   });
 }

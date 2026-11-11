@@ -16,7 +16,7 @@ import SwiftUI
 extension TodoDetailSheet {
     var columnBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            DetailColumnHeader(subline: "In \(list?.name ?? "Today")", onClose: close) {
+            DetailColumnHeader(subline: "In \(list?.nameInSentence ?? SystemListKind.today.nameInSentence)", onClose: close) {
                 titleField
             }
             Hairline()

@@ -56,10 +56,9 @@ export const PROPER_NOUNS = [
   "Command",
   "Option",
   "Control",
-  // The time lists and the fourth column, named as places
-  "Today",
-  "This week",
-  "Someday",
+  // The fourth column, named as a place. The time lists (Today, This week,
+  // Someday) aren't here: mid-sentence they're lowercase ("Moved to this
+  // week") and keep their capitals only where they stand alone as a name
   "Done",
   "Undo",
   // Calendar words

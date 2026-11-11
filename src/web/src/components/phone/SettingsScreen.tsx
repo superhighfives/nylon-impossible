@@ -158,8 +158,8 @@ export function SettingsScreen({
           />
         </div>
         <p className={HINT}>
-          Today moves to This week, and This week to Someday, at your local
-          midnight. A todo gets at least a full day in Today.
+          Today moves to this week, and this week to someday, at your local
+          midnight. A todo gets at least a full day in today.
         </p>
       </section>
 

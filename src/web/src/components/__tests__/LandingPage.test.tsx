@@ -82,6 +82,35 @@ describe("LandingPage", () => {
     );
   });
 
+  it("names the time lists in lowercase mid-sentence", () => {
+    render(<LandingPage />);
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Today, this week, someday.",
+      }),
+    ).toBeInTheDocument();
+    // Each shot has a light and a dark image
+    expect(
+      screen.getAllByAltText(
+        "Nylon on the web: today, this week and someday side by side, with a sidebar of lists.",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getAllByAltText("Nylon on iPhone, showing today.").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        "Swipe to mark done, and a today widget on your Home Screen.",
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "What you're doing now. Anything still here tomorrow moves on to this week by itself.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("names the three horizons in order", () => {
     render(<LandingPage />);
     const horizons = screen

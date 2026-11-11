@@ -45,8 +45,17 @@ struct DoneHistoryView: View {
         return a.todo.id.uuidString < b.todo.id.uuidString
     }
 
+    private func list(_ todo: TodoItem) -> TodoListModel? {
+        lists.first { $0.id.lowercased() == todo.listKey?.lowercased() }
+    }
+
     private func listName(_ todo: TodoItem) -> String {
-        lists.first { $0.id.lowercased() == todo.listKey?.lowercased() }?.name ?? "Today"
+        list(todo)?.name ?? "Today"
+    }
+
+    /// "Puts it back in today": the list's name inside a sentence.
+    private func listNameInSentence(_ todo: TodoItem) -> String {
+        list(todo)?.nameInSentence ?? SystemListKind.today.nameInSentence
     }
 
     var body: some View {
@@ -108,9 +117,9 @@ struct DoneHistoryView: View {
         .padding(.vertical, 10)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(todo.title)
-        .accessibilityValue("Done, from \(listName(todo))")
+        .accessibilityValue("Done, from \(listNameInSentence(todo))")
         .accessibilityAddTraits(.isButton)
-        .accessibilityHint("Puts it back in \(listName(todo))")
+        .accessibilityHint("Puts it back in \(listNameInSentence(todo))")
         .accessibilityAction {
             withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
                 actions.restoreFromDone(todo)

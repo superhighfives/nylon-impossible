@@ -116,7 +116,7 @@ struct TodoActionsTests {
         // A week out places in This week.
         #expect(todo.listKey == fixture.week.id)
         let label = DueLabel.text(for: DueLabel.inDays(7)).text
-        #expect(fixture.actions.toasts.current?.text == "Done · next \(label), in This week")
+        #expect(fixture.actions.toasts.current?.text == "Done · next \(label), in this week")
 
         fixture.actions.toasts.performAction()
         #expect(todo.listKey == fixture.today.id)
@@ -247,11 +247,28 @@ struct TodoActionsTests {
         fixture.actions.move(todo, toList: fixture.week.id)
         #expect(todo.listKey == fixture.week.id)
         #expect(todo.position > "a3")
-        #expect(fixture.actions.toasts.current?.text == "Moved to This week")
+        #expect(fixture.actions.toasts.current?.text == "Moved to this week")
 
         fixture.actions.toasts.performAction()
         #expect(todo.listKey == fixture.today.id)
         #expect(todo.position == "a1")
+    }
+
+    @Test("a move to one of your lists names it as written, even one called Today")
+    func moveToYourList() throws {
+        let fixture = try makeFixture()
+        let groceries = TodoListModel(id: "groceries", userId: "u1", name: "Groceries", position: "a0")
+        let mine = TodoListModel(id: "mine", userId: "u1", name: "Today", position: "a1")
+        fixture.context.insert(groceries)
+        fixture.context.insert(mine)
+        let todo = insert("Oat milk", in: fixture.today, fixture)
+
+        fixture.actions.move(todo, toList: groceries.id)
+        #expect(fixture.actions.toasts.current?.text == "Moved to Groceries")
+        fixture.actions.move(todo, toList: mine.id)
+        #expect(fixture.actions.toasts.current?.text == "Moved to Today")
+        fixture.actions.move(todo, toList: fixture.today.id)
+        #expect(fixture.actions.toasts.current?.text == "Moved to today")
     }
 
     @Test("moving to the list it's in does nothing")
@@ -273,7 +290,7 @@ struct TodoActionsTests {
 
         #expect(!todo.isCompleted)
         #expect(todo.listKey == fixture.week.id)
-        #expect(fixture.actions.toasts.current?.text == "Back in This week")
+        #expect(fixture.actions.toasts.current?.text == "Back in this week")
     }
 
     @Test("a pasted list adds one todo per line, in order, with typed dates")

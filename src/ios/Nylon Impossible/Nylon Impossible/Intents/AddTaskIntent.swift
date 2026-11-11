@@ -77,11 +77,12 @@ struct AddTaskIntent: AppIntent {
             scheduleBackgroundSync()
         }
 
-        let confirmation = Self.confirmation(listName: destination.name, dueDate: todo.dueDate)
+        let confirmation = Self.confirmation(listName: destination.nameInSentence, dueDate: todo.dueDate)
         return .result(dialog: IntentDialog(stringLiteral: confirmation))
     }
 
-    /// Which list a todo goes in, and the name to confirm it with.
+    /// Which list a todo goes in, and the name to confirm it with, as it reads
+    /// mid-sentence: "today", "this week", or your list's own name.
     ///
     /// A time list resolves by kind to this account's row. Before the first
     /// sync there is no row, so the todo is created without a list, which the
@@ -91,22 +92,22 @@ struct AddTaskIntent: AppIntent {
     static func resolve(
         _ target: DeepLink.ListTarget,
         lists: [TodoListModel]
-    ) -> (listId: String?, name: String) {
+    ) -> (listId: String?, nameInSentence: String) {
         switch target {
         case .today, .thisWeek, .someday:
             if let kind = target.systemKind, let list = lists.first(where: { $0.systemKind == kind }) {
-                return (list.id, list.name)
+                return (list.id, list.nameInSentence)
             }
         case .list(let id):
             if let list = lists.first(where: { $0.id.caseInsensitiveCompare(id) == .orderedSame }) {
-                return (list.id, list.name)
+                return (list.id, list.nameInSentence)
             }
         }
         let today = lists.first { $0.systemKind == .today }
-        return (today?.id, today?.name ?? "Today")
+        return (today?.id, SystemListKind.today.nameInSentence)
     }
 
-    /// "Added to This week · Due Fri", or "Added to Today" with no due day.
+    /// "Added to this week · Due Fri", or "Added to today" with no due day.
     static func confirmation(listName: String, dueDate: Date?, now: Date = Date()) -> String {
         guard let dueDate else { return "Added to \(listName)" }
         return "Added to \(listName) · \(DueLabel.chip(for: dueDate, now: now))"

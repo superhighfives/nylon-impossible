@@ -3,7 +3,15 @@ import {
   PointerSensor,
   TouchSensor,
 } from "@dnd-kit/core";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { listNameInSentence } from "@nylon-impossible/shared";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   afterEach,
@@ -49,6 +57,10 @@ vi.mock("../useBoardData", () => ({
     byKind,
     collections,
     listName: (id: string) => lists.find((l) => l.id === id)?.name ?? "List",
+    listInSentence: (id: string) => {
+      const list = lists.find((l) => l.id === id);
+      return list ? listNameInSentence(list) : "List";
+    },
     actions: {
       checked: new Set(),
       collapsing: new Set(),
@@ -70,7 +82,7 @@ vi.mock("../useBoardData", () => ({
 vi.mock("../OvernightNote", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../OvernightNote")>()),
   useOvernightNote: () => ({
-    text: "2 moved to This week overnight",
+    text: "2 moved to this week overnight",
     dismiss: vi.fn(),
     seeKind: "thisWeek",
   }),
@@ -183,7 +195,7 @@ describe("PhoneApp", () => {
     const pill = within(page("today")).getByRole("status");
     expect(pill.closest("[data-banner-slot]")).not.toBeNull();
     await userEvent.click(
-      within(pill).getByRole("button", { name: "2 moved to This week" }),
+      within(pill).getByRole("button", { name: "2 moved to this week" }),
     );
     expect(
       within(switcher()).getByRole("button", { name: "This week" }),
@@ -204,6 +216,41 @@ describe("PhoneApp", () => {
     expect(
       within(switcher()).getByRole("button", { name: "This week" }),
     ).toHaveAttribute("aria-current", "page");
+  });
+});
+
+describe("PhoneApp empty states", () => {
+  afterEach(() => {
+    todos = startingTodos;
+  });
+
+  it("points an empty Today at this week, and an empty This week at someday", async () => {
+    todos = [
+      ...["a", "b", "c", "d"].map((id) =>
+        makeTodo({ id: `w-${id}`, listId: "list-week" }),
+      ),
+      makeTodo({ id: "s-a", listId: "list-someday" }),
+      makeTodo({ id: "s-b", listId: "list-someday" }),
+    ];
+    render(<PhoneApp />);
+    expect(within(page("today")).getByText("Nothing today.")).toBeVisible();
+    await userEvent.click(
+      within(page("today")).getByRole("button", {
+        name: "4 waiting in this week",
+      }),
+    );
+    expect(
+      within(switcher()).getByRole("button", { name: "This week" }),
+    ).toHaveAttribute("aria-current", "page");
+
+    todos = todos.filter((t) => t.listId !== "list-week");
+    cleanup();
+    render(<PhoneApp />);
+    expect(
+      within(page("thisWeek")).getByRole("button", {
+        name: "2 waiting in someday",
+      }),
+    ).toBeInTheDocument();
   });
 });
 

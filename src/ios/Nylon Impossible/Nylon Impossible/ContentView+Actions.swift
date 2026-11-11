@@ -37,7 +37,7 @@ extension ContentView {
         let created = actions.add(draft: text, to: listId, parseDates: parseDates, userId: authService.userId)
         noteAdded(created, to: listId)
         guard !created.isEmpty, let listId, listId != currentListId else { return }
-        let name = orderedLists.first { $0.id == listId }?.name ?? "List"
+        let name = orderedLists.first { $0.id == listId }?.nameInSentence ?? "List"
         let message = created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)"
         let lists = orderedLists
         actions.toasts.show(message, actionLabel: "View", action: { [viewModel] in

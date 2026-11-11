@@ -11,12 +11,15 @@ import { displayTitle, groupDoneByDay, mastheadSubline } from "./model";
 export function DonePage({
   todos,
   listName,
+  listInSentence,
   timeZone,
   onRestore,
   loading = false,
 }: {
   todos: TodoWithUrls[];
   listName: (id: string) => string;
+  /** The list inside a sentence: "Put “Milk” back in today". */
+  listInSentence: (id: string) => string;
   timeZone: string;
   onRestore: (todo: TodoWithUrls) => void;
   /** Todos haven't arrived: say so, rather than "Nothing done yet." */
@@ -51,7 +54,7 @@ export function DonePage({
                 <li key={todo.id} className="flex items-start gap-3 py-1.5">
                   <button
                     type="button"
-                    aria-label={`Put “${displayTitle(todo)}” back in ${listName(todo.listId)}`}
+                    aria-label={`Put “${displayTitle(todo)}” back in ${listInSentence(todo.listId)}`}
                     onClick={() => onRestore(todo)}
                     className="-my-1.5 -mr-1.5 -ml-2.5 flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-n-field n-focus-inset"
                   >

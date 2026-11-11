@@ -56,9 +56,10 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 ## Copy
 
 - Sentence case, always. Proper nouns keep their capitals.
-- Short and specific: "Moved to This week", not "Your todo has been moved successfully".
+- The time lists are lowercase mid-sentence: "Moved to this week", "Back in today", "Today, this week, someday.". They keep their capitals only where the name stands alone: column and page titles, the switcher, the sidebar, menu items and buttons. Your own lists keep their names everywhere: "Moved to Groceries".
+- Short and specific: "Moved to this week", not "Your todo has been moved successfully".
 - Toasts name what happened and, when it can be reversed, offer Undo.
-- Empty states say what's true and, when it helps, where to look next: "Nothing today." with "4 waiting in This week".
+- Empty states say what's true and, when it helps, where to look next: "Nothing today." with "4 waiting in this week".
 
 ## Visual
 

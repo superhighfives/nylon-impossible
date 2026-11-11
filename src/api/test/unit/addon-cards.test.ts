@@ -159,7 +159,7 @@ describe("buildHomepageCard", () => {
     // Someday always shows, with a written empty line.
     expect(empty.sections[3].header).toBe("Someday · 0");
     expect(empty.sections[3].widgets[0].textParagraph?.text).toBe(
-      "Nothing in Someday.",
+      "Nothing in someday.",
     );
   });
 
