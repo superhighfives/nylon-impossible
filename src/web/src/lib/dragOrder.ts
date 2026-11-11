@@ -7,6 +7,19 @@ interface Orderable {
 }
 
 /**
+ * Order by fractional-index position, by code point, as D1, the API and iOS
+ * do. Keys are base-62 and mix cases (`"Zz"` sorts before `"a0"`), so
+ * `localeCompare` would disagree. Equal positions keep their order: the
+ * sort is stable, so ties stay as the server sent them.
+ */
+export function byPosition(
+  a: { position: string },
+  b: { position: string },
+): number {
+  return a.position < b.position ? -1 : a.position > b.position ? 1 : 0;
+}
+
+/**
  * Clamp an insertion index into the dragged row's own tier. A list's
  * incomplete order is pinned rows first, then the rest, so a pinned
  * row can only land among the pinned and an unpinned one only after them.

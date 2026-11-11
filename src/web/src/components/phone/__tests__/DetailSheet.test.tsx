@@ -1,13 +1,15 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TodoActions } from "../useTodoActions";
-import { makeTodo } from "./fixtures";
+import { makeTodo, makeUrl } from "./fixtures";
+
+const createTodo = vi.hoisted(() => vi.fn());
 
 vi.mock("@/hooks/useTodos", () => {
   const mutation = () => ({ mutate: vi.fn(), isPending: false });
   return {
     useAddTodoUrl: mutation,
-    useCreateTodo: mutation,
+    useCreateTodo: () => ({ mutate: createTodo, isPending: false }),
     useDeleteTodo: mutation,
     useDeleteTodoUrl: mutation,
     useProcessTodo: mutation,
@@ -83,5 +85,50 @@ describe("DetailSheet", () => {
       />,
     );
     expect(document.querySelector("[data-icon]")).toBeNull();
+  });
+
+  it("shows subtasks and links by code point, and adds a subtask last", () => {
+    const parent = makeTodo({
+      urls: [
+        makeUrl({ id: "l-a0", url: "https://example.com/a0", position: "a0" }),
+        makeUrl({ id: "l-Zz", url: "https://example.com/Zz", position: "Zz" }),
+      ],
+    });
+    const sub = (title: string, position: string) =>
+      makeTodo({ id: title, title, position, parentId: parent.id });
+    render(
+      <DetailSheet
+        todo={parent}
+        subtasks={[
+          sub("a0", "a0"),
+          sub("aa", "aa"),
+          sub("Zz", "Zz"),
+          sub("aZ", "aZ"),
+        ]}
+        listTargets={[]}
+        listName={() => "Today"}
+        timeZone="UTC"
+        actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
+        onClose={vi.fn()}
+      />,
+    );
+    const subtasks = screen.getByRole("region", { name: /Subtasks/ });
+    expect(
+      within(subtasks)
+        .getAllByRole("button", { pressed: false })
+        .map((b) => b.getAttribute("aria-label")),
+    ).toEqual(["Zz", "a0", "aZ", "aa"]);
+    const links = screen.getByRole("region", { name: "Links" });
+    expect(
+      within(links)
+        .getAllByRole("link")
+        .map((a) => a.getAttribute("href")),
+    ).toEqual(["https://example.com/Zz", "https://example.com/a0"]);
+
+    const input = screen.getByRole("textbox", { name: "New subtask" });
+    fireEvent.change(input, { target: { value: "Pack" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(createTodo).toHaveBeenCalledTimes(1);
+    expect(createTodo.mock.calls[0][0].position > "aa").toBe(true);
   });
 });

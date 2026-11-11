@@ -11,6 +11,7 @@ import {
   openRows,
   planSubmit,
   rowMeta,
+  splitLists,
   viewForKey,
 } from "../model";
 import { dueIn, makeList, makeTodo, makeUrl, NOW, TZ } from "./fixtures";
@@ -104,6 +105,18 @@ describe("rowMeta", () => {
       }),
     );
     expect(metaSummary(parts)).toBe("Link to visitlisboa.com and 2 more");
+  });
+
+  it("takes the code-point first link, so Zz comes before a0", () => {
+    const todo = makeTodo({
+      urls: [
+        makeUrl({ id: "a", position: "a0" }),
+        makeUrl({ id: "z", url: "https://example.com/z", position: "Zz" }),
+      ],
+    });
+    expect(rowMeta(todo, [], NOW, TZ)).toContainEqual(
+      expect.objectContaining({ kind: "link", text: "example.com", more: 1 }),
+    );
   });
 
   it("ignores whitespace-only notes", () => {
@@ -211,6 +224,35 @@ describe("openRows", () => {
     expect(
       openRows(todos, "list-today", new Set(["f"])).map((t) => t.id),
     ).toEqual(["b", "a"]);
+  });
+
+  it("sorts each pinned tier by code point", () => {
+    const todos = [
+      makeTodo({ id: "a0", position: "a0" }),
+      makeTodo({ id: "a0V", position: "a0V" }),
+      makeTodo({ id: "Zz", position: "Zz" }),
+      makeTodo({ id: "pa1", position: "a1", pinned: true }),
+      makeTodo({ id: "pZy", position: "Zy", pinned: true }),
+    ];
+    expect(openRows(todos, "list-today", new Set()).map((t) => t.id)).toEqual([
+      "pZy",
+      "pa1",
+      "Zz",
+      "a0",
+      "a0V",
+    ]);
+  });
+});
+
+describe("splitLists", () => {
+  it("orders your lists by code point", () => {
+    const { collections } = splitLists([
+      makeList("a0", "Trips", null, "a0"),
+      makeList("today", "Today", "today", "a1"),
+      makeList("a0V", "Books", null, "a0V"),
+      makeList("Zz", "Groceries", null, "Zz"),
+    ]);
+    expect(collections.map((l) => l.id)).toEqual(["Zz", "a0", "a0V"]);
   });
 });
 

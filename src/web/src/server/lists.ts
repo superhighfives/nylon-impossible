@@ -42,13 +42,16 @@ export const getLists = createServerFn({ method: "GET" }).handler(async () => {
     Effect.gen(function* () {
       const userLists = yield* Effect.tryPromise({
         try: () =>
-          db.select().from(lists).where(eq(lists.userId, user.id)).all(),
+          db
+            .select()
+            .from(lists)
+            .where(eq(lists.userId, user.id))
+            .orderBy(lists.position)
+            .all(),
         catch: (error) =>
           new DatabaseError({ operation: "getLists", cause: error }),
       });
-      return userLists
-        .sort((a, b) => a.position.localeCompare(b.position))
-        .map(serializeList);
+      return userLists.map(serializeList);
     }),
   );
   return runEffect(program);

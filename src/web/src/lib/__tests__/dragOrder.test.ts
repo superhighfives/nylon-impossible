@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  byPosition,
   clampToTier,
   dropLineY,
   dropPlacement,
@@ -22,6 +23,22 @@ const list = [
   row("b", "a1"),
   row("c", "a2"),
 ];
+
+describe("byPosition", () => {
+  it("orders mixed-case keys by code point, as D1 and iOS do", () => {
+    const keys = ["a0", "a1", "Zz", "Zy", "a0V", "a0k"];
+    expect(
+      keys
+        .map((position) => ({ position }))
+        .sort(byPosition)
+        .map((r) => r.position),
+    ).toEqual(["Zy", "Zz", "a0", "a0V", "a0k", "a1"]);
+  });
+
+  it("returns 0 for equal positions", () => {
+    expect(byPosition({ position: "a0" }, { position: "a0" })).toBe(0);
+  });
+});
 
 describe("clampToTier", () => {
   it("keeps an unpinned row out of the pinned tier", () => {

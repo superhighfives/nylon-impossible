@@ -1,5 +1,6 @@
 import type { TodoActions } from "@/components/phone/useTodoActions";
 import { runToastUndo } from "@/components/phone/useTodoActions";
+import { byPosition } from "@/lib/dragOrder";
 import { toast } from "@/lib/toast";
 import type {
   SerializedList,
@@ -214,9 +215,7 @@ export function createBoard(ctx: BoardContext): Board {
     openLink: () => {
       const { todo } = current();
       if (!todo) return;
-      const first = [...todo.urls].sort((a, b) =>
-        a.position.localeCompare(b.position),
-      )[0];
+      const first = [...todo.urls].sort(byPosition)[0];
       if (first) window.open(first.url, "_blank", "noopener,noreferrer");
       else toast.info("No link on this todo");
     },
