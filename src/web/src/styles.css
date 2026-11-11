@@ -41,7 +41,6 @@
      leaving the colour and opacity changes. */
   --animate-n-pop: n-pop 240ms var(--n-ease-out-strong);
   --animate-n-fade-in: n-fade-in var(--n-duration-fast) ease-out;
-  --animate-n-row-in: n-row-in var(--n-duration-slow) var(--n-ease-out-strong);
 
   @keyframes n-pop {
     0% {
@@ -57,12 +56,6 @@
   @keyframes n-fade-in {
     from {
       opacity: 0;
-    }
-  }
-  @keyframes n-row-in {
-    from {
-      opacity: 0;
-      transform: translateY(-8px);
     }
   }
 }

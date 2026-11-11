@@ -8,7 +8,6 @@ import type { TodoWithUrls } from "@/types/database";
 import {
   useCreateTodo,
   useDeleteTodo,
-  usePendingTodoIds,
   useSmartCreate,
   useTodos,
   useUpdateTodo,
@@ -318,45 +317,6 @@ describe("useDeleteTodo", () => {
     const cached = queryClient.getQueryData<TodoWithUrls[]>(TODO_QUERY_KEY);
     expect(cached).toHaveLength(2);
     expect(cached?.[0]?.id).toBe("todo-1");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// usePendingTodoIds
-// ---------------------------------------------------------------------------
-
-describe("usePendingTodoIds", () => {
-  it("reports only the todos with a save in flight", async () => {
-    let resolveUpdate: (value: unknown) => void = () => {};
-    mockUpdateTodo.mockImplementation(
-      () => new Promise((resolve) => (resolveUpdate = resolve)) as never,
-    );
-    mockDeleteTodo.mockImplementation(() => new Promise(() => {}) as never);
-
-    const { Wrapper } = createWrapper();
-    const { result } = renderHook(
-      () => ({
-        update: useUpdateTodo(),
-        remove: useDeleteTodo(),
-        pending: usePendingTodoIds(),
-      }),
-      { wrapper: Wrapper },
-    );
-
-    result.current.update.mutate({ id: "a", input: { completed: true } });
-    result.current.remove.mutate("c");
-
-    await waitFor(() =>
-      expect(result.current.pending.updating.has("a")).toBe(true),
-    );
-    expect(result.current.pending.updating.has("b")).toBe(false);
-    expect(result.current.pending.deleting.has("c")).toBe(true);
-    expect(result.current.pending.deleting.has("a")).toBe(false);
-
-    resolveUpdate({ id: "a" });
-    await waitFor(() =>
-      expect(result.current.pending.updating.has("a")).toBe(false),
-    );
   });
 });
 

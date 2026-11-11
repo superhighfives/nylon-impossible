@@ -139,21 +139,3 @@ export function getFetchedPreviewTitle(url: SerializedTodoUrl): string | null {
   }
   return url.title ?? url.siteName ?? null;
 }
-
-/**
- * Build the `onError` handler that cascades a broken stored favicon to Google's
- * service, then hides the image entirely if both fail.
- */
-export function buildFaviconErrorHandler(
-  url: SerializedTodoUrl,
-  googleFaviconUrl: string | null,
-): React.ReactEventHandler<HTMLImageElement> {
-  return (event) => {
-    const img = event.currentTarget;
-    if (url.favicon && googleFaviconUrl && img.src !== googleFaviconUrl) {
-      img.src = googleFaviconUrl;
-      return;
-    }
-    img.style.display = "none";
-  };
-}

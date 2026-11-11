@@ -1,12 +1,7 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { createInitialTodo, toDueDay } from "@nylon-impossible/shared";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
-import {
-  useMutation,
-  useMutationState,
-  useQuery,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import { useEffect } from "react";
 import { z } from "zod";
@@ -148,40 +143,6 @@ export function useCreateTodo() {
 
 const UPDATE_TODO_MUTATION_KEY = ["todos", "update"] as const;
 const DELETE_TODO_MUTATION_KEY = ["todos", "delete"] as const;
-
-/** The todo id from a `useUpdateTodo` mutation's `{ id, input }` variables. */
-function updateVariablesId(variables: unknown): string | undefined {
-  if (
-    typeof variables === "object" &&
-    variables !== null &&
-    "id" in variables &&
-    typeof variables.id === "string"
-  ) {
-    return variables.id;
-  }
-  return undefined;
-}
-
-/**
- * Ids of todos with an update or delete in flight. Lets a row guard only its
- * own controls — a single shared `isPending` would dim every row in the
- * column whenever any one of them is saving.
- */
-export function usePendingTodoIds() {
-  const updating = useMutationState({
-    filters: { mutationKey: UPDATE_TODO_MUTATION_KEY, status: "pending" },
-    select: (m) => updateVariablesId(m.state.variables),
-  });
-  const deleting = useMutationState({
-    filters: { mutationKey: DELETE_TODO_MUTATION_KEY, status: "pending" },
-    select: (m) =>
-      typeof m.state.variables === "string" ? m.state.variables : undefined,
-  });
-  return {
-    updating: new Set(updating.filter((id) => id !== undefined)),
-    deleting: new Set(deleting.filter((id) => id !== undefined)),
-  };
-}
 
 export function useUpdateTodo() {
   const queryClient = useQueryClient();

@@ -1,7 +1,8 @@
-import { Effect, Exit, Layer } from "effect";
+import { env } from "cloudflare:workers";
+import { Effect, Exit } from "effect";
 import type { User } from "./auth";
 import { AuthService, AuthServiceLive, ensureUserExists } from "./auth";
-import { DatabaseService, DatabaseServiceLive } from "./db";
+import { type DbClient, getDbClient } from "./db";
 import {
   DatabaseError,
   type UnauthorizedError,
@@ -10,11 +11,9 @@ import {
 import { causeToClientError } from "./server-errors";
 
 /**
- * Combined layer that provides both Auth and Database services
- *
- * This is the main layer you'll use in server functions
+ * The layer server functions run with: it provides AuthService
  */
-export const AppLayer = Layer.mergeAll(AuthServiceLive, DatabaseServiceLive);
+export const AppLayer = AuthServiceLive;
 
 /**
  * Wrapper that combines authentication + database + user creation
@@ -41,20 +40,26 @@ export const AppLayer = Layer.mergeAll(AuthServiceLive, DatabaseServiceLive);
  * ```
  */
 export const withAuthenticatedUser = <A, E>(
-  callback: (user: User, db: import("./db").DbClient) => Effect.Effect<A, E>,
+  callback: (user: User, db: DbClient) => Effect.Effect<A, E>,
 ): Effect.Effect<
   A,
   E | DatabaseError | UnauthorizedError | UserNotFoundError,
-  AuthService | DatabaseService
+  AuthService
 > =>
   Effect.gen(function* () {
     // Get authenticated user from AuthService
     const authService = yield* AuthService;
     const user = yield* authService.getUser;
 
-    // Get database client from DatabaseService
-    const dbService = yield* DatabaseService;
-    const db = yield* dbService.getClient;
+    // Get database client for this request
+    const db = yield* Effect.try({
+      try: () => getDbClient(env.DB),
+      catch: (error) =>
+        new DatabaseError({
+          operation: "getClient",
+          cause: error,
+        }),
+    });
 
     // Ensure user exists in database (same as original implementation)
     yield* Effect.tryPromise({
@@ -90,7 +95,7 @@ export const withAuthenticatedUser = <A, E>(
  * ```
  */
 export const runEffect = async <A, E>(
-  effect: Effect.Effect<A, E, AuthService | DatabaseService>,
+  effect: Effect.Effect<A, E, AuthService>,
 ): Promise<A> => {
   const exit = await Effect.runPromiseExit(
     effect.pipe(Effect.provide(AppLayer)),

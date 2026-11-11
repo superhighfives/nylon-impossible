@@ -13,13 +13,7 @@ import {
 } from "./handlers/gmail-addon/actions";
 import { gmailAddonContextual } from "./handlers/gmail-addon/contextual";
 import { gmailAddonHomepage } from "./handlers/gmail-addon/homepage";
-import {
-  createList,
-  deleteList,
-  getList,
-  getLists,
-  updateList,
-} from "./handlers/lists";
+import { createList, deleteList, getLists, updateList } from "./handlers/lists";
 import { processTodo } from "./handlers/process";
 import { smartCreate } from "./handlers/smart-create";
 import { syncTodos } from "./handlers/sync";
@@ -144,7 +138,6 @@ app.delete("/todos/:id/urls/:urlId", deleteTodoUrl);
 // List routes
 app.get("/lists", getLists);
 app.post("/lists", createList);
-app.get("/lists/:id", getList);
 app.patch("/lists/:id", updateList);
 app.delete("/lists/:id", deleteList);
 
