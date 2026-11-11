@@ -276,12 +276,10 @@ extension ContentView {
         case .showDone:
             jump(.done)
         case .moveToList(let listId):
-            guard let column = focusedColumn,
-                  let id = selectedTodoId,
+            guard let id = selectedTodoId,
                   let todo = todos.first(where: { $0.id == id }),
                   todo.listKey?.lowercased() != listId.lowercased() else { return }
-            selectedTodoId = BoardNavigator.neighbor(of: id, in: rows(column).map(\.id))
-            actions.move(todo, toList: listId)
+            moveKeepingSelection(todo, to: listId)
         }
     }
 

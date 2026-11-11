@@ -260,8 +260,13 @@ export function useTodoActions({
     (
       todo: TodoWithUrls,
       listId: string,
-      // `name`: for a list too new to be in the cache yet.
-      { quiet = false, name }: { quiet?: boolean; name?: string } = {},
+      // `name`: for a list too new to be in the cache yet. `onUndo`: after
+      // the toast's Undo has put it back.
+      {
+        quiet = false,
+        name,
+        onUndo,
+      }: { quiet?: boolean; name?: string; onUndo?: () => void } = {},
     ) => {
       if (todo.listId === listId) return;
       const from = { listId: todo.listId, position: todo.position };
@@ -272,9 +277,10 @@ export function useTodoActions({
       onMoved?.(listId);
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
-      showUndoToast(`Moved to ${name ?? listInSentence(listId)}`, () =>
-        update({ id: todo.id, input: from }),
-      );
+      showUndoToast(`Moved to ${name ?? listInSentence(listId)}`, () => {
+        update({ id: todo.id, input: from });
+        onUndo?.();
+      });
     },
     [listInSentence, topPosition, update, onMoved],
   );

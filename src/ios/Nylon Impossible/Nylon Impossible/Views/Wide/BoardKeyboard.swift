@@ -168,6 +168,27 @@ enum BoardNavigator {
         return index > 0 ? rows[index - 1] : nil
     }
 
+    /// What a row command did to its todo, for `selection(after:of:in:rows:)`.
+    enum RowChange: Equatable {
+        /// Done or Delete: it's gone from the column.
+        case gone
+        /// Moved to another list (1/2/3, Move to…, the menu's Move).
+        case moved(to: String)
+    }
+
+    /// The todo selected after a row command on `todo` in `column`, and the
+    /// column it's in. Done and Delete hand the selection to the next todo
+    /// (principle 3); a moved todo still exists, so it stays selected and
+    /// the keyboard goes with it to its new column.
+    static func selection(
+        after change: RowChange, of todo: UUID, in column: String, rows: [UUID]
+    ) -> (todo: UUID?, column: String) {
+        switch change {
+        case .gone: return (neighbor(of: todo, in: rows), column)
+        case .moved(let list): return (todo, list)
+        }
+    }
+
     /// Moving across columns keeps the row's position where it can.
     static func across(from rows: [UUID], current: UUID?, to target: [UUID]) -> UUID? {
         guard !target.isEmpty else { return nil }

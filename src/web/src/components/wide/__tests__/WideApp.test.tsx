@@ -133,6 +133,34 @@ const focusedTitle = () =>
 const press = (key: string) =>
   fireEvent.keyDown(document.activeElement ?? window, { key });
 
+/** The selected todo, and the column it's in. */
+const selection = () => {
+  const row = (
+    document.activeElement as HTMLElement | null
+  )?.closest<HTMLElement>("[data-row-id]");
+  if (!row?.closest("[data-row-container]")?.hasAttribute("data-selected")) {
+    return null;
+  }
+  return {
+    id: row.dataset.rowId,
+    column: row.closest<HTMLElement>("[data-column]")?.dataset.column,
+  };
+};
+/** A column's todos, top to bottom. */
+const rowIds = (listId: string) =>
+  [
+    ...document.querySelectorAll<HTMLElement>(
+      `[data-column="${listId}"] [data-row-id]`,
+    ),
+  ].map((r) => r.dataset.rowId);
+/** `update` as the cache applies it; the next render shows the change. */
+const liveUpdates = () =>
+  update.mockImplementation(
+    ({ id, input }: { id: string; input: Partial<TodoWithUrls> }) => {
+      todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
+    },
+  );
+
 /** The board row's children, left to right: columns, the sheet and the end. */
 const slides = () =>
   [
@@ -583,8 +611,9 @@ describe("WideApp", () => {
     expect(focusedTitle()).toContain("Review PR");
   });
 
-  it("1/2/3 move the focused todo, and focus moves on to its neighbour", () => {
-    render(<WideApp />);
+  it("1/2/3 move the focused todo, and it stays selected in its new column", () => {
+    const { container, rerender } = render(<WideApp />);
+    liveUpdates();
     rowButton("Review PR").focus();
     press("2");
     expect(update).toHaveBeenCalledWith({
@@ -595,11 +624,59 @@ describe("WideApp", () => {
       "Moved to this week",
       expect.anything(),
     );
-    expect(focusedTitle()).toContain("Call Mum");
+    rerender(<WideApp />);
+    // At the top of This week, with the keyboard's bar; Today's next todo
+    // isn't selected.
+    expect(selection()).toEqual({ id: "t1", column: "list-week" });
+    expect(rowIds("list-week")[0]).toBe("t1");
+    expect(container.querySelector("[data-wide-ready]")).toHaveAttribute(
+      "data-keyboard",
+    );
+    expect(
+      rowButton("Review PR")
+        .closest("li")
+        ?.querySelector("[data-row-selection-bar]"),
+    ).toBeInTheDocument();
+    expect(
+      rowButton("Call Mum").closest("[data-row-container]"),
+    ).not.toHaveAttribute("data-selected");
+
+    press("3");
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-someday" });
+    press("1");
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-today" });
     // Already in Today: nothing to do.
     update.mockClear();
     press("1");
     expect(update).not.toHaveBeenCalled();
+  });
+
+  it("Undo puts a moved todo back, still selected", () => {
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    rowButton("Review PR").focus();
+    press("2");
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-week" });
+    press("z");
+    expect(update).toHaveBeenLastCalledWith({
+      id: "t1",
+      input: { listId: "list-today", position: "a0" },
+    });
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-today" });
+  });
+
+  it("x and Delete still hand the selection to the next todo", () => {
+    render(<WideApp />);
+    rowButton("Review PR").focus();
+    press("x");
+    expect(focusedTitle()).toContain("Call Mum");
+    rowButton("Send invoice").focus();
+    press("Backspace");
+    expect(focusedTitle()).toContain("Renew passport");
   });
 
   it("p pins and x marks done", async () => {
@@ -934,6 +1011,65 @@ describe("WideApp", () => {
     );
   });
 
+  it("Move to keeps the todo selected, and scrolls to a list off screen", async () => {
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    const board = layOutBoard(600);
+    act(() => rowButton("Review PR").focus());
+    press("m");
+    const dialog = await screen.findByRole("dialog", {
+      name: "Move “Review PR”",
+    });
+    await userEvent.type(within(dialog).getByRole("combobox"), "stud{Enter}");
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-studio" });
+    // Studio is the fifth column: 1088–1360px.
+    expect(board.scrollTo).toHaveBeenLastCalledWith({
+      left: 1360 - 600,
+      behavior: "auto",
+    });
+  });
+
+  it("the right-click menu's Move keeps the todo selected", async () => {
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    fireEvent.contextMenu(rowButton("Review PR"), {
+      clientX: 200,
+      clientY: 200,
+    });
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    await userEvent.click(
+      within(menu).getByRole("menuitem", { name: /Move to This week/ }),
+    );
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-week" });
+  });
+
+  it("with a todo open, 2 keeps it open, beside its new column", async () => {
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    rowButton("Review PR").focus();
+    await userEvent.keyboard("{Enter}");
+    press("2");
+    rerender(<WideApp />);
+    expect(
+      within(screen.getByRole("dialog")).getByRole("textbox", {
+        name: "Title",
+      }),
+    ).toHaveValue("Review PR");
+    expect(selection()).toEqual({ id: "t1", column: "list-week" });
+    expect(slides()).toEqual([
+      "list-today",
+      "list-week",
+      "sheet",
+      "list-someday",
+      "list-groceries",
+      "list-studio",
+      "done",
+      "end",
+    ]);
+  });
+
   it("Move to offers a new list when nothing matches", async () => {
     createList.mockImplementation((_input, opts) =>
       opts.onSuccess({ ...lists[3], id: "list-new", name: "Garden" }),
@@ -963,6 +1099,32 @@ describe("WideApp", () => {
       "Moved to Garden",
       expect.anything(),
     );
+  });
+
+  it("Move to a new list keeps the todo selected in the new column", async () => {
+    const garden = makeList("list-new", "Garden", null, "a5");
+    const before = lists;
+    createList.mockImplementation((_input, opts) => {
+      lists = [...lists, garden];
+      opts.onSuccess(garden);
+    });
+    try {
+      const { rerender } = render(<WideApp />);
+      liveUpdates();
+      act(() => rowButton("Review PR").focus());
+      press("m");
+      const dialog = await screen.findByRole("dialog", {
+        name: "Move “Review PR”",
+      });
+      await userEvent.type(
+        within(dialog).getByRole("combobox"),
+        "Garden{Enter}",
+      );
+      rerender(<WideApp />);
+      expect(selection()).toEqual({ id: "t1", column: "list-new" });
+    } finally {
+      lists = before;
+    }
   });
 
   it("leaves keys alone while typing", () => {

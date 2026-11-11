@@ -142,10 +142,11 @@ extension ContentView {
 
     // MARK: - Row keys
 
-    /// A row key on `todo`, in `column`. On the open todo (`fromDetail`) the
-    /// selection stays on it when it moves, so the detail keeps showing it.
+    /// A row key on `todo`, in `column`. Done and Delete hand the selection
+    /// on; a move keeps it on the todo (`moveKeepingSelection`).
     func act(_ key: BoardKey, on todo: TodoItem, in column: String, fromDetail: Bool) {
-        let neighbor = BoardNavigator.neighbor(of: todo.id, in: keyRows(column))
+        // Where Done and Delete hand the selection (a move keeps it).
+        let neighbor = BoardNavigator.selection(after: .gone, of: todo.id, in: column, rows: keyRows(column)).todo
 
         // Done's rows: X or Return puts one back, Delete removes it.
         if column == Self.doneColumn {
@@ -197,8 +198,7 @@ extension ContentView {
         case .move(let kind):
             guard let target = orderedLists.first(where: { $0.systemKind == kind }),
                   target.id.lowercased() != column.lowercased() else { return }
-            if !fromDetail { selectedTodoId = neighbor }
-            actions.move(todo, toList: target.id)
+            moveKeepingSelection(todo, to: target.id)
         default:
             break
         }
@@ -208,5 +208,33 @@ extension ContentView {
     func select(_ id: UUID?, in column: String) {
         selectedTodoId = id
         if let id { lastSelected[column] = id }
+    }
+
+    /// Move a todo by command (1/2/3, Move to…, Todo ▸ Move to, the board's
+    /// menu). Unlike Done and Delete it stays selected, and the keyboard goes
+    /// with it to its new column, as it does on Undo. Dragging doesn't come
+    /// through here.
+    func moveKeepingSelection(_ todo: TodoItem, to listId: String) {
+        let from = todo.listKey
+        actions.move(todo, toList: listId) {
+            if selectedTodoId == todo.id, let from { follow(todo, to: from) }
+        }
+        follow(todo, to: listId)
+    }
+
+    /// Select `todo` in its new list's column, which scrolls into view as Go
+    /// to does. Your list comes into the fourth column; with a todo open the
+    /// detail keeps it, and the keyboard.
+    private func follow(_ todo: TodoItem, to listId: String) {
+        guard let list = orderedLists.first(where: { $0.id.lowercased() == listId.lowercased() }) else { return }
+        let next = BoardNavigator.selection(after: .moved(to: list.id), of: todo.id, in: list.id, rows: [])
+        select(next.todo, in: next.column)
+        guard detailTodo == nil else { return }
+        if !list.isSystem { openColumnId = list.id }
+        focusedColumnId = list.id
+        scrollColumnId = list.id
+        keySection = .column(list.id)
+        addCursor = nil
+        boardFocused = true
     }
 }

@@ -163,13 +163,10 @@ extension ContentView {
         }
     }
 
-    /// Moving from the palette hands the selection on, as 1/2/3 do.
+    /// Moving from the palette keeps the todo selected, as 1/2/3 do.
     private func moveSelected(_ todo: TodoItem, to listId: String) {
-        if selectedTodoId == todo.id, let column = selectionColumn {
-            selectsByKeyboard = true
-            selectedTodoId = BoardNavigator.neighbor(of: todo.id, in: keyRows(column))
-        }
-        actions.move(todo, toList: listId)
+        selectsByKeyboard = true
+        moveKeepingSelection(todo, to: listId)
     }
 
     /// New list "…": create it, then move the todo into it.

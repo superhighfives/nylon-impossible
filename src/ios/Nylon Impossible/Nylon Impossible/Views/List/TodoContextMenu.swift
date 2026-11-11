@@ -18,6 +18,8 @@ struct TodoContextMenu: View {
     let lists: [TodoListModel]
     let actions: TodoActions
     var style: Style = .phone
+    /// The board's move, which keeps the todo selected; else a plain move.
+    var onMove: ((TodoItem, String) -> Void)?
 
     private var others: [TodoListModel] {
         let here = todo.listKey?.lowercased()
@@ -95,7 +97,11 @@ struct TodoContextMenu: View {
 
     private func moveButton(_ target: TodoListModel, label: String, systemImage: String) -> some View {
         Button {
-            actions.move(todo, toList: target.id)
+            if let onMove {
+                onMove(todo, target.id)
+            } else {
+                actions.move(todo, toList: target.id)
+            }
         } label: {
             Label(label, systemImage: systemImage)
         }
