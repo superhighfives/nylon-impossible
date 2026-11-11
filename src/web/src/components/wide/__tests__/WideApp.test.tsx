@@ -616,10 +616,10 @@ describe("WideApp", () => {
     liveUpdates();
     rowButton("Review PR").focus();
     press("2");
-    expect(update).toHaveBeenCalledWith({
-      id: "t1",
-      input: expect.objectContaining({ listId: "list-week" }),
-    });
+    expect(update).toHaveBeenCalledWith(
+      { id: "t1", input: expect.objectContaining({ listId: "list-week" }) },
+      expect.anything(),
+    );
     expect(toast.success).toHaveBeenCalledWith(
       "Moved to this week",
       expect.anything(),
@@ -665,6 +665,22 @@ describe("WideApp", () => {
       id: "t1",
       input: { listId: "list-today", position: "a0" },
     });
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-today" });
+  });
+
+  it("a move the server refuses goes back, still selected", () => {
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    rowButton("Review PR").focus();
+    press("2");
+    rerender(<WideApp />);
+    expect(selection()).toEqual({ id: "t1", column: "list-week" });
+    // The optimistic move is rolled back, then the call's onError runs.
+    todos = todos.map((t) =>
+      t.id === "t1" ? { ...t, listId: "list-today", position: "a0" } : t,
+    );
+    update.mock.lastCall?.[1]?.onError?.();
     rerender(<WideApp />);
     expect(selection()).toEqual({ id: "t1", column: "list-today" });
   });
@@ -1001,10 +1017,13 @@ describe("WideApp", () => {
       "Studio1",
     ]);
     await userEvent.type(within(dialog).getByRole("combobox"), "groc{Enter}");
-    expect(update).toHaveBeenCalledWith({
-      id: "t1",
-      input: expect.objectContaining({ listId: "list-groceries" }),
-    });
+    expect(update).toHaveBeenCalledWith(
+      {
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-groceries" }),
+      },
+      expect.anything(),
+    );
     expect(toast.success).toHaveBeenCalledWith(
       "Moved to Groceries",
       expect.anything(),
@@ -1091,10 +1110,10 @@ describe("WideApp", () => {
       expect.objectContaining({ name: "Garden" }),
       expect.anything(),
     );
-    expect(update).toHaveBeenCalledWith({
-      id: "t1",
-      input: expect.objectContaining({ listId: "list-new" }),
-    });
+    expect(update).toHaveBeenCalledWith(
+      { id: "t1", input: expect.objectContaining({ listId: "list-new" }) },
+      expect.anything(),
+    );
     expect(toast.success).toHaveBeenCalledWith(
       "Moved to Garden",
       expect.anything(),
@@ -1910,6 +1929,7 @@ describe("WideApp drag and drop", () => {
         id: "t1",
         input: expect.objectContaining({ listId: "list-groceries" }),
       }),
+      expect.anything(),
     );
   });
 

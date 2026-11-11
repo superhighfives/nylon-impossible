@@ -261,19 +261,26 @@ export function useTodoActions({
       todo: TodoWithUrls,
       listId: string,
       // `name`: for a list too new to be in the cache yet. `onUndo`: after
-      // the toast's Undo has put it back.
+      // the toast's Undo has put it back. `onFailed`: after a move the
+      // server refused has been rolled back.
       {
         quiet = false,
         name,
         onUndo,
-      }: { quiet?: boolean; name?: string; onUndo?: () => void } = {},
+        onFailed,
+      }: {
+        quiet?: boolean;
+        name?: string;
+        onUndo?: () => void;
+        onFailed?: () => void;
+      } = {},
     ) => {
       if (todo.listId === listId) return;
       const from = { listId: todo.listId, position: todo.position };
-      update({
-        id: todo.id,
-        input: { listId, position: topPosition(listId) },
-      });
+      update(
+        { id: todo.id, input: { listId, position: topPosition(listId) } },
+        { onError: () => onFailed?.() },
+      );
       onMoved?.(listId);
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;

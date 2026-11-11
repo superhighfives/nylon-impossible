@@ -444,17 +444,26 @@ export function WideApp({
 
   /**
    * Move a todo by command (1/2/3, Move to…, the menu): unlike Done and
-   * Delete, the selection stays on it, in its new column, and on Undo goes
-   * back with it.
+   * Delete, the selection stays on it, in its new column, and on Undo (or
+   * a move the server refused) goes back with it.
    */
   const moveTodo = (todo: TodoWithUrls, listId: string, name?: string) => {
     if (todo.listId === listId) return;
     followTodo(todo.id, listId);
+    const followBack = () => {
+      if (selectedIdNow.current === todo.id) {
+        followTodo(todo.id, todo.listId);
+      } else if (
+        pendingFocus.current?.target === "row" &&
+        pendingFocus.current.rowId === todo.id
+      ) {
+        pendingFocus.current = null;
+      }
+    };
     actions.move(todo, listId, {
       name,
-      onUndo: () => {
-        if (selectedIdNow.current === todo.id) followTodo(todo.id, todo.listId);
-      },
+      onUndo: followBack,
+      onFailed: followBack,
     });
   };
 
