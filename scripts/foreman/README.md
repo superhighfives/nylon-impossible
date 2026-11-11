@@ -298,16 +298,27 @@ works as its name in the off switches.
 **The digest** is `jq` over the last 24 hours of `events.jsonl`, plus `gh`
 queries for merged PRs, `needs-decision`, `owner-merge`, specs in Define whose
 open questions aren't "None.", `~/.foreman/verify/`, and `~/.foreman/waits/`
-for open stalls. It comments on the
-open "Foreman digest" issue by `nylon-foreman`, opening and pinning it the
-first time, then sends a Discord alert linking the comment. When all four
-sections are empty, it posts and alerts nothing.
+for open stalls. It emails the result through Cloudflare Email Sending's
+REST API, from `Nylon foreman <foreman@superhighfives.com>` to
+`hi@charliegleason.com`, with the subject `Nylon digest: <Weekday> <d>
+<Month>`. The email has a plain-text part (the markdown) and a plain HTML
+part (a heading per section, a list of its lines, every `#n` linked to the
+repo), built in `perl` with titles escaped before linking. It needs the token
+in `~/.foreman/cloudflare-email-token` (below). The send counts only if
+Cloudflare lists the recipient as delivered or queued. A missing token, an API
+error or a bounce fails the routine with the reason, which alerts and shows
+up under the next day's Problems. When all four sections are empty, it sends
+nothing. `FOREMAN_DIGEST_FROM`, `FOREMAN_DIGEST_TO`, `FOREMAN_CF_ACCOUNT_ID`
+and `FOREMAN_CF_TOKEN_FILE` override the sender, the recipient, the account
+and the token file.
 
 **Running one now:** `foreman.sh routine <name>` ignores the schedule and the
 off switch, but not the PR limit. `--dry-run` changes nothing on GitHub. For
 `sentry` and `scout` it still runs Claude, which is read-only anyway, and
 prints what would be filed. For `deps` it lists what would be bundled. For
-`dispatch` and `digest` it prints the installs and the comment.
+`dispatch` it prints the installs. For `digest` it prints the email's subject,
+sender, recipient and both parts, and whether the token file exists, without
+reading it.
 `foreman.sh status` lists each routine's last run, next run, and whether it's
 off.
 
@@ -428,6 +439,19 @@ repo and to the Nylon project. Its classic token (scopes `repo`, `workflow`,
   `status`, and alerts once.
 - **To renew it:** make a new classic token on `nylon-foreman` with the same
   scopes, and write it to `~/.foreman/github-token`. The next tick uses it.
+
+**The digest's Cloudflare token** lives in
+**`~/.foreman/cloudflare-email-token`**, `chmod 600`: an API token on the
+Cloudflare account with Email Sending's send permission, made without an
+expiry. Only the digest reads it, and it reaches `curl` as a header file, never
+as an argument. There's no early warning: if it's revoked, that morning's
+digest fails and alerts.
+- **To renew it:** in the Cloudflare dashboard, make a new API token with
+  Email Sending send permission for the account, write it to
+  `~/.foreman/cloudflare-email-token` and `chmod 600` it. Run
+  `foreman.sh routine digest` to send that day's digest.
+- Sending to `hi@charliegleason.com` without Workers Paid needs it verified
+  under Email Routing → Destination addresses.
 
 **Setup and state:**
 - Claude's credentials come from the operator's shim

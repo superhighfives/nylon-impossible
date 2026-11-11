@@ -1,6 +1,6 @@
 ---
 name: routines
-description: The foreman's scheduled routines for nylon-impossible (nightly Sentry sweep, weekly Dependabot bundle, dispatch, the weekly scout, the daily digest). Use when changing, debugging or turning off a routine, when an issue, board item, PR or digest comment looks like a routine made it, or when asked what runs on the Mac mini besides builds.
+description: The foreman's scheduled routines for nylon-impossible (nightly Sentry sweep, weekly Dependabot bundle, dispatch, the weekly scout, the daily digest). Use when changing, debugging or turning off a routine, when an issue, board item, PR or digest email looks like a routine made it, or when asked what runs on the Mac mini besides builds.
 ---
 
 # Routines
@@ -17,7 +17,7 @@ stop it.
 | `deps` | Mondays, from 09:00 | Claude, `dependabot-bundle` skill | One `foreman/deps-<date>` PR |
 | `dispatch` | Every tick | Shell | An operator job on every agent PR |
 | `scout` | Thursdays, from 03:00 | Claude | Up to 5 draft items in Ideas |
-| `digest` | Daily, from 08:00 | Shell | A comment on the pinned "Foreman digest" issue, and a Discord alert |
+| `digest` | Daily, from 08:00 | Shell | An email to the owner, through Cloudflare Email Sending |
 
 A routine runs on the first tick after its time, once per window, even if
 that run fails. A failed run alerts and shows up in the next digest. Each run
@@ -61,7 +61,24 @@ logs a `routine` event to `~/.foreman/events.jsonl`.
   (`needs-decision`, `owner-merge`, specs with questions), **Found** (what sentry and scout filed) and **Problems** (failed
   builds, rounds, spec runs and routines, and a token about to expire). It's
   built in shell from `events.jsonl` and GitHub's own fields, so no text on
-  GitHub can steer it. It posts nothing when every section is empty.
+  GitHub can steer it. It's emailed from `foreman@superhighfives.com` to
+  `hi@charliegleason.com`, subject `Nylon digest: <Weekday> <d> <Month>`,
+  with a plain-text part and a simple HTML one with every `#n` linked. It
+  sends nothing when every section is empty. A failed send (no token file,
+  a Cloudflare error, a bounce) alerts on Discord and shows up under the
+  next day's Problems; that day's digest isn't posted anywhere else. The
+  old pinned "Foreman digest" issue (#588) is retired.
+
+## The digest's token
+
+The Cloudflare API token is in `~/.foreman/cloudflare-email-token` on the
+Mac mini, `chmod 600`, next to `github-token`. It has Email Sending's send
+permission and no expiry, so there's no early warning: a revoked token shows
+up as that morning's `routine digest failed (Cloudflare 403: …)`. To renew it,
+make a new API token with Email Sending send permission for the account in
+the Cloudflare dashboard, write it to that file, `chmod 600` it, and run
+`foreman.sh routine digest` to send the day's digest. The README's "The
+machine account" section has the rest.
 
 ## What they're trusted with
 
@@ -80,7 +97,7 @@ review rounds cover it like any other `foreman/*` PR.
 
 ```sh
 ~/.foreman/bin/foreman.sh status                    # each routine's last run, next run, and whether it's off
-~/.foreman/bin/foreman.sh routine sentry --dry-run  # what it would file, open, install or post; changes nothing
+~/.foreman/bin/foreman.sh routine sentry --dry-run  # what it would file, open, install or email; changes nothing
 ~/.foreman/bin/foreman.sh routine digest            # run it now, ignoring its schedule
 ```
 
