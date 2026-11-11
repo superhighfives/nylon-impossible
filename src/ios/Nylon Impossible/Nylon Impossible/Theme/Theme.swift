@@ -252,19 +252,15 @@ enum Theme {
     enum Icon {
         static let add = "plus" // lucide: Plus
         static let done = "checkmark" // lucide: Check
-        static let doneCircle = "checkmark.circle" // lucide: CheckCircle2
         static let todo = "circle" // lucide: Circle
         static let list = "list.bullet" // lucide: List
         static let close = "xmark" // lucide: X
-        static let remove = "minus" // lucide: Minus
         static let pin = "pin.fill" // lucide: Pin
         static let `repeat` = "repeat" // lucide: Repeat
         static let due = "calendar" // lucide: Calendar
-        static let time = "clock" // lucide: Clock
         static let notes = "doc.text" // lucide: FileText
         static let link = "link" // lucide: Link2
         static let externalLink = "arrow.up.right" // lucide: ExternalLink
-        static let email = "envelope" // lucide: Mail
         static let subtasks = "list.bullet.indent" // lucide: ListTree
         static let edit = "pencil" // lucide: Pencil
         static let newList = "text.badge.plus" // lucide: ListPlus
@@ -273,8 +269,6 @@ enum Theme {
         static let settings = "gear" // lucide: Settings
         static let retry = "arrow.clockwise" // lucide: RefreshCw
         static let error = "exclamationmark.circle" // lucide: AlertCircle
-        static let info = "info.circle" // lucide: Info
-        static let dragHandle = "line.3.horizontal" // lucide: GripVertical
         static let chevronDown = "chevron.down" // lucide: ChevronDown
         static let chevronLeft = "chevron.left" // lucide: ChevronLeft
         static let chevronRight = "chevron.right" // lucide: ChevronRight

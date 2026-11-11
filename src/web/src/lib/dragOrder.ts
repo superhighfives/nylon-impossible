@@ -26,19 +26,6 @@ export function clampToTier<T extends Orderable>(
 }
 
 /**
- * Insert `item` into `items` (which must not already contain it) at `index`,
- * clamped into its tier.
- */
-export function insertInTier<T extends Orderable>(
-  items: T[],
-  item: T,
-  index: number,
-): T[] {
-  const at = clampToTier(items, item.pinned, index);
-  return [...items.slice(0, at), item, ...items.slice(at)];
-}
-
-/**
  * A fractional position for the row at `index` in `items` (which includes
  * it), between its neighbours in the same tier. Neighbours across the tier
  * boundary are ignored — tiers sort independently.

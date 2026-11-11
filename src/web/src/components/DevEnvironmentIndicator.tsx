@@ -4,10 +4,6 @@ import { API_URL } from "../lib/config";
 const isPreviewDeploy = (hostname: string) =>
   /^pr-\d+\.nylonimpossible\.com$/.test(hostname);
 
-interface Props {
-  origin: string;
-}
-
 /**
  * The current page URL and API base, but only in local dev and preview
  * deploys — returns null in production so callers render nothing. Used by the
@@ -22,23 +18,4 @@ export function useDevEnvironment(
   if (import.meta.env.PROD && !isPreviewDeploy(hostname)) return null;
 
   return { currentUrl: `${origin}${location.href}`, apiUrl: API_URL };
-}
-
-/** Small rows listing the current URL + API base. */
-export function DevEnvironmentDetails({ origin }: Props) {
-  const env = useDevEnvironment(origin);
-  if (!env) return null;
-
-  return (
-    <>
-      <div className="flex gap-2">
-        <span className="text-n-ink-subtle">url</span>
-        <span className="max-w-64 truncate">{env.currentUrl}</span>
-      </div>
-      <div className="flex gap-2">
-        <span className="text-n-ink-subtle">api</span>
-        <span>{env.apiUrl}</span>
-      </div>
-    </>
-  );
 }

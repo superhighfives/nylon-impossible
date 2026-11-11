@@ -3,7 +3,6 @@ import {
   clampToTier,
   dropLineY,
   dropPlacement,
-  insertInTier,
   partOffset,
   positionAt,
   slotAt,
@@ -38,31 +37,15 @@ describe("clampToTier", () => {
   });
 });
 
-describe("insertInTier", () => {
-  it("inserts at the requested slot when it's in the row's tier", () => {
-    const next = insertInTier(list, row("x", "zz"), 3);
-    expect(next.map((t) => t.id)).toEqual(["p1", "p2", "a", "x", "b", "c"]);
-  });
-
-  it("pushes an unpinned row below the pinned ones", () => {
-    const next = insertInTier(list, row("x", "zz"), 0);
-    expect(next.map((t) => t.id)).toEqual(["p1", "p2", "x", "a", "b", "c"]);
-  });
-
-  it("lands in an empty list", () => {
-    expect(insertInTier([], row("x", "a0"), 3).map((t) => t.id)).toEqual(["x"]);
-  });
-});
-
 describe("positionAt", () => {
   it("sorts between same-tier neighbours", () => {
-    const items = insertInTier(list, row("x", "zz"), 3); // between a and b
+    const items = [...list.slice(0, 3), row("x", "zz"), ...list.slice(3)]; // between a and b
     const pos = positionAt(items, 3);
     expect(pos > "a0" && pos < "a1").toBe(true);
   });
 
   it("ignores a neighbour across the tier boundary", () => {
-    const items = insertInTier(list, row("x", "zz"), 2); // top of unpinned
+    const items = [...list.slice(0, 2), row("x", "zz"), ...list.slice(2)]; // top of unpinned
     const pos = positionAt(items, 2);
     expect(pos < "a0").toBe(true);
   });

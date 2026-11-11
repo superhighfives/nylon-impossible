@@ -1,7 +1,7 @@
 import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { beforeEach, describe, expect, it } from "vitest";
-import { cleanDb } from "../helpers";
+import { cleanDb, getTodayListId, seedSystemLists, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -116,6 +116,25 @@ describe("API routing", () => {
     it("GET /unknown returns 404", async () => {
       const res = await SELF.fetch("http://localhost/unknown");
       expect(res.status).toBe(404);
+    });
+
+    // GET /lists/:id was written for a delete confirmation Settled "Deleting
+    // a list" rules out, and no client called it (#617).
+    it("GET /lists/:id returns 404 for a real list", async () => {
+      await seedUser();
+      await seedSystemLists();
+      const listId = await getTodayListId();
+      const headers = { Authorization: "Bearer test-token" };
+
+      const one = await SELF.fetch(`http://localhost/lists/${listId}`, {
+        headers,
+      });
+      expect(one.status).toBe(404);
+
+      const all = await SELF.fetch("http://localhost/lists", { headers });
+      expect(all.status).toBe(200);
+      const body = await all.json<{ id: string }[]>();
+      expect(body.map((l) => l.id)).toContain(listId.toLowerCase());
     });
   });
 });

@@ -33,33 +33,6 @@ export async function getLists(c: Context<Env>) {
   return c.json(userLists.map(serializeList));
 }
 
-// GET /lists/:id - a single list plus its todo count, for the "this will
-// delete N todos" confirmation the client shows before issuing DELETE.
-export async function getList(c: Context<Env>) {
-  const listId = c.req.param("id");
-  if (!listId) {
-    return apiError(c, "list_id_required");
-  }
-  const db = getDb(c.env.DB);
-  const userId = c.get("userId");
-
-  const [existing] = await db
-    .select()
-    .from(lists)
-    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
-
-  if (!existing) {
-    return apiError(c, "list_not_found");
-  }
-
-  const [{ todoCount }] = await db
-    .select({ todoCount: count() })
-    .from(todos)
-    .where(eq(todos.listId, listId));
-
-  return c.json({ ...serializeList(existing), todoCount });
-}
-
 const createListSchema = z.object({
   id: listIdSchema.optional(),
   name: z.string().min(1).max(200),

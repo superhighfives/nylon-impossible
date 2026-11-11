@@ -46,8 +46,7 @@ function createTestD1(): D1Database {
   return { prepare } as unknown as D1Database;
 }
 
-// A Drizzle client over a fresh database holding one user, user_1. Built
-// here rather than with db.ts's getDbClient, which imports cloudflare:workers.
+// A Drizzle client over a fresh database holding one user, user_1.
 async function createTestDb() {
   const db = drizzle(createTestD1(), { schema });
   await db.run(
