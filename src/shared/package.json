@@ -14,7 +14,8 @@
     "./todo-date-fixtures.json": "./src/todo-date-fixtures.json",
     "./addon-state": "./src/addon-state.ts",
     "./demo-seed": "./src/demo-seed.ts",
-    "./serialize": "./src/serialize.ts"
+    "./serialize": "./src/serialize.ts",
+    "./queries": "./src/queries.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"

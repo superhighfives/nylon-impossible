@@ -1,5 +1,9 @@
 import { Dialog } from "@base-ui/react/dialog";
-import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
+import {
+  type BoardTimeKind,
+  dayKeyIn,
+  dueDayKey,
+} from "@nylon-impossible/shared";
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,7 +24,7 @@ import {
   useState,
 } from "react";
 import { RAISED } from "@/components/ui/styles";
-import type { SystemListKind, TodoWithUrls } from "@/types/database";
+import type { TodoWithUrls } from "@/types/database";
 import { Calendar } from "./Calendar";
 import { displayTitle, dueChoices, dueLabel } from "./model";
 import {
@@ -123,7 +127,7 @@ export function ContextMenu({
   /** Every list except the one it's in, in display order. */
   moveTargets: MenuTarget[];
   /** The kind of list the todo is in, for the Move to arrows. */
-  listKind?: SystemListKind | null;
+  listKind?: BoardTimeKind | null;
   onClose: () => void;
   onMove: (todo: TodoWithUrls, listId: string) => void;
   onTogglePin: (todo: TodoWithUrls) => void;
@@ -486,7 +490,7 @@ function MoveIcon({
   size,
 }: {
   target: MenuTarget;
-  from: SystemListKind | null;
+  from: BoardTimeKind | null;
   size: number;
 }) {
   if (!target.kind) return <ListIcon size={size} aria-hidden="true" />;

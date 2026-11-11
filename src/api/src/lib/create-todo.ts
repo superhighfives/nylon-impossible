@@ -3,15 +3,17 @@ import {
   normalizeHttpUrl,
   parseTodoDate,
 } from "@nylon-impossible/shared";
+import {
+  getSystemListId,
+  getUserTimezone,
+} from "@nylon-impossible/shared/queries";
 import { serializeTodo } from "@nylon-impossible/shared/serialize";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
-import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 import { finishTodoLinks } from "./process-todo";
-import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];

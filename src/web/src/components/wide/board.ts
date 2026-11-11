@@ -1,12 +1,9 @@
+import type { BoardTimeKind } from "@nylon-impossible/shared";
 import type { TodoActions } from "@/components/phone/useTodoActions";
 import { runToastUndo } from "@/components/phone/useTodoActions";
 import { byPosition } from "@/lib/dragOrder";
 import { toast } from "@/lib/toast";
-import type {
-  SerializedList,
-  SystemListKind,
-  TodoWithUrls,
-} from "@/types/database";
+import type { SerializedList, TodoWithUrls } from "@/types/database";
 import {
   columnRows,
   focusedColumn,
@@ -90,7 +87,7 @@ export interface BoardContext {
   currentColumn: string | null;
   selectionColumn: string | null;
   detailOpen: boolean;
-  byKind: Partial<Record<SystemListKind, SerializedList>>;
+  byKind: Partial<Record<BoardTimeKind, SerializedList>>;
   actions: TodoActions;
   todoById: (id: string | undefined) => TodoWithUrls | undefined;
   doneById: (id: string | undefined) => TodoWithUrls | undefined;

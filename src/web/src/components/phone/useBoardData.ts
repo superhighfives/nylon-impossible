@@ -1,10 +1,11 @@
+import { BOARD_TIME_KINDS } from "@nylon-impossible/shared";
 import { useCallback, useMemo } from "react";
 import { useHints } from "@/hooks/useHints";
 import { useLists } from "@/hooks/useLists";
 import { useLocalMidnightTick } from "@/hooks/useLocalMidnightTick";
 import { useTodos } from "@/hooks/useTodos";
 import type { TodoWithUrls } from "@/types/database";
-import { openRows, splitLists, TIME_KINDS } from "./model";
+import { openRows, splitLists } from "./model";
 import { recordRecentMove } from "./moveMenu";
 import { useTodoActions } from "./useTodoActions";
 
@@ -95,7 +96,7 @@ export function useBoardData() {
   /** Today, This week, Someday, then your lists — move and add targets. */
   const targets = useMemo(
     () =>
-      [...TIME_KINDS.map((kind) => byKind[kind]), ...collections]
+      [...BOARD_TIME_KINDS.map((kind) => byKind[kind]), ...collections]
         .filter((l) => l !== undefined)
         .map((l) => ({ id: l.id, label: l.name, kind: l.systemKind })),
     [byKind, collections],

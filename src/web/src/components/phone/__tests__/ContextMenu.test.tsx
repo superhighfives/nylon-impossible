@@ -1,7 +1,7 @@
+import type { BoardTimeKind } from "@nylon-impossible/shared";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SystemListKind } from "@/types/database";
 import { ContextMenu, type MenuTarget } from "../ContextMenu";
 import { recordRecentMove } from "../moveMenu";
 import { makeTodo } from "./fixtures";
@@ -16,7 +16,7 @@ function setup(
   {
     moveTargets = TIME_TARGETS,
     listKind = "today",
-  }: { moveTargets?: MenuTarget[]; listKind?: SystemListKind | null } = {},
+  }: { moveTargets?: MenuTarget[]; listKind?: BoardTimeKind | null } = {},
 ) {
   const handlers = {
     onClose: vi.fn(),

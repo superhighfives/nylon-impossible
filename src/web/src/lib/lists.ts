@@ -1,7 +1,6 @@
 import { DEMO_SEED_TODOS } from "@nylon-impossible/shared/demo-seed";
 import { and, eq } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
-import type { SystemListKind } from "@/types/database";
 import type { DbClient } from "./db";
 import { lists, todos, todoUrls } from "./schema";
 
@@ -149,45 +148,4 @@ export async function seedDemoTodos(
       .insert(todoUrls)
       .values(urlRows.slice(i, i + TODO_URL_INSERT_CHUNK_SIZE));
   }
-}
-
-/** Look up one of a user's system list ids (Today/This week/Someday). */
-export async function getSystemListId(
-  db: DbClient,
-  userId: string,
-  kind: SystemListKind,
-): Promise<string | null> {
-  const [list] = await db
-    .select({ id: lists.id })
-    .from(lists)
-    .where(
-      and(
-        eq(lists.userId, userId),
-        eq(lists.kind, "system"),
-        eq(lists.systemKind, kind),
-      ),
-    );
-  return list?.id ?? null;
-}
-
-/**
- * Verify a client-supplied `listId` actually belongs to `userId` before it's
- * written onto a todo. `listId` only ever passes a UUID-format check at the
- * request boundary — without this, an authenticated user could point their
- * own todo at another user's list id (a leaked/guessed UUID), which stays
- * invisible to them (all reads filter by `todos.userId`) but cascade-deletes
- * the moment the *other* user deletes that list. Returns the id back for a
- * convenient `??`/ternary at the call site, or null if it isn't owned by
- * `userId`.
- */
-export async function verifyListOwnership(
-  db: DbClient,
-  userId: string,
-  listId: string,
-): Promise<string | null> {
-  const [list] = await db
-    .select({ id: lists.id })
-    .from(lists)
-    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
-  return list?.id ?? null;
 }

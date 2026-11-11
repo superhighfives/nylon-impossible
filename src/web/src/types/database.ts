@@ -7,6 +7,7 @@ export type {
   User,
 } from "@/lib/schema";
 
+import type { BoardTimeKind } from "@nylon-impossible/shared";
 import type {
   SerializedTodo,
   SerializedTodoUrl as SharedSerializedTodoUrl,
@@ -40,9 +41,6 @@ export interface UpdateTodoInput {
   listId?: string;
 }
 
-/** Which built-in bucket a system list represents. */
-export type SystemListKind = "today" | "thisWeek" | "someday";
-
 export interface CreateListInput {
   name: string;
   position?: string;
@@ -59,7 +57,7 @@ export interface SerializedList {
   userId: string;
   name: string;
   kind: "system" | "custom";
-  systemKind: SystemListKind | null;
+  systemKind: BoardTimeKind | null;
   position: string;
   createdAt: string;
   updatedAt: string;

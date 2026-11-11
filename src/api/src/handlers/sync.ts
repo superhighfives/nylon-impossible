@@ -1,6 +1,11 @@
 import { TODO_NOTES_MAX, toDueDay } from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
+  getSystemListId,
+  getUserTimezone,
+  verifyListOwnership,
+} from "@nylon-impossible/shared/queries";
+import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
@@ -27,11 +32,9 @@ import {
 import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
-import { getSystemListId, verifyListOwnership } from "../lib/lists";
 import { pinnedRequestFields, resolvePinned } from "../lib/pinned";
 import { finishTodoLinks } from "../lib/process-todo";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
-import { getUserTimezone } from "../lib/user-timezone";
 import type { Env } from "../types";
 
 const recurrenceSchema = z.object({

@@ -1,11 +1,11 @@
 import { toDueDay } from "@nylon-impossible/shared";
+import { verifyListOwnership } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { createSmartTodo } from "../lib/create-todo";
 import { getDb } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
-import { verifyListOwnership } from "../lib/lists";
 import type { Env } from "../types";
 
 const smartCreateSchema = z.object({

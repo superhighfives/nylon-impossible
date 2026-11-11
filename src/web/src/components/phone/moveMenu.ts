@@ -5,13 +5,13 @@
  * under "More". Pure, so the choices can be tested; the recents live in this
  * browser's storage.
  */
-import type { SystemListKind } from "@/types/database";
+import { BOARD_TIME_KINDS, type BoardTimeKind } from "@nylon-impossible/shared";
 
 export interface MoveTarget {
   id: string;
   label: string;
   /** Set for Today, This week and Someday; null for your lists. */
-  kind: SystemListKind | null;
+  kind: BoardTimeKind | null;
 }
 
 export interface MovePlan {
@@ -23,7 +23,6 @@ export interface MovePlan {
 export const RECENT_MOVE_LIMIT = 2;
 const RECENT_MOVE_KEY = "nylon:recent-move-lists";
 const RECENT_MOVE_HISTORY = 20;
-const TIME_ORDER: SystemListKind[] = ["today", "thisWeek", "someday"];
 
 /**
  * `others` is every list but the todo's own, in display order. Recents that
@@ -61,10 +60,10 @@ export function moveMenuPlan(
  */
 export function moveArrow(
   target: MoveTarget,
-  from: SystemListKind | null,
+  from: BoardTimeKind | null,
 ): "left" | "right" {
   if (!from || !target.kind) return "right";
-  return TIME_ORDER.indexOf(target.kind) < TIME_ORDER.indexOf(from)
+  return BOARD_TIME_KINDS.indexOf(target.kind) < BOARD_TIME_KINDS.indexOf(from)
     ? "left"
     : "right";
 }
