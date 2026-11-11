@@ -36,6 +36,13 @@
       "when": 1794100000000,
       "tag": "0004_lowercase_todo_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794355344636,
+      "tag": "0005_api_tokens",
+      "breakpoints": true
     }
   ]
 }

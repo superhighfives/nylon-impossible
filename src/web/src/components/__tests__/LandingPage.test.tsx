@@ -129,8 +129,14 @@ describe("LandingPage", () => {
     }
   });
 
-  it("keeps the privacy and terms links", () => {
+  it("links to the API docs beside privacy and terms", () => {
     render(<LandingPage />);
+    const footer = screen.getByRole("navigation", { name: "Footer" });
+    expect(footer).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "API" })).toHaveAttribute(
+      "href",
+      "/docs/api",
+    );
     expect(screen.getByRole("link", { name: "Privacy" })).toHaveAttribute(
       "href",
       "/privacy",

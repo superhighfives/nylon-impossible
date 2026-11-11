@@ -234,6 +234,26 @@ export const todoUrls = sqliteTable(
   (table) => [index("idx_todo_urls_todo").on(table.todoId)],
 );
 
+// One personal, read-only API token per user, for `/v1`. Only the SHA-256 hex
+// of the token is kept: it's shown once, and a lost one is regenerated, not
+// recovered. Regenerating replaces the row (unique on user_id).
+export const apiTokens = sqliteTable("api_tokens", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  // Null until first use. Written at most once an hour, so reads don't each
+  // cost a D1 write.
+  lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
+});
+
 // Relations (for relational query API)
 export const usersRelations = relations(users, ({ many }) => ({
   todos: many(todos),
@@ -284,3 +304,5 @@ export type TodoUrl = typeof todoUrls.$inferSelect;
 export type NewTodoUrl = typeof todoUrls.$inferInsert;
 export type GmailAddonLink = typeof gmailAddonLinks.$inferSelect;
 export type NewGmailAddonLink = typeof gmailAddonLinks.$inferInsert;
+export type ApiToken = typeof apiTokens.$inferSelect;
+export type NewApiToken = typeof apiTokens.$inferInsert;

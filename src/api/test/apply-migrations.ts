@@ -7,6 +7,7 @@ declare module "cloudflare:test" {
     TEST_MIGRATIONS: D1Migration[];
     CLERK_SECRET_KEY: string;
     CLERK_PUBLISHABLE_KEY: string;
+    V1_RATE_LIMIT: RateLimit;
   }
 }
 

@@ -15,7 +15,8 @@
     "./addon-state": "./src/addon-state.ts",
     "./demo-seed": "./src/demo-seed.ts",
     "./serialize": "./src/serialize.ts",
-    "./queries": "./src/queries.ts"
+    "./queries": "./src/queries.ts",
+    "./api-v1": "./src/api-v1.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"

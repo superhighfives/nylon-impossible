@@ -7,12 +7,20 @@ import {
   Moon,
   Sun,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  type ApiTokenInfo,
+  useApiToken,
+  useCreateApiToken,
+  useRevokeApiToken,
+} from "@/hooks/useApiToken";
 import {
   type Theme,
   useDeleteCurrentUser,
   useUpdateUser,
   useUser,
 } from "@/hooks/useUser";
+import { API_URL } from "@/lib/config";
 import { messageFromError, toast } from "@/lib/toast";
 import { useDevEnvironment } from "../DevEnvironmentIndicator";
 import { browserTimeZone } from "../TimezoneSync";
@@ -38,11 +46,15 @@ const pretty = (zone: string) => zone.replace(/_/g, " ");
 const SECTION = "mx-5 border-b border-n-hairline py-5";
 const LABEL = "mb-2 block text-[0.8125rem] font-semibold text-n-ink-muted";
 const HINT = "mt-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted";
+const BUTTON =
+  "min-h-11 cursor-pointer rounded-n-chip border border-n-hairline px-3.5 text-[0.9375rem] font-medium n-focus disabled:opacity-50";
+const EXTERNAL_LINK =
+  "-mx-2 flex min-h-11 items-center justify-between rounded-n-chip px-2 text-base text-n-ink no-underline n-focus";
 
 /**
  * Settings for the phone: theme, the timezone (Automatic follows this device;
- * picking a zone by hand turns Automatic off), and account deletion. Each
- * choice saves the moment it's made.
+ * picking a zone by hand turns Automatic off), the personal API token, and
+ * account deletion. Each choice saves the moment it's made.
  */
 export function SettingsScreen({
   open,
@@ -77,7 +89,8 @@ export function SettingsScreen({
   };
 
   const deleteAccount = () => {
-    // The one confirmation in the app: it can't be undone.
+    // One of the app's few confirmations (with Regenerate and Revoke API
+    // token): it can't be undone.
     const ok = window.confirm(
       "Permanently delete your account? All of your todos and lists will be removed and cannot be recovered.",
     );
@@ -163,6 +176,8 @@ export function SettingsScreen({
         </p>
       </section>
 
+      <ApiTokenSection open={open} />
+
       <section className={SECTION}>
         <h2 className={LABEL}>About</h2>
         {[
@@ -174,7 +189,7 @@ export function SettingsScreen({
             href={link.href}
             target="_blank"
             rel="noopener"
-            className="-mx-2 flex min-h-11 items-center justify-between rounded-n-chip px-2 text-base text-n-ink no-underline n-focus"
+            className={EXTERNAL_LINK}
           >
             {link.label}
             <ArrowUpRight
@@ -216,6 +231,175 @@ export function SettingsScreen({
         <Environment origin={window.location.origin} />
       )}
     </Screen>
+  );
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** "3 Nov 2026", or "3 Nov" without the year. */
+function day(iso: string, withYear: boolean) {
+  const d = new Date(iso);
+  const short = `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  return withYear ? `${short} ${d.getFullYear()}` : short;
+}
+
+function tokenDates(info: ApiTokenInfo) {
+  const used = info.lastUsedAt
+    ? `Last used ${day(info.lastUsedAt, false)}`
+    : "Never used";
+  return `Created ${day(info.createdAt, true)} · ${used}`;
+}
+
+/**
+ * The personal API token: one per account, read-only, for the person's own
+ * scripts. It's shown once, right after it's made, and stays on screen until
+ * Settings closes. Regenerate and Revoke ask first: the old token can't come
+ * back, since only its hash is kept.
+ */
+function ApiTokenSection({ open }: { open: boolean }) {
+  const { data: info, isPending } = useApiToken(open);
+  const create = useCreateApiToken();
+  const revoke = useRevokeApiToken();
+  const [fresh, setFresh] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) setFresh(null);
+  }, [open]);
+
+  const fail = (fallback: string) => (err: unknown) =>
+    toast.error(messageFromError(err, fallback));
+  const busy = create.isPending || revoke.isPending;
+
+  const make = (regenerate: boolean) => {
+    if (
+      regenerate &&
+      !window.confirm(
+        "Regenerate your API token? Anything using the current one will stop working.",
+      )
+    ) {
+      return;
+    }
+    create.mutate(regenerate, {
+      onSuccess: ({ token }) => setFresh(token),
+      onError: fail(
+        regenerate ? "Couldn't regenerate token" : "Couldn't create token",
+      ),
+    });
+  };
+
+  const remove = () => {
+    if (
+      !window.confirm(
+        "Revoke your API token? Anything using it will stop working.",
+      )
+    ) {
+      return;
+    }
+    revoke.mutate(undefined, {
+      onSuccess: () => toast.success("Token revoked"),
+      onError: fail("Couldn't revoke token"),
+    });
+  };
+
+  const copy = () => {
+    if (!fresh) return;
+    navigator.clipboard
+      .writeText(fresh)
+      .then(() => toast.success("Copied"), fail("Couldn't copy"));
+  };
+
+  const docsLink = (
+    <a
+      href="/docs/api"
+      target="_blank"
+      rel="noopener"
+      className={EXTERNAL_LINK}
+    >
+      API docs
+      <ArrowUpRight size={16} aria-hidden="true" className="text-n-ink-muted" />
+    </a>
+  );
+
+  return (
+    <section className={SECTION}>
+      <h2 className={LABEL}>API token</h2>
+      {fresh ? (
+        <>
+          <div className="flex gap-2">
+            <input
+              aria-label="API token"
+              readOnly
+              value={fresh}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-h-11 min-w-0 flex-1 rounded-n-field border border-n-hairline bg-n-canvas px-3 font-mono text-[0.8125rem] text-n-ink n-focus dark:bg-n-surface"
+            />
+            <button
+              type="button"
+              onClick={copy}
+              className={`${BUTTON} text-n-ink`}
+            >
+              Copy
+            </button>
+          </div>
+          <p className={HINT}>Copy it now. You won’t see it again.</p>
+          <code className="mt-3 block rounded-n-field bg-n-fill px-3 py-2 font-mono text-xs leading-relaxed break-all text-n-ink">
+            {`curl -H "Authorization: Bearer ${fresh}" ${API_URL}/v1/lists/today/todos`}
+          </code>
+          <div className="mt-2">{docsLink}</div>
+        </>
+      ) : info ? (
+        <>
+          <p className="text-base text-n-ink">{tokenDates(info)}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => make(true)}
+              disabled={busy}
+              className={`${BUTTON} text-n-ink`}
+            >
+              Regenerate
+            </button>
+            <button
+              type="button"
+              onClick={remove}
+              disabled={busy}
+              className={`${BUTTON} text-n-overdue`}
+            >
+              Revoke
+            </button>
+          </div>
+          <div className="mt-2">{docsLink}</div>
+        </>
+      ) : (
+        <>
+          <button
+            type="button"
+            onClick={() => make(false)}
+            disabled={busy || isPending}
+            className={`${BUTTON} text-n-ink`}
+          >
+            Create token
+          </button>
+          <p className={HINT}>
+            Lets your own scripts read your lists and todos. It can’t change
+            anything.
+          </p>
+        </>
+      )}
+    </section>
   );
 }
 

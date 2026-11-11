@@ -1,4 +1,5 @@
 import { verifyToken } from "@clerk/backend";
+import { API_TOKEN_PREFIX } from "@nylon-impossible/shared/api-v1";
 import * as Sentry from "@sentry/cloudflare";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
@@ -27,6 +28,12 @@ export async function verifyClerkJWT(
   }
 
   const token = authHeader.slice(7);
+  // A personal API token only reads /v1. Clerk would reject it anyway (it
+  // isn't a JWT); this keeps the apps' routes closed to it without relying
+  // on that.
+  if (token.startsWith(API_TOKEN_PREFIX)) {
+    return null;
+  }
 
   try {
     const payload = await verifyToken(token, {

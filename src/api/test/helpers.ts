@@ -1,5 +1,55 @@
-import { env } from "cloudflare:test";
+import {
+  createExecutionContext,
+  env,
+  waitOnExecutionContext,
+} from "cloudflare:test";
+import { expect } from "vitest";
+import worker from "../src";
 import { and, eq, getDb, lists, todos, todoUrls, users } from "../src/lib/db";
+
+/** Stands in for a Clerk session JWT; the Clerk mock accepts it. */
+export const SESSION =
+  "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJ1c2VyX3Rlc3RfMTIzIn0.sig";
+
+/** A rate limiter that always lets the request through. */
+const OPEN_LIMIT = { limit: async () => ({ success: true }) };
+
+/**
+ * Calls the worker directly rather than through SELF, so a test can swap a
+ * binding (the /v1 rate limiter) and wait for `waitUntil` work (the API
+ * token's last-used write) before reading D1.
+ */
+export async function callWorker(
+  path: string,
+  init: RequestInit & { token?: string } = {},
+  overrides: Record<string, unknown> = {},
+) {
+  const { token, ...rest } = init;
+  const headers = new Headers(rest.headers);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  const ctx = createExecutionContext();
+  const res = await worker.fetch?.(
+    new Request(`http://localhost${path}`, { ...rest, headers }) as Request<
+      unknown,
+      IncomingRequestCfProperties
+    >,
+    { ...env, V1_RATE_LIMIT: OPEN_LIMIT, ...overrides } as never,
+    ctx,
+  );
+  await waitOnExecutionContext(ctx);
+  if (!res) throw new Error("worker has no fetch handler");
+  return res;
+}
+
+/** Makes a personal API token for the user the Clerk mock signs in. */
+export async function createApiToken() {
+  const res = await callWorker("/users/me/api-token", {
+    method: "POST",
+    token: SESSION,
+  });
+  expect(res.status).toBe(201);
+  return res.json<{ token: string; createdAt: string }>();
+}
 
 /**
  * Seed the system lists (Today/This week/Someday) for a user,
@@ -92,6 +142,7 @@ export async function seedTodo(
 }
 
 export async function cleanDb() {
+  await env.DB.exec("DELETE FROM api_tokens");
   await env.DB.exec("DELETE FROM todo_urls");
   await env.DB.exec("DELETE FROM todos");
   await env.DB.exec("DELETE FROM lists");
