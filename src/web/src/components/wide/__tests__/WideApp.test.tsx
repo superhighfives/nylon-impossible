@@ -23,7 +23,7 @@ const remove = vi.fn();
 const createList = vi.fn();
 const updateList = vi.fn();
 const deleteList = vi.fn();
-const lists = [
+let lists = [
   makeList("list-today", "Today", "today", "a0"),
   makeList("list-week", "This week", "thisWeek", "a1"),
   makeList("list-someday", "Someday", "someday", "a2"),
@@ -115,6 +115,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 });
 
 import { toast } from "@/lib/toast";
+import { COLUMN_WIDTH } from "../Column";
 import { WideApp } from "../WideApp";
 
 const column = (name: string) =>
@@ -132,7 +133,7 @@ const focusedTitle = () =>
 const press = (key: string) =>
   fireEvent.keyDown(document.activeElement ?? window, { key });
 
-/** The board row's children, left to right: columns and the sheet. */
+/** The board row's children, left to right: columns, the sheet and the end. */
 const slides = () =>
   [
     ...document.querySelectorAll<HTMLElement>(
@@ -363,7 +364,7 @@ describe("WideApp", () => {
     expect(screen.queryAllByRole("button", { name: /^Close / })).toEqual([]);
     // Every column keeps one width; only Done has a tint.
     for (const region of screen.getAllByRole("region")) {
-      expect(region).toHaveClass("w-[17rem]", "shrink-0");
+      expect(region).toHaveClass(...COLUMN_WIDTH.split(" "));
       expect(region.classList.contains("bg-n-surface")).toBe(
         region === column("Done"),
       );
@@ -372,6 +373,101 @@ describe("WideApp", () => {
     expect(
       within(more).getByRole("button", { name: "Done" }),
     ).not.toHaveAttribute("aria-current");
+  });
+
+  it("sizes every column as a quarter of the board, between the board tokens", () => {
+    render(<WideApp />);
+    expect(COLUMN_WIDTH).toBe(
+      "w-[clamp(var(--n-board-column-min-width),25cqi,var(--n-board-column-max-width))] shrink-0",
+    );
+    // The quarter is of `main`, the board, whatever the sidebar takes.
+    expect(screen.getByRole("main", { name: "Board" })).toHaveClass(
+      "@container",
+    );
+  });
+
+  it("gives the skeleton's columns the same width, and the end after Done", () => {
+    listsLoading = true;
+    try {
+      render(<WideApp />);
+      const board = screen.getByRole("main", { name: "Board" });
+      for (const c of board.querySelectorAll("[data-column]")) {
+        expect(c).toHaveClass(...COLUMN_WIDTH.split(" "));
+      }
+      expect(board.lastElementChild).toHaveAttribute("data-board-end");
+    } finally {
+      listsLoading = false;
+    }
+  });
+
+  it("ends the board after Done with a hairline and the hatch, and nothing to click", async () => {
+    render(<WideApp />);
+    const board = screen.getByRole("main", { name: "Board" });
+    const end = () => board.lastElementChild as HTMLElement;
+    // Done closes on a hairline whether or not the columns fill the board.
+    expect(column("Done")).toHaveClass("border-x", "border-n-hairline");
+    expect(end()).toHaveAttribute("data-board-end");
+    expect(end().previousElementSibling).toBe(column("Done"));
+    // Fills what's left, down to nothing, so it shrinks rather than appears.
+    expect(end()).toHaveClass("n-board-hatch", "flex-1", "min-w-0");
+    expect(end()).toHaveAttribute("aria-hidden", "true");
+    expect(end().childElementCount).toBe(0);
+    expect(end()).not.toHaveAttribute("tabindex");
+    // A click there selects nothing and opens nothing.
+    await userEvent.click(rowButton("Call Mum"));
+    await userEvent.click(end());
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(
+      rowButton("Call Mum").closest("[data-row-container]"),
+    ).toHaveAttribute("data-selected");
+
+    // Still last, after Done, with a todo open.
+    await userEvent.click(rowButton("Call Mum"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(end()).toHaveAttribute("data-board-end");
+    expect(end().previousElementSibling).toBe(column("Done"));
+  });
+
+  it("opening a todo changes no column's width", async () => {
+    render(<WideApp />);
+    const expectShared = () => {
+      const columns = document.querySelectorAll<HTMLElement>(
+        'main[aria-label="Board"] > [data-column]',
+      );
+      expect(columns).toHaveLength(6);
+      for (const c of columns)
+        expect(c).toHaveClass(...COLUMN_WIDTH.split(" "));
+    };
+    expectShared();
+    await userEvent.dblClick(rowButton("Call Mum"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(slides()).toContain("sheet");
+    // Its own column too: only the padding moves in clear of the sheet.
+    expectShared();
+  });
+
+  it("a new list arrives before Done, and the others keep their width", () => {
+    const { rerender } = render(<WideApp />);
+    const before = lists;
+    lists = [...lists, makeList("list-zines", "Zines", null, "a5")];
+    try {
+      rerender(<WideApp />);
+      expect(slides()).toEqual([
+        "list-today",
+        "list-week",
+        "list-someday",
+        "list-groceries",
+        "list-studio",
+        "list-zines",
+        "done",
+        "end",
+      ]);
+      for (const region of screen.getAllByRole("region")) {
+        expect(region).toHaveClass(...COLUMN_WIDTH.split(" "));
+      }
+    } finally {
+      lists = before;
+    }
   });
 
   it("rows hover with the same 60% fill in every column and the open todo", async () => {
@@ -931,6 +1027,7 @@ describe("WideApp", () => {
       "list-groceries",
       "list-studio",
       "done",
+      "end",
     ]);
   });
 
@@ -946,6 +1043,7 @@ describe("WideApp", () => {
       "sheet",
       "list-studio",
       "done",
+      "end",
     ]);
   });
 

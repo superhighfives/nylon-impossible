@@ -18,11 +18,13 @@ import type { Board, JumpTarget } from "./commands";
 export type BoardSlot =
   | { kind: "list"; list: SerializedList }
   | { kind: "done" }
-  | { kind: "sheet" };
+  | { kind: "sheet" }
+  | { kind: "end" };
 
 /**
  * The wide board's row: `lists` (the time lists, then yours in the
- * sidebar's order), then Done. Nothing is swapped in or out. With a todo
+ * sidebar's order), then Done, then the end: the rest of the board's width,
+ * zero when the columns overflow. Nothing is swapped in or out. With a todo
  * open, its sheet goes straight after the todo's column (`sheetAfter`), and
  * the columns after it keep their order.
  */
@@ -35,7 +37,7 @@ export function boardSlots(
     slots.push({ kind: "list", list });
     if (list.id === sheetAfter) slots.push({ kind: "sheet" });
   }
-  slots.push({ kind: "done" });
+  slots.push({ kind: "done" }, { kind: "end" });
   return slots;
 }
 

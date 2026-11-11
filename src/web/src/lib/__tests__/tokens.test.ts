@@ -75,6 +75,18 @@ describe("design token generator", () => {
     expect(css).toContain("--n-radius-field: 0.625rem;");
   });
 
+  it("emits the board's column widths and hatch, web and Apple", () => {
+    const css = renderCss(tokens);
+    expect(css).toContain("--n-board-column-min-width: 17rem;");
+    expect(css).toContain("--n-board-column-max-width: 26rem;");
+    expect(css).toContain("--n-board-hatch-spacing: 0.75rem;");
+    expect(css).toContain("--n-board-hatch-angle: 45deg;");
+    expect(css).toContain("--n-board-hatch-width: 0.0625rem;");
+    const swift = renderSwift(tokens);
+    expect(swift).toContain("static let columnMaxWidth: CGFloat = 416");
+    expect(swift).toContain("static let hatchSpacing: CGFloat = 12");
+  });
+
   it("gives every icon both a lucide and an SF Symbol name", () => {
     for (const [name, icon] of Object.entries(tokens.icons)) {
       if (name.startsWith("$")) continue;

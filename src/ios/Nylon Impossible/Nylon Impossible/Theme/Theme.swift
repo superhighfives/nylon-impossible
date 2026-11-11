@@ -237,6 +237,16 @@ enum Theme {
         static let shadowOpacityDark: Double = 0.4
     }
 
+    /// The wide board's columns: a quarter of the board, up to
+    /// `columnMaxWidth`. The minimums are `Theme.Wide`'s. Past the last
+    /// column, a hatch of `hairline` lines.
+    enum Board {
+        static let columnMaxWidth: CGFloat = 416
+        static let hatchSpacing: CGFloat = 12
+        static let hatchAngle: Double = 45
+        static let hatchWidth: CGFloat = 1
+    }
+
     enum Motion {
         static let fast: TimeInterval = 0.15
         static let base: TimeInterval = 0.22

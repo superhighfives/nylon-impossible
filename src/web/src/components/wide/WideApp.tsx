@@ -748,6 +748,19 @@ export function WideApp({
   );
   const skeleton = loading && timeLists.length === 0;
 
+  // The board's end, past Done: the hatch, in whatever width the columns
+  // leave. Always in the row, so it shrinks rather than appears. Nothing in
+  // it to click (principle 4).
+  const renderEnd = () => (
+    <div
+      key="end"
+      aria-hidden="true"
+      data-slide="end"
+      data-board-end
+      className="n-board-hatch min-w-0 flex-1"
+    />
+  );
+
   const renderDone = () => (
     <DoneColumn
       key={DONE_COLUMN}
@@ -822,19 +835,26 @@ export function WideApp({
             }}
           />
           {/* One row of columns that scrolls sideways; each child is named
-              by `data-slide` so it slides when the row changes. */}
+              by `data-slide` so it slides when the row changes. The size
+              container the columns' width is a quarter of. */}
           <main
             ref={boardRow}
             aria-label="Board"
-            className="relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
+            className="@container relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {skeleton
-              ? [...BOARD_TIME_KINDS.map(renderSkeletonColumn), renderDone()]
+              ? [
+                  ...BOARD_TIME_KINDS.map(renderSkeletonColumn),
+                  renderDone(),
+                  renderEnd(),
+                ]
               : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
                   slot.kind === "list" ? (
                     renderColumn(slot.list)
                   ) : slot.kind === "done" ? (
                     renderDone()
+                  ) : slot.kind === "end" ? (
+                    renderEnd()
                   ) : (
                     // The open todo's sheet: laid over its column's right
                     // edge, above the columns around it.

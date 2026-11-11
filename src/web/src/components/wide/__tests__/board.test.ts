@@ -20,7 +20,7 @@ const names = (sheetAfter: string | null) =>
   );
 
 describe("boardSlots", () => {
-  it("is the time lists, every list in order, then Done, with no sheet", () => {
+  it("is the time lists, every list in order, then Done and the end, with no sheet", () => {
     expect(names(null)).toEqual([
       "today",
       "week",
@@ -28,6 +28,7 @@ describe("boardSlots", () => {
       "groceries",
       "studio",
       "done",
+      "end",
     ]);
   });
 
@@ -40,6 +41,7 @@ describe("boardSlots", () => {
       "groceries",
       "studio",
       "done",
+      "end",
     ]);
     expect(names("groceries")).toEqual([
       "today",
@@ -49,6 +51,7 @@ describe("boardSlots", () => {
       "sheet",
       "studio",
       "done",
+      "end",
     ]);
   });
 
