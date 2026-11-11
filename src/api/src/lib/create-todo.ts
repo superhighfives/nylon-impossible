@@ -38,7 +38,7 @@ export interface CreateSmartTodoOptions {
    * creation already does. Position is scoped to the parent's existing
    * subtasks (prepended) instead of the user's top-level list, and the new
    * todo can never carry a recurrence (recurrence and subtasks are
-   * mutually exclusive, enforced elsewhere in `updateTodoCore` too).
+   * mutually exclusive, enforced in `handlers/sync.ts` too).
    */
   parentId?: string;
   /**
@@ -46,7 +46,8 @@ export interface CreateSmartTodoOptions {
    * Ignored when `parentId` is set (subtasks are always scoped to their
    * parent's list). Callers MUST verify this belongs to `userId` first (e.g.
    * via `verifyListOwnership`) — this function trusts it as already-checked,
-   * matching how `updateTodoCore` treats an incoming `listId` patch.
+   * matching how `handlers/sync.ts` checks an incoming `listId` before
+   * writing it.
    */
   listId?: string;
   /**

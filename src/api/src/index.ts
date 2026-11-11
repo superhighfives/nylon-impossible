@@ -22,13 +22,7 @@ import {
   deleteTodoUrl,
   updateTodoUrl,
 } from "./handlers/todo-urls";
-import {
-  createTodo,
-  deleteTodo,
-  getTodo,
-  listTodos,
-  updateTodo,
-} from "./handlers/todos";
+import { getTodo, listTodos } from "./handlers/todos";
 import { deleteMe, getMe, updateMe } from "./handlers/users";
 import { clerkWebhook } from "./handlers/webhooks";
 import { verifyGoogleIdToken } from "./lib/addon-auth";
@@ -124,10 +118,7 @@ app.post("/gmail-addon/actions/refresh", gmailAddonRefresh);
 app.post("/todos/smart", smartCreate);
 app.post("/todos/sync", syncTodos);
 app.get("/todos", listTodos);
-app.post("/todos", createTodo);
 app.get("/todos/:id", getTodo);
-app.put("/todos/:id", updateTodo);
-app.delete("/todos/:id", deleteTodo);
 // Link processing — deterministic, no AI.
 app.post("/todos/:id/process", processTodo);
 // A link's menu: Show as URL, Remove.

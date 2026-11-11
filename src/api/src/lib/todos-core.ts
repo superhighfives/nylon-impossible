@@ -16,49 +16,17 @@ import {
   or,
   todos,
 } from "./db";
-import { getSystemListId, verifyListOwnership } from "./lists";
+import { getSystemListId } from "./lists";
 import { notifySync } from "./notify-sync";
 import { getUserTimezone } from "./user-timezone";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
-type Todo = typeof todos.$inferSelect;
-
-/**
- * Thrown when a patch's `listId` doesn't resolve to a list owned by the
- * caller — either it doesn't exist, or it belongs to someone else.
- */
-export class InvalidListError extends Error {
-  constructor() {
-    super("listId must reference one of the user's own lists");
-    this.name = "InvalidListError";
-  }
-}
-
-/**
- * Fields `updateTodoCore` accepts. Mirrors the REST `PUT /todos/:id` body,
- * minus request-shape concerns (no zod here — validation/coercion is the
- * caller's job; REST validates via zod).
- */
-export interface UpdateTodoPatch {
-  title?: string;
-  notes?: string | null;
-  completed?: boolean;
-  position?: string;
-  dueDate?: Date | null;
-  recurrence?: Todo["recurrence"] | null;
-  // Client-set only to undo a completed repeat (cleared to null). Normal
-  // completions are stamped server-side.
-  completedAt?: Date | null;
-  updatedAt?: Date;
-  pinned?: boolean;
-  listId?: string;
-}
 
 /**
  * The user's open, top-level todos across every list (system and custom), in
- * list order then item order. Shared by the Gmail add-on homepage card and
- * any REST surface that needs the same "what's on my plate" view, so the two
+ * list order then item order. Used by the Gmail add-on homepage card, and by
+ * anything else that needs the same "what's on my plate" view, so the two
  * can't drift. Excludes completed todos and subtasks (parentId IS NULL),
  * matching the top-level list shown on web/iOS — except, with `doneSince`,
  * todos finished since then, which keep their place (`completed` is true).
@@ -123,7 +91,7 @@ export async function listListsForUser(db: Db, userId: string) {
 
 /**
  * Toggle a top-level todo's completed state, applying the same server-canonical
- * rules as the REST `updateTodo` handler:
+ * rules as the apps' sync (`handlers/sync.ts`):
  *   - a recurring todo being completed rolls its dueDate forward instead of
  *     persisting the completion (completed stays false, completedAt stamped),
  *   - completing a pinned todo unpins it,
@@ -202,130 +170,6 @@ export async function setTodoCompleted(
     await db
       .update(todos)
       .set({ completed, updatedAt: now })
-      .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)));
-  }
-
-  const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));
-
-  await notifySync(env, userId);
-
-  return updated;
-}
-
-/**
- * Apply a patch to a todo (title/notes/completed/position/dueDate/recurrence/
- * completedAt/pinned), applying the same server-canonical rules the REST
- * `PUT /todos/:id` handler always has:
- *   - a recurring todo being completed for the first time rolls its dueDate
- *     forward instead of persisting the completion,
- *   - recurrence and subtasks are mutually exclusive (server-enforced),
- *   - completing a pinned todo unpins it,
- *   - completion cascades to subtasks.
- * Then pokes connected web/iOS clients to sync. Returns the updated row, or
- * null if the todo doesn't exist or isn't owned by `userId` — callers decide
- * how to surface that (REST returns 404).
- */
-export async function updateTodoCore(
-  db: Db,
-  env: Bindings,
-  userId: string,
-  todoId: string,
-  patch: UpdateTodoPatch,
-): Promise<Todo | null> {
-  const [existing] = await db
-    .select()
-    .from(todos)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
-
-  if (!existing) return null;
-
-  const updatedAt = patch.updatedAt ?? new Date();
-  const updates: Record<string, unknown> = { updatedAt };
-
-  if (patch.title !== undefined) updates.title = patch.title;
-  if (patch.notes !== undefined) updates.notes = patch.notes;
-  if (patch.completed !== undefined) updates.completed = patch.completed;
-  if (patch.position !== undefined) updates.position = patch.position;
-  if (patch.dueDate !== undefined) updates.dueDate = patch.dueDate;
-  if (patch.recurrence !== undefined) updates.recurrence = patch.recurrence;
-  // completedAt is caller-set only to undo a completed repeat (null); a normal
-  // completion stamps it server-side just below.
-  if (patch.completedAt !== undefined) updates.completedAt = patch.completedAt;
-  if (patch.pinned !== undefined) updates.pinned = patch.pinned;
-  if (patch.listId !== undefined && patch.listId !== existing.listId) {
-    const ownedListId = await verifyListOwnership(db, userId, patch.listId);
-    if (!ownedListId) throw new InvalidListError();
-    updates.listId = ownedListId;
-    updates.listEnteredAt = updatedAt;
-  }
-
-  // Server-canonical advance: when a recurring todo is being marked complete
-  // for the first time, advance dueDate to the next future occurrence and keep
-  // completed = false instead of persisting the completion. The client does the
-  // same advance optimistically; the server's result is authoritative.
-  const completingRow =
-    patch.completed === true && existing.completed === false;
-  // Recurrence and subtasks are mutually exclusive. A subtask never recurs, and
-  // a todo with children can't recur. Enforce server-side.
-  let recurrence =
-    patch.recurrence !== undefined ? patch.recurrence : existing.recurrence;
-  if (recurrence) {
-    const isSubtask = existing.parentId != null;
-    let hasChildren = false;
-    if (!isSubtask) {
-      const [child] = await db
-        .select({ id: todos.id })
-        .from(todos)
-        .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)))
-        .limit(1);
-      hasChildren = !!child;
-    }
-    if (isSubtask || hasChildren) recurrence = null;
-  }
-  if (patch.recurrence !== undefined) updates.recurrence = recurrence;
-  const anchor = patch.dueDate !== undefined ? patch.dueDate : existing.dueDate;
-  if (completingRow && recurrence && anchor) {
-    const now = new Date();
-    const timeZone = await getUserTimezone(db, userId);
-    const nextDue = toDueDay(nextDueDate(recurrence, anchor, now, timeZone));
-    updates.completed = false;
-    updates.completedAt = now;
-    updates.dueDate = nextDue;
-    // The new occurrence is placed by its due date's distance, per the
-    // settled recurrence heuristic — unless the caller also explicitly
-    // moved it in this same patch, which wins.
-    if (patch.listId === undefined) {
-      const placementListId = await getSystemListId(
-        db,
-        userId,
-        placementForDueDate(nextDue, now, timeZone),
-      );
-      if (placementListId && placementListId !== existing.listId) {
-        updates.listId = placementListId;
-        updates.listEnteredAt = now;
-      }
-    }
-  }
-
-  // Completing a pinned todo unpins it — it sorts as an ordinary done todo.
-  if (completingRow && existing.pinned) updates.pinned = false;
-
-  await db
-    .update(todos)
-    .set(updates)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
-
-  // Completion cascade: toggling a top-level todo's completed flag cascades to
-  // its subtasks (checking completes them; unchecking reopens them). Subtasks
-  // never recur, so completedAt stays null like ordinary completions.
-  if (
-    existing.parentId == null &&
-    patch.completed !== undefined &&
-    patch.completed !== existing.completed
-  ) {
-    await db
-      .update(todos)
-      .set({ completed: patch.completed, updatedAt })
       .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)));
   }
 

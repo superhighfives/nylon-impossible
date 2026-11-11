@@ -1,7 +1,13 @@
 import { SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { beforeEach, describe, expect, it } from "vitest";
-import { cleanDb, getTodayListId, seedSystemLists, seedUser } from "../helpers";
+import {
+  cleanDb,
+  getTodayListId,
+  seedSystemLists,
+  seedTodo,
+  seedUser,
+} from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
 const mockVerifyToken = verifyToken as ReturnType<
@@ -77,15 +83,58 @@ describe("API routing", () => {
       expect(body.error).toBe("Unauthorized");
     });
 
-    it("POST /todos without auth returns 401", async () => {
+    it("POST /todos/sync without auth returns 401", async () => {
       mockVerifyToken.mockRejectedValue(new Error("No token"));
 
-      const res = await SELF.fetch("http://localhost/todos", {
+      const res = await SELF.fetch("http://localhost/todos/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "Test" }),
+        body: JSON.stringify({ changes: [] }),
       });
       expect(res.status).toBe(401);
+    });
+  });
+
+  // No app build ever called these, and the web writes through its own
+  // server functions; the apps write through /todos/sync. They were removed
+  // in #619 and shouldn't come back by accident.
+  describe("removed todo write routes", () => {
+    const AUTH_JSON = {
+      Authorization: "Bearer test-token",
+      "Content-Type": "application/json",
+    };
+    const TODO_ID = "550e8400-e29b-41d4-a716-446655440000";
+
+    beforeEach(async () => {
+      await seedUser();
+    });
+
+    it("POST /todos returns 404", async () => {
+      const res = await SELF.fetch("http://localhost/todos", {
+        method: "POST",
+        headers: AUTH_JSON,
+        body: JSON.stringify({ title: "Test" }),
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("PUT /todos/:id returns 404", async () => {
+      await seedTodo(TODO_ID);
+      const res = await SELF.fetch(`http://localhost/todos/${TODO_ID}`, {
+        method: "PUT",
+        headers: AUTH_JSON,
+        body: JSON.stringify({ title: "Renamed" }),
+      });
+      expect(res.status).toBe(404);
+    });
+
+    it("DELETE /todos/:id returns 404", async () => {
+      await seedTodo(TODO_ID);
+      const res = await SELF.fetch(`http://localhost/todos/${TODO_ID}`, {
+        method: "DELETE",
+        headers: AUTH_JSON,
+      });
+      expect(res.status).toBe(404);
     });
   });
 
