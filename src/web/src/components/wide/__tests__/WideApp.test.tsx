@@ -2369,6 +2369,40 @@ describe("WideApp hidden columns", () => {
     ]);
   });
 
+  it("hides a column from the open eye beside its count", async () => {
+    render(<WideApp />);
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Hide column",
+        description: "Groceries",
+      }),
+    );
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: true },
+    });
+  });
+
+  it("shows a hidden column from its closed eye", async () => {
+    hide("list-groceries");
+    render(<WideApp />);
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Show column",
+        description: "Groceries",
+      }),
+    );
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: false },
+    });
+  });
+
+  it("gives the time lists no eye", () => {
+    render(<WideApp />);
+    expect(document.querySelectorAll("[data-column-eye]")).toHaveLength(2);
+  });
+
   it("offers no Hide column on Today, This week or Someday", () => {
     render(<WideApp />);
     for (const name of ["Today", "This week", "Someday"]) {

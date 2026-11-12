@@ -1,6 +1,6 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { useDroppable } from "@dnd-kit/core";
-import { Check, Plus } from "lucide-react";
+import { Check, Eye, EyeOff, Plus } from "lucide-react";
 import type { ReactNode } from "react";
 import type { SerializedList } from "@/types/database";
 import { MENU_ITEM, MENU_POPUP } from "./Column";
@@ -32,7 +32,10 @@ function SelectionBar({ on }: { on: boolean }) {
  * One list in the sidebar: a button that also accepts a dropped todo. While
  * a todo is dragged over it, it fills, so the drop target is unmistakable.
  * Your lists' entries have a right-click menu with Hide column (or Show
- * column); a hidden list's entry stays in place, muted, with its count.
+ * column); a hidden list's entry stays in place, muted, with its count. An
+ * eye beside the count does the same: closed and always there when hidden,
+ * open and on hover (or focus) when shown. Its space is always kept, so the
+ * count doesn't move.
  */
 function ListEntry({
   list,
@@ -66,7 +69,7 @@ function ListEntry({
       data-column-hidden={hidden ? "" : undefined}
       aria-describedby={`sidebar-count-${list.id}`}
       onClick={() => onSelect(list)}
-      className={`${ENTRY} ${strong ? "font-semibold" : "font-medium"} ${
+      className={`${ENTRY} pr-9 ${strong ? "font-semibold" : "font-medium"} ${
         dropping
           ? "bg-n-brand text-n-brand-ink"
           : hidden
@@ -90,8 +93,34 @@ function ListEntry({
       </span>
     </button>
   );
+  const eye = onToggleColumn ? (
+    <button
+      type="button"
+      data-column-eye={list.id}
+      aria-label={hidden ? "Show column" : "Hide column"}
+      aria-describedby={`sidebar-eye-${list.id}`}
+      onClick={() => onToggleColumn(list)}
+      className={`absolute top-1/2 right-2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft transition-opacity duration-(--n-duration-fast) pointer-fine:hover:text-n-ink ${
+        hidden
+          ? ""
+          : "pointer-fine:opacity-0 pointer-fine:group-hover/entry:opacity-100 pointer-fine:focus-visible:opacity-100"
+      }`}
+    >
+      {hidden ? (
+        <EyeOff size={15} aria-hidden="true" />
+      ) : (
+        <Eye size={15} aria-hidden="true" />
+      )}
+    </button>
+  ) : null;
   return (
-    <li ref={setNodeRef}>
+    <li ref={setNodeRef} className="group/entry relative">
+      {eye}
+      {eye && (
+        <span id={`sidebar-eye-${list.id}`} hidden>
+          {list.name}
+        </span>
+      )}
       {onToggleColumn ? (
         <ContextMenu.Root>
           <ContextMenu.Trigger render={button} />
