@@ -1,6 +1,13 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { renderWithProviders } from "@/test/helpers";
 
 vi.mock("@clerk/tanstack-react-start", () => ({
   useAuth: () => ({ getToken: async () => "session-jwt", isSignedIn: true }),
@@ -83,9 +90,17 @@ afterEach(() => {
 
 function renderSettings(open = true) {
   const onClose = vi.fn();
-  const view = renderWithProviders(
-    <SettingsScreen open={open} onClose={onClose} />,
-  );
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  const view = render(<SettingsScreen open={open} onClose={onClose} />, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
   return {
     ...view,
     rerenderOpen: (next: boolean) =>
