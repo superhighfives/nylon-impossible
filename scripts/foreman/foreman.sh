@@ -42,7 +42,9 @@ ROUTINES_ALL="dispatch sentry deps scout digest" # the order a tick considers th
 MAX_SENTRY_ISSUES=5 # per night
 MAX_SCOUT_ITEMS=5   # per week
 RECENTLY_CLOSED_DAYS=30 # a Sentry short ID in an issue closed this recently isn't filed again
-DIGEST_TITLE="Foreman digest"
+DIGEST_FROM="${FOREMAN_DIGEST_FROM:-foreman@superhighfives.com}" # the digest email's sender, as "Nylon foreman"
+DIGEST_TO="${FOREMAN_DIGEST_TO:-hi@charliegleason.com}"
+CF_ACCOUNT_ID="${FOREMAN_CF_ACCOUNT_ID:-1f12960834ae2c36ac08812df07167c2}" # Cloudflare Email Sending sends it
 # The column specs are argued in. The owner may rename it "Define" on the
 # board at any time, so each run reads which one it has (spec_column).
 SPEC_COL="Specced" SPEC_OLD="Specced"
@@ -65,6 +67,7 @@ ROUTINES="$HOME_DIR/routines" # per routine: when it last ran, and <name>.off to
 DISPATCH="$HOME_DIR/dispatch" # per PR: an operator job dispatch started (was shepherd/)
 OPERATOR_PLISTS="${FOREMAN_OPERATOR_PLISTS:-$HOME/Library/LaunchAgents}" # where the operator's jobs live
 TOKEN_FILE="${FOREMAN_TOKEN_FILE:-$HOME_DIR/github-token}" # $AGENT's token, chmod 600
+CF_TOKEN_FILE="${FOREMAN_CF_TOKEN_FILE:-$HOME_DIR/cloudflare-email-token}" # Email Sending, for the digest; chmod 600
 LABEL=com.foreman.nylon-impossible
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 SHIM="${FOREMAN_SHIM:-$HOME/.config/operator/exec.sh}" # resolves the Claude token; see `operator help`
@@ -1550,11 +1553,12 @@ run_routine() { # board_json name -> runs it now; a live run counts as its run f
   esac
 }
 
-routine_failed() { # name status what
-  log "routine $1 failed (exit $2); see $3"
+routine_failed() { # name status what [reason] -> the reason, if given, replaces "exit N" in the event and alert
+  local why="${4:-exit $2}"
+  log "routine $1 failed ($why); see $3"
   dry && return 0
-  routine_event "$1" failed "exit $2"
-  alert "routine $1 failed (exit $2); log: $3"
+  routine_event "$1" failed "$why"
+  alert "routine $1 failed ($why); log: $3"
 }
 
 # What a read-only routine may do. Nothing else: no shell, no web, and the
@@ -2067,6 +2071,8 @@ digest_waiting() { # board_json -> "- " lines: what's waiting on the owner
     | "\(.content.number)\t\(.content.title)"' <<<"$board")
 }
 
+digest_date() { perl -MPOSIX=strftime -e 'print strftime("%A %-d %B", localtime shift), "\n"' "$(now)"; } # "Thursday 5 November"
+
 digest_body() { # board_json -> the digest's markdown; nothing when every section is empty
   local since merged waiting found problems token="" s
   since=$(( $(now) - 86400 ))
@@ -2076,36 +2082,66 @@ digest_body() { # board_json -> the digest's markdown; nothing when every sectio
   found=$(digest_found "$since")
   problems=$(digest_problems "$since" "$token")
   [ -n "$merged$waiting$found$problems" ] || return 0
-  echo "**$(perl -MPOSIX=strftime -e 'print strftime("%A %-d %B", localtime shift)' "$(now)")**: the last 24 hours."
+  echo "**$(digest_date)**: the last 24 hours."
   for s in "Merged|$merged" "Waiting on you|$waiting" "Found|$found" "Problems|$problems"; do
     printf '\n### %s\n\n%s\n' "${s%%|*}" "${s#*|}"
   done | sed -E '/^### /{n;n;s/^$/None./;}'
 }
 
-digest_issue() { # -> the open "Foreman digest" issue $AGENT opened, if any
-  gh issue list -R "$OWNER/$REPO" --state open --author "$AGENT" --limit 20 --search "\"$DIGEST_TITLE\" in:title" --json number,title \
-    --jq ".[] | select(.title == \"$DIGEST_TITLE\") | .number" | head -1
+digest_html() { # digest markdown on stdin -> the email's HTML part: a heading per section, a list of its lines
+  # Each line is escaped first and then every #n is linked, so a title can't
+  # add markup. The input is digest_body's own fixed shape, not general markdown.
+  U="https://github.com/$OWNER/$REPO/issues" perl -ne '
+    BEGIN { print "<!doctype html>\n<html><head><meta charset=\"utf-8\"></head><body>\n" }
+    chomp; next if $_ eq "";
+    s/&/&amp;/g; s/</&lt;/g; s/>/&gt;/g;
+    s{#(\d+)}{<a href="$ENV{U}/$1">#$1</a>}g;
+    if ($. == 1) { s{^\*\*(.*?)\*\*}{<strong>$1</strong>}; print "<p>$_</p>\n"; next }
+    if (/^### (.*)$/) { print "</ul>\n" if $ul; $ul = 0; print "<h2>$1</h2>\n"; next }
+    if (/^- (.*)$/) { print "<ul>\n" unless $ul; $ul = 1; print "<li>$1</li>\n"; next }
+    print "</ul>\n" if $ul; $ul = 0; print "<p>$_</p>\n";
+    END { print "</ul>\n" if $ul; print "</body></html>\n" }'
+}
+
+digest_send() { # subject text html -> sends the email; prints the response's result, or fails printing why
+  local token req out code resp why url="https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/email/sending/send"
+  [ -r "$CF_TOKEN_FILE" ] && token=$(tr -d '[:space:]' < "$CF_TOKEN_FILE") && [ -n "$token" ] \
+    || { echo "no token file"; return 1; }
+  req=$(jq -n --arg from "$DIGEST_FROM" --arg to "$DIGEST_TO" --arg subject "$1" --arg text "$2" --arg html "$3" \
+    '{from:{address:$from, name:"Nylon foreman"}, to:$to, subject:$subject, text:$text, html:$html}')
+  # The token goes in as a header file and the body on stdin, so neither is in `ps`.
+  out=$(curl -sS -X POST "$url" -H @<(printf 'Authorization: Bearer %s\n' "$token") \
+    -H 'Content-Type: application/json' --data-binary @- -w '\n%{http_code}' <<<"$req" 2>/dev/null) || true
+  code=$(tail -n 1 <<<"$out"); resp=$(sed '$d' <<<"$out")
+  case "$code" in ''|000) echo "Cloudflare didn't answer"; return 1 ;; esac
+  if [ "${code#2}" = "$code" ] || [ "$(jq -r '.success' <<<"$resp" 2>/dev/null)" != true ]; then
+    why=$(jq -r '[.errors[]?.message] | join("; ")' <<<"$resp" 2>/dev/null)
+    echo "Cloudflare $code${why:+: $why}"; return 1
+  fi
+  # A 2xx can still bounce: it counts only once the recipient is delivered or queued.
+  jq -e --arg to "$DIGEST_TO" '($to | ascii_downcase) as $t
+    | [(.result.delivered // [])[], (.result.queued // [])[] | ascii_downcase] | index($t) != null' <<<"$resp" >/dev/null 2>&1 \
+    || { echo "bounced"; return 1; }
+  jq -c '.result' <<<"$resp"
 }
 
 routine_digest() { # board_json
-  local body n url
+  local body subject html result
   body=$(digest_body "$1")
   if [ -z "$body" ]; then log "digest: nothing to say"; dry || routine_event digest ok "nothing to say"; return 0; fi
-  n=$(digest_issue || true)
+  subject="Nylon digest: $(digest_date)"
+  html=$(digest_html <<<"$body")
   if dry; then
-    log "would post this on ${n:+#}${n:-a new pinned \"$DIGEST_TITLE\" issue}, and alert:"; quoted "$body"; return 0
+    log "would email this, from Nylon foreman <$DIGEST_FROM> to $DIGEST_TO:"
+    quoted "Subject: $subject"
+    log "text part:"; quoted "$body"
+    log "HTML part:"; quoted "$html"
+    if [ -r "$CF_TOKEN_FILE" ]; then log "token: $CF_TOKEN_FILE exists"; else log "token: no $CF_TOKEN_FILE, so a real run would fail"; fi
+    return 0
   fi
-  if [ -z "$n" ]; then
-    url=$(gh issue create -R "$OWNER/$REPO" --title "$DIGEST_TITLE" --label kind:chore \
-      --body "The foreman's daily digest: a comment each morning with what merged, what's waiting on you, what the routines found, and what went wrong (scripts/foreman/README.md, \"Routines\").") \
-      || { routine_failed digest 1 "couldn't open the digest issue"; return 0; }
-    n="${url##*/}"
-    gh issue pin "$n" -R "$OWNER/$REPO" >/dev/null 2>&1 || log "couldn't pin #$n"
-  fi
-  url=$(gh issue comment "$n" -R "$OWNER/$REPO" --body-file - <<<"$body") \
-    || { routine_failed digest 1 "couldn't comment on #$n"; return 0; }
-  log "digest: $url"; routine_event digest ok "$url"
-  alert "today's digest: $url"
+  result=$(digest_send "$subject" "$body" "$html") \
+    || { routine_failed digest 1 "$LOGS/foreman.log" "$result"; return 0; }
+  log "digest: sent to $DIGEST_TO"; routine_event digest ok "$result"
 }
 
 routines_status() { # one line per routine: last run, next run, off

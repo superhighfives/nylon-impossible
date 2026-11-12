@@ -1299,7 +1299,7 @@ DIGEST_BOARD=$(jq -c '.items.nodes = [
   {id:"I52", status:{name:"Specced"}, content:{__typename:"Issue", number:52, title:"Pick a colour", state:"OPEN", author:{login:"superhighfives"}, labels:{nodes:[{name:"spec"},{name:"needs-decision"}]}}}]' <<<"$FB_BOARD")
 D_MERGED='[{"number":143,"title":"Fix save","body":"Closes #43.\n\nAlso fixes #44","mergedAt":"2026-10-31T14:00:00Z"},
   {"number":140,"title":"Old","body":"","mergedAt":"2026-10-30T00:00:00Z"}]'
-D_ND='[{"number":52,"title":"Pick a colour"}]' D_OM='[{"number":144,"title":"Bundle dependabot updates"}]' D_DIGEST='[]'
+D_ND='[{"number":52,"title":"Pick a colour"}]' D_OM='[{"number":144,"title":"Bundle dependabot updates"}]'
 gh() { # applies --jq itself, like gh
   local out jqf="" prev="" a
   for a in "$@"; do [ "$prev" = --jq ] && jqf="$a"; prev="$a"; done
@@ -1308,10 +1308,8 @@ gh() { # applies --jq itself, like gh
     "pr list")
       case "$*" in *"--state merged"*) out="$D_MERGED" ;; *owner-merge*) out="$D_OM" ;; *) out='[]' ;; esac ;;
     "issue list")
-      case "$*" in *needs-decision*) out="$D_ND" ;; *in:title*) out="$D_DIGEST" ;; *) out='[]' ;; esac ;;
+      case "$*" in *needs-decision*) out="$D_ND" ;; *) out='[]' ;; esac ;;
     "issue view") out=$(jq -cn --arg b "${SPEC_OK/None./1. Retry?}" '{body:$b}') ;;
-    "issue create") echo "https://github.com/superhighfives/nylon-impossible/issues/700"; return 0 ;;
-    "issue comment") echo "https://github.com/superhighfives/nylon-impossible/issues/${3}#issuecomment-1"; return 0 ;;
     *) return 0 ;;
   esac
   if [ -n "$jqf" ]; then jq -r "$jqf" <<<"$out"; else echo "$out"; fi
@@ -1325,23 +1323,89 @@ expect "waiting: decisions, merges and specs"  "- #52 Pick a colour: needs your 
 expect "the same on a Define board"            "- #51 Crash on save: its spec has questions for you" \
   "$(on_board "$(define "$DIGEST_BOARD")" digest_waiting "$(define "$DIGEST_BOARD")" | grep spec)"
 
+# The HTML part: escaped, then linked, so a title can't add markup.
+html=$(printf '%s\n' '**Sunday 1 November**: the last 24 hours.' '' '### Merged' '' '- #143 Use <b> & </b> (#43)' '' '### Found' '' 'None.' | digest_html)
+expect "every #n links to its issue" \
+  '<li><a href="https://github.com/superhighfives/nylon-impossible/issues/143">#143</a> Use &lt;b&gt; &amp; &lt;/b&gt; (<a href="https://github.com/superhighfives/nylon-impossible/issues/43">#43</a>)</li>' \
+  "$(grep '<li>' <<<"$html")"
+expect "a heading per section, and a list of its lines"  "<h2>Merged</h2>|<ul>|<li>|</ul>|<h2>Found</h2>|<p>None.</p>" \
+  "$(grep -oE '^<(h2|ul|li|/ul|p)>(Merged|Found|None\.)?(</h2>|</p>)?' <<<"$html" | sed -n '2,$p' | paste -sd'|' -)"
+expect "the date line"  "<p><strong>Sunday 1 November</strong>: the last 24 hours.</p>"  "$(sed -n 3p <<<"$html")"
+expect "a title can't inject a tag"  no  "$(grep -q '<b>' <<<"$html" && echo yes || echo no)"
+
+# Sending, with curl stubbed: CURL_OUT is the response body, CURL_CODE its status.
+export FOREMAN_CF_TOKEN_FILE="$tmp/cf-token"; CF_TOKEN_FILE="$FOREMAN_CF_TOKEN_FILE"
+CURL_OUT='{"success":true,"errors":[],"messages":[],"result":{"delivered":["hi@charliegleason.com"],"permanent_bounces":[],"queued":[]}}'
+CURL_CODE=200
+curl() {
+  local prev="" a
+  echo "curl $*" >> "$CALLS"
+  for a in "$@"; do [ "$prev" = -H ] && case "$a" in @*) cat "${a#@}" > "$tmp/curl-header" ;; esac; prev="$a"; done
+  cat > "$tmp/curl-body"
+  printf '%s\n%s' "$CURL_OUT" "$CURL_CODE"
+}
+digest_ok() { tail -n 1 "$EVENTS" | jq -r '"\(.routine) \(.outcome) \(.note)"'; }
+
+: > "$CALLS"; rm -f "$CF_TOKEN_FILE"
+expect_prefix "the dry run prints the email"  "Nylon digest: Sunday 1 November" \
+  "$(DRY=1 routine_digest "$DIGEST_BOARD" | grep -o 'Nylon digest: .*')"
+dry_out=$(DRY=1 routine_digest "$DIGEST_BOARD")
+expect "from and to"                    yes  "$(grep -qF 'from Nylon foreman <foreman@superhighfives.com> to hi@charliegleason.com' <<<"$dry_out" && echo yes || echo no)"
+expect "both parts, with all four sections"  "4 4"  "$(grep -c '| ### ' <<<"$dry_out") $(grep -c '| <h2>' <<<"$dry_out")"
+expect "and says the token file is missing"  yes  "$(grep -qF "no $CF_TOKEN_FILE" <<<"$dry_out" && echo yes || echo no)"
+expect "without sending anything"       no   "$(called 'curl ')"
+
 : > "$CALLS"
 routine_digest "$DIGEST_BOARD" >/dev/null
-expect "the first digest opens the issue"      yes  "$(called "issue create -R superhighfives/nylon-impossible --title $DIGEST_TITLE")"
-expect "pins it"                               yes  "$(called 'issue pin 700')"
-expect "and comments on it"                    yes  "$(called 'issue comment 700')"
-expect "with an alert linking the comment"     yes  "$(called "alert today's digest: https://github.com/superhighfives/nylon-impossible/issues/700#issuecomment-1")"
-: > "$CALLS"; D_DIGEST='[{"number":650,"title":"Foreman digest"}]'
+expect "no token file: it fails, with the reason"  "digest failed no token file"  "$(digest_ok)"
+expect "and alerts"                     yes  "$(called 'alert routine digest failed (no token file)')"
+expect "without calling Cloudflare"     no   "$(called 'curl ')"
+expect "and the next digest lists it"   "- Routine digest failed (no token file)"  "$(digest_problems "$DAY_AGO" | grep 'Routine digest')"
+
+echo "cf-secret" > "$CF_TOKEN_FILE"; chmod 600 "$CF_TOKEN_FILE"
+: > "$CALLS"
 routine_digest "$DIGEST_BOARD" >/dev/null
-expect "after that, it comments on the same one"  "no yes"  "$(called 'issue create') $(called 'issue comment 650')"
+expect "a send logs the API's result"   'digest ok {"delivered":["hi@charliegleason.com"],"permanent_bounces":[],"queued":[]}'  "$(digest_ok)"
+expect "to the account's send endpoint"  yes  "$(called 'curl -sS -X POST https://api.cloudflare.com/client/v4/accounts/1f12960834ae2c36ac08812df07167c2/email/sending/send')"
+expect "with the token in a header file" "Authorization: Bearer cf-secret"  "$(cat "$tmp/curl-header")"
+expect "never as an argument"           no   "$(called 'cf-secret')"
+expect "the envelope"                   'Nylon foreman foreman@superhighfives.com hi@charliegleason.com Nylon digest: Sunday 1 November' \
+  "$(jq -r '"\(.from.name) \(.from.address) \(.to) \(.subject)"' "$tmp/curl-body")"
+expect "a text and an HTML part"        "yes yes" \
+  "$(jq -r '"\(.text | startswith("**Sunday 1 November**") | if . then "yes" else "no" end) \(.html | contains("<h2>Problems</h2>") | if . then "yes" else "no" end)"' "$tmp/curl-body")"
+expect "nothing on GitHub, and no alert"  "no no no"  "$(called 'issue create') $(called 'issue comment') $(called 'alert ')"
+
+: > "$CALLS"; CURL_OUT='{"success":true,"result":{"delivered":[],"permanent_bounces":[],"queued":["Hi@CharlieGleason.com"]}}'
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "queued counts as sent"          "digest ok"  "$(digest_ok | cut -d' ' -f1,2)"
+
+: > "$CALLS"; CURL_OUT='{"success":true,"result":{"delivered":[],"permanent_bounces":["hi@charliegleason.com"],"queued":[]}}'
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "a bounce is a failure"          "digest failed bounced"  "$(digest_ok)"
+
+: > "$CALLS"; CURL_CODE=403 CURL_OUT='{"success":false,"errors":[{"code":10000,"message":"Authentication error"}],"result":null}'
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "an API error fails with its message"  "digest failed Cloudflare 403: Authentication error"  "$(digest_ok)"
+expect "and alerts"                     yes  "$(called 'alert routine digest failed (Cloudflare 403: Authentication error)')"
+expect "and posts nothing to GitHub"    "no no"  "$(called 'issue create') $(called 'issue comment')"
+
+: > "$CALLS"; CURL_CODE=200 CURL_OUT='{"success":false,"errors":[{"code":10001,"message":"email.sending.error.invalid_request_schema"}],"result":null}'
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "success: false is a failure too"  "digest failed Cloudflare 200: email.sending.error.invalid_request_schema"  "$(digest_ok)"
+
+: > "$CALLS"; CURL_CODE=000 CURL_OUT=''
+routine_digest "$DIGEST_BOARD" >/dev/null
+expect "no answer is a failure"         "digest failed Cloudflare didn't answer"  "$(digest_ok)"
 
 : > "$EVENTS"; D_MERGED='[]' D_ND='[]' D_OM='[]'
 EMPTY_BOARD=$(jq -c '.items.nodes = []' <<<"$FB_BOARD")
 : > "$CALLS"
 expect "nothing to say: no body"               ""   "$(digest_body "$EMPTY_BOARD")"
+CURL_CODE=200
 routine_digest "$EMPTY_BOARD" >/dev/null
-expect "so no comment"                         no   "$(called 'issue comment')"
+expect "so no email"                           no   "$(called 'curl ')"
 expect "and no alert"                          no   "$(called 'alert ')"
+expect "it logs nothing to say"                "digest ok nothing to say"  "$(digest_ok)"
 
 echo
 echo "$pass passed, $fail failed"
