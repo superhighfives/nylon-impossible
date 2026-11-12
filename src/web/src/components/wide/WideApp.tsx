@@ -42,7 +42,7 @@ import {
   sheetScrollTarget,
 } from "./board";
 import { columnRows, rowById } from "./boardDom";
-import { Column } from "./Column";
+import { COLUMN_WIDTH, Column } from "./Column";
 import { CommandPalette } from "./CommandPalette";
 import { COMMANDS, type JumpTarget, keyHint } from "./commands";
 import { DONE_COLUMN, DoneColumn } from "./DoneColumn";
@@ -907,14 +907,14 @@ export function WideApp({
                   ) : slot.kind === "end" ? (
                     renderEnd()
                   ) : (
-                    // The open todo's sheet: laid over its column's right
-                    // edge, above the columns around it.
+                    // The open todo's sheet: as wide as a column, laid over
+                    // its column's right padding, above the columns around it.
                     <div
                       key="sheet"
                       ref={setSheetEl}
                       data-slide="sheet"
                       data-board-sheet
-                      className="relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) w-(--n-sheet-width) shrink-0"
+                      className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) ${COLUMN_WIDTH}`}
                     />
                   ),
                 )}

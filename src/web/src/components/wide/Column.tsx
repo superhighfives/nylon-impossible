@@ -60,13 +60,11 @@ export const COLUMN_WIDTH =
   "w-[clamp(var(--n-board-column-min-width),25cqi,var(--n-board-column-max-width))] shrink-0";
 
 /**
- * A column's side padding: 24px, or out to the sheet's overlap on the right
- * while its todo is open, so nothing in it sits under the sheet.
+ * A column's side padding: 24px on the left, and the sheet's overlap on the
+ * right, open or not. The sheet only ever covers that padding, so opening a
+ * todo never rewraps the column's text (principle 8).
  */
-const columnPadding = (sheetOpen: boolean) =>
-  `pl-6 duration-(--n-duration-base) ease-n-out ${
-    sheetOpen ? "pr-(--n-sheet-overlap)" : "pr-6"
-  }`;
+const COLUMN_PADDING = "pl-6 pr-(--n-sheet-overlap)";
 
 /** Behind the open sheet, the column recedes; its selected row doesn't. */
 const RECEDE = "opacity-(--n-sheet-recede)";
@@ -149,7 +147,7 @@ export function ColumnHeader({
 
   return (
     <header
-      className={`relative flex h-[10.5rem] shrink-0 flex-col justify-end pb-[1.125rem] transition-[padding,opacity] ${columnPadding(sheetOpen)} ${
+      className={`relative flex h-[10.5rem] shrink-0 flex-col justify-end pb-[1.125rem] transition-opacity ${COLUMN_PADDING} ${
         sheetOpen ? RECEDE : ""
       }`}
     >
@@ -206,11 +204,7 @@ export function ColumnHeader({
       </div>
       {/* In the header's top corner, so the title keeps the column's full
           width: a list name at 40px doesn't fit beside a button. */}
-      <div
-        className={`absolute top-3 flex items-center gap-0.5 transition-[right] duration-(--n-duration-base) ease-n-out ${
-          sheetOpen ? "right-(--n-sheet-overlap)" : "right-4"
-        }`}
-      >
+      <div className="absolute top-3 right-(--n-sheet-overlap) flex items-center gap-0.5">
         {onDelete && (
           <Menu.Root>
             <Menu.Trigger
@@ -402,13 +396,13 @@ export function Column({
       />
       <div
         aria-hidden="true"
-        className={`ml-6 h-px shrink-0 bg-n-hairline transition-[margin,opacity] duration-(--n-duration-base) ease-n-out ${
-          sheetOpen ? `mr-(--n-sheet-overlap) ${RECEDE}` : "mr-6"
+        className={`mr-(--n-sheet-overlap) ml-6 h-px shrink-0 bg-n-hairline transition-opacity duration-(--n-duration-base) ease-n-out ${
+          sheetOpen ? RECEDE : ""
         }`}
       />
       <div
         data-column-body={listId}
-        className={`min-h-0 flex-1 overflow-y-auto pt-2.5 pb-10 transition-[padding] [scrollbar-gutter:stable] [scrollbar-width:thin] ${columnPadding(sheetOpen)}`}
+        className={`min-h-0 flex-1 overflow-y-auto pt-2.5 pb-10 [scrollbar-gutter:stable] [scrollbar-width:thin] ${COLUMN_PADDING}`}
       >
         <div
           data-column-composer

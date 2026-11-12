@@ -222,10 +222,9 @@ enum Theme {
 
     /// The open todo on the wide board: a sheet after its todo's column.
     enum Sheet {
-        static let width: CGFloat = 400
         static let radius: CGFloat = 14
         static let inset: CGFloat = 8
-        static let overlap: CGFloat = 48
+        static let overlap: CGFloat = 24
         static let slide: CGFloat = 32
         /// The todo's column while the sheet is open, bar its selected row.
         static let recede: Double = 0.8
