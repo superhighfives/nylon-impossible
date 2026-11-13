@@ -78,4 +78,5 @@ export const createListSchema = z.object({
 export const updateListSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   position: z.string().optional(),
+  columnHidden: z.boolean().optional(),
 });

@@ -2099,6 +2099,30 @@ describe("WideApp drag and drop", () => {
     );
   });
 
+  it("moves to a hidden list's sidebar entry, and its column stays hidden", () => {
+    const before = lists;
+    lists = lists.map((l) =>
+      l.id === "list-groceries" ? { ...l, columnHidden: true } : l,
+    );
+    try {
+      render(<WideApp />);
+      const top = layOut("Today");
+      start("t1");
+      move("t1", "side:list-groceries", top + 30);
+      end("t1", "side:list-groceries");
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "t1",
+          input: expect.objectContaining({ listId: "list-groceries" }),
+        }),
+      );
+      expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+      expect(updateList).not.toHaveBeenCalled();
+    } finally {
+      lists = before;
+    }
+  });
+
   describe("easing rows into place", () => {
     const animate = vi.fn();
     const realAnimate = Element.prototype.animate;
@@ -2227,5 +2251,304 @@ describe("WideApp URLs", () => {
   it("focuses This week's column for /this-week", () => {
     render(<WideApp view={{ kind: "thisWeek" }} />);
     expect(focusedTitle()).toContain("Send invoice");
+  });
+});
+
+describe("WideApp hidden columns", () => {
+  const defaults = lists;
+  /** Saves as the server would: the next render has the list's new state. */
+  const applyUpdates = () =>
+    updateList.mockImplementation(
+      ({ id, input }: { id: string; input: Record<string, unknown> }) => {
+        lists = lists.map((l) => (l.id === id ? { ...l, ...input } : l));
+      },
+    );
+  const hide = (id: string) => {
+    lists = lists.map((l) => (l.id === id ? { ...l, columnHidden: true } : l));
+  };
+  const sidebarEntry = (name: string) =>
+    within(screen.getByRole("navigation", { name: "Lists" })).getByRole(
+      "button",
+      { name },
+    );
+  const rightClick = async (name: string) => {
+    fireEvent.contextMenu(sidebarEntry(name));
+    return screen.findByRole("menu");
+  };
+  /** Render, then render again once `updateList` has saved. */
+  const renderBoard = (props: Parameters<typeof WideApp>[0] = {}) => {
+    const view = render(<WideApp {...props} />);
+    return () => act(() => view.rerender(<WideApp {...props} />));
+  };
+
+  beforeEach(() => {
+    lists = defaults;
+    updateList.mockReset();
+    applyUpdates();
+    todos = [
+      makeTodo({ id: "t1", title: "Review PR", listId: "list-today" }),
+      makeTodo({ id: "s1", title: "Read Piranesi", listId: "list-someday" }),
+      makeTodo({ id: "g1", title: "Parmesan", listId: "list-groceries" }),
+      makeTodo({ id: "st1", title: "Mix the EP", listId: "list-studio" }),
+    ];
+  });
+  afterEach(() => {
+    lists = defaults;
+  });
+
+  it("hides your list's column from its sidebar entry, and the others close up", async () => {
+    const saved = renderBoard();
+    const menu = await rightClick("Groceries");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Hide column"]);
+    await userEvent.click(within(menu).getByRole("menuitem"));
+    expect(updateList).toHaveBeenCalledWith({
+      id: "list-groceries",
+      input: { columnHidden: true },
+    });
+    saved();
+    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+    expect(slides()).toEqual([
+      "list-today",
+      "list-week",
+      "list-someday",
+      "list-studio",
+      "done",
+      "end",
+    ]);
+    // No toast: the muted entry is where it comes back from.
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
+  it("keeps a hidden list's entry in place, muted, with its count", () => {
+    hide("list-groceries");
+    render(<WideApp />);
+    const entries = document.querySelectorAll<HTMLElement>(
+      "[data-sidebar-list]",
+    );
+    expect([...entries].map((b) => b.dataset.sidebarList)).toEqual([
+      "list-today",
+      "list-week",
+      "list-someday",
+      "list-groceries",
+      "list-studio",
+    ]);
+    const groceries = sidebarEntry("Groceries");
+    expect(groceries).toHaveAttribute("data-column-hidden");
+    const classes = (el: HTMLElement) => el.className.split(" ");
+    expect(classes(groceries)).toContain("text-n-ink-muted");
+    expect(classes(groceries)).not.toContain("text-n-ink");
+    expect(classes(sidebarEntry("Studio"))).toContain("text-n-ink");
+    expect(groceries).toHaveAccessibleDescription("1 todo, column hidden");
+  });
+
+  it("Show column brings it back in its usual place", async () => {
+    hide("list-groceries");
+    const saved = renderBoard();
+    const menu = await rightClick("Groceries");
+    await userEvent.click(
+      within(menu).getByRole("menuitem", { name: "Show column" }),
+    );
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: false },
+    });
+    saved();
+    expect(slides()).toEqual([
+      "list-today",
+      "list-week",
+      "list-someday",
+      "list-groceries",
+      "list-studio",
+      "done",
+      "end",
+    ]);
+  });
+
+  it("hides a column from the open eye beside its count", async () => {
+    render(<WideApp />);
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Hide column",
+        description: "Groceries",
+      }),
+    );
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: true },
+    });
+  });
+
+  it("shows a hidden column from its closed eye", async () => {
+    hide("list-groceries");
+    render(<WideApp />);
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Show column",
+        description: "Groceries",
+      }),
+    );
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: false },
+    });
+  });
+
+  it("gives the time lists no eye", () => {
+    render(<WideApp />);
+    expect(document.querySelectorAll("[data-column-eye]")).toHaveLength(2);
+  });
+
+  it("offers no Hide column on Today, This week or Someday", () => {
+    render(<WideApp />);
+    for (const name of ["Today", "This week", "Someday"]) {
+      fireEvent.contextMenu(sidebarEntry(name));
+      expect(screen.queryByRole("menu")).toBeNull();
+    }
+  });
+
+  it("clicking a hidden list's entry shows its column and goes in", async () => {
+    hide("list-groceries");
+    const saved = renderBoard();
+    const board = layOutBoard(600);
+    await userEvent.click(sidebarEntry("Groceries"));
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: false },
+    });
+    saved();
+    expect(column("Groceries")).toBeInTheDocument();
+    expect(focusedTitle()).toContain("Parmesan");
+    // The fourth column, 816–1088px: scrolled just far enough.
+    expect(board.scrollTo).toHaveBeenLastCalledWith({
+      left: 1088 - 600,
+      behavior: "auto",
+    });
+  });
+
+  it("choosing a hidden list in the palette shows its column", async () => {
+    hide("list-groceries");
+    const saved = renderBoard();
+    fireEvent.keyDown(window, { key: "k", metaKey: true });
+    const palette = await screen.findByRole("dialog", {
+      name: "Search and commands",
+    });
+    await userEvent.type(within(palette).getByRole("combobox"), "Groceries");
+    await userEvent.click(
+      within(palette).getByRole("option", { name: /^Groceries/ }),
+    );
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: false },
+    });
+    saved();
+    expect(focusedTitle()).toContain("Parmesan");
+  });
+
+  it("opening a hidden list's /list/:id shows its column", () => {
+    hide("list-groceries");
+    const onNavigate = vi.fn();
+    const saved = renderBoard({
+      view: { kind: "list", id: "list-groceries" },
+      onNavigate,
+    });
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-groceries",
+      input: { columnHidden: false },
+    });
+    saved();
+    expect(focusedTitle()).toContain("Parmesan");
+    expect(onNavigate).not.toHaveBeenCalledWith(null);
+  });
+
+  it("the palette offers Hide column for the selection's list, not a time list's", async () => {
+    const saved = renderBoard();
+    const commands = async () => {
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      const palette = await screen.findByRole("dialog", {
+        name: "Search and commands",
+      });
+      await userEvent.type(within(palette).getByRole("combobox"), "column");
+      return within(palette).queryAllByRole("option");
+    };
+    act(() => rowButton("Review PR").focus());
+    expect(await commands()).toEqual([]);
+    await userEvent.keyboard("{Escape}");
+
+    act(() => rowButton("Mix the EP").focus());
+    const [option] = await commands();
+    expect(option).toHaveTextContent("Hide column “Studio”");
+    await userEvent.click(option);
+    saved();
+    expect(screen.queryByRole("region", { name: "Studio" })).toBeNull();
+    // The keyboard moved to the column before it.
+    expect(focusedTitle()).toContain("Parmesan");
+  });
+
+  it("hiding the column with the keyboard from its ⋯ menu moves it to the column before", async () => {
+    const saved = renderBoard();
+    act(() => rowButton("Parmesan").focus());
+    await userEvent.click(
+      screen.getByRole("button", { name: "Groceries options" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Hide column" }),
+    );
+    saved();
+    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+    expect(focusedTitle()).toContain("Read Piranesi");
+    // The sidebar's bar went with the selection, to Someday.
+    const nav = screen.getByRole("navigation", { name: "Lists" });
+    expect(
+      nav.querySelector("[data-selection-bar]")?.closest("button"),
+    ).toHaveAccessibleName("Someday");
+  });
+
+  it("← → skip a hidden column", () => {
+    hide("list-groceries");
+    render(<WideApp />);
+    rowButton("Read Piranesi").focus();
+    press("ArrowRight");
+    expect(focusedTitle()).toContain("Mix the EP");
+    press("ArrowLeft");
+    expect(focusedTitle()).toContain("Read Piranesi");
+  });
+
+  it("leaves a hidden column out of the Tab order", () => {
+    hide("list-groceries");
+    render(<WideApp />);
+    const stops = [
+      ...document.querySelectorAll<HTMLElement>(
+        'main[aria-label="Board"] [data-row-id][tabindex="0"]',
+      ),
+    ].map((el) => el.dataset.rowList);
+    expect(stops).not.toContain("list-groceries");
+    expect(stops).toContain("list-studio");
+  });
+
+  it("hiding the open todo's column closes its sheet", async () => {
+    const saved = renderBoard();
+    await userEvent.dblClick(rowButton("Parmesan"));
+    await screen.findByRole("dialog");
+    expect(slides()).toContain("sheet");
+    fireEvent.contextMenu(sidebarEntry("Groceries"));
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Hide column" }),
+    );
+    saved();
+    expect(slides()).not.toContain("sheet");
+    expect(screen.queryByRole("region", { name: "Groceries" })).toBeNull();
+  });
+
+  it("closes the sheet when its column is hidden from another window", async () => {
+    const saved = renderBoard();
+    await userEvent.dblClick(rowButton("Parmesan"));
+    await screen.findByRole("dialog");
+    hide("list-groceries");
+    saved();
+    expect(slides()).not.toContain("sheet");
   });
 });

@@ -80,13 +80,18 @@ const RECEDE = "opacity-(--n-sheet-recede)";
 export const HEAD_FOCUS =
   "outline-none transition-colors duration-(--n-duration-fast) group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)] forced-colors:group-data-[keyboard]/board:focus:outline-2 forced-colors:group-data-[keyboard]/board:focus:outline-solid";
 
-const MENU_ITEM =
+/** A menu's popup and items: the column's ⋯ menu, the sidebar's right-click. */
+export const MENU_POPUP =
+  "min-w-44 overflow-clip rounded-[0.875rem] bg-n-canvas text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill";
+
+export const MENU_ITEM =
   "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";
 
 /**
  * A column's title and subline on the shared baseline. Your lists' titles
- * rename in place (Enter or blur saves, Esc cancels) and carry a ⋯ menu.
- * There's no ×: every list is always on the board.
+ * rename in place (Enter or blur saves, Esc cancels) and carry a ⋯ menu:
+ * Rename, Hide column and Delete list. There's no ×: a hidden list's column
+ * comes back from the sidebar.
  */
 export function ColumnHeader({
   listId,
@@ -96,6 +101,7 @@ export function ColumnHeader({
   icon,
   banner,
   onRename,
+  onHide,
   onDelete,
   sheetOpen = false,
 }: {
@@ -117,6 +123,8 @@ export function ColumnHeader({
    */
   banner?: ReactNode;
   onRename?: (name: string) => void;
+  /** Your list's column: Hide column, which takes it off the board. */
+  onHide?: () => void;
   onDelete?: () => void;
   /** The column's todo is open: clear of the sheet, and receded. */
   sheetOpen?: boolean;
@@ -126,6 +134,9 @@ export function ColumnHeader({
   // follows the field unmounting doesn't save twice.
   const finished = useRef(false);
   const fromMenu = useRef(false);
+  // Hide column waits for the menu to close: it holds focus until then, and
+  // the keyboard is handed to the column before this one.
+  const hideOnClose = useRef(false);
   const setRenaming = (on: boolean) => {
     finished.current = !on;
     setRenamingState(on);
@@ -206,7 +217,13 @@ export function ColumnHeader({
           width: a list name at 40px doesn't fit beside a button. */}
       <div className="absolute top-3 right-(--n-sheet-overlap) flex items-center gap-0.5">
         {onDelete && (
-          <Menu.Root>
+          <Menu.Root
+            onOpenChangeComplete={(open) => {
+              if (open || !hideOnClose.current) return;
+              hideOnClose.current = false;
+              onHide?.();
+            }}
+          >
             <Menu.Trigger
               aria-label={`${title} options`}
               className={ICON_BUTTON}
@@ -217,7 +234,7 @@ export function ColumnHeader({
               <Menu.Positioner align="end" sideOffset={4} className="z-50">
                 <Menu.Popup
                   finalFocus={() => !fromMenu.current}
-                  className="min-w-44 overflow-clip rounded-[0.875rem] bg-n-canvas text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill"
+                  className={MENU_POPUP}
                 >
                   {onRename && (
                     <Menu.Item
@@ -228,6 +245,19 @@ export function ColumnHeader({
                       }}
                     >
                       Rename
+                    </Menu.Item>
+                  )}
+                  {onHide && (
+                    <Menu.Item
+                      className={MENU_ITEM}
+                      onClick={() => {
+                        // The column leaves, so the keyboard goes to the
+                        // one before it, not back to this menu's button.
+                        fromMenu.current = true;
+                        hideOnClose.current = true;
+                      }}
+                    >
+                      Hide column
                     </Menu.Item>
                   )}
                   <Menu.Item
@@ -313,6 +343,7 @@ export function Column({
   loading,
   error,
   onRename,
+  onHide,
   onDelete,
   onBackgroundClick,
   sheetOpen = false,
@@ -340,6 +371,8 @@ export function Column({
   error: ReactNode;
   /** Your list's column: rename in place. */
   onRename?: (name: string) => void;
+  /** Your list's column: Hide column, in the ⋯ menu. */
+  onHide?: () => void;
   /** Your list's column: Delete list, in the ⋯ menu. */
   onDelete?: () => void;
   /** A click on the column's empty space: focus it, select nothing. */
@@ -391,6 +424,7 @@ export function Column({
         icon={icon}
         banner={banner}
         onRename={onRename}
+        onHide={onHide}
         onDelete={onDelete}
         sheetOpen={sheetOpen}
       />

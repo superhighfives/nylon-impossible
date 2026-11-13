@@ -1,7 +1,7 @@
 import { asc, inArray } from "drizzle-orm";
 import type { BaseSQLiteDatabase } from "drizzle-orm/sqlite-core";
 import { chunkForD1 } from "./d1";
-import { type Todo, type TodoUrl, todoUrls } from "./schema";
+import { type List, type Todo, type TodoUrl, todoUrls } from "./schema";
 
 // The one wire shape for a todo and its links. The API's routes and the web's
 // getTodos all serialize through here, so a field added to one reaches every
@@ -59,6 +59,25 @@ export function serializeUrl(url: TodoUrl) {
     fetchedAt: url.fetchedAt?.toISOString() ?? null,
     createdAt: url.createdAt.toISOString(),
     updatedAt: url.updatedAt.toISOString(),
+  };
+}
+
+/**
+ * A list with ISO dates, for the API's routes and the web's getLists alike.
+ * A null `columnHidden` (never hidden) goes out as shown. The ID keeps its
+ * stored case: the API lowercases it, the web compares it as stored.
+ */
+export function serializeList(list: List) {
+  return {
+    id: list.id,
+    userId: list.userId,
+    name: list.name,
+    kind: list.kind,
+    systemKind: list.systemKind,
+    position: list.position,
+    columnHidden: list.columnHidden ?? false,
+    createdAt: list.createdAt.toISOString(),
+    updatedAt: list.updatedAt.toISOString(),
   };
 }
 

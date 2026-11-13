@@ -86,7 +86,7 @@ matrix, once it exists) and check the changed lines against it. Flag:
   exceptions: Gmail's card, where a ticked todo stays, crossed out, until it
   refreshes; and the wide layout's fourth column, which shows Done by default
   (Settled "Wide layout");
-- visible controls on rows: handles, toolbars, chevrons, per-row buttons
+- visible controls on todo rows: handles, toolbars, chevrons, per-row buttons
   (principle 4);
 - layout that jumps: space for a banner or the fourth column that's added and
   removed rather than kept (principle 8);

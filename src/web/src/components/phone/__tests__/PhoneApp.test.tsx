@@ -32,7 +32,8 @@ const lists = [
   makeList("list-today", "Today", "today"),
   makeList("list-week", "This week", "thisWeek"),
   makeList("list-someday", "Someday", "someday"),
-  makeList("list-groceries", "Groceries", null),
+  // Hidden on the wide board; the phone shows every list regardless (#645).
+  { ...makeList("list-groceries", "Groceries", null), columnHidden: true },
 ];
 const startingTodos = [
   makeTodo({ id: "open", title: "Water the plants" }),
@@ -177,6 +178,14 @@ describe("PhoneApp", () => {
     ).toHaveAttribute("aria-current", "page");
     await userEvent.keyboard("{End}");
     expect(doneButton()).toHaveAttribute("aria-current", "page");
+  });
+
+  it("shows a list whose column is hidden on the wide board", async () => {
+    render(<PhoneApp />);
+    await userEvent.click(
+      within(switcher()).getByRole("button", { name: "Lists" }),
+    );
+    expect(within(page("lists")).getByText("Groceries")).toBeVisible();
   });
 
   it("leaves Done out of the account sheet", async () => {

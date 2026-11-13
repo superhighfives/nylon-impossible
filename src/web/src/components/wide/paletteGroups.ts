@@ -26,6 +26,10 @@ export interface PaletteSource {
   listName: (listId: string) => string;
   /** The selection, for the commands that act on it. */
   selected: TodoWithUrls | null;
+  /** The column with the selection, for Hide column: your list's, or none. */
+  columnList: SerializedList | null;
+  /** Hide one of your lists' columns, or show it again. */
+  toggleColumn: (list: SerializedList) => void;
   /** Send feedback, for admins. */
   admin: boolean;
   board: Board;
@@ -78,6 +82,30 @@ function commandItems(s: PaletteSource): PaletteItem[] {
       },
     ];
   });
+}
+
+/**
+ * Hide column for the list with the selection, and Show column for each list
+ * you've hidden. Never for Today, This week, Someday or Done.
+ */
+function columnItems(s: PaletteSource): PaletteItem[] {
+  const hide =
+    s.columnList && !s.columnList.systemKind && !s.columnList.columnHidden
+      ? [s.columnList]
+      : [];
+  const show = s.collections.filter((l) => l.columnHidden);
+  return [
+    ...hide.map((l) => ({
+      id: `hide:${l.id}`,
+      label: `Hide column “${l.name}”`,
+      run: () => s.toggleColumn(l),
+    })),
+    ...show.map((l) => ({
+      id: `show:${l.id}`,
+      label: `Show column “${l.name}”`,
+      run: () => s.toggleColumn(l),
+    })),
+  ];
 }
 
 /** Todos: up to eight matching titles, Done included. */
@@ -164,6 +192,9 @@ export function paletteGroups(
   return [
     { label: "Todos", items: todoItems(s, query) },
     { label: "Go to", items: filterItems(goToItems(s), query) },
-    { label: "Commands", items: filterItems(commandItems(s), query) },
+    {
+      label: "Commands",
+      items: filterItems([...commandItems(s), ...columnItems(s)], query),
+    },
   ];
 }

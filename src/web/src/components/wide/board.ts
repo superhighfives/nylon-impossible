@@ -22,18 +22,26 @@ export type BoardSlot =
   | { kind: "end" };
 
 /**
+ * The lists with a column on the board: all but the ones you've hidden
+ * (Settled "Wide layout"). The sidebar keeps every list.
+ */
+export function shownColumns(lists: SerializedList[]): SerializedList[] {
+  return lists.filter((l) => !l.columnHidden);
+}
+
+/**
  * The wide board's row: `lists` (the time lists, then yours in the
- * sidebar's order), then Done, then the end: the rest of the board's width,
- * zero when the columns overflow. Nothing is swapped in or out. With a todo
- * open, its sheet goes straight after the todo's column (`sheetAfter`), and
- * the columns after it keep their order.
+ * sidebar's order, less the hidden ones), then Done, then the end: the rest
+ * of the board's width, zero when the columns overflow. Nothing else is
+ * swapped in or out. With a todo open, its sheet goes straight after the
+ * todo's column (`sheetAfter`), and the columns after it keep their order.
  */
 export function boardSlots(
   lists: SerializedList[],
   sheetAfter: string | null,
 ): BoardSlot[] {
   const slots: BoardSlot[] = [];
-  for (const list of lists) {
+  for (const list of shownColumns(lists)) {
     slots.push({ kind: "list", list });
     if (list.id === sheetAfter) slots.push({ kind: "sheet" });
   }
