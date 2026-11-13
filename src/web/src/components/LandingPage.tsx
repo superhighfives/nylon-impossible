@@ -363,7 +363,10 @@ export function LandingPage() {
 
         <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-n-hairline py-8 text-[0.8125rem] text-n-ink-muted">
           <span className="font-n-display font-bold text-n-ink">Nylon</span>
-          <nav aria-label="Legal" className="flex gap-5">
+          <nav aria-label="Footer" className="flex gap-5">
+            <Link to="/docs/api" className={linkClass}>
+              API
+            </Link>
             <Link to="/privacy" className={linkClass}>
               Privacy
             </Link>
