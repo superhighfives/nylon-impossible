@@ -174,13 +174,12 @@ const slides = () =>
   ].map((el) => el.dataset.slide);
 
 /**
- * Lays the board out `width` px wide, unscrolled: each column 272px (17rem)
- * and the sheet 400px, overlapping its column by 48px. jsdom has no layout.
+ * Lays the board out `width` px wide, unscrolled: each column and the sheet
+ * 272px (17rem), the sheet overlapping its column by 24px. jsdom has no layout.
  */
 const layOutBoard = (width: number) => {
   const board = screen.getByRole("main", { name: "Board" });
-  const widthOf = (el: HTMLElement) =>
-    el.dataset.slide === "sheet" ? 400 : 272;
+  const COLUMN_PX = 272;
   Object.defineProperty(board, "clientWidth", {
     configurable: true,
     value: width,
@@ -205,14 +204,14 @@ const layOutBoard = (width: number) => {
       sib;
       sib = sib.previousElementSibling as HTMLElement | null
     ) {
-      x += widthOf(sib);
+      x += COLUMN_PX;
       if (sib.dataset.slide === "sheet") sheet = true;
     }
-    return sheet ? x - 48 : x;
+    return sheet ? x - 24 : x;
   };
   const restore = [
     ["offsetLeft", (el: HTMLElement) => leftOf(el)],
-    ["offsetWidth", (el: HTMLElement) => widthOf(el)],
+    ["offsetWidth", () => COLUMN_PX],
   ] as const;
   for (const [prop, get] of restore) {
     Object.defineProperty(HTMLElement.prototype, prop, {
@@ -1271,14 +1270,14 @@ describe("WideApp", () => {
     await screen.findByRole("dialog");
     const someday = column("Someday");
     expect(someday).toHaveAttribute("data-sheet-open");
-    // Its header and Add field recede, and its contents move in clear of
-    // the sheet's overlap.
+    // Its header and Add field recede. Its padding is the sheet's overlap
+    // whether or not it's open, so its text doesn't rewrap.
     expect(someday.querySelector("header")).toHaveClass(
       RECEDE,
       "pr-(--n-sheet-overlap)",
     );
     expect(someday.querySelector("[data-column-composer]")).toHaveClass(RECEDE);
-    expect(someday.querySelector("[data-column-body]")).toHaveClass(
+    expect(column("Today").querySelector("header")).toHaveClass(
       "pr-(--n-sheet-overlap)",
     );
     // The rows recede unless selected; the selected row's fill runs on
@@ -1329,11 +1328,11 @@ describe("WideApp", () => {
   it("opening a todo scrolls its column and the sheet into view together", async () => {
     render(<WideApp />);
     const board = layOutBoard(700);
-    // Studio, 1088–1360px; its sheet overlaps it by 48px, to 1712px.
+    // Studio, 1088–1360px; its sheet overlaps it by 24px, to 1608px.
     await userEvent.dblClick(rowButton("Mix the EP"));
     await screen.findByRole("dialog");
     expect(board.scrollTo).toHaveBeenLastCalledWith({
-      left: 1712 - 700,
+      left: 1608 - 700,
       behavior: "auto",
     });
   });

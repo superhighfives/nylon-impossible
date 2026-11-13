@@ -101,7 +101,7 @@ export function renderCss(tokens) {
   }
   out.push("");
   const { sheet } = tokens;
-  for (const name of ["width", "radius", "inset", "overlap", "slide"]) {
+  for (const name of ["radius", "inset", "overlap", "slide"]) {
     out.push(`  --n-sheet-${name}: ${sheet[name] / 16}rem;`);
   }
   out.push(`  --n-sheet-recede: ${sheet.recede};`);
@@ -388,7 +388,7 @@ export function renderSwift(tokens) {
     "    /// The open todo on the wide board: a sheet after its todo's column.",
     "    enum Sheet {",
   );
-  for (const name of ["width", "radius", "inset", "overlap", "slide"]) {
+  for (const name of ["radius", "inset", "overlap", "slide"]) {
     out.push(`        static let ${name}: CGFloat = ${sheet[name]}`);
   }
   out.push(
