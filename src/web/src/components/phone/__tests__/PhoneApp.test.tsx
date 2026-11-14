@@ -263,6 +263,32 @@ describe("PhoneApp empty states", () => {
   });
 });
 
+describe("PhoneApp, a row that fails to draw", () => {
+  afterEach(() => {
+    todos = startingTodos;
+    vi.restoreAllMocks();
+  });
+
+  it("takes down only that page's list, which says so", () => {
+    // React logs the caught error; the test is that it's caught.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { urls: _, ...bare } = makeTodo({
+      id: "t-bad",
+      title: "Olive oil",
+      listId: "list-today",
+    });
+    todos = [
+      bare as TodoWithUrls,
+      makeTodo({ id: "w-ok", title: "Send invoice", listId: "list-week" }),
+    ];
+    render(<PhoneApp />);
+    expect(
+      within(page("today")).getByText("Couldn't show this"),
+    ).toBeInTheDocument();
+    expect(within(page("thisWeek")).getByText("Send invoice")).toBeVisible();
+  });
+});
+
 describe("PhoneApp reordering", () => {
   const ROW = 48;
   const realOffsetTop = Object.getOwnPropertyDescriptor(

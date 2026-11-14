@@ -793,6 +793,7 @@ export function WideApp({
         subline={columnSubline(kind, now, timeZone)}
         sheetOpen={sheetColumn === list.id}
         rows={rowsFor(list.id)}
+        resetKey={todos}
         subtasksOf={subtasksOf}
         checked={actions.checked}
         collapsing={actions.collapsing}

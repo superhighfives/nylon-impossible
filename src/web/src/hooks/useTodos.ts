@@ -337,6 +337,15 @@ interface SmartCreateResponse {
   todos: TodoWithUrls[];
 }
 
+/**
+ * The API's smart-create body. Each todo carries its links, but an older
+ * Worker sent bare todos, and onSuccess puts these straight into the cache,
+ * where every row reads `urls`. So don't trust it to be there.
+ */
+interface SmartCreateBody {
+  todos: Array<Omit<TodoWithUrls, "urls"> & { urls?: TodoWithUrls["urls"] }>;
+}
+
 export interface SmartCreateInput {
   text: string;
   listId?: string;
@@ -386,7 +395,10 @@ export function useSmartCreate() {
         throw new Error(message ?? `Request failed (${response.status})`);
       }
 
-      return response.json();
+      const body: SmartCreateBody = await response.json();
+      return {
+        todos: body.todos.map((todo) => ({ ...todo, urls: todo.urls ?? [] })),
+      };
     },
     onMutate: async ({ text, listId, dueDate }) => {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });

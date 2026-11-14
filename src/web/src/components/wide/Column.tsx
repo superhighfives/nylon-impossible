@@ -5,6 +5,7 @@ import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { EmptyLine } from "@/components/phone/EmptyLine";
 import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
 import { ICON_BUTTON, SUBLINE } from "@/components/ui/styles";
+import { ViewBoundary } from "@/components/ViewBoundary";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
@@ -347,6 +348,7 @@ export function Column({
   onDelete,
   onBackgroundClick,
   sheetOpen = false,
+  resetKey,
   ...rowCallbacks
 }: RowCallbacks & {
   listId: string;
@@ -379,6 +381,8 @@ export function Column({
   onBackgroundClick?: () => void;
   /** Its todo is open, in the sheet beside it. */
   sheetOpen?: boolean;
+  /** What the rows come from: a row that failed to draw retries when it changes. */
+  resetKey?: unknown;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnDropId(listId),
@@ -456,46 +460,48 @@ export function Column({
         ) : error ? (
           error
         ) : (
-          <div data-drop-area={listId} className="relative min-h-24">
-            {rows.length === 0 ? (
-              <div
-                className={`transition-colors duration-(--n-duration-fast) ${
-                  isOver ? "text-n-ink" : "text-n-ink-subtle"
-                }`}
-              >
-                <EmptyLine text={empty} density="wide" />
-              </div>
-            ) : (
-              <ul
-                ref={listRef}
-                data-row-list={listId}
-                className={`m-0 list-none p-0 ${sheetOpen ? SHEET_ROWS : ""}`}
-              >
-                {rows.map((todo) => (
-                  <DraggableRow
-                    key={todo.id}
-                    todo={todo}
-                    listId={listId}
-                    subtasks={subtasksOf(todo.id)}
-                    checked={checked.has(todo.id)}
-                    collapsing={collapsing.has(todo.id)}
-                    highlighted={highlightedId === todo.id}
-                    selected={selectedId === todo.id}
-                    tabStop={tabStopId === todo.id}
-                    {...rowCallbacks}
-                  />
-                ))}
-              </ul>
-            )}
-            {indicator && indicator.listId === listId && (
-              <div
-                aria-hidden="true"
-                data-drop-indicator
-                style={{ top: indicator.y }}
-                className="pointer-events-none absolute -inset-x-2.5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
-              />
-            )}
-          </div>
+          <ViewBoundary view="column" resetKey={resetKey}>
+            <div data-drop-area={listId} className="relative min-h-24">
+              {rows.length === 0 ? (
+                <div
+                  className={`transition-colors duration-(--n-duration-fast) ${
+                    isOver ? "text-n-ink" : "text-n-ink-subtle"
+                  }`}
+                >
+                  <EmptyLine text={empty} density="wide" />
+                </div>
+              ) : (
+                <ul
+                  ref={listRef}
+                  data-row-list={listId}
+                  className={`m-0 list-none p-0 ${sheetOpen ? SHEET_ROWS : ""}`}
+                >
+                  {rows.map((todo) => (
+                    <DraggableRow
+                      key={todo.id}
+                      todo={todo}
+                      listId={listId}
+                      subtasks={subtasksOf(todo.id)}
+                      checked={checked.has(todo.id)}
+                      collapsing={collapsing.has(todo.id)}
+                      highlighted={highlightedId === todo.id}
+                      selected={selectedId === todo.id}
+                      tabStop={tabStopId === todo.id}
+                      {...rowCallbacks}
+                    />
+                  ))}
+                </ul>
+              )}
+              {indicator && indicator.listId === listId && (
+                <div
+                  aria-hidden="true"
+                  data-drop-indicator
+                  style={{ top: indicator.y }}
+                  className="pointer-events-none absolute -inset-x-2.5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
+                />
+              )}
+            </div>
+          </ViewBoundary>
         )}
       </div>
     </section>

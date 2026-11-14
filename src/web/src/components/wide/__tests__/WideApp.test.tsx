@@ -1,4 +1,5 @@
 import type { DndContextProps } from "@dnd-kit/core";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
@@ -48,26 +49,52 @@ vi.mock("@/hooks/useLists", () => ({
   useUpdateList: () => ({ mutate: updateList }),
   useDeleteList: () => ({ mutate: deleteList }),
 }));
-vi.mock("@/hooks/useTodos", () => ({
-  useTodos: () => ({
-    data: todos,
-    isLoading: false,
-    error: null,
-    refetch: vi.fn(),
-    isFetching: false,
-  }),
-  useUpdateTodo: () => ({
-    mutate: update,
-    mutateAsync: async (vars: unknown) => update(vars),
-  }),
-  useDeleteTodo: () => ({ mutate: remove }),
-  useSmartCreate: () => ({ mutateAsync: smartCreate }),
-  useCreateTodo: () => ({ mutate: vi.fn() }),
-  useDeleteTodoUrl: () => ({ mutate: vi.fn() }),
-  useAddTodoUrl: () => ({ mutate: addUrl }),
-  useProcessTodo: () => ({ mutate: vi.fn() }),
-  useUpdateUrlPreview: () => ({ mutate: vi.fn() }),
+/**
+ * The real todos cache and smart-create, for the tests that need what the
+ * mutation itself puts in the cache. Render inside `withCache`'s provider.
+ * The cache's refetch never lands, so what onSuccess swaps in stays.
+ */
+let liveCache = false;
+vi.mock("@/server/todos", () => ({
+  getTodos: vi.fn(),
+  createTodo: vi.fn(),
+  updateTodo: vi.fn(),
+  deleteTodo: vi.fn(),
 }));
+vi.mock("@/hooks/useTodos", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useTodos")>();
+  const { useQuery } = await import("@tanstack/react-query");
+  const useLiveTodos = () =>
+    useQuery<TodoWithUrls[]>({
+      queryKey: ["todos"],
+      queryFn: () => new Promise(() => {}),
+      initialData: todos,
+      staleTime: Number.POSITIVE_INFINITY,
+    }).data;
+  return {
+    useTodos: () => ({
+      // biome-ignore lint/correctness/useHookAtTopLevel: `liveCache` is fixed for a whole test
+      data: liveCache ? useLiveTodos() : todos,
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+      isFetching: false,
+    }),
+    useUpdateTodo: () => ({
+      mutate: update,
+      mutateAsync: async (vars: unknown) => update(vars),
+    }),
+    useDeleteTodo: () => ({ mutate: remove }),
+    useSmartCreate: () =>
+      // biome-ignore lint/correctness/useHookAtTopLevel: `liveCache` is fixed for a whole test
+      liveCache ? actual.useSmartCreate() : { mutateAsync: smartCreate },
+    useCreateTodo: () => ({ mutate: vi.fn() }),
+    useDeleteTodoUrl: () => ({ mutate: vi.fn() }),
+    useAddTodoUrl: () => ({ mutate: addUrl }),
+    useProcessTodo: () => ({ mutate: vi.fn() }),
+    useUpdateUrlPreview: () => ({ mutate: vi.fn() }),
+  };
+});
 /** The client's Reduce motion hint; the drag tests turn it off. */
 let reducedMotion = "reduce";
 vi.mock("@/hooks/useHints", () => ({
@@ -92,6 +119,7 @@ vi.mock("@/hooks/useUser", () => ({
 }));
 vi.mock("@clerk/tanstack-react-start", () => ({
   useClerk: () => ({ signOut: vi.fn() }),
+  useAuth: () => ({ getToken: async () => "test-token", userId: "user-1" }),
 }));
 vi.mock("@/lib/toast", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/toast")>()),
@@ -2631,5 +2659,97 @@ describe("WideApp hidden columns", () => {
     hide("list-groceries");
     saved();
     expect(slides()).not.toContain("sheet");
+  });
+});
+
+describe("WideApp, a row that fails to draw", () => {
+  /** A todo as an older API sent it from smart-create: no `urls`. */
+  const withoutUrls = (overrides: Partial<TodoWithUrls>) => {
+    const { urls: _, ...bare } = makeTodo(overrides);
+    return bare as TodoWithUrls;
+  };
+  let quiet: ReturnType<typeof vi.spyOn>;
+  beforeEach(() => {
+    // React logs the caught error; the test is that it's caught.
+    quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    todos = [
+      makeTodo({ id: "t1", title: "Review PR", listId: "list-today" }),
+      makeTodo({ id: "w1", title: "Send invoice", listId: "list-week" }),
+      makeTodo({ id: "g1", title: "Parmesan", listId: "list-groceries" }),
+      makeTodo({ id: "st1", title: "Mix the EP", listId: "list-studio" }),
+    ];
+  });
+  afterEach(() => {
+    quiet.mockRestore();
+    liveCache = false;
+    vi.unstubAllGlobals();
+  });
+
+  it("takes down only its column, which says so, and comes back once the todos change", () => {
+    todos = [
+      ...todos,
+      withoutUrls({
+        id: "g2",
+        title: "Olive oil",
+        listId: "list-groceries",
+        position: "a1",
+      }),
+    ];
+    const { rerender } = render(<WideApp />);
+    const groceries = column("Groceries");
+    expect(within(groceries).getByText("Couldn't show this")).toHaveClass(
+      "text-n-ink-muted",
+    );
+    expect(within(groceries).queryByText("Parmesan")).toBeNull();
+    // The column's head and Add still work around it.
+    expect(
+      screen.getByRole("textbox", { name: "New todo in Groceries" }),
+    ).toBeInTheDocument();
+    expect(rowButton("Review PR")).toBeInTheDocument();
+    expect(rowButton("Send invoice")).toBeInTheDocument();
+    expect(rowButton("Mix the EP")).toBeInTheDocument();
+
+    todos = todos.map((t) => (t.id === "g2" ? makeTodo(t) : t));
+    rerender(<WideApp />);
+    expect(within(groceries).queryByText("Couldn't show this")).toBeNull();
+    expect(rowButton("Olive oil")).toBeInTheDocument();
+  });
+
+  it("survives a smart-create that answers without urls, with the todo open beside Today", async () => {
+    liveCache = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({
+          todos: [
+            withoutUrls({
+              id: "added-1",
+              title: "Read",
+              listId: "list-today",
+              position: "0",
+            }),
+          ],
+        }),
+      ),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <WideApp />
+      </QueryClientProvider>,
+    );
+    const add = screen.getByRole("textbox", { name: "New todo in today" });
+    await userEvent.type(add, "Read https://example.com{Enter}");
+    await act(async () => {});
+    expect(
+      queryClient
+        .getQueryData<TodoWithUrls[]>(["todos"])
+        ?.find((t) => t.id === "added-1")?.urls,
+    ).toEqual([]);
+    expect(rowButton("Read")).toBeInTheDocument();
+    expect(document.querySelector("[data-detail-column]")).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't show this")).toBeNull();
   });
 });
