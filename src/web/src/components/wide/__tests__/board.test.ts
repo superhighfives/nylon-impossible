@@ -1,11 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { makeList } from "@/components/phone/__tests__/fixtures";
 import { boardSlots, revealSpan, sheetScrollTarget } from "../board";
-
-// The commands' Undo reaches the server through it; these don't need it.
-vi.mock("@/components/phone/useTodoActions", () => ({
-  runToastUndo: vi.fn(),
-}));
 
 const lists = [
   makeList("today", "Today", "today", "a0"),

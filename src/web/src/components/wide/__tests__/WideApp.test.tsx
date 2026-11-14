@@ -689,6 +689,82 @@ describe("WideApp", () => {
     expect(selection()).toEqual({ id: "t1", column: "list-today" });
   });
 
+  it("z steps back through the last actions, newest first, and ⇧Z forward", async () => {
+    vi.useFakeTimers();
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    const toasts = () => vi.mocked(toast.success).mock.calls.map((c) => c[0]);
+    const finish = async (title: string) => {
+      rowButton(title).focus();
+      press("x");
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+      });
+      rerender(<WideApp />);
+    };
+    await finish("Review PR");
+    await finish("Call Mum");
+    rowButton("Send invoice").focus();
+    press("3");
+    rerender(<WideApp />);
+    // Long after the last toast has gone.
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+    });
+
+    update.mockClear();
+    vi.mocked(toast.success).mockClear();
+    press("z");
+    press("z");
+    press("z");
+    expect(update.mock.calls.map((c) => c[0])).toEqual([
+      { id: "w1", input: { listId: "list-week", position: "a0" } },
+      { id: "t2", input: { completed: false, position: "a1" } },
+      { id: "t1", input: { completed: false, position: "a0" } },
+    ]);
+    expect(toasts()).toEqual([
+      "Undone: Moved to someday",
+      "Undone: Done",
+      "Undone: Done",
+    ]);
+
+    update.mockClear();
+    vi.mocked(toast.success).mockClear();
+    fireEvent.keyDown(document.activeElement ?? window, {
+      key: "Z",
+      shiftKey: true,
+    });
+    fireEvent.keyDown(document.activeElement ?? window, {
+      key: "Z",
+      shiftKey: true,
+    });
+    expect(update.mock.calls.map((c) => c[0])).toEqual([
+      { id: "t1", input: { completed: true } },
+      { id: "t2", input: { completed: true } },
+    ]);
+    expect(toasts()).toEqual(["Redone: Done", "Redone: Done"]);
+    vi.useRealTimers();
+  });
+
+  it("a new action clears what ⇧Z could redo", () => {
+    const { rerender } = render(<WideApp />);
+    liveUpdates();
+    rowButton("Review PR").focus();
+    press("2");
+    rerender(<WideApp />);
+    press("z");
+    rerender(<WideApp />);
+    rowButton("Send invoice").focus();
+    press("3");
+    rerender(<WideApp />);
+    update.mockClear();
+    fireEvent.keyDown(document.activeElement ?? window, {
+      key: "Z",
+      shiftKey: true,
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("a move the server refuses goes back, still selected", async () => {
     const { rerender } = render(<WideApp />);
     liveUpdates();
@@ -811,6 +887,11 @@ describe("WideApp", () => {
     expect(dialogKeys("Mark done")).toBe("X");
     expect(dialogKeys("Move to a list…")).toBe("M");
     expect(dialogKeys("New list")).toBe("⇧N");
+    expect(dialogKeys("Undo")).toBe("Z");
+    expect(dialogKeys("Redo")).toBe("⇧Z");
+    // Redo straight after Undo, under Help.
+    const labels = [...dialog.querySelectorAll("dt")].map((d) => d.textContent);
+    expect(labels.indexOf("Redo")).toBe(labels.indexOf("Undo") + 1);
     fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
     await act(async () => {});
 

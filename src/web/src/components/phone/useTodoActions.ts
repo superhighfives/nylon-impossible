@@ -17,6 +17,11 @@ import type {
   UpdateTodoInput,
 } from "@/types/database";
 import { dueLabel, plural } from "./model";
+import {
+  createUndoHistory,
+  type UndoEntry,
+  type UndoOutcome,
+} from "./undoHistory";
 
 /** How long a checked row holds, filled, before it collapses. */
 export const DONE_HOLD_MS = 400;
@@ -33,19 +38,6 @@ const PLACEMENT_NAMES = {
   someday: "Someday",
 } as const;
 
-/** The on-screen toast's action, so the `z` key can press it. */
-let current: { id: string; run: () => void } | null = null;
-
-/** Press the Undo on screen, if there is one. Returns whether it did. */
-export function runToastUndo() {
-  if (!current) return false;
-  const { id, run } = current;
-  current = null;
-  toast.dismiss(id);
-  run();
-  return true;
-}
-
 /**
  * One toast at a time on the phone: a new one replaces whatever's showing,
  * so its action is always the one on screen. The action closes the toast.
@@ -59,9 +51,6 @@ export function showActionToast(
   toast.dismiss();
   const id = toast.success(text, {
     timeout,
-    onClose: () => {
-      if (current?.id === id) current = null;
-    },
     actionProps: {
       children: label,
       onClick: () => {
@@ -70,7 +59,6 @@ export function showActionToast(
       },
     },
   });
-  if (label === "Undo") current = { id, run };
   return id;
 }
 
@@ -101,6 +89,10 @@ function withId(set: ReadonlySet<string>, id: string, on: boolean) {
  * - **Delete list** works the same way: the list and its todos hide at once,
  *   and the list is deleted (its todos with it) when the toast expires.
  * - **Move** and **Pin** are instant, with Undo for moves.
+ * - **History**: every action with an Undo toast goes into an undo history
+ *   (`undoHistory.ts`), so the wide board's `z` steps back through the last
+ *   20 and ⇧Z forward again. The toast's own Undo is the same as `z`: it's
+ *   always for the newest action. A delete leaves the history once it's sent.
  *
  * Pending timers are flushed (committed) on unmount and when the page is
  * hidden, so leaving the app mid-hold never drops a completion or delete.
@@ -110,6 +102,7 @@ export function useTodoActions({
   listName,
   listInSentence,
   allTodos,
+  lists,
   onMoved,
 }: {
   timeZone: string;
@@ -117,6 +110,8 @@ export function useTodoActions({
   /** The name inside a toast: "Moved to this week", "Moved to Groceries". */
   listInSentence: (listId: string) => string;
   allTodos: TodoWithUrls[];
+  /** Every list, so a redone list delete can tell the list has gone. */
+  lists?: SerializedList[];
   /** After any move, quiet ones included: where it went. */
   onMoved?: (listId: string) => void;
 }) {
@@ -134,6 +129,9 @@ export function useTodoActions({
   );
   const todosRef = useRef(allTodos);
   todosRef.current = allTodos;
+  const listsRef = useRef(lists);
+  listsRef.current = lists;
+  const [history] = useState(createUndoHistory);
 
   const update = updateTodo.mutate;
   const updateAsync = updateTodo.mutateAsync;
@@ -178,6 +176,55 @@ export function useTodoActions({
       flush();
     };
   }, []);
+
+  /** Run `change` on a todo that still exists; false if it's been deleted. */
+  const ifTodo = useCallback((id: string, change: () => void) => {
+    if (!todosRef.current.some((t) => t.id === id)) return false;
+    change();
+    return true;
+  }, []);
+
+  /**
+   * Put an action into the history and show its toast, whose Undo is the
+   * same as `z`. One that's already left the history (a delete sent while
+   * the toast was up) says so instead.
+   */
+  const record = useCallback(
+    (entry: UndoEntry) => {
+      history.push(entry);
+      showUndoToast(entry.text, () => {
+        if (history.undo(entry)?.kind === "gone") {
+          toast.info("Already deleted");
+        }
+      });
+    },
+    [history],
+  );
+
+  /** `z` and ⇧Z: "Undone: Done", "Redone: Moved to this week". */
+  const announce = useCallback((word: string, outcome: UndoOutcome) => {
+    if (!outcome) return false;
+    toast.dismiss();
+    if (outcome.kind === "gone") toast.info("Already deleted");
+    else {
+      toast.success(`${word}: ${outcome.entry.text}`, {
+        timeout: UNDO_TOAST_MS,
+      });
+    }
+    return true;
+  }, []);
+
+  /** Reverse the newest action in the history. Returns whether there was one. */
+  const undo = useCallback(
+    () => announce("Undone", history.undo()),
+    [announce, history],
+  );
+
+  /** Re-apply the most recently undone action. */
+  const redo = useCallback(
+    () => announce("Redone", history.redo()),
+    [announce, history],
+  );
 
   /** Top of a list's open rows — where moved and restored todos land. */
   const topPosition = useCallback((listId: string) => {
@@ -231,10 +278,15 @@ export function useTodoActions({
             PLACEMENT_NAMES[placement] === listName(todo.listId)
               ? ""
               : `, in ${TIME_LIST_NAMES_IN_SENTENCE[placement]}`;
-          showUndoToast(
-            `Done · next ${dueLabel(next, now, timeZone).text}${where}`,
-            () => update({ id: todo.id, input: undo }),
-          );
+          record({
+            text: `Done · next ${dueLabel(next, now, timeZone).text}${where}`,
+            undo: () =>
+              ifTodo(todo.id, () => update({ id: todo.id, input: undo })),
+            redo: () =>
+              ifTodo(todo.id, () =>
+                update({ id: todo.id, input: { completed: true } }),
+              ),
+          });
         });
         return;
       }
@@ -250,11 +302,19 @@ export function useTodoActions({
             position: todo.position,
           };
           if (todo.pinned) undo.pinned = true;
-          showUndoToast("Done", () => update({ id: todo.id, input: undo }));
+          record({
+            text: "Done",
+            undo: () =>
+              ifTodo(todo.id, () => update({ id: todo.id, input: undo })),
+            redo: () =>
+              ifTodo(todo.id, () =>
+                update({ id: todo.id, input: { completed: true } }),
+              ),
+          });
         });
       });
     },
-    [cancel, listName, schedule, timeZone, update],
+    [cancel, ifTodo, listName, record, schedule, timeZone, update],
   );
 
   const move = useCallback(
@@ -262,37 +322,51 @@ export function useTodoActions({
       todo: TodoWithUrls,
       listId: string,
       // `name`: for a list too new to be in the cache yet. `onUndo`: after
-      // the toast's Undo has put it back. `onFailed`: after a move the
-      // server refused has been rolled back.
+      // an Undo has put it back. `onRedo`: after a Redo has moved it again.
+      // `onFailed`: after a move the server refused has been rolled back.
       {
         quiet = false,
         name,
         onUndo,
+        onRedo,
         onFailed,
       }: {
         quiet?: boolean;
         name?: string;
         onUndo?: () => void;
+        onRedo?: () => void;
         onFailed?: () => void;
       } = {},
     ) => {
       if (todo.listId === listId) return;
       const from = { listId: todo.listId, position: todo.position };
-      // The promise, not mutate's per-call onError: that runs only for the
-      // latest call, so a refused move pressed before another would be lost.
-      updateAsync({
-        id: todo.id,
-        input: { listId, position: topPosition(listId) },
-      }).catch(() => onFailed?.());
-      onMoved?.(listId);
+      const send = () => {
+        // The promise, not mutate's per-call onError: that runs only for the
+        // latest call, so a refused move pressed before another would be lost.
+        updateAsync({
+          id: todo.id,
+          input: { listId, position: topPosition(listId) },
+        }).catch(() => onFailed?.());
+        onMoved?.(listId);
+      };
+      send();
       // The detail sheet shows the new list on its chip; no toast needed.
       if (quiet) return;
-      showUndoToast(`Moved to ${name ?? listInSentence(listId)}`, () => {
-        update({ id: todo.id, input: from });
-        onUndo?.();
+      record({
+        text: `Moved to ${name ?? listInSentence(listId)}`,
+        undo: () =>
+          ifTodo(todo.id, () => {
+            update({ id: todo.id, input: from });
+            onUndo?.();
+          }),
+        redo: () =>
+          ifTodo(todo.id, () => {
+            send();
+            onRedo?.();
+          }),
       });
     },
-    [listInSentence, topPosition, update, updateAsync, onMoved],
+    [ifTodo, listInSentence, record, topPosition, update, updateAsync, onMoved],
   );
 
   const togglePin = useCallback(
@@ -305,24 +379,33 @@ export function useTodoActions({
   const destroy = useCallback(
     (todo: TodoWithUrls) => {
       const key = `delete:${todo.id}`;
-      setHidden((s) => withId(s, todo.id, true));
-      schedule(key, UNDO_TOAST_MS, () => {
-        remove(todo.id, {
-          onSettled: () => setHidden((s) => withId(s, todo.id, false)),
+      // Hidden now, sent when the toast's 5s are up (a Redo starts a fresh
+      // 5s). Once sent it leaves the history: there's no bringing it back.
+      const hide = () => {
+        setHidden((s) => withId(s, todo.id, true));
+        schedule(key, UNDO_TOAST_MS, () => {
+          history.drop(entry);
+          remove(todo.id, {
+            onSettled: () => setHidden((s) => withId(s, todo.id, false)),
+          });
         });
-      });
-      showUndoToast("Deleted", () => {
-        // Hiding the page flushes pending work, so the delete may already be
-        // sent while this toast is still on screen. Say so, rather than
-        // un-hiding a row that's gone.
-        if (!cancel(key)) {
-          toast.info("Already deleted");
-          return;
-        }
-        setHidden((s) => withId(s, todo.id, false));
-      });
+      };
+      const entry: UndoEntry = {
+        text: "Deleted",
+        undo: () => {
+          // Hiding the page flushes pending work, so the delete may already
+          // be sent while its toast is still on screen. Say so, rather than
+          // un-hiding a row that's gone.
+          if (!cancel(key)) return false;
+          setHidden((s) => withId(s, todo.id, false));
+          return true;
+        },
+        redo: () => ifTodo(todo.id, hide),
+      };
+      hide();
+      record(entry);
     },
-    [cancel, remove, schedule],
+    [cancel, history, ifTodo, record, remove, schedule],
   );
 
   /** Delete one of your lists, and every todo in it, with Undo. */
@@ -332,39 +415,61 @@ export function useTodoActions({
       const count = todosRef.current.filter(
         (t) => t.listId === list.id && t.parentId == null,
       ).length;
-      setHiddenLists((s) => withId(s, list.id, true));
-      schedule(key, UNDO_TOAST_MS, () => {
-        removeList(list.id, {
-          onSettled: () => setHiddenLists((s) => withId(s, list.id, false)),
+      const hide = () => {
+        setHiddenLists((s) => withId(s, list.id, true));
+        schedule(key, UNDO_TOAST_MS, () => {
+          history.drop(entry);
+          removeList(list.id, {
+            onSettled: () => setHiddenLists((s) => withId(s, list.id, false)),
+          });
         });
-      });
-      const text =
-        count > 0
-          ? `Deleted “${list.name}” and ${plural(count, "todo")}`
-          : `Deleted “${list.name}”`;
-      showUndoToast(text, () => {
-        if (!cancel(key)) {
-          toast.info("Already deleted");
-          return;
-        }
-        setHiddenLists((s) => withId(s, list.id, false));
-      });
+      };
+      const entry: UndoEntry = {
+        text:
+          count > 0
+            ? `Deleted “${list.name}” and ${plural(count, "todo")}`
+            : `Deleted “${list.name}”`,
+        undo: () => {
+          if (!cancel(key)) return false;
+          setHiddenLists((s) => withId(s, list.id, false));
+          return true;
+        },
+        redo: () => {
+          if (
+            listsRef.current &&
+            !listsRef.current.some((l) => l.id === list.id)
+          ) {
+            return false;
+          }
+          hide();
+          return true;
+        },
+      };
+      hide();
+      record(entry);
     },
-    [cancel, removeList, schedule],
+    [cancel, history, record, removeList, schedule],
   );
 
   /** Done history: put a todo back in the list it was finished from. */
   const restore = useCallback(
     (todo: TodoWithUrls) => {
-      update({
-        id: todo.id,
-        input: { completed: false, position: topPosition(todo.listId) },
+      const send = () =>
+        update({
+          id: todo.id,
+          input: { completed: false, position: topPosition(todo.listId) },
+        });
+      send();
+      record({
+        text: `Back in ${listInSentence(todo.listId)}`,
+        undo: () =>
+          ifTodo(todo.id, () =>
+            update({ id: todo.id, input: { completed: true } }),
+          ),
+        redo: () => ifTodo(todo.id, send),
       });
-      showUndoToast(`Back in ${listInSentence(todo.listId)}`, () =>
-        update({ id: todo.id, input: { completed: true } }),
-      );
     },
-    [listInSentence, topPosition, update],
+    [ifTodo, listInSentence, record, topPosition, update],
   );
 
   /**
@@ -413,6 +518,8 @@ export function useTodoActions({
     destroyList,
     restore,
     save,
+    undo,
+    redo,
   };
 }
 

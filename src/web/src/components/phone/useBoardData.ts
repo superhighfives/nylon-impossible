@@ -55,6 +55,7 @@ export function useBoardData() {
     listName,
     listInSentence,
     allTodos: todos,
+    lists,
     onMoved,
   });
   // A list deleted with Undo still pending is gone from every view.

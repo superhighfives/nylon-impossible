@@ -1,6 +1,7 @@
 import { listNameInSentence } from "@nylon-impossible/shared";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { TodoWithUrls } from "@/types/database";
 
 const update = vi.fn();
 const remove = vi.fn();
@@ -26,6 +27,7 @@ vi.mock("@/lib/toast", async (importOriginal) => ({
 }));
 
 import { toast } from "@/lib/toast";
+import { UNDO_HISTORY_LIMIT } from "../undoHistory";
 import {
   DONE_COLLAPSE_MS,
   DONE_HOLD_MS,
@@ -44,16 +46,20 @@ const lists = [
 
 function setup(todos = [makeTodo()]) {
   const byId = (id: string) => lists.find((l) => l.id === id);
-  return renderHook(() =>
-    useTodoActions({
-      timeZone: TZ,
-      listName: (id) => byId(id)?.name ?? "List",
-      listInSentence: (id) => {
-        const list = byId(id);
-        return list ? listNameInSentence(list) : "List";
-      },
-      allTodos: todos,
-    }),
+  // `allTodos` is a prop, so a test can rerender with a todo deleted.
+  return renderHook(
+    ({ allTodos }) =>
+      useTodoActions({
+        timeZone: TZ,
+        listName: (id) => byId(id)?.name ?? "List",
+        listInSentence: (id) => {
+          const list = byId(id);
+          return list ? listNameInSentence(list) : "List";
+        },
+        allTodos,
+        lists,
+      }),
+    { initialProps: { allTodos: todos } },
   );
 }
 
@@ -72,6 +78,7 @@ describe("useTodoActions", () => {
     remove.mockReset();
     removeList.mockReset();
     vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.info).mockClear();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -298,5 +305,292 @@ describe("useTodoActions", () => {
     // so flush that too.
     act(() => vi.advanceTimersByTime(DONE_COLLAPSE_MS));
     expect(update).toHaveBeenCalled();
+  });
+
+  describe("history", () => {
+    /** Three todos in Today, and a helper to finish one. */
+    function three() {
+      const todos = [
+        makeTodo({ id: "a", position: "a1" }),
+        makeTodo({ id: "b", position: "a2" }),
+        makeTodo({ id: "c", position: "a3" }),
+      ];
+      const hook = setup(todos);
+      const finish = (todo: TodoWithUrls) => {
+        act(() => hook.result.current.complete(todo));
+        act(() => vi.advanceTimersByTime(DONE_HOLD_MS + DONE_COLLAPSE_MS));
+      };
+      return { todos, ...hook, finish };
+    }
+    const lastInput = () => update.mock.lastCall?.[0];
+
+    it("undoes after its toast has closed, newest first, each with Undone: …", () => {
+      const { todos, result, finish } = three();
+      finish(todos[0]);
+      finish(todos[1]);
+      act(() => result.current.move(todos[2], "list-week"));
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS * 2));
+
+      act(() => {
+        result.current.undo();
+      });
+      expect(lastInput()).toEqual({
+        id: "c",
+        input: { listId: "list-today", position: "a3" },
+      });
+      expect(toast.success).toHaveBeenLastCalledWith(
+        "Undone: Moved to this week",
+        { timeout: UNDO_TOAST_MS },
+      );
+      act(() => {
+        result.current.undo();
+      });
+      expect(lastInput()).toEqual({
+        id: "b",
+        input: { completed: false, position: "a2" },
+      });
+      act(() => {
+        result.current.undo();
+      });
+      expect(lastInput()).toEqual({
+        id: "a",
+        input: { completed: false, position: "a1" },
+      });
+      expect(toast.success).toHaveBeenLastCalledWith("Undone: Done", {
+        timeout: UNDO_TOAST_MS,
+      });
+
+      // Nothing left: does nothing, shows nothing.
+      update.mockClear();
+      vi.mocked(toast.success).mockClear();
+      let did = true;
+      act(() => {
+        did = result.current.undo();
+      });
+      expect(did).toBe(false);
+      expect(update).not.toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it("redo re-applies what was undone, newest undone first, with Redone: …", () => {
+      const { todos, result, finish } = three();
+      finish(todos[0]);
+      finish(todos[1]);
+      act(() => {
+        result.current.undo();
+        result.current.undo();
+      });
+      act(() => {
+        result.current.redo();
+      });
+      expect(lastInput()).toEqual({ id: "a", input: { completed: true } });
+      expect(toast.success).toHaveBeenLastCalledWith("Redone: Done", {
+        timeout: UNDO_TOAST_MS,
+      });
+      act(() => {
+        result.current.redo();
+      });
+      expect(lastInput()).toEqual({ id: "b", input: { completed: true } });
+
+      // A redone move goes to the top of its list again.
+      act(() => result.current.move(todos[2], "list-week"));
+      act(() => {
+        result.current.undo();
+        result.current.redo();
+      });
+      expect(lastInput()).toEqual({
+        id: "c",
+        input: expect.objectContaining({ listId: "list-week" }),
+      });
+      expect(toast.success).toHaveBeenLastCalledWith(
+        "Redone: Moved to this week",
+        { timeout: UNDO_TOAST_MS },
+      );
+    });
+
+    it("a new history action clears redo; a pin doesn't", () => {
+      const { todos, result, finish } = three();
+      finish(todos[0]);
+      act(() => {
+        result.current.undo();
+      });
+      act(() => result.current.togglePin(todos[1]));
+      update.mockClear();
+      act(() => {
+        result.current.redo();
+      });
+      expect(lastInput()).toEqual({ id: "a", input: { completed: true } });
+
+      act(() => {
+        result.current.undo();
+      });
+      finish(todos[1]);
+      update.mockClear();
+      let did = true;
+      act(() => {
+        did = result.current.redo();
+      });
+      expect(did).toBe(false);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("the toast's Undo is an undo from the history: redoable, no extra toast", () => {
+      const { todos, result, finish } = three();
+      finish(todos[0]);
+      const toasts = vi.mocked(toast.success).mock.calls.length;
+      clickToastAction();
+      expect(lastInput()).toEqual({
+        id: "a",
+        input: { completed: false, position: "a1" },
+      });
+      expect(toast.success).toHaveBeenCalledTimes(toasts);
+      act(() => {
+        result.current.redo();
+      });
+      expect(lastInput()).toEqual({ id: "a", input: { completed: true } });
+    });
+
+    it("a delete is sent when its 5s are up and leaves the history", () => {
+      const { todos, result, finish } = three();
+      finish(todos[0]);
+      act(() => result.current.destroy(todos[1]));
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS));
+      expect(remove).toHaveBeenCalledWith("b", expect.anything());
+
+      // `z` skips the sent delete to the Done before it.
+      act(() => {
+        result.current.undo();
+      });
+      expect(lastInput()).toEqual({
+        id: "a",
+        input: { completed: false, position: "a1" },
+      });
+      expect(result.current.hidden.has("b")).toBe(true);
+      expect(toast.info).not.toHaveBeenCalled();
+    });
+
+    it("a delete is still sent on time after newer actions", () => {
+      const { todos, result, finish } = three();
+      act(() => result.current.destroy(todos[0]));
+      finish(todos[1]);
+      act(() => result.current.move(todos[2], "list-week"));
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS));
+      expect(remove).toHaveBeenCalledWith("a", expect.anything());
+    });
+
+    it("undoing an unsent delete un-hides it; redoing hides it and sends it 5s later", () => {
+      const { todos, result } = three();
+      act(() => result.current.destroy(todos[0]));
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS - 1000));
+      act(() => {
+        result.current.undo();
+      });
+      expect(result.current.hidden.has("a")).toBe(false);
+      expect(toast.success).toHaveBeenLastCalledWith("Undone: Deleted", {
+        timeout: UNDO_TOAST_MS,
+      });
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS * 2));
+      expect(remove).not.toHaveBeenCalled();
+
+      act(() => {
+        result.current.redo();
+      });
+      expect(result.current.hidden.has("a")).toBe(true);
+      expect(toast.success).toHaveBeenLastCalledWith("Redone: Deleted", {
+        timeout: UNDO_TOAST_MS,
+      });
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS - 1));
+      expect(remove).not.toHaveBeenCalled();
+      act(() => vi.advanceTimersByTime(1));
+      expect(remove).toHaveBeenCalledWith("a", expect.anything());
+
+      // Sent: out of the history.
+      let did = true;
+      act(() => {
+        did = result.current.undo();
+      });
+      expect(did).toBe(false);
+    });
+
+    it("undoing and redoing a list delete reuses its own toast text", () => {
+      const { result } = setup([
+        makeTodo({ id: "g", listId: "list-groceries" }),
+      ]);
+      const groceries = lists[2];
+      act(() => result.current.destroyList(groceries));
+      act(() => {
+        result.current.undo();
+      });
+      expect(result.current.hiddenLists.has("list-groceries")).toBe(false);
+      expect(toast.success).toHaveBeenLastCalledWith(
+        "Undone: Deleted “Groceries” and 1 todo",
+        { timeout: UNDO_TOAST_MS },
+      );
+      act(() => {
+        result.current.redo();
+      });
+      expect(result.current.hiddenLists.has("list-groceries")).toBe(true);
+      act(() => vi.advanceTimersByTime(UNDO_TOAST_MS));
+      expect(removeList).toHaveBeenCalledWith(
+        "list-groceries",
+        expect.anything(),
+      );
+    });
+
+    it("an entry whose todo has since been deleted says Already deleted and is dropped", () => {
+      const { todos, result, rerender, finish } = three();
+      finish(todos[0]);
+      act(() => result.current.move(todos[1], "list-week"));
+      // Deleted on another device: gone from the cache.
+      rerender({ allTodos: [todos[0], todos[2]] });
+      update.mockClear();
+      act(() => {
+        result.current.undo();
+      });
+      expect(toast.info).toHaveBeenCalledWith("Already deleted");
+      expect(update).not.toHaveBeenCalled();
+
+      // Dropped: the next `z` reaches the Done before it, and there's no
+      // redo of the dropped move.
+      act(() => {
+        result.current.undo();
+      });
+      expect(lastInput()).toEqual({
+        id: "a",
+        input: { completed: false, position: "a1" },
+      });
+      act(() => {
+        result.current.redo();
+      });
+      update.mockClear();
+      let did = true;
+      act(() => {
+        did = result.current.redo();
+      });
+      expect(did).toBe(false);
+    });
+
+    it(`holds ${UNDO_HISTORY_LIMIT}; a 21st action drops the oldest`, () => {
+      const todos = Array.from({ length: UNDO_HISTORY_LIMIT + 1 }, (_, i) =>
+        makeTodo({ id: `t${i}`, position: `a${i}` }),
+      );
+      const { result } = setup(todos);
+      for (const todo of todos) {
+        act(() => result.current.move(todo, "list-week"));
+      }
+      update.mockClear();
+      let count = 0;
+      for (;;) {
+        let did = false;
+        act(() => {
+          did = result.current.undo();
+        });
+        if (!did) break;
+        count++;
+      }
+      expect(count).toBe(UNDO_HISTORY_LIMIT);
+      expect(update.mock.calls.map((c) => c[0].id)).not.toContain("t0");
+      expect(update.mock.lastCall?.[0].id).toBe("t1");
+    });
   });
 });
