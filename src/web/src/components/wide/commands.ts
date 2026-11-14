@@ -29,6 +29,7 @@ export interface Board {
   newTodo: () => void;
   newList: () => void;
   undo: () => void;
+  redo: () => void;
   palette: () => void;
   jump: (target: JumpTarget) => void;
   startGo: () => void;
@@ -320,6 +321,14 @@ export const COMMANDS: Command[] = [
     bindings: [{ key: "z" }],
     group: "Help",
     run: (b) => b.undo(),
+  },
+  {
+    id: "redo",
+    label: "Redo",
+    keys: [["⇧", "Z"]],
+    bindings: [{ key: "z", shift: true }],
+    group: "Help",
+    run: (b) => b.redo(),
   },
   {
     id: "shortcuts",

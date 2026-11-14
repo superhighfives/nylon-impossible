@@ -1,6 +1,5 @@
 import type { BoardTimeKind } from "@nylon-impossible/shared";
 import type { TodoActions } from "@/components/phone/useTodoActions";
-import { runToastUndo } from "@/components/phone/useTodoActions";
 import { byPosition } from "@/lib/dragOrder";
 import { toast } from "@/lib/toast";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
@@ -237,7 +236,10 @@ export function createBoard(ctx: BoardContext): Board {
     newTodo: ctx.newTodo,
     newList: ctx.newList,
     undo: () => {
-      runToastUndo();
+      actions.undo();
+    },
+    redo: () => {
+      actions.redo();
     },
     palette: ctx.togglePalette,
     jump: ctx.jump,

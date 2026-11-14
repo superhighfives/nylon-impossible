@@ -30,6 +30,7 @@ describe("commandForKey", () => {
     [{ key: "n" }, "new-todo"],
     [{ key: "N", shiftKey: true }, "new-list"],
     [{ key: "z" }, "undo"],
+    [{ key: "Z", shiftKey: true }, "redo"],
     [{ key: "f" }, "feedback"],
     [{ key: "?", shiftKey: true }, "shortcuts"],
     [{ key: "g" }, "go"],
