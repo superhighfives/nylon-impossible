@@ -11,7 +11,6 @@ import {
   isColumnBackground,
   TINTED,
 } from "./Column";
-import { SkeletonRows } from "./Skeleton";
 
 /** Done's column id: always the board's last column, not a list. */
 export const DONE_COLUMN = "done";
@@ -46,7 +45,10 @@ export function DoneColumn({
   onRestore: (todo: TodoWithUrls) => void;
   /** A click on the column's empty space: focus it, select nothing. */
   onBackgroundClick?: () => void;
-  /** Todos haven't arrived: placeholder rows, not "Nothing done yet." */
+  /**
+   * Todos haven't arrived: nothing, not "Nothing done yet." Done is never
+   * among the first three columns, so the skeleton's fade has ended by it.
+   */
   loading?: boolean;
 }) {
   const groups = groupDoneByDay(todos, now, timeZone);
@@ -76,12 +78,9 @@ export function DoneColumn({
       <div aria-hidden="true" className="mx-6 h-px shrink-0 bg-n-hairline" />
       <div className="min-h-0 flex-1 overflow-y-auto px-6 pt-2.5 pb-10 [scrollbar-gutter:stable] [scrollbar-width:thin]">
         {loading ? (
-          <>
-            <p className="sr-only" aria-live="polite">
-              Loading…
-            </p>
-            <SkeletonRows count={3} />
-          </>
+          <p className="sr-only" aria-live="polite">
+            Loading…
+          </p>
         ) : groups.length === 0 ? (
           <div className="text-n-ink-subtle">
             {/* The composer's height: Done has no "+ Add", so its line sits
