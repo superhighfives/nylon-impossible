@@ -3,6 +3,7 @@ import { EmptyLine } from "@/components/phone/EmptyLine";
 import { displayTitle, groupDoneByDay } from "@/components/phone/model";
 import { SelectionBar } from "@/components/phone/TodoRow";
 import { ROW_HOVER } from "@/components/ui/styles";
+import { ViewBoundary } from "@/components/ViewBoundary";
 import type { TodoWithUrls } from "@/types/database";
 import {
   COLUMN_WIDTH,
@@ -89,27 +90,30 @@ export function DoneColumn({
             <EmptyLine text="Nothing done yet." density="wide" />
           </div>
         ) : (
-          groups.map((group) => (
-            <section key={group.label} className="pt-2 pb-1">
-              <h3 className="m-0 mb-1 text-[0.8125rem] font-semibold text-n-ink-muted">
-                {group.label}
-              </h3>
-              <ul className="m-0 list-none p-0">
-                {group.items.map((todo) => (
-                  <DoneRow
-                    key={todo.id}
-                    todo={todo}
-                    where={listName(todo.listId)}
-                    whereInSentence={listInSentence(todo.listId)}
-                    selected={selectedId === todo.id}
-                    tabStop={tabStopId === todo.id}
-                    onSelect={onSelect}
-                    onRestore={onRestore}
-                  />
-                ))}
-              </ul>
-            </section>
-          ))
+          // Level with the first row beside it, as the empty line is.
+          <ViewBoundary view="done" resetKey={todos} className="mt-10">
+            {groups.map((group) => (
+              <section key={group.label} className="pt-2 pb-1">
+                <h3 className="m-0 mb-1 text-[0.8125rem] font-semibold text-n-ink-muted">
+                  {group.label}
+                </h3>
+                <ul className="m-0 list-none p-0">
+                  {group.items.map((todo) => (
+                    <DoneRow
+                      key={todo.id}
+                      todo={todo}
+                      where={listName(todo.listId)}
+                      whereInSentence={listInSentence(todo.listId)}
+                      selected={selectedId === todo.id}
+                      tabStop={tabStopId === todo.id}
+                      onSelect={onSelect}
+                      onRestore={onRestore}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </ViewBoundary>
         )}
       </div>
     </section>

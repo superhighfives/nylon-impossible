@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { ViewBoundary } from "@/components/ViewBoundary";
 import { DragPreview } from "@/components/wide/useBoardDrag";
 import { useHints } from "@/hooks/useHints";
 import { useCreateList } from "@/hooks/useLists";
@@ -342,24 +343,26 @@ export function PhoneApp({
     }
     if (!listId || rows.length === 0) return renderEmpty(emptyFor);
     return (
-      <PhoneRows
-        listId={listId}
-        rows={rows}
-        drag={drag.drag}
-        settleFrom={drag.settleFrom(listId)}
-        animate={reducedMotion !== "reduce"}
-        subtasksOf={subtasksOf}
-        checked={actions.checked}
-        collapsing={actions.collapsing}
-        highlightedId={menuId}
-        now={now}
-        timeZone={timeZone}
-        onCheck={actions.complete}
-        onOpen={(t) => {
-          if (!drag.justDragged.current) setDetailId(t.id);
-        }}
-        onMenu={(t) => setMenuId(t.id)}
-      />
+      <ViewBoundary view="phone-list" resetKey={todos} className="px-5">
+        <PhoneRows
+          listId={listId}
+          rows={rows}
+          drag={drag.drag}
+          settleFrom={drag.settleFrom(listId)}
+          animate={reducedMotion !== "reduce"}
+          subtasksOf={subtasksOf}
+          checked={actions.checked}
+          collapsing={actions.collapsing}
+          highlightedId={menuId}
+          now={now}
+          timeZone={timeZone}
+          onCheck={actions.complete}
+          onOpen={(t) => {
+            if (!drag.justDragged.current) setDetailId(t.id);
+          }}
+          onMenu={(t) => setMenuId(t.id)}
+        />
+      </ViewBoundary>
     );
   };
 

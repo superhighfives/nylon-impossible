@@ -401,4 +401,60 @@ describe("useSmartCreate", () => {
       queryClient.getQueryData<TodoWithUrls[]>(["todos"])?.map((t) => t.id),
     ).toEqual(["todo-saved", "todo-old"]);
   });
+
+  /** Add `text`, with the API answering `body`, and return the cached todos. */
+  async function savedRows(text: string, body: unknown) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(body)),
+    );
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData(["todos"], []);
+    const { result } = renderHook(() => useSmartCreate(), {
+      wrapper: Wrapper,
+    });
+    await act(() => result.current.mutateAsync({ text }));
+    vi.unstubAllGlobals();
+    return queryClient.getQueryData<TodoWithUrls[]>(["todos"]) ?? [];
+  }
+
+  it("caches a saved todo with no urls as having no links", async () => {
+    const { urls: _, ...bare } = makeTodo({ id: "todo-saved" });
+    const [row] = await savedRows("Buy milk", { todos: [bare] });
+    expect(row.id).toBe("todo-saved");
+    expect(row.urls).toEqual([]);
+    expect(() => rowMeta(row, [], now, "UTC")).not.toThrow();
+  });
+
+  it("keeps a saved todo's pending link through the swap", async () => {
+    const saved = makeTodo({
+      id: "todo-saved",
+      title: "Read",
+      urls: [
+        {
+          id: "url-1",
+          todoId: "todo-saved",
+          url: "https://example.com/",
+          title: null,
+          description: null,
+          siteName: null,
+          favicon: null,
+          image: null,
+          showPreview: true,
+          position: "a0",
+          fetchStatus: "pending",
+          fetchedAt: null,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        },
+      ],
+    });
+    const [row] = await savedRows("Read https://example.com", {
+      todos: [saved],
+    });
+    expect(row.id).toBe("todo-saved");
+    expect(rowMeta(row, [], now, "UTC")).toMatchObject([
+      { kind: "link", text: "example.com", fetching: true },
+    ]);
+  });
 });

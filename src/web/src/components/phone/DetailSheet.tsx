@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { ICON_BUTTON, ROW_HOVER, SUBLINE } from "@/components/ui/styles";
+import { ViewBoundary } from "@/components/ViewBoundary";
 import {
   useAddTodoUrl,
   useCreateTodo,
@@ -174,7 +175,11 @@ export function DetailSheet(props: DetailSheetProps) {
                 : ""
             }`}
           >
-            {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
+            {todo && (
+              <ViewBoundary view="detail" resetKey={todo} className="p-6">
+                <DetailBody key={todo.id} {...props} todo={todo} />
+              </ViewBoundary>
+            )}
           </Dialog.Popup>
         </Dialog.Portal>
       </Dialog.Root>
@@ -191,7 +196,11 @@ export function DetailSheet(props: DetailSheetProps) {
         <Dialog.Backdrop className="fixed inset-0 z-40 bg-[color-mix(in_srgb,black_28%,transparent)] transition-opacity duration-(--n-duration-base) data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-[color-mix(in_srgb,black_55%,transparent)]" />
         <Dialog.Popup className="fixed inset-x-0 top-[3.375rem] bottom-0 z-40 mx-auto flex max-w-[42rem] flex-col rounded-t-[1.375rem] bg-n-canvas text-n-ink shadow-[0_-10px_40px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-[translate,opacity] duration-(--n-duration-slow) ease-n-out data-ending-style:translate-y-full data-starting-style:translate-y-full dark:bg-n-surface">
           {/* Keyed so each todo gets fresh field state. */}
-          {todo && <DetailBody key={todo.id} {...props} todo={todo} />}
+          {todo && (
+            <ViewBoundary view="detail" resetKey={todo} className="p-6">
+              <DetailBody key={todo.id} {...props} todo={todo} />
+            </ViewBoundary>
+          )}
         </Dialog.Popup>
       </Dialog.Portal>
     </Dialog.Root>

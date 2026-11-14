@@ -1,8 +1,8 @@
 import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
+import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
 import { getDb, lists, todoUrls, users } from "../../src/lib/db";
 import { cleanDb, getTodayListId, seedUser } from "../helpers";
 
@@ -118,6 +118,27 @@ describe("Smart create endpoint", () => {
       expect(body.todos).toHaveLength(1);
       // Title should be clean domain name from fallback
       expect(body.todos[0].title).toBe("Check example.com");
+    });
+
+    it("returns the todo with its pending link", async () => {
+      const res = await smartCreate("Read https://example.com");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].urls).toHaveLength(1);
+      expect(body.todos[0].urls[0]).toMatchObject({
+        todoId: body.todos[0].id,
+        url: "https://example.com/",
+        fetchStatus: "pending",
+      });
+    });
+
+    it("returns urls: [] for plain text", async () => {
+      const res = await smartCreate("Buy milk");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      expect(body.todos[0].urls).toEqual([]);
     });
 
     it("stores URL in todoUrls table", async () => {

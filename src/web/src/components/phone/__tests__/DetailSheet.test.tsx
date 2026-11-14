@@ -135,4 +135,24 @@ describe("DetailSheet", () => {
     expect(createTodo).toHaveBeenCalledTimes(1);
     expect(createTodo.mock.calls[0][0].position > "aa").toBe(true);
   });
+
+  it("shows Couldn't show this in place of a todo that fails to draw", () => {
+    // React logs the caught error; the test is that it's caught.
+    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { urls: _, ...bare } = makeTodo({ title: "Olive oil" });
+    render(
+      <DetailSheet
+        todo={bare as ReturnType<typeof makeTodo>}
+        subtasks={[]}
+        listTargets={[]}
+        listName={() => "Today"}
+        listInSentence={() => "today"}
+        timeZone="UTC"
+        actions={{ save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Couldn't show this")).toBeInTheDocument();
+    quiet.mockRestore();
+  });
 });

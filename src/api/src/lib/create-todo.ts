@@ -7,7 +7,10 @@ import {
   getSystemListId,
   getUserTimezone,
 } from "@nylon-impossible/shared/queries";
-import { serializeTodo } from "@nylon-impossible/shared/serialize";
+import {
+  serializeTodo,
+  serializeUrl,
+} from "@nylon-impossible/shared/serialize";
 import * as Sentry from "@sentry/cloudflare";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
@@ -73,7 +76,9 @@ export interface CreateSmartTodoOptions {
 }
 
 export interface CreateSmartTodoResult {
-  todo: ReturnType<typeof serializeTodo>;
+  todo: ReturnType<typeof serializeTodo> & {
+    urls: ReturnType<typeof serializeUrl>[];
+  };
 }
 
 /**
@@ -260,6 +265,15 @@ export async function createSmartTodo(
     .from(todos)
     .where(eq(todos.id, todoId))
     .then((rows) => rows[0]);
+  // The links just inserted, so a client can show them before its next sync.
+  const urls =
+    totalUrls > 0
+      ? await db
+          .select()
+          .from(todoUrls)
+          .where(eq(todoUrls.todoId, todoId))
+          .orderBy(todoUrls.position)
+      : [];
 
   Sentry.addBreadcrumb({
     category: "todo",
@@ -270,7 +284,7 @@ export async function createSmartTodo(
 
   await notifySync(env, userId);
 
-  return { todo: serializeTodo(created) };
+  return { todo: { ...serializeTodo(created), urls: urls.map(serializeUrl) } };
 }
 
 /**
