@@ -15,7 +15,7 @@
     "deploy": "bun run build && wrangler deploy"
   },
   "dependencies": {
-    "@clerk/react": "^6.11.1",
+    "@clerk/react": "^6.18.6",
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
