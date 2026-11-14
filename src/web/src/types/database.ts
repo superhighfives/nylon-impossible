@@ -49,6 +49,8 @@ export interface CreateListInput {
 export interface UpdateListInput {
   name?: string;
   position?: string;
+  /** Leave your list's column off the wide board's row, or bring it back. */
+  columnHidden?: boolean;
 }
 
 /** A list (Today/This week/Someday, or a custom list) as returned by the server. */
@@ -59,6 +61,8 @@ export interface SerializedList {
   kind: "system" | "custom";
   systemKind: BoardTimeKind | null;
   position: string;
+  /** Its column is left off the wide board's row. Always false for the time lists. */
+  columnHidden: boolean;
   createdAt: string;
   updatedAt: string;
 }

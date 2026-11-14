@@ -1,3 +1,4 @@
+import { serializeList as serializeSharedList } from "@nylon-impossible/shared/serialize";
 import type { Context } from "hono";
 import { z } from "zod/v4";
 import { and, count, eq, getDb, lists, todos } from "../lib/db";
@@ -7,16 +8,7 @@ import { notifySync } from "../lib/notify-sync";
 import type { Env } from "../types";
 
 function serializeList(list: typeof lists.$inferSelect) {
-  return {
-    id: list.id.toLowerCase(),
-    userId: list.userId,
-    name: list.name,
-    kind: list.kind,
-    systemKind: list.systemKind,
-    position: list.position,
-    createdAt: list.createdAt.toISOString(),
-    updatedAt: list.updatedAt.toISOString(),
-  };
+  return { ...serializeSharedList(list), id: list.id.toLowerCase() };
 }
 
 // GET /lists - all of the user's lists (system + custom), position order
@@ -74,9 +66,11 @@ export async function createList(c: Context<Env>) {
 const updateListSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   position: z.string().optional(),
+  columnHidden: z.boolean().optional(),
 });
 
-// PATCH /lists/:id - rename/reposition a custom list. Rejects system lists.
+// PATCH /lists/:id - rename, reposition, hide or show (`columnHidden`) a
+// custom list. Rejects system lists.
 export async function updateList(c: Context<Env>) {
   const listId = c.req.param("id");
   if (!listId) {
@@ -108,6 +102,8 @@ export async function updateList(c: Context<Env>) {
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.position !== undefined)
     updates.position = parsed.data.position;
+  if (parsed.data.columnHidden !== undefined)
+    updates.columnHidden = parsed.data.columnHidden;
 
   await db.update(lists).set(updates).where(eq(lists.id, listId));
 

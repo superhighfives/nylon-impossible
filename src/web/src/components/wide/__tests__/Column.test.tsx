@@ -4,7 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Column } from "../Column";
 
-const column = (listId: string, title: string, onDelete: () => void) => (
+const column = (
+  listId: string,
+  title: string,
+  onDelete: () => void,
+  onHide: () => void = vi.fn(),
+) => (
   <Column
     listId={listId}
     title={title}
@@ -21,6 +26,7 @@ const column = (listId: string, title: string, onDelete: () => void) => (
     loading={false}
     error={null}
     onRename={vi.fn()}
+    onHide={onHide}
     onDelete={onDelete}
     now={new Date()}
     timeZone="UTC"
@@ -50,12 +56,57 @@ describe("Column", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((i) => i.textContent),
-    ).toEqual(["Rename", "Delete list"]);
+    ).toEqual(["Rename", "Hide column", "Delete list"]);
     await userEvent.click(
       within(menu).getByRole("menuitem", { name: "Delete list" }),
     );
     expect(deleteStudio).toHaveBeenCalledOnce();
     expect(deleteGroceries).not.toHaveBeenCalled();
+  });
+
+  it("hides a list's column from its ⋯ menu", async () => {
+    const hide = vi.fn();
+    render(
+      <DndContext>{column("studio", "Studio", vi.fn(), hide)}</DndContext>,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Studio options" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Hide column" }),
+    );
+    expect(hide).toHaveBeenCalledOnce();
+  });
+
+  it("gives Today no ⋯ menu, so no Hide column", () => {
+    render(
+      <DndContext>
+        <Column
+          listId="today"
+          title="Today"
+          subline=""
+          rows={[]}
+          subtasksOf={() => []}
+          checked={new Set()}
+          collapsing={new Set()}
+          highlightedId={null}
+          selectedId={null}
+          indicator={null}
+          composer={null}
+          empty="Nothing today."
+          loading={false}
+          error={null}
+          now={new Date()}
+          timeZone="UTC"
+          onCheck={vi.fn()}
+          onOpen={vi.fn()}
+          onMenu={vi.fn()}
+        />
+      </DndContext>,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Today options" }),
+    ).not.toBeInTheDocument();
   });
 
   it("clamps a list's title to two lines and keeps the subline's line", () => {

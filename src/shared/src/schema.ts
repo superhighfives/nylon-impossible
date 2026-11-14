@@ -177,6 +177,10 @@ export const lists = sqliteTable(
       enum: ["today", "thisWeek", "someday"],
     }),
     position: text("position").notNull().default("a0"),
+    // Your list's column is left off a wide board's row. Null or false means
+    // shown; system lists are never hidden. Nullable so it needs no backfill
+    // and no later contract migration.
+    columnHidden: integer("column_hidden", { mode: "boolean" }),
     createdAt: integer("created_at", { mode: "timestamp" })
       .notNull()
       .default(sql`(unixepoch())`),
