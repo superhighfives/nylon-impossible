@@ -151,7 +151,7 @@ struct TodoActionsTests {
         #expect(rows.map(\.title) == ["Stretch"])
     }
 
-    @Test("delete hides at once and only deletes when the toast goes")
+    @Test("delete hides at once and only deletes when it's sent")
     func deferredDelete() throws {
         let fixture = try makeFixture()
         let todo = insert("Renew passport", in: fixture.week, fixture)
@@ -165,6 +165,8 @@ struct TodoActionsTests {
         #expect(rows.isEmpty)
 
         fixture.actions.toasts.expire()
+        #expect(!todo.isSoftDeleted)
+        fixture.actions.flush()
         #expect(todo.isSoftDeleted)
         #expect(!todo.isSynced)
         #expect(fixture.actions.pendingDeletes.isEmpty)
@@ -177,14 +179,14 @@ struct TodoActionsTests {
 
         fixture.actions.delete(todo)
         fixture.actions.toasts.performAction()
-        fixture.actions.toasts.expire()
+        fixture.actions.flush()
 
         #expect(!todo.isSoftDeleted)
         #expect(fixture.actions.pendingDeletes.isEmpty)
     }
 
-    @Test("a second toast commits the first one's delete")
-    func replacingCommits() throws {
+    @Test("a second toast leaves the first one's delete waiting out its time")
+    func replacingWaits() throws {
         let fixture = try makeFixture()
         let first = insert("One", in: fixture.today, fixture)
         let second = insert("Two", in: fixture.today, fixture)
@@ -192,8 +194,23 @@ struct TodoActionsTests {
         fixture.actions.delete(first)
         fixture.actions.commitDone(second)
 
-        #expect(first.isSoftDeleted)
+        #expect(!first.isSoftDeleted)
+        #expect(fixture.actions.pendingDeletes.contains(first.id))
         #expect(fixture.actions.toasts.current?.text == "Done")
+    }
+
+    @Test("a delete is sent when its time is up, and then leaves the history")
+    func deleteSentAfterTime() async throws {
+        let fixture = try makeFixture()
+        fixture.actions.toasts.duration = .milliseconds(20)
+        let todo = insert("Renew passport", in: fixture.week, fixture)
+
+        fixture.actions.delete(todo)
+        #expect(fixture.actions.history.past.count == 1)
+        await fixture.actions.deleteTimers[todo.id.uuidString]?.value
+
+        #expect(todo.isSoftDeleted)
+        #expect(fixture.actions.history.past.isEmpty)
     }
 
     @Test("deleting a list hides it now, names it and its todos, and commits when the toast goes")
@@ -209,7 +226,7 @@ struct TodoActionsTests {
         #expect(fixture.actions.toasts.current?.text == "Deleted “Studio” and 3 todos")
         #expect(committed == 0)
 
-        fixture.actions.toasts.expire()
+        fixture.actions.flush()
         #expect(committed == 1)
         #expect(fixture.actions.pendingListDeletes.isEmpty)
     }
@@ -222,7 +239,7 @@ struct TodoActionsTests {
         fixture.actions.deleteList(studio, todoCount: 0) { _ in committed = true }
         #expect(fixture.actions.toasts.current?.text == "Deleted “Studio”")
         fixture.actions.toasts.performAction()
-        fixture.actions.toasts.expire()
+        fixture.actions.flush()
         #expect(!committed)
         #expect(fixture.actions.pendingListDeletes.isEmpty)
     }
@@ -368,6 +385,21 @@ struct ToastCenterTests {
         let toasts = ToastCenter()
         toasts.show("Couldn’t sync", action: nil)
         #expect(toasts.current?.actionLabel == nil)
+    }
+
+    @Test("an undo or redo from the history toasts it with nothing to tap")
+    func historyToasts() {
+        let toasts = ToastCenter()
+        let entry = UndoHistory.Entry(text: "Moved to this week", undo: { true }, redo: { true })
+        toasts.show("Done") {}
+        toasts.show(.undo, .done(entry))
+        #expect(toasts.current?.text == "Undone: Moved to this week")
+        #expect(toasts.current?.actionLabel == nil)
+        #expect(toasts.timeout(hasAction: false) == Theme.Phone.toastDuration)
+        toasts.show(.redo, .done(entry))
+        #expect(toasts.current?.text == "Redone: Moved to this week")
+        toasts.show(.undo, .gone(entry))
+        #expect(toasts.current?.text == "Already deleted")
     }
 
     @Test("toasts time out and run their expiry")

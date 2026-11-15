@@ -6,7 +6,7 @@
 //  show, which of them are single keys (bound only while no field is being
 //  edited), what needs a selected row, and how a command reaches the board —
 //  a board key through `perform`, everything else through `run`. Plus the
-//  Undo bridge that puts the toast's Undo on ⌘Z.
+//  undo history that puts the last 20 actions on ⌘Z and ⇧⌘Z.
 //
 
 import Foundation
@@ -197,50 +197,168 @@ struct MenuCommandTests {
     }
 }
 
-@Suite("Toast undo bridge")
+@Suite("Undo history")
 @MainActor
-struct ToastUndoBridgeTests {
-    @Test("⌘Z runs the toast's Undo while it's up")
-    func undoRunsAction() {
-        let toasts = ToastCenter()
-        let undoManager = UndoManager()
-        undoManager.groupsByEvent = false
-        let bridge = ToastUndoBridge()
-        var undone = false
-        toasts.show("Done") { undone = true }
-        undoManager.beginUndoGrouping()
-        bridge.sync(toasts, undoManager: undoManager)
-        undoManager.endUndoGrouping()
-        #expect(undoManager.canUndo)
-        #expect(undoManager.undoActionName == "Done")
-        undoManager.undo()
-        #expect(undone)
-        #expect(toasts.current == nil)
+struct UndoHistoryTests {
+    /// Logs what's done to each entry; a name in `gone` makes it fail.
+    final class Log {
+        var lines: [String] = []
+        var gone: Set<String> = []
+        var announced: [String] = []
+
+        func entry(_ text: String) -> UndoHistory.Entry {
+            UndoHistory.Entry(
+                text: text,
+                undo: { [unowned self] in
+                    guard !gone.contains(text) else { return false }
+                    lines.append("undo \(text)")
+                    return true
+                },
+                redo: { [unowned self] in
+                    guard !gone.contains(text) else { return false }
+                    lines.append("redo \(text)")
+                    return true
+                }
+            )
+        }
     }
 
-    @Test("An expired or replaced toast takes its Undo with it")
-    func expiryRemovesUndo() {
-        let toasts = ToastCenter()
-        let undoManager = UndoManager()
-        undoManager.groupsByEvent = false
-        let bridge = ToastUndoBridge()
-        toasts.show("Deleted") {}
-        undoManager.beginUndoGrouping()
-        bridge.sync(toasts, undoManager: undoManager)
-        undoManager.endUndoGrouping()
-        toasts.expire()
-        bridge.sync(toasts, undoManager: undoManager)
-        #expect(!undoManager.canUndo)
-        #expect(bridge.registeredId == nil)
+    private func make() -> (UndoHistory, UndoManager, Log) {
+        let history = UndoHistory()
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        history.attach(manager)
+        let log = Log()
+        history.announce = { step, outcome in
+            switch outcome {
+            case .done(let entry): log.announced.append("\(step == .undo ? "Undone" : "Redone"): \(entry.text)")
+            case .gone: log.announced.append("Already deleted")
+            }
+        }
+        return (history, manager, log)
     }
 
-    @Test("A toast without Undo registers nothing")
-    func viewToastIgnored() {
-        let toasts = ToastCenter()
-        let undoManager = UndoManager()
-        let bridge = ToastUndoBridge()
-        toasts.show("Added to someday", actionLabel: "View") {}
-        bridge.sync(toasts, undoManager: undoManager)
-        #expect(!undoManager.canUndo)
+    @Test("⌘Z steps back newest first, each named after its toast, then nothing")
+    func undoesNewestFirst() {
+        let (history, manager, log) = make()
+        for text in ["Done", "Done", "Moved to this week"] { history.push(log.entry(text)) }
+        #expect(manager.undoActionName == "Moved to this week")
+        manager.undo()
+        #expect(manager.undoActionName == "Done")
+        #expect(manager.redoActionName == "Moved to this week")
+        manager.undo()
+        manager.undo()
+        #expect(!manager.canUndo)
+        #expect(log.lines == ["undo Moved to this week", "undo Done", "undo Done"])
+        #expect(log.announced == ["Undone: Moved to this week", "Undone: Done", "Undone: Done"])
+    }
+
+    @Test("⇧⌘Z redoes the most recently undone first, back onto ⌘Z")
+    func redoesForward() {
+        let (history, manager, log) = make()
+        for text in ["a", "b", "c"] { history.push(log.entry(text)) }
+        manager.undo()
+        manager.undo()
+        #expect(manager.redoActionName == "b")
+        manager.redo()
+        manager.redo()
+        #expect(!manager.canRedo)
+        #expect(manager.undoActionName == "c")
+        manager.undo()
+        #expect(log.lines.suffix(3) == ["redo b", "redo c", "undo c"])
+        #expect(log.announced.suffix(3) == ["Redone: b", "Redone: c", "Undone: c"])
+    }
+
+    @Test("a new action clears redo")
+    func newActionClearsRedo() {
+        let (history, manager, log) = make()
+        history.push(log.entry("a"))
+        history.push(log.entry("b"))
+        manager.undo()
+        history.push(log.entry("c"))
+        #expect(!manager.canRedo)
+        #expect(history.future.isEmpty)
+        #expect(history.past.map(\.text) == ["a", "c"])
+    }
+
+    @Test("holds 20; a 21st pushes out the oldest")
+    func holdsTwenty() {
+        let (history, manager, log) = make()
+        for index in 1...(UndoHistory.limit + 1) { history.push(log.entry(String(index))) }
+        #expect(history.past.count == UndoHistory.limit)
+        for _ in 1...UndoHistory.limit { manager.undo() }
+        #expect(!manager.canUndo)
+        #expect(log.lines.first == "undo 21")
+        #expect(log.lines.last == "undo 2")
+    }
+
+    @Test("a dropped action (a sent delete) leaves ⌘Z and ⇧⌘Z")
+    func dropLeaves() {
+        let (history, manager, log) = make()
+        let deleted = log.entry("Deleted")
+        history.push(log.entry("Done"))
+        history.push(deleted)
+        history.drop(deleted)
+        #expect(manager.undoActionName == "Done")
+        manager.undo()
+        #expect(log.lines == ["undo Done"])
+        #expect(history.past.isEmpty)
+    }
+
+    @Test("an action whose todo has gone says Already deleted and drops out")
+    func goneDrops() {
+        let (history, manager, log) = make()
+        history.push(log.entry("Done"))
+        history.push(log.entry("Moved to this week"))
+        log.gone = ["Moved to this week"]
+        manager.undo()
+        #expect(log.announced == ["Already deleted"])
+        #expect(!manager.canRedo)
+        #expect(manager.undoActionName == "Done")
+        #expect(history.past.map(\.text) == ["Done"])
+    }
+
+    @Test("a toast's Undo button undoes through ⌘Z, so ⇧⌘Z can redo it")
+    func toastUndoIsRedoable() {
+        let (history, manager, log) = make()
+        let done = log.entry("Done")
+        history.push(done)
+        history.undo(done)
+        #expect(log.lines == ["undo Done"])
+        #expect(log.announced.isEmpty)
+        #expect(!manager.canUndo)
+        #expect(manager.redoActionName == "Done")
+        manager.redo()
+        #expect(log.lines == ["undo Done", "redo Done"])
+    }
+
+    @Test("a toast's Undo for an action that's left the history says so")
+    func toastUndoAfterDrop() {
+        let (history, _, log) = make()
+        let deleted = log.entry("Deleted")
+        history.push(deleted)
+        history.drop(deleted)
+        history.undo(deleted)
+        #expect(log.lines.isEmpty)
+        #expect(log.announced == ["Already deleted"])
+    }
+
+    @Test("something typed since stays on top: a toast's Undo leaves it, and ⌘Z undoes the typing")
+    func typingAbove() {
+        let (history, manager, log) = make()
+        let done = log.entry("Done")
+        history.push(done)
+        final class Field { var undone = false }
+        let field = Field()
+        manager.beginUndoGrouping()
+        manager.registerUndo(withTarget: field) { $0.undone = true }
+        manager.setActionName("Typing")
+        manager.endUndoGrouping()
+        history.undo(done)
+        #expect(log.lines == ["undo Done"])
+        #expect(manager.undoActionName == "Typing")
+        manager.undo()
+        #expect(field.undone)
+        #expect(!manager.canUndo)
     }
 }

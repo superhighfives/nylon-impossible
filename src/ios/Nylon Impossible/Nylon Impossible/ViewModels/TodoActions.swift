@@ -9,9 +9,12 @@
 //    "Done · Undo". A repeat's next occurrence goes where its new due date
 //    puts it (`RecurrenceHelper.placement`) and toasts "Done · next Mon",
 //    adding ", in This week" when that's a different list.
-//  - Delete hides the row at once but only deletes when its toast goes, so
-//    Undo never has to resurrect something the server already dropped.
+//  - Delete hides the row at once but only deletes after the toast's time,
+//    so Undo never has to resurrect something the server already dropped.
 //  - Moves and restores toast with an Undo that puts every field back.
+//  - Each of those goes into the window's `UndoHistory`, so ⌘Z steps back
+//    through the last 20 and ⇧⌘Z forward again. The toast's Undo is the same
+//    as ⌘Z for its own action. A delete leaves the history once it's sent.
 //
 //  The completion rules themselves stay in `TodoCompletionService`, shared with
 //  the widget; this only decides timing and what Undo restores.
@@ -67,20 +70,27 @@ struct TodoSnapshot {
 final class TodoActions {
     let toasts = ToastCenter()
     let viewModel: TodoViewModel
+    /// The last 20 actions with Undo, on the window's undo manager.
+    let history = UndoHistory()
 
     /// Checked rows waiting out their hold before they leave.
     private(set) var holding: Set<UUID> = []
     /// Rows fading out under Reduce Motion, which drops the collapse.
     private(set) var fading: Set<UUID> = []
-    /// Deleted rows whose toast is still up. Hidden, not yet deleted.
+    /// Deleted rows waiting out their time. Hidden, not yet deleted.
     private(set) var pendingDeletes: Set<UUID> = []
-    /// Deleted lists (by id) whose toast is still up, or whose delete is
+    /// Deleted lists (by id) waiting out their time, or whose delete is
     /// still on its way to the server. Hidden, with their todos.
     private(set) var pendingListDeletes: Set<String> = []
 
     @ObservationIgnored var reduceMotion = false
     @ObservationIgnored var holdDuration: Duration = Theme.Phone.doneHold
     @ObservationIgnored private var holdTasks: [UUID: Task<Void, Never>] = [:]
+    /// What sends each waiting delete when its time is up, by todo id or
+    /// "list:" and the list's id. `flush` sends them all now.
+    @ObservationIgnored private var deleteSends: [String: () -> Void] = [:]
+    /// Counts each waiting delete down. Awaiting one waits for the send.
+    @ObservationIgnored private(set) var deleteTimers: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var context: ModelContext?
     @ObservationIgnored private var container: ModelContainer?
     @ObservationIgnored private var onMutate: () -> Void = {}
@@ -89,6 +99,7 @@ final class TodoActions {
 
     init(viewModel: TodoViewModel? = nil) {
         self.viewModel = viewModel ?? TodoViewModel()
+        history.announce = { [toasts] step, outcome in toasts.show(step, outcome) }
     }
 
     /// Wire up the store and the after-change hook (a sync, in the app).
@@ -118,6 +129,12 @@ final class TodoActions {
     func listNameInSentence(_ listId: String?) -> String {
         guard let listId else { return SystemListKind.today.nameInSentence }
         return allLists().first { $0.id.lowercased() == listId.lowercased() }?.nameInSentence ?? "List"
+    }
+
+    /// Whether a todo is still there to change: not deleted here or on
+    /// another device, and not waiting on its delete.
+    func exists(_ todo: TodoItem) -> Bool {
+        !todo.isDeleted && todo.modelContext != nil && !todo.isSoftDeleted && !pendingDeletes.contains(todo.id)
     }
 
     /// Whether a row is drawn checked: held, or a repeat already done today.
@@ -220,9 +237,7 @@ final class TodoActions {
         } else {
             text = "Done"
         }
-        toasts.show(text, action: { [weak self] in
-            self?.undo(snapshot, todo: todo)
-        })
+        record(text, todo: todo, before: snapshot)
     }
 
     /// Put a done todo back in its list, from the Done history.
@@ -232,12 +247,43 @@ final class TodoActions {
         TodoCompletionService.toggle(todo, allTodos: allTodos(), lists: allLists())
         save()
         onMutate()
-        toasts.show("Back in \(listNameInSentence(todo.listKey))", action: { [weak self] in
-            self?.undo(snapshot, todo: todo)
-        })
+        record("Back in \(listNameInSentence(todo.listKey))", todo: todo, before: snapshot)
     }
 
-    private func undo(_ snapshot: TodoSnapshot, todo: TodoItem) {
+    // MARK: - History
+
+    /// Into the history, with its toast: Undo puts back `before`, Redo what
+    /// the todo is now. `onUndo` and `onRedo` run after each.
+    private func record(
+        _ text: String, todo: TodoItem, before: TodoSnapshot,
+        onUndo: (() -> Void)? = nil, onRedo: (() -> Void)? = nil
+    ) {
+        let after = TodoSnapshot(todo, children: children(of: todo))
+        record(UndoHistory.Entry(
+            text: text,
+            undo: { [weak self] in
+                guard let self, self.exists(todo) else { return false }
+                self.restore(before, todo: todo)
+                onUndo?()
+                return true
+            },
+            redo: { [weak self] in
+                guard let self, self.exists(todo) else { return false }
+                self.restore(after, todo: todo)
+                onRedo?()
+                return true
+            }
+        ))
+    }
+
+    /// Put an action into the history and toast it, with an Undo that's the
+    /// same as ⌘Z for it.
+    private func record(_ entry: UndoHistory.Entry) {
+        history.push(entry)
+        toasts.show(entry.text, action: { [weak self] in self?.history.undo(entry) })
+    }
+
+    private func restore(_ snapshot: TodoSnapshot, todo: TodoItem) {
         let children = children(of: todo)
         withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
             snapshot.restore(todo, children: children)
@@ -248,22 +294,40 @@ final class TodoActions {
 
     // MARK: - Delete
 
-    /// Hide now, delete when the toast goes. Undo just un-hides.
+    /// Hide now, delete when the toast's time is up. Undo just un-hides, and
+    /// Redo hides it again for a fresh stretch.
     func delete(_ todo: TodoItem) {
         let id = todo.id
-        withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
-            _ = pendingDeletes.insert(id)
+        let key = id.uuidString
+        // Weak: the entry's redo holds `hide`, so a strong one would keep
+        // both alive for the window's life.
+        weak var entry: UndoHistory.Entry?
+        let hide = { [weak self] in
+            guard let self else { return }
+            self.setHidden { _ = self.pendingDeletes.insert(id) }
+            self.schedule(key) {
+                if let entry { self.history.drop(entry) }
+                self.commitDelete(todo)
+            }
         }
-        toasts.show(
-            "Deleted",
-            onExpire: { [weak self] in self?.commitDelete(todo) },
-            action: { [weak self] in
-                guard let self else { return }
-                withAnimation(self.reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
-                    _ = self.pendingDeletes.remove(id)
-                }
+        let deleted = UndoHistory.Entry(
+            text: "Deleted",
+            undo: { [weak self] in
+                // Leaving the app sends waiting deletes, so this one may have
+                // gone while its toast was still up.
+                guard let self, self.cancelDelete(key) else { return false }
+                self.setHidden { _ = self.pendingDeletes.remove(id) }
+                return true
+            },
+            redo: { [weak self] in
+                guard let self, self.exists(todo) else { return false }
+                hide()
+                return true
             }
         )
+        entry = deleted
+        hide()
+        record(deleted)
     }
 
     private func commitDelete(_ todo: TodoItem) {
@@ -274,41 +338,80 @@ final class TodoActions {
     }
 
     /// Delete one of your lists straight away, with Undo: it and its todos
-    /// hide now, and `commit` deletes it when the toast goes. `commit` calls
-    /// its argument when it's done (or failed), which un-hides the list.
+    /// hide now, and `commit` deletes it when the toast's time is up.
+    /// `commit` calls its argument when it's done (or failed), which un-hides
+    /// the list.
     func deleteList(
         _ list: TodoListModel,
         todoCount: Int,
         commit: @escaping (_ finished: @escaping () -> Void) -> Void
     ) {
         let id = list.id
-        // Once per list: a second request would replace this toast, which
-        // expires it and commits the delete it was holding back.
+        // Once per list: its delete is already waiting.
         guard !pendingListDeletes.contains(id) else { return }
-        withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
-            _ = pendingListDeletes.insert(id)
-        }
-        let text = todoCount > 0
-            ? "Deleted “\(list.name)” and \(todoCount) \(todoCount == 1 ? "todo" : "todos")"
-            : "Deleted “\(list.name)”"
-        toasts.show(
-            text,
-            onExpire: { [weak self] in
-                guard let self, self.pendingListDeletes.contains(id) else { return }
+        let key = "list:\(id)"
+        weak var entry: UndoHistory.Entry?
+        let hide = { [weak self] in
+            guard let self else { return }
+            self.setHidden { _ = self.pendingListDeletes.insert(id) }
+            self.schedule(key) {
+                if let entry { self.history.drop(entry) }
                 commit { [weak self] in _ = self?.pendingListDeletes.remove(id) }
+            }
+        }
+        let deleted = UndoHistory.Entry(
+            text: todoCount > 0
+                ? "Deleted “\(list.name)” and \(todoCount) \(todoCount == 1 ? "todo" : "todos")"
+                : "Deleted “\(list.name)”",
+            undo: { [weak self] in
+                guard let self, self.cancelDelete(key) else { return false }
+                self.setHidden { _ = self.pendingListDeletes.remove(id) }
+                return true
             },
-            action: { [weak self] in
-                guard let self else { return }
-                withAnimation(self.reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base)) {
-                    _ = self.pendingListDeletes.remove(id)
-                }
+            redo: { [weak self] in
+                // Gone if another device deleted it in the meantime.
+                guard let self, !self.pendingListDeletes.contains(id),
+                      self.allLists().contains(where: { $0.id == id }) else { return false }
+                hide()
+                return true
             }
         )
+        entry = deleted
+        hide()
+        record(deleted)
     }
 
-    /// Commit anything a toast is holding back — leaving the app, signing out.
+    private func setHidden(_ change: () -> Void) {
+        withAnimation(reduceMotion ? nil : Theme.Motion.easeOutStrong(Theme.Motion.base), change)
+    }
+
+    /// Send a delete when a toast with Undo would time out.
+    private func schedule(_ key: String, send: @escaping () -> Void) {
+        deleteTimers[key]?.cancel()
+        deleteSends[key] = send
+        let wait = toasts.timeout(hasAction: true)
+        deleteTimers[key] = Task { [weak self] in
+            try? await Task.sleep(for: wait)
+            guard !Task.isCancelled else { return }
+            self?.sendDelete(key)
+        }
+    }
+
+    private func sendDelete(_ key: String) {
+        deleteTimers.removeValue(forKey: key)?.cancel()
+        deleteSends.removeValue(forKey: key)?()
+    }
+
+    /// Stop a delete that hasn't been sent. False if it already has.
+    private func cancelDelete(_ key: String) -> Bool {
+        deleteTimers.removeValue(forKey: key)?.cancel()
+        return deleteSends.removeValue(forKey: key) != nil
+    }
+
+    /// Send every delete that's waiting — leaving the app, signing out.
     func flush() {
         toasts.expire()
+        for key in Array(deleteSends.keys) { sendDelete(key) }
     }
 
     // MARK: - Move and pin
@@ -316,10 +419,11 @@ final class TodoActions {
     /// Move to another list. `announce` toasts with Undo (the context menu and
     /// drops); the detail sheet's own List chip already shows where it went.
     /// `position` places it (a board drop); without one it goes last.
-    /// `onUndo` runs after the toast's Undo has put it back.
+    /// `onUndo` runs after an Undo has put it back, `onRedo` after a Redo
+    /// has moved it again.
     func move(
         _ todo: TodoItem, toList listId: String, position: String? = nil, announce: Bool = true,
-        onUndo: (() -> Void)? = nil
+        onUndo: (() -> Void)? = nil, onRedo: (() -> Void)? = nil
     ) {
         guard todo.listKey?.lowercased() != listId.lowercased() else { return }
         let snapshot = TodoSnapshot(todo)
@@ -334,10 +438,7 @@ final class TodoActions {
             recentLists.record(listId)
         }
         guard announce else { return }
-        toasts.show("Moved to \(listNameInSentence(listId))", action: { [weak self] in
-            self?.undo(snapshot, todo: todo)
-            onUndo?()
-        })
+        record("Moved to \(listNameInSentence(listId))", todo: todo, before: snapshot, onUndo: onUndo, onRedo: onRedo)
     }
 
     func togglePin(_ todo: TodoItem) {

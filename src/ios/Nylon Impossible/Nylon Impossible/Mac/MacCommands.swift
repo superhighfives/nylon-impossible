@@ -6,9 +6,9 @@
 //  Window). View: Today ⌘1, This week ⌘2, Someday ⌘3, Show Done ⇧⌘D, and
 //  the sidebar toggle. Todo: the board's single-key map as menu items —
 //  their keys are only bound while no text field is focused — plus Move to.
-//  Edit keeps the system's items; ⌘Z reaches the toast's Undo through the
-//  window's undo manager (see `ToastUndoBridge`). Help opens the site and,
-//  for an admin, Send Feedback… ⇧⌘F (see FeedbackPresentation.swift).
+//  Edit keeps the system's items; ⌘Z and ⇧⌘Z step through the last 20
+//  actions on the window's undo manager (see `UndoHistory`). Help opens the
+//  site and, for an admin, Send Feedback… ⇧⌘F (see FeedbackPresentation.swift).
 //
 //  Titles, keys and routing come from `BoardMenuCommand`.
 //

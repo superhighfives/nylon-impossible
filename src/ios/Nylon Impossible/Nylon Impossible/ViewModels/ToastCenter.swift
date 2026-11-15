@@ -3,9 +3,8 @@
 //  Nylon Impossible
 //
 //  The one toast on screen: "Done · Undo", "Deleted · Undo", "Added to
-//  Someday · View". A new toast replaces the old one, and replacing (or
-//  timing out) runs the old one's `onExpire` — that's where a deferred delete
-//  actually happens, so it can still be undone until the toast goes.
+//  Someday · View", "Undone: Done". A new toast replaces the old one, and
+//  replacing (or timing out) runs the old one's `onExpire`.
 //
 
 import Foundation
@@ -62,6 +61,17 @@ final class ToastCenter {
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
             self?.expire(ifCurrent: toast.id)
+        }
+    }
+
+    /// An undo or redo from the history: "Undone: Done", "Redone: Moved to
+    /// this week", or "Already deleted", with nothing to tap.
+    func show(_ step: UndoHistory.Step, _ outcome: UndoHistory.Outcome) {
+        switch outcome {
+        case .done(let entry):
+            show("\(step == .undo ? "Undone" : "Redone"): \(entry.text)", action: nil)
+        case .gone:
+            show("Already deleted", action: nil)
         }
     }
 

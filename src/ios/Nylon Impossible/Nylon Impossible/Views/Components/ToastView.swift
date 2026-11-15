@@ -93,7 +93,7 @@ extension View {
         }
         #else
         // VoiceOver on the Mac has no Magic Tap; ⌘Z reaches Undo instead
-        // (`ToastUndoBridge`).
+        // (`UndoHistory`).
         self
         #endif
     }
