@@ -212,13 +212,15 @@ extension ContentView {
 
     /// Move a todo by command (1/2/3, Move to…, Todo ▸ Move to, the board's
     /// menu). Unlike Done and Delete it stays selected, and the keyboard goes
-    /// with it to its new column, as it does on Undo. Dragging doesn't come
-    /// through here.
+    /// with it to its new column, as it does on Undo and Redo. Dragging
+    /// doesn't come through here.
     func moveKeepingSelection(_ todo: TodoItem, to listId: String) {
         let from = todo.listKey
-        actions.move(todo, toList: listId) {
+        actions.move(todo, toList: listId, onUndo: {
             if selectedTodoId == todo.id, let from { follow(todo, to: from) }
-        }
+        }, onRedo: {
+            if selectedTodoId == todo.id { follow(todo, to: listId) }
+        })
         follow(todo, to: listId)
     }
 

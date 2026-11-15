@@ -222,8 +222,9 @@ the few UIKit/AppKit touch points shared code needs go through
   the inspector, the focused list as the window title. Menus come from
   `BoardMenuCommand` (File ▸ New Todo ⌘N / New List ⇧⌘N, View ▸ Today ⌘1 /
   This week ⌘2 / Someday ⌘3 / Show Done ⇧⌘D, Todo ▸ the single-key map).
-  ⌘Z reaches the toast's Undo through `ToastUndoBridge`. Text and links
-  dragged in from other apps become todos in that column.
+  ⌘Z and ⇧⌘Z step through the last 20 actions (`UndoHistory`, on the
+  window's undo manager; the phone layout too). Text and links dragged in
+  from other apps become todos in that column.
 - **`ContentRoot` owns the queries.** The split view's columns and the
   inspector are separate view graphs on macOS; a `@Query` read from one of
   them trapped AttributeGraph ("setting value during update") at launch. Keep

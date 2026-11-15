@@ -132,7 +132,6 @@ extension ContentView {
             sidebarVisibility = narrow ? .detailOnly : .all
         }
         .focusedSceneValue(\.board, commandHandler)
-        .onChange(of: actions.toasts.current) { undoBridge.sync(actions.toasts, undoManager: undoManager) }
         #else
         boardOverlays(HStack(spacing: 0) {
             sidebar

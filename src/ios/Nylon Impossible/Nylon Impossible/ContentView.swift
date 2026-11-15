@@ -134,8 +134,8 @@ struct ContentView: View {
 
     // MARK: Mac state
     @State var sidebarVisibility: NavigationSplitViewVisibility = .all
-    /// The toast's Undo on Edit ▸ Undo (⌘Z).
-    @State var undoBridge = ToastUndoBridge()
+    /// This window's undo manager, which carries `actions.history`: ⌘Z,
+    /// Edit ▸ Undo and shake.
     @Environment(\.undoManager) var undoManager
     @Environment(\.openURL) var openURL
     #if os(macOS)
@@ -185,8 +185,9 @@ struct ContentView: View {
             await scheduleMidnightTicks()
         }
         .onChange(of: reduceMotion, initial: true) { _, reduce in actions.reduceMotion = reduce }
+        .onChange(of: undoManager, initial: true) { _, manager in actions.history.attach(manager) }
         .onChange(of: scenePhase) { _, phase in
-            // A delete waiting on its toast commits when you leave.
+            // A waiting delete is sent when you leave.
             if phase != .active { actions.flush() }
         }
         .onChange(of: isWide, initial: true) { _, wide in carryAcross(toWide: wide) }
