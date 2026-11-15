@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { Effect, Exit } from "effect";
+import { Effect, Exit, Schedule } from "effect";
 import type { User } from "./auth";
 import { AuthService, AuthServiceLive, ensureUserExists } from "./auth";
 import { type DbClient, getDbClient } from "./db";
@@ -14,6 +14,17 @@ import { causeToClientError } from "./server-errors";
  * The layer server functions run with: it provides AuthService
  */
 export const AppLayer = AuthServiceLive;
+
+/**
+ * Tries `ensureUserExists` gets before a request fails. It's the first query
+ * of every server function and a write, so it goes to the D1 primary, and a
+ * transient "Network connection lost" there would otherwise fail a request
+ * that would have worked: the row almost always exists already, and the
+ * inserts are idempotent. One thing a retry can't redo: demo seeding is gated
+ * on the user insert having created the row, so if that attempt drops after
+ * the insert, a non-production demo account comes up without its demo todos.
+ */
+export const ENSURE_USER_ATTEMPTS = 3;
 
 /**
  * Wrapper that combines authentication + database + user creation
@@ -61,7 +72,10 @@ export const withAuthenticatedUser = <A, E>(
         }),
     });
 
-    // Ensure user exists in database (same as original implementation)
+    // Ensure user exists in database, retrying transient D1 errors. Only the
+    // final failure reaches Sentry, so warn about the ones a later attempt
+    // may recover from, or a blip on every request would look healthy.
+    let attempt = 0;
     yield* Effect.tryPromise({
       try: () => ensureUserExists(db, user.id, user.email),
       catch: (error) =>
@@ -69,7 +83,23 @@ export const withAuthenticatedUser = <A, E>(
           operation: "ensureUserExists",
           cause: error,
         }),
-    });
+    }).pipe(
+      Effect.tapError((error) =>
+        Effect.sync(() => {
+          attempt++;
+          if (attempt < ENSURE_USER_ATTEMPTS) {
+            console.warn(
+              `ensureUserExists attempt ${attempt} of ${ENSURE_USER_ATTEMPTS} failed, retrying`,
+              error.cause,
+            );
+          }
+        }),
+      ),
+      Effect.retry({
+        times: ENSURE_USER_ATTEMPTS - 1,
+        schedule: Schedule.exponential("50 millis"),
+      }),
+    );
 
     // Execute callback with user and db
     return yield* callback(user, db);
