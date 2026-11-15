@@ -42,13 +42,22 @@ function unauthorized(c: Parameters<typeof apiError>[0]) {
 
 /**
  * Auth for `/v1/*`: accepts only a personal API token, never a Clerk session
- * token (it never calls Clerk, so a JWT finds no hash). Sets `userId` and
- * `tokenId`, then applies the per-token rate limit.
+ * token (it never calls Clerk, so a JWT finds no hash). Applies the
+ * per-token rate limit, keyed on the token's hash, before the D1 lookup, so a
+ * script stuck on a revoked token is held to 60 reads a minute too. Then sets
+ * `userId` and `tokenId`.
  */
 export const tokenMiddleware = createMiddleware<Env>(async (c, next) => {
   const header = c.req.header("Authorization");
   const token = header?.startsWith("Bearer ") ? header.slice(7) : null;
   if (!token || !API_TOKEN_PATTERN.test(token)) return unauthorized(c);
+
+  const tokenHash = await hashApiToken(token);
+  const { success } = await c.env.V1_RATE_LIMIT.limit({ key: tokenHash });
+  if (!success) {
+    c.header("Retry-After", "60");
+    return apiError(c, "rate_limited");
+  }
 
   const db = getDb(c.env.DB);
   const [row] = await db
@@ -58,7 +67,7 @@ export const tokenMiddleware = createMiddleware<Env>(async (c, next) => {
       lastUsedAt: apiTokens.lastUsedAt,
     })
     .from(apiTokens)
-    .where(eq(apiTokens.tokenHash, await hashApiToken(token)))
+    .where(eq(apiTokens.tokenHash, tokenHash))
     .limit(1);
   if (!row) return unauthorized(c);
 
@@ -88,12 +97,6 @@ export const tokenMiddleware = createMiddleware<Env>(async (c, next) => {
         )
         .then(() => undefined),
     );
-  }
-
-  const { success } = await c.env.V1_RATE_LIMIT.limit({ key: row.id });
-  if (!success) {
-    c.header("Retry-After", "60");
-    return apiError(c, "rate_limited");
   }
 
   await next();

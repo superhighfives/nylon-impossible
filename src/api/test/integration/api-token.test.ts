@@ -252,15 +252,26 @@ describe("personal API token", () => {
         code: "rate_limited",
       });
 
-      // Keyed on the token's id, not the user or the token itself.
+      // Keyed on the token's hash, not the user or the token itself.
       const [row] = await tokenRows();
-      expect(limiter.limit).toHaveBeenLastCalledWith({ key: row.id });
+      expect(limiter.limit).toHaveBeenLastCalledWith({ key: row.tokenHash });
     });
 
-    it("isn't counted for a request without a valid token", async () => {
+    it("isn't counted for a request without a well-formed token", async () => {
       const limiter = { limit: vi.fn(async () => ({ success: true })) };
       await call("/v1/lists", {}, { V1_RATE_LIMIT: limiter });
       expect(limiter.limit).not.toHaveBeenCalled();
+    });
+
+    it("holds an unknown token to the limit before D1 is read", async () => {
+      const limiter = { limit: vi.fn(async () => ({ success: false })) };
+      const res = await call(
+        "/v1/lists",
+        { token: `nyl_${"A".repeat(43)}` },
+        { V1_RATE_LIMIT: limiter },
+      );
+      expect(res.status).toBe(429);
+      expect(limiter.limit).toHaveBeenCalledOnce();
     });
   });
 });
