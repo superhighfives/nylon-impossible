@@ -802,6 +802,7 @@ export function WideApp({
         indicator={drag.indicator}
         settle={drag.settle}
         loading={loading}
+        position={columnIds.indexOf(list.id)}
         error={errorView}
         empty={EMPTY_COPY[kind ?? ""] ?? "Nothing here yet."}
         onRename={
@@ -858,7 +859,7 @@ export function WideApp({
    * subline and banner space as the loaded column), with placeholder rows,
    * rather than Done filling the board. Nothing in it takes focus.
    */
-  const renderSkeletonColumn = (kind: BoardTimeKind) => (
+  const renderSkeletonColumn = (kind: BoardTimeKind, position: number) => (
     <Column
       key={`skeleton-${kind}`}
       listId={`skeleton-${kind}`}
@@ -872,6 +873,7 @@ export function WideApp({
       selectedId={null}
       indicator={null}
       loading
+      position={position}
       error={null}
       empty=""
       composer={<SkeletonComposer />}
@@ -981,11 +983,21 @@ export function WideApp({
             aria-label="Board"
             className="@container relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
+            {/* Before the lists arrive, the three time columns and then
+                nothing: no Done, since your lists may come before it. The
+                time columns are where they'll load, so your lists and Done
+                arrive in the empty space after them and nothing already
+                drawn moves (principle 8). A skeleton Done would have to
+                slide out of their way. */}
             {skeleton
               ? [
                   ...BOARD_TIME_KINDS.map(renderSkeletonColumn),
-                  renderDone(),
-                  renderEnd(),
+                  <div
+                    key="skeleton-rest"
+                    aria-hidden="true"
+                    data-skeleton-rest
+                    className="min-w-0 flex-1"
+                  />,
                 ]
               : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
                   slot.kind === "list" ? (

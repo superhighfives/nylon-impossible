@@ -342,6 +342,7 @@ export function Column({
   banner,
   empty,
   loading,
+  position = 0,
   error,
   onRename,
   onHide,
@@ -370,6 +371,8 @@ export function Column({
   banner?: ReactNode;
   empty: string;
   loading: boolean;
+  /** Its place on the board, from 0: placeholder rows fade along it. */
+  position?: number;
   error: ReactNode;
   /** Your list's column: rename in place. */
   onRename?: (name: string) => void;
@@ -455,7 +458,7 @@ export function Column({
             <p className="sr-only" aria-live="polite">
               Loading…
             </p>
-            <SkeletonRows />
+            <SkeletonRows column={position} />
           </>
         ) : error ? (
           error

@@ -35,6 +35,8 @@ let lists = [
 let todos: TodoWithUrls[] = [];
 /** The lists' first load, before they arrive. */
 let listsLoading = false;
+/** The todos' first load, after the lists have arrived. */
+let todosLoading = false;
 const sweptAt = new Date().toISOString();
 
 vi.mock("@/hooks/useLists", () => ({
@@ -74,7 +76,7 @@ vi.mock("@/hooks/useTodos", async (importOriginal) => {
   return {
     useTodos: () => ({
       // biome-ignore lint/correctness/useHookAtTopLevel: `liveCache` is fixed for a whole test
-      data: liveCache ? useLiveTodos() : todos,
+      data: todosLoading ? undefined : liveCache ? useLiveTodos() : todos,
       isLoading: false,
       error: null,
       refetch: vi.fn(),
@@ -377,29 +379,31 @@ describe("WideApp", () => {
     expect(groceries).not.toHaveAttribute("aria-current");
   });
 
-  it("draws the board's shape while it loads, instead of Done across it", () => {
+  it("draws the time columns while it loads, then nothing: no Done to promise where it ends", () => {
     listsLoading = true;
     try {
       render(<WideApp />);
       const board = screen.getByRole("main", { name: "Board" });
-      // The three time columns hold their places, by name, beside Done.
+      // The three time columns hold their places, by name, and nothing
+      // follows: your lists may come before Done.
       expect(
         [...board.querySelectorAll("[data-column]")].map((c) =>
           c.getAttribute("data-column"),
         ),
-      ).toEqual([
-        "skeleton-today",
-        "skeleton-thisWeek",
-        "skeleton-someday",
-        "done",
-      ]);
+      ).toEqual(["skeleton-today", "skeleton-thisWeek", "skeleton-someday"]);
       expect(
         within(board)
           .getAllByRole("heading", { level: 2 })
           .map((h) => h.textContent),
-      ).toEqual(["Today", "This week", "Someday", "Done"]);
-      // Placeholder rows everywhere, and no false empty state for Done.
-      expect(board.querySelectorAll("[data-skeleton-rows]")).toHaveLength(4);
+      ).toEqual(["Today", "This week", "Someday"]);
+      expect(board.lastElementChild).toHaveAttribute("data-skeleton-rest");
+      expect(board.lastElementChild?.childElementCount).toBe(0);
+      // Placeholder rows fade by column, gone by the fourth.
+      expect(
+        [...board.querySelectorAll<HTMLElement>("[data-skeleton-rows]")].map(
+          (rows) => Number(rows.style.opacity).toFixed(2),
+        ),
+      ).toEqual(["1.00", "0.67", "0.33"]);
       expect(within(board).queryByText("Nothing done yet.")).toBeNull();
       // Screen readers hear "Loading…"; nothing in a placeholder takes focus.
       expect(within(board).getAllByText("Loading…").length).toBeGreaterThan(0);
@@ -462,7 +466,7 @@ describe("WideApp", () => {
     );
   });
 
-  it("gives the skeleton's columns the same width, and the end after Done", () => {
+  it("gives the skeleton's columns the same width", () => {
     listsLoading = true;
     try {
       render(<WideApp />);
@@ -470,9 +474,42 @@ describe("WideApp", () => {
       for (const c of board.querySelectorAll("[data-column]")) {
         expect(c).toHaveClass(...COLUMN_WIDTH.split(" "));
       }
-      expect(board.lastElementChild).toHaveAttribute("data-board-end");
     } finally {
       listsLoading = false;
+    }
+  });
+
+  it("fades the placeholder rows by column once the lists are in, none from the fourth", () => {
+    todosLoading = true;
+    try {
+      render(<WideApp />);
+      const board = screen.getByRole("main", { name: "Board" });
+      const opacities = [...board.querySelectorAll("[data-column]")].map(
+        (c) => {
+          const rows = c.querySelector<HTMLElement>("[data-skeleton-rows]");
+          return [
+            c.getAttribute("data-column"),
+            rows ? Number(rows.style.opacity).toFixed(2) : null,
+          ];
+        },
+      );
+      expect(opacities).toEqual([
+        ["list-today", "1.00"],
+        ["list-week", "0.67"],
+        ["list-someday", "0.33"],
+        ["list-groceries", null],
+        ["list-studio", null],
+        ["done", null],
+      ]);
+      // Every column still says it's loading, and Done claims nothing.
+      for (const c of board.querySelectorAll("[data-column]")) {
+        expect(within(c as HTMLElement).getByText("Loading…")).toHaveClass(
+          "sr-only",
+        );
+      }
+      expect(within(board).queryByText("Nothing done yet.")).toBeNull();
+    } finally {
+      todosLoading = false;
     }
   });
 

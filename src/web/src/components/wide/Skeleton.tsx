@@ -5,7 +5,12 @@ import { Plus } from "lucide-react";
  * so the board has its shape from the first paint instead of Done filling
  * it. Decorative; the column says "Loading…" to screen readers, and none of
  * it can take focus. The bars pulse unless motion is reduced.
+ *
+ * They fade across the board by column, full in the first and gone by the
+ * fourth, so the skeleton doesn't promise how many columns will load.
  */
+export const SKELETON_COLUMNS = 3;
+
 const WIDTHS = [
   ["78%", "34%"],
   ["62%", "26%"],
@@ -13,9 +18,23 @@ const WIDTHS = [
   ["55%", "30%"],
 ];
 
-export function SkeletonRows({ count = 4 }: { count?: number }) {
+export function SkeletonRows({
+  count = 4,
+  column = 0,
+}: {
+  count?: number;
+  /** The column's place on the board, from 0. */
+  column?: number;
+}) {
+  const opacity = 1 - column / SKELETON_COLUMNS;
+  if (opacity <= 0) return null;
   return (
-    <ul aria-hidden="true" data-skeleton-rows className="pt-1">
+    <ul
+      aria-hidden="true"
+      data-skeleton-rows
+      style={{ opacity }}
+      className="pt-1"
+    >
       {WIDTHS.slice(0, count).map(([title, meta], i) => (
         <li
           // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholder rows
