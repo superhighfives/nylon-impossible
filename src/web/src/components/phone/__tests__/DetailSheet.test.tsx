@@ -155,4 +155,159 @@ describe("DetailSheet", () => {
     expect(screen.getByText("Couldn't show this")).toBeInTheDocument();
     quiet.mockRestore();
   });
+
+  describe("notes", () => {
+    const sample = [
+      "## Plan",
+      "Ship it with **bold** steps:",
+      "- a",
+      "- b",
+      "See [link](https://example.com).",
+    ].join("\n");
+
+    const renderNotes = (
+      notes: string | null,
+      { column = false }: { column?: boolean } = {},
+    ) => {
+      const save = vi.fn();
+      const onClose = vi.fn();
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const view = render(
+        <DetailSheet
+          todo={makeTodo({ notes })}
+          subtasks={[]}
+          listTargets={[]}
+          listName={() => "Today"}
+          listInSentence={() => "today"}
+          timeZone="UTC"
+          actions={{ save, destroy: vi.fn() } as unknown as TodoActions}
+          onClose={onClose}
+          {...(column && { variant: "column", container, animated: false })}
+        />,
+      );
+      const rendered = () =>
+        document.querySelector<HTMLElement>("[data-notes-rendered]");
+      const editor = () =>
+        screen.queryByRole("textbox", {
+          name: "Notes",
+        }) as HTMLTextAreaElement | null;
+      return { save, onClose, rendered, editor, view, container };
+    };
+
+    for (const column of [false, true]) {
+      const layout = column ? "on the wide board" : "in the phone sheet";
+
+      it(`draws Markdown while they aren't being edited, ${layout}`, () => {
+        const { rendered } = renderNotes(sample, { column });
+        const notes = rendered();
+        expect(notes).not.toBeNull();
+        if (!notes) return;
+        expect(notes.tagName).not.toBe("TEXTAREA");
+        expect(
+          within(notes).getByRole("heading", { name: "Plan" }),
+        ).toBeInTheDocument();
+        expect(within(notes).getByText("bold").tagName).toBe("STRONG");
+        const items = within(notes).getAllByRole("listitem");
+        expect(items.map((li) => li.textContent)).toEqual(["a", "b"]);
+        expect(items[0].parentElement?.tagName).toBe("UL");
+        expect(
+          within(notes).getByRole("link", { name: "link" }),
+        ).toHaveAttribute("href", "https://example.com/");
+      });
+    }
+
+    it("edits the exact stored text on a click, and draws it again on blur", () => {
+      const { rendered, editor } = renderNotes(sample);
+      const notes = rendered();
+      if (!notes) throw new Error("not rendered");
+      fireEvent.click(within(notes).getByText("bold"));
+      const field = editor();
+      expect(field?.tagName).toBe("TEXTAREA");
+      expect(field?.value).toBe(sample);
+      expect(field).toHaveFocus();
+      expect(field?.selectionStart).toBe(sample.length);
+      expect(rendered()).toBeNull();
+
+      if (field) fireEvent.blur(field);
+      expect(rendered()?.querySelector("strong")?.textContent).toBe("bold");
+      expect(
+        document.querySelector("textarea[placeholder='Add notes']"),
+      ).toBeNull();
+    });
+
+    it("opens a link in a new tab without starting to edit", () => {
+      const { rendered } = renderNotes(sample);
+      const link = screen.getByRole("link", { name: "link" });
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noopener noreferrer");
+      fireEvent.click(link);
+      expect(rendered()).not.toBeNull();
+      expect(
+        document.querySelector("textarea[placeholder='Add notes']"),
+      ).toBeNull();
+    });
+
+    it("never draws raw HTML or a javascript: link", () => {
+      const notes = [
+        '<img src=x onerror="alert(1)">',
+        "<script>alert(1)</script>",
+        "[x](javascript:alert(1))",
+        '<a href="javascript:alert(1)">y</a>',
+      ].join("\n");
+      const { rendered } = renderNotes(notes);
+      const view = rendered();
+      if (!view) throw new Error("not rendered");
+      expect(view.querySelector("img, script, a, iframe")).toBeNull();
+      expect(view.querySelector("[href], [onerror], [src]")).toBeNull();
+      expect(view.textContent).toContain('<img src=x onerror="alert(1)">');
+      expect(view.textContent).toContain("[x](javascript:alert(1))");
+    });
+
+    it("edits on Return, and Esc saves and leaves the editor, not the sheet", () => {
+      const { rendered, editor, save, onClose } = renderNotes("- a", {
+        column: true,
+      });
+      const notes = rendered();
+      if (!notes) throw new Error("not rendered");
+      notes.focus();
+      fireEvent.keyDown(notes, { key: "Enter" });
+      const field = editor();
+      expect(field).toHaveFocus();
+      if (!field) return;
+      fireEvent.change(field, { target: { value: "- a\n- **b**" } });
+      fireEvent.keyDown(field, { key: "Escape" });
+      expect(save).toHaveBeenCalledWith(expect.any(String), {
+        notes: "- a\n- **b**",
+      });
+      expect(onClose).not.toHaveBeenCalled();
+      const after = rendered();
+      expect(after).toHaveFocus();
+      expect(after?.querySelector("strong")?.textContent).toBe("b");
+    });
+
+    it("saves exactly the Markdown typed", () => {
+      const { editor, save } = renderNotes(null);
+      const field = editor();
+      if (!field) throw new Error("no editor");
+      const typed = "# Heading\n\n- [ ] *one*  \n  - two\n";
+      fireEvent.focus(field);
+      fireEvent.change(field, { target: { value: typed } });
+      // Still the editor while typing, though the notes aren't empty now.
+      expect(editor()).toBe(field);
+      fireEvent.blur(field);
+      expect(save).toHaveBeenCalledTimes(1);
+      expect(save).toHaveBeenCalledWith(expect.any(String), { notes: typed });
+    });
+
+    it("shows Add notes when empty, and edits on focus", () => {
+      const { editor, rendered } = renderNotes(null);
+      expect(rendered()).toBeNull();
+      const field = editor();
+      expect(field).toHaveAttribute("placeholder", "Add notes");
+      field?.focus();
+      expect(field).toHaveFocus();
+      expect(editor()).toBe(field);
+    });
+  });
 });

@@ -47,6 +47,7 @@ import {
   linkDomain,
   repeatLabel,
 } from "./model";
+import { Notes } from "./Notes";
 import { useAutosaveField } from "./useAutosaveField";
 import type { TodoActions } from "./useTodoActions";
 
@@ -378,17 +379,14 @@ function DetailBody({
   );
 
   const notesField = (label: string, className: string) => (
-    <label className="block">
-      <span className={label}>Notes</span>
-      <textarea
-        value={notes.value}
-        onChange={(e) => notes.onChange(e.target.value)}
-        onBlur={notes.flush}
-        placeholder="Add notes"
-        rows={columnVariant ? 2 : 3}
-        className={`field-sizing-content block w-full resize-none rounded-n-chip bg-transparent p-0 text-n-ink n-focus placeholder:text-n-ink-muted ${className}`}
-      />
-    </label>
+    <Notes
+      value={notes.value}
+      onChange={notes.onChange}
+      onBlur={notes.flush}
+      label={label}
+      rows={columnVariant ? 2 : 3}
+      className={className}
+    />
   );
 
   const footer = (className: string, deleteClass: string) => (
