@@ -984,7 +984,11 @@ export function WideApp({
             className="@container relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {/* Before the lists arrive, the three time columns and then
-                nothing: no Done, since your lists may come before it. */}
+                nothing: no Done, since your lists may come before it. The
+                time columns are where they'll load, so your lists and Done
+                arrive in the empty space after them and nothing already
+                drawn moves (principle 8). A skeleton Done would have to
+                slide out of their way. */}
             {skeleton
               ? [
                   ...BOARD_TIME_KINDS.map(renderSkeletonColumn),
