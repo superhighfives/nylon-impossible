@@ -9,9 +9,11 @@ import { NewListPopover } from "./NewListPopover";
 /** Droppable ids for sidebar entries, distinct from column ids. */
 export const sidebarDropId = (listId: string) => `side:${listId}`;
 
+/** The entries' type size, which the eye's row matches to line up. */
+const ENTRY_TEXT = "text-[0.9375rem]";
+
 /** A sidebar entry, less its text colour: each sets one, so none compete. */
-const ENTRY =
-  "relative flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left text-[0.9375rem] n-focus-soft transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface";
+const ENTRY = `relative flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left ${ENTRY_TEXT} n-focus-soft transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface`;
 
 /**
  * The 3px ink bar on the left edge: the column the selection is in. Ink, not
@@ -33,9 +35,13 @@ function SelectionBar({ on }: { on: boolean }) {
  * a todo is dragged over it, it fills, so the drop target is unmistakable.
  * Your lists' entries have a right-click menu with Hide column (or Show
  * column); a hidden list's entry stays in place, muted, with its count. An
- * eye beside the count does the same: closed and always there when hidden,
- * open and on hover (or focus) when shown. Its space is always kept, so the
- * count doesn't move.
+ * eye just before the count does the same: closed and always there when
+ * hidden; on hover (or focus) of the entry, open or closed as it stands. Its
+ * space is always kept, so the count doesn't move.
+ *
+ * The eye can't sit inside the entry (a button in a button), so it lies over
+ * the space the entry keeps for it, after the entry in the DOM so it's on
+ * top and is the next Tab stop. An invisible copy of the count lines it up.
  */
 function ListEntry({
   list,
@@ -69,16 +75,23 @@ function ListEntry({
       data-column-hidden={hidden ? "" : undefined}
       aria-describedby={`sidebar-count-${list.id}`}
       onClick={() => onSelect(list)}
-      className={`${ENTRY} pr-9 ${strong ? "font-semibold" : "font-medium"} ${
+      className={`${ENTRY} ${strong ? "font-semibold" : "font-medium"} ${
         dropping
           ? "bg-n-brand text-n-brand-ink"
-          : hidden
-            ? "text-n-ink-muted"
-            : "text-n-ink"
+          : `${hidden ? "text-n-ink-muted" : "text-n-ink"} ${
+              // The eye lies over the entry, so the whole row's hover lights
+              // it: over the eye, the entry itself isn't hovered.
+              onToggleColumn
+                ? "pointer-fine:group-hover/entry:bg-n-surface"
+                : ""
+            }`
       }`}
     >
       <SelectionBar on={current} />
       <span className="min-w-0 flex-1 truncate">{list.name}</span>
+      {onToggleColumn && (
+        <span aria-hidden="true" data-eye-space className="size-6 shrink-0" />
+      )}
       {/* The name is what's visible ("Groceries"); the count is read as
           its description ("4 todos"). */}
       <span
@@ -94,33 +107,36 @@ function ListEntry({
     </button>
   );
   const eye = onToggleColumn ? (
-    <button
-      type="button"
-      data-column-eye={list.id}
-      aria-label={hidden ? "Show column" : "Hide column"}
-      aria-describedby={`sidebar-eye-${list.id}`}
-      onClick={() => onToggleColumn(list)}
-      className={`absolute top-1/2 right-2 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-n-chip text-n-ink-muted n-focus-soft transition-opacity duration-(--n-duration-fast) pointer-fine:hover:text-n-ink ${
-        hidden
-          ? ""
-          : "pointer-fine:opacity-0 pointer-fine:group-hover/entry:opacity-100 pointer-fine:focus-visible:opacity-100"
-      }`}
+    <span
+      className={`pointer-events-none absolute inset-y-0 right-2.5 flex items-center gap-2 ${ENTRY_TEXT}`}
     >
-      {hidden ? (
-        <EyeOff size={15} aria-hidden="true" />
-      ) : (
-        <Eye size={15} aria-hidden="true" />
-      )}
-    </button>
+      <button
+        type="button"
+        data-column-eye={list.id}
+        aria-label={hidden ? "Show column" : "Hide column"}
+        aria-describedby={`sidebar-eye-${list.id}`}
+        onClick={() => onToggleColumn(list)}
+        className={`pointer-events-auto flex size-6 cursor-pointer items-center justify-center rounded-n-chip n-focus-soft transition-opacity duration-(--n-duration-fast) pointer-fine:hover:text-n-ink ${
+          dropping ? "text-n-brand-ink" : "text-n-ink-muted"
+        } ${
+          hidden
+            ? ""
+            : "pointer-fine:opacity-0 pointer-fine:group-hover/entry:opacity-100 pointer-fine:group-has-[:focus-visible]/entry:opacity-100"
+        }`}
+      >
+        {hidden ? (
+          <EyeOff size={15} aria-hidden="true" />
+        ) : (
+          <Eye size={15} aria-hidden="true" />
+        )}
+      </button>
+      <span aria-hidden="true" className="invisible font-normal tabular-nums">
+        {count}
+      </span>
+    </span>
   ) : null;
   return (
     <li ref={setNodeRef} className="group/entry relative">
-      {eye}
-      {eye && (
-        <span id={`sidebar-eye-${list.id}`} hidden>
-          {list.name}
-        </span>
-      )}
       {onToggleColumn ? (
         <ContextMenu.Root>
           <ContextMenu.Trigger render={button} />
@@ -139,6 +155,12 @@ function ListEntry({
         </ContextMenu.Root>
       ) : (
         button
+      )}
+      {eye}
+      {eye && (
+        <span id={`sidebar-eye-${list.id}`} hidden>
+          {list.name}
+        </span>
       )}
     </li>
   );
