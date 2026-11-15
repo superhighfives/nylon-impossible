@@ -59,7 +59,7 @@ export const SEED_TODOS: SeedTodo[] = [
     list: "week",
     due: 4,
     notes:
-      "Flights land Thursday 9:40am. Ask Rita for the pastelaria list and check whether the tram 28 pass covers Belém.",
+      "Flights land **Thursday 9:40am**. Ask Rita for the pastelaria list.\n\nBefore we go:\n- check the [tram 28 pass](https://www.visitlisboa.com/tram-28) covers Belém\n- pack the travel adapter",
     link: {
       url: "https://www.visitlisboa.com/tram-28",
       title: "Tram 28 — the complete guide",

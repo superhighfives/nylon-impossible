@@ -148,6 +148,17 @@ private enum FontCache {
     static var fonts: [FontCacheKey: PlatformFont] = [:]
 }
 
+extension Theme.Fonts.Style {
+    /// The space between lines that makes up the style's line height, at a
+    /// Dynamic Type size. Text views stacked as lines (the drawn notes) are
+    /// spaced by it too, so they keep the same rhythm as one text.
+    @MainActor
+    func lineSpacing(for dynamicTypeSize: DynamicTypeSize) -> CGFloat {
+        let font = uiFont(for: dynamicTypeSize)
+        return max(0, lineHeight * (font.pointSize / size) - font.nylonLineHeight)
+    }
+}
+
 /// Sets a token text style at the environment's Dynamic Type size. Reading
 /// the size here is what makes text re-lay out when it changes, and lets a
 /// `.dynamicTypeSize(...)` cap apply to these fonts like system ones.
@@ -162,7 +173,7 @@ private struct TextStyleModifier: ViewModifier {
         let scale = font.pointSize / style.size
         return content
             .font(Font(font))
-            .lineSpacing(max(0, style.lineHeight * scale - font.nylonLineHeight))
+            .lineSpacing(style.lineSpacing(for: dynamicTypeSize))
             .tracking(style.tracking(tracking) * scale)
     }
 }
