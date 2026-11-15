@@ -40,11 +40,16 @@ export type Env = {
     // read/write; main's branch protection still applies). Set via `wrangler secret put`; /feedback answers
     // feedback_unavailable without it.
     GITHUB_FEEDBACK_TOKEN?: string;
+    // Workers rate limit for /v1, keyed on the personal API token's id
+    // (60 requests a minute). In wrangler.jsonc, top level and `previews`.
+    V1_RATE_LIMIT: RateLimit;
   };
   Variables: {
     userId: string;
     role: "admin" | null;
     // Set by verifyGoogleIdToken on the /gmail-addon/* routes.
     googleClaims: GoogleIdTokenClaims;
+    // Set by tokenMiddleware on /v1/*: the personal API token's row id.
+    tokenId: string;
   };
 };

@@ -19,6 +19,8 @@ import { drizzle } from "drizzle-orm/d1";
 
 // Re-export schema from shared package
 export {
+  type ApiToken,
+  apiTokens,
   type GmailAddonLink,
   gmailAddonLinks,
   type List,

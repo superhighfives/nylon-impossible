@@ -18,6 +18,8 @@ import { Route as BoardSomedayRouteImport } from './routes/_board.someday'
 import { Route as BoardThisWeekRouteImport } from './routes/_board.this-week'
 import { Route as BoardTodayRouteImport } from './routes/_board.today'
 import { Route as ConnectGmailAddonRouteImport } from './routes/connect/gmail-addon'
+import { Route as DocsIndexRouteImport } from './routes/docs/index'
+import { Route as DocsApiRouteImport } from './routes/docs/api'
 import { Route as BoardListIdRouteImport } from './routes/_board.list.$id'
 
 const BoardRoute = BoardRouteImport.update({
@@ -64,6 +66,16 @@ const ConnectGmailAddonRoute = ConnectGmailAddonRouteImport.update({
   path: '/connect/gmail-addon',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsApiRoute = DocsApiRouteImport.update({
+  id: '/docs/api',
+  path: '/docs/api',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BoardListIdRoute = BoardListIdRouteImport.update({
   id: '/list/$id',
   path: '/list/$id',
@@ -79,6 +91,8 @@ export interface FileRoutesByFullPath {
   '/this-week': typeof BoardThisWeekRoute
   '/today': typeof BoardTodayRoute
   '/connect/gmail-addon': typeof ConnectGmailAddonRoute
+  '/docs/api': typeof DocsApiRoute
+  '/docs/': typeof DocsIndexRoute
   '/list/$id': typeof BoardListIdRoute
 }
 export interface FileRoutesByTo {
@@ -89,7 +103,9 @@ export interface FileRoutesByTo {
   '/this-week': typeof BoardThisWeekRoute
   '/today': typeof BoardTodayRoute
   '/connect/gmail-addon': typeof ConnectGmailAddonRoute
+  '/docs/api': typeof DocsApiRoute
   '/': typeof BoardIndexRoute
+  '/docs': typeof DocsIndexRoute
   '/list/$id': typeof BoardListIdRoute
 }
 export interface FileRoutesById {
@@ -102,7 +118,9 @@ export interface FileRoutesById {
   '/_board/this-week': typeof BoardThisWeekRoute
   '/_board/today': typeof BoardTodayRoute
   '/connect/gmail-addon': typeof ConnectGmailAddonRoute
+  '/docs/api': typeof DocsApiRoute
   '/_board/': typeof BoardIndexRoute
+  '/docs/': typeof DocsIndexRoute
   '/_board/list/$id': typeof BoardListIdRoute
 }
 export interface FileRouteTypes {
@@ -116,6 +134,8 @@ export interface FileRouteTypes {
     | '/this-week'
     | '/today'
     | '/connect/gmail-addon'
+    | '/docs/api'
+    | '/docs/'
     | '/list/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -126,7 +146,9 @@ export interface FileRouteTypes {
     | '/this-week'
     | '/today'
     | '/connect/gmail-addon'
+    | '/docs/api'
     | '/'
+    | '/docs'
     | '/list/$id'
   id:
     | '__root__'
@@ -138,7 +160,9 @@ export interface FileRouteTypes {
     | '/_board/this-week'
     | '/_board/today'
     | '/connect/gmail-addon'
+    | '/docs/api'
     | '/_board/'
+    | '/docs/'
     | '/_board/list/$id'
   fileRoutesById: FileRoutesById
 }
@@ -147,6 +171,8 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   ConnectGmailAddonRoute: typeof ConnectGmailAddonRoute
+  DocsApiRoute: typeof DocsApiRoute
+  DocsIndexRoute: typeof DocsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -214,6 +240,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectGmailAddonRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/api': {
+      id: '/docs/api'
+      path: '/docs/api'
+      fullPath: '/docs/api'
+      preLoaderRoute: typeof DocsApiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_board/list/$id': {
       id: '/_board/list/$id'
       path: '/list/$id'
@@ -249,6 +289,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   ConnectGmailAddonRoute: ConnectGmailAddonRoute,
+  DocsApiRoute: DocsApiRoute,
+  DocsIndexRoute: DocsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
