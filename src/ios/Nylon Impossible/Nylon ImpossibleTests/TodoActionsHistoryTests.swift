@@ -150,6 +150,24 @@ struct TodoActionsHistoryTests {
         #expect(manager.undoActionName == "Done")
     }
 
+    @Test("a sent delete lets go of its entry, for a todo and a list")
+    func sentDeleteFreesEntry() throws {
+        let fixture = try makeFixture()
+        let todo = insert("Renew passport", in: fixture.week, fixture)
+        let studio = TodoListModel(id: "studio", userId: "u1", name: "Studio", kind: "custom", systemKind: nil)
+        fixture.context.insert(studio)
+        fixture.actions.delete(todo)
+        weak var deleted = fixture.actions.history.past.last
+        fixture.actions.flush()
+        fixture.actions.deleteList(studio, todoCount: 0) { finished in finished() }
+        weak var deletedList = fixture.actions.history.past.last
+        fixture.actions.flush()
+
+        #expect(fixture.actions.history.past.isEmpty)
+        #expect(deleted == nil)
+        #expect(deletedList == nil)
+    }
+
     @Test("redoing a list delete hides it again; undoing it brings it back unsent")
     func redoDeleteList() throws {
         let fixture = try makeFixture()

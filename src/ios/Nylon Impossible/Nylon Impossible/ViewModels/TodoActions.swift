@@ -299,7 +299,9 @@ final class TodoActions {
     func delete(_ todo: TodoItem) {
         let id = todo.id
         let key = id.uuidString
-        var entry: UndoHistory.Entry?
+        // Weak: the entry's redo holds `hide`, so a strong one would keep
+        // both alive for the window's life.
+        weak var entry: UndoHistory.Entry?
         let hide = { [weak self] in
             guard let self else { return }
             self.setHidden { _ = self.pendingDeletes.insert(id) }
@@ -348,7 +350,7 @@ final class TodoActions {
         // Once per list: its delete is already waiting.
         guard !pendingListDeletes.contains(id) else { return }
         let key = "list:\(id)"
-        var entry: UndoHistory.Entry?
+        weak var entry: UndoHistory.Entry?
         let hide = { [weak self] in
             guard let self else { return }
             self.setHidden { _ = self.pendingListDeletes.insert(id) }
