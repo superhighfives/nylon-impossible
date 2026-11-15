@@ -20,7 +20,9 @@ export const AppLayer = AuthServiceLive;
  * of every server function and a write, so it goes to the D1 primary, and a
  * transient "Network connection lost" there would otherwise fail a request
  * that would have worked: the row almost always exists already, and the
- * insert is idempotent.
+ * inserts are idempotent. One thing a retry can't redo: demo seeding is gated
+ * on the user insert having created the row, so if that attempt drops after
+ * the insert, a non-production demo account comes up without its demo todos.
  */
 export const ENSURE_USER_ATTEMPTS = 3;
 
