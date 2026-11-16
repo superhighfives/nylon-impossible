@@ -91,7 +91,7 @@ export const MENU_ITEM =
 /**
  * A column's title and subline on the shared baseline. Your lists' titles
  * rename in place (Enter or blur saves, Esc cancels) and carry a ⋯ menu:
- * Rename, Hide column and Delete list. There's no ×: a hidden list's column
+ * Rename, Hide column, Copy list ID and Delete list. There's no ×: a hidden list's column
  * comes back from the sidebar.
  */
 export function ColumnHeader({
@@ -103,6 +103,7 @@ export function ColumnHeader({
   banner,
   onRename,
   onHide,
+  onCopyId,
   onDelete,
   sheetOpen = false,
 }: {
@@ -126,6 +127,8 @@ export function ColumnHeader({
   onRename?: (name: string) => void;
   /** Your list's column: Hide column, which takes it off the board. */
   onHide?: () => void;
+  /** Your list's column: Copy list ID, for the personal API. */
+  onCopyId?: () => void;
   onDelete?: () => void;
   /** The column's todo is open: clear of the sheet, and receded. */
   sheetOpen?: boolean;
@@ -261,6 +264,11 @@ export function ColumnHeader({
                       Hide column
                     </Menu.Item>
                   )}
+                  {onCopyId && (
+                    <Menu.Item className={MENU_ITEM} onClick={onCopyId}>
+                      Copy list ID
+                    </Menu.Item>
+                  )}
                   <Menu.Item
                     className={`${MENU_ITEM} text-n-destructive`}
                     onClick={onDelete}
@@ -346,6 +354,7 @@ export function Column({
   error,
   onRename,
   onHide,
+  onCopyId,
   onDelete,
   onBackgroundClick,
   sheetOpen = false,
@@ -378,6 +387,8 @@ export function Column({
   onRename?: (name: string) => void;
   /** Your list's column: Hide column, in the ⋯ menu. */
   onHide?: () => void;
+  /** Your list's column: Copy list ID, in the ⋯ menu. */
+  onCopyId?: () => void;
   /** Your list's column: Delete list, in the ⋯ menu. */
   onDelete?: () => void;
   /** A click on the column's empty space: focus it, select nothing. */
@@ -432,6 +443,7 @@ export function Column({
         banner={banner}
         onRename={onRename}
         onHide={onHide}
+        onCopyId={onCopyId}
         onDelete={onDelete}
         sheetOpen={sheetOpen}
       />

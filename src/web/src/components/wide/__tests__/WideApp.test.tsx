@@ -1,6 +1,13 @@
 import type { DndContextProps } from "@dnd-kit/core";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   afterEach,
@@ -2696,6 +2703,77 @@ describe("WideApp hidden columns", () => {
     hide("list-groceries");
     saved();
     expect(slides()).not.toContain("sheet");
+  });
+});
+
+describe("WideApp copy list ID", () => {
+  let writeText: ReturnType<typeof vi.fn>;
+  beforeEach(() => {
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+    writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+  });
+
+  const openMenu = async (name: string) => {
+    await userEvent.click(
+      screen.getByRole("button", { name: `${name} options` }),
+    );
+    return screen.findByRole("menu");
+  };
+
+  it("sits in your list's ⋯ menu after Hide column, before Delete list", async () => {
+    render(<WideApp />);
+    const menu = await openMenu("Groceries");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Rename", "Hide column", "Copy list ID", "Delete list"]);
+  });
+
+  it("isn't offered on Today, This week, Someday or Done", () => {
+    render(<WideApp />);
+    for (const name of ["Today", "This week", "Someday", "Done"]) {
+      expect(
+        screen.queryByRole("button", { name: `${name} options` }),
+      ).toBeNull();
+    }
+    // Nor on the sidebar's right-click menu, which only hides and shows.
+    fireEvent.contextMenu(
+      within(screen.getByRole("navigation", { name: "Lists" })).getByRole(
+        "button",
+        { name: "Groceries" },
+      ),
+    );
+    expect(screen.queryByRole("menuitem", { name: "Copy list ID" })).toBeNull();
+  });
+
+  it("copies the list's id, as /v1/lists/:id takes it, and says so", async () => {
+    render(<WideApp />);
+    const menu = await openMenu("Studio");
+    await userEvent.click(
+      within(menu).getByRole("menuitem", { name: "Copy list ID" }),
+    );
+    expect(writeText).toHaveBeenCalledWith("list-studio");
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Copied"));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("says when the clipboard refuses", async () => {
+    writeText.mockRejectedValue(undefined);
+    render(<WideApp />);
+    const menu = await openMenu("Studio");
+    await userEvent.click(
+      within(menu).getByRole("menuitem", { name: "Copy list ID" }),
+    );
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith("Couldn't copy"),
+    );
+    expect(toast.success).not.toHaveBeenCalled();
   });
 });
 

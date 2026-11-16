@@ -9,6 +9,7 @@ const column = (
   title: string,
   onDelete: () => void,
   onHide: () => void = vi.fn(),
+  onCopyId: () => void = vi.fn(),
 ) => (
   <Column
     listId={listId}
@@ -27,6 +28,7 @@ const column = (
     error={null}
     onRename={vi.fn()}
     onHide={onHide}
+    onCopyId={onCopyId}
     onDelete={onDelete}
     now={new Date()}
     timeZone="UTC"
@@ -56,7 +58,7 @@ describe("Column", () => {
       within(menu)
         .getAllByRole("menuitem")
         .map((i) => i.textContent),
-    ).toEqual(["Rename", "Hide column", "Delete list"]);
+    ).toEqual(["Rename", "Hide column", "Copy list ID", "Delete list"]);
     await userEvent.click(
       within(menu).getByRole("menuitem", { name: "Delete list" }),
     );
@@ -76,6 +78,22 @@ describe("Column", () => {
       await screen.findByRole("menuitem", { name: "Hide column" }),
     );
     expect(hide).toHaveBeenCalledOnce();
+  });
+
+  it("copies a list's id from its ⋯ menu", async () => {
+    const copy = vi.fn();
+    render(
+      <DndContext>
+        {column("studio", "Studio", vi.fn(), vi.fn(), copy)}
+      </DndContext>,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Studio options" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("menuitem", { name: "Copy list ID" }),
+    );
+    expect(copy).toHaveBeenCalledOnce();
   });
 
   it("gives Today no ⋯ menu, so no Hide column", () => {
