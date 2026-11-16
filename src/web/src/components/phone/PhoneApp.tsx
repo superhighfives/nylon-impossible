@@ -31,6 +31,7 @@ import {
   type PageKey,
   plural,
   viewForKey,
+  viewForList,
 } from "./model";
 import { OvernightPill, useOvernightNote } from "./OvernightNote";
 import { PhoneRows } from "./PhoneRows";
@@ -59,7 +60,10 @@ export function PhoneApp({
   view = null,
   onNavigate,
 }: {
-  /** The view the URL names (`/this-week`, `/list/:id`); null is Today. */
+  /**
+   * The view the URL names (`/this-week`, `/list/:id`, `/todo/:id`); null
+   * is Today.
+   */
   view?: BoardView | null;
   /** Keeps the URL in step as you page and open lists. */
   onNavigate?: (view: BoardView | null) => void;
@@ -235,6 +239,7 @@ export function PhoneApp({
   useEffect(() => {
     if (urlKey === syncedKey.current) return;
     syncedKey.current = urlKey;
+    if (view?.kind === "todo") return;
     if (urlKey.startsWith("list:")) {
       setCollectionId(urlKey.slice(5));
       goTo(3);
@@ -252,8 +257,29 @@ export function PhoneApp({
     );
   }, [urlKey]);
 
+  // `/todo/:id` (the Mac's menu bar hands a todo over this way): once the
+  // todos are in, its page, with its detail open over it, and the URL names
+  // the page. One that's done, gone or not yours goes to `/`, as a missing
+  // `/list/:id` does.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a todo's URL arrives, once todos are in
+  useEffect(() => {
+    if (view?.kind !== "todo" || loading || todosLoading) return;
+    const todo = todos.find((t) => t.id === view.id && !t.completed);
+    const next = todo ? viewForList(todo.listId, lists) : null;
+    syncedKey.current = boardViewKey(next, lists);
+    if (todo) {
+      goToList(todo.listId);
+      setDetailId(todo.id);
+    } else {
+      goTo(0);
+    }
+    onNavigate?.(next);
+  }, [urlKey, loading, todosLoading]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the view changes
   useEffect(() => {
+    // A todo's URL waits for the todos, above, rather than becoming Today.
+    if (view?.kind === "todo") return;
     if (stateKey === syncedKey.current) return;
     syncedKey.current = stateKey;
     const next = viewForKey(stateKey);

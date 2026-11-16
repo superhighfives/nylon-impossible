@@ -8,6 +8,10 @@
  *   /list/:id                      one list by id (phone: pushed; wide: its
  *                                  column, focused). A time list's id resolves
  *                                  to its own page.
+ *   /todo/:id                      one todo by id (phone: its detail over its
+ *                                  page; wide: its column, with the todo open
+ *                                  in the sheet beside it). The Mac's menu bar
+ *                                  hands a todo over this way.
  *   /                              the board, starting at Today
  */
 
@@ -18,7 +22,8 @@ export type BoardTimeKind = (typeof BOARD_TIME_KINDS)[number];
 export type BoardView =
   | { kind: BoardTimeKind }
   | { kind: "lists" }
-  | { kind: "list"; id: string };
+  | { kind: "list"; id: string }
+  | { kind: "todo"; id: string };
 
 export const BOARD_TIME_PATHS: Record<BoardTimeKind, string> = {
   today: "/today",
@@ -33,6 +38,8 @@ export function boardPath(view: BoardView): string {
       return "/lists";
     case "list":
       return `/list/${encodeURIComponent(view.id)}`;
+    case "todo":
+      return `/todo/${encodeURIComponent(view.id)}`;
     default:
       return BOARD_TIME_PATHS[view.kind];
   }
@@ -45,10 +52,11 @@ export function parseBoardPath(pathname: string): BoardView | null {
     if (path === BOARD_TIME_PATHS[kind]) return { kind };
   }
   if (path === "/lists") return { kind: "lists" };
-  const match = /^\/list\/([^/]+)$/.exec(path);
-  if (match?.[1]) {
+  const match = /^\/(list|todo)\/([^/]+)$/.exec(path);
+  if (match?.[1] && match[2]) {
+    const kind = match[1] === "todo" ? "todo" : "list";
     try {
-      return { kind: "list", id: decodeURIComponent(match[1]) };
+      return { kind, id: decodeURIComponent(match[2]) };
     } catch {
       return null;
     }

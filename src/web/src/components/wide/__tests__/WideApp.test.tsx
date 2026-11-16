@@ -2405,6 +2405,66 @@ describe("WideApp URLs", () => {
     render(<WideApp view={{ kind: "thisWeek" }} />);
     expect(focusedTitle()).toContain("Send invoice");
   });
+
+  describe("/todo/:id", () => {
+    const sheetTitle = () => {
+      const sheet = document.querySelector<HTMLElement>("[data-detail-column]");
+      return sheet
+        ? within(sheet).getByRole<HTMLTextAreaElement>("textbox", {
+            name: "Title",
+          }).value
+        : null;
+    };
+
+    it("goes to its column and opens it in the sheet beside it", () => {
+      const onNavigate = vi.fn();
+      render(
+        <WideApp view={{ kind: "todo", id: "w1" }} onNavigate={onNavigate} />,
+      );
+      expect(selection()).toEqual({ id: "w1", column: "list-week" });
+      expect(sheetTitle()).toBe("Send invoice");
+      expect(slides().indexOf("sheet")).toBe(slides().indexOf("list-week") + 1);
+      // The URL then names the column, as on arriving at /this-week.
+      expect(onNavigate).toHaveBeenLastCalledWith({ kind: "thisWeek" });
+    });
+
+    it("names one of your lists as /list/:id", () => {
+      const onNavigate = vi.fn();
+      render(
+        <WideApp view={{ kind: "todo", id: "g1" }} onNavigate={onNavigate} />,
+      );
+      expect(sheetTitle()).toBe("Parmesan");
+      expect(onNavigate).toHaveBeenLastCalledWith({
+        kind: "list",
+        id: "list-groceries",
+      });
+    });
+
+    it("waits for the todos before going", () => {
+      todosLoading = true;
+      const onNavigate = vi.fn();
+      const { rerender } = render(
+        <WideApp view={{ kind: "todo", id: "w1" }} onNavigate={onNavigate} />,
+      );
+      expect(onNavigate).not.toHaveBeenCalled();
+      todosLoading = false;
+      rerender(
+        <WideApp view={{ kind: "todo", id: "w1" }} onNavigate={onNavigate} />,
+      );
+      expect(sheetTitle()).toBe("Send invoice");
+      expect(onNavigate).not.toHaveBeenCalledWith(null);
+    });
+
+    it("sends an unknown todo back to /", () => {
+      const onNavigate = vi.fn();
+      render(
+        <WideApp view={{ kind: "todo", id: "nope" }} onNavigate={onNavigate} />,
+      );
+      expect(sheetTitle()).toBeNull();
+      expect(onNavigate).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenLastCalledWith(null);
+    });
+  });
 });
 
 describe("WideApp hidden columns", () => {

@@ -24,6 +24,7 @@ import {
   boardViewKey,
   columnSubline,
   displayTitle,
+  viewForList,
 } from "@/components/phone/model";
 import {
   OvernightPill,
@@ -127,7 +128,10 @@ export function WideApp({
   view = null,
   onNavigate,
 }: {
-  /** The view the URL names: `/list/:id` goes to that list's column. */
+  /**
+   * The view the URL names: `/list/:id` goes to that list's column, and
+   * `/todo/:id` to its todo's, with the todo open beside it.
+   */
   view?: BoardView | null;
   /** Keeps the URL naming your list while the selection is in it. */
   onNavigate?: (view: BoardView | null) => void;
@@ -377,6 +381,11 @@ export function WideApp({
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes, once lists are in
   useEffect(() => {
     if (loading || urlKey === appliedUrlKey.current) return;
+    // A todo's URL waits for the todos too.
+    if (view?.kind === "todo") {
+      if (!todosLoading) openTodoFromUrl(view.id);
+      return;
+    }
     appliedUrlKey.current = urlKey;
     const kind = BOARD_TIME_KINDS.find((k) => k === urlKey);
     const id = urlKey.startsWith("list:")
@@ -391,7 +400,25 @@ export function WideApp({
       appliedUrlKey.current = boardViewKey(null, lists);
       onNavigate?.(null);
     }
-  }, [urlKey, loading]);
+  }, [urlKey, loading, todosLoading]);
+
+  /**
+   * `/todo/:id` (the Mac's menu bar hands a todo over this way): its column,
+   * with the todo selected and open in the sheet beside it, and then the URL
+   * names the column. A done todo is shown in Done, which doesn't open; one
+   * that's gone or isn't yours goes to `/`, as a missing `/list/:id` does.
+   */
+  const openTodoFromUrl = (id: string) => {
+    const todo = todoById(id) ?? doneById(id);
+    const next =
+      todo && !todo.completed ? viewForList(todo.listId, lists) : null;
+    appliedUrlKey.current = boardViewKey(next, lists);
+    if (todo) {
+      goToTodo(todo);
+      if (!todo.completed) setDetailId(todo.id);
+    }
+    onNavigate?.(next);
+  };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when you go to another column
   useEffect(() => {
