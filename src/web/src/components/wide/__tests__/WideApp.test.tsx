@@ -2597,6 +2597,17 @@ describe("WideApp hidden columns", () => {
     expect(eye).toHaveFocus();
   });
 
+  it("opens the same menu when the eye is right-clicked", async () => {
+    render(<WideApp />);
+    fireEvent.contextMenu(eyeOf("list-groceries"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Hide column"]);
+  });
+
   it("shows a shown list's open eye only on hover or focus", () => {
     render(<WideApp />);
     const eye = eyeOf("list-studio");

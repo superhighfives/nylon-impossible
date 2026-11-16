@@ -42,6 +42,8 @@ function SelectionBar({ on }: { on: boolean }) {
  * The eye can't sit inside the entry (a button in a button), so it lies over
  * the space the entry keeps for it, after the entry in the DOM so it's on
  * top and is the next Tab stop. An invisible copy of the count lines it up.
+ * Both sit in the menu's trigger, so right-clicking the eye opens the menu
+ * too.
  */
 function ListEntry({
   list,
@@ -139,7 +141,10 @@ function ListEntry({
     <li ref={setNodeRef} className="group/entry relative">
       {onToggleColumn ? (
         <ContextMenu.Root>
-          <ContextMenu.Trigger render={button} />
+          <ContextMenu.Trigger>
+            {button}
+            {eye}
+          </ContextMenu.Trigger>
           <ContextMenu.Portal>
             <ContextMenu.Positioner className="z-50">
               <ContextMenu.Popup className={MENU_POPUP}>
@@ -156,7 +161,6 @@ function ListEntry({
       ) : (
         button
       )}
-      {eye}
       {eye && (
         <span id={`sidebar-eye-${list.id}`} hidden>
           {list.name}
