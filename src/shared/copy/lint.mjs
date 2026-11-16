@@ -17,14 +17,16 @@
  * Gmail findings are reported but never fail, even with --strict. A line
  * containing `copy-lint-ignore`, or the line after one, is skipped.
  *
- * Plain Node plus the TypeScript parser. The check functions are exported so
- * the copy lint test can run them without touching the filesystem.
+ * Plain Node plus the TypeScript parser: TypeScript 6, aliased as
+ * `typescript-6`, because TypeScript 7's npm package has no JavaScript API.
+ * The check functions are exported so the copy lint test can run them
+ * without touching the filesystem.
  */
 
 import { appendFileSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+import ts from "typescript-6";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = join(here, "../../..");
