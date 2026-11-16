@@ -88,6 +88,8 @@
   --n-board-hatch-spacing: 0.75rem;
   --n-board-hatch-angle: 45deg;
   --n-board-hatch-width: 0.0625rem;
+  --n-board-hatch-opacity: 0.4;
+  --n-board-hatch-tile: 1.0625rem;
 
   --n-duration-fast: 150ms;
   --n-duration-base: 220ms;

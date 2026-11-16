@@ -111,9 +111,22 @@ export function renderCss(tokens) {
   for (const name of ["columnMinWidth", "columnMaxWidth"]) {
     out.push(`  --n-board-${kebab(name)}: ${board[name] / 16}rem;`);
   }
+  // The web's tile only joins up with its neighbours at 45° (or 135°, 225°, 315°); any
+  // other angle would draw a broken hatch, so fail here instead.
+  if (board.hatch.angle % 90 !== 45) {
+    throw new Error(
+      `board.hatch.angle must be 45, 135, 225 or 315, not ${board.hatch.angle}: the web's hatch tile only joins up at those angles`,
+    );
+  }
   out.push(`  --n-board-hatch-spacing: ${board.hatch.spacing / 16}rem;`);
   out.push(`  --n-board-hatch-angle: ${board.hatch.angle}deg;`);
   out.push(`  --n-board-hatch-width: ${board.hatch.width / 16}rem;`);
+  out.push(`  --n-board-hatch-opacity: ${board.hatch.opacity};`);
+  // One line per square tile, corner to corner: `spacing` apart at 45°, and
+  // a whole pixel wide so every tile draws the same and the lines can't band.
+  out.push(
+    `  --n-board-hatch-tile: ${Math.round(board.hatch.spacing * Math.SQRT2) / 16}rem;`,
+  );
   out.push("");
   const curve = tokens.motion.easeOutStrong.join(", ");
   for (const name of ["fast", "base", "slow"]) {
@@ -409,12 +422,13 @@ export function renderSwift(tokens) {
   out.push(
     "    /// The wide board's columns: a quarter of the board, up to",
     "    /// `columnMaxWidth`. The minimums are `Theme.Wide`'s. Past the last",
-    "    /// column, a hatch of `hairline` lines.",
+    "    /// column, a hatch of `hairline` lines at `hatchOpacity`.",
     "    enum Board {",
     `        static let columnMaxWidth: CGFloat = ${board.columnMaxWidth}`,
     `        static let hatchSpacing: CGFloat = ${board.hatch.spacing}`,
     `        static let hatchAngle: Double = ${board.hatch.angle}`,
     `        static let hatchWidth: CGFloat = ${board.hatch.width}`,
+    `        static let hatchOpacity: Double = ${board.hatch.opacity}`,
     "    }",
     "",
   );

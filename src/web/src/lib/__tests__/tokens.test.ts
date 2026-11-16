@@ -82,9 +82,26 @@ describe("design token generator", () => {
     expect(css).toContain("--n-board-hatch-spacing: 0.75rem;");
     expect(css).toContain("--n-board-hatch-angle: 45deg;");
     expect(css).toContain("--n-board-hatch-width: 0.0625rem;");
+    expect(css).toContain("--n-board-hatch-opacity: 0.4;");
+    // 12 × √2 ≈ 17px: a whole pixel, so the tile draws the same every time.
+    expect(css).toContain("--n-board-hatch-tile: 1.0625rem;");
     const swift = renderSwift(tokens);
     expect(swift).toContain("static let columnMaxWidth: CGFloat = 416");
     expect(swift).toContain("static let hatchSpacing: CGFloat = 12");
+    expect(swift).toContain("static let hatchOpacity: Double = 0.4");
+  });
+
+  it("refuses a hatch angle the web's tile can't draw", () => {
+    for (const angle of [30, 90, -45]) {
+      const changed = structuredClone(tokens);
+      changed.board.hatch.angle = angle;
+      expect(() => renderCss(changed), String(angle)).toThrow(
+        /board\.hatch\.angle/,
+      );
+    }
+    const turned = structuredClone(tokens);
+    turned.board.hatch.angle = 135;
+    expect(renderCss(turned)).toContain("--n-board-hatch-angle: 135deg;");
   });
 
   it("gives every icon both a lucide and an SF Symbol name", () => {
