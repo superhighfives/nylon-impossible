@@ -121,6 +121,20 @@ struct NotesMarkdownTests {
         #expect(plain(text) == note)
     }
 
+    @Test("a link's title isn't shown, and an unsafe link with one shows as typed")
+    func linkTitles() throws {
+        let text = try #require(paragraph(NotesMarkdown.blocks(#"[a](https://example.com "Home") [b](javascript:x 'y')"#).first))
+        #expect(links(text) == [URL(string: "https://example.com")!])
+        #expect(plain(text) == "a [b](javascript:x 'y')")
+    }
+
+    @Test("a long note full of links parses")
+    func manyLinks() throws {
+        let note = Array(repeating: "[x](https://example.com) [y](javascript:z)", count: 500).joined(separator: " ")
+        let text = try #require(paragraph(NotesMarkdown.blocks(note).first))
+        #expect(links(text).count == 500)
+    }
+
     @Test("raw HTML, entities and images show as typed")
     func literal() throws {
         let source = "<b>hi</b> &amp; ![cat](https://example.com/cat.png)"

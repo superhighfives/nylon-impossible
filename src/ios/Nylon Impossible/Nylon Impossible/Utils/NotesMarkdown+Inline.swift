@@ -37,7 +37,11 @@ extension NotesMarkdown {
         }
         linkBareURLs(&parsed)
         // What shows as typed isn't linked either, not even a URL inside it.
-        for literal in literals {
+        // Each distinct literal is looked for once, and only when something
+        // is linked at all.
+        guard parsed.runs.contains(where: { $0.link != nil }) else { return parsed }
+        var seen = Set<String>()
+        for literal in literals where seen.insert(literal).inserted {
             var from = parsed.startIndex
             while from < parsed.endIndex, let range = parsed[from...].range(of: literal) {
                 parsed[range].link = nil
@@ -199,8 +203,14 @@ extension NotesMarkdown {
             }
             href = String(s[from..<j])
         }
-        // An optional "title", which notes don't show.
-        if let title = String(s[j...]).prefixMatch(of: #/\s+(?:"[^"]*"|'[^']*')/#) { j += title.0.count }
+        // An optional "title", which notes don't show. Scanned in place
+        // rather than matched against a copy of the rest of the note.
+        var k = j
+        while k < s.count, s[k].isWhitespace { k += 1 }
+        if k > j, k < s.count, s[k] == "\"" || s[k] == "'",
+           let quote = s[(k + 1)...].firstIndex(of: s[k]) {
+            j = quote + 1
+        }
         while j < s.count, s[j] == " " { j += 1 }
         guard j < s.count, s[j] == ")" else { return nil }
         return (close, href, j + 1)
