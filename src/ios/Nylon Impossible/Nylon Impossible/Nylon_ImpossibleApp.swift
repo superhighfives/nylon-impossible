@@ -24,8 +24,8 @@ struct Nylon_ImpossibleApp: App {
     // hook for them. See AppDelegate.swift.
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     #else
-    // The Dock badge, the global hotkey and reopening the window from the
-    // Dock. See Mac/MacAppDelegate.swift.
+    // The menu bar icon, the global hotkey and `nylon://` links. See
+    // Mac/MacAppDelegate.swift.
     @NSApplicationDelegateAdaptor(MacAppDelegate.self) private var appDelegate
     #endif
     @State private var authService = AuthService()
@@ -184,8 +184,8 @@ struct Nylon_ImpossibleApp: App {
 
     var body: some Scene {
         #if os(macOS)
-        // The board window and Settings; see Mac/MacScenes.swift. The menu bar
-        // icon is `MenuBarController`, started with `MacServices`.
+        // Settings only; see Mac/MacScenes.swift. The app itself is the menu
+        // bar icon's popover, `MenuBarController`, started with `MacServices`.
         MacScenes()
         #else
         WindowGroup {
@@ -286,52 +286,22 @@ struct RootView: View {
         .animation(.easeInOut, value: clerk.client != nil)
         .onChange(of: isSignedIn) { _, signedIn in
             if signedIn {
-                // Set Sentry user context (opaque ID only — no PII)
-                if let userId = authService.userId {
-                    let sentryUser = Sentry.User(userId: userId)
-                    SentrySDK.setUser(sentryUser)
-                }
-                // Migrate any existing UserDefaults token to Keychain (one-time)
-                authService.migrateAuthTokenFromUserDefaultsToKeychain()
-                // Persist userId to shared UserDefaults and a fresh auth token to
-                // the Keychain for Siri, Share Extension, and BackgroundSyncService
-                authService.persistUserIdToSharedDefaults()
-                Task { await authService.persistAuthTokenToKeychain() }
+                SessionLifecycle.didSignIn(auth: authService)
                 hasTriggeredInitialSync = false
                 triggerInitialSync()
-                // The widget reads sign-in state from shared defaults, which
-                // only just changed — without this it keeps showing the
-                // signed-out card until something else reloads it.
-                WidgetRefresh.reload()
             } else {
-                // Clear Sentry user on sign out
-                SentrySDK.setUser(nil)
-                // Reset sync on sign out
-                syncService?.reset()
-                // Drop cached preference state so the next account doesn't inherit it
-                preferencesService?.resetLocalState()
+                SessionLifecycle.didSignOut(sync: syncService, preferences: preferencesService)
                 hasTriggeredInitialSync = false
             }
         }
         // Clerk has loaded and there's no session — the same condition that
-        // puts `SignInView` on screen above. Reached two ways: an explicit sign
-        // out, and a launch where the stored session had expired or been
-        // revoked. Only the first runs `signOut()`, so without this the shared
-        // defaults keep naming the last account, and every Clerk-less target
-        // reads that as signed in — the widget included, which would leave that
-        // account's todos on the Home Screen while the app sits on the sign-in
-        // wall. Fires on appear too, because `isSignedIn` starting false is not
-        // a change `onChange` can see.
+        // puts `SignInView` on screen above: an explicit sign out, or a launch
+        // whose stored session had expired or been revoked. Fires on appear
+        // too, because `isSignedIn` starting false is not a change `onChange`
+        // can see.
         .onChange(of: clerk.client != nil && !isSignedIn, initial: true) { _, isSignedOut in
             guard isSignedOut else { return }
-            authService.clearSharedSessionState()
-            // The cached sweep and zone outlive the process, and on the Mac
-            // sign-out can happen from Settings with no board window (so no
-            // `isSignedIn` change above) — drop them here too.
-            preferencesService?.resetLocalState()
-            // Take the signed-out user's todos off the Home Screen now, rather
-            // than leaving them there until the next reload.
-            WidgetRefresh.reload()
+            SessionLifecycle.isSignedOut(auth: authService, preferences: preferencesService)
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSSystemTimeZoneDidChange)) { _ in
             guard isSignedIn else { return }
@@ -342,24 +312,15 @@ struct RootView: View {
 
             switch newPhase {
             case .active:
-                syncService.connectWebSocket()
-                // Refresh the stored auth token: BackgroundSyncService's fallback
-                // when it can't mint one (see SharedClerk)
-                Task { await authService.persistAuthTokenToKeychain() }
+                SessionLifecycle.becameActive(auth: authService, sync: syncService, preferences: preferencesService)
                 // Recompute the badge on foreground so it crosses the day
                 // boundary even without a sync round-trip.
                 BadgeService.refresh(modelContext: modelContext)
-                // Travelling while backgrounded changes the zone without the
-                // app seeing the notification below.
-                Task { await preferencesService?.reportDeviceTimezone() }
-                // The sweep runs at local midnight, usually while the app is
-                // backgrounded; this is when the morning note can appear.
-                Task { await preferencesService?.refreshLastSweep() }
             case .background, .inactive:
                 #if os(iOS)
                 // A Mac app keeps its socket while it runs — the menu bar
-                // extra, the Dock badge and the desktop widget all show live
-                // data with no window focused — so only iOS lets go here.
+                // popover and the desktop widget show live data with no
+                // window focused — so only iOS lets go here.
                 syncService.disconnectWebSocket()
                 #endif
                 // The app's single widget refresh, covering everything that
@@ -385,14 +346,7 @@ struct RootView: View {
         hasTriggeredInitialSync = true
 
         Task {
-            // First, migrate any existing local todos
-            await syncService.migrateLocalTodos()
-            // Then sync with server
-            await syncService.sync()
-            // Connect WebSocket for real-time updates
-            syncService.connectWebSocket()
-            // Fetch user preferences
-            await preferencesService?.fetchPreferences()
+            await SessionLifecycle.initialSync(sync: syncService, preferences: preferencesService)
         }
     }
 }

@@ -2,12 +2,14 @@
 //  MenuBarController.swift
 //  Nylon Impossible
 //
-//  The menu bar icon, as a plain `NSStatusItem`, and the quick add it opens
-//  in a panel under it.
+//  The menu bar icon, as a plain `NSStatusItem`, and the popover it opens
+//  under itself: quick add over today's todos, which is the whole Mac app.
+//  The icon is always there, since it's the only way in; the global hotkey
+//  opens the same popover.
 //
 //  This used to be a SwiftUI `MenuBarExtra`. That re-applies its label image
-//  to the status button on every scene update — and the board window updates
-//  the scenes many times a second — and each `setImage:` asks the status bar
+//  to the status button on every scene update — and the old board window
+//  updated the scenes many times a second — and each `setImage:` asks the status bar
 //  window for another constraints pass. That window allows about as many
 //  passes as it has views (six), so a busy board ran it out and AppKit threw
 //  "more Update Constraints in Window passes than there are views in the
@@ -29,24 +31,10 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         self.services = services
     }
 
-    /// Show or hide the icon as the Settings toggle changes.
+    /// Put the icon in the menu bar. Called once, at launch.
     func start() {
-        withObservationTracking {
-            _ = services.settings.showsMenuBarIcon
-        } onChange: { [weak self] in
-            Task { @MainActor in self?.start() }
-        }
-        apply(services.settings.showsMenuBarIcon)
-    }
-
-    private func apply(_ shows: Bool) {
-        if shows, item == nil {
-            item = makeItem()
-        } else if !shows, let item {
-            close()
-            NSStatusBar.system.removeStatusItem(item)
-            self.item = nil
-        }
+        guard item == nil else { return }
+        item = makeItem()
     }
 
     private func makeItem() -> NSStatusItem {
@@ -62,7 +50,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         return item
     }
 
-    @objc private func toggle() {
+    @objc func toggle() {
         if panel?.isVisible == true {
             close()
         } else {
@@ -70,7 +58,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func show() {
+    func show() {
         guard let button = item?.button, let buttonWindow = button.window else { return }
         let panel = panel ?? makePanel()
         self.panel = panel
@@ -86,7 +74,7 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         panel.makeKeyAndOrderFront(nil)
     }
 
-    private func close() {
+    func close() {
         panel?.orderOut(nil)
         item?.button?.highlight(false)
     }

@@ -2,10 +2,11 @@
 //  MacFeatureTests.swift
 //  Nylon ImpossibleTests
 //
-//  The Mac's own pieces, as logic: the quick-add hotkey (key codes,
-//  modifiers, what Settings shows, what's refused, how it's stored), the Dock
-//  badge's count and label, the sign-in providers, and the widget's large
-//  family on the desktop. The Carbon registration itself isn't exercised —
+//  The Mac's own pieces, as logic: a menu bar app with no board window, the
+//  quick-add hotkey (key codes, modifiers, what Settings shows, what's
+//  refused, how it's stored), the Settings and Sign in windows, the popover's
+//  rows and keys, the sign-in providers, and the widget's large family on the
+//  desktop. The Carbon registration itself isn't exercised —
 //  claiming a system-wide hotkey from a test run would steal it from whatever
 //  the machine running the tests is doing.
 //
@@ -16,6 +17,7 @@ import Carbon.HIToolbox
 import ClerkKit
 import Foundation
 import SwiftData
+import SwiftUI
 import Testing
 import WidgetKit
 @testable import Nylon_Impossible
@@ -68,14 +70,14 @@ struct GlobalHotKeyTests {
 
         let fresh = MacSettings(defaults: defaults)
         #expect(fresh.hotKey == .quickAddDefault)
-        #expect(fresh.showsMenuBarIcon && fresh.showsDockBadge && fresh.hotKeyEnabled)
+        #expect(fresh.hotKeyEnabled)
 
         let custom = HotKeyShortcut(keyCode: UInt32(kVK_ANSI_N), modifiers: [.command, .option])
         fresh.hotKey = custom
-        fresh.showsDockBadge = false
+        fresh.hotKeyEnabled = false
         let reloaded = MacSettings(defaults: defaults)
         #expect(reloaded.hotKey == custom)
-        #expect(!reloaded.showsDockBadge)
+        #expect(!reloaded.hotKeyEnabled)
 
         // A stored shortcut that isn't allowed any more is ignored.
         defaults.set(try JSONEncoder().encode(HotKeyShortcut(keyCode: 0, modifiers: [.shift])), forKey: MacSettings.Key.hotKey)
@@ -83,75 +85,156 @@ struct GlobalHotKeyTests {
     }
 }
 
-@Suite("Dock badge")
+@Suite("Menu bar app")
 @MainActor
-struct DockBadgeTests {
-    private static let userId = "user_badge"
+struct MenuBarAppTests {
+    @Test("No Dock icon and no app menu: the app is an LSUIElement")
+    func agentApp() {
+        #expect(Bundle.main.object(forInfoDictionaryKey: "LSUIElement") as? Bool == true)
+    }
 
-    private func makeContainer() throws -> ModelContainer {
-        try ModelContainer(
+    @Test("The only scene is Settings: no board window")
+    func noBoardWindow() {
+        let scenes = String(reflecting: type(of: MacScenes().body))
+        #expect(scenes.contains("Settings<"))
+        #expect(!scenes.contains("WindowGroup"))
+        #expect(!scenes.contains("Window<"))
+    }
+
+    @Test("Settings comes to the front: the app activates before it opens")
+    func settingsOpensInFront() {
+        var steps: [String] = []
+        MacWindowOpening.open(activate: { steps.append("activate") }) { steps.append("open") }
+        #expect(steps == ["activate", "open"])
+    }
+
+    @Test("Sign in opens its window in front, and closes it when done")
+    func signInWindow() throws {
+        let signIn = MacSignInWindow()
+        var activated = 0
+        signIn.activate = { activated += 1 }
+        #expect(!signIn.isVisible)
+
+        signIn.show()
+        let window = try #require(signIn.window)
+        defer { window.close() }
+        #expect(signIn.isVisible)
+        #expect(activated == 1)
+        #expect(window.title == "Sign in")
+        let content = try #require(window.contentViewController)
+        #expect(String(describing: type(of: content)).contains("MacSignInView"))
+
+        // A second Sign in brings the same window back rather than another.
+        signIn.show()
+        #expect(signIn.window === window)
+        #expect(activated == 2)
+
+        signIn.close()
+        #expect(!signIn.isVisible)
+    }
+}
+
+@Suite("Menu bar popover")
+@MainActor
+struct QuickAddViewTests {
+    private static let userId = "user_popover"
+
+    @Test("It lists today only: no other list's todos, whichever list adds")
+    func todayOnly() throws {
+        let container = try ModelContainer(
             for: TodoItem.self, TodoUrl.self, TodoListModel.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
-    }
-
-    /// Today: two open, one done. Someday: one undated, one overdue.
-    private func seed(_ context: ModelContext, now: Date) {
+        let context = container.mainContext
+        let now = Date()
         let today = TodoListModel(id: "today", userId: Self.userId, name: "Today", kind: "system", systemKind: .today)
-        let someday = TodoListModel(id: "someday", userId: Self.userId, name: "Someday", kind: "system", systemKind: .someday)
-        context.insert(today)
-        context.insert(someday)
-        func todo(_ title: String, _ list: TodoListModel, due: Int? = nil, done: Bool = false) {
+        let week = TodoListModel(id: "week", userId: Self.userId, name: "This week", kind: "system", systemKind: .thisWeek)
+        let groceries = TodoListModel(id: "groceries", userId: Self.userId, name: "Groceries")
+        [today, week, groceries].forEach(context.insert)
+        func todo(_ title: String, _ list: TodoListModel, due: Int? = nil) {
             let item = TodoItem(title: title, userId: Self.userId, position: "a0")
             item.listKey = list.id
             item.dueDate = due.map { DueLabel.inDays($0, now: now) }
-            item.isCompleted = done
             context.insert(item)
         }
-        todo("Review PR", today)
-        todo("Call Mum", today)
-        todo("Email the landlord", today, done: true)
-        todo("Read Piranesi", someday)
-        todo("Renew passport", someday, due: -2)
-        try? context.save()
+        todo("Call Kaiser", today)
+        todo("Send invoice", week)
+        todo("Renew passport", week, due: 0)
+        todo("Parmesan", groceries)
+        try context.save()
+
+        let all = try context.fetch(FetchDescriptor<TodoItem>())
+        let lists = try context.fetch(FetchDescriptor<TodoListModel>())
+        let rows = QuickAddView.todayRows(all, lists: lists, userId: Self.userId, now: now)
+        #expect(Set(rows.map(\.title)) == ["Call Kaiser", "Renew passport"])
+        // The same set the widget shows.
+        let digest = TodayDigest.fetch(userId: Self.userId, context: context, now: now)
+        #expect(rows.map(\.id) == digest.map(\.id))
+        // A todo being deleted leaves straight away.
+        let hidden = try #require(rows.first).id
+        #expect(!QuickAddView.todayRows(all, lists: lists, userId: Self.userId, hidden: [hidden], now: now).contains { $0.id == hidden })
     }
 
-    @Test("The label is the count, and nothing at zero")
-    func label() {
-        #expect(DockBadgeController.label(for: 0) == nil)
-        #expect(DockBadgeController.label(for: 3) == "3")
-        #expect(DockBadgeController.label(for: 120) == "120")
+    @Test("↵ edits a row's title and ⇧↵ opens it on the web")
+    func returnKeys() {
+        #expect(QuickAddRowCommand(key: .return, characters: "\r", modifiers: []) == .edit)
+        #expect(QuickAddRowCommand(key: .return, characters: "\r", modifiers: .shift) == .openOnWeb)
     }
 
-    @Test("The count is today's open todos: the Today list plus anything due")
-    func count() throws {
-        let container = try makeContainer()
-        let now = Date()
-        seed(container.mainContext, now: now)
-        #expect(DockBadgeController.count(userId: Self.userId, context: container.mainContext, now: now) == 3)
-        #expect(DockBadgeController.count(userId: nil, context: container.mainContext, now: now) == 0)
-        #expect(DockBadgeController.count(userId: "someone-else", context: container.mainContext, now: now) == 0)
+    @Test("X marks done and O opens the link; P no longer pins")
+    func letterKeys() {
+        func command(_ letter: String, _ modifiers: SwiftUI.EventModifiers = []) -> QuickAddRowCommand? {
+            QuickAddRowCommand(key: KeyEquivalent(Character(letter)), characters: letter, modifiers: modifiers)
+        }
+        #expect(command("x") == .done)
+        #expect(command("X", .shift) == .done)
+        #expect(command("o") == .openLink)
+        #expect(command("n") == .backToField)
+        #expect(command("j") == .next)
+        #expect(command("k") == .previous)
+        #expect(command("p") == nil)
+        #expect(command("P", .shift) == nil)
+        // ⌘X is the Edit menu's, not Mark done.
+        #expect(command("x", .command) == nil)
+        #expect(QuickAddRowCommand(key: .downArrow, characters: "", modifiers: []) == .next)
+        #expect(QuickAddRowCommand(key: .upArrow, characters: "", modifiers: []) == .previous)
+        #expect(QuickAddRowCommand(key: .escape, characters: "", modifiers: []) == .backToField)
     }
 
-    @Test("Refresh pushes the label, and the Settings toggle clears it")
-    func refreshFollowsSetting() throws {
-        let container = try makeContainer()
-        seed(container.mainContext, now: Date())
-        let suite = "nylon-tests-\(UUID().uuidString)"
-        let defaults = try #require(UserDefaults(suiteName: suite))
-        defer { defaults.removePersistentDomain(forName: suite) }
-        let settings = MacSettings(defaults: defaults)
+    @Test("Saving a title trims it; an empty or unchanged one keeps the old title")
+    func titleEdit() {
+        var edit = QuickAddTitleEdit(id: UUID(), original: "Call Kaiser")
+        #expect(edit.text == "Call Kaiser")
+        #expect(edit.titleToSave == nil)
+        edit.text = "  Call Kaiser about the bill "
+        #expect(edit.titleToSave == "Call Kaiser about the bill")
+        edit.text = "   "
+        #expect(edit.titleToSave == nil)
+        edit.text = ""
+        #expect(edit.titleToSave == nil)
+    }
 
-        var applied: [String?] = []
-        let badge = DockBadgeController()
-        badge.apply = { applied.append($0) }
-        badge.currentUserId = { Self.userId }
-        badge.attach(container: container, settings: settings)
+    @Test("⇧↵ opens <web origin>/todo/<id> and closes the popover")
+    func openOnWeb() throws {
+        let id = try #require(UUID(uuidString: "6F1C2B9A-0D3E-4A5B-8C7D-112233445566"))
+        var steps: [String] = []
+        QuickAddHandoff.openOnWeb(
+            id,
+            base: try #require(URL(string: "https://nylonimpossible.com")),
+            open: { steps.append("open \($0.absoluteString)") },
+            dismiss: { steps.append("dismiss") }
+        )
+        #expect(steps == ["open https://nylonimpossible.com/todo/6f1c2b9a-0d3e-4a5b-8c7d-112233445566", "dismiss"])
+    }
 
-        badge.refresh()
-        settings.showsDockBadge = false
-        badge.refresh()
-        #expect(applied == ["3", nil])
+    @Test("The web origin sits beside the API")
+    func webOrigin() throws {
+        func web(_ api: String) throws -> String {
+            Config.webBase(forAPI: try #require(URL(string: api))).absoluteString
+        }
+        #expect(try web("https://api.nylonimpossible.com") == "https://nylonimpossible.com")
+        #expect(try web("https://api.preview.example.com/") == "https://preview.example.com")
+        #expect(try web("http://localhost:8787") == "http://localhost:3000")
     }
 }
 

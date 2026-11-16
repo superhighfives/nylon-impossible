@@ -2,83 +2,28 @@
 //  MacScenes.swift
 //  Nylon Impossible
 //
-//  The Mac app's scenes: the board window and Settings (⌘,). The menu bar
-//  icon isn't a scene (see `MenuBarController`). All of them read their
-//  services from `MacServices`, so the menu bar and Settings work with the
-//  window closed.
+//  The Mac app is the menu bar icon and its popover (`MenuBarController`), so
+//  its only scene is Settings. It has no board window, no Dock icon and no
+//  app menu (`LSUIElement`); the web board is the one full editor. Sign in is
+//  a plain window (`MacSignInWindow`), opened from the popover. Everything
+//  reads its services from `MacServices`.
 //
 
 #if os(macOS)
-import AppIntents
 import AppKit
 import ClerkKit
 import SwiftData
 import SwiftUI
 
 struct MacScenes: Scene {
-    static let boardWindowId = "board"
-
-    /// SwiftUI names a `WindowGroup`'s windows "<id>-AppWindow-<n>".
-    static func isBoardWindow(_ window: NSWindow) -> Bool {
-        window.identifier?.rawValue.hasPrefix(boardWindowId) == true
-    }
-
     var body: some Scene {
-        WindowGroup("Nylon", id: Self.boardWindowId) {
-            MacBoardWindow()
-        }
-        .defaultSize(width: 1280, height: 820)
-        .windowResizability(.contentMinSize)
-        .windowToolbarStyle(.unified(showsTitle: true))
-        .commands { MacCommands() }
-
         Settings {
             MacSettingsRoot()
         }
     }
 }
 
-/// The board window's content: the signed-in shell, or a DEBUG screenshot
-/// route.
-struct MacBoardWindow: View {
-    @Environment(\.openWindow) private var openWindow
-    private let services = MacServices.shared
-
-    var body: some View {
-        Group {
-            #if DEBUG
-            if let route = ScreenRoute.launch {
-                ScreenRouteRoot(route: route)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Theme.Colors.fill)
-                    // A screenshot run is launched from a script; come to the
-                    // front so a right-click lands and the capture is clean.
-                    .onAppear { NSApp.activate(ignoringOtherApps: true) }
-            } else {
-                root
-            }
-            #else
-            root
-            #endif
-        }
-        .frame(minWidth: 720, minHeight: 480)
-        .onAppear { services.openWindow = openWindow }
-    }
-
-    private var root: some View {
-        RootView(
-            syncService: services.syncService,
-            preferencesService: services.preferencesService,
-            feedbackService: services.feedbackService
-        )
-            .environment(Clerk.shared)
-            .environment(services.authService)
-            .modelContainer(services.container)
-            .task { NylonShortcuts.updateAppShortcutParameters() }
-    }
-}
-
-/// Settings, with the same services as the window.
+/// Settings, with the popover's services.
 struct MacSettingsRoot: View {
     private let services = MacServices.shared
 
@@ -94,13 +39,13 @@ struct MacSettingsRoot: View {
     }
 }
 
-/// The menu bar icon's panel (see `MenuBarController`).
+/// The menu bar icon's popover (see `MenuBarController`).
 struct MacMenuBarRoot: View {
     var onDismiss: () -> Void
     private let services = MacServices.shared
 
     var body: some View {
-        QuickAddView(presentation: .menuBar, onDismiss: onDismiss)
+        QuickAddView(onDismiss: onDismiss)
             .environment(services.authService)
             .environment(services.syncService)
             .environment(Clerk.shared)
@@ -119,4 +64,39 @@ enum MacAppearance {
         }
     }
 }
+
+/// Bring the app forward before opening one of its windows. An `LSUIElement`
+/// app isn't active while you use the popover (it's a non-activating panel),
+/// so without this Settings and Sign in would open behind the app in front.
+enum MacWindowOpening {
+    static func open(activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }, _ open: () -> Void) {
+        activate()
+        open()
+    }
+}
+
+#if DEBUG
+/// A screenshot run (`-NylonScreen`) draws its route in an ordinary window,
+/// since the app has no window of its own to draw it in.
+@MainActor
+enum MacScreenRouteWindow {
+    private static var window: NSWindow?
+
+    static func show(_ route: ScreenRoute) {
+        let root = ScreenRouteRoot(route: route)
+            .frame(minWidth: 480, minHeight: 360)
+            .background(Theme.Colors.fill)
+        let window = NSWindow(contentViewController: NSHostingController(rootView: root))
+        window.title = "Nylon"
+        window.setContentSize(NSSize(width: 960, height: 720))
+        window.isReleasedWhenClosed = false
+        window.center()
+        self.window = window
+        // A screenshot run is launched from a script; come to the front so
+        // the capture is clean.
+        NSApp.activate(ignoringOtherApps: true)
+        window.makeKeyAndOrderFront(nil)
+    }
+}
+#endif
 #endif
