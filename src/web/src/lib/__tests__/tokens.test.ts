@@ -91,6 +91,19 @@ describe("design token generator", () => {
     expect(swift).toContain("static let hatchOpacity: Double = 0.4");
   });
 
+  it("refuses a hatch angle the web's tile can't draw", () => {
+    for (const angle of [30, 90, -45]) {
+      const changed = structuredClone(tokens);
+      changed.board.hatch.angle = angle;
+      expect(() => renderCss(changed), String(angle)).toThrow(
+        /board\.hatch\.angle/,
+      );
+    }
+    const turned = structuredClone(tokens);
+    turned.board.hatch.angle = 135;
+    expect(renderCss(turned)).toContain("--n-board-hatch-angle: 135deg;");
+  });
+
   it("gives every icon both a lucide and an SF Symbol name", () => {
     for (const [name, icon] of Object.entries(tokens.icons)) {
       if (name.startsWith("$")) continue;
