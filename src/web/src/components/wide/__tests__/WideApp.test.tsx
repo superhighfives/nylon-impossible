@@ -2521,7 +2521,7 @@ describe("WideApp hidden columns", () => {
     ]);
   });
 
-  it("hides a column from the open eye beside its count", async () => {
+  it("hides a column from the open eye before its count", async () => {
     render(<WideApp />);
     await userEvent.click(
       await screen.findByRole("button", {
@@ -2553,6 +2553,109 @@ describe("WideApp hidden columns", () => {
   it("gives the time lists no eye", () => {
     render(<WideApp />);
     expect(document.querySelectorAll("[data-column-eye]")).toHaveLength(2);
+  });
+
+  const eyeOf = (id: string) => {
+    const eye = document.querySelector<HTMLElement>(
+      `[data-column-eye="${id}"]`,
+    );
+    if (!eye) throw new Error(`no eye for ${id}`);
+    return eye;
+  };
+  const classesOf = (el: Element) => el.className.split(" ");
+
+  it("keeps the time lists' counts on the same right edge as yours", () => {
+    render(<WideApp />);
+    expect(classesOf(sidebarEntry("Today"))).not.toContain("pr-9");
+    expect(sidebarEntry("Today").querySelector("[data-eye-space]")).toBeNull();
+  });
+
+  it("puts the eye before the count, in space the entry always keeps", () => {
+    render(<WideApp />);
+    const entry = sidebarEntry("Groceries");
+    const space = entry.querySelector("[data-eye-space]");
+    expect(space).not.toBeNull();
+    // The kept space comes after the name and before the count…
+    expect(space?.previousElementSibling).toHaveTextContent("Groceries");
+    expect(space?.nextElementSibling).toHaveTextContent("1");
+    // …and the eye lies over it, lined up by an invisible copy of the count.
+    const eye = eyeOf("list-groceries");
+    const copy = eye.nextElementSibling;
+    expect(copy).toHaveTextContent("1");
+    expect(copy).toHaveClass("invisible");
+  });
+
+  it("puts the eye after its entry, so it's on top and the next Tab stop", async () => {
+    render(<WideApp />);
+    const entry = sidebarEntry("Groceries");
+    const eye = eyeOf("list-groceries");
+    expect(
+      entry.compareDocumentPosition(eye) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    entry.focus();
+    await userEvent.tab();
+    expect(eye).toHaveFocus();
+  });
+
+  it("opens the same menu when the eye is right-clicked", async () => {
+    render(<WideApp />);
+    fireEvent.contextMenu(eyeOf("list-groceries"));
+    const menu = await screen.findByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Hide column"]);
+  });
+
+  it("shows a shown list's open eye only on hover or focus", () => {
+    render(<WideApp />);
+    const eye = eyeOf("list-studio");
+    expect(eye.querySelector(".lucide-eye")).not.toBeNull();
+    const c = classesOf(eye);
+    expect(c).toContain("pointer-fine:opacity-0");
+    expect(c).toContain("pointer-fine:group-hover/entry:opacity-100");
+    expect(c).toContain(
+      "pointer-fine:group-has-[:focus-visible]/entry:opacity-100",
+    );
+  });
+
+  it("always shows a hidden list's closed eye", () => {
+    hide("list-groceries");
+    render(<WideApp />);
+    const eye = eyeOf("list-groceries");
+    expect(eye.querySelector(".lucide-eye-off")).not.toBeNull();
+    expect(classesOf(eye)).not.toContain("pointer-fine:opacity-0");
+  });
+
+  it("lights the whole row on hover, the eye included", () => {
+    render(<WideApp />);
+    expect(classesOf(sidebarEntry("Groceries"))).toContain(
+      "pointer-fine:group-hover/entry:bg-n-surface",
+    );
+  });
+
+  it("toggles from the eye without going to the list", async () => {
+    const onNavigate = vi.fn();
+    const saved = renderBoard({ onNavigate });
+    onNavigate.mockClear();
+    await userEvent.click(eyeOf("list-studio"));
+    saved();
+    expect(updateList.mock.calls[0][0]).toEqual({
+      id: "list-studio",
+      input: { columnHidden: true },
+    });
+    expect(onNavigate).not.toHaveBeenCalledWith({
+      kind: "list",
+      id: "list-studio",
+    });
+    // Now hidden, the same eye is closed, and brings it back.
+    expect(eyeOf("list-studio")).toHaveAccessibleName("Show column");
+    await userEvent.click(eyeOf("list-studio"));
+    expect(updateList.mock.calls[1][0]).toEqual({
+      id: "list-studio",
+      input: { columnHidden: false },
+    });
   });
 
   it("offers no Hide column on Today, This week or Someday", () => {
