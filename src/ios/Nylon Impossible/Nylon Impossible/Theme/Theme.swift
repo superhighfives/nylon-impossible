@@ -238,12 +238,13 @@ enum Theme {
 
     /// The wide board's columns: a quarter of the board, up to
     /// `columnMaxWidth`. The minimums are `Theme.Wide`'s. Past the last
-    /// column, a hatch of `hairline` lines.
+    /// column, a hatch of `hairline` lines at `hatchOpacity`.
     enum Board {
         static let columnMaxWidth: CGFloat = 416
         static let hatchSpacing: CGFloat = 12
         static let hatchAngle: Double = 45
         static let hatchWidth: CGFloat = 1
+        static let hatchOpacity: Double = 0.4
     }
 
     enum Motion {

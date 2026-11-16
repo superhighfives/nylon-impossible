@@ -180,13 +180,28 @@ p {
 }
 
 /* What's left of the wide board past Done: `hairline` lines at the board
-   tokens' angle, width and spacing. Decorative, so forced colours drop it. */
+   tokens' opacity, angle and width. A repeating gradient's period never lands
+   on the pixel grid, so its lines band; this repeats a whole-pixel tile with
+   one line corner to corner (and the corners of its neighbours), which draws
+   the same every time. Decorative, so forced colours drop it. */
 @utility n-board-hatch {
-  background-image: repeating-linear-gradient(
-    var(--n-board-hatch-angle),
-    var(--n-color-hairline) 0 var(--n-board-hatch-width),
-    transparent var(--n-board-hatch-width) var(--n-board-hatch-spacing)
+  --n-board-hatch-line: color-mix(
+    in srgb,
+    var(--n-color-hairline) calc(var(--n-board-hatch-opacity) * 100%),
+    transparent
   );
+  --n-board-hatch-half: calc(var(--n-board-hatch-width) / 2);
+  background-image: linear-gradient(
+    var(--n-board-hatch-angle),
+    var(--n-board-hatch-line) 0 var(--n-board-hatch-half),
+    transparent var(--n-board-hatch-half) calc(50% - var(--n-board-hatch-half)),
+    var(--n-board-hatch-line) calc(50% - var(--n-board-hatch-half))
+      calc(50% + var(--n-board-hatch-half)),
+    transparent calc(50% + var(--n-board-hatch-half))
+      calc(100% - var(--n-board-hatch-half)),
+    var(--n-board-hatch-line) calc(100% - var(--n-board-hatch-half))
+  );
+  background-size: var(--n-board-hatch-tile) var(--n-board-hatch-tile);
 }
 
 /* The ring on a container whose field has keyboard focus: the composers,

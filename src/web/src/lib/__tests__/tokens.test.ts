@@ -82,9 +82,13 @@ describe("design token generator", () => {
     expect(css).toContain("--n-board-hatch-spacing: 0.75rem;");
     expect(css).toContain("--n-board-hatch-angle: 45deg;");
     expect(css).toContain("--n-board-hatch-width: 0.0625rem;");
+    expect(css).toContain("--n-board-hatch-opacity: 0.4;");
+    // 12 × √2 ≈ 17px: a whole pixel, so the tile draws the same every time.
+    expect(css).toContain("--n-board-hatch-tile: 1.0625rem;");
     const swift = renderSwift(tokens);
     expect(swift).toContain("static let columnMaxWidth: CGFloat = 416");
     expect(swift).toContain("static let hatchSpacing: CGFloat = 12");
+    expect(swift).toContain("static let hatchOpacity: Double = 0.4");
   });
 
   it("gives every icon both a lucide and an SF Symbol name", () => {

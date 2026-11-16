@@ -22,8 +22,8 @@ struct VerticalHairline: View {
 }
 
 /// What's left of the board past its last column: `hairline` lines at the
-/// board tokens' angle, width and spacing, as the web draws them. Nothing in
-/// it to click or read.
+/// board tokens' opacity, angle, width and spacing, as the web draws them.
+/// Nothing in it to click or read.
 struct BoardHatch: View {
     var body: some View {
         Canvas { context, size in
@@ -38,7 +38,7 @@ struct BoardHatch: View {
                 lines.addRect(CGRect(x: -reach / 2, y: y, width: reach, height: Theme.Board.hatchWidth))
                 y += Theme.Board.hatchSpacing
             }
-            context.fill(lines, with: .color(Theme.Colors.hairline))
+            context.fill(lines, with: .color(Theme.Colors.hairline.opacity(Theme.Board.hatchOpacity)))
         }
         .ignoresSafeArea()
         .allowsHitTesting(false)
