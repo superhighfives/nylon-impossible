@@ -107,6 +107,20 @@ struct NotesMarkdownTests {
         #expect(plain(text) == "[x](javascript:alert(1)) [y](/settings) <javascript:z>")
     }
 
+    @Test("an autolink stays live, and a < with no > shows as typed")
+    func autolinks() throws {
+        let text = try #require(paragraph(NotesMarkdown.blocks("a < b <https://example.com> c <d").first))
+        #expect(links(text) == [URL(string: "https://example.com")!])
+        #expect(plain(text) == "a < b https://example.com c <d")
+    }
+
+    @Test("a long note full of < parses")
+    func manyAngles() throws {
+        let note = Array(repeating: "x < y", count: 2000).joined(separator: " ")
+        let text = try #require(paragraph(NotesMarkdown.blocks(note).first))
+        #expect(plain(text) == note)
+    }
+
     @Test("raw HTML, entities and images show as typed")
     func literal() throws {
         let source = "<b>hi</b> &amp; ![cat](https://example.com/cat.png)"

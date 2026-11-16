@@ -102,7 +102,12 @@ extension NotesMarkdown {
                 continue
             }
             if ch == "<" {
-                let rest = String(s[i...])
+                // An autolink holds no space, `<` or `>`, so only look as far
+                // as the next one: copying the rest of the note at every `<`
+                // made a long note full of them slow to type in.
+                var j = i + 1
+                while j < s.count, !s[j].isWhitespace, s[j] != "<", s[j] != ">" { j += 1 }
+                let rest = j < s.count && s[j] == ">" ? String(s[i...j]) : ""
                 if let auto = rest.prefixMatch(of: #/<((?i:https?:\/\/|mailto:)[^\s<>]+)>/#), safeURL(String(auto.1)) != nil {
                     out.append(String(auto.0))
                     i += auto.0.count
