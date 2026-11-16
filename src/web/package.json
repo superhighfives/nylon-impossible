@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "effect-language-service patch",
+    "prepare": "effect-tsgo patch",
     "predev": "../../scripts/db-dev-bootstrap.sh",
     "dev": "vite dev --port 3000",
     "build": "vite build",
@@ -51,7 +51,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/workers-types": "^5.20261028.1",
-    "@effect/language-service": "^0.87.5",
+    "@effect/tsgo": "^0.69.0",
     "@tanstack/devtools-vite": "^0.8.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -63,7 +63,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "jsdom": "^29.1.1",
     "solid-js": "^1.9.18",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^5.0.3",
     "web-vitals": "^6.2.3",
