@@ -55,6 +55,9 @@ struct TodoDetailSheet: View {
     @State var editingNotes = false
     /// When a link in the drawn notes last opened, so its tap doesn't edit.
     @State var linkOpenedAt: Date?
+    /// The drawn notes' blocks, parsed once per change rather than per draw.
+    @State var notesBlocks = NotesMarkdown.Cache()
+    @Environment(\.openURL) var openURL
 
     /// `notesShown` is the drawn notes, with the keyboard on them.
     enum Field { case title, notes, notesShown, subtask, link }

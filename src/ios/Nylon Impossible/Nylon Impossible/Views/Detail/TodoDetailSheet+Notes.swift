@@ -55,7 +55,9 @@ extension TodoDetailSheet {
     }
 
     func renderedNotes(style: Theme.Fonts.Style) -> some View {
-        NotesMarkdownView(blocks: NotesMarkdown.blocks(notes), style: style)
+        // Hidden while editing, so it isn't parsed again until you stop.
+        let blocks = notesBlocks.blocks(notes, frozen: editingNotes)
+        return NotesMarkdownView(blocks: blocks, style: style)
             .contentShape(Rectangle())
             .background {
                 if focus == .notesShown {
@@ -80,6 +82,13 @@ extension TodoDetailSheet {
             .accessibilityElement(children: .combine)
             .accessibilityHint("Edits the notes")
             .accessibilityAction { editNotes() }
+            // Combined into one element, the links inside can't be reached,
+            // so each one is an action of its own.
+            .accessibilityActions {
+                ForEach(Array(NotesMarkdown.links(in: blocks).enumerated()), id: \.offset) { _, link in
+                    Button("Open \(link.title)") { openURL(link.url) }
+                }
+            }
     }
 
     /// A tap that opened a link doesn't also start editing.

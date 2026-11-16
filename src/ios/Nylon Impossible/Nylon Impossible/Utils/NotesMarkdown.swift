@@ -46,6 +46,41 @@ enum NotesMarkdown {
         var gap = false
     }
 
+    /// Every live link in the blocks, in order, with the text it's drawn as.
+    static func links(in blocks: [Block]) -> [(title: String, url: URL)] {
+        func links(_ text: AttributedString) -> [(title: String, url: URL)] {
+            text.runs.compactMap { run in
+                run.link.map { (String(text[run.range].characters), $0) }
+            }
+        }
+        func links(_ list: List) -> [(title: String, url: URL)] {
+            list.items.flatMap { links($0.text) + ($0.list.map(links) ?? []) }
+        }
+        return blocks.flatMap { block -> [(title: String, url: URL)] in
+            switch block.kind {
+            case let .paragraph(text), let .heading(text): links(text)
+            case .code: []
+            case let .quote(inner): Self.links(in: inner)
+            case let .list(list): links(list)
+            }
+        }
+    }
+
+    /// The last notes parsed and their blocks, so drawing them again doesn't
+    /// parse them again. While they're being edited the drawn view is hidden,
+    /// so it keeps the blocks it had rather than parsing every keystroke.
+    final class Cache {
+        private var source: String?
+        private var cached: [Block] = []
+
+        func blocks(_ source: String, frozen: Bool = false) -> [Block] {
+            if source == self.source || (frozen && self.source != nil) { return cached }
+            self.source = source
+            cached = NotesMarkdown.blocks(source)
+            return cached
+        }
+    }
+
     /// How deep quotes nest before the rest reads as text.
     static let maxQuoteDepth = 3
 

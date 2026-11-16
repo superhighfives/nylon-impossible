@@ -175,6 +175,22 @@ struct NotesMarkdownTests {
         #expect(links(text).isEmpty)
     }
 
+    @Test("every live link is found, in quotes and nested lists too, but not in code")
+    func allLinks() {
+        let blocks = NotesMarkdown.blocks("[one](https://a.example)\n> [two](https://b.example)\n- x\n  - [three](https://c.example)\n```\nhttps://d.example\n```")
+        let found = NotesMarkdown.links(in: blocks)
+        #expect(found.map(\.title) == ["one", "two", "three"])
+        #expect(found.map(\.url.host) == ["a.example", "b.example", "c.example"])
+    }
+
+    @Test("the cache parses each change once, and keeps its blocks while frozen")
+    func cache() {
+        let cache = NotesMarkdown.Cache()
+        #expect(paragraph(cache.blocks("**a**").first).map(plain) == "a")
+        #expect(paragraph(cache.blocks("**a**b", frozen: true).first).map(plain) == "a")
+        #expect(paragraph(cache.blocks("**a**b").first).map(plain) == "ab")
+    }
+
     @Test("the editor stores exactly what was typed, Markdown and all")
     func storedRaw() {
         let typed = "Flights land **Thursday**.\n\n- [pass](https://example.com)\n"
