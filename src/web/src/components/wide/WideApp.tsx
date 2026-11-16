@@ -33,6 +33,7 @@ import { SettingsScreen } from "@/components/phone/SettingsScreen";
 import { useBoardData } from "@/components/phone/useBoardData";
 import { useHints } from "@/hooks/useHints";
 import { useCreateList, useUpdateList } from "@/hooks/useLists";
+import { messageFromError, toast } from "@/lib/toast";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
 import {
@@ -585,6 +586,18 @@ export function WideApp({
     if (before) pendingFocus.current = { column: before, target: "head" };
   };
 
+  /**
+   * Your list's id, for the personal API (`/v1/lists/:id`). The time lists
+   * go by their aliases there (`today`, `this-week`, `someday`), so they
+   * have no menu to offer it from. The toast matches Settings' Copy.
+   */
+  const copyListId = (list: SerializedList) => {
+    navigator.clipboard.writeText(list.id).then(
+      () => toast.success("Copied"),
+      (err: unknown) => toast.error(messageFromError(err, "Couldn't copy")),
+    );
+  };
+
   /** "View" on an "Added to …" toast. */
   const viewList = (listId: string) => {
     goTo(listId);
@@ -811,6 +824,7 @@ export function WideApp({
             : (name) => updateList.mutate({ id: list.id, input: { name } })
         }
         onHide={kind ? undefined : () => hideColumn(list, "board")}
+        onCopyId={kind ? undefined : () => copyListId(list)}
         onDelete={kind ? undefined : () => deleteList(list)}
         icon={
           kind ? undefined : (
