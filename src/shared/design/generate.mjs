@@ -111,6 +111,13 @@ export function renderCss(tokens) {
   for (const name of ["columnMinWidth", "columnMaxWidth"]) {
     out.push(`  --n-board-${kebab(name)}: ${board[name] / 16}rem;`);
   }
+  // The web's tile only joins up with its neighbours at 45° (or 135°); any
+  // other angle would draw a broken hatch, so fail here instead.
+  if (board.hatch.angle % 90 !== 45) {
+    throw new Error(
+      `board.hatch.angle must be 45 or 135, not ${board.hatch.angle}: the web's hatch tile only joins up at those angles`,
+    );
+  }
   out.push(`  --n-board-hatch-spacing: ${board.hatch.spacing / 16}rem;`);
   out.push(`  --n-board-hatch-angle: ${board.hatch.angle}deg;`);
   out.push(`  --n-board-hatch-width: ${board.hatch.width / 16}rem;`);

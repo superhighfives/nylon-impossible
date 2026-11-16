@@ -180,10 +180,12 @@ p {
 }
 
 /* What's left of the wide board past Done: `hairline` lines at the board
-   tokens' opacity, angle and width. A repeating gradient's period never lands
-   on the pixel grid, so its lines band; this repeats a whole-pixel tile with
-   one line corner to corner (and the corners of its neighbours), which draws
-   the same every time. Decorative, so forced colours drop it. */
+   tokens' opacity, angle and width, `spacing` apart. A repeating gradient's
+   period never lands on the pixel grid, so its lines band; this repeats a
+   whole-pixel tile (`--n-board-hatch-tile`, derived from `spacing`) with one
+   line corner to corner (and the corners of its neighbours), which draws the
+   same every time. The tile only joins up at 45° or 135°, which generate.mjs
+   enforces. Decorative, so forced colours drop it. */
 @utility n-board-hatch {
   --n-board-hatch-line: color-mix(
     in srgb,
