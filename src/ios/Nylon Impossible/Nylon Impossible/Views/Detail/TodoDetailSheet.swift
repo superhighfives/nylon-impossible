@@ -51,8 +51,16 @@ struct TodoDetailSheet: View {
     @State var urls: [APITodoUrl]
     @State var pendingSync: Task<Void, Never>?
     @FocusState var focus: Field?
+    /// The notes are the plain-text editor rather than drawn as Markdown.
+    @State var editingNotes = false
+    /// When a link in the drawn notes last opened, so its tap doesn't edit.
+    @State var linkOpenedAt: Date?
+    /// The drawn notes' blocks, parsed once per change rather than per draw.
+    @State var notesBlocks = NotesMarkdown.Cache()
+    @Environment(\.openURL) var openURL
 
-    enum Field { case title, notes, subtask, link }
+    /// `notesShown` is the drawn notes, with the keyboard on them.
+    enum Field { case title, notes, notesShown, subtask, link }
 
     init(
         todo: TodoItem,
@@ -279,28 +287,6 @@ struct TodoDetailSheet: View {
         .padding(.top, Theme.Space.s2)
         .transition(.opacity)
     }
-
-    // MARK: - Notes
-
-    var notesField: some View {
-        VStack(alignment: .leading, spacing: isColumn ? Theme.Space.s1 : 6) {
-            SectionLabel(text: "Notes")
-            TextField("Add notes", text: $notes, prompt: Text("Add notes").foregroundStyle(Theme.Colors.inkMuted), axis: .vertical)
-                .textStyle(isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body)
-                .foregroundStyle(Theme.Colors.ink)
-                .lineLimit(isColumn ? 2... : 3...)
-                .focused($focus, equals: .notes)
-                .onChange(of: notes) { _, newValue in
-                    let value = newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : newValue
-                    guard value != todo.itemNotes else { return }
-                    todo.itemNotes = value
-                    todo.markModified()
-                    scheduleSync()
-                }
-                .accessibilityLabel("Notes")
-        }
-    }
-
 }
 
 extension TodoDetailSheet {
