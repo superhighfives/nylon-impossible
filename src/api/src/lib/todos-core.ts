@@ -7,6 +7,7 @@ import {
   nextDueDate,
   placementForDueDate,
 } from "@nylon-impossible/shared/recurrence";
+import type { Recurrence } from "@nylon-impossible/shared/schema";
 import type { Env } from "../types";
 import {
   and,
@@ -18,6 +19,7 @@ import {
   isNull,
   lists,
   or,
+  type Todo,
   todos,
 } from "./db";
 import { notifySync } from "./notify-sync";
@@ -92,8 +94,75 @@ export async function listListsForUser(db: Db, userId: string) {
 }
 
 /**
- * Toggle a top-level todo's completed state, applying the same server-canonical
- * rules as the apps' sync (`handlers/sync.ts`):
+ * The recurrence a todo can actually hold: `candidate`, or null when the todo
+ * is a subtask or has at least one child. Recurrence and subtasks are mutually
+ * exclusive, a subtask never recurs and a todo with children can't recur, so
+ * an old or direct client can't reach the illegal state.
+ */
+export async function effectiveRecurrence(
+  db: Db,
+  userId: string,
+  existing: Pick<Todo, "id" | "parentId">,
+  candidate: Recurrence | null,
+): Promise<Recurrence | null> {
+  if (!candidate) return null;
+  if (existing.parentId != null) return null;
+  const [child] = await db
+    .select({ id: todos.id })
+    .from(todos)
+    .where(and(eq(todos.parentId, existing.id), eq(todos.userId, userId)))
+    .limit(1);
+  return child ? null : candidate;
+}
+
+/**
+ * What completing a repeat writes instead of the completion: its due date
+ * advanced to the next occurrence, `completedAt` stamped, and the system list
+ * the new occurrence is placed in by that date's distance, per the settled
+ * recurrence heuristic (null if the user has no such list). The caller keeps
+ * `completed` false and decides whether `listId` applies. The time zone is
+ * passed in so a caller can look it up once for many todos.
+ */
+export async function rollForward(
+  db: Db,
+  userId: string,
+  opts: { recurrence: Recurrence; dueDate: Date; now: Date; timeZone: string },
+): Promise<{ dueDate: Date; completedAt: Date; listId: string | null }> {
+  const { recurrence, now, timeZone } = opts;
+  const dueDate = toDueDay(
+    nextDueDate(recurrence, opts.dueDate, now, timeZone),
+  );
+  const listId = await getSystemListId(
+    db,
+    userId,
+    placementForDueDate(dueDate, now, timeZone),
+  );
+  return { dueDate, completedAt: now, listId };
+}
+
+/**
+ * Completion cascade: toggling a top-level todo's completed flag cascades to
+ * its subtasks (checking completes them; unchecking reopens them). Subtasks
+ * never recur, so completedAt stays untouched like ordinary completions.
+ * Bumping updatedAt makes them appear in the next pull. The caller checks the
+ * todo is top-level and its flag changed.
+ */
+export async function cascadeCompletion(
+  db: Db,
+  userId: string,
+  parentId: string,
+  completed: boolean,
+  updatedAt: Date,
+) {
+  await db
+    .update(todos)
+    .set({ completed, updatedAt })
+    .where(and(eq(todos.parentId, parentId), eq(todos.userId, userId)));
+}
+
+/**
+ * Toggle a top-level todo's completed state, applying the server-canonical
+ * rules the apps' sync shares:
  *   - a recurring todo being completed rolls its dueDate forward instead of
  *     persisting the completion (completed stays false, completedAt stamped),
  *   - completing a pinned todo unpins it,
@@ -120,40 +189,26 @@ export async function setTodoCompleted(
 
   const completingRow = completed === true && existing.completed === false;
 
-  // Recurrence and subtasks are mutually exclusive: a subtask never recurs and
-  // a todo with children can't recur. A recurring todo being completed advances
-  // its dueDate to the next occurrence rather than persisting the completion.
-  let recurrence = existing.recurrence;
-  if (recurrence) {
-    const isSubtask = existing.parentId != null;
-    let hasChildren = false;
-    if (!isSubtask) {
-      const [child] = await db
-        .select({ id: todos.id })
-        .from(todos)
-        .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)))
-        .limit(1);
-      hasChildren = !!child;
-    }
-    if (isSubtask || hasChildren) recurrence = null;
-  }
+  // A recurring todo being completed advances its dueDate to the next
+  // occurrence rather than persisting the completion.
+  const recurrence = await effectiveRecurrence(
+    db,
+    userId,
+    existing,
+    existing.recurrence,
+  );
   if (completingRow && recurrence && existing.dueDate) {
-    const timeZone = await getUserTimezone(db, userId);
-    const nextDue = toDueDay(
-      nextDueDate(recurrence, existing.dueDate, now, timeZone),
-    );
+    const next = await rollForward(db, userId, {
+      recurrence,
+      dueDate: existing.dueDate,
+      now,
+      timeZone: await getUserTimezone(db, userId),
+    });
     updates.completed = false;
-    updates.completedAt = now;
-    updates.dueDate = nextDue;
-    // The new occurrence is placed by its due date's distance, per the
-    // settled recurrence heuristic — then ages normally afterward.
-    const placementListId = await getSystemListId(
-      db,
-      userId,
-      placementForDueDate(nextDue, now, timeZone),
-    );
-    if (placementListId && placementListId !== existing.listId) {
-      updates.listId = placementListId;
+    updates.completedAt = next.completedAt;
+    updates.dueDate = next.dueDate;
+    if (next.listId && next.listId !== existing.listId) {
+      updates.listId = next.listId;
       updates.listEnteredAt = now;
     }
   }
@@ -166,13 +221,8 @@ export async function setTodoCompleted(
     .set(updates)
     .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
 
-  // Completion cascade: toggling a top-level todo's completed flag cascades to
-  // its subtasks (checking completes them; unchecking reopens them).
   if (existing.parentId == null && completed !== existing.completed) {
-    await db
-      .update(todos)
-      .set({ completed, updatedAt: now })
-      .where(and(eq(todos.parentId, todoId), eq(todos.userId, userId)));
+    await cascadeCompletion(db, userId, todoId, completed, now);
   }
 
   const [updated] = await db.select().from(todos).where(eq(todos.id, todoId));

@@ -1,14 +1,15 @@
-import { TODO_NOTES_MAX, toDueDay } from "@nylon-impossible/shared";
+import {
+  TEXT_URL_PATTERN,
+  TODO_NOTES_MAX,
+  toDueDay,
+} from "@nylon-impossible/shared";
 import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import {
   getSystemListId,
   getUserTimezone,
   verifyListOwnership,
 } from "@nylon-impossible/shared/queries";
-import {
-  nextDueDate,
-  placementForDueDate,
-} from "@nylon-impossible/shared/recurrence";
+import { placementForDueDate } from "@nylon-impossible/shared/recurrence";
 import {
   loadUrlsByTodoId,
   serializeTodo,
@@ -34,6 +35,11 @@ import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { pinnedRequestFields, resolvePinned } from "../lib/pinned";
 import { finishTodoLinks } from "../lib/process-todo";
+import {
+  cascadeCompletion,
+  effectiveRecurrence,
+  rollForward,
+} from "../lib/todos-core";
 import { extractUrlsFromText, truncateTitle } from "../lib/url-helpers";
 import type { Env } from "../types";
 
@@ -73,6 +79,21 @@ const syncRequestSchema = z.object({
   ),
 });
 
+// What the notes clean-up strips once a todo's links are stored: a URL (or an
+// iOS share sheet's "URL: …" line) ending at whitespace or the end of the
+// notes, with at most one closing punctuation mark before it.
+const NOTES_URL_END = String.raw`(?=[)\].,;!?]?\s|$)`;
+const NOTES_PREFIXED_URL_REGEX = new RegExp(
+  String.raw`URL:\s*${TEXT_URL_PATTERN}*${NOTES_URL_END}`,
+  "gi",
+);
+const NOTES_URL_REGEX = new RegExp(
+  `${TEXT_URL_PATTERN}*${NOTES_URL_END}`,
+  "gi",
+);
+
+type SyncChange = (typeof syncRequestSchema)["_output"]["changes"][number];
+
 interface SyncConflict {
   id: string;
   resolution: "local" | "remote";
@@ -80,9 +101,48 @@ interface SyncConflict {
   remoteUpdatedAt: Date;
 }
 
-function sortChangesForApply(
-  changes: Array<(typeof syncRequestSchema)["_output"]["changes"][number]>,
-) {
+/** A change older than the stored todo loses to it (last write wins). */
+function remoteWins(
+  id: string,
+  change: SyncChange,
+  existing: Todo,
+): SyncConflict {
+  return {
+    id,
+    resolution: "remote",
+    localUpdatedAt: change.updatedAt,
+    remoteUpdatedAt: existing.updatedAt,
+  };
+}
+
+/** A todo whose links need storing. explicitUrls takes priority over regex extraction. */
+interface UrlExtraction {
+  todoId: string;
+  explicitUrls?: string[];
+  title?: string;
+  notes?: string;
+}
+
+/**
+ * Queue a todo's links for storing: the change's explicit `urls`, or else any
+ * found in its title or notes.
+ */
+function queueUrls(list: UrlExtraction[], todoId: string, change: SyncChange) {
+  if (change.urls && change.urls.length > 0) {
+    list.push({ todoId, explicitUrls: change.urls.map((u) => u.url) });
+  } else if (
+    (change.notes && extractUrlsFromText(change.notes).length > 0) ||
+    (change.title && extractUrlsFromText(change.title).length > 0)
+  ) {
+    list.push({
+      todoId,
+      title: change.title,
+      notes: change.notes ?? undefined,
+    });
+  }
+}
+
+function sortChangesForApply(changes: SyncChange[]) {
   const getRank = (parentId: string | null | undefined) => (parentId ? 1 : 0);
   return changes
     .map((change, originalIndex) => ({ change, originalIndex }))
@@ -121,13 +181,8 @@ export async function syncTodos(c: Context<Env>) {
     return apiError(c, "email_already_registered");
   }
 
-  // Track todos that need URLs stored. explicitUrls takes priority over regex extraction.
-  const urlExtractionNeeded: Array<{
-    todoId: string;
-    explicitUrls?: string[];
-    title?: string;
-    notes?: string;
-  }> = [];
+  // Track todos that need URLs stored.
+  const urlExtractionNeeded: UrlExtraction[] = [];
 
   // 1. Apply client changes (with conflict resolution)
   // Normalize UUIDs to lowercase to match web-generated IDs
@@ -148,39 +203,21 @@ export async function syncTodos(c: Context<Env>) {
         if (change.updatedAt >= existing.updatedAt) {
           await db.delete(todos).where(eq(todos.id, normalizedId));
         } else {
-          conflicts.push({
-            id: normalizedId,
-            resolution: "remote",
-            localUpdatedAt: change.updatedAt,
-            remoteUpdatedAt: existing.updatedAt,
-          });
+          conflicts.push(remoteWins(normalizedId, change, existing));
         }
       }
       // If doesn't exist, nothing to delete
     } else if (existing) {
       // Update existing - last write wins
       if (change.updatedAt >= existing.updatedAt) {
-        let nextRecurrence =
+        const nextRecurrence = await effectiveRecurrence(
+          db,
+          userId,
+          existing,
           change.recurrence !== undefined
             ? change.recurrence
-            : existing.recurrence;
-        // Recurrence and subtasks are mutually exclusive. A subtask never
-        // recurs, and a todo that has children can't recur. Enforce here so an
-        // old or direct client can't reach the illegal state.
-        if (nextRecurrence) {
-          if (existing.parentId) {
-            nextRecurrence = null;
-          } else {
-            const [child] = await db
-              .select({ id: todos.id })
-              .from(todos)
-              .where(
-                and(eq(todos.parentId, normalizedId), eq(todos.userId, userId)),
-              )
-              .limit(1);
-            if (child) nextRecurrence = null;
-          }
-        }
+            : existing.recurrence,
+        );
         const nextDueDateValue =
           change.dueDate !== undefined ? change.dueDate : existing.dueDate;
         const completing =
@@ -199,22 +236,19 @@ export async function syncTodos(c: Context<Env>) {
         // client advance.
         let recurrencePlacementListId: string | null = null;
         if (completing && nextRecurrence && nextDueDateValue) {
-          const now = new Date();
-          const timeZone = await timeZoneForUser();
-          dueDateToWrite = toDueDay(
-            nextDueDate(nextRecurrence, nextDueDateValue, now, timeZone),
-          );
+          const next = await rollForward(db, userId, {
+            recurrence: nextRecurrence,
+            dueDate: nextDueDateValue,
+            now: new Date(),
+            timeZone: await timeZoneForUser(),
+          });
+          dueDateToWrite = next.dueDate;
           completedToWrite = false;
-          completedAtToWrite = now;
-          // The new occurrence is placed by its due date's distance, per the
-          // settled recurrence heuristic — unless the client also explicitly
-          // moved it in this same change, which wins.
+          completedAtToWrite = next.completedAt;
+          // The new occurrence goes where placement puts it, unless the client
+          // also explicitly moved it in this same change, which wins.
           if (change.listId === undefined) {
-            recurrencePlacementListId = await getSystemListId(
-              db,
-              userId,
-              placementForDueDate(dueDateToWrite, now, timeZone),
-            );
+            recurrencePlacementListId = next.listId;
           }
         }
         // Completing a pinned todo unpins it, same as the Gmail add-on's
@@ -254,44 +288,22 @@ export async function syncTodos(c: Context<Env>) {
             updatedAt: change.updatedAt,
           })
           .where(eq(todos.id, normalizedId));
-        // Completion cascade: toggling a top-level todo's completed flag
-        // cascades to its subtasks (checking completes them; unchecking reopens
-        // them). Subtasks never recur, so completedAt stays null like ordinary
-        // completions. Bumping updatedAt makes children appear in the next pull.
         if (
           !existing.parentId &&
           change.completed !== undefined &&
           change.completed !== existing.completed
         ) {
-          await db
-            .update(todos)
-            .set({ completed: change.completed, updatedAt: change.updatedAt })
-            .where(
-              and(eq(todos.parentId, normalizedId), eq(todos.userId, userId)),
-            );
+          await cascadeCompletion(
+            db,
+            userId,
+            normalizedId,
+            change.completed,
+            change.updatedAt,
+          );
         }
-        if (change.urls && change.urls.length > 0) {
-          urlExtractionNeeded.push({
-            todoId: normalizedId,
-            explicitUrls: change.urls.map((u) => u.url),
-          });
-        } else if (
-          (change.notes && extractUrlsFromText(change.notes).length > 0) ||
-          (change.title && extractUrlsFromText(change.title).length > 0)
-        ) {
-          urlExtractionNeeded.push({
-            todoId: normalizedId,
-            title: change.title,
-            notes: change.notes ?? undefined,
-          });
-        }
+        queueUrls(urlExtractionNeeded, normalizedId, change);
       } else {
-        conflicts.push({
-          id: normalizedId,
-          resolution: "remote",
-          localUpdatedAt: change.updatedAt,
-          remoteUpdatedAt: existing.updatedAt,
-        });
+        conflicts.push(remoteWins(normalizedId, change, existing));
       }
     } else {
       // Create new
@@ -387,21 +399,7 @@ export async function syncTodos(c: Context<Env>) {
               ),
             );
         }
-        if (change.urls && change.urls.length > 0) {
-          urlExtractionNeeded.push({
-            todoId: normalizedId,
-            explicitUrls: change.urls.map((u) => u.url),
-          });
-        } else if (
-          (change.notes && extractUrlsFromText(change.notes).length > 0) ||
-          (change.title && extractUrlsFromText(change.title).length > 0)
-        ) {
-          urlExtractionNeeded.push({
-            todoId: normalizedId,
-            title: change.title,
-            notes: change.notes ?? undefined,
-          });
-        }
+        queueUrls(urlExtractionNeeded, normalizedId, change);
       }
     }
   }
@@ -489,11 +487,8 @@ export async function syncTodos(c: Context<Env>) {
 
       if (!explicitUrls && notes) {
         const cleanedNotes = notes
-          .replace(
-            /URL:\s*https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi,
-            "",
-          )
-          .replace(/https?:\/\/[^\s<>"{}|\\^`[\]]*(?=[)\].,;!?]?\s|$)/gi, "")
+          .replace(NOTES_PREFIXED_URL_REGEX, "")
+          .replace(NOTES_URL_REGEX, "")
           .trim();
         await db
           .update(todos)
