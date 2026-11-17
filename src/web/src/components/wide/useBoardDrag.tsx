@@ -22,6 +22,7 @@ import {
   SETTLE_TTL_MS,
   type Settle,
 } from "./settle";
+import { landingSwing, pickTilt, tiltStyle, tiltTokens } from "./tilt";
 
 /** Where the line goes in an empty column, from the top of its row list. */
 const EMPTY_LINE_Y = 8;
@@ -87,6 +88,8 @@ export function useBoardDrag({
 }) {
   const { reducedMotion } = useHints();
   const [dragging, setDragging] = useState<TodoWithUrls | null>(null);
+  // The drag's tilt, in degrees: picked as it lifts, held until it drops.
+  const [tilt, setTilt] = useState(0);
   const [indicator, setIndicator] = useState<DropIndicator | null>(null);
   const [settle, setSettle] = useState<Settle | null>(null);
   // The line as last drawn, which is where a release drops. A ref, so a
@@ -153,6 +156,7 @@ export function useBoardDrag({
   const onDragStart = (e: DragStartEvent) => {
     const todo = e.active.data.current?.todo as TodoWithUrls | undefined;
     setDragging(todo ?? null);
+    setTilt(pickTilt(tiltTokens()?.max ?? 0));
     untrack.current?.();
     const track = (ev: PointerEvent) => {
       pointer.current = ev.clientY;
@@ -222,8 +226,10 @@ export function useBoardDrag({
     else if (drop?.kind === "place") {
       if (reducedMotion !== "reduce") {
         const from = captureRows([todo.listId, drop.listId]);
+        // Reduced motion has no settle, so no swing either.
+        const swing = landingSwing(tilt, tiltTokens(), false);
         const landing = preview
-          ? landAt(from, todo.id, drop.listId, preview)
+          ? landAt(from, todo.id, drop.listId, preview, { tilt, swing })
           : null;
         setSettle({ from, landing });
       }
@@ -233,6 +239,7 @@ export function useBoardDrag({
 
   return {
     dragging,
+    tilt,
     indicator,
     settle,
     justDragged,
@@ -241,12 +248,22 @@ export function useBoardDrag({
   };
 }
 
-/** What follows the pointer while a row is dragged. */
-export function DragPreview({ todo }: { todo: TodoWithUrls }) {
+/**
+ * What follows the pointer while a row is dragged: a card tilted by the
+ * drag's angle (`tilt`, in degrees), lifted with a deeper shadow.
+ */
+export function DragPreview({
+  todo,
+  tilt,
+}: {
+  todo: TodoWithUrls;
+  tilt: number;
+}) {
   return (
     <div
       data-drag-preview
-      className="flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5"
+      style={tiltStyle(tilt)}
+      className="n-lifted flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5 shadow-[0_14px_30px_color-mix(in_srgb,black_16%,transparent)]"
     >
       <span
         aria-hidden="true"
@@ -256,5 +273,19 @@ export function DragPreview({ todo }: { todo: TodoWithUrls }) {
         {displayTitle(todo)}
       </span>
     </div>
+  );
+}
+
+/**
+ * The drop line's dot: 8px of `brand` at its leading end, with a 2px
+ * `canvas` ring so it reads over any row. Scales in; goes inside the line.
+ */
+export function DropDot() {
+  return (
+    <span
+      aria-hidden="true"
+      data-drop-dot
+      className="absolute top-1/2 -left-1 size-2 -translate-y-1/2 animate-n-dot-in rounded-full bg-n-brand ring-2 ring-n-canvas"
+    />
   );
 }

@@ -115,7 +115,7 @@ extension WidgetTodo {
         WidgetTodo(id: UUID(), title: "Renew passport", meta: [.due("2 days overdue", overdue: true)]),
         WidgetTodo(id: UUID(), title: "Review PR for the sync engine", meta: [.pinned]),
         WidgetTodo(id: UUID(), title: "Call Mum about Sunday lunch", meta: []),
-        WidgetTodo(id: UUID(), title: "Water the plants", meta: [.due("Today", overdue: false), .repeats("Weekly")]),
+        WidgetTodo(id: UUID(), title: "Water the plants", meta: [.due("Today", overdue: false, today: true), .repeats("Weekly")]),
         WidgetTodo(id: UUID(), title: "Reply to the venue about Thursday", meta: [])
     ]
 }

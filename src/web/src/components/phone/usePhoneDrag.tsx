@@ -11,10 +11,12 @@ import {
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { previewRect, SETTLE_TTL_MS } from "@/components/wide/settle";
+import { landingSwing, pickTilt, tiltTokens } from "@/components/wide/tilt";
 import { useHints } from "@/hooks/useHints";
 import {
   dropLineY,
   dropPlacement,
+  gapTop,
   type RowSpan,
   slotAt,
 } from "@/lib/dragOrder";
@@ -39,8 +41,20 @@ export interface PhoneDrag {
   slot: number;
   /** Pointer only: the line's offset from the top of the row list, in px. */
   lineY: number | null;
+  /** Touch only: where the gap the rows part to leave starts, in px. */
+  gapY: number | null;
   /** The dragged row's height, which the others part by. */
   height: number;
+  /** The drag's tilt, in degrees: picked as it lifts, held until it drops. */
+  tilt: number;
+}
+
+/** What a page's rows settle from after a drop. */
+export interface PhoneSettle {
+  /** Where each row was on screen at the drop, by todo id. */
+  tops: Map<string, number>;
+  /** The dropped todo, which swings past level as it lands. */
+  landing: { id: string; tilt: number; swing: number };
 }
 
 /** A page's row list, which rows and the line are measured against. */
@@ -121,7 +135,7 @@ export function usePhoneDrag({
   const [pending, setPending] = useState<{
     listId: string;
     ids: string[];
-    from: Map<string, number> | null;
+    from: PhoneSettle | null;
   } | null>(null);
 
   const sensors = useSensors(
@@ -170,14 +184,19 @@ export function usePhoneDrag({
       startY(e.activatorEvent) - list.getBoundingClientRect().top;
     moved.current = false;
     const own = spans.current[from];
+    const mode = e.activatorEvent?.type.startsWith("touch")
+      ? "touch"
+      : "pointer";
     show({
       todo,
       listId,
-      mode: e.activatorEvent?.type.startsWith("touch") ? "touch" : "pointer",
+      mode,
       from,
       slot: from,
       lineY: null,
+      gapY: mode === "touch" ? gapTop(spans.current, from, from) : null,
       height: own ? own.bottom - own.top : 0,
+      tilt: pickTilt(tiltTokens()?.max ?? 0),
     });
   };
 
@@ -208,7 +227,9 @@ export function usePhoneDrag({
         ? dropLineY(spans.current, index, cur.from, y)
         : null;
     if (index !== cur.slot || lineY !== cur.lineY) {
-      show({ ...cur, slot: index, lineY });
+      const gapY =
+        cur.mode === "touch" ? gapTop(spans.current, cur.from, index) : null;
+      show({ ...cur, slot: index, lineY, gapY });
     }
   };
 
@@ -225,7 +246,22 @@ export function usePhoneDrag({
   const onDragEnd = (_e: DragEndEvent) => {
     const cur = shown.current;
     // Read before the preview unmounts and the rows stop parting.
-    const from = cur && reducedMotion !== "reduce" ? capture(cur) : null;
+    const tops = cur && reducedMotion !== "reduce" ? capture(cur) : null;
+    const from =
+      cur && tops
+        ? {
+            tops,
+            landing: {
+              id: cur.todo.id,
+              tilt: cur.tilt,
+              swing: landingSwing(
+                cur.tilt,
+                tiltTokens(),
+                reducedMotion === "reduce",
+              ),
+            },
+          }
+        : null;
     onDragCancel();
     // Released where it started: nothing changes, nothing is saved.
     if (!cur || cur.slot === cur.from) return;
@@ -242,7 +278,7 @@ export function usePhoneDrag({
     sensors,
     justDragged,
     ordered,
-    /** Where `listId`'s rows were on screen at the drop, by todo id. */
+    /** Where `listId`'s rows were on screen at the drop, and what landed. */
     settleFrom: (listId: string) =>
       pending?.listId === listId ? pending.from : null,
     handlers: { onDragStart, onDragMove, onDragEnd, onDragCancel },

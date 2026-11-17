@@ -12,13 +12,35 @@ import Foundation
 /// One piece of a row's meta line, in the order the spec lists them.
 enum MetaPart: Hashable, Sendable {
     case pinned
-    case due(String, overdue: Bool)
+    /// `today` marks a todo due today, the one meta part set on a brand
+    /// chip.
+    case due(String, overdue: Bool, today: Bool = false)
     case repeats(String)
     case subtasks(done: Int, total: Int)
     case notes
     /// The first link's domain, and how many more links there are:
     /// "visitlisboa.com +2".
     case link(String, more: Int = 0)
+
+    /// How the row's meta line sets this part: due today on a brand chip
+    /// (the only yellow on a row); pinned, repeat and other due days on a
+    /// `fill` chip; overdue, subtasks, notes and links as plain text.
+    var chip: MetaChip? {
+        switch self {
+        case .pinned, .repeats: return .fill
+        case .due(_, let overdue, let today):
+            if overdue { return nil }
+            return today ? .brand : .fill
+        case .subtasks, .notes, .link: return nil
+        }
+    }
+}
+
+/// A meta part's chip: a `brand` fill with `brandInk` text, or a `fill`
+/// fill with `ink` text.
+enum MetaChip: Hashable, Sendable {
+    case brand
+    case fill
 }
 
 enum DueLabel {
@@ -150,7 +172,8 @@ enum TodoMeta {
         if todo.pinned { parts.append(.pinned) }
         if let dueDate = todo.dueDate {
             let label = DueLabel.text(for: dueDate, now: now, calendar: calendar, locale: locale)
-            parts.append(.due(label.text, overdue: label.overdue))
+            let today = DueLabel.daysUntil(dueDate, now: now, calendar: calendar) == 0
+            parts.append(.due(label.text, overdue: label.overdue, today: today))
         }
         if let recurrence = todo.recurrence {
             parts.append(.repeats(RepeatLabel.text(recurrence.frequency)))
@@ -175,7 +198,7 @@ enum TodoMeta {
         parts.map { part -> String in
             switch part {
             case .pinned: return "Pinned"
-            case .due(let text, let overdue): return overdue ? text : "Due \(text)"
+            case .due(let text, let overdue, _): return overdue ? text : "Due \(text)"
             case .repeats(let text): return "Repeats \(text.lowercased())"
             case .subtasks(let done, let total): return "\(done) of \(total) subtasks done"
             case .notes: return "Has notes"

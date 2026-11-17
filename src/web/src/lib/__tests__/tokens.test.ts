@@ -91,6 +91,37 @@ describe("design token generator", () => {
     expect(swift).toContain("static let hatchOpacity: Double = 0.4");
   });
 
+  it("emits a drag's tilt and lift, web and Apple", () => {
+    const css = renderCss(tokens);
+    expect(css).toContain("--n-tilt-max: 1.5deg;");
+    expect(css).toContain("--n-tilt-overshoot: 1.33;");
+    expect(css).toContain("--n-settle-overshoot: 0.4deg;");
+    expect(css).toContain("--n-settle-min-tilt: 0.25deg;");
+    expect(css).toContain("--n-lift: 1.02;");
+    const swift = renderSwift(tokens);
+    expect(swift).toContain("static let tiltMax: Double = 1.5");
+    expect(swift).toContain("static let tiltOvershoot: Double = 1.33");
+    expect(swift).toContain("static let settleOvershoot: Double = 0.4");
+    expect(swift).toContain("static let settleMinTilt: Double = 0.25");
+    expect(swift).toContain("static let lift: CGFloat = 1.02");
+  });
+
+  it("gives a colour its own alpha per appearance: brandSoft is 22%, 16% in dark", () => {
+    const css = renderCss(tokens);
+    const dark = css.slice(css.indexOf(".dark {"));
+    // 0.22 × 255 ≈ 0x38; 0.16 × 255 ≈ 0x29.
+    expect(css.slice(0, css.indexOf(".dark {"))).toContain(
+      "--n-color-brand-soft: #ffe62938;",
+    );
+    expect(dark).toContain("--n-color-brand-soft: #ffe62929;");
+    const swift = renderSwift(tokens);
+    expect(swift).toContain(
+      "static let brandSoft = dynamic(light: 0xFFE629, dark: 0xFFE629, lightAlpha: 0.22, darkAlpha: 0.16)",
+    );
+    // One alpha for both stays an opacity.
+    expect(swift).toContain(".opacity(0.08)");
+  });
+
   it("refuses a hatch angle the web's tile can't draw", () => {
     for (const angle of [30, 90, -45]) {
       const changed = structuredClone(tokens);

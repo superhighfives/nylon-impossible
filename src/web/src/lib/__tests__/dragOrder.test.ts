@@ -4,6 +4,7 @@ import {
   clampToTier,
   dropLineY,
   dropPlacement,
+  gapTop,
   partOffset,
   positionAt,
   slotAt,
@@ -225,5 +226,44 @@ describe("parting the rows around a touch drag", () => {
     expect([0, 1, 2, 3, 4].map((i) => partOffset(0, index, i, 40))).toEqual([
       0, -40, 0, 0, 0,
     ]);
+  });
+});
+
+describe("the gap a touch drag opens", () => {
+  // Five rows, 40 tall from 8; the one at index 1 is dragged.
+  const spans = [0, 1, 2, 3, 4].map((i) => ({
+    top: 8 + i * 40,
+    bottom: 48 + i * 40,
+  }));
+
+  it("is the row's own space while it's over its slot", () => {
+    expect(gapTop(spans, 1, 1)).toBe(48);
+  });
+
+  it.each([0, 1, 2, 3])(
+    "at slot %i, sits exactly where the parted rows leave room",
+    (slot) => {
+      const top = gapTop(spans, 1, slot);
+      expect(top).not.toBeNull();
+      const gap = { top: top ?? 0, bottom: (top ?? 0) + 40 };
+      // Where every other row is drawn, parted by `partOffset`.
+      const drawn = spans
+        .map((s, i) => ({ s, dy: partOffset(1, slot, i, 40), i }))
+        .filter(({ i }) => i !== 1)
+        .map(({ s, dy }) => ({ top: s.top + dy, bottom: s.bottom + dy }));
+      // No row overlaps the gap, and it touches the rows either side.
+      for (const r of drawn) {
+        expect(r.bottom <= gap.top || r.top >= gap.bottom).toBe(true);
+      }
+      expect(
+        drawn.some((r) => r.bottom === gap.top) || gap.top === spans[0].top,
+      ).toBe(true);
+      // Its place among the others is the slot.
+      expect(drawn.filter((r) => r.bottom <= gap.top)).toHaveLength(slot);
+    },
+  );
+
+  it("is null before the rows are measured", () => {
+    expect(gapTop([], 0, 0)).toBeNull();
   });
 });

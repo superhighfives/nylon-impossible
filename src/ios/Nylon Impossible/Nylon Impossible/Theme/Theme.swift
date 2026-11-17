@@ -30,10 +30,13 @@ enum Theme {
             light: UInt32,
             dark: UInt32,
             lightHighContrast: UInt32? = nil,
-            darkHighContrast: UInt32? = nil
+            darkHighContrast: UInt32? = nil,
+            lightAlpha: CGFloat = 1,
+            darkAlpha: CGFloat = 1
         ) -> Color {
             let color = platformColor(
-                light: light, dark: dark, lightHighContrast: lightHighContrast, darkHighContrast: darkHighContrast
+                light: light, dark: dark, lightHighContrast: lightHighContrast, darkHighContrast: darkHighContrast,
+                lightAlpha: lightAlpha, darkAlpha: darkAlpha
             )
             #if os(macOS)
             return Color(nsColor: color)
@@ -44,17 +47,21 @@ enum Theme {
 
         /// The same colour as a dynamic `NSColor`/`UIColor`, resolved against
         /// the appearance (macOS) or trait collection (iOS) it's drawn in.
+        /// `lightAlpha` and `darkAlpha` are for a token whose alpha differs
+        /// by appearance.
         static func platformColor(
             light: UInt32,
             dark: UInt32,
             lightHighContrast: UInt32? = nil,
-            darkHighContrast: UInt32? = nil
+            darkHighContrast: UInt32? = nil,
+            lightAlpha: CGFloat = 1,
+            darkAlpha: CGFloat = 1
         ) -> PlatformColor {
             func resolve(isDark: Bool, isHighContrast: Bool) -> PlatformColor {
                 rgb(hex(
                     light: light, dark: dark, lightHighContrast: lightHighContrast, darkHighContrast: darkHighContrast,
                     isDark: isDark, isHighContrast: isHighContrast
-                ))
+                ), alpha: isDark ? darkAlpha : lightAlpha)
             }
             #if os(macOS)
             return NSColor(name: nil) { appearance in
@@ -97,12 +104,12 @@ enum Theme {
         }
         // swiftlint:enable function_parameter_count
 
-        private static func rgb(_ hex: UInt32) -> PlatformColor {
+        private static func rgb(_ hex: UInt32, alpha: CGFloat) -> PlatformColor {
             PlatformColor(
                 red: CGFloat((hex >> 16) & 0xFF) / 255,
                 green: CGFloat((hex >> 8) & 0xFF) / 255,
                 blue: CGFloat(hex & 0xFF) / 255,
-                alpha: 1
+                alpha: alpha
             )
         }
 
@@ -132,10 +139,12 @@ enum Theme {
         static let notice = dynamic(light: 0xB54700, dark: 0xFF9A4D)
         /// The overnight note's pill (orange-3)
         static let noticeFill = dynamic(light: 0xFFF1E0, dark: 0x2B1A0C)
-        /// Fills: done checkbox, send button, a sidebar list as a drop target. Thin lines only for the two Settled exceptions: the drop line while dragging and the composer's focus ring. Never text on white. (yellow-9)
+        /// Fills: done checkbox, send button, a sidebar list as a drop target, the drop line's dot, a due-today chip, the toast's Undo, the overnight note. Thin lines only for the two Settled exceptions: the drop line while dragging and the composer's focus ring. Never text on white. (yellow-9)
         static let brand = dynamic(light: 0xFFE629, dark: 0xFFE629)
         /// Text and icons on a brand fill (yellow-12)
         static let brandInk = dynamic(light: 0x473B1F, dark: 0x473B1F)
+        /// The gap a touch drag opens between the rows it parts. A fill, never a line or text (yellow-9 at 22% (16% in dark, where 22% over canvas reads as olive))
+        static let brandSoft = dynamic(light: 0xFFE629, dark: 0xFFE629, lightAlpha: 0.22, darkAlpha: 0.16)
     }
 
     enum Fonts {
@@ -251,6 +260,16 @@ enum Theme {
         static let fast: TimeInterval = 0.15
         static let base: TimeInterval = 0.22
         static let slow: TimeInterval = 0.32
+
+        /// A drag's tilt: one angle per drag, at random within ±`tiltMax`
+        /// degrees, overshooting to `tiltOvershoot` times it on the way. The
+        /// landed row swings `settleOvershoot` degrees past level, unless it
+        /// was tilted less than `settleMinTilt`. The lifted todo scales to `lift`.
+        static let tiltMax: Double = 1.5
+        static let tiltOvershoot: Double = 1.33
+        static let settleOvershoot: Double = 0.4
+        static let settleMinTilt: Double = 0.25
+        static let lift: CGFloat = 1.02
 
         /// The shared ease-out-strong curve at a token duration.
         static func easeOutStrong(_ duration: TimeInterval = base) -> Animation {

@@ -193,7 +193,7 @@ struct WidgetMetaLine: View {
         switch part {
         case .pinned:
             glyphed(Theme.Icon.pin, "Pinned")
-        case .due(let text, let overdue):
+        case .due(let text, let overdue, _):
             Text(text)
                 .fontWeight(overdue ? .medium : .regular)
                 .foregroundStyle(overdue ? Theme.Colors.overdue : Theme.Colors.inkMuted)

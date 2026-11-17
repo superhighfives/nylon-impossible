@@ -153,13 +153,23 @@ struct RowSelectionBar: View {
 }
 
 /// "Pinned · Fri · ↻ Weekly · 1/4 · ▤ · visitlisboa.com" — only what's set.
+/// Pinned, repeat and the due day sit on chips (`MetaPart.chip`): due today
+/// on the brand fill, the only yellow on a row, and the rest on `fill`.
+/// Overdue stays red text, and subtasks, notes and links stay plain.
 struct MetaLine: View {
     let parts: [MetaPart]
+
+    /// The chip's 20pt height, grown with Dynamic Type alongside its text.
+    @ScaledMetric(relativeTo: .caption) private var chipHeight = Theme.Chip.height
 
     var body: some View {
         FlowLayout(spacing: Theme.Space.s3, lineSpacing: Theme.Space.s1) {
             ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                item(part)
+                if let style = part.chip {
+                    chip(style) { item(part) }
+                } else {
+                    item(part)
+                }
             }
         }
         .textStyle(Theme.Fonts.Role.meta)
@@ -173,11 +183,17 @@ struct MetaLine: View {
         switch part {
         case .pinned:
             glyphed(Theme.Icon.pin, "Pinned")
-        case .due(let text, let overdue):
-            Text(text)
-                .fontWeight(overdue ? .medium : .regular)
-                .foregroundStyle(overdue ? Theme.Colors.overdue : Theme.Colors.inkMuted)
-                .monospacedDigit()
+        case .due(let text, let overdue, _):
+            if overdue {
+                Text(text)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Theme.Colors.overdue)
+                    .monospacedDigit()
+            } else {
+                // On its chip, which sets the ink.
+                Text(text)
+                    .monospacedDigit()
+            }
         case .repeats(let text):
             glyphed(Theme.Icon.repeat, text)
         case .subtasks(let done, let total):
@@ -190,6 +206,20 @@ struct MetaLine: View {
             glyphed(Theme.Icon.link, more > 0 ? "\(domain) +\(more)" : domain)
                 .lineLimit(1)
         }
+    }
+
+    /// A chip: 12pt semibold on `brand` with `brandInk`, or on `fill` with
+    /// `ink`, 20pt high with the chip radius.
+    private func chip(_ style: MetaChip, @ViewBuilder _ content: () -> some View) -> some View {
+        content()
+            .textStyle(Theme.Fonts.Role.metaChip)
+            .foregroundStyle(style == .brand ? Theme.Colors.brandInk : Theme.Colors.ink)
+            .padding(.horizontal, Theme.Chip.paddingX)
+            .frame(minHeight: chipHeight)
+            .background(
+                style == .brand ? Theme.Colors.brand : Theme.Colors.fill,
+                in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
+            )
     }
 
     private func glyphed(_ symbol: String, _ text: String) -> some View {

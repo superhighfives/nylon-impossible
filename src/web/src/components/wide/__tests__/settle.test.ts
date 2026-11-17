@@ -82,7 +82,7 @@ describe("settleRows", () => {
     const from = captureRows(["today"]);
     document.body.innerHTML = "";
     // c let go just under the top, and dropped first.
-    const landing = { id: "c", listId: "today", top: 6 };
+    const landing = { id: "c", listId: "today", top: 6, tilt: 0, swing: 0 };
     const after = columnOf("today", [
       ["c", 0],
       ["a", 48],
@@ -100,6 +100,63 @@ describe("settleRows", () => {
     );
   });
 
+  it("swings the dropped row past level as it lands, over the same settle", () => {
+    columnOf("today", [
+      ["a", 0],
+      ["b", 48],
+    ]);
+    const from = captureRows(["today"]);
+    document.body.innerHTML = "";
+    const landing = {
+      id: "b",
+      listId: "today",
+      top: 4,
+      tilt: 1.2,
+      swing: -0.4,
+    };
+    const after = columnOf("today", [
+      ["b", 0],
+      ["a", 48],
+    ]);
+
+    expect(settleRows(after, "today", from, timing, landing)).toBe(true);
+    expect(animateOf(after, 0)).toHaveBeenCalledWith(
+      [
+        { rotate: "1.2deg" },
+        { rotate: "-0.4deg", offset: 0.6 },
+        { rotate: "0deg" },
+      ],
+      timing,
+    );
+    expect(animateOf(after, 0)).toHaveBeenCalledWith(
+      [{ transform: "translateY(4px)" }, { transform: "none" }],
+      timing,
+    );
+    // Only the dropped row swings.
+    expect(animateOf(after, 1)).toHaveBeenCalledOnce();
+  });
+
+  it("a landing with no swing (nearly level, or reduced motion) only eases", () => {
+    columnOf("today", [
+      ["a", 0],
+      ["b", 48],
+    ]);
+    const from = captureRows(["today"]);
+    document.body.innerHTML = "";
+    const landing = { id: "b", listId: "today", top: 4, tilt: 0.1, swing: 0 };
+    const after = columnOf("today", [
+      ["b", 0],
+      ["a", 48],
+    ]);
+
+    settleRows(after, "today", from, timing, landing);
+    expect(animateOf(after, 0)).toHaveBeenCalledOnce();
+    expect(animateOf(after, 0)).toHaveBeenCalledWith(
+      [{ transform: "translateY(4px)" }, { transform: "none" }],
+      timing,
+    );
+  });
+
   it("waits while the dropped row is still in its old place", () => {
     const before = columnOf("today", [
       ["a", 0],
@@ -107,7 +164,7 @@ describe("settleRows", () => {
       ["c", 96],
     ]);
     const from = captureRows(["today"]);
-    const landing = { id: "c", listId: "today", top: 6 };
+    const landing = { id: "c", listId: "today", top: 6, tilt: 0, swing: 0 };
 
     expect(settleRows(before, "today", from, timing, landing)).toBe(false);
     for (const i of [0, 1, 2])
@@ -119,7 +176,7 @@ describe("settleRows", () => {
     columnOf("week", [["w", 0]]);
     const from = captureRows(["today", "week"]);
     document.body.innerHTML = "";
-    const landing = { id: "a", listId: "week", top: 52 };
+    const landing = { id: "a", listId: "week", top: 52, tilt: 0, swing: 0 };
     const after = columnOf("week", [
       ["w", 0],
       ["a", 48],

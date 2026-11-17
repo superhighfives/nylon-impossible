@@ -1,10 +1,12 @@
 import { useDraggable } from "@dnd-kit/core";
 import { useLayoutEffect, useRef } from "react";
 import { settleTiming } from "@/components/wide/settle";
+import { swingKeyframes } from "@/components/wide/tilt";
+import { DropDot } from "@/components/wide/useBoardDrag";
 import { partOffset } from "@/lib/dragOrder";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoRow, type TodoRowProps } from "./TodoRow";
-import type { PhoneDrag } from "./usePhoneDrag";
+import type { PhoneDrag, PhoneSettle } from "./usePhoneDrag";
 
 type RowProps = Omit<
   TodoRowProps,
@@ -49,6 +51,7 @@ function DraggableRow({
       todo={todo}
       dragging={active && !touch}
       lifted={active && touch}
+      tilt={active && touch ? mine.tilt : undefined}
       rowRef={setNodeRef}
       rowStyle={
         touch
@@ -69,8 +72,9 @@ function DraggableRow({
 
 /**
  * A page's rows, which reorder by dragging: the rows part around a touch
- * drag, and a pointer drag draws the yellow line where it would land. After
- * a drop the rows ease from where they were into the new order.
+ * drag to open a soft yellow gap, and a pointer drag draws the yellow line
+ * where it would land. After a drop the rows ease from where they were into
+ * the new order, and the dropped one swings past level as it lands.
  */
 export function PhoneRows({
   listId,
@@ -87,8 +91,8 @@ export function PhoneRows({
   listId: string;
   rows: TodoWithUrls[];
   drag: PhoneDrag | null;
-  /** Where the rows were on screen at a drop, by id. */
-  settleFrom: Map<string, number> | null;
+  /** Where the rows were on screen at a drop, and what landed. */
+  settleFrom: PhoneSettle | null;
   animate: boolean;
   subtasksOf: (id: string) => TodoWithUrls[];
   checked: ReadonlySet<string>;
@@ -96,7 +100,7 @@ export function PhoneRows({
   highlightedId: string | null;
 }) {
   const listRef = useRef<HTMLUListElement>(null);
-  const settled = useRef<Map<string, number> | null>(null);
+  const settled = useRef<PhoneSettle | null>(null);
   // Runs in the commit that shows the dropped order, before it paints.
   useLayoutEffect(() => {
     const list = listRef.current;
@@ -104,12 +108,16 @@ export function PhoneRows({
     settled.current = settleFrom;
     const timing = settleTiming();
     if (!timing) return;
+    const { tops, landing } = settleFrom;
     for (const li of list.querySelectorAll<HTMLElement>(
       ":scope > li[data-phone-row]",
     )) {
       const id = li.querySelector<HTMLElement>("[data-row-id]")?.dataset.rowId;
-      const was = id ? settleFrom.get(id) : undefined;
+      const was = id ? tops.get(id) : undefined;
       if (was === undefined) continue;
+      if (id === landing.id && landing.swing !== 0) {
+        li.animate?.(swingKeyframes(landing.tilt, landing.swing), timing);
+      }
       const dy = was - li.getBoundingClientRect().top;
       if (dy === 0) continue;
       li.animate?.(
@@ -119,8 +127,24 @@ export function PhoneRows({
     }
   }, [settleFrom]);
   const line = drag?.listId === listId ? drag.lineY : null;
+  const gap = drag?.listId === listId ? drag.gapY : null;
   return (
     <ul ref={listRef} data-phone-rows={listId} className="relative pt-2">
+      {gap !== null && drag && (
+        // Under the rows, filling the space they part to leave.
+        <li
+          aria-hidden="true"
+          data-drop-gap
+          style={{ top: gap, height: drag.height }}
+          className={`pointer-events-none absolute inset-x-0 ${
+            animate
+              ? "transition-[top] duration-(--n-duration-fast) ease-n-out"
+              : ""
+          }`}
+        >
+          <span className="absolute inset-x-2 inset-y-1 rounded-n-field bg-n-brand-soft" />
+        </li>
+      )}
       {rows.map((todo, i) => (
         <DraggableRow
           key={todo.id}
@@ -142,7 +166,9 @@ export function PhoneRows({
           data-drop-indicator
           style={{ top: line }}
           className="pointer-events-none absolute inset-x-5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
-        />
+        >
+          <DropDot />
+        </li>
       )}
     </ul>
   );

@@ -89,7 +89,7 @@ export function linkDomain(url: string): string {
 
 export type MetaPart =
   | { kind: "pin"; text: string }
-  | { kind: "due"; text: string; overdue: boolean }
+  | { kind: "due"; text: string; overdue: boolean; today: boolean }
   | { kind: "repeat"; text: string }
   | { kind: "subtasks"; text: string }
   | { kind: "notes"; text: string }
@@ -118,7 +118,12 @@ export function rowMeta(
   if (todo.pinned) parts.push({ kind: "pin", text: "Pinned" });
   if (todo.dueDate) {
     const due = dueLabel(todo.dueDate, now, timeZone);
-    parts.push({ kind: "due", text: due.text, overdue: due.overdue });
+    parts.push({
+      kind: "due",
+      text: due.text,
+      overdue: due.overdue,
+      today: daysUntil(todo.dueDate, now, timeZone) === 0,
+    });
   }
   if (todo.recurrence) {
     parts.push({ kind: "repeat", text: repeatLabel(todo.recurrence) });

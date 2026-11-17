@@ -5,8 +5,9 @@
 
 import SwiftUI
 
-/// The toast pill: inverted colours, the message, and its action in bold.
-/// Yellow stays a fill, so the action is set in weight, not colour.
+/// The toast pill: inverted colours, the message, and its action (Undo) as
+/// a filled button: bold dark ink on a brand yellow fill, the yellow-as-fill
+/// that Settled "Brand accent" allows.
 ///
 /// VoiceOver hears the toast as an announcement that says how to undo, and
 /// can undo without finding the pill: a two-finger double-tap (the Magic
@@ -61,18 +62,28 @@ struct ToastView: View {
             .padding(.top, Theme.Space.s3)
             .padding(.bottom, stacked && toast.actionLabel != nil ? 0 : Theme.Space.s3)
         if let label = toast.actionLabel {
-            Button(label) { toasts.performAction() }
-                .fontWeight(.bold)
-                // The action never wraps mid-word (on the Mac it split "Un/do"
-                // when the pill was narrow); `ViewThatFits` stacks instead.
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .padding(.leading, stacked ? 0 : Theme.Space.s3)
-                .padding(.trailing, Theme.Space.s3)
-                .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
-                .contentShape(Rectangle())
-                .buttonStyle(.plain)
-                .accessibilityHint("Or double-tap with two fingers anywhere")
+            Button { toasts.performAction() } label: {
+                Text(label)
+                    .fontWeight(.bold)
+                    .foregroundStyle(Theme.Colors.brandInk)
+                    // The action never wraps mid-word (on the Mac it split
+                    // "Un/do" when the pill was narrow); at accessibility
+                    // sizes it drops under the message instead.
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, Theme.ToastAction.paddingX)
+                    .frame(minHeight: Theme.ToastAction.height)
+                    .background(
+                        Theme.Colors.brand,
+                        in: RoundedRectangle(cornerRadius: Theme.ToastAction.radius, style: .continuous)
+                    )
+                    // The 36pt fill sits in a 44pt target.
+                    .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(.leading, stacked ? 0 : Theme.Space.s1)
+            .accessibilityHint("Or double-tap with two fingers anywhere")
         }
     }
 

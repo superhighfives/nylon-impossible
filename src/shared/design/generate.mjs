@@ -38,11 +38,18 @@ export function loadTokens() {
 }
 
 const kebab = (name) => name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
+/**
+ * A colour's alpha in one appearance: one number for both, or `{ light, dark }`
+ * when they differ. Undefined when it has none.
+ */
+const alphaOf = (c, mode) =>
+  typeof c.alpha === "object" ? c.alpha[mode] : c.alpha;
 /** A colour value as CSS hex, with the token's alpha (if any) as a fourth byte. */
-const cssHex = (hex, c) => {
+const cssHex = (hex, c, mode = "light") => {
   const base = hex.toLowerCase();
-  if (c.alpha === undefined) return base;
-  const byte = Math.round(c.alpha * 255)
+  const alpha = alphaOf(c, mode);
+  if (alpha === undefined) return base;
+  const byte = Math.round(alpha * 255)
     .toString(16)
     .padStart(2, "0");
   return `${base}${byte}`;
@@ -133,10 +140,16 @@ export function renderCss(tokens) {
     out.push(`  --n-duration-${name}: ${tokens.motion[name]}ms;`);
   }
   out.push(`  --n-ease-out-strong: cubic-bezier(${curve});`);
+  // A drag's tilt and lift: angles in degrees, the rest plain ratios.
+  out.push(`  --n-tilt-max: ${tokens.motion.tiltMax}deg;`);
+  out.push(`  --n-tilt-overshoot: ${tokens.motion.tiltOvershoot};`);
+  out.push(`  --n-settle-overshoot: ${tokens.motion.settleOvershoot}deg;`);
+  out.push(`  --n-settle-min-tilt: ${tokens.motion.settleMinTilt}deg;`);
+  out.push(`  --n-lift: ${tokens.motion.lift};`);
   out.push("}", "", ".dark {");
   for (const [name, c] of entries(tokens.color)) {
-    if (c.dark.toLowerCase() !== c.light.toLowerCase()) {
-      out.push(`  --n-color-${kebab(name)}: ${cssHex(c.dark, c)};`);
+    if (cssHex(c.dark, c, "dark") !== cssHex(c.light, c)) {
+      out.push(`  --n-color-${kebab(name)}: ${cssHex(c.dark, c, "dark")};`);
     }
   }
   out.push(`  --n-sheet-shadow: ${cssSheetShadow(sheet, "dark")};`);
@@ -159,7 +172,7 @@ export function renderCss(tokens) {
     out.push("  }", "", "  .dark {");
     for (const [name, c] of high) {
       out.push(
-        `    --n-color-${kebab(name)}: ${cssHex(c.highContrast.dark, c)};`,
+        `    --n-color-${kebab(name)}: ${cssHex(c.highContrast.dark, c, "dark")};`,
       );
     }
     out.push("  }", "}", "");
@@ -230,10 +243,13 @@ export function renderSwift(tokens) {
     "            light: UInt32,",
     "            dark: UInt32,",
     "            lightHighContrast: UInt32? = nil,",
-    "            darkHighContrast: UInt32? = nil",
+    "            darkHighContrast: UInt32? = nil,",
+    "            lightAlpha: CGFloat = 1,",
+    "            darkAlpha: CGFloat = 1",
     "        ) -> Color {",
     "            let color = platformColor(",
-    "                light: light, dark: dark, lightHighContrast: lightHighContrast, darkHighContrast: darkHighContrast",
+    "                light: light, dark: dark, lightHighContrast: lightHighContrast, darkHighContrast: darkHighContrast,",
+    "                lightAlpha: lightAlpha, darkAlpha: darkAlpha",
     "            )",
     "            #if os(macOS)",
     "            return Color(nsColor: color)",
@@ -244,17 +260,21 @@ export function renderSwift(tokens) {
     "",
     "        /// The same colour as a dynamic `NSColor`/`UIColor`, resolved against",
     "        /// the appearance (macOS) or trait collection (iOS) it's drawn in.",
+    "        /// `lightAlpha` and `darkAlpha` are for a token whose alpha differs",
+    "        /// by appearance.",
     "        static func platformColor(",
     "            light: UInt32,",
     "            dark: UInt32,",
     "            lightHighContrast: UInt32? = nil,",
-    "            darkHighContrast: UInt32? = nil",
+    "            darkHighContrast: UInt32? = nil,",
+    "            lightAlpha: CGFloat = 1,",
+    "            darkAlpha: CGFloat = 1",
     "        ) -> PlatformColor {",
     "            func resolve(isDark: Bool, isHighContrast: Bool) -> PlatformColor {",
     "                rgb(hex(",
     "                    light: light, dark: dark, lightHighContrast: lightHighContrast, darkHighContrast: darkHighContrast,",
     "                    isDark: isDark, isHighContrast: isHighContrast",
-    "                ))",
+    "                ), alpha: isDark ? darkAlpha : lightAlpha)",
     "            }",
     "            #if os(macOS)",
     "            return NSColor(name: nil) { appearance in",
@@ -297,12 +317,12 @@ export function renderSwift(tokens) {
     "        }",
     "        // swiftlint:enable function_parameter_count",
     "",
-    "        private static func rgb(_ hex: UInt32) -> PlatformColor {",
+    "        private static func rgb(_ hex: UInt32, alpha: CGFloat) -> PlatformColor {",
     "            PlatformColor(",
     "                red: CGFloat((hex >> 16) & 0xFF) / 255,",
     "                green: CGFloat((hex >> 8) & 0xFF) / 255,",
     "                blue: CGFloat(hex & 0xFF) / 255,",
-    "                alpha: 1",
+    "                alpha: alpha",
     "            )",
     "        }",
     "",
@@ -312,8 +332,16 @@ export function renderSwift(tokens) {
     const high = c.highContrast
       ? `, lightHighContrast: ${swiftHex(c.highContrast.light)}, darkHighContrast: ${swiftHex(c.highContrast.dark)}`
       : "";
+    // One alpha for both appearances is an opacity; one per appearance goes
+    // into the dynamic colour.
+    const perMode = typeof c.alpha === "object";
+    const alphas = perMode
+      ? `, lightAlpha: ${c.alpha.light}, darkAlpha: ${c.alpha.dark}`
+      : "";
+    const opacity =
+      c.alpha === undefined || perMode ? "" : `.opacity(${c.alpha})`;
     out.push(
-      `        static let ${name} = dynamic(light: ${swiftHex(c.light)}, dark: ${swiftHex(c.dark)}${high})${c.alpha === undefined ? "" : `.opacity(${c.alpha})`}`,
+      `        static let ${name} = dynamic(light: ${swiftHex(c.light)}, dark: ${swiftHex(c.dark)}${high}${alphas})${opacity}`,
     );
   }
   out.push("    }", "");
@@ -442,6 +470,16 @@ export function renderSwift(tokens) {
     );
   }
   out.push(
+    "",
+    "        /// A drag's tilt: one angle per drag, at random within ±`tiltMax`",
+    "        /// degrees, overshooting to `tiltOvershoot` times it on the way. The",
+    "        /// landed row swings `settleOvershoot` degrees past level, unless it",
+    "        /// was tilted less than `settleMinTilt`. The lifted todo scales to `lift`.",
+    `        static let tiltMax: Double = ${tokens.motion.tiltMax}`,
+    `        static let tiltOvershoot: Double = ${tokens.motion.tiltOvershoot}`,
+    `        static let settleOvershoot: Double = ${tokens.motion.settleOvershoot}`,
+    `        static let settleMinTilt: Double = ${tokens.motion.settleMinTilt}`,
+    `        static let lift: CGFloat = ${tokens.motion.lift}`,
     "",
     "        /// The shared ease-out-strong curve at a token duration.",
     "        static func easeOutStrong(_ duration: TimeInterval = base) -> Animation {",

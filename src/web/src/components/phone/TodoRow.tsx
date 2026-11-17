@@ -19,6 +19,7 @@ import {
   useRef,
 } from "react";
 import { RAISED, ROW_HOVER } from "@/components/ui/styles";
+import { tiltStyle } from "@/components/wide/tilt";
 import type { TodoWithUrls } from "@/types/database";
 import { displayTitle, type MetaPart, metaSummary, rowMeta } from "./model";
 
@@ -38,12 +39,42 @@ const META_ICONS = {
   link: Link2,
 } as const;
 
+/**
+ * Which meta items are chips: due today in `brand`, the row's only yellow;
+ * Pinned, Repeat and the other due days in `fill`. Overdue stays red text,
+ * and subtasks, notes and links stay plain. Chips are information, not
+ * controls: no hover, nothing to press.
+ */
+export function metaChip(part: MetaPart): "brand" | "fill" | null {
+  switch (part.kind) {
+    case "due":
+      if (part.overdue) return null;
+      return part.today ? "brand" : "fill";
+    case "pin":
+    case "repeat":
+      return "fill";
+    default:
+      return null;
+  }
+}
+
+const CHIP =
+  "h-5 rounded-n-chip px-[0.4375rem] text-[0.75rem] leading-none font-semibold";
+const CHIP_COLORS = {
+  brand: "bg-n-brand text-n-brand-ink",
+  fill: "bg-n-fill text-n-ink",
+} as const;
+
 function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
   const Icon = part.kind === "due" ? null : META_ICONS[part.kind];
   const overdue = part.kind === "due" && part.overdue;
+  const chip = metaChip(part);
   return (
     <span
-      className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""}`}
+      data-meta-chip={chip ?? undefined}
+      className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""} ${
+        chip ? `${CHIP} ${CHIP_COLORS[chip]}` : ""
+      }`}
     >
       {part.kind === "link" && part.fetching ? (
         <Loader2
@@ -231,6 +262,8 @@ export interface TodoRowProps {
    * look. A touch drag moves the row itself, so it doesn't fade.
    */
   lifted?: boolean;
+  /** Phone: a touch drag's tilt, in degrees, while `lifted`. */
+  tilt?: number;
   /** Phone: the row's slot's style, for a drag's offsets. */
   rowStyle?: CSSProperties;
   /** Extra props for the row's main button — drag listeners, data hooks. */
@@ -394,6 +427,7 @@ function PhoneTodoRow({
   onMenu,
   dragging = false,
   lifted = false,
+  tilt = 0,
   rowStyle,
   bodyProps,
   bodyRef,
@@ -456,9 +490,11 @@ function PhoneTodoRow({
       style={rowStyle}
     >
       <div
+        data-row-card
+        style={lifted ? tiltStyle(tilt) : undefined}
         className={`flex min-h-0 items-start gap-3 overflow-clip px-5 transition-[background-color,box-shadow] duration-(--n-duration-fast) ${
           lifted
-            ? RAISED
+            ? `${RAISED} n-lifted`
             : highlighted
               ? "bg-n-fill"
               : "pointer-fine:hover:bg-n-surface"

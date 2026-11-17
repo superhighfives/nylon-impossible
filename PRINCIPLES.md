@@ -84,10 +84,10 @@ How the wide board (web, iPad and the Mac, with a pointer and keyboard) shows ea
 | Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface` plus the 3px `brand` ring | — |
 | Focused by click | Same as selected by click | Nothing visible | Nothing extra | Same as by keyboard | — |
 | Column holds the selection | — | — | 3px `ink` bar | — | — |
-| Drop target | A 2pt/2px `brand` line in the gap where the todo will land | — | `brand` fill, `brandInk` text | — | — |
+| Drop target | A 2pt/2px `brand` line in the gap where the todo will land, with an 8pt `brand` dot at its leading end | — | `brand` fill, `brandInk` text | — | — |
 | Column as a drop target | The line only, no column fill | — | — | — | — |
 | Dragging (source) | The original row stays, faded to 35% | — | — | — | — |
-| Drag preview | `surface` card, `hairline` border, field radius, checkbox and title | — | — | — | — |
+| Drag preview | `surface` card, `hairline` border, field radius, tilted at random up to 1.5° either way, checkbox and title | — | — | — | — |
 
 - **Section with the keyboard.** The sidebar, a column or the open todo that has the keyboard shows a 4pt/4px `sectionOutline` (ink at 8%) drawn inside its edges: a frame, not a selection, and never `brand`. It shows whether the keyboard is on the section or in it, follows "Keyboard or pointer", and changes none of the looks inside it. At launch the keyboard is on Today, with the outline hidden until the first key press.
 - **Two bars, two roles.** The row's keyboard bar is `inkMuted`; the sidebar's bar for the column holding the selection is `ink`.
