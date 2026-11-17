@@ -75,7 +75,7 @@ describe("design token generator", () => {
     expect(css).toContain("--n-radius-field: 0.625rem;");
   });
 
-  it("emits the board's column widths and hatch, web and Apple", () => {
+  it("emits the board's column widths and hatch, for the web only", () => {
     const css = renderCss(tokens);
     expect(css).toContain("--n-board-column-min-width: 17rem;");
     expect(css).toContain("--n-board-column-max-width: 26rem;");
@@ -85,10 +85,10 @@ describe("design token generator", () => {
     expect(css).toContain("--n-board-hatch-opacity: 0.4;");
     // 12 × √2 ≈ 17px: a whole pixel, so the tile draws the same every time.
     expect(css).toContain("--n-board-hatch-tile: 1.0625rem;");
+    // The web board is the only board (#689): Apple gets no Board or Sheet.
     const swift = renderSwift(tokens);
-    expect(swift).toContain("static let columnMaxWidth: CGFloat = 416");
-    expect(swift).toContain("static let hatchSpacing: CGFloat = 12");
-    expect(swift).toContain("static let hatchOpacity: Double = 0.4");
+    expect(swift).not.toContain("enum Board");
+    expect(swift).not.toContain("enum Sheet");
   });
 
   it("emits a drag's tilt and lift, web and Apple", () => {
