@@ -34,10 +34,6 @@ export const fetchUrlMetadataResult = vi.fn<
   Promise<UrlMetadataResult>
 >(async () => ({ ok: true, metadata: NULL_METADATA }));
 
-export const fetchUrlMetadata = vi.fn<[url: string], Promise<UrlMetadata>>(
-  async (url) => (await fetchUrlMetadataResult(url)).metadata,
-);
-
 // Pure predicate — no network, so the real implementation is what tests want.
 // Kept in sync by hand with url-metadata.ts's TWEET_URL_RE.
 const TWEET_URL_RE =
@@ -73,13 +69,9 @@ export function mockFailedUrlFetch(): void {
  */
 export function resetUrlMetadataMock(): void {
   fetchUrlMetadataResult.mockReset();
-  fetchUrlMetadata.mockReset();
   // Default: reachable page with no usable tags (no network requests).
   fetchUrlMetadataResult.mockResolvedValue({
     ok: true,
     metadata: NULL_METADATA,
   });
-  fetchUrlMetadata.mockImplementation(
-    async (url) => (await fetchUrlMetadataResult(url)).metadata,
-  );
 }

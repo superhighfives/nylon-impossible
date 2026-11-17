@@ -12,7 +12,7 @@ import {
   serializeUrl,
 } from "@nylon-impossible/shared/serialize";
 import * as Sentry from "@sentry/cloudflare";
-import { generateNKeysBetween } from "fractional-indexing";
+import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { notifySync } from "./notify-sync";
@@ -23,34 +23,17 @@ type Bindings = Env["Bindings"];
 
 export interface CreateSmartTodoOptions {
   /**
-   * Extra URLs to attach beyond those parsed from `text` — e.g. a link the
-   * caller wants fetched for metadata. Deduped against parsed URLs; never
-   * affects the title.
-   */
-  extraUrls?: string[];
-  /**
    * URLs attached with a title already known, which should NOT be fetched for
    * metadata — e.g. a Gmail thread permalink, where the subject is known up
    * front and a fetch would just hit an auth wall. Stored as already-`fetched`
    * so clients render the title (and their email treatment) immediately.
-   * Deduped against parsed URLs and `extraUrls`.
+   * Deduped against parsed URLs.
    */
   attachedUrls?: { url: string; title?: string; siteName?: string }[];
   /**
-   * Create as a subtask of this todo instead of a top-level todo. Must
-   * belong to `userId` and be itself top-level (subtasks can't nest) —
-   * mirrors the validation `src/web/src/server/todos.ts`'s own subtask
-   * creation already does. Position is scoped to the parent's existing
-   * subtasks (prepended) instead of the user's top-level list, and the new
-   * todo can never carry a recurrence (recurrence and subtasks are
-   * mutually exclusive, enforced in `handlers/sync.ts` too).
-   */
-  parentId?: string;
-  /**
-   * Place the new top-level todo in this list instead of the Today default.
-   * Ignored when `parentId` is set (subtasks are always scoped to their
-   * parent's list). Callers MUST verify this belongs to `userId` first (e.g.
-   * via `verifyListOwnership`) — this function trusts it as already-checked,
+   * Place the new todo in this list instead of the Today default. Callers
+   * MUST verify this belongs to `userId` first (e.g. via
+   * `verifyListOwnership`) — this function trusts it as already-checked,
    * matching how `handlers/sync.ts` checks an incoming `listId` before
    * writing it.
    */
@@ -82,24 +65,10 @@ export interface CreateSmartTodoResult {
 }
 
 /**
- * Thrown when `parentId` doesn't resolve to a top-level todo owned by
- * `userId` — either it doesn't exist, belongs to someone else, or is itself
- * a subtask.
- */
-export class InvalidParentTodoError extends Error {
-  constructor() {
-    super("parentId must reference one of the user's top-level todos");
-    this.name = "InvalidParentTodoError";
-  }
-}
-
-/**
  * Core of the smart-create path, shared by the `POST /todos/smart` REST
  * handler and the Gmail add-on. Given a resolved `userId` and free text, it
- * creates a todo (prepended to its list —
- * the user's top-level list, or a parent's subtasks when `parentId` is set),
- * extracts + attaches URLs in the background, and pokes connected clients to
- * sync. Keeping this in one place means URL handling, positioning, and
+ * creates a top-level todo (prepended to its list), extracts + attaches URLs
+ * in the background, and pokes connected clients to sync. Keeping this in one place means URL handling, positioning, and
  * `notifySync` behave identically everywhere.
  */
 export async function createSmartTodo(
@@ -111,58 +80,31 @@ export async function createSmartTodo(
 ): Promise<CreateSmartTodoResult> {
   const trimmed = text.trim();
 
-  const parentId = options.parentId ?? null;
-  // Subtasks are implicitly scoped to their parent's list. A top-level todo
-  // uses the caller-supplied (already-verified) list, or defaults to Today.
-  let listId: string | null = null;
-  if (parentId) {
-    const [parent] = await db
-      .select({ id: todos.id, parentId: todos.parentId, listId: todos.listId })
-      .from(todos)
-      .where(and(eq(todos.id, parentId), eq(todos.userId, userId)));
-    if (!parent || parent.parentId !== null) {
-      throw new InvalidParentTodoError();
-    }
-    listId = parent.listId;
-  } else {
-    listId = options.listId ?? (await getSystemListId(db, userId, "today"));
-  }
+  // The caller-supplied (already-verified) list, or Today by default.
+  const listId = options.listId ?? (await getSystemListId(db, userId, "today"));
   if (!listId) {
     throw new Error(`No list found to place todo into for user ${userId}`);
   }
 
-  // Get the lowest position in the target list so the new todo is prepended:
-  // the user's top-level list, or (when parentId is set) that parent's
-  // existing subtasks.
+  // Get the lowest top-level position so the new todo is prepended.
   const firstTodo = await db
     .select({ position: todos.position })
     .from(todos)
-    .where(
-      and(
-        eq(todos.userId, userId),
-        parentId ? eq(todos.parentId, parentId) : isNull(todos.parentId),
-      ),
-    )
+    .where(and(eq(todos.userId, userId), isNull(todos.parentId)))
     .orderBy(todos.position)
     .limit(1)
     .then((rows) => rows[0]);
 
-  const position = generateNKeysBetween(
-    null,
-    firstTodo?.position ?? null,
-    1,
-  )[0];
+  const position = generateKeyBetween(null, firstTodo?.position ?? null);
   const now = new Date();
 
   const initial = createInitialTodo(trimmed);
 
-  // Typed dates. Subtasks have no due date of their own in the UI, so only
-  // top-level todos are parsed.
+  // Typed dates.
   let dueDate: Date | null = options.dueDate ?? null;
   if (
     options.dueDate === undefined &&
     options.parseDate !== false &&
-    !parentId &&
     initial.titleIsTyped
   ) {
     const parsed = parseTodoDate(initial.title, {
@@ -175,20 +117,14 @@ export async function createSmartTodo(
     }
   }
 
-  // Merge any caller-supplied URLs (e.g. a Gmail thread permalink) with those
-  // parsed from the text, keeping order (parsed first) and deduping. extraUrls
-  // passes the same http/https gate as parsed URLs — a caller-supplied value is
-  // untrusted input, so a `javascript:`/`data:` string can't slip through to a
-  // persisted, clickable link.
-  const extraUrls = (options.extraUrls ?? [])
-    .map(normalizeHttpUrl)
-    .filter((url): url is string => url !== null);
-  // URLs we fetch metadata for in the background (parsed from text + plain extras).
-  const fetchedUrls = Array.from(new Set([...initial.urls, ...extraUrls]));
+  // URLs parsed from the text, which we fetch metadata for in the background.
+  const fetchedUrls = Array.from(new Set(initial.urls));
 
   // Pre-titled attachments (e.g. a Gmail thread permalink) skip the fetch: the
   // title is already known and the target sits behind auth. Normalize through
-  // the same http/https gate, then dedupe within the group and against the
+  // the same http/https gate as parsed URLs (a caller-supplied
+  // value is untrusted input, so a `javascript:`/`data:` string can't slip
+  // through to a persisted, clickable link), then dedupe within the group and against the
   // fetched set (via a running `Set`) so a URL never lands in both places.
   const seenUrls = new Set(fetchedUrls);
   const attachedUrls = (options.attachedUrls ?? [])
@@ -212,7 +148,6 @@ export async function createSmartTodo(
   await db.insert(todos).values({
     id: todoId,
     userId,
-    parentId,
     listId,
     listEnteredAt: now,
     title: initial.title,
@@ -224,15 +159,19 @@ export async function createSmartTodo(
     updatedAt: now,
   });
 
+  const pendingLinks = fetchedUrls.map((url) => ({
+    id: crypto.randomUUID(),
+    todoId,
+    url,
+  }));
+
   // Insert any URLs — fetched ones start pending, attachments start settled.
   const totalUrls = fetchedUrls.length + attachedUrls.length;
   if (totalUrls > 0) {
     const urlPositions = generateNKeysBetween(null, null, totalUrls);
     await db.insert(todoUrls).values([
-      ...fetchedUrls.map((url, i) => ({
-        id: crypto.randomUUID(),
-        todoId,
-        url,
+      ...pendingLinks.map((link, i) => ({
+        ...link,
         position: urlPositions[i],
         fetchStatus: "pending" as const,
         createdAt: now,
@@ -251,12 +190,6 @@ export async function createSmartTodo(
         updatedAt: now,
       })),
     ]);
-
-    // Fetch URL metadata in background — only when there are pending URLs;
-    // attachments already carry their title and must not be re-fetched.
-    if (fetchedUrls.length > 0) {
-      options.waitUntil(fetchUrlMetadataBackground(db, todoId, env, userId));
-    }
   }
 
   // Fetch the created todo to return
@@ -275,6 +208,15 @@ export async function createSmartTodo(
           .orderBy(todoUrls.position)
       : [];
 
+  // Fetch metadata for the pending links in the background, then name the todo
+  // after what came back if its title is still the "Check {domain}"
+  // placeholder. Attachments already carry their title and must not be
+  // re-fetched. Started after the read-back above, so the response always
+  // shows the links as inserted.
+  if (pendingLinks.length > 0) {
+    options.waitUntil(finishTodoLinks(db, env, userId, pendingLinks));
+  }
+
   Sentry.addBreadcrumb({
     category: "todo",
     message: "todo.created",
@@ -285,31 +227,4 @@ export async function createSmartTodo(
   await notifySync(env, userId);
 
   return { todo: { ...serializeTodo(created), urls: urls.map(serializeUrl) } };
-}
-
-/**
- * Fetch metadata for a new todo's URLs in the background, then name the todo
- * after what came back if its title is still the "Check {domain}" placeholder.
- */
-async function fetchUrlMetadataBackground(
-  db: Db,
-  todoId: string,
-  env: { USER_SYNC: DurableObjectNamespace },
-  userId: string,
-): Promise<void> {
-  // Get the pending URL records we just created — attachments (e.g. a Gmail
-  // permalink) are inserted already `fetched` and must not be fetched over.
-  const urlRecords = await db
-    .select({ id: todoUrls.id, url: todoUrls.url })
-    .from(todoUrls)
-    .where(
-      and(eq(todoUrls.todoId, todoId), eq(todoUrls.fetchStatus, "pending")),
-    );
-
-  await finishTodoLinks(
-    db,
-    env,
-    userId,
-    urlRecords.map((record) => ({ ...record, todoId })),
-  );
 }
