@@ -304,6 +304,7 @@ export function Composer({
       <form
         ref={rootRef}
         aria-label={`Add a todo to ${targetInSentence}`}
+        data-composer
         onSubmit={(e) => {
           e.preventDefault();
           void submit();
@@ -418,6 +419,7 @@ export function Composer({
     <form
       ref={rootRef}
       aria-label="Add a todo"
+      data-composer
       onSubmit={(e) => {
         e.preventDefault();
         void submit();
