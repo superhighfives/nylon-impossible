@@ -37,6 +37,30 @@ struct WebSocketServiceTests {
         ))
     }
 
+    @Test("a TLS handshake cut off by a dropped connection is transient (Sentry NSURLErrorDomain -1200)")
+    func tlsClosedDuringHandshake() {
+        let error = NSError(
+            domain: NSURLErrorDomain,
+            code: NSURLErrorSecureConnectionFailed,
+            userInfo: ["_kCFStreamErrorCodeKey": -9816, "_kCFStreamErrorDomainKey": 3]
+        )
+        #expect(WebSocketService.isTransientNetworkDrop(error))
+    }
+
+    @Test("a TLS certificate failure still reaches Sentry")
+    func tlsCertificateFailure() {
+        #expect(!WebSocketService.isTransientNetworkDrop(
+            NSError(
+                domain: NSURLErrorDomain,
+                code: NSURLErrorSecureConnectionFailed,
+                userInfo: ["_kCFStreamErrorCodeKey": -9807, "_kCFStreamErrorDomainKey": 3]
+            )
+        ))
+        #expect(!WebSocketService.isTransientNetworkDrop(
+            NSError(domain: NSURLErrorDomain, code: NSURLErrorSecureConnectionFailed)
+        ))
+    }
+
     @Test("real failures still reach Sentry")
     func realFailures() {
         #expect(!WebSocketService.isTransientNetworkDrop(

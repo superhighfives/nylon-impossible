@@ -156,6 +156,8 @@ final class WebSocketService {
     /// dropping (-1005), no network or a timeout, and the POSIX aborts and
     /// resets the OS reports after sleep or a network switch. The service
     /// reconnects on its own, so these are breadcrumbs, not Sentry errors.
+    /// A TLS failure (-1200) counts only when the connection closed
+    /// mid-handshake; a certificate or protocol failure is still reported.
     nonisolated static func isTransientNetworkDrop(_ error: Error) -> Bool {
         let transientURLCodes: Set<Int> = [
             NSURLErrorNetworkConnectionLost,
@@ -169,8 +171,17 @@ final class WebSocketService {
         let transientPOSIXCodes: Set<Int32> = [
             ECONNABORTED, ECONNRESET, ENOTCONN, ETIMEDOUT, ENETDOWN, ENETUNREACH, ENETRESET, EPIPE
         ]
+        // errSSLClosedNoNotify and errSSLClosedAbort: the connection closed
+        // during the TLS handshake (Sentry NSURLErrorDomain -1200 / -9816).
+        let transientTLSStreamCodes: Set<Int> = [-9816, -9806]
+        func isClosedDuringHandshake(_ nsError: NSError) -> Bool {
+            guard nsError.domain == NSURLErrorDomain, nsError.code == NSURLErrorSecureConnectionFailed,
+                  let streamCode = nsError.userInfo["_kCFStreamErrorCodeKey"] as? Int else { return false }
+            return transientTLSStreamCodes.contains(streamCode)
+        }
         func matches(_ nsError: NSError) -> Bool {
             (nsError.domain == NSURLErrorDomain && transientURLCodes.contains(nsError.code))
+                || isClosedDuringHandshake(nsError)
                 || (nsError.domain == NSPOSIXErrorDomain && Int32(exactly: nsError.code).map(transientPOSIXCodes.contains) == true)
         }
         let nsError = error as NSError
