@@ -1,7 +1,14 @@
 import { splitTodoText } from "./todo-text";
 
+/**
+ * A URL's scheme and one character of what follows it in free text,
+ * unquantified, so each regex that finds URLs picks its own `+` or `*` and
+ * shares the character class.
+ */
+export const TEXT_URL_PATTERN = /https?:\/\/[^\s<>"{}|\\^`[\]]/.source;
+
 /** A URL in free text, as smart-create finds it. */
-export const TEXT_URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/gi;
+export const TEXT_URL_REGEX = new RegExp(`${TEXT_URL_PATTERN}+`, "gi");
 
 /** Common trailing punctuation that shouldn't be part of URLs. */
 export const URL_TRAILING_PUNCTUATION = /[.,;:!?)]+$/;
