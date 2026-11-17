@@ -252,15 +252,100 @@ function trimUrl(url: string): string {
 }
 
 /**
- * `[text](href)` at `start` (on the `[`): the text, the href and where it
- * ends, or null when it isn't one.
+ * Lookups over one inline string, built the first time they're needed, so a
+ * long note stays linear: without them a run of `[`, or of `*` that never
+ * closes, rescans the rest of the paragraph from each one.
  */
-function matchLink(
-  s: string,
-  start: number,
-): { text: string; href: string; end: number } | null {
+class Lookups {
+  private brackets?: Int32Array;
+  private spaces?: Int32Array;
+  private parens?: Int32Array;
+  private pairs?: Int32Array;
+  private failed = new Map<string, Uint8Array>();
+
+  constructor(private readonly s: string) {}
+
+  /**
+   * The `]` that closes the `[` at `start`, or -1. Escapes are read from the
+   * start of the string, so this agrees with a scan from `start` unless a
+   * backslash comes just before it.
+   */
+  closingBracket(start: number): number {
+    if (!this.brackets) {
+      const { s } = this;
+      const brackets = new Int32Array(s.length).fill(-1);
+      const open: number[] = [];
+      for (let j = 0; j < s.length; j++) {
+        const ch = s[j];
+        if (ch === "\\") {
+          j++;
+        } else if (ch === "[") {
+          open.push(j);
+        } else if (ch === "]") {
+          const from = open.pop();
+          if (from !== undefined) brackets[from] = j;
+        }
+      }
+      this.brackets = brackets;
+    }
+    return this.brackets[start];
+  }
+
+  /**
+   * Where a bare href starting at `from` ends: at whitespace, or at a `)`
+   * its own parentheses don't account for.
+   */
+  hrefEnd(from: number): number {
+    const { s } = this;
+    if (!this.spaces || !this.parens || !this.pairs) {
+      const n = s.length;
+      // The next whitespace, and the next `(` or `)`, at or after each index.
+      const spaces = new Int32Array(n + 1).fill(n);
+      const parens = new Int32Array(n + 1).fill(n);
+      for (let j = n - 1; j >= 0; j--) {
+        spaces[j] = /\s/.test(s[j]) ? j : spaces[j + 1];
+        parens[j] = s[j] === "(" || s[j] === ")" ? j : parens[j + 1];
+      }
+      // Each `(`'s matching `)`, or -1.
+      const pairs = new Int32Array(n).fill(-1);
+      const open: number[] = [];
+      for (let j = 0; j < n; j++) {
+        if (s[j] === "(") open.push(j);
+        if (s[j] === ")") {
+          const at = open.pop();
+          if (at !== undefined) pairs[at] = j;
+        }
+      }
+      this.spaces = spaces;
+      this.parens = parens;
+      this.pairs = pairs;
+    }
+    const limit = this.spaces[from];
+    let j = from;
+    for (;;) {
+      const p = this.parens[j];
+      if (p >= limit || s[p] === ")") return Math.min(p, limit);
+      const close = this.pairs[p];
+      // An unclosed `(` runs the href to the whitespace.
+      if (close < 0 || close >= limit) return limit;
+      j = close + 1;
+    }
+  }
+
+  /** Where earlier closer searches for `marker` passed and found nothing. */
+  failedSearch(marker: string): Uint8Array {
+    let seen = this.failed.get(marker);
+    if (!seen) {
+      seen = new Uint8Array(this.s.length + 1);
+      this.failed.set(marker, seen);
+    }
+    return seen;
+  }
+}
+
+/** The `]` closing the `[` at `start`, scanning from there; or -1. */
+function scanBracket(s: string, start: number): number {
   let depth = 0;
-  let close = -1;
   for (let j = start; j < s.length; j++) {
     const ch = s[j];
     if (ch === "\\") {
@@ -269,12 +354,25 @@ function matchLink(
       depth++;
     } else if (ch === "]") {
       depth--;
-      if (depth === 0) {
-        close = j;
-        break;
-      }
+      if (depth === 0) return j;
     }
   }
+  return -1;
+}
+
+/**
+ * `[text](href)` at `start` (on the `[`): the text, the href and where it
+ * ends, or null when it isn't one.
+ */
+function matchLink(
+  s: string,
+  start: number,
+  lookups: Lookups,
+): { text: string; href: string; end: number } | null {
+  const close =
+    s[start - 1] === "\\"
+      ? scanBracket(s, start)
+      : lookups.closingBracket(start);
   if (close < 0 || s[close + 1] !== "(") return null;
   let j = close + 2;
   while (s[j] === " ") j++;
@@ -285,17 +383,8 @@ function matchLink(
     href = s.slice(j + 1, end);
     j = end + 1;
   } else {
-    let parens = 0;
     const from = j;
-    for (; j < s.length; j++) {
-      const ch = s[j];
-      if (/\s/.test(ch)) break;
-      if (ch === "(") parens++;
-      if (ch === ")") {
-        if (parens === 0) break;
-        parens--;
-      }
-    }
+    j = lookups.hrefEnd(from);
     href = s.slice(from, j);
   }
   // An optional "title", which notes don't show.
@@ -309,11 +398,27 @@ function matchLink(
 /**
  * Where the `*` or `_` run of `marker` that opens at `from` closes, or -1.
  * Runs of the other length are stepped over, so `*a **b** c*` pairs its
- * outer stars.
+ * outer stars. A search that reaches a place an earlier failed one passed
+ * would fail the same way from there, so it stops.
  */
-function findCloser(s: string, from: number, marker: string): number {
+function findCloser(
+  s: string,
+  from: number,
+  marker: string,
+  lookups: Lookups,
+): number {
   const ch = marker[0];
+  const failed = lookups.failedSearch(marker);
+  const passed: number[] = [];
+  const fail = () => {
+    for (const j of passed) failed[j] = 1;
+    return -1;
+  };
   for (let j = from; j < s.length; j++) {
+    if (j > from) {
+      if (failed[j]) return fail();
+      passed.push(j);
+    }
     if (s[j] === "\\") {
       j++;
       continue;
@@ -342,7 +447,7 @@ function findCloser(s: string, from: number, marker: string): number {
     }
     j += run - 1;
   }
-  return -1;
+  return fail();
 }
 
 /** One paragraph's, item's or heading's text, `\n` as line breaks. */
@@ -358,6 +463,7 @@ export function parseInline(s: string, depth = 0, inLink = false): Inline[] {
     out.push(node);
   };
   if (depth > MAX_INLINE_DEPTH) return [{ type: "text", text: s }];
+  const lookups = new Lookups(s);
 
   let i = 0;
   while (i < s.length) {
@@ -392,7 +498,7 @@ export function parseInline(s: string, depth = 0, inLink = false): Inline[] {
 
     // Images aren't drawn: `![alt](src)` stays as typed.
     if (ch === "!" && s[i + 1] === "[") {
-      const image = matchLink(s, i + 1);
+      const image = matchLink(s, i + 1, lookups);
       if (image) {
         text += s.slice(i, image.end);
         i = image.end;
@@ -401,7 +507,7 @@ export function parseInline(s: string, depth = 0, inLink = false): Inline[] {
     }
 
     if (ch === "[" && !inLink) {
-      const link = matchLink(s, i);
+      const link = matchLink(s, i, lookups);
       if (link) {
         const href = safeHref(link.href);
         if (href) {
@@ -459,7 +565,7 @@ export function parseInline(s: string, depth = 0, inLink = false): Inline[] {
         !(ch === "_" && i > 0 && WORD.test(s[i - 1]));
       if (opens) {
         const marker = run >= 2 ? ch + ch : ch;
-        const close = findCloser(s, i + marker.length, marker);
+        const close = findCloser(s, i + marker.length, marker, lookups);
         if (close > 0) {
           const children = parseInline(
             s.slice(i + marker.length, close),

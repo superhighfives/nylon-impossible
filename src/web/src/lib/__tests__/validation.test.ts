@@ -1,3 +1,4 @@
+import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { describe, expect, it } from "vitest";
 import { createTodoSchema, updateTodoSchema } from "../validation";
 
@@ -87,6 +88,20 @@ describe("updateTodoSchema", () => {
   it("accepts partial update with description", () => {
     const result = updateTodoSchema.safeParse({ description: "Updated desc" });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts notes at the limit and rejects them past it", () => {
+    const notes = "a".repeat(TODO_NOTES_MAX);
+    expect(TODO_NOTES_MAX).toBe(100_000);
+    expect(updateTodoSchema.safeParse({ notes }).success).toBe(true);
+    expect(createTodoSchema.safeParse({ title: "a", notes }).success).toBe(
+      true,
+    );
+    const over = updateTodoSchema.safeParse({ notes: `${notes}a` });
+    expect(over.success).toBe(false);
+    if (!over.success) {
+      expect(over.error.issues[0].message).toBe("Notes are too long");
+    }
   });
 
   it("accepts clearing description with null", () => {

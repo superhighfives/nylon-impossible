@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { and, eq } from "drizzle-orm";
+import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, lists, todos, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedTodo, seedTodoUrl, seedUser } from "../helpers";
@@ -481,6 +482,30 @@ describe("Sync endpoint", () => {
     const body = await syncRequest({ changes: [] }).then((r) => r.json<any>());
     const todo = body.todos.find((t: any) => t.id === todoId);
     expect(todo.notes).toBe("A plain note with no URL");
+  });
+
+  it("keeps notes at the notes limit, and rejects one character more", async () => {
+    const now = new Date().toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440016";
+    const notes = "word ".repeat(TODO_NOTES_MAX / 5);
+    expect(notes).toHaveLength(TODO_NOTES_MAX);
+    const change = {
+      id: todoId,
+      title: "Long notes",
+      completed: false,
+      position: "a0",
+      updatedAt: now,
+    };
+
+    const res = await syncRequest({ changes: [{ ...change, notes }] });
+    expect(res.status).toBe(200);
+    const body = await syncRequest({ changes: [] }).then((r) => r.json<any>());
+    expect(body.todos.find((t: any) => t.id === todoId).notes).toBe(notes);
+
+    const over = await syncRequest({
+      changes: [{ ...change, notes: `${notes}a` }],
+    });
+    expect(over.status).toBe(400);
   });
 
   it("extracts URLs from both title and notes when both contain URLs", async () => {

@@ -2,7 +2,7 @@
 export const TODO_TITLE_MAX = 500;
 
 /** Longest notes the API accepts. */
-export const TODO_NOTES_MAX = 10000;
+export const TODO_NOTES_MAX = 100_000;
 
 /**
  * Target length for a title cut from overflowing text. Deliberately well under

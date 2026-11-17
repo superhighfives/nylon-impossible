@@ -14,7 +14,7 @@ enum TodoText {
     /// Longest title the API accepts.
     static let titleMax = 500
     /// Longest notes the API accepts.
-    static let notesMax = 10_000
+    static let notesMax = 100_000
     /// Target length for a title cut from overflowing text.
     private static let overflowTitleLength = 120
 

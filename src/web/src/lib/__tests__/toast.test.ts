@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   ApiError,
   apiErrorFrom,
@@ -29,6 +30,20 @@ describe("messageFromError", () => {
     ).toBe("Couldn’t add the link");
     expect(messageFromError("nope", "fallback")).toBe("fallback");
     expect(messageFromError(undefined, "fallback")).toBe("fallback");
+  });
+
+  it("never shows a zod failure's JSON", () => {
+    const result = z
+      .object({ notes: z.string().max(1, "Notes are too long") })
+      .safeParse({ notes: "ab" });
+    if (result.success) throw new Error("expected a failure");
+    // As it arrives from a server function: an Error with the issues as JSON.
+    expect(
+      messageFromError(
+        new Error(result.error.message),
+        "Couldn’t save changes",
+      ),
+    ).toBe("Couldn’t save changes");
   });
 
   it("shows invalid_url's own message, which says what to do", () => {

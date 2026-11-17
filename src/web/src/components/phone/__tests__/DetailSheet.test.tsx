@@ -1,4 +1,4 @@
-import type { Recurrence } from "@nylon-impossible/shared";
+import { type Recurrence, TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/lib/toast";
@@ -571,6 +571,39 @@ describe("DetailSheet", () => {
         expect(error).toHaveBeenCalledWith("Couldn’t copy");
         expect(screen.queryByText("Copied")).toBeNull();
       });
+    });
+
+    it("stops at the notes limit, says so once, and counts near it", () => {
+      const info = vi.spyOn(toast, "info").mockImplementation(() => "");
+      const { editor, save } = renderNotes(null);
+      const field = editor();
+      if (!field) throw new Error("no editor");
+      expect(field).toHaveAttribute("maxLength", String(TODO_NOTES_MAX));
+      fireEvent.focus(field);
+
+      fireEvent.change(field, { target: { value: "a".repeat(89_999) } });
+      expect(screen.queryByText(/\/ 100,000$/)).toBeNull();
+      fireEvent.change(field, { target: { value: "a".repeat(90_000) } });
+      const count = screen.getByText("90,000 / 100,000");
+      expect(field).toHaveAttribute("aria-describedby", count.id);
+      expect(info).not.toHaveBeenCalled();
+
+      const full = "a".repeat(TODO_NOTES_MAX);
+      fireEvent.change(field, { target: { value: full } });
+      fireEvent.change(field, { target: { value: `${full.slice(1)}b` } });
+      expect(info).toHaveBeenCalledTimes(1);
+      expect(info).toHaveBeenCalledWith(
+        "Notes can be up to 100,000 characters",
+      );
+      expect(screen.getByText("100,000 / 100,000")).toBeInTheDocument();
+
+      fireEvent.blur(field);
+      expect(save).toHaveBeenCalledWith(expect.any(String), {
+        notes: `${full.slice(1)}b`,
+      });
+      // Drawn, not edited: no count.
+      expect(screen.queryByText(/\/ 100,000$/)).toBeNull();
+      info.mockRestore();
     });
 
     it("saves exactly the Markdown typed", () => {
