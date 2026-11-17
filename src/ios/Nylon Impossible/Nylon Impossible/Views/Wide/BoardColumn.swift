@@ -13,9 +13,11 @@
 //  including the bottom padding, last. That's also how rows reorder within a
 //  column. A drop on the header or the composer moves a todo from another
 //  column to the end and leaves one from this column where it is. A 2pt
-//  line marks where it will land, and the column itself never tints
-//  (PRINCIPLES.md, States: "Column as a drop target"). Rows open the wide
-//  context menu on long-press or right-click.
+//  line, with a dot at its start, marks where it will land, and the column
+//  itself never tints (PRINCIPLES.md, States: "Column as a drop target").
+//  The landed row swings past level, the other way to the drag's tilt, as
+//  it comes to rest. Rows open the wide context menu on long-press or
+//  right-click.
 //
 
 import SwiftUI
@@ -63,6 +65,8 @@ struct BoardColumn<Accessory: View>: View {
     /// Where the drop line is, in the rows' coordinates; nil for none.
     @State private var dropLine: CGFloat?
     @State private var geometry = DropGeometry()
+    /// The todo that just landed here, swinging to rest.
+    @State private var landing: DropLanding?
 
     private static var columnSpace: String { "boardColumn" }
     private static var rowsSpace: String { "boardColumnRows" }
@@ -164,6 +168,7 @@ struct BoardColumn<Accessory: View>: View {
         #endif
         .contextMenu { TodoContextMenu(todo: todo, lists: lists, actions: actions, style: .wide, onMove: onMove) }
         .todoDragSource(todo)
+        .modifier(LandingSwing(landing: landing?.id == todo.id ? landing : nil))
         .onGeometryChange(for: CGRect.self) {
             $0.frame(in: .named(Self.rowsSpace))
         } action: { frame in
@@ -178,15 +183,20 @@ struct BoardColumn<Accessory: View>: View {
 
     // MARK: - Drop
 
-    /// The 2pt line in the gap the drop would land in.
+    /// The 2pt line in the gap the drop would land in, with a dot centred
+    /// on its leading end.
     @ViewBuilder
     private var dropLineView: some View {
         if let y = dropLine {
             Rectangle()
                 .fill(Theme.Colors.brand)
-                .frame(height: 2)
+                .frame(height: Theme.Drag.lineHeight)
+                .overlay(alignment: .leading) {
+                    DropLineDot()
+                        .offset(x: -(Theme.Drag.dotSize / 2 + Theme.Drag.dotRing))
+                }
                 .padding(.horizontal, Theme.Wide.gutter)
-                .offset(y: y - 1)
+                .offset(y: y - Theme.Drag.lineHeight / 2)
                 .allowsHitTesting(false)
                 .accessibilityHidden(true)
         }
@@ -222,8 +232,20 @@ struct BoardColumn<Accessory: View>: View {
     private func drop(_ item: ExternalDrop, at location: CGPoint) {
         switch item {
         case .todo(let id):
+            // Read before the session ends: the row lands from this tilt.
+            let tilt = TodoDragSession.current?.id == id ? TodoDragSession.current?.tilt : nil
             TodoDragSession.end()
             dropLine = nil
+            if let tilt, !reduceMotion, DragTilt.settleSwing(for: tilt) != 0 {
+                let landed = DropLanding(id: id, tilt: tilt, swing: DragTilt.settleSwing(for: tilt))
+                landing = landed
+                // Let go once it's played, so a row scrolled back into view
+                // doesn't swing again.
+                Task {
+                    try? await Task.sleep(for: Theme.Drag.landingHold)
+                    if landing == landed { landing = nil }
+                }
+            }
             let y = location.y - geometry.rowsOrigin
             onDrop(id, BoardDrop.slot(rows: dropRows, dragged: id, y: y, rowsTop: rowsTop))
         case .drafts(let text):

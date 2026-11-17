@@ -3,13 +3,14 @@
 //  Nylon Impossible
 //
 //  The note Today shows the morning after the sweep moved something: "2
-//  moved to This week", with a moon and a dismiss ×, as a small orange pill.
+//  moved to This week", with a moon and a dismiss ×, as a small yellow pill.
 //  `OvernightNote` decides when; this only draws it.
 //
 
 import SwiftUI
 
-/// The overnight note as a small orange pill, above Today's title in the
+/// The overnight note as a small pill, brand yellow with dark ink (the
+/// yellow-as-fill Settled "Brand accent" allows), above Today's title in the
 /// space every board column header and top-level phone page keeps for it (so
 /// titles don't move when it comes or goes). Its text goes to the list they
 /// moved to; × dismisses it. Always one line: the full text when it fits,
@@ -60,11 +61,11 @@ struct OvernightPill: View {
         }
         .textStyle(Theme.Fonts.Role.meta)
         .fontWeight(.medium)
-        .foregroundStyle(Theme.Colors.notice)
+        .foregroundStyle(Theme.Colors.brandInk)
         .padding(.leading, 10)
         .padding(.trailing, 2)
         .padding(.vertical, 4)
-        .background(Theme.Colors.noticeFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Theme.Colors.brand, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.updatesFrequently)

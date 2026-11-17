@@ -23,6 +23,7 @@
   --n-color-notice-fill: #fff1e0;
   --n-color-brand: #ffe629;
   --n-color-brand-ink: #473b1f;
+  --n-color-brand-soft: #ffe62938;
 
   --n-font-display: "Archivo Variable", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --n-font-text: ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -95,6 +96,11 @@
   --n-duration-base: 220ms;
   --n-duration-slow: 320ms;
   --n-ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --n-tilt-max: 1.5deg;
+  --n-tilt-overshoot: 1.33;
+  --n-settle-overshoot: 0.4deg;
+  --n-settle-min-tilt: 0.25deg;
+  --n-lift: 1.02;
 }
 
 .dark {
@@ -111,6 +117,7 @@
   --n-color-destructive-fill: #3b1219;
   --n-color-notice: #ff9a4d;
   --n-color-notice-fill: #2b1a0c;
+  --n-color-brand-soft: #ffe62929;
   --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 40%, transparent);
 }
 

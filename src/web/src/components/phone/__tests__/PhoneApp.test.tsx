@@ -316,12 +316,17 @@ describe("PhoneApp reordering", () => {
     place.mockReset();
     animate.mockReset();
     // jsdom has no layout: a row sits at its index × ROW in its list, and
-    // on screen where its transform puts it.
+    // on screen where its transform puts it. The touch drag's gap is
+    // absolutely placed, so it takes no room.
     Object.defineProperty(HTMLElement.prototype, "offsetTop", {
       configurable: true,
       get(this: HTMLElement) {
         const parent = this.parentElement;
-        return parent ? [...parent.children].indexOf(this) * ROW : 0;
+        if (!parent) return 0;
+        const inFlow = [...parent.children].filter(
+          (el) => !el.matches("[data-drop-gap]"),
+        );
+        return inFlow.indexOf(this) * ROW;
       },
     });
     Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
@@ -423,8 +428,10 @@ describe("PhoneApp reordering", () => {
     expect(row("t2").style.transition).toContain("transform");
     expect(row("t3").style.transform).toBe("");
     expect(row("p1").style.transform).toBe("");
-    // Touch parts the rows; there's no line.
+    // Touch parts the rows into a soft yellow gap; there's no line.
     expect(line()).toBeNull();
+    const gap = page("today").querySelector<HTMLElement>("[data-drop-gap]");
+    expect(gap?.style.top).toBe(`${row("t2").offsetTop}px`);
     // The lifted row keeps its look and doesn't fade.
     expect(row("t1")).not.toHaveClass("opacity-35");
 

@@ -1,4 +1,5 @@
 import { columnRows } from "./boardDom";
+import { swingKeyframes } from "./tilt";
 
 /**
  * Where each row in the columns a drop touches sat when it was dropped, by
@@ -11,6 +12,10 @@ export interface Landing {
   id: string;
   listId: string;
   top: number;
+  /** The drag's tilt, in degrees, which the row lands from. */
+  tilt: number;
+  /** How far past level it swings as it lands; 0 for no swing. */
+  swing: number;
 }
 
 /** What a drop's columns settle from. */
@@ -64,6 +69,7 @@ export function landAt(
   todoId: string,
   listId: string,
   preview: DOMRect,
+  { tilt, swing }: Pick<Landing, "tilt" | "swing"> = { tilt: 0, swing: 0 },
 ): Landing | null {
   const was = from.get(todoId);
   const area = document.querySelector<HTMLElement>(
@@ -85,7 +91,7 @@ export function landAt(
       ? { transform: `translateY(${top - row.offsetTop}px)` }
       : { opacity: 0 };
   row.animate?.([hold, hold], { duration: SETTLE_TTL_MS });
-  return { id: todoId, listId, top };
+  return { id: todoId, listId, top, tilt, swing };
 }
 
 /** `--n-duration-base` and `--n-ease-out-strong`, or null if unset. */
@@ -103,8 +109,9 @@ export function settleTiming(): SettleTiming | null {
 /**
  * Ease the rows of `list`, column `listId`, from where they were in `from`
  * (the dropped todo from `landing`, if given) to where they are now. Rows new
- * to the column, or that didn't move, are left alone. True if any row moved;
- * false until the drop's new order has rendered.
+ * to the column, or that didn't move, are left alone. The dropped todo also
+ * swings past level as it lands, if `landing` has a swing. True if any row
+ * moved; false until the drop's new order has rendered.
  */
 export function settleRows(
   list: HTMLElement,
@@ -138,6 +145,10 @@ export function settleRows(
     if (!was || was.listId !== listId) continue;
     // Ends `landAt`'s hold, so the settle starts from where it held.
     for (const held of li.getAnimations?.() ?? []) held.cancel();
+    if (landing && was === landing && landing.swing !== 0) {
+      moved = true;
+      li.animate?.(swingKeyframes(landing.tilt, landing.swing), timing);
+    }
     const dy = was.top - li.offsetTop;
     if (dy === 0) continue;
     moved = true;

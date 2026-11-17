@@ -265,6 +265,46 @@ describe("useTodoActions", () => {
     );
   });
 
+  it("a drop into another column toasts Moved to …, and Undo puts it back where it was", () => {
+    const todo = makeTodo({ position: "a5" });
+    const { result } = setup([todo]);
+    act(() => result.current.place(todo, "list-week", "a2"));
+    expect(update).toHaveBeenLastCalledWith({
+      id: todo.id,
+      input: { listId: "list-week", position: "a2" },
+    });
+    expect(toast.success).toHaveBeenCalledWith(
+      "Moved to this week",
+      expect.objectContaining({ timeout: UNDO_TOAST_MS }),
+    );
+    clickToastAction();
+    expect(update).toHaveBeenLastCalledWith({
+      id: todo.id,
+      input: { listId: "list-today", position: "a5" },
+    });
+  });
+
+  it("a drop into one of your lists names it as written", () => {
+    const todo = makeTodo();
+    const { result } = setup([todo]);
+    act(() => result.current.place(todo, "list-groceries", "a0"));
+    expect(toast.success).toHaveBeenLastCalledWith(
+      "Moved to Groceries",
+      expect.anything(),
+    );
+  });
+
+  it("a reorder within its column saves the position without a toast", () => {
+    const todo = makeTodo({ position: "a5" });
+    const { result } = setup([todo]);
+    act(() => result.current.place(todo, "list-today", "a2"));
+    expect(update).toHaveBeenLastCalledWith({
+      id: todo.id,
+      input: { position: "a2" },
+    });
+    expect(toast.success).not.toHaveBeenCalled();
+  });
+
   it("pin toggles", () => {
     const todo = makeTodo({ pinned: true });
     const { result } = setup([todo]);

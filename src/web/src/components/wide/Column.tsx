@@ -9,6 +9,7 @@ import { ViewBoundary } from "@/components/ViewBoundary";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
+import { DropDot } from "./useBoardDrag";
 
 /**
  * The rows beside the open sheet: all but the selected one recede, and the
@@ -513,7 +514,9 @@ export function Column({
                   data-drop-indicator
                   style={{ top: indicator.y }}
                   className="pointer-events-none absolute -inset-x-2.5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
-                />
+                >
+                  <DropDot />
+                </div>
               )}
             </div>
           </ViewBoundary>

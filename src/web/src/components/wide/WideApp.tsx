@@ -1035,7 +1035,9 @@ export function WideApp({
           </main>
         </div>
         <DragOverlay dropAnimation={null}>
-          {drag.dragging ? <DragPreview todo={drag.dragging} /> : null}
+          {drag.dragging ? (
+            <DragPreview todo={drag.dragging} tilt={drag.tilt} />
+          ) : null}
         </DragOverlay>
       </DndContext>
 

@@ -659,7 +659,7 @@ export function PhoneApp({
           </div>
           <DragOverlay dropAnimation={null}>
             {drag.drag?.mode === "pointer" ? (
-              <DragPreview todo={drag.drag.todo} />
+              <DragPreview todo={drag.drag.todo} tilt={drag.drag.tilt} />
             ) : null}
           </DragOverlay>
         </DndContext>

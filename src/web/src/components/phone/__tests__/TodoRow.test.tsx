@@ -1,6 +1,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { LONG_PRESS_MS, TodoRow, type TodoRowProps } from "../TodoRow";
+import {
+  LONG_PRESS_MS,
+  metaChip,
+  TodoRow,
+  type TodoRowProps,
+} from "../TodoRow";
 import { dueIn, makeTodo, NOW, TZ } from "./fixtures";
 
 function setup(overrides: Partial<TodoRowProps> = {}) {
@@ -37,6 +42,56 @@ describe("TodoRow", () => {
     expect(screen.getByText("3 days overdue")).toHaveClass("text-n-overdue");
     // Just the checkbox and the row body: no handles, chevrons or toolbars.
     expect(screen.getAllByRole("button")).toHaveLength(2);
+  });
+
+  it("overdue stays red text, not a chip", () => {
+    setup();
+    const overdue = screen.getByText("3 days overdue");
+    expect(overdue).not.toHaveAttribute("data-meta-chip");
+    expect(overdue).not.toHaveClass("bg-n-brand", "bg-n-fill");
+  });
+
+  it("due today is the row's one yellow chip, keeping the word Today", () => {
+    setup({ todo: makeTodo({ dueDate: dueIn(0) }) });
+    const today = screen.getByText("Today");
+    expect(today).toHaveAttribute("data-meta-chip", "brand");
+    expect(today).toHaveClass(
+      "bg-n-brand",
+      "text-n-brand-ink",
+      "rounded-n-chip",
+      "h-5",
+      "font-semibold",
+    );
+  });
+
+  it.each([
+    ["Tomorrow", { dueDate: dueIn(1) }],
+    ["Pinned", { pinned: true }],
+    ["Weekly", { dueDate: dueIn(3), recurrence: { frequency: "weekly" } }],
+  ] as const)("%s is a grey chip", (text, todo) => {
+    setup({ todo: makeTodo(todo) });
+    const chip = screen.getByText(text).closest("span[data-meta-chip]");
+    expect(chip).toHaveAttribute("data-meta-chip", "fill");
+    expect(chip).toHaveClass("bg-n-fill", "text-n-ink");
+    expect(chip).not.toHaveClass("bg-n-brand");
+  });
+
+  it("subtasks, notes and links stay plain text", () => {
+    expect(metaChip({ kind: "subtasks", text: "1/3" })).toBeNull();
+    expect(metaChip({ kind: "notes", text: "Notes" })).toBeNull();
+    expect(
+      metaChip({ kind: "link", text: "a.com", href: "https://a.com", more: 0 }),
+    ).toBeNull();
+    expect(
+      metaChip({ kind: "due", text: "Oct 30", overdue: false, today: false }),
+    ).toBe("fill");
+  });
+
+  it("a lifted row tilts by its drag's angle", () => {
+    setup({ lifted: true, tilt: -1.2 });
+    const card = document.querySelector<HTMLElement>("[data-row-card]");
+    expect(card).toHaveClass("n-lifted");
+    expect(card?.style.getPropertyValue("--n-drag-tilt")).toBe("-1.2deg");
   });
 
   it("on wide, hovers with 60% fill; a selected row is the full fill", () => {

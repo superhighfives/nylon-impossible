@@ -65,6 +65,7 @@ describe("rowMeta", () => {
       kind: "due",
       text: "4 days overdue",
       overdue: true,
+      today: false,
     });
     expect(parts).toContainEqual({ kind: "subtasks", text: "1/2" });
     expect(parts).toContainEqual(

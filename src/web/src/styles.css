@@ -31,6 +31,7 @@
   --color-n-notice-fill: var(--n-color-notice-fill);
   --color-n-brand: var(--n-color-brand);
   --color-n-brand-ink: var(--n-color-brand-ink);
+  --color-n-brand-soft: var(--n-color-brand-soft);
   --font-n-display: var(--n-font-display);
   --font-n-text: var(--n-font-text);
   --radius-n-chip: var(--n-radius-chip);
@@ -41,6 +42,8 @@
      leaving the colour and opacity changes. */
   --animate-n-pop: n-pop 240ms var(--n-ease-out-strong);
   --animate-n-fade-in: n-fade-in var(--n-duration-fast) ease-out;
+  /* The drop line's dot scales in. */
+  --animate-n-dot-in: n-dot-in var(--n-duration-fast) var(--n-ease-out-strong);
 
   @keyframes n-pop {
     0% {
@@ -57,6 +60,33 @@
     from {
       opacity: 0;
     }
+  }
+  @keyframes n-dot-in {
+    from {
+      scale: 0;
+    }
+  }
+}
+
+/* A dragged todo's pose: the pointer preview, and a row lifted by a touch.
+   Tilted by the drag's angle and scaled to `--n-lift` over
+   `--n-duration-fast`, overshooting the angle on the way. Under reduced
+   motion the animation stops, so the tilt holds as a still pose.
+   `--n-drag-tilt` is set where the todo is dragged. */
+@utility n-lifted {
+  rotate: var(--n-drag-tilt, 0deg);
+  scale: var(--n-lift);
+  animation: n-lift var(--n-duration-fast) var(--n-ease-out-strong);
+}
+
+@keyframes n-lift {
+  from {
+    rotate: 0deg;
+    scale: 1;
+    box-shadow: none;
+  }
+  60% {
+    rotate: calc(var(--n-drag-tilt, 0deg) * var(--n-tilt-overshoot));
   }
 }
 

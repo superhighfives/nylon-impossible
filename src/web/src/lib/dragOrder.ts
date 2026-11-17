@@ -142,3 +142,22 @@ export function partOffset(
   if (index < from && index >= slot) return height;
   return 0;
 }
+
+/**
+ * Where the gap a touch drag opens starts, from the top of the row list:
+ * the space the parted rows leave for the dragged row (`spans[from]`, as tall
+ * as it) at `slot` among the others. It sits where `partOffset` moves the
+ * rows away from. Null if the spans aren't measured.
+ */
+export function gapTop(
+  spans: RowSpan[],
+  from: number,
+  slot: number,
+): number | null {
+  // The row the gap opens beside: the last to move up, or the first to
+  // move down (the dragged row's own, while it's over its slot).
+  const own = spans[from];
+  const at = spans[slot];
+  if (!own || !at) return null;
+  return slot > from ? at.bottom - (own.bottom - own.top) : at.top;
+}

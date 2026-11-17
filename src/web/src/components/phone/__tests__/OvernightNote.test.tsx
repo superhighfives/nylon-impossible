@@ -93,6 +93,19 @@ describe("useOvernightNote", () => {
 });
 
 describe("OvernightPill", () => {
+  it("is a yellow pill: brand fill, brandInk text, moon and ×", () => {
+    render(
+      <OvernightPill
+        text="2 moved to this week overnight"
+        onSee={vi.fn()}
+        onDismiss={vi.fn()}
+      />,
+    );
+    const pill = screen.getByRole("status");
+    expect(pill).toHaveClass("bg-n-brand", "text-n-brand-ink");
+    expect(pill).not.toHaveClass("bg-n-notice-fill", "text-n-notice");
+  });
+
   it("is a status with the text as a link and a labelled dismiss", async () => {
     const onSee = vi.fn();
     const onDismiss = vi.fn();

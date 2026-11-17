@@ -96,6 +96,47 @@ describe("Column", () => {
     expect(copy).toHaveBeenCalledOnce();
   });
 
+  it("draws the drop line with a brand dot at its leading end", () => {
+    render(
+      <DndContext>
+        <Column
+          listId="today"
+          title="Today"
+          subline=""
+          rows={[]}
+          subtasksOf={() => []}
+          checked={new Set()}
+          collapsing={new Set()}
+          highlightedId={null}
+          selectedId={null}
+          indicator={{ listId: "today", index: 0, y: 8 }}
+          composer={null}
+          empty="Nothing today."
+          loading={false}
+          error={null}
+          now={new Date()}
+          timeZone="UTC"
+          onCheck={vi.fn()}
+          onOpen={vi.fn()}
+          onMenu={vi.fn()}
+        />
+      </DndContext>,
+    );
+    const line = document.querySelector("[data-drop-indicator]");
+    // The line itself is unchanged: 2px of brand.
+    expect(line).toHaveClass("h-0.5", "bg-n-brand");
+    const dot = line?.querySelector("[data-drop-dot]");
+    expect(dot).toHaveClass(
+      "size-2",
+      "-left-1",
+      "rounded-full",
+      "bg-n-brand",
+      "ring-2",
+      "ring-n-canvas",
+      "animate-n-dot-in",
+    );
+  });
+
   it("gives Today no ⋯ menu, so no Hide column", () => {
     render(
       <DndContext>

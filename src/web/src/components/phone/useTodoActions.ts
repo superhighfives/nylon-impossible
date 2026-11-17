@@ -474,17 +474,27 @@ export function useTodoActions({
 
   /**
    * Drag-and-drop: put a todo at an exact slot, in its own list or another.
-   * The drop itself is the feedback, so there's no toast.
+   * A reorder within its list is its own feedback, so it has no toast. A
+   * drop into another list says "Moved to this week", and its Undo puts the
+   * todo back in its old list at its old position.
    */
   const place = useCallback(
     (todo: TodoWithUrls, listId: string, position: string) => {
       if (todo.listId === listId && todo.position === position) return;
-      update({
-        id: todo.id,
-        input: todo.listId === listId ? { position } : { listId, position },
+      if (todo.listId === listId) {
+        update({ id: todo.id, input: { position } });
+        return;
+      }
+      const from = { listId: todo.listId, position: todo.position };
+      const send = () => update({ id: todo.id, input: { listId, position } });
+      send();
+      record({
+        text: `Moved to ${listInSentence(listId)}`,
+        undo: () => ifTodo(todo.id, () => update({ id: todo.id, input: from })),
+        redo: () => ifTodo(todo.id, send),
       });
     },
-    [update],
+    [ifTodo, listInSentence, record, update],
   );
 
   /** Due… in the context menu. Clearing the day clears Repeat too. */

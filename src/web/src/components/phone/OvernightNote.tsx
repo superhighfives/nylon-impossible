@@ -56,7 +56,7 @@ export function useOvernightNote(
 }
 
 /**
- * The overnight note as a small orange pill, above Today's title in the
+ * The overnight note as a small yellow pill (`brand` with `brandInk`), above Today's title in the
  * space every column (and every top-level phone page) keeps for it. Its text selects the first todo in the
  * list they moved to; × dismisses it. Up to two lines, then truncated.
  */
@@ -73,7 +73,7 @@ export function OvernightPill({
     <div
       role="status"
       data-overnight-note
-      className="flex max-w-full animate-n-fade-in items-center gap-1.5 self-start rounded-[0.5rem] bg-n-notice-fill py-1 pr-0.5 pl-2.5 text-[0.8125rem] font-medium text-n-notice"
+      className="flex max-w-full animate-n-fade-in items-center gap-1.5 self-start rounded-[0.5rem] bg-n-brand py-1 pr-0.5 pl-2.5 text-[0.8125rem] font-medium text-n-brand-ink"
     >
       <Moon size={13} aria-hidden="true" className="shrink-0" />
       <button
