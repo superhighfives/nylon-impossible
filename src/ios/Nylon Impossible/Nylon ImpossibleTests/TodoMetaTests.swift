@@ -12,6 +12,8 @@ struct TodoMetaTests {
         return calendar
     }()
     private static let locale = Locale(identifier: "en_US_POSIX")
+    /// Groups thousands with a comma, as "1,240 words" expects.
+    private static let enUS = Locale(identifier: "en_US")
     /// Sunday, October 18 2026, midday UTC.
     private static let now = Date(timeIntervalSince1970: 1_792_324_800)
 
@@ -84,7 +86,7 @@ struct TodoMetaTests {
             .due("Fri", overdue: false),
             .repeats("Weekly"),
             .subtasks(done: 1, total: 2),
-            .notes,
+            .notes(words: 3),
             .link("visitlisboa.com")
         ])
     }
@@ -103,6 +105,38 @@ struct TodoMetaTests {
         let todo = TodoItem(title: "Read Piranesi")
         todo.itemNotes = "   \n"
         #expect(TodoMeta.parts(for: todo, subtasks: []).isEmpty)
+    }
+
+    // The same cases as the web's word-count.test.ts and model.test.ts.
+    @Test("note word counts", arguments: [
+        ("Spare", 1),
+        ("Spare set is in the blue bowl", 7),
+        ("  Spare set\n\n  is in the bowl \t", 6),
+        ("**Bold** - [link](https://example.com/a b)", 4),
+        ("one\u{00A0}two\u{3000}three", 3),
+        ("", 0),
+        ("  \n\t ", 0),
+    ])
+    func noteWords(text: String, words: Int) {
+        #expect(NoteLength.words(text) == words)
+    }
+
+    @Test("notes read as their length, in full and grouped", arguments: [
+        ("Spare", "1 word"),
+        ("Spare set is in the blue bowl", "7 words"),
+        ("  Spare set\n\n  is in the bowl \t", "6 words"),
+        (Array(repeating: "word", count: 1240).joined(separator: " "), "1,240 words"),
+    ])
+    func notesPart(notes: String, text: String) {
+        let todo = TodoItem(title: "Check keys")
+        todo.itemNotes = notes
+        let parts = TodoMeta.parts(for: todo, subtasks: [])
+        guard case .notes(let words) = parts.first, parts.count == 1 else {
+            Issue.record("expected one notes part, got \(parts)")
+            return
+        }
+        #expect(NoteLength.label(words, locale: Self.enUS) == text)
+        #expect(TodoMeta.accessibilityText(parts, locale: Self.enUS) == "Notes, \(text)")
     }
 
     @Test("deleted subtasks drop out of n/m")

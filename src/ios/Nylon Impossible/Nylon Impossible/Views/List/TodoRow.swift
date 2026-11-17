@@ -199,9 +199,9 @@ struct MetaLine: View {
         case .subtasks(let done, let total):
             glyphed(Theme.Icon.subtasks, "\(done)/\(total)")
                 .monospacedDigit()
-        case .notes:
-            Image(systemName: Theme.Icon.notes)
-                .imageScale(.small)
+        case .notes(let words):
+            glyphed(Theme.Icon.notes, NoteLength.label(words))
+                .monospacedDigit()
         case .link(let domain, let more):
             glyphed(Theme.Icon.link, more > 0 ? "\(domain) +\(more)" : domain)
                 .lineLimit(1)

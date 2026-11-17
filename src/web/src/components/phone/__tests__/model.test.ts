@@ -77,7 +77,7 @@ describe("rowMeta", () => {
       }),
     );
     expect(metaSummary(parts)).toBe(
-      "Pinned, 4 days overdue, Repeats weekly, 1/2 subtasks, Has notes, Link to visitlisboa.com",
+      "Pinned, 4 days overdue, Repeats weekly, 1/2 subtasks, Notes, 4 words, Link to visitlisboa.com",
     );
   });
 
@@ -122,6 +122,18 @@ describe("rowMeta", () => {
 
   it("ignores whitespace-only notes", () => {
     expect(rowMeta(makeTodo({ notes: "  \n" }), [], NOW, TZ)).toEqual([]);
+  });
+
+  // The same cases as the Apple app's TodoMetaTests ("note word counts").
+  it.each([
+    ["Spare", "1 word", "Notes, 1 word"],
+    ["Spare set is in the blue bowl", "7 words", "Notes, 7 words"],
+    ["  Spare set\n\n  is in the bowl \t", "6 words", "Notes, 6 words"],
+    [Array(1240).fill("word").join(" "), "1,240 words", "Notes, 1,240 words"],
+  ])("counts the notes' words: %#", (notes, text, spoken) => {
+    const parts = rowMeta(makeTodo({ notes }), [], NOW, TZ);
+    expect(parts).toEqual([{ kind: "notes", text }]);
+    expect(metaSummary(parts)).toBe(spoken);
   });
 });
 
