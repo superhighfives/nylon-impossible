@@ -64,6 +64,8 @@ vi.mock("@/hooks/useLists", () => ({
  * The cache's refetch never lands, so what onSuccess swaps in stays.
  */
 let liveCache = false;
+/** The todos query's refetch; a test can have it bring a todo in. */
+const refetchTodos = vi.fn(async () => {});
 vi.mock("@/server/todos", () => ({
   getTodos: vi.fn(),
   createTodo: vi.fn(),
@@ -86,7 +88,7 @@ vi.mock("@/hooks/useTodos", async (importOriginal) => {
       data: todosLoading ? undefined : liveCache ? useLiveTodos() : todos,
       isLoading: false,
       error: null,
-      refetch: vi.fn(),
+      refetch: refetchTodos,
       isFetching: false,
     }),
     useUpdateTodo: () => ({
@@ -2455,14 +2457,33 @@ describe("WideApp URLs", () => {
       expect(onNavigate).not.toHaveBeenCalledWith(null);
     });
 
-    it("sends an unknown todo back to /", () => {
+    it("sends an unknown todo back to /", async () => {
       const onNavigate = vi.fn();
       render(
         <WideApp view={{ kind: "todo", id: "nope" }} onNavigate={onNavigate} />,
       );
-      expect(sheetTitle()).toBeNull();
-      expect(onNavigate).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
       expect(onNavigate).toHaveBeenLastCalledWith(null);
+      expect(sheetTitle()).toBeNull();
+    });
+
+    it("looks again for a todo that isn't in yet, as one just added on the Mac", async () => {
+      const before = todos;
+      refetchTodos.mockClear();
+      refetchTodos.mockImplementationOnce(async () => {
+        todos = [
+          ...before,
+          makeTodo({ id: "new", title: "Call Kaiser", listId: "list-week" }),
+        ];
+      });
+      const onNavigate = vi.fn();
+      render(
+        <WideApp view={{ kind: "todo", id: "new" }} onNavigate={onNavigate} />,
+      );
+      await waitFor(() => expect(sheetTitle()).toBe("Call Kaiser"));
+      expect(refetchTodos).toHaveBeenCalledTimes(1);
+      expect(onNavigate).toHaveBeenLastCalledWith({ kind: "thisWeek" });
+      todos = before;
     });
   });
 });

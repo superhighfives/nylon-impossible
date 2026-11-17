@@ -10,6 +10,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -45,6 +46,8 @@ const startingTodos = [
   }),
 ];
 let todos: TodoWithUrls[] = startingTodos;
+/** The todos query's refetch; a test can have it bring a todo in. */
+const refetch = vi.fn(async () => {});
 const { byKind, collections } = splitLists(lists);
 const place = vi.fn();
 /** The client's Reduce motion hint; the drag tests turn it off. */
@@ -76,7 +79,7 @@ vi.mock("../useBoardData", () => ({
     loading: false,
     todosLoading: false,
     error: null,
-    refetch: vi.fn(),
+    refetch,
     isFetching: false,
   }),
 }));
@@ -273,15 +276,34 @@ describe("PhoneApp /todo/:id", () => {
     });
   });
 
-  it("sends an unknown or done todo to /", () => {
+  it("sends an unknown or done todo to /", async () => {
     for (const id of ["nope", "finished"]) {
       const onNavigate = vi.fn();
       render(<PhoneApp view={{ kind: "todo", id }} onNavigate={onNavigate} />);
-      expect(screen.queryByRole("dialog", { name: /^Detail for/ })).toBeNull();
-      expect(onNavigate).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
       expect(onNavigate).toHaveBeenLastCalledWith(null);
+      expect(screen.queryByRole("dialog", { name: /^Detail for/ })).toBeNull();
       cleanup();
     }
+  });
+
+  it("looks again for a todo that isn't in yet, as one just added on the Mac", async () => {
+    refetch.mockClear();
+    refetch.mockImplementationOnce(async () => {
+      todos = [
+        ...startingTodos,
+        makeTodo({ id: "new", title: "Call Kaiser", listId: "list-today" }),
+      ];
+    });
+    const onNavigate = vi.fn();
+    render(
+      <PhoneApp view={{ kind: "todo", id: "new" }} onNavigate={onNavigate} />,
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Detail for Call Kaiser" }),
+    ).toBeInTheDocument();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(onNavigate).not.toHaveBeenCalledWith(null);
   });
 });
 

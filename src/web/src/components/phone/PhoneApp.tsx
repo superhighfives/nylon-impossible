@@ -260,11 +260,23 @@ export function PhoneApp({
   // `/todo/:id` (the Mac's menu bar hands a todo over this way): once the
   // todos are in, its page, with its detail open over it, and the URL names
   // the page. One that's done, gone or not yours goes to `/`, as a missing
-  // `/list/:id` does.
+  // `/list/:id` does. One the Mac added a moment ago can reach the server
+  // after this page's first fetch, so a todo that isn't there at all is
+  // looked for once more before going to `/`.
+  const [recheckedTodo, setRecheckedTodo] = useState<string | null>(null);
+  const recheckingTodo = useRef<string | null>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when a todo's URL arrives, once todos are in
   useEffect(() => {
     if (view?.kind !== "todo" || loading || todosLoading) return;
-    const todo = todos.find((t) => t.id === view.id && !t.completed);
+    const id = view.id;
+    if (!todos.some((t) => t.id === id) && recheckedTodo !== id) {
+      if (recheckingTodo.current !== id) {
+        recheckingTodo.current = id;
+        void refetch().finally(() => setRecheckedTodo(id));
+      }
+      return;
+    }
+    const todo = todos.find((t) => t.id === id && !t.completed);
     const next = todo ? viewForList(todo.listId, lists) : null;
     syncedKey.current = boardViewKey(next, lists);
     if (todo) {
@@ -274,7 +286,7 @@ export function PhoneApp({
       goTo(0);
     }
     onNavigate?.(next);
-  }, [urlKey, loading, todosLoading]);
+  }, [urlKey, loading, todosLoading, recheckedTodo]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the view changes
   useEffect(() => {

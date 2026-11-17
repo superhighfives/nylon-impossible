@@ -377,6 +377,9 @@ export function WideApp({
   // doesn't move focus again. They run in this order in the same commit
   // (the lists arriving), so the first has to stay above the second.
   const appliedUrlKey = useRef<string | null>(null);
+  // A `/todo/:id` that wasn't in the todos: looked for again, then done.
+  const [recheckedTodo, setRecheckedTodo] = useState<string | null>(null);
+  const recheckingTodo = useRef<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the URL changes, once lists are in
   useEffect(() => {
@@ -400,16 +403,25 @@ export function WideApp({
       appliedUrlKey.current = boardViewKey(null, lists);
       onNavigate?.(null);
     }
-  }, [urlKey, loading, todosLoading]);
+  }, [urlKey, loading, todosLoading, recheckedTodo]);
 
   /**
    * `/todo/:id` (the Mac's menu bar hands a todo over this way): its column,
    * with the todo selected and open in the sheet beside it, and then the URL
    * names the column. A done todo is shown in Done, which doesn't open; one
    * that's gone or isn't yours goes to `/`, as a missing `/list/:id` does.
+   * One the Mac added a moment ago can reach the server after this page's
+   * first fetch, so a todo that isn't there is looked for once more first.
    */
   const openTodoFromUrl = (id: string) => {
     const todo = todoById(id) ?? doneById(id);
+    if (!todo && recheckedTodo !== id) {
+      if (recheckingTodo.current !== id) {
+        recheckingTodo.current = id;
+        void refetch().finally(() => setRecheckedTodo(id));
+      }
+      return;
+    }
     const next =
       todo && !todo.completed ? viewForList(todo.listId, lists) : null;
     appliedUrlKey.current = boardViewKey(next, lists);
