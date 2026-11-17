@@ -1,6 +1,6 @@
 # Principles
 
-Nylon is a todo app built around time. Today, This week and Someday are a flow that todos move through on their own, and your lists sit beside them as permanent collections. It runs on the web, iPhone, iPad, the Mac (including the menu bar) and inside Gmail.
+Nylon is a todo app built around time. Today, This week and Someday are a flow that todos move through on their own, and your lists sit beside them as permanent collections. It runs on the web, iPhone, the Mac's menu bar and inside Gmail.
 
 This page is the short, durable version of what Nylon is and how it behaves. Read it before changing UI or copy. Issues and pull requests record how each piece was built; this file records what stays true across them.
 
@@ -14,7 +14,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 4. **Todo rows carry information, not controls.** Actions live in gestures, context menus and the keyboard. Todo rows have no visible handles, toolbars or chevrons. Other rows, like sidebar entries, may carry controls.
 5. **One design, many densities.** Phone, wide screen, the menu bar and the Gmail card share the same structure, the same order and the same words.
 6. **Editorial type, native behavior.** Archivo display type and hairline rules provide the hierarchy. Each platform keeps its own conventions: sheets, swipe, haptics, Dynamic Type, keyboard shortcuts. Native means native to the input, not the device. Touch works the same on every touch layout: long-press to drag, rows that part to make room, immediate feedback. A pointer works the same wherever there's one: a drop line, hover, a click to select.
-7. **Keyboard first where there's a keyboard.** On wide screens and the Mac, everything you can click you can also reach from the keyboard, and the same letter does the same thing everywhere. The keyboard is either on a section (the sidebar, a column, the open todo) or in it. Tab, ⇧Tab and ← → move between sections; Return steps in and Esc steps out. Inside, the arrow keys move through items, and in a form, keys do ordinary form things. The section with the keyboard has a light outline.
+7. **Keyboard first where there's a keyboard.** On wide screens and in the menu bar, everything you can click you can also reach from the keyboard, and the same letter does the same thing everywhere. The keyboard is either on a section (the sidebar, a column, the open todo) or in it. Tab, ⇧Tab and ← → move between sections; Return steps in and Esc steps out. Inside, the arrow keys move through items, and in a form, keys do ordinary form things. The section with the keyboard has a light outline.
 8. **Things don't jump.** Space that something might need (a banner) is kept whether or not it's showing. When columns move to make room, they slide; they never jump.
 9. **Settled stays settled.** Decisions below need a written reason to reopen, not a polish pass.
 
@@ -34,7 +34,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 | Dropping with a pointer | The todo lands in the gap nearest the pointer, shown by the drop line. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
 | Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. Two exceptions: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move; and the composer's 3px focus ring, where its `surface` fill and the caret also mark focus |
 | Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9 |
-| Moving between lists by drag | Wide layouts only: the web board, iPad and Mac. On a phone layout a todo moves through its menu (Move to) |
+| Moving between lists by drag | The web board only. On a phone layout a todo moves through its menu (Move to) |
 | Case | Sentence case for every label, title and menu item: "This week", "New list", "Keyboard shortcuts" |
 
 ## Vocabulary
@@ -72,12 +72,12 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 
 ## States
 
-How the wide board (web, iPad and the Mac, with a pointer and keyboard) shows each interaction state. Every platform draws the same look for the same state. Colours are `tokens.json` names; hover and fills ease over `motion.fast` and respect reduced motion. Touch layouts, the menu bar popover and Gmail follow their own conventions (principle 6).
+How the wide board (the web) shows each interaction state. Colours are `tokens.json` names; hover and fills ease over `motion.fast` and respect reduced motion. Touch layouts, the menu bar popover and Gmail follow their own conventions (principle 6).
 
 | State | Rows (columns, Done, an open todo) | Column head | Sidebar entry | Composer | Palette item |
 | --- | --- | --- | --- | --- | --- |
 | Rest | No background | Title only | No background | No background, "Add" placeholder | No background |
-| Hover (pointer only) | `fill` at 60%, in every column, tinted or not | Rename button: `fill` | `surface` (web) / `fill` at 70% (Apple) | `surface` | Moves the highlight |
+| Hover (pointer only) | `fill` at 60%, in every column, tinted or not | Rename button: `fill` | `surface` | `surface` | Moves the highlight |
 | Pressed | Nothing extra: the click selects, and the selection is the feedback | — | — | — | — |
 | Selected by click | `fill`, chip radius | — | — | — | — |
 | Selected by keyboard | `fill` plus a 3px `inkMuted` bar, inset 6 | — | — | On Add, not typing: as a row, `fill` plus the `inkMuted` bar | `fill` |
