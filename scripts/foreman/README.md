@@ -21,7 +21,10 @@ the PR history shows who did what.
 Each tick:
 
 1. **Merge.** For each open `foreman/*` PR by `nylon-foreman`, run the merge
-   gate. Merge if it passes. If the only thing stopping it is a guarded
+   gate. Merge if it passes. A merged PR whose body closes its issue
+   (`Closes #n`) sets the issue to Done. One that says `Part of #n` puts it
+   back in Ready with a comment, so the rest gets built (#689 closed with its
+   second half unbuilt). If the only thing stopping it is a guarded
    area, label it `owner-merge`, comment once, and send an alert. If its
    review is 🟡 or 🔴, run a review round (below). A merge alerts with a
    link to the PR's **Try it** section, for the owner to try it once it's
