@@ -48,8 +48,7 @@ same weekday and date.
 - **iOS** needs no account. It launches the DEBUG build with
   `-NylonScreen <route>` (plus `-NylonDark`), which skips sign-in and draws
   in-memory sample data, on a simulator the script creates for itself
-  (6.9" iPhone). The app is iPhone-only: there are no iPad shots, no iPad
-  App Store set and no landscape runs.
+  (6.9" iPhone).
 - `--web` writes the composite (browser + iPhone), a raw
   App Store set in `output/app-store/` (uploaded as a workflow artifact;
   App Store Connect upload is manual), and WebP shots for the web landing page
