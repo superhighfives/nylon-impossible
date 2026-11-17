@@ -24,7 +24,7 @@ import {
   Repeat,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, ROW_HOVER, SUBLINE } from "@/components/ui/styles";
 import { ViewBoundary } from "@/components/ViewBoundary";
 import {
@@ -131,6 +131,55 @@ export interface DetailSheetProps {
   onExited?: () => void;
   /** `column`: slide and fade in and out, unless motion is reduced. */
   animated?: boolean;
+  /**
+   * `column`: the board's keyboard is on the sheet (`on`, the sheet itself
+   * focused) or in it (`in`, a field or button). Marks it for the outline.
+   */
+  keySection?: "on" | "in";
+  /**
+   * `column`: each new value puts the keyboard on the sheet (focus on the
+   * sheet itself, nothing being edited), once it's showing. Return on a
+   * todo's row asks for it; a click doesn't.
+   */
+  focusRequest?: number;
+}
+
+/** What Tab stops at inside the sheet. */
+const TABBABLE =
+  'a[href], button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Keys inside the board's sheet. Esc in a field or on a button steps out to
+ * the sheet itself (a menu inside closes on its own first); Esc on the sheet
+ * is the board's, which closes it. Tab and ⇧Tab wrap within the sheet: only
+ * its last and first stops are caught, so the browser moves between the
+ * rest, and on the sheet itself Tab is the board's next section.
+ */
+function sheetKeys(e: KeyboardEvent<HTMLElement>) {
+  const sheet = e.currentTarget;
+  const target = e.target as HTMLElement;
+  if (e.defaultPrevented || target === sheet) return;
+  if (!sheet.contains(target) || target.closest('[role="menu"]')) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    e.stopPropagation();
+    sheet.focus();
+    return;
+  }
+  if (e.key !== "Tab") return;
+  // In document order, which not every engine keeps for a selector list.
+  const stops = [...sheet.querySelectorAll<HTMLElement>(TABBABLE)].sort(
+    (a, b) =>
+      a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1,
+  );
+  const first = stops[0];
+  const last = stops.at(-1);
+  const wrapTo = e.shiftKey
+    ? target === first && last
+    : target === last && first;
+  if (!wrapTo) return;
+  e.preventDefault();
+  wrapTo.focus();
 }
 
 /**
@@ -148,14 +197,30 @@ export function DetailSheet(props: DetailSheetProps) {
     open = !!todo,
     onExited,
     animated = true,
+    keySection,
+    focusRequest = 0,
   } = props;
+  const [popup, setPopup] = useState<HTMLElement | null>(null);
+  const focusedFor = useRef(focusRequest);
+  useEffect(() => {
+    if (!popup || focusRequest === focusedFor.current) return;
+    focusedFor.current = focusRequest;
+    popup.focus({ preventScroll: true });
+  }, [popup, focusRequest]);
   if (variant === "column") {
     return (
       <Dialog.Root
         open={open && !!todo && !!container}
         modal={false}
         disablePointerDismissal
-        onOpenChange={(next) => {
+        onOpenChange={(next, details) => {
+          // Esc is the board's: from a field it steps out to the sheet,
+          // from the sheet it closes it. Let it through to the board's keys.
+          if (details.reason === "escape-key") {
+            details.cancel();
+            details.allowPropagation();
+            return;
+          }
           if (!next) onClose();
         }}
         onOpenChangeComplete={(next) => {
@@ -167,10 +232,14 @@ export function DetailSheet(props: DetailSheetProps) {
               right and bottom, its left edge over the todo's column, with
               a shadow cast left. It slides in from the left as it fades. */}
           <Dialog.Popup
+            ref={setPopup}
             data-detail-column
+            data-key-section={keySection}
+            tabIndex={-1}
             initialFocus={false}
             finalFocus={false}
-            className={`absolute top-(--n-sheet-inset) right-(--n-sheet-inset) bottom-(--n-sheet-inset) left-0 flex flex-col overflow-clip rounded-(--n-sheet-radius) bg-n-surface text-n-ink shadow-(--n-sheet-shadow) outline-none ${
+            onKeyDown={sheetKeys}
+            className={`n-section-outline absolute top-(--n-sheet-inset) right-(--n-sheet-inset) bottom-(--n-sheet-inset) left-0 flex flex-col overflow-clip rounded-(--n-sheet-radius) bg-n-surface text-n-ink shadow-(--n-sheet-shadow) outline-none ${
               animated
                 ? "transition-[translate,opacity] duration-(--n-duration-base) ease-n-out data-ending-style:-translate-x-(--n-sheet-slide) data-ending-style:opacity-0 data-starting-style:-translate-x-(--n-sheet-slide) data-starting-style:opacity-0"
                 : ""
@@ -363,13 +432,19 @@ function DetailBody({
     <label className="block min-w-0">
       <span className="sr-only">Title</span>
       <textarea
+        data-detail-title
         value={title.value}
         onChange={(e) => title.onChange(e.target.value)}
         onBlur={title.flush}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
-            e.currentTarget.blur();
+            // On the board, back out to the sheet, which keeps the keyboard.
+            const sheet = e.currentTarget.closest<HTMLElement>(
+              "[data-detail-column]",
+            );
+            if (sheet) sheet.focus();
+            else e.currentTarget.blur();
           }
         }}
         rows={1}

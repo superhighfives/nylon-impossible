@@ -65,6 +65,9 @@ export function Composer({
   countFor,
   isVisible,
   onAdded,
+  idle = false,
+  onIdleChange,
+  onLeaveDown,
 }: {
   /** The list on screen — the default target. */
   currentListId: string;
@@ -87,6 +90,20 @@ export function Composer({
    * board opens it beside its column; focus stays here.
    */
   onAdded?: (todo: TodoWithUrls) => void;
+  /**
+   * `inline` on the wide board: the keyboard is on Add but not typing. The
+   * field is read-only, so the board's keys act, and it looks like a row
+   * selected by keyboard (States, Composer). Return or a click starts typing.
+   */
+  idle?: boolean;
+  /**
+   * `inline` on the wide board: Return or a click starts typing (false), Esc
+   * stops it and stays on Add (true), and leaving Add resets it (false).
+   * Without it, Esc leaves the field.
+   */
+  onIdleChange?: (idle: boolean) => void;
+  /** `inline`: ↓ with nothing typed, on to the column's first todo. */
+  onLeaveDown?: () => void;
 }) {
   const inline = variant === "inline";
   const popover = variant === "popover";
@@ -200,6 +217,7 @@ export function Composer({
   const onBlur = (e: FocusEvent<HTMLFormElement>) => {
     if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
       setFocused(false);
+      if (idle) onIdleChange?.(false);
     }
   };
 
@@ -286,15 +304,29 @@ export function Composer({
   );
 
   const onFieldKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // On Add, not typing: Return starts; every other key is the board's.
+    if (idle) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        onIdleChange?.(false);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown" && !draft && onLeaveDown) {
+      e.preventDefault();
+      onLeaveDown();
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       void submit();
     }
     // The quick-add popover closes itself on Escape.
     if (e.key === "Escape" && !popover) {
-      e.currentTarget.blur();
-      // On the board, Esc only steps out of Add; the open todo closes on
-      // the next one.
+      // On the board, Esc stops typing and stays on Add, keeping what's
+      // typed; the board's own Esc only acts on the next one.
+      if (onIdleChange) onIdleChange(true);
+      else e.currentTarget.blur();
       if (inline) e.stopPropagation();
     }
   };
@@ -373,8 +405,11 @@ export function Composer({
         }}
         onFocus={() => setFocused(true)}
         onBlur={onBlur}
-        className={`n-focus-within relative -mx-2.5 rounded-n-field focus-within:z-1 px-2.5 transition-colors duration-(--n-duration-fast) ${
-          showChips ? "bg-n-surface" : "pointer-fine:hover:bg-n-surface"
+        data-idle={idle ? "" : undefined}
+        className={`relative -mx-2.5 rounded-n-field focus-within:z-1 px-2.5 transition-colors duration-(--n-duration-fast) ${
+          idle
+            ? "bg-n-fill"
+            : `n-focus-within ${showChips ? "bg-n-surface" : "pointer-fine:hover:bg-n-surface"}`
         }`}
       >
         <div className="flex items-start gap-3">
@@ -390,6 +425,10 @@ export function Composer({
             value={draft}
             aria-label={`New todo in ${targetInSentence}`}
             placeholder="Add"
+            readOnly={idle}
+            onPointerDown={() => {
+              if (idle) onIdleChange?.(false);
+            }}
             onChange={(e) => {
               setDraft(e.target.value);
               if (!e.target.value) setKeepDateWords(false);

@@ -3,7 +3,11 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Ellipsis } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { EmptyLine } from "@/components/phone/EmptyLine";
-import { TodoRow, type TodoRowProps } from "@/components/phone/TodoRow";
+import {
+  SelectionBar,
+  TodoRow,
+  type TodoRowProps,
+} from "@/components/phone/TodoRow";
 import { ICON_BUTTON, SUBLINE } from "@/components/ui/styles";
 import { ViewBoundary } from "@/components/ViewBoundary";
 import type { TodoWithUrls } from "@/types/database";
@@ -158,7 +162,11 @@ export function ColumnHeader({
     fromMenu.current = false;
     const next = name?.replace(/\s+/g, " ").trim();
     if (next && next !== title) onRename?.(next);
-    requestAnimationFrame(() => titleButton.current?.focus());
+    // Back to the title, unless the rename ended by moving on (Tab, a click).
+    requestAnimationFrame(() => {
+      const at = document.activeElement;
+      if (!at || at === document.body) titleButton.current?.focus();
+    });
   };
 
   return (
@@ -360,6 +368,8 @@ export function Column({
   onBackgroundClick,
   sheetOpen = false,
   resetKey,
+  keySection,
+  addSelected = false,
   ...rowCallbacks
 }: RowCallbacks & {
   listId: string;
@@ -398,6 +408,13 @@ export function Column({
   sheetOpen?: boolean;
   /** What the rows come from: a row that failed to draw retries when it changes. */
   resetKey?: unknown;
+  /**
+   * The board's keyboard is on this column (`on`, its head focused, nothing
+   * selected) or in it (`in`). Marks it for the outline.
+   */
+  keySection?: "on" | "in";
+  /** The keyboard is on Add, not typing: the row keyboard bar beside it. */
+  addSelected?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: columnDropId(listId),
@@ -434,7 +451,8 @@ export function Column({
         if (isColumnBackground(e.target)) onBackgroundClick?.();
       }}
       data-sheet-open={sheetOpen ? "" : undefined}
-      className={`relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline first:border-l-0`}
+      data-key-section={keySection}
+      className={`n-section-outline relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline first:border-l-0`}
     >
       <ColumnHeader
         listId={listId}
@@ -460,10 +478,11 @@ export function Column({
       >
         <div
           data-column-composer
-          className={`transition-opacity duration-(--n-duration-base) ${
+          className={`relative transition-opacity duration-(--n-duration-base) ${
             sheetOpen ? RECEDE : ""
           }`}
         >
+          {addSelected && <SelectionBar />}
           {composer}
         </div>
         {loading ? (

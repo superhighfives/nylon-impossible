@@ -246,7 +246,11 @@ export interface TodoRowProps {
    */
   onSelect?: (todo: TodoWithUrls) => void;
   onCheck: (todo: TodoWithUrls) => void;
-  onOpen: (todo: TodoWithUrls) => void;
+  /**
+   * `by` (wide): Enter or Space on the title opens it from the keyboard,
+   * which on the board puts the keyboard on the open todo's sheet.
+   */
+  onOpen: (todo: TodoWithUrls, by?: "keyboard" | "pointer") => void;
   /** `at` is the pointer, for a right-click; absent from the keyboard. */
   onMenu: (todo: TodoWithUrls, at?: { x: number; y: number }) => void;
   /**
@@ -365,7 +369,7 @@ function WideTodoRow({
             onSelect?.(todo);
             return;
           }
-          onOpen(todo);
+          onOpen(todo, e.detail === 0 ? "keyboard" : "pointer");
         }}
         onContextMenu={(e) => {
           if ((e.target as Element).closest("a")) return;

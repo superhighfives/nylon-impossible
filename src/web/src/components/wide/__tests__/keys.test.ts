@@ -18,6 +18,10 @@ describe("commandForKey", () => {
     [{ key: "h" }, "left"],
     [{ key: "ArrowLeft" }, "left"],
     [{ key: "Escape" }, "back"],
+    [{ key: "Tab" }, "next-section"],
+    [{ key: "Tab", shiftKey: true }, "previous-section"],
+    // The board's only where no button takes it (`isNativeControl`).
+    [{ key: "Enter" }, "open"],
     [{ key: "x" }, "done"],
     [{ key: "1" }, "move-today"],
     [{ key: "2" }, "move-thisWeek"],
@@ -28,6 +32,7 @@ describe("commandForKey", () => {
     [{ key: "Backspace" }, "delete"],
     [{ key: "Delete" }, "delete"],
     [{ key: "n" }, "new-todo"],
+    [{ key: "n", metaKey: true }, "new-todo"],
     [{ key: "N", shiftKey: true }, "new-list"],
     [{ key: "z" }, "undo"],
     [{ key: "Z", shiftKey: true }, "redo"],
@@ -71,8 +76,7 @@ describe("commandForKey", () => {
     expect(idFor({ key: "1", ctrlKey: true })).toBeNull();
     expect(idFor({ key: "j", altKey: true })).toBeNull();
     expect(idFor({ key: "q" })).toBeNull();
-    // Enter opens natively: the focused row is a button.
-    expect(idFor({ key: "Enter" })).toBeNull();
+    expect(idFor({ key: "Tab", altKey: true })).toBeNull();
   });
 });
 
@@ -109,6 +113,46 @@ describe("isTypingTarget", () => {
     expect(isTypingTarget(el("d"))).toBe(true);
     expect(isTypingTarget(el("e"))).toBe(false);
     expect(isTypingTarget(null)).toBe(false);
+  });
+
+  it("is false on the open todo's sheet itself, and on a column's Add that isn't typing", () => {
+    document.body.innerHTML = `
+      <div role="dialog" data-detail-column id="sheet" tabindex="-1">
+        <textarea id="title"></textarea>
+      </div>
+      <section data-column="week">
+        <textarea id="idle" readonly></textarea>
+        <textarea id="typing"></textarea>
+      </section>`;
+    const el = (id: string) => document.getElementById(id);
+    expect(isTypingTarget(el("sheet"))).toBe(false);
+    expect(isTypingTarget(el("title"))).toBe(true);
+    expect(isTypingTarget(el("idle"))).toBe(false);
+    expect(isTypingTarget(el("typing"))).toBe(true);
+  });
+});
+
+describe("the section keys in the registry", () => {
+  it("lists Tab and ⇧Tab under Move around, with Return and Esc's new copy", () => {
+    const moveAround = COMMANDS.filter((c) => c.group === "Move around").map(
+      (c) => [c.label, c.keys.map((k) => k.join("")).join(" or ")],
+    );
+    expect(moveAround).toEqual([
+      ["Next todo", "J or ↓"],
+      ["Previous todo", "K or ↑"],
+      ["Column left, or into the sidebar", "H or ←"],
+      ["Column right, or out of the sidebar", "L or →"],
+      ["Next section", "⇥"],
+      ["Previous section", "⇧⇥"],
+      ["Step in, or open", "↵"],
+      ["Step out, or close", "Esc"],
+    ]);
+  });
+
+  it("keeps New todo as N, with ⌘N working while typing", () => {
+    expect(commandForKey({ key: "n" })?.anywhere).toBeFalsy();
+    expect(commandForKey({ key: "n", metaKey: true })?.anywhere).toBe(true);
+    expect(keyHint("new-todo")).toBe("N");
   });
 });
 

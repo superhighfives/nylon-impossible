@@ -1,4 +1,5 @@
 import { DONE_COLUMN } from "./DoneColumn";
+import { SHEET, SIDEBAR } from "./sections";
 
 /**
  * The board's DOM lookups. Rows carry `data-row-id` and `data-row-list` on
@@ -39,8 +40,41 @@ export function rowById(id: string | null): HTMLElement | null {
     : null;
 }
 
-function sidebar() {
+/** The sidebar: focused itself, the keyboard is on its section. */
+export function sidebar() {
   return document.querySelector<HTMLElement>('aside[aria-label="Sidebar"]');
+}
+
+/** The open todo's sheet: focused itself, the keyboard is on its section. */
+export function sheetPopup() {
+  return document.querySelector<HTMLElement>("[data-detail-column]");
+}
+
+/** A column's head: focused, the keyboard is on (or in) the column. */
+export function columnHead(listId: string): HTMLElement | null {
+  return document.querySelector<HTMLElement>(
+    `[data-column-head="${CSS.escape(listId)}"]`,
+  );
+}
+
+/**
+ * The section `el` is in: the sidebar, the sheet or a column, and whether
+ * `el` is the section's own anchor (the sidebar, the sheet, a column's
+ * head), where focus sits with nothing in it chosen. Null elsewhere: the
+ * toolbar, popups, nothing.
+ */
+export function sectionOf(
+  el: Element | null,
+): { id: string; anchor: boolean } | null {
+  if (!(el instanceof HTMLElement)) return null;
+  const side = el.closest('aside[aria-label="Sidebar"]');
+  if (side) return { id: SIDEBAR, anchor: el === side };
+  const sheet = el.closest("[data-detail-column]");
+  if (sheet) return { id: SHEET, anchor: el === sheet };
+  const column = el.closest<HTMLElement>("[data-column]")?.dataset.column;
+  if (column)
+    return { id: column, anchor: el.hasAttribute("data-column-head") };
+  return null;
 }
 
 /** The sidebar item for a column: a list, or Done. */

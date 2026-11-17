@@ -115,7 +115,11 @@ export function renderCss(tokens) {
   out.push(`  --n-sheet-shadow: ${cssSheetShadow(sheet, "light")};`);
   out.push("");
   const { board } = tokens;
-  for (const name of ["columnMinWidth", "columnMaxWidth"]) {
+  for (const name of [
+    "columnMinWidth",
+    "columnMaxWidth",
+    "sectionOutlineWidth",
+  ]) {
     out.push(`  --n-board-${kebab(name)}: ${board[name] / 16}rem;`);
   }
   // The web's tile only joins up with its neighbours at 45° (or 135°, 225°, 315°); any

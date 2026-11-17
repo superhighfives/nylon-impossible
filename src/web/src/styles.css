@@ -236,6 +236,32 @@ p {
   background-size: var(--n-board-hatch-tile) var(--n-board-hatch-tile);
 }
 
+/* The wide board's section with the keyboard (the sidebar, a column, the
+   open todo; PRINCIPLES.md States, "Section with the keyboard"): a
+   `sectionOutline` frame inside its edges. It's an overlay, not a border on
+   the section, so it lies over selected rows' fills, follows the section's
+   corners and moves nothing when it appears (principle 8). It shows on the
+   section marked `data-key-section` while the keyboard was the last input
+   (the board root's `data-keyboard`). Drawn as the overlay's border, so
+   forced colours turn it into a system-coloured frame. The section has to
+   be positioned and must not scroll itself, or the frame scrolls away. */
+@utility n-section-outline {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: none;
+    pointer-events: none;
+    border: var(--n-board-section-outline-width) solid
+      var(--n-color-section-outline);
+    border-radius: inherit;
+  }
+  [data-keyboard] &[data-key-section]::after {
+    display: block;
+  }
+}
+
 /* The ring on a container whose field has keyboard focus: the composers,
    whose bare text fields draw no outline of their own. Yellow alone — the ink
    hairline reads as a second ring around a filled field. */

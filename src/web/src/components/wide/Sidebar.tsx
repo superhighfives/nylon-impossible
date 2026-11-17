@@ -41,9 +41,10 @@ function SelectionBar({ on }: { on: boolean }) {
  *
  * The eye can't sit inside the entry (a button in a button), so it lies over
  * the space the entry keeps for it, after the entry in the DOM so it's on
- * top and is the next Tab stop. An invisible copy of the count lines it up.
- * Both sit in the menu's trigger, so right-clicking the eye opens the menu
- * too.
+ * top. It isn't a Tab stop: Tab moves between the board's sections, and the
+ * keyboard reaches Hide column and Show column through the palette. An
+ * invisible copy of the count lines it up. Both sit in the menu's trigger,
+ * so right-clicking the eye opens the menu too.
  */
 function ListEntry({
   list,
@@ -115,6 +116,7 @@ function ListEntry({
       <button
         type="button"
         data-column-eye={list.id}
+        tabIndex={-1}
         aria-label={hidden ? "Show column" : "Hide column"}
         aria-describedby={`sidebar-eye-${list.id}`}
         onClick={() => onToggleColumn(list)}
@@ -197,6 +199,7 @@ export function Sidebar({
   onShortcuts,
   onFeedback,
   loading = false,
+  keySection,
 }: {
   timeLists: SerializedList[];
   collections: SerializedList[];
@@ -216,125 +219,139 @@ export function Sidebar({
   onFeedback?: () => void;
   /** Lists haven't arrived: draw the time lists as placeholders. */
   loading?: boolean;
+  /**
+   * The board's keyboard is on the sidebar (`on`, the sidebar itself
+   * focused) or in it (`in`, an entry). Marks it for the outline.
+   */
+  keySection?: "on" | "in";
 }) {
   return (
+    // Focusable itself, for the keyboard on its section. Its contents
+    // scroll inside it, so the outline stays put.
     <aside
       aria-label="Sidebar"
-      className="flex w-60 shrink-0 flex-col gap-7 overflow-y-auto border-r border-n-hairline px-5 pt-7 pb-5 [scrollbar-width:thin]"
+      tabIndex={-1}
+      data-key-section={keySection}
+      className="n-section-outline relative flex w-60 shrink-0 flex-col border-r border-n-hairline outline-none"
     >
-      <p className="m-0 px-2.5 font-n-display text-xl font-extrabold tracking-[-0.02em] text-n-ink">
-        Nylon
-      </p>
-      <nav aria-label="Lists">
-        <ul className="flex flex-col gap-0.5">
-          {/* Before the lists arrive the time lists are already known by
+      <div className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-5 pt-7 pb-5 [scrollbar-width:thin]">
+        <p className="m-0 px-2.5 font-n-display text-xl font-extrabold tracking-[-0.02em] text-n-ink">
+          Nylon
+        </p>
+        <nav aria-label="Lists">
+          <ul className="flex flex-col gap-0.5">
+            {/* Before the lists arrive the time lists are already known by
               name, so they hold their place (not focusable; the columns
               say "Loading…"). */}
-          {loading &&
-            timeLists.length === 0 &&
-            TIME_PLACEHOLDERS.map((name) => (
-              <li
-                key={name}
-                aria-hidden="true"
-                data-skeleton-entry
-                className="flex h-9 items-center gap-2 px-2.5 text-[0.9375rem] font-semibold text-n-ink"
-              >
-                <span className="min-w-0 flex-1 truncate">{name}</span>
-                <span className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse" />
-              </li>
-            ))}
-          {timeLists.map((list) => (
-            <ListEntry
-              key={list.id}
-              list={list}
-              count={countFor(list.id)}
-              current={selectionColumn === list.id}
-              strong
-              onSelect={onTimeList}
-            />
-          ))}
-        </ul>
-        <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-xs font-semibold text-n-ink-muted">
-          Lists
-        </h2>
-        <ul className="flex flex-col gap-0.5">
-          {collections.map((list) => (
-            <ListEntry
-              key={list.id}
-              list={list}
-              count={countFor(list.id)}
-              current={selectionColumn === list.id}
-              onSelect={onCollection}
-              onToggleColumn={onToggleColumn}
-            />
-          ))}
-          <li>
-            <NewListPopover
-              side="right"
-              onCreate={onCreateList}
-              trigger={
-                <button
-                  type="button"
-                  data-sidebar-nav
-                  aria-keyshortcuts="Shift+N"
-                  className={`${ENTRY} font-medium text-n-ink-muted`}
+            {loading &&
+              timeLists.length === 0 &&
+              TIME_PLACEHOLDERS.map((name) => (
+                <li
+                  key={name}
+                  aria-hidden="true"
+                  data-skeleton-entry
+                  className="flex h-9 items-center gap-2 px-2.5 text-[0.9375rem] font-semibold text-n-ink"
                 >
-                  <Plus size={15} aria-hidden="true" className="shrink-0" />
-                  New list
-                </button>
-              }
-            />
-          </li>
-        </ul>
-      </nav>
-      <nav aria-label="More" className="mt-auto flex flex-col gap-0.5">
-        <SidebarButton
-          onClick={onDone}
-          describedBy="sidebar-done-count"
-          item="done"
-        >
-          <SelectionBar on={selectionColumn === "done"} />
-          <Check
-            size={15}
-            strokeWidth={2.4}
-            aria-hidden="true"
-            className="shrink-0"
-          />
-          <span className="flex-1">Done</span>
-          {/* Not a false "0" before the todos arrive. */}
-          {loading ? (
-            <span
+                  <span className="min-w-0 flex-1 truncate">{name}</span>
+                  <span className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse" />
+                </li>
+              ))}
+            {timeLists.map((list) => (
+              <ListEntry
+                key={list.id}
+                list={list}
+                count={countFor(list.id)}
+                current={selectionColumn === list.id}
+                strong
+                onSelect={onTimeList}
+              />
+            ))}
+          </ul>
+          <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-xs font-semibold text-n-ink-muted">
+            Lists
+          </h2>
+          <ul className="flex flex-col gap-0.5">
+            {collections.map((list) => (
+              <ListEntry
+                key={list.id}
+                list={list}
+                count={countFor(list.id)}
+                current={selectionColumn === list.id}
+                onSelect={onCollection}
+                onToggleColumn={onToggleColumn}
+              />
+            ))}
+            <li>
+              <NewListPopover
+                side="right"
+                onCreate={onCreateList}
+                trigger={
+                  <button
+                    type="button"
+                    data-sidebar-nav
+                    aria-keyshortcuts="Shift+N"
+                    className={`${ENTRY} font-medium text-n-ink-muted`}
+                  >
+                    <Plus size={15} aria-hidden="true" className="shrink-0" />
+                    New list
+                  </button>
+                }
+              />
+            </li>
+          </ul>
+        </nav>
+        <nav aria-label="More" className="mt-auto flex flex-col gap-0.5">
+          <SidebarButton
+            onClick={onDone}
+            describedBy="sidebar-done-count"
+            item="done"
+          >
+            <SelectionBar on={selectionColumn === "done"} />
+            <Check
+              size={15}
+              strokeWidth={2.4}
               aria-hidden="true"
-              className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse"
+              className="shrink-0"
             />
-          ) : (
-            <span aria-hidden="true" className="font-normal tabular-nums">
-              {doneCount}
+            <span className="flex-1">Done</span>
+            {/* Not a false "0" before the todos arrive. */}
+            {loading ? (
+              <span
+                aria-hidden="true"
+                className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse"
+              />
+            ) : (
+              <span aria-hidden="true" className="font-normal tabular-nums">
+                {doneCount}
+              </span>
+            )}
+            <span id="sidebar-done-count" hidden>
+              {doneCount} {doneCount === 1 ? "todo" : "todos"}
             </span>
+          </SidebarButton>
+          <SidebarButton onClick={onSettings}>Settings</SidebarButton>
+          {onFeedback && (
+            <SidebarButton onClick={onFeedback} keyShortcut="f">
+              <span className="flex-1">Send feedback</span>
+              <span
+                aria-hidden="true"
+                className="font-n-text text-xs font-normal"
+              >
+                f
+              </span>
+            </SidebarButton>
           )}
-          <span id="sidebar-done-count" hidden>
-            {doneCount} {doneCount === 1 ? "todo" : "todos"}
-          </span>
-        </SidebarButton>
-        <SidebarButton onClick={onSettings}>Settings</SidebarButton>
-        {onFeedback && (
-          <SidebarButton onClick={onFeedback} keyShortcut="f">
-            <span className="flex-1">Send feedback</span>
+          <SidebarButton onClick={onShortcuts} keyShortcut="?">
+            <span className="flex-1">Keyboard shortcuts</span>
             <span
               aria-hidden="true"
               className="font-n-text text-xs font-normal"
             >
-              f
+              ?
             </span>
           </SidebarButton>
-        )}
-        <SidebarButton onClick={onShortcuts} keyShortcut="?">
-          <span className="flex-1">Keyboard shortcuts</span>
-          <span aria-hidden="true" className="font-n-text text-xs font-normal">
-            ?
-          </span>
-        </SidebarButton>
-      </nav>
+        </nav>
+      </div>
     </aside>
   );
 }
