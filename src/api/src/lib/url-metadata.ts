@@ -250,20 +250,15 @@ export interface UrlMetadataResult {
 }
 
 /**
- * Fetch and extract metadata from a URL.
+ * Fetch and extract metadata from a URL, reporting whether the page was
+ * reachable.
  *
  * Extracts Open Graph tags, Twitter Card tags, and standard meta tags.
  * Returns null values for any metadata that cannot be extracted.
  * Times out after 10 seconds to prevent hanging on slow/unresponsive servers.
- */
-export async function fetchUrlMetadata(url: string): Promise<UrlMetadata> {
-  return (await fetchUrlMetadataResult(url)).metadata;
-}
-
-/**
- * As `fetchUrlMetadata`, but reporting whether the page was reachable. Prefer
- * this wherever the outcome is stored or shown — a URL row marked `fetched`
- * with nothing in it is indistinguishable from one that genuinely 404'd.
+ *
+ * Store or show the outcome with `ok`: a URL row marked `fetched` with nothing
+ * in it is indistinguishable from one that genuinely 404'd.
  */
 export async function fetchUrlMetadataResult(
   url: string,

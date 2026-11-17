@@ -25,16 +25,3 @@ export function resolvePinned(input: {
 }): boolean | undefined {
   return input.pinned ?? input.sticky;
 }
-
-/** Fold a parsed request's `sticky` into `pinned` and drop the legacy key. */
-export function normalizePinned<
-  T extends { pinned?: boolean; sticky?: boolean },
->(input: T): Omit<T, "sticky"> {
-  const { sticky: _legacy, ...rest } = input;
-  const pinned = resolvePinned(input);
-  return pinned === undefined ? rest : { ...rest, pinned };
-}
-
-// Both spellings for a response body. Lives with the shared serializers, which
-// are its only response-side users.
-export { pinnedResponseFields } from "@nylon-impossible/shared/serialize";

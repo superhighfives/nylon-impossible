@@ -20,6 +20,11 @@ import {
   todoUrls,
 } from "../../src/lib/db";
 import { mockGetUserList } from "../__mocks__/clerk-backend";
+import {
+  fetchUrlMetadataResult,
+  mockFetchUrlMetadata,
+  resetUrlMetadataMock,
+} from "../__mocks__/url-metadata";
 import { cleanDb, getTodayListId, seedTodo, seedUser } from "../helpers";
 
 async function getTimeListId(
@@ -802,6 +807,47 @@ describe("Gmail add-on", () => {
       expect(urls[0].title).toBe("Q3 planning notes");
       expect(urls[0].siteName).toBe("Gmail");
       expect(urls[0].fetchStatus).toBe("fetched");
+    });
+
+    it("add-from-message fetches a typed link but not the permalink", async () => {
+      resetUrlMetadataMock();
+      mockFetchUrlMetadata({ title: "The deck" });
+      await linkUser();
+      const token = await idToken();
+      const permalink = "https://mail.google.com/mail/u/0/#all/thread-xyz";
+      const res = await post("/gmail-addon/actions/add-from-message", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: {
+              stringInputs: { value: ["Read https://example.com/deck"] },
+            },
+          },
+          parameters: { permalink, subject: "Q3 planning notes" },
+        },
+      });
+      expect(res.status).toBe(200);
+
+      const db = getDb(env.DB);
+      const [todo] = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      const linkRows = () =>
+        db.select().from(todoUrls).where(eq(todoUrls.todoId, todo.id));
+      await vi.waitFor(async () => {
+        const typed = (await linkRows()).find(
+          (u) => u.url === "https://example.com/deck",
+        );
+        expect(typed?.fetchStatus).toBe("fetched");
+        expect(typed?.title).toBe("The deck");
+      });
+
+      expect(fetchUrlMetadataResult).toHaveBeenCalledExactlyOnceWith(
+        "https://example.com/deck",
+      );
+      const mail = (await linkRows()).find((u) => u.url === permalink);
+      expect(mail?.fetchStatus).toBe("fetched");
+      expect(mail?.title).toBe("Q3 planning notes");
     });
 
     it("drops a non-http permalink instead of persisting a javascript: URL", async () => {

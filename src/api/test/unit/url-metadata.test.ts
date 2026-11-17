@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchUrlMetadata } from "../../src/lib/url-metadata";
+import { fetchUrlMetadataResult } from "../../src/lib/url-metadata";
 
 // Build minimal HTML with requested meta tags
 function makeHtml(parts: {
@@ -75,7 +75,7 @@ const NULL_METADATA = {
   image: null,
 };
 
-describe("fetchUrlMetadata", () => {
+describe("fetchUrlMetadataResult", () => {
   describe("title extraction", () => {
     it("prefers og:title over other sources", async () => {
       stubFetchOk(
@@ -85,7 +85,9 @@ describe("fetchUrlMetadata", () => {
           title: "HTML Title",
         }),
       );
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.title).toBe("OG Title");
     });
 
@@ -93,19 +95,25 @@ describe("fetchUrlMetadata", () => {
       stubFetchOk(
         makeHtml({ twitterTitle: "Twitter Title", title: "HTML Title" }),
       );
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.title).toBe("Twitter Title");
     });
 
     it("falls back to <title> tag as last resort", async () => {
       stubFetchOk(makeHtml({ title: "HTML Title" }));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.title).toBe("HTML Title");
     });
 
     it("returns null title when no title found", async () => {
       stubFetchOk(makeHtml({}));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.title).toBeNull();
     });
 
@@ -114,14 +122,18 @@ describe("fetchUrlMetadata", () => {
         <meta content="Content First Title" property="og:title">
       </head></html>`;
       stubFetchOk(html);
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.title).toBe("Content First Title");
     });
 
     it("trims whitespace from <title> tag", async () => {
       const html = "<html><head><title>  Trimmed Title  </title></head></html>";
       stubFetchOk(html);
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.title).toBe("Trimmed Title");
     });
   });
@@ -135,7 +147,9 @@ describe("fetchUrlMetadata", () => {
           description: "Meta Desc",
         }),
       );
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.description).toBe("OG Desc");
     });
 
@@ -146,19 +160,25 @@ describe("fetchUrlMetadata", () => {
           description: "Meta Desc",
         }),
       );
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.description).toBe("Twitter Desc");
     });
 
     it("falls back to standard meta description", async () => {
       stubFetchOk(makeHtml({ description: "Meta Desc" }));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.description).toBe("Meta Desc");
     });
 
     it("returns null description when none found", async () => {
       stubFetchOk(makeHtml({}));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.description).toBeNull();
     });
   });
@@ -166,19 +186,25 @@ describe("fetchUrlMetadata", () => {
   describe("siteName extraction", () => {
     it("uses og:site_name when present", async () => {
       stubFetchOk(makeHtml({ ogSiteName: "My Site" }));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.siteName).toBe("My Site");
     });
 
     it("falls back to hostname (without www) when og:site_name is absent", async () => {
       stubFetchOk(makeHtml({}));
-      const meta = await fetchUrlMetadata("https://www.example.com/path");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://www.example.com/path",
+      );
       expect(meta.siteName).toBe("example.com");
     });
 
     it("preserves subdomain in hostname fallback", async () => {
       stubFetchOk(makeHtml({}));
-      const meta = await fetchUrlMetadata("https://api.example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://api.example.com",
+      );
       expect(meta.siteName).toBe("api.example.com");
     });
   });
@@ -186,31 +212,41 @@ describe("fetchUrlMetadata", () => {
   describe("favicon extraction", () => {
     it("extracts favicon from link rel=icon with absolute URL", async () => {
       stubFetchOk(makeHtml({ icon: "https://cdn.example.com/icon.png" }));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.favicon).toBe("https://cdn.example.com/icon.png");
     });
 
     it("resolves relative favicon path against base URL", async () => {
       stubFetchOk(makeHtml({ icon: "/images/favicon.png" }));
-      const meta = await fetchUrlMetadata("https://example.com/page");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com/page",
+      );
       expect(meta.favicon).toBe("https://example.com/images/favicon.png");
     });
 
     it("falls back to apple-touch-icon when no icon link", async () => {
       stubFetchOk(makeHtml({ appleIcon: "/apple-icon.png" }));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.favicon).toBe("https://example.com/apple-icon.png");
     });
 
     it("falls back to /favicon.ico when no link tags present", async () => {
       stubFetchOk(makeHtml({}));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.favicon).toBe("https://example.com/favicon.ico");
     });
 
     it("prefers rel=icon over apple-touch-icon", async () => {
       stubFetchOk(makeHtml({ icon: "/icon.png", appleIcon: "/apple.png" }));
-      const meta = await fetchUrlMetadata("https://example.com");
+      const { metadata: meta } = await fetchUrlMetadataResult(
+        "https://example.com",
+      );
       expect(meta.favicon).toBe("https://example.com/icon.png");
     });
   });
@@ -218,20 +254,20 @@ describe("fetchUrlMetadata", () => {
   describe("error handling", () => {
     it("returns null metadata on network failure", async () => {
       stubFetchError(new Error("Network error"));
-      const meta = await fetchUrlMetadata("https://example.com");
-      expect(meta).toEqual(NULL_METADATA);
+      const result = await fetchUrlMetadataResult("https://example.com");
+      expect(result).toEqual({ ok: false, metadata: NULL_METADATA });
     });
 
     it("returns null metadata on 404 response", async () => {
       stubFetchStatus(404);
-      const meta = await fetchUrlMetadata("https://example.com");
-      expect(meta).toEqual(NULL_METADATA);
+      const result = await fetchUrlMetadataResult("https://example.com");
+      expect(result).toEqual({ ok: false, metadata: NULL_METADATA });
     });
 
     it("returns null metadata on 500 response", async () => {
       stubFetchStatus(500);
-      const meta = await fetchUrlMetadata("https://example.com");
-      expect(meta).toEqual(NULL_METADATA);
+      const result = await fetchUrlMetadataResult("https://example.com");
+      expect(result).toEqual({ ok: false, metadata: NULL_METADATA });
     });
 
     it("returns null metadata when response.text() throws", async () => {
@@ -242,8 +278,8 @@ describe("fetchUrlMetadata", () => {
           text: () => Promise.reject(new Error("body read failed")),
         }),
       );
-      const meta = await fetchUrlMetadata("https://example.com");
-      expect(meta).toEqual(NULL_METADATA);
+      const result = await fetchUrlMetadataResult("https://example.com");
+      expect(result).toEqual({ ok: false, metadata: NULL_METADATA });
     });
   });
 
@@ -255,7 +291,7 @@ describe("fetchUrlMetadata", () => {
       });
       vi.stubGlobal("fetch", mockFetchFn);
 
-      await fetchUrlMetadata("https://example.com");
+      await fetchUrlMetadataResult("https://example.com");
 
       expect(mockFetchFn).toHaveBeenCalledWith(
         "https://example.com",
@@ -272,7 +308,7 @@ describe("fetchUrlMetadata", () => {
       });
       vi.stubGlobal("fetch", mockFetchFn);
 
-      await fetchUrlMetadata("https://example.com");
+      await fetchUrlMetadataResult("https://example.com");
 
       expect(mockFetchFn).toHaveBeenCalledWith(
         "https://example.com",
@@ -296,7 +332,7 @@ describe("fetchUrlMetadata", () => {
       });
       vi.stubGlobal("fetch", stub);
 
-      const meta = await fetchUrlMetadata(TWEET_URL);
+      const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
 
       expect(String(stub.mock.calls[0][0])).toContain(
         "cdn.syndication.twimg.com/tweet-result",
@@ -318,7 +354,7 @@ describe("fetchUrlMetadata", () => {
       });
       vi.stubGlobal("fetch", stub);
 
-      const meta = await fetchUrlMetadata(TWEET_URL);
+      const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
       expect(meta.description).toBe("Check this out");
     });
 
@@ -333,7 +369,7 @@ describe("fetchUrlMetadata", () => {
       });
       vi.stubGlobal("fetch", stub);
 
-      const meta = await fetchUrlMetadata(TWEET_URL);
+      const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
       expect(meta.description).toBeNull();
       expect(meta.title).toBe("Nicolas Finet (@nifinet)");
     });
@@ -350,7 +386,7 @@ describe("fetchUrlMetadata", () => {
       });
       vi.stubGlobal("fetch", stub);
 
-      const meta = await fetchUrlMetadata(TWEET_URL);
+      const { metadata: meta } = await fetchUrlMetadataResult(TWEET_URL);
 
       expect(meta.title).toBe("Scraped Title");
     });

@@ -2,8 +2,13 @@ import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
 import { dayKeyIn, dueDayKey } from "@nylon-impossible/shared";
 import { and, eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
-import { getDb, lists, todoUrls, users } from "../../src/lib/db";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getDb, lists, todos, todoUrls, users } from "../../src/lib/db";
+import {
+  fetchUrlMetadataResult,
+  mockFetchUrlMetadata,
+  resetUrlMetadataMock,
+} from "../__mocks__/url-metadata";
 import { cleanDb, getTodayListId, seedUser } from "../helpers";
 
 // @clerk/backend is aliased to our mock in vitest.config.ts
@@ -251,6 +256,40 @@ describe("Smart create endpoint", () => {
         .where(eq(todoUrls.todoId, body.todos[0].id));
       expect(urls).toHaveLength(1);
       expect(urls[0].url).toBe("https://example.com/");
+    });
+  });
+
+  describe("background link fetch", () => {
+    beforeEach(() => resetUrlMetadataMock());
+
+    it("fetches a typed link and names the todo after the page", async () => {
+      mockFetchUrlMetadata({ title: "An article worth reading" });
+      const res = await smartCreate("https://example.com/article");
+      expect(res.status).toBe(200);
+
+      const body = await res.json<{ todos: any[] }>();
+      const todoId = body.todos[0].id;
+      expect(body.todos[0].title).toBe("Check example.com");
+
+      const db = getDb(env.DB);
+      await vi.waitFor(async () => {
+        const [link] = await db
+          .select()
+          .from(todoUrls)
+          .where(eq(todoUrls.todoId, todoId));
+        expect(link.fetchStatus).toBe("fetched");
+        expect(link.title).toBe("An article worth reading");
+      });
+      await vi.waitFor(async () => {
+        const [todo] = await db
+          .select()
+          .from(todos)
+          .where(eq(todos.id, todoId));
+        expect(todo.title).toBe("An article worth reading");
+      });
+      expect(fetchUrlMetadataResult).toHaveBeenCalledExactlyOnceWith(
+        "https://example.com/article",
+      );
     });
   });
 

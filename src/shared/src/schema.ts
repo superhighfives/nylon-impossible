@@ -299,14 +299,8 @@ export const todoUrlsRelations = relations(todoUrls, ({ one }) => ({
 
 // Type exports
 export type User = typeof users.$inferSelect;
-export type NewUser = typeof users.$inferInsert;
 export type Todo = typeof todos.$inferSelect;
-export type NewTodo = typeof todos.$inferInsert;
 export type List = typeof lists.$inferSelect;
-export type NewList = typeof lists.$inferInsert;
 export type TodoUrl = typeof todoUrls.$inferSelect;
-export type NewTodoUrl = typeof todoUrls.$inferInsert;
-export type GmailAddonLink = typeof gmailAddonLinks.$inferSelect;
-export type NewGmailAddonLink = typeof gmailAddonLinks.$inferInsert;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type NewApiToken = typeof apiTokens.$inferInsert;
