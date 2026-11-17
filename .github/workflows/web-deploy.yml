@@ -87,11 +87,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: src/api
-          command: deploy --var ENVIRONMENT:production --var CF_ACCOUNT_ID:${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          secrets: |
-            CLOUDFLARE_API_TOKEN
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: deploy --var ENVIRONMENT:production
 
       - name: Build Web
         run: bun run --cwd src/web build
@@ -133,11 +129,11 @@ jobs:
           echo "✘ $URL never returned a healthy HTML 200 after deploy" >&2
           exit 1
 
-  # Per-branch preview via Cloudflare Worker Previews (private beta). Replaces
-  # the old fully-isolated per-PR stack: no config rewriting, no per-PR queue,
-  # no custom domains, and no close-triggered cleanup — stale previews are
-  # auto-evicted by the platform. Previews share prod D1; the hourly cron only
-  # ever runs on production, never on a preview. See
+  # Per-branch preview via Cloudflare Worker Previews. Replaces the old
+  # fully-isolated per-PR stack: no config rewriting, no per-PR queue, no
+  # custom domains, and no close-triggered cleanup — stale previews are
+  # auto-evicted by the platform. Previews bind a separate preview D1, not
+  # prod's; the hourly cron only ever runs on production, never on a preview. See
   # https://github.com/superhighfives/nylon-impossible/blob/02f8c45b3ba52896a25bde813cfd2b0a05ef9fb1/plans/done/2026-08-13-migrate-pr-previews-to-worker-previews.md.
   #
   # Preview secrets are seeded by this job (see the "Set preview API/Web
@@ -214,7 +210,7 @@ jobs:
           # `+e` is what the `rc` checks below have always assumed.
           set +e
           set -uo pipefail
-          # `wrangler preview` (private beta) can exit 0 yet return an empty
+          # `wrangler preview` can exit 0 yet return an empty
           # `urls` array: the preview deploys, but no Preview URL is minted
           # because the worker has Preview URLs disabled (preview_urls / no
           # workers.dev subdomain). Capture stdout+stderr and treat "no URL" as
@@ -255,7 +251,6 @@ jobs:
           set -euo pipefail
           printf '%s' "$CLERK_SECRET_KEY" | bunx wrangler preview secret put CLERK_SECRET_KEY --name "$PREVIEW_NAME"
           printf '%s' "$CLERK_PUBLISHABLE_KEY" | bunx wrangler preview secret put CLERK_PUBLISHABLE_KEY --name "$PREVIEW_NAME"
-          printf '%s' "$CLOUDFLARE_API_TOKEN" | bunx wrangler preview secret put CLOUDFLARE_API_TOKEN --name "$PREVIEW_NAME"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

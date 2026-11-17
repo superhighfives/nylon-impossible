@@ -78,7 +78,7 @@
   "observability": {
     "enabled": true,
   },
-  // Worker Previews (private beta): per-branch preview deployments created by
+  // Worker Previews: per-branch preview deployments created by
   // `wrangler preview`. Bindings and vars are NOT inherited from the top level,
   // so everything a preview needs is repeated here.
   //   - DB is a SEPARATE preview database (not prod's `database_id`), so preview
