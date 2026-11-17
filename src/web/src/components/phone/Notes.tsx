@@ -69,7 +69,7 @@ function list(node: List, nested: boolean, className: string, key?: number) {
     : nested
       ? "list-[circle]"
       : "list-disc";
-  const classes = `m-0 pl-5 ${shape}${className}`;
+  const classes = `m-0 pl-5 ${shape} ${className}`;
   return node.ordered ? (
     <ol key={key} start={node.start} className={classes}>
       {items}
@@ -83,12 +83,12 @@ function list(node: List, nested: boolean, className: string, key?: number) {
 
 function blocks(nodes: Block[]): ReactNode[] {
   return nodes.map((node, i) => {
-    const gap = node.gap ? ` ${GAP}` : "";
+    const gap = node.gap ? GAP : "";
     switch (node.type) {
       case "paragraph":
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
-          <p key={i} className={`m-0${gap}`}>
+          <p key={i} className={`m-0 ${gap}`}>
             {inlines(node.children)}
           </p>
         );
@@ -97,7 +97,7 @@ function blocks(nodes: Block[]): ReactNode[] {
         const Heading = (["h3", "h4", "h5"] as const)[node.level - 1];
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
-          <Heading key={i} className={`m-0 font-bold text-inherit${gap}`}>
+          <Heading key={i} className={`m-0 font-bold text-inherit ${gap}`}>
             {inlines(node.children)}
           </Heading>
         );
@@ -107,7 +107,7 @@ function blocks(nodes: Block[]): ReactNode[] {
           <pre
             // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
             key={i}
-            className={`m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap${gap}`}
+            className={`m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap ${gap}`}
           >
             <code>{node.text}</code>
           </pre>
@@ -117,7 +117,7 @@ function blocks(nodes: Block[]): ReactNode[] {
           <blockquote
             // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
             key={i}
-            className={`m-0 border-l-2 border-n-hairline pl-3 text-n-ink-muted${gap}`}
+            className={`m-0 border-l-2 border-n-hairline pl-3 text-n-ink-muted ${gap}`}
           >
             {blocks(node.blocks)}
           </blockquote>
