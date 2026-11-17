@@ -181,9 +181,7 @@ export function createBoard(ctx: BoardContext): Board {
   };
   /** Focus is on a column's Add. */
   const onAdd = () =>
-    !!(document.activeElement as HTMLElement | null)?.closest(
-      "[data-column-composer]",
-    );
+    !!document.activeElement?.closest("[data-column-composer]");
 
   /** The selected row and its todo: open, or finished (in Done). */
   const current = () => {
@@ -234,8 +232,12 @@ export function createBoard(ctx: BoardContext): Board {
       if (at.id === SIDEBAR && at.level === "in") {
         // → goes into the column, as a click; New list, Settings and
         // Keyboard shortcuts take Enter instead.
-        const el = document.activeElement as HTMLElement;
-        if (delta === 1 && (el.dataset.sidebarList || el.dataset.sidebarItem)) {
+        const el = document.activeElement;
+        if (
+          delta === 1 &&
+          el instanceof HTMLElement &&
+          (el.dataset.sidebarList || el.dataset.sidebarItem)
+        ) {
           el.click();
         }
         return;
