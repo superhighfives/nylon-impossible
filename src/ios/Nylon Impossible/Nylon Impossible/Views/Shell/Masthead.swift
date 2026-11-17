@@ -111,27 +111,15 @@ private struct Squiggle: Shape {
     }
 }
 
-/// The written empty state, drawn as a row: a squiggle in the "+ Add"
-/// composer's icon slot and "Nothing today." at a row title's size, so it sits
-/// where the first todo will and that todo takes its place without moving
-/// anything. Nothing here can be tapped, so the squiggle and the words are
-/// subtle, lighter than a row. When there's somewhere to go,
+/// The written empty state: a large centred squiggle over "Nothing today."
+/// at a row title's size. Nothing here can be tapped, so the squiggle and the
+/// words are subtle, lighter than a row. When there's somewhere to go,
 /// "4 waiting in this week →" sits under the words.
 struct EmptyLine: View {
     let text: String
     var link: (text: String, action: () -> Void)?
 
-    @Environment(\.isWideLayout) private var isWide
-
-    /// Where the words start: the composer's, after its icon slot.
-    private var textInset: CGFloat { Theme.Phone.checkbox + Theme.Space.s3 }
-
     var body: some View {
-        if isWide { row } else { centred }
-    }
-
-    /// Pages have room: a large centred squiggle over the words, still subtle.
-    private var centred: some View {
         VStack(spacing: Theme.Space.s4) {
             Squiggle()
                 .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -161,45 +149,6 @@ struct EmptyLine: View {
         .padding(.top, Theme.Space.s8)
         .padding(.horizontal, Theme.Phone.gutter)
         .frame(maxWidth: .infinity)
-    }
-
-    /// Board columns: the quiet row, only drawn wide.
-    private var row: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .center, spacing: Theme.Space.s3) {
-                Squiggle()
-                    .stroke(style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
-                    .frame(width: 16, height: 8)
-                    .frame(width: Theme.Phone.checkbox)
-                    .accessibilityHidden(true)
-                Text(text)
-                    .textStyle(Theme.Fonts.Role.rowTitleWide)
-                    .fontWeight(.regular)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .foregroundStyle(Theme.Colors.inkSubtle)
-            .padding(.vertical, Theme.Space.s3)
-            .frame(minHeight: Theme.Space.rowMinHeight)
-            if let link {
-                Button(action: link.action) {
-                    HStack(spacing: Theme.Space.s1) {
-                        Text(link.text)
-                        Image(systemName: "arrow.right")
-                            .imageScale(.small)
-                    }
-                    .textStyle(Theme.Fonts.Role.control)
-                    .fontWeight(.regular)
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(minHeight: Theme.Space.rowMinHeight)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .padding(.leading, textInset)
-            }
-        }
-        .padding(.horizontal, Theme.Wide.gutter)
-        .padding(.bottom, link == nil ? 0 : Theme.Space.s4)
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -239,7 +188,7 @@ enum MastheadCopy {
 
     static let done = "Finished todos, by day"
 
-    /// A page or column before its lists have synced, on phone and iPad.
+    /// A page before its lists have synced.
     static let loading = "Getting your lists…"
 
     /// "Sunday, October 18".

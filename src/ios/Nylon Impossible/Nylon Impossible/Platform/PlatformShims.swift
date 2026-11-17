@@ -4,9 +4,8 @@
 //
 //  The few places the app touches UIKit or AppKit directly, behind one small
 //  API each, so shared views and services never need `#if os(macOS)` for
-//  them: which kind of device this is, a light haptic, whether VoiceOver or
-//  Switch Control is on, the Liquid Glass composer, and the pointing-hand
-//  cursor over clickable chrome.
+//  them: a light haptic, whether VoiceOver or Switch Control is on, the
+//  Liquid Glass composer, and the pointing-hand cursor over clickable chrome.
 //
 //  Compiled into the app and the share extension.
 //
@@ -17,23 +16,6 @@ import AppKit
 #else
 import UIKit
 #endif
-
-/// What kind of device the app is running on.
-enum DeviceIdiom: Equatable {
-    case phone, pad, mac
-
-    @MainActor
-    static var current: DeviceIdiom {
-        #if os(macOS)
-        return .mac
-        #else
-        return UIDevice.current.userInterfaceIdiom == .pad ? .pad : .phone
-        #endif
-    }
-
-    /// Devices that get the wide board when the window is wide enough.
-    var supportsBoard: Bool { self != .phone }
-}
 
 /// The light tap the share extension plays when a todo lands. On a Mac it's
 /// the trackpad's alignment haptic, which is silent on a mouse.
@@ -107,16 +89,6 @@ extension View {
         #endif
     }
 
-    /// Turn off iPadOS's pointer hover effect (the row tints itself). A Mac
-    /// pointer has no hover effect to turn off.
-    func pointerHoverEffectDisabled(_ disabled: Bool) -> some View {
-        #if os(iOS)
-        hoverEffectDisabled(disabled)
-        #else
-        self
-        #endif
-    }
-
     /// No navigation bar at all (the account sheet's root).
     func hidesNavigationBar() -> some View {
         #if os(iOS)
@@ -151,7 +123,7 @@ extension View {
     }
 
     /// The pointing-hand cursor while the pointer is over this view, on a
-    /// Mac. iPadOS draws its own pointer effects, so it's a no-op there.
+    /// Mac. It's a no-op on iOS.
     func pointingHandCursor() -> some View {
         #if os(macOS)
         return modifier(PointingHandCursor())

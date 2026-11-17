@@ -37,21 +37,33 @@ struct FeedbackContext: Encodable, Equatable, Sendable {
     /// The API caps each optional field at 200 characters.
     static let maxFieldLength = 200
 
-    /// "ios", "ipados" or "mac" — the issue's `platform:` label.
-    static func platform(for idiom: DeviceIdiom) -> String {
+    /// What the app is running on. There's no iPad app: an iPad runs the
+    /// iPhone app, which reports itself as a phone.
+    enum Idiom: Equatable {
+        case phone, mac
+
+        static var current: Idiom {
+            #if os(macOS)
+            return .mac
+            #else
+            return .phone
+            #endif
+        }
+    }
+
+    /// "ios" or "mac" — the issue's `platform:` label.
+    static func platform(for idiom: Idiom) -> String {
         switch idiom {
         case .phone: return "ios"
-        case .pad: return "ipados"
         case .mac: return "mac"
         }
     }
 
-    /// "iOS 26.1", "iPadOS 26.0.1", "macOS 26.1".
-    static func osDescription(idiom: DeviceIdiom, version: OperatingSystemVersion) -> String {
+    /// "iOS 26.1", "macOS 26.1".
+    static func osDescription(idiom: Idiom, version: OperatingSystemVersion) -> String {
         let name: String
         switch idiom {
         case .phone: name = "iOS"
-        case .pad: name = "iPadOS"
         case .mac: name = "macOS"
         }
         var number = "\(version.majorVersion).\(version.minorVersion)"
@@ -72,7 +84,7 @@ struct FeedbackContext: Encodable, Equatable, Sendable {
         colorScheme: ColorScheme?,
         viewport: CGSize?,
         bundle: Bundle = .main,
-        idiom: DeviceIdiom? = nil
+        idiom: Idiom? = nil
     ) -> FeedbackContext {
         let idiom = idiom ?? .current
         return FeedbackContext(

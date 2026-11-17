@@ -8,22 +8,14 @@
 //  rides the keyboard through the bottom safe-area inset, so nothing here
 //  hard-codes an inset.
 //
-//  On iPad at regular width the same state drives the wide board instead
-//  (ContentView+Wide.swift): sidebar, columns and a trailing panel. Split
-//  view or Stage Manager narrowing the window to compact falls back to this
-//  phone layout, carrying an open detail, Done or Settings across.
-//
 
+#if os(iOS)
 import AppIntents
 import SwiftData
 import SwiftUI
 
 /// Owns the store's queries and hands their results to `ContentView` as
-/// plain arrays. On macOS the board's sidebar, columns and inspector are
-/// separate hosting views with their own view graphs; a `@Query` read from
-/// one of those graphs refreshes inside the wrong graph's update and trips
-/// AttributeGraph's "setting value during update" trap. Reading the results
-/// here, once, keeps every query update in this view's own graph.
+/// plain arrays.
 struct ContentRoot: View {
     @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
     @Query(sort: \TodoListModel.position) private var lists: [TodoListModel]
@@ -40,8 +32,6 @@ struct ContentView: View {
     @Environment(\.scenePhase) var scenePhase
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.screenRoute) var screenRoute
-    @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    @Environment(\.dynamicTypeSize) var dynamicTypeSize
     @Environment(AuthService.self) var authService
     @Environment(SyncService.self) var syncService
     @Environment(UserPreferencesService.self) var preferences
@@ -79,83 +69,11 @@ struct ContentView: View {
     @State var midnightTick = 0
     @State var composerHeight: CGFloat = 0
 
-    // MARK: Wide (iPad and Mac) state
-    /// Your list open in the board's fourth column (else Done shows there).
-    @State var openColumnId: String?
-    /// iPad: Settings, as a sheet over the board. (A Mac has its Settings
-    /// window; Done is the fourth column.)
-    @State var widePanel: AccountRoute?
-    /// The board's selection, and the column it's in.
-    @State var selectedTodoId: UUID?
-    /// The selection last moved by keyboard (a board key, the palette), so
-    /// the selected row shows its bar; a click or tap clears it.
-    @State var selectsByKeyboard = false
-    @State var focusedColumnId: String?
-    /// The last todo selected in each column, so going back lands on it.
-    @State var lastSelected: [String: UUID] = [:]
-    /// Your list whose title is being renamed in place.
-    @State var renamingColumnId: String?
-    /// The toolbar's quick add, and the New list popover (and which button
-    /// it's anchored to).
-    @State var showsQuickAdd = false
-    @State var newListAnchor: NewListAnchor?
-    /// The keyboard's place in the sidebar, when it's there rather than on
-    /// the board (← from the first column, or Esc).
-    @State var sidebarCursor: SidebarItem?
-    /// ⌘K's palette, G L's lists, or M's Move to.
-    @State var palette: PaletteMode?
-    @State var showsShortcuts = false
-    /// G was pressed: the next key is a destination (for 1.2 seconds).
-    @State var goPending = false
-    @State var goTask: Task<Void, Never>?
-    /// Each column's composer: its draft, a chip picked over the default, a
-    /// focus request, and which one is being typed in.
-    @State var drafts: [String: String] = [:]
-    @State var chosenTargets: [String: String] = [:]
-    @State var composerFocusRequest: String?
-    @State var editingColumnId: String?
-    /// Raised to scroll the board to a column.
-    @State var scrollColumnId: String?
-    @State var showsDueCalendar = false
-    @State var lastKey: (key: BoardKey, at: Date)?
-    @FocusState var boardFocused: Bool
-    /// The section the keyboard last moved to (or a click put it in); nil
-    /// before either, which is Today. See `currentSection`.
-    @State var keySection: BoardSection?
-    /// The last column the keyboard was on, so Return on the sidebar lands
-    /// on its item.
-    @State var lastColumnSection: String?
-    /// The keyboard is on a column's Add field, not typing in it.
-    @State var addCursor: String?
-    /// Return on the open todo: put the cursor in its title.
-    @State var detailFocusRequest = false
-    /// One of the open todo's fields is being edited.
-    @State var detailEditing = false
-
-    // MARK: Mac state
-    @State var sidebarVisibility: NavigationSplitViewVisibility = .all
-    /// This window's undo manager, which carries `actions.history`: ⌘Z,
-    /// Edit ▸ Undo and shake.
+    /// This window's undo manager, which carries `actions.history`: ⌘Z
+    /// and shake.
     @Environment(\.undoManager) var undoManager
-    @Environment(\.openURL) var openURL
-    #if os(macOS)
-    @Environment(\.openSettings) var openSettings
-    #endif
 
     var viewModel: TodoViewModel { actions.viewModel }
-
-    /// The board, not the phone layout: an iPad window at regular width, or
-    /// any Mac window. An iPhone in landscape can be regular too, but keeps
-    /// the phone layout; a narrow Mac window keeps the board too (the sidebar
-    /// collapses and the columns scroll), since the phone's pager and sheets
-    /// aren't Mac idioms.
-    var isWide: Bool {
-        #if os(macOS)
-        return true
-        #else
-        return horizontalSizeClass == .regular && DeviceIdiom.current == .pad
-        #endif
-    }
 
     // MARK: - Body
 
@@ -163,18 +81,8 @@ struct ContentView: View {
         // Read so a midnight tick re-runs body (dates, repeats done today).
         // swiftlint:disable:next redundant_discardable_let
         let _ = midnightTick
-        Group {
-            #if os(macOS)
-            wideBody
-            #else
-            if isWide {
-                wideBody
-            } else {
-                phoneBody
-            }
-            #endif
-        }
-        .alert("Rename list", isPresented: Binding(get: { renamingList != nil }, set: { if !$0 { renamingList = nil } })) {
+        phoneBody
+            .alert("Rename list", isPresented: Binding(get: { renamingList != nil }, set: { if !$0 { renamingList = nil } })) {
             TextField("List name", text: $renameText)
             Button("Cancel", role: .cancel) {}
             Button("Rename") { commitRename() }
@@ -190,7 +98,6 @@ struct ContentView: View {
             // A waiting delete is sent when you leave.
             if phase != .active { actions.flush() }
         }
-        .onChange(of: isWide, initial: true) { _, wide in carryAcross(toWide: wide) }
         // Siri matches "Add … to {list} in Nylon" against the list names it
         // was last given, so a new or renamed list has to be re-registered.
         .onChange(of: collections.map(\.name)) { NylonShortcuts.updateAppShortcutParameters() }
@@ -202,7 +109,6 @@ struct ContentView: View {
 
     // MARK: - Phone
 
-    #if os(iOS)
     var phoneBody: some View {
         VStack(spacing: 0) {
             Switcher(
@@ -343,7 +249,6 @@ struct ContentView: View {
         }
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: showsComposer)
     }
-    #endif
 }
 
 extension ContentView {
@@ -434,14 +339,13 @@ extension ContentView {
     var showsFeedback: Bool { feedback != nil && preferences.isAdmin && screenRoute == nil }
 
     /// Where feedback was flagged from, for the issue: "Today",
-    /// "board › Groceries › detail".
+    /// "Lists › Groceries › detail".
     var feedbackScreen: String {
-        var parts = [isWide ? "board" : viewModel.page.title]
-        let openId = isWide ? openColumnId : viewModel.openCollectionId
-        if let openId, let list = lists.first(where: { $0.id == openId }) { parts.append(list.name) }
+        var parts = [viewModel.page.title]
+        if let openId = viewModel.openCollectionId, let list = lists.first(where: { $0.id == openId }) {
+            parts.append(list.name)
+        }
         if detailTodo != nil { parts.append("detail") }
-        if isWide, detailTodo == nil, openColumnId == nil { parts.append("done") }
-        if isWide, widePanel == .settings { parts.append("settings") }
         if showsAccount { parts.append(accountPath.isEmpty ? "account" : "settings") }
         return parts.joined(separator: " › ")
     }
@@ -458,3 +362,4 @@ extension ContentView {
         return authService.userInitials ?? "?"
     }
 }
+#endif

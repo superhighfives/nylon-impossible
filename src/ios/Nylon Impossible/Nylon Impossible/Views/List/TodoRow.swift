@@ -7,9 +7,9 @@
 //  the long-press menu `ListPage` attaches, and tapping the row opens the
 //  detail sheet. There are no swipe actions: a horizontal swipe pages lists.
 //
-//  On the iPad board the same row takes the wide type scale, tints under the
-//  pointer (no controls appear), and fills when it's the selected row, with
-//  a bar beside it while moving with the keyboard.
+//  In the Mac's menu bar popover the same row takes the wide type scale,
+//  tints under the pointer (no controls appear), and fills when it's the
+//  selected row, with a bar beside it while moving with the keyboard.
 //
 
 import SwiftUI
@@ -18,14 +18,10 @@ struct TodoRow: View {
     let todo: TodoItem
     let subtasks: [TodoItem]
     let actions: TodoActions
-    /// The board's selection (iPad and Mac).
+    /// The popover's selection (Mac).
     var isSelected = false
     /// Every list in display order, for VoiceOver's Move actions.
     var lists: [TodoListModel] = []
-    /// The board: a click on an unselected row selects it; a click on the
-    /// selection (so a double click too) opens it. Nil on the phone, where a
-    /// tap opens.
-    var onSelect: (() -> Void)?
     let onOpen: () -> Void
     /// The Mac popover: a field in the title's place while it's edited.
     var titleField: AnyView?
@@ -89,7 +85,7 @@ struct TodoRow: View {
     }
 
     private func titleButton(checked: Bool, parts: [MetaPart]) -> some View {
-        Button(action: tap) {
+        Button(action: onOpen) {
             VStack(alignment: .leading, spacing: Theme.Space.s1) {
                 Text(todo.title)
                     .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: -0.005)
@@ -106,16 +102,6 @@ struct TodoRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        // The row tints itself; the pointer shouldn't also morph.
-        .pointerHoverEffectDisabled(isWide)
-    }
-
-    private func tap() {
-        if let onSelect, !isSelected {
-            onSelect()
-        } else {
-            onOpen()
-        }
     }
 
     private func perform(_ action: TodoRowAccessibility.Action) {
@@ -127,7 +113,7 @@ struct TodoRow: View {
         }
     }
 
-    /// The board's selection, and the row's only focus indicator: the soft
+    /// The popover's selection, and the row's only focus indicator: the soft
     /// fill, plus a bar beside it while moving with the keyboard, as on wide
     /// web. Hover tints lightly.
     private var highlight: some View {
@@ -144,8 +130,8 @@ struct TodoRow: View {
     }
 }
 
-/// Beside the board's selected row while moving with the keyboard: the
-/// sidebar's bar (3pt, inset 6pt top and bottom), drawn 7pt clear of the
+/// Beside the popover's selected row while moving with the keyboard: the
+/// web sidebar's bar (3pt, inset 6pt top and bottom), drawn 7pt clear of the
 /// row's fill so nothing shifts. Overlaid at the row's content edge, which
 /// is 10pt inside the fill. Muted ink is 5:1 or more against canvas,
 /// surface and fill.

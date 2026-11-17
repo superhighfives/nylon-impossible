@@ -15,23 +15,20 @@
 //  sharetext draw the share extension's sheet (a link, and three pasted
 //  lines) in the app, and widgets draws the Today widget's real views at
 //  iPhone sizes, small, medium and Lock Screen, from the sample data — simctl's openurl
-//  stops at a system "Open in Nylon?" prompt a script can't answer). On iPad: board,
-//  column (a list open as the fourth column), inspector (the detail panel),
-//  menu (a row selected, ready for a long-press), keys (the keyboard on an
-//  empty Today, outlined, as after a key press), shortcuts (the Keyboard
-//  shortcuts sheet open over the board; on a Mac too). `-NylonLandscape YES`
-//  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
-//  it never touches the real store or the network.
+//  stops at a system "Open in Nylon?" prompt a script can't answer). The
+//  route skips sign-in and runs on in-memory sample data, so it never
+//  touches the real store or the network.
 //
 //  On a Mac the route is drawn in a window of its own, as the app has none:
 //  `menubar` the menu bar popover, `settings` the Settings window's view,
 //  `signin` the sign-in window's, `share` the share extension at its Mac
-//  sheet size, and `widgets` the desktop sizes.
+//  sheet size, and `widgets` the desktop sizes. Any other route draws the
+//  popover there too, since the Mac has no other view of a list.
 //
-//  States for the quality pass, on either layout: signin (the signed-out
+//  States for the quality pass, on the iPhone: signin (the signed-out
 //  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
-//  Today, two waiting in This week), syncerror (Today, or the board, under
-//  the sync error line), and perf (500 todos in Today, for scrolling and the
+//  Today, two waiting in This week), syncerror (Today under the sync error
+//  line), and perf (500 todos in Today, for scrolling and the
 //  done hold).
 //
 
@@ -42,12 +39,6 @@ import SwiftUI
 enum ScreenRoute: String, CaseIterable {
     case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
     case share, sharetext, widgets
-    case board, column, inspector, menu
-    /// The board with the keyboard on an empty Today, so its section
-    /// outline shows without a key press.
-    case keys
-    /// The board with the Keyboard shortcuts sheet open.
-    case shortcuts
     case signin, loading, empty, syncerror, perf
     /// macOS: the menu bar popover, drawn in a window.
     case menubar
@@ -58,18 +49,6 @@ enum ScreenRoute: String, CaseIterable {
         UserDefaults.standard.string(forKey: "NylonScreen").flatMap(ScreenRoute.init(rawValue:))
         #else
         nil
-        #endif
-    }
-
-    /// `-NylonLandscape YES` draws the app at landscape size, turned a
-    /// quarter, for an iPad screenshot. A windowed iPadOS 26 scene refuses
-    /// programmatic rotation and simctl can't turn the device, so the capture
-    /// script rotates the PNG back. Screenshot runs only.
-    static var drawsLandscape: Bool {
-        #if DEBUG
-        UserDefaults.standard.bool(forKey: "NylonLandscape")
-        #else
-        false
         #endif
     }
 
@@ -117,7 +96,7 @@ struct ScreenRouteRoot: View {
     @State private var preferences: UserPreferencesService
     /// Kept in state, like the services: SwiftUI can recreate this view
     /// struct, and a new container would release the old one and destroy
-    /// every sample todo the board is still showing (a re-render then reads
+    /// every sample todo the app is still showing (a re-render then reads
     /// a dead model and crashes).
     @State private var container: ModelContainer
 
@@ -143,20 +122,7 @@ struct ScreenRouteRoot: View {
     }
 
     var body: some View {
-        if ScreenRoute.drawsLandscape {
-            GeometryReader { geometry in
-                content
-                    .frame(width: geometry.size.height, height: geometry.size.width)
-                    .rotationEffect(.degrees(90))
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-            }
-            .ignoresSafeArea()
-            #if os(iOS)
-            .statusBarHidden()
-            #endif
-        } else {
-            content
-        }
+        content
     }
 
     @ViewBuilder
@@ -188,7 +154,7 @@ struct ScreenRouteRoot: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .background(Color(nsColor: .windowBackgroundColor))
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
-        case .menubar:
+        default:
             QuickAddView()
                 .environment(authService)
                 .environment(syncService)
@@ -198,8 +164,9 @@ struct ScreenRouteRoot: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(Theme.Colors.fill)
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
-        #endif
+        #else
         default: app
+        #endif
         }
     }
 
@@ -232,6 +199,7 @@ struct ScreenRouteRoot: View {
         .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
     }
 
+    #if os(iOS)
     private var app: some View {
         ContentRoot()
             .environment(authService)
@@ -241,6 +209,7 @@ struct ScreenRouteRoot: View {
             .modelContainer(container)
             .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
     }
+    #endif
 }
 
 /// The prototype's sample todos, dated relative to today.
@@ -252,7 +221,7 @@ enum SampleData {
         let container = try! ModelContainer(for: schema, configurations: [configuration])
         switch route {
         case .loading: break
-        case .empty, .keys: seedEmptyToday(container.mainContext)
+        case .empty: seedEmptyToday(container.mainContext)
         case .perf: seedMany(container.mainContext)
         default: seed(container.mainContext)
         }

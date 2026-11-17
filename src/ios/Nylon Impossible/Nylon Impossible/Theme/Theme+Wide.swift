@@ -2,79 +2,35 @@
 //  Theme+Wide.swift
 //  Nylon Impossible
 //
-//  The iPad layout's measurements and type roles, alongside Theme+Phone. The
-//  sizes follow the spec's wide scale (Display 40, Body 15, Meta 13) and the
-//  wide prototype; like the phone roles they're built on the generated
-//  `Theme.Fonts.Style`, so they scale with Dynamic Type.
+//  The Mac popover's measurements and type roles, alongside Theme+Phone: the
+//  wide scale (Body 15) the web board uses too. Like the phone roles they're
+//  built on the generated `Theme.Fonts.Style`, so they scale with Dynamic Type.
 //
 
 import SwiftUI
 
 extension Theme {
-    /// Fixed measurements of the wide (iPad) layout.
+    /// Fixed measurements of the wide layout (the Mac popover).
     enum Wide {
-        /// Column gutter.
+        /// The rows' gutter.
         static let gutter = Theme.Space.s6
-        /// The sidebar's width.
-        static let sidebarWidth: CGFloat = 248
-        /// A Mac window narrower than this hides its sidebar on its own, and
-        /// one this wide or wider shows it: without the sidebar, four
-        /// columns at `columnMinWidth` fit.
-        static let sidebarMinWindowWidth: CGFloat = 960
-        /// The narrowest a column gets before the board scrolls sideways.
-        static let columnMinWidth: CGFloat = 240
-        /// The same at accessibility text sizes.
-        static let columnMinWidthLargeText: CGFloat = 380
-
-        /// A board column's width on a board `length` wide: a quarter of it,
-        /// from `minimum` up to `Theme.Board.columnMaxWidth`. It depends on
-        /// the board alone, so opening a todo or adding a list never resizes
-        /// a column.
-        static func columnWidth(for length: CGFloat, minimum: CGFloat) -> CGFloat {
-            min(Theme.Board.columnMaxWidth, max(minimum, length / 4))
-        }
-        /// Header height above each column's hairline, so every title sits
-        /// on the same baseline. Scaled with Dynamic Type where it's used.
-        static let columnHeader: CGFloat = 140
-        /// The trailing panel (detail, Done, Settings).
-        static let panelWidth: CGFloat = 400
-        /// The sidebar's row height and corner radius. 44, the touch
-        /// minimum: an iPad is still a touch screen without a pointer.
-        static let sidebarRow: CGFloat = Theme.Space.rowMinHeight
-        static let sidebarRadius: CGFloat = 8
     }
 }
 
 extension Theme.Fonts.Role {
-    /// A column title ("This week"), the wide display size.
-    static let columnTitle = Theme.Fonts.Wide.display
-    /// A todo's title in a column row.
+    /// A todo's title in a popover row.
     static let rowTitleWide = Theme.Fonts.Style(
         size: 15, lineHeight: 21, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .subheadline
     )
-    /// Wide body: the column composer.
+    /// Wide body: the popover's composer.
     static let bodyWide = Theme.Fonts.Wide.body
-    /// The open todo's title, heading the fourth column: Archivo 28, under
-    /// the column titles' 40 so a todo's longer name doesn't wrap word by word.
-    static let detailTitleWide = Theme.Fonts.Style(
-        size: 28, lineHeight: 31, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .title1
-    )
-    /// The sidebar wordmark, Archivo 20 heavy.
-    static let wordmark = Theme.Fonts.Style(
-        size: 20, lineHeight: 24, weight: .heavy, variationWeight: 800, isDisplay: true, textStyle: .title3
-    )
-    /// A sidebar entry.
-    static let sidebarItem = Theme.Fonts.Style(
-        size: 15, lineHeight: 20, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .subheadline
-    )
 }
 
 extension EnvironmentValues {
-    /// True inside the iPad board, where rows use the wide type scale, the
-    /// column gutter and a pointer hover tint.
+    /// True inside the Mac popover, where rows use the wide type scale, the
+    /// wide gutter and a pointer hover tint.
     @Entry var isWideLayout = false
-    /// True while the board's selection last moved by keyboard: the selected
-    /// row adds a bar beside its fill, as in the sidebar. A click or tap
-    /// selects with the fill alone.
+    /// True while the selection last moved by keyboard: the selected row adds
+    /// a bar beside its fill. A click selects with the fill alone.
     @Entry var selectsByKeyboard = false
 }

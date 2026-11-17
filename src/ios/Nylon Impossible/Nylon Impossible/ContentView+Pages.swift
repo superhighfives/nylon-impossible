@@ -5,6 +5,7 @@
 //  The five pages and their copy, split from ContentView.swift.
 //
 
+#if os(iOS)
 import SwiftUI
 
 extension ContentView {
@@ -142,3 +143,4 @@ extension ContentView {
         }
     }
 }
+#endif

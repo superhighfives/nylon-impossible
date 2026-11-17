@@ -2,7 +2,7 @@
 //  TodoDetailSheet+Notes.swift
 //  Nylon Impossible
 //
-//  The open todo's Notes, in the sheet and the board's fourth column alike.
+//  The open todo's Notes.
 //
 
 import SwiftUI
@@ -15,16 +15,16 @@ extension TodoDetailSheet {
     /// switch moves nothing but the text (principle 8). Empty notes are
     /// always the editor, with its "Add notes" placeholder.
     var notesField: some View {
-        let style = isColumn ? Theme.Fonts.Role.bodyWide : Theme.Fonts.Role.body
+        let style = Theme.Fonts.Role.body
         let hasNotes = Self.storedNotes(notes) != nil
         let rendered = hasNotes && !editingNotes
-        return VStack(alignment: .leading, spacing: isColumn ? Theme.Space.s1 : 6) {
+        return VStack(alignment: .leading, spacing: 6) {
             SectionLabel(text: "Notes")
             ZStack(alignment: .topLeading) {
                 TextField("Add notes", text: $notes, prompt: Text("Add notes").foregroundStyle(Theme.Colors.inkMuted), axis: .vertical)
                     .textStyle(style)
                     .foregroundStyle(Theme.Colors.ink)
-                    .lineLimit(isColumn ? 2... : 3...)
+                    .lineLimit(3...)
                     .focused($focus, equals: .notes)
                     .disabled(rendered)
                     .opacity(rendered ? 0 : 1)

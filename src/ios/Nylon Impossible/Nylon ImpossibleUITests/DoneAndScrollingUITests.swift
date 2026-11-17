@@ -10,24 +10,21 @@
 import XCTest
 
 final class DoneAndScrollingUITests: NylonUITestCase {
-    /// The checkbox sits just inside the row's gutter (20pt on the phone,
-    /// 24 on the board), level with the title's first line.
+    /// The checkbox sits just inside the row's 20pt gutter, level with the
+    /// title's first line.
     private func tapCheckbox(of row: XCUIElement) {
         row.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-            .withOffset(CGVector(dx: (isPad ? 24 : 20) + 12, dy: 24))
+            .withOffset(CGVector(dx: 20 + 12, dy: 24))
             .tap()
     }
 
-    /// A row in Today. On the board, Done is the fourth column, so a todo
-    /// that's just been finished is still on screen under the same title,
-    /// there; look only in Today's column.
+    /// A row in Today.
     private func todayRow(_ title: String) -> XCUIElement {
-        guard isPad else { return row(title) }
-        return app.otherElements.matching(identifier: "Today").firstMatch.buttons[title].firstMatch
+        row(title)
     }
 
     func testDoneHoldsInPlaceThenLeavesWithUndo() {
-        launch(isPad ? "board" : "today")
+        launch("today")
         let target = todayRow("Call Mum about Sunday lunch")
         let next = todayRow("Finish quarterly report")
         waitFor(target)
@@ -61,7 +58,7 @@ final class DoneAndScrollingUITests: NylonUITestCase {
         launch("perf")
         let first = row("Review the sync engine PR 1")
         waitFor(first, timeout: 10)
-        let list = isPad ? app.scrollViews.firstMatch : app.collectionViews.firstMatch
+        let list = app.collectionViews.firstMatch
         let options = XCTMeasureOptions()
         options.iterationCount = 3
         measure(metrics: [XCTOSSignpostMetric.scrollingAndDecelerationMetric], options: options) {

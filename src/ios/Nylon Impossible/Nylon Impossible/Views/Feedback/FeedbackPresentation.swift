@@ -38,23 +38,6 @@ extension View {
     }
 }
 
-extension FeedbackService {
-    /// The keyboard shortcut for Send Feedback… on a Mac and an iPad with a
-    /// keyboard. Not ⌥⌘F: that's Find and Replace in the standard Edit menu.
-    static let shortcut = (key: KeyEquivalent("f"), modifiers: EventModifiers([.command, .shift]))
-
-    /// Open the sheet with the window as it looks now attached.
-    func presentWithSnapshot() {
-        #if os(macOS)
-        let snapshot = MacFeedbackSnapshot.frontWindow()
-        #else
-        let snapshot = FeedbackPresenter.snapshotKeyWindow()
-        #endif
-        present(viewport: snapshot?.size)
-        if let image = snapshot?.image { Task { await add(image) } }
-    }
-}
-
 private struct FeedbackPresentationModifier: ViewModifier {
     let feedback: FeedbackService?
     let isEnabled: Bool
@@ -267,24 +250,6 @@ private extension UIFont {
             .traits: [UIFontDescriptor.TraitKey.weight: weight],
         ])
         return UIFont(descriptor: descriptor, size: 0)
-    }
-}
-#endif
-
-#if os(macOS)
-// MARK: - Mac
-
-@MainActor
-enum MacFeedbackSnapshot {
-    /// The front window's content as it looks now, at the screen's scale.
-    /// Drawn from the view, so it needs no Screen Recording permission.
-    static func frontWindow() -> (image: CGImage, size: CGSize)? {
-        guard let window = NSApp.windows.first(where: { $0.isVisible && !($0 is NSPanel) }),
-              let view = window.contentView,
-              let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
-        view.cacheDisplay(in: view.bounds, to: rep)
-        guard let image = rep.cgImage else { return nil }
-        return (image, view.bounds.size)
     }
 }
 #endif

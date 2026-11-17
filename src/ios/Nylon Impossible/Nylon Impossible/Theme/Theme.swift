@@ -229,33 +229,6 @@ enum Theme {
         static let field: CGFloat = 10
     }
 
-    /// The open todo on the wide board: a sheet after its todo's column.
-    enum Sheet {
-        static let radius: CGFloat = 14
-        static let inset: CGFloat = 8
-        static let overlap: CGFloat = 24
-        static let slide: CGFloat = 32
-        /// The todo's column while the sheet is open, bar its selected row.
-        static let recede: Double = 0.8
-        /// Cast left, ink-black at the appearance's opacity.
-        static let shadowX: CGFloat = -8
-        static let shadowY: CGFloat = 0
-        static let shadowRadius: CGFloat = 12
-        static let shadowOpacityLight: Double = 0.08
-        static let shadowOpacityDark: Double = 0.4
-    }
-
-    /// The wide board's columns: a quarter of the board, up to
-    /// `columnMaxWidth`. The minimums are `Theme.Wide`'s. Past the last
-    /// column, a hatch of `hairline` lines at `hatchOpacity`.
-    enum Board {
-        static let columnMaxWidth: CGFloat = 416
-        static let hatchSpacing: CGFloat = 12
-        static let hatchAngle: Double = 45
-        static let hatchWidth: CGFloat = 1
-        static let hatchOpacity: Double = 0.4
-    }
-
     enum Motion {
         static let fast: TimeInterval = 0.15
         static let base: TimeInterval = 0.22

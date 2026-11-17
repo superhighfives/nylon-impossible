@@ -10,10 +10,6 @@
 import XCTest
 
 final class PhoneDoneUITests: NylonUITestCase {
-    override func setUpWithError() throws {
-        try XCTSkipIf(isPad, "The phone layout")
-    }
-
     private var doneButton: XCUIElement { app.buttons["Done"].firstMatch }
 
     /// A page's masthead title: the tallest on-screen text with that label

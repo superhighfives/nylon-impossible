@@ -427,44 +427,6 @@ export function renderSwift(tokens) {
   }
   out.push("    }", "");
 
-  // The wide board's sheet
-  const { sheet } = tokens;
-  out.push(
-    "    /// The open todo on the wide board: a sheet after its todo's column.",
-    "    enum Sheet {",
-  );
-  for (const name of ["radius", "inset", "overlap", "slide"]) {
-    out.push(`        static let ${name}: CGFloat = ${sheet[name]}`);
-  }
-  out.push(
-    "        /// The todo's column while the sheet is open, bar its selected row.",
-    `        static let recede: Double = ${sheet.recede}`,
-    "        /// Cast left, ink-black at the appearance's opacity.",
-    `        static let shadowX: CGFloat = ${sheet.shadow.x}`,
-    `        static let shadowY: CGFloat = ${sheet.shadow.y}`,
-    `        static let shadowRadius: CGFloat = ${sheet.shadow.blur / 2}`,
-    `        static let shadowOpacityLight: Double = ${sheet.shadowOpacity.light}`,
-    `        static let shadowOpacityDark: Double = ${sheet.shadowOpacity.dark}`,
-    "    }",
-    "",
-  );
-
-  // The wide board's columns and what comes after them
-  const { board } = tokens;
-  out.push(
-    "    /// The wide board's columns: a quarter of the board, up to",
-    "    /// `columnMaxWidth`. The minimums are `Theme.Wide`'s. Past the last",
-    "    /// column, a hatch of `hairline` lines at `hatchOpacity`.",
-    "    enum Board {",
-    `        static let columnMaxWidth: CGFloat = ${board.columnMaxWidth}`,
-    `        static let hatchSpacing: CGFloat = ${board.hatch.spacing}`,
-    `        static let hatchAngle: Double = ${board.hatch.angle}`,
-    `        static let hatchWidth: CGFloat = ${board.hatch.width}`,
-    `        static let hatchOpacity: Double = ${board.hatch.opacity}`,
-    "    }",
-    "",
-  );
-
   // Motion
   const [x1, y1, x2, y2] = tokens.motion.easeOutStrong;
   out.push("    enum Motion {");

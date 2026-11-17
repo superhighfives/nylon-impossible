@@ -12,10 +12,9 @@ import Foundation
 struct DeepLinkDestination: Equatable {
     /// The phone page to show.
     let page: TodoViewModel.Page
-    /// One of your lists to open on the Lists page (phone) or as the fourth
-    /// column (iPad); nil for a time list.
+    /// One of your lists to open on the Lists page; nil for a time list.
     let collectionId: String?
-    /// The list the composer adds to — the column to focus on iPad.
+    /// The list the composer adds to.
     let listId: String?
 
     /// - Parameter lists: every list, as `ContentView.orderedLists` holds them.

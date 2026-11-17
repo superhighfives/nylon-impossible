@@ -6,11 +6,6 @@
 //  text on screen, edited in place), a chip row (List, Due, Repeat, Pin),
 //  Notes, Subtasks, Links, and a footer with Delete and the dates.
 //
-//  In the board's fourth column (iPad and Mac) it's built like a column
-//  instead: the title on the column header's baseline, the hairline, and the
-//  board's type sizes, with the properties as rows rather than chips (see
-//  TodoDetailSheet+Column.swift).
-//
 //  Every edit saves as it's made. There's no Save or Cancel: closing the sheet
 //  is the only way to finish, and there's nothing left to save when you do.
 //  Typing writes to the store at once and syncs once you pause.
@@ -26,18 +21,8 @@ struct TodoDetailSheet: View {
     let lists: [TodoListModel]
     let apiService: APIService?
     let userId: String?
-    /// Set when the detail is the iPad inspector rather than a sheet, so ×
-    /// and Delete close the panel instead of dismissing a presentation.
-    var onClose: (() -> Void)?
-    /// The board's Return on the open todo: put the cursor in the title.
-    var focusTitle: Binding<Bool> = .constant(false)
-    /// Told when editing starts (a field takes the cursor) and stops, so the
-    /// board stands its keys down meanwhile and takes the keyboard back after.
-    var onEditingChange: ((Bool) -> Void)?
 
     @Environment(\.dismiss) var dismiss
-    /// In the board's fourth column, which is tinted; a sheet sits on canvas.
-    @Environment(\.isWideLayout) var isWide
     @Environment(\.modelContext) var modelContext
     @Query var everyTodo: [TodoItem]
 
@@ -67,17 +52,9 @@ struct TodoDetailSheet: View {
         actions: TodoActions,
         lists: [TodoListModel],
         apiService: APIService?,
-        userId: String?,
-        showsCalendar: Bool = false,
-        onClose: (() -> Void)? = nil,
-        focusTitle: Binding<Bool> = .constant(false),
-        onEditingChange: ((Bool) -> Void)? = nil
+        userId: String?
     ) {
         self.todo = todo
-        self.onClose = onClose
-        self.focusTitle = focusTitle
-        self.onEditingChange = onEditingChange
-        _showsDatePicker = State(initialValue: showsCalendar)
         self.actions = actions
         self.lists = lists
         self.apiService = apiService
@@ -103,38 +80,12 @@ struct TodoDetailSheet: View {
         lists.first { $0.id.lowercased() == todo.listKey?.lowercased() }
     }
 
-    /// The board's fourth column rather than a sheet.
-    var isColumn: Bool { onClose != nil && isWide }
-
     var body: some View {
-        Group {
-            if isColumn {
-                columnBody
-            } else {
-                sheetBody
-            }
-        }
-        .onChange(of: focus) { old, new in
-            if (old == nil) != (new == nil) { onEditingChange?(new != nil) }
-        }
-        .onChange(of: focusTitle.wrappedValue, initial: true) { _, requested in
-            guard requested else { return }
-            focusTitle.wrappedValue = false
-            focus = .title
-        }
-    }
-
-
-    var sheetBody: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                // The sheet closes with the drag indicator or a swipe down; only
-                // the iPad inspector, which has no such gesture, keeps ×.
-                if onClose != nil {
-                    closeRow
-                } else {
-                    Spacer().frame(height: Theme.Space.s10)
-                }
+                // The sheet closes with the drag indicator or a swipe down,
+                // so it has no ×.
+                Spacer().frame(height: Theme.Space.s10)
                 titleField
                 chips
                 if showsDatePicker { datePicker }
@@ -149,47 +100,27 @@ struct TodoDetailSheet: View {
             .padding(.bottom, Theme.Space.s12)
         }
         .scrollDismissesKeyboard(.interactively)
-        .background(isWide ? Theme.Colors.surface : Theme.Colors.canvas)
+        .background(Theme.Colors.canvas)
         .task { await loadUrls() }
         .onDisappear(perform: flushEdits)
     }
 
     func close() {
-        if let onClose { onClose() } else { dismiss() }
+        dismiss()
     }
 
     // MARK: - Title
 
-    var closeRow: some View {
-        HStack {
-            Spacer()
-            Button(action: close, label: {
-                Image(systemName: Theme.Icon.close)
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .frame(width: 30, height: 30)
-                    .background(Theme.Colors.fill, in: Circle())
-                    .frame(width: Theme.Space.rowMinHeight, height: Theme.Space.rowMinHeight)
-                    .contentShape(Circle())
-            })
-            .buttonStyle(.plain)
-            .padding(.trailing, -10)
-            .accessibilityLabel("Close")
-        }
-        .padding(.top, Theme.Space.s3)
-    }
-
     var titleField: some View {
         TextField("Title", text: $title, axis: .vertical)
             .textStyle(
-                isColumn ? Theme.Fonts.Role.detailTitleWide : Theme.Fonts.Role.sheetTitle,
+                Theme.Fonts.Role.sheetTitle,
                 tracking: Theme.Tracking.sheetTitle
             )
             .foregroundStyle(Theme.Colors.ink)
             .focused($focus, equals: .title)
-            .modifier(DetailTabWrap(field: .title, isColumn: isColumn, focus: $focus))
             .submitLabel(.done)
-            .padding(.bottom, isColumn ? 0 : Theme.Space.s4)
+            .padding(.bottom, Theme.Space.s4)
             .onChange(of: title) { _, newValue in
                 // Return finishes the title rather than starting a new line.
                 if newValue.contains(where: \.isNewline) {
@@ -290,8 +221,7 @@ struct TodoDetailSheet: View {
 }
 
 extension TodoDetailSheet {
-    // The menus behind List, Due and Repeat, shared by the sheet's chips and
-    // the column's rows.
+    // The menus behind List, Due and Repeat.
 
     @ViewBuilder
     var listMenuItems: some View {
@@ -338,30 +268,6 @@ extension TodoDetailSheet {
         if todo.recurrence != nil {
             Divider()
             Button("Don’t repeat", role: .destructive) { setRepeat(nil) }
-        }
-    }
-}
-
-/// Tab and ⇧Tab in the board's open todo go from field to field as in any
-/// form, but wrap at the ends: ⇧Tab on the title goes to the links field,
-/// Tab on the links field to the title, so they never leave the form for
-/// another column's Add field. Elsewhere Tab is the system's, so the due and
-/// repeat rows take their turn where the system gives buttons one.
-struct DetailTabWrap: ViewModifier {
-    let field: TodoDetailSheet.Field
-    let isColumn: Bool
-    let focus: FocusState<TodoDetailSheet.Field?>.Binding
-
-    func body(content: Content) -> some View {
-        content.onKeyPress(keys: [.tab], phases: .down) { press in
-            guard isColumn else { return .ignored }
-            let back = press.modifiers.contains(.shift)
-            switch (field, back) {
-            case (.title, true): focus.wrappedValue = .link
-            case (.link, false): focus.wrappedValue = .title
-            default: return .ignored
-            }
-            return .handled
         }
     }
 }

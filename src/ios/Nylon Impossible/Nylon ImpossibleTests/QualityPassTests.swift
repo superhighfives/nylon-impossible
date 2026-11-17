@@ -66,13 +66,6 @@ struct RowAccessibilityTests {
             #expect(order == ["Zebra", "Email the landlord", "Pick up dry cleaning"])
         }
     }
-
-    @Test("the sidebar's counts read as words")
-    func sidebarCounts() {
-        #expect(WideSidebar.countText(0) == "No todos")
-        #expect(WideSidebar.countText(1) == "1 todo")
-        #expect(WideSidebar.countText(12) == "12 todos")
-    }
 }
 
 @MainActor

@@ -12,9 +12,8 @@
 //  sheet: `placeholder` shows a shared link's stand-in title, and
 //  `allowsEmptySubmit` lets it be sent as-is.
 //
-//  On the iPad board the same composer is the quiet "+ Add" row at the top of
-//  each column (`style: .inline`): no glass, the chips under the field while
-//  it's focused, and Escape hands the keyboard back to the board.
+//  In the Mac's menu bar popover the same composer is a quiet "+ Add" row
+//  (`style: .inline`): no glass, and the chips under the field.
 //
 
 import SwiftUI
@@ -34,8 +33,7 @@ struct Composer: View {
     /// Add what's typed to `listId`; `parseDates` is false once × was tapped.
     let onSubmit: (_ listId: String?, _ parseDates: Bool) -> Void
     var style: Style = .floating
-    /// Told when the field gains or loses focus, so the board can stand its
-    /// single-key shortcuts down while you type.
+    /// Told when the field gains or loses focus.
     var onFocusChange: ((Bool) -> Void)?
     /// Replaces "Add to Today…" — the share sheet shows the title a shared
     /// link will get if nothing is typed.
@@ -43,9 +41,6 @@ struct Composer: View {
     /// Send with nothing typed (the share sheet, where the placeholder is
     /// what's saved). The send button then shows from the start.
     var allowsEmptySubmit = false
-    /// The list chips. Off for a board column's Add field, whose column
-    /// already says which list it is; the due chip still shows.
-    var showsListChips = true
     /// Esc, after the field lets go: quick add closes its popover with it.
     var onEscape: (() -> Void)?
     /// The Mac menu bar's popover: the chips show once you type (not on
@@ -53,9 +48,6 @@ struct Composer: View {
     /// list below (`onDown`).
     var menuBarKeys = false
     var onDown: (() -> Void)?
-    /// The board's Tab and ⇧Tab (true) while typing: stop, and go to the
-    /// next or previous section.
-    var onTab: ((_ back: Bool) -> Void)?
 
     @State private var keepWords = false
     @State private var wasFocused = false
@@ -138,8 +130,8 @@ struct Composer: View {
             .foregroundStyle(Theme.Colors.ink)
             .lineLimit(1...4)
             // A vertical field keeps the height it grew to when the text
-            // size goes up and back down, which pushed every board column's
-            // rows 33pt down. A fresh field per size measures afresh; the
+            // size goes up and back down, which pushed the rows under it
+            // 33pt down. A fresh field per size measures afresh; the
             // draft is in `text`, and `body` gives the new field the focus.
             .id(dynamicTypeSize)
             .focused($isFocused)
@@ -158,11 +150,6 @@ struct Composer: View {
                 return .handled
             }
             .onKeyPress(keys: [.tab], phases: .down) { press in
-                if let onTab {
-                    isFocused = false
-                    onTab(press.modifiers.contains(.shift))
-                    return .handled
-                }
                 guard menuBarKeys, hasDraft, !lists.isEmpty else { return .ignored }
                 let at = lists.firstIndex { $0.id == targetId } ?? 0
                 let step = press.modifiers.contains(.shift) ? -1 : 1
@@ -245,8 +232,8 @@ struct Composer: View {
         .padding(.bottom, Theme.Space.s2)
     }
 
-    /// "+ Add": the field's own placeholder is the row, so tapping it (or
-    /// pressing n) focuses in place.
+    /// "+ Add": the field's own placeholder is the row, so tapping it
+    /// focuses in place.
     private var inline: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: Theme.Space.s3) {
@@ -269,7 +256,7 @@ struct Composer: View {
             .frame(minHeight: Theme.Space.rowMinHeight)
             .contentShape(Rectangle())
             .onTapGesture { isFocused = true }
-            if showsChips, showsListChips || typedDue != nil {
+            if showsChips {
                 chips
                     .padding(.bottom, Theme.Space.s1)
                     .transition(.opacity)
@@ -319,7 +306,7 @@ struct Composer: View {
         if let due = typedDue {
             dueChip(due)
         }
-        ForEach(showsListChips ? lists : []) { list in
+        ForEach(lists) { list in
             ChipButton(text: list.name, isOn: list.id == targetId, strong: true) {
                 chosenListId = list.id == currentListId ? nil : list.id
             }
