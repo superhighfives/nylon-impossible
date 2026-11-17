@@ -27,6 +27,7 @@ import {
   OnlineStatusContext,
   useOnlineStatusValue,
 } from "../hooks/useOnlineStatus";
+import { useReloadOnNewBuild } from "../hooks/useReloadOnNewBuild";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 import { getHints } from "../lib/client-hints";
 import { initSentry, Sentry } from "../lib/sentry";
@@ -125,6 +126,7 @@ function SentryUserSync() {
 function RootDocument() {
   const { hints } = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
+  useReloadOnNewBuild();
 
   return (
     <html

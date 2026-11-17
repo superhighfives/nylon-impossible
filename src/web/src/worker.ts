@@ -11,11 +11,22 @@
 // is imported and wrapped, rather than repointing away from it.
 import * as Sentry from "@sentry/cloudflare";
 import startEntry from "@tanstack/react-start/server-entry";
+import { versionResponse } from "./server/version";
 
 // startEntry is { fetch: RequestHandler }, whose fetch is typed (request, opts?)
 // but invoked by the runtime as (request, env, ctx). It's structurally an
 // ExportedHandler for our purposes; cast to satisfy withSentry.
-const handler = startEntry as unknown as ExportedHandler<Env>;
+const app = startEntry as unknown as ExportedHandler<Env>;
+
+// `GET /version` is answered here, before the app, so it never renders a page.
+const handler: ExportedHandler<Env> = {
+  fetch(request, env, ctx) {
+    return (
+      versionResponse(request) ??
+      (app.fetch as NonNullable<typeof app.fetch>)(request, env, ctx)
+    );
+  },
+};
 
 // DSN and environment are build-time client-hint vars (a Sentry DSN is not a
 // secret — it already ships in the browser bundle). Vite inlines import.meta.env
