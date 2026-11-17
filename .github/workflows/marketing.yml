@@ -253,7 +253,7 @@ jobs:
         if: always()
         run: |
           status=src/marketing/source/capture-status.json
-          # Every iOS asset must be fresh: one stale iPad shot cached under
+          # Every iOS asset must be fresh: one stale shot cached under
           # this revision would be skipped (and republished) from then on.
           if [ -f "$status" ] && jq -e '
               [to_entries[] | select(.key | startswith("ios-")) | .value]

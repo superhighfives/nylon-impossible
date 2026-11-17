@@ -53,7 +53,7 @@ What's true when it's done.
 
 ## Behaviour
 
-Per platform: web wide, web phone, iPhone, iPad, Mac, menu bar, Gmail. Say
+Per platform: web wide, web phone, iPhone, Mac menu bar, Gmail. Say
 "unchanged" for the ones it doesn't touch.
 
 ## Non-goals

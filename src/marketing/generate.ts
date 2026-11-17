@@ -94,7 +94,7 @@ const WEBSITE_DIR =
 type Mode = "light" | "dark";
 const MODES: Mode[] = ["light", "dark"];
 
-type DeviceKey = "iphone" | "ipad";
+type DeviceKey = "iphone";
 
 interface Size {
   width: number;
@@ -113,7 +113,7 @@ interface Placement {
 interface ParityScreen {
   name: string;
   device: DeviceKey;
-  /** The iOS DEBUG `-NylonScreen` route. iPad routes are drawn landscape. */
+  /** The iOS DEBUG `-NylonScreen` route. */
   ios: string;
   /** The web path to open. */
   web: string;
@@ -150,7 +150,7 @@ interface Manifest {
         size: Size;
       }
     >;
-    shots: { device: DeviceKey; screen: string; landscape?: boolean }[];
+    shots: { device: DeviceKey; screen: string }[];
   };
   web: {
     port: number;
@@ -174,7 +174,6 @@ interface Manifest {
     png?: boolean;
     backgrounds: Record<Mode, { r: number; g: number; b: number }>;
     browser: { web: Placement; phone: Placement };
-    ipad: { tablet: Placement; phone: Placement };
   };
 }
 
@@ -248,7 +247,7 @@ function webAsset(shot: string, mode: Mode): string {
 }
 
 function iosShotName(shot: Manifest["ios"]["shots"][number]): string {
-  return `ios-${shot.device}-${shot.screen}${shot.landscape ? "-landscape" : ""}`;
+  return `ios-${shot.device}-${shot.screen}`;
 }
 
 const WEB_ASSETS = manifest.web.shots.flatMap((shot) =>
@@ -809,9 +808,7 @@ function buildIOSApp(udid: string): string {
 /**
  * Capture every manifest shot for one device class through the DEBUG
  * screenshot routes: `-NylonScreen <route>` skips sign-in and draws the app's
- * sample data, `-NylonDark YES` forces dark, and `-NylonLandscape YES` draws
- * an iPad run at landscape size turned a quarter clockwise (iPadOS 26 won't
- * rotate a windowed scene on request), which we turn back here.
+ * sample data, and `-NylonDark YES` forces dark.
  */
 type IOSShot = Manifest["ios"]["shots"][number];
 
@@ -903,8 +900,6 @@ async function captureIOSDevice(
         shot.screen,
         "-NylonDark",
         mode === "dark" ? "YES" : "NO",
-        "-NylonLandscape",
-        shot.landscape ? "YES" : "NO",
       ];
       await withSimRetries("launch", udid, () =>
         // --terminate-running-process: each shot is a fresh launch with its
@@ -945,11 +940,7 @@ async function captureIOSDevice(
       }
       if (lastErr) throw lastErr;
 
-      // Landscape runs are drawn turned a quarter clockwise; turn them back.
-      await sharp(raw)
-        .rotate(shot.landscape ? 270 : 0)
-        .png()
-        .toFile(dest);
+      await sharp(raw).png().toFile(dest);
       unlinkSync(raw);
       console.log(`  → ${name}.png`);
     }
@@ -1093,8 +1084,8 @@ async function captureIOSPhases(): Promise<void> {
     console.log("  iOS capture was skippable, but no cached PNGs found.");
   }
   await openSimulatorWindow();
-  // One phase per device class, so an iPad flake can't throw away a good
-  // iPhone run (or the other way round).
+  // One phase per device class, so a flake on one can't throw away a good
+  // run on another.
   for (const device of DEVICES) {
     await capturePhase(`ios ${device}`, iosAssets(device), () =>
       captureIOSDevice(device),
@@ -1169,9 +1160,8 @@ async function deviceLayer(
   return { input: image, left: p.left - padLeft, top: p.top - padTop };
 }
 
-/** iPhone display corners are ~13% of its width; the iPad's are far tighter. */
+/** iPhone display corners are ~13% of its width. */
 const IPHONE_RADIUS = 0.13;
-const IPAD_RADIUS = 0.022;
 
 async function writeComposite(
   name: string,
@@ -1237,15 +1227,6 @@ async function compositeBrowser(mode: Mode): Promise<void> {
   ]);
 }
 
-/** The iPad variant: the landscape board behind, iPhone in front. */
-async function compositeIPad(mode: Mode): Promise<void> {
-  const { tablet, phone } = manifest.composite.ipad;
-  await writeComposite("nylon-screenshot-ipad", mode, [
-    await deviceLayer(tablet, mode, IPAD_RADIUS),
-    await deviceLayer(phone, mode, IPHONE_RADIUS),
-  ]);
-}
-
 /**
  * Raw device screenshots grouped by App Store display class, numbered in
  * manifest order — ready to drag into App Store Connect, which is a manual
@@ -1261,19 +1242,16 @@ async function writeAppStoreSet(): Promise<void> {
     mkdirSync(dir, { recursive: true });
     const n = (counters.get(shot.device) ?? 0) + 1;
     counters.set(shot.device, n);
-    const expected = shot.landscape
-      ? { width: spec.size.height, height: spec.size.width }
-      : spec.size;
+    const expected = spec.size;
     for (const mode of MODES) {
       const src = sourcePath(`${iosShotName(shot)}-${mode}`);
       if (!existsSync(src)) {
         console.warn(`  ⚠ ${src} not found, skipping`);
         continue;
       }
-      const label = `${shot.screen}${shot.landscape ? "-landscape" : ""}`;
       const dest = join(
         dir,
-        `${String(n).padStart(2, "0")}-${label}-${mode}.png`,
+        `${String(n).padStart(2, "0")}-${shot.screen}-${mode}.png`,
       );
       const meta = await sharp(src).metadata();
       if (meta.width !== expected.width || meta.height !== expected.height) {
@@ -1311,7 +1289,6 @@ async function writeLandingImages(): Promise<void> {
 async function runWebStep(): Promise<void> {
   console.log("\n── Web composites ───────────────────────────────");
   for (const mode of MODES) await compositeBrowser(mode);
-  for (const mode of MODES) await compositeIPad(mode);
   console.log("\n── App Store set ────────────────────────────────");
   await writeAppStoreSet();
   console.log("\n── Landing images ───────────────────────────────");
@@ -1448,12 +1425,7 @@ async function captureParityIOS(): Promise<void> {
     try {
       await captureIOSDevice(device, {
         simulator: simulators[device],
-        // iPad is shown at landscape, like the wide web board beside it.
-        shots: mine.map((s) => ({
-          device,
-          screen: s.ios,
-          landscape: device === "ipad",
-        })),
+        shots: mine.map((s) => ({ device, screen: s.ios })),
         output: (shot, mode) =>
           paritySource("ios", byRoute.get(shot.screen) ?? shot.screen, mode),
       });
@@ -1546,7 +1518,7 @@ async function parityPair(
   return { input, width: totalW, height: totalH };
 }
 
-/** Lay pairs out in rows of `perRow`, phone screens first, then iPad. */
+/** Lay pairs out in rows of `perRow`, one group per device class. */
 async function writeParitySheet(mode: Mode): Promise<string> {
   const { screens } = manifest.parity;
   const margin = 64;
@@ -1554,7 +1526,6 @@ async function writeParitySheet(mode: Mode): Promise<string> {
   const colGap = 48;
   const groups: { device: DeviceKey; perRow: number; width: number }[] = [
     { device: "iphone", perRow: 4, width: 440 },
-    { device: "ipad", perRow: 2, width: 880 },
   ];
   const placed: Composite[] = [];
   let y = margin;
@@ -1623,7 +1594,7 @@ function runPublishStep(): void {
     process.exit(1);
   }
 
-  const files = ["nylon-screenshot", "nylon-screenshot-ipad"].flatMap((name) =>
+  const files = ["nylon-screenshot"].flatMap((name) =>
     MODES.flatMap((mode) => [
       `${name}-${mode}@2x.jpg`,
       `${name}-${mode}.jpg`,

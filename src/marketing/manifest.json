@@ -10,12 +10,6 @@
         "types": ["iPhone 17 Pro Max", "iPhone 16 Pro Max"],
         "appStore": "iphone-6.9",
         "size": { "width": 1320, "height": 2868 }
-      },
-      "ipad": {
-        "simulator": "Nylon Marketing iPad 13",
-        "types": ["iPad Pro 13-inch (M5)", "iPad Pro 13-inch (M4)"],
-        "appStore": "ipad-13",
-        "size": { "width": 2064, "height": 2752 }
       }
     },
     "shots": [
@@ -23,12 +17,7 @@
       { "device": "iphone", "screen": "week" },
       { "device": "iphone", "screen": "detail" },
       { "device": "iphone", "screen": "composer" },
-      { "device": "iphone", "screen": "lists" },
-      { "device": "ipad", "screen": "board" },
-      { "device": "ipad", "screen": "inspector" },
-      { "device": "ipad", "screen": "board", "landscape": true },
-      { "device": "ipad", "screen": "column", "landscape": true },
-      { "device": "ipad", "screen": "inspector", "landscape": true }
+      { "device": "iphone", "screen": "lists" }
     ]
   },
   "web": {
@@ -40,12 +29,10 @@
   },
   "parity": {
     "simulators": {
-      "iphone": "Nylon Parity iPhone 6.9",
-      "ipad": "Nylon Parity iPad 13"
+      "iphone": "Nylon Parity iPhone 6.9"
     },
     "web": {
-      "iphone": { "viewport": { "width": 440, "height": 956 }, "scale": 3, "mobile": true },
-      "ipad": { "viewport": { "width": 1376, "height": 1032 }, "scale": 2 }
+      "iphone": { "viewport": { "width": 440, "height": 956 }, "scale": 3, "mobile": true }
     },
     "screens": [
       { "name": "today", "device": "iphone", "ios": "today", "web": "/today" },
@@ -54,10 +41,7 @@
       { "name": "detail", "device": "iphone", "ios": "detail", "web": "/this-week", "open": "Plan Lisbon trip" },
       { "name": "composer", "device": "iphone", "ios": "composer", "web": "/this-week", "type": "Call the dentist friday" },
       { "name": "done", "device": "iphone", "ios": "done", "web": "/today", "tap": "Done" },
-      { "name": "settings", "device": "iphone", "ios": "settings", "web": "/today", "account": "Settings" },
-      { "name": "board", "device": "ipad", "ios": "board", "web": "/" },
-      { "name": "column", "device": "ipad", "ios": "column", "web": "/list/mktg_list_groceries" },
-      { "name": "inspector", "device": "ipad", "ios": "inspector", "web": "/", "open": "Plan Lisbon trip" }
+      { "name": "settings", "device": "iphone", "ios": "settings", "web": "/today", "account": "Settings" }
     ]
   },
   "composite": {
@@ -70,10 +54,6 @@
     "browser": {
       "web": { "shot": "web-desktop", "left": 60, "top": 60, "width": 1760 },
       "phone": { "shot": "ios-iphone-today", "left": 1580, "top": 220, "width": 550 }
-    },
-    "ipad": {
-      "tablet": { "shot": "ios-ipad-board-landscape", "left": 60, "top": 110, "width": 1700 },
-      "phone": { "shot": "ios-iphone-today", "left": 1640, "top": 330, "width": 500 }
     }
   }
 }

@@ -46,11 +46,11 @@ same weekday and date.
   sample data) itself, inside the best-effort web phase — the seed needs the
   capture account's Clerk id, so there's no separate workflow step.
 - **iOS** needs no account. It launches the DEBUG build with
-  `-NylonScreen <route>` (plus `-NylonDark`, `-NylonLandscape`), which skips
-  sign-in and draws in-memory sample data, on simulators the script creates
-  for itself (6.9" iPhone, 13" iPad). iPhone and iPad are separate capture
-  phases, so one flaking doesn't discard the other.
-- `--web` writes the composites (browser + iPhone, and iPad + iPhone), a raw
+  `-NylonScreen <route>` (plus `-NylonDark`), which skips sign-in and draws
+  in-memory sample data, on a simulator the script creates for itself
+  (6.9" iPhone). The app is iPhone-only: there are no iPad shots, no iPad
+  App Store set and no landscape runs.
+- `--web` writes the composite (browser + iPhone), a raw
   App Store set in `output/app-store/` (uploaded as a workflow artifact;
   App Store Connect upload is manual), and WebP shots for the web landing page
   in `output/landing/` (copy into `src/web/public/images/landing/`).
