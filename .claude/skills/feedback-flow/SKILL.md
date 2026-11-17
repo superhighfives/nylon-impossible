@@ -52,10 +52,11 @@ table. Claude writes `.fix-shots/plan.json` and doesn't commit it or capture
 anything itself:
 
 ```json
-{"shots": [{"device": "iphone", "screen": "<route>", "dark": true, "landscape": false, "note": "<what to look at>"}]}
+{"shots": [{"device": "iphone", "screen": "<route>", "dark": true, "note": "<what to look at>"}]}
 ```
 
-At most 4 shots, on `-NylonScreen` routes (listed at the top of
+`device` is `iphone` (a simulator) or `mac` (the Mac binary's own
+windows, e.g. `menubar`). At most 4 shots, on `-NylonScreen` routes (listed at the top of
 `src/ios/Nylon Impossible/Nylon Impossible/Views/Shell/ScreenRoute.swift`),
 in the report's appearance. If a still can't show the fix (a gesture,
 timing, sync, data that isn't in the sample), write

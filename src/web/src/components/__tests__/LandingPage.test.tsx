@@ -122,11 +122,14 @@ describe("LandingPage", () => {
 
   it("lists every platform", () => {
     render(<LandingPage />);
-    for (const name of ["Web", "Web on your phone", "iPhone", "iPad", "Mac"]) {
+    for (const name of ["Web", "Web on your phone", "iPhone", "Mac", "Gmail"]) {
       expect(
         screen.getByRole("heading", { level: 3, name }),
       ).toBeInTheDocument();
     }
+    expect(
+      screen.queryByRole("heading", { level: 3, name: "iPad" }),
+    ).not.toBeInTheDocument();
   });
 
   it("links to the API docs beside privacy and terms", () => {

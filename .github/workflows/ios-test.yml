@@ -52,14 +52,13 @@ jobs:
         || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: macos-26
     timeout-minutes: 20
-    # The app is universal and lays out differently on iPad (regular width),
-    # so run the suite on both families — and on the Mac, which builds the
-    # same targets for macOS. fail-fast off so one family's failure doesn't
-    # hide the others' results.
+    # Run the suite on the iPhone and on the Mac, which builds the same
+    # targets for macOS. fail-fast off so one family's failure doesn't hide
+    # the other's results.
     strategy:
       fail-fast: false
       matrix:
-        family: [iPhone, iPad, macOS]
+        family: [iPhone, macOS]
     defaults:
       run:
         working-directory: src/ios/Nylon Impossible
@@ -125,7 +124,7 @@ jobs:
           import json, sys
           data = json.load(sys.stdin)
           devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and '$FAMILY' in d['name']]
-          print(devices[0]['name'] if devices else ('iPhone 16 Pro' if '$FAMILY' == 'iPhone' else 'iPad Pro 13-inch (M4)'))
+          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
             ")
           fi
           echo "Running tests on: $DEVICE"

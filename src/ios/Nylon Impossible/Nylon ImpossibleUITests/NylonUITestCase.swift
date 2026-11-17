@@ -13,8 +13,6 @@ import XCTest
 class NylonUITestCase: XCTestCase {
     var app: XCUIApplication!
 
-    var isPad: Bool { UIDevice.current.userInterfaceIdiom == .pad }
-
     override func setUp() {
         super.setUp()
         continueAfterFailure = false

@@ -51,21 +51,20 @@ interface Manifest {
     project: string;
     scheme: string;
     bundleId: string;
-    devices: Record<"iphone" | "ipad", { types: string[] }>;
+    devices: Record<"iphone", { types: string[] }>;
   };
 }
 const manifest: Manifest = JSON.parse(readFileSync(join(SCRIPT_DIR, "manifest.json"), "utf8"));
 
-type Device = "iphone" | "ipad" | "mac";
-const DEVICES: Device[] = ["iphone", "ipad", "mac"];
-const DEVICE_LABEL: Record<Device, string> = { iphone: "iPhone", ipad: "iPad", mac: "Mac" };
+type Device = "iphone" | "mac";
+const DEVICES: Device[] = ["iphone", "mac"];
+const DEVICE_LABEL: Record<Device, string> = { iphone: "iPhone", mac: "Mac" };
 const MAX_SHOTS = 4;
 
 interface Shot {
   device: Device;
   screen: string;
   dark?: boolean;
-  landscape?: boolean;
   note?: string;
 }
 
@@ -77,11 +76,10 @@ interface Plan {
 /** Per image, keyed by file name. */
 type Status = Record<string, { ok: true } | { ok: false; error: string }>;
 
-// Our own simulators, so a capture never touches one the marketing run (or a
+// Our own simulator, so a capture never touches one the marketing run (or a
 // person) is using.
-const SIMULATOR_NAME: Record<"iphone" | "ipad", string> = {
+const SIMULATOR_NAME: Record<"iphone", string> = {
   iphone: "Nylon Fix iPhone",
-  ipad: "Nylon Fix iPad",
 };
 
 // Kept between the before and after runs: switching branches and building
@@ -135,7 +133,6 @@ function readPlan(path: string): Plan {
       device: shot.device,
       screen: shot.screen,
       dark: shot.dark === true,
-      landscape: shot.landscape === true,
       note: typeof shot.note === "string" ? plainText(shot.note) : undefined,
     }));
   return { shots };
@@ -156,7 +153,7 @@ function plainText(text: string): string {
 
 function shotName(shot: Shot, index: number): string {
   const mode = shot.dark ? "dark" : "light";
-  return `${index + 1}-${shot.device}-${shot.screen}-${mode}${shot.landscape ? "-landscape" : ""}`;
+  return `${index + 1}-${shot.device}-${shot.screen}-${mode}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +196,7 @@ function builtApp(derivedData: string, products: string): string {
 const SIM_LAUNCH_ENV = { ...process.env, SIMCTL_CHILD_TZ: manifest.timeZone };
 
 async function captureSimulator(
-  device: "iphone" | "ipad",
+  device: "iphone",
   shots: { shot: Shot; dest: string }[],
   status: Status,
 ): Promise<void> {
@@ -251,7 +248,6 @@ async function captureSimulator(
             "simctl", "launch", "--terminate-running-process", udid, bundleId,
             "-NylonScreen", shot.screen,
             "-NylonDark", shot.dark ? "YES" : "NO",
-            "-NylonLandscape", shot.landscape ? "YES" : "NO",
           ],
           { stdio: "pipe", timeout: 120_000, env: SIM_LAUNCH_ENV },
         ),
@@ -271,8 +267,7 @@ async function captureSimulator(
         }
       }
       if (lastErr) throw lastErr;
-      // Landscape runs are drawn turned a quarter clockwise; turn them back.
-      await sharp(raw).rotate(shot.landscape ? 270 : 0).png().toFile(dest);
+      await sharp(raw).png().toFile(dest);
       unlinkSync(raw);
       status[basename(dest)] = { ok: true };
       console.log(`  → ${dest}`);
@@ -430,7 +425,7 @@ function report(): void {
       "| | Before | After |",
       "| --- | --- | --- |",
     );
-    const width = (shot: Shot) => (shot.device === "mac" || shot.landscape ? 480 : shot.device === "ipad" ? 360 : 280);
+    const width = (shot: Shot) => (shot.device === "mac" ? 480 : 280);
     plan.shots.forEach((shot, i) => {
       const name = shotName(shot, i);
       const cell = (as: "before" | "after") => {

@@ -12,7 +12,6 @@ import XCTest
 
 final class PullToRefreshUITests: NylonUITestCase {
     func testPullingTheChipRowDownDoesNotRefresh() throws {
-        if isPad { throw XCTSkip("The iPad board keeps its pull-to-refresh") }
         launch("today", dark: true)
         waitFor(row("Call Mum about Sunday lunch"))
 

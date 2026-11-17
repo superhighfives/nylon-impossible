@@ -52,7 +52,6 @@ struct FeedbackTests {
     @Test("Platform label per device")
     func platformLabels() {
         #expect(FeedbackContext.platform(for: .phone) == "ios")
-        #expect(FeedbackContext.platform(for: .pad) == "ipados")
         #expect(FeedbackContext.platform(for: .mac) == "mac")
     }
 
@@ -61,7 +60,7 @@ struct FeedbackTests {
         let v26 = OperatingSystemVersion(majorVersion: 26, minorVersion: 1, patchVersion: 0)
         let v26p = OperatingSystemVersion(majorVersion: 26, minorVersion: 0, patchVersion: 1)
         #expect(FeedbackContext.osDescription(idiom: .phone, version: v26) == "iOS 26.1")
-        #expect(FeedbackContext.osDescription(idiom: .pad, version: v26p) == "iPadOS 26.0.1")
+        #expect(FeedbackContext.osDescription(idiom: .phone, version: v26p) == "iOS 26.0.1")
         #expect(FeedbackContext.osDescription(idiom: .mac, version: v26) == "macOS 26.1")
     }
 

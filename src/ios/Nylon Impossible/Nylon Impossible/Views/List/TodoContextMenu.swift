@@ -2,24 +2,18 @@
 //  TodoContextMenu.swift
 //  Nylon Impossible
 //
-//  A row's long-press (and, on iPad, right-click) menu. The phone lists the
-//  moves flat under a "Move to" header (see MoveMenuPlan). The wide
-//  layout groups them the pointer way: Move to…, Due…, Pin, Delete. Delete
-//  never confirms; it toasts with Undo.
+//  A row's long-press menu: the moves flat under a "Move to" header (see
+//  MoveMenuPlan), then Pin and Delete. Delete never confirms; it toasts
+//  with Undo.
 //
 
 import SwiftUI
 
 struct TodoContextMenu: View {
-    enum Style { case phone, wide }
-
     let todo: TodoItem
     /// Every list in display order.
     let lists: [TodoListModel]
     let actions: TodoActions
-    var style: Style = .phone
-    /// The board's move, which keeps the todo selected; else a plain move.
-    var onMove: ((TodoItem, String) -> Void)?
 
     private var others: [TodoListModel] {
         let here = todo.listKey?.lowercased()
@@ -27,14 +21,6 @@ struct TodoContextMenu: View {
     }
 
     var body: some View {
-        switch style {
-        case .phone: phone
-        case .wide: wide
-        }
-    }
-
-    @ViewBuilder
-    private var phone: some View {
         let plan = MoveMenuPlan(others: others, recentIds: actions.recentLists.ids)
         Section("Move to") {
             ForEach(plan.timeLists) { target in
@@ -59,37 +45,6 @@ struct TodoContextMenu: View {
         }
     }
 
-    @ViewBuilder
-    private var wide: some View {
-        Menu {
-            let timeLists = others.filter(\.isSystem)
-            let collections = others.filter { !$0.isSystem }
-            Section {
-                ForEach(timeLists) { target in
-                    moveButton(target, label: target.name, systemImage: arrow(to: target))
-                }
-            }
-            if !collections.isEmpty {
-                Section {
-                    ForEach(collections) { target in
-                        moveButton(target, label: target.name, systemImage: "list.bullet")
-                    }
-                }
-            }
-        } label: {
-            Label("Move to…", systemImage: "arrow.right")
-        }
-        Menu {
-            DueMenuItems(hasDue: todo.dueDate != nil) { actions.setDue(todo, $0) }
-        } label: {
-            Label("Due…", systemImage: Theme.Icon.due)
-        }
-        Section {
-            pinButton
-            deleteButton
-        }
-    }
-
     private func arrow(to target: TodoListModel) -> String {
         let here = todo.listKey?.lowercased()
         return MoveMenuPlan.arrow(to: target, from: lists.first { $0.id.lowercased() == here })
@@ -97,11 +52,7 @@ struct TodoContextMenu: View {
 
     private func moveButton(_ target: TodoListModel, label: String, systemImage: String) -> some View {
         Button {
-            if let onMove {
-                onMove(todo, target.id)
-            } else {
-                actions.move(todo, toList: target.id)
-            }
+            actions.move(todo, toList: target.id)
         } label: {
             Label(label, systemImage: systemImage)
         }

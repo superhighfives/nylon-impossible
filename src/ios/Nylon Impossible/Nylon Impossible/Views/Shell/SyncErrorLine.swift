@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// One quiet line under the switcher (over the board, on iPad) when a sync
+/// One quiet line under the switcher when a sync
 /// genuinely fails — transient blips and being offline never reach `.error`;
 /// see `SyncService.sync()`. Retry tries again; × puts the line away until
 /// the next failure. Nothing is lost either way: changes stay on the device

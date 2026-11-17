@@ -1080,7 +1080,7 @@ build_rules() { # issue -> how a build checks, opens its PR and fills in "Try it
     minutes) and put the Web URL in the section with \`gh pr edit\`. If the
     change can't be seen on the web, say so instead.
   - **Steps:** the routes to open and what to do there, in order.
-  - **Apple:** if it changes iPhone, iPad, Mac or the menu bar, write
+  - **Apple:** if it changes the iPhone or the Mac menu bar, write
     \`.fix-shots/plan.json\` naming the \`-NylonScreen\` routes that show
     it (feedback-flow skill). Don't commit it, and don't capture anything:
     when you've finished, the foreman takes before and after shots on this

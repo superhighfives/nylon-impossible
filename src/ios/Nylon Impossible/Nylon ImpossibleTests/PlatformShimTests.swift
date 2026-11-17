@@ -2,7 +2,7 @@
 //  PlatformShimTests.swift
 //  Nylon ImpossibleTests
 //
-//  The platform shims: the App Group each platform uses, the device idiom,
+//  The platform shims: the App Group each platform uses, the device idiom (feedback's),
 //  the font line height, the keychain query, and — on macOS — that the
 //  generated Theme resolves its colours from the window's appearance
 //  (light, dark and Increase Contrast) and that Archivo is registered.
@@ -31,14 +31,13 @@ struct PlatformShimTests {
         #expect(BackgroundSyncService.appGroupSuiteName == AppGroup.identifier)
     }
 
-    @Test("The device idiom gets the board on iPad and Mac")
+    @Test("The device idiom is the Mac or the phone: there's no iPad app")
     func deviceIdiom() {
         #if os(macOS)
-        #expect(DeviceIdiom.current == .mac)
+        #expect(FeedbackContext.Idiom.current == .mac)
+        #else
+        #expect(FeedbackContext.Idiom.current == .phone)
         #endif
-        #expect(DeviceIdiom.mac.supportsBoard)
-        #expect(DeviceIdiom.pad.supportsBoard)
-        #expect(!DeviceIdiom.phone.supportsBoard)
     }
 
     @Test("A font's line height is at least its size")
@@ -122,25 +121,24 @@ struct PlatformShimTests {
     #endif
 }
 
-@Suite("External drops")
-struct ExternalDropTests {
-    @Test("A dragged row's id is a todo, not text")
-    func rowIdIsTodo() {
-        let id = UUID()
-        #expect(ExternalDrop.classify(id.uuidString) == .todo(id))
-        #expect(ExternalDrop.classify("  \(id.uuidString)\n") == .todo(id))
+/// #689: the iOS app is iPhone-only, and the Apple board's screenshot routes
+/// went with the board.
+@Suite("iPhone only")
+struct PhoneOnlyTests {
+    #if os(iOS)
+    @Test("The app declares the iPhone family only")
+    func deviceFamily() {
+        let family = Bundle.main.object(forInfoDictionaryKey: "UIDeviceFamily") as? [Int]
+        #expect(family == [1])
     }
+    #endif
 
-    @Test("Text from another app becomes composer input, lines and all")
-    func textIsDrafts() {
-        #expect(ExternalDrop.classify("Buy milk\nCall Mum friday") == .drafts("Buy milk\nCall Mum friday"))
-        #expect(ExternalDrop.classify("   ") == nil)
-    }
-
-    @Test("Web links are input; file URLs aren't")
-    func links() throws {
-        let web = try #require(URL(string: "https://www.visitlisboa.com/tram-28"))
-        #expect(ExternalDrop.classify(web) == .drafts("https://www.visitlisboa.com/tram-28"))
-        #expect(ExternalDrop.classify(URL(fileURLWithPath: "/tmp/notes.txt")) == nil)
+    @Test("The board's screenshot routes are gone")
+    func boardRoutesGone() {
+        for name in ["board", "column", "inspector", "menu", "keys", "shortcuts"] {
+            #expect(ScreenRoute(rawValue: name) == nil, "\(name) is still a route")
+        }
+        #expect(ScreenRoute(rawValue: "today") != nil)
+        #expect(ScreenRoute(rawValue: "menubar") != nil)
     }
 }

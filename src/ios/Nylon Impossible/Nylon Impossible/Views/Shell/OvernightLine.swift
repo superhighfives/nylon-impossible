@@ -21,8 +21,6 @@ struct OvernightPill: View {
     let onSee: () -> Void
     let onDismiss: () -> Void
 
-    @Environment(\.isWideLayout) private var isWide
-
     /// "2 moved to This week": the moon says when.
     private var fullText: String {
         line.text.hasSuffix(" overnight") ? String(line.text.dropLast(" overnight".count)) : line.text
@@ -49,7 +47,7 @@ struct OvernightPill: View {
             .padding(.vertical, -14)
             .help(fullText)
             .accessibilityLabel(fullText)
-            .accessibilityHint(isWide ? "Selects the first of them" : "Shows them")
+            .accessibilityHint("Shows them")
             Button(action: onDismiss) {
                 Image(systemName: Theme.Icon.close)
                     .font(.system(size: 11, weight: .bold))

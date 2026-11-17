@@ -8,7 +8,7 @@ export const LANDING_COPY = {
   headline: "Today, this week, someday.",
   lead: "Nylon is a todo list shaped by time.",
   subhead:
-    "Things you don't get to move along on their own, and done means gone. The same on the web, iPhone, iPad and Mac.",
+    "Things you don't get to move along on their own, and done means gone. The same on the web, iPhone and Mac.",
   eyebrow: "Coming soon",
   joined: "You're on the list. We'll email you when it's ready.",
 };
@@ -44,7 +44,7 @@ const features = [
   },
   {
     title: "Keyboard first",
-    body: "On a wide screen or the Mac, everything you can click has a key.",
+    body: "On a wide screen or in the menu bar, everything you can click has a key.",
   },
 ];
 
@@ -63,12 +63,8 @@ const platforms = [
     body: "Swipe to mark done, and a today widget on your Home Screen.",
   },
   {
-    title: "iPad",
-    body: "The wide board, with all three columns side by side.",
-  },
-  {
     title: "Mac",
-    body: "A native app, plus quick add from the menu bar.",
+    body: "Quick add and today's todos, from the menu bar.",
   },
   {
     title: "Gmail",

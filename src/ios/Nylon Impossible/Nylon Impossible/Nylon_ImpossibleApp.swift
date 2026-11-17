@@ -200,13 +200,10 @@ struct Nylon_ImpossibleApp: App {
             signedInRoot
             #endif
         }
-        // The iPad board's keys, for the shortcut overlay and menu bar.
-        .commands {
-            BoardCommands(feedback: feedbackService, showsFeedback: preferencesService?.isAdmin == true)
-        }
         #endif
     }
 
+    #if os(iOS)
     private var signedInRoot: some View {
         RootView(syncService: syncService, preferencesService: preferencesService, feedbackService: feedbackService)
             .environment(Clerk.shared)
@@ -225,8 +222,12 @@ struct Nylon_ImpossibleApp: App {
             }
             .modelContainer(SharedModelContainer.shared)
     }
+    #endif
 }
 
+#if os(iOS)
+/// The iPhone app's root: sign-in, then the phone shell. (The Mac has no
+/// window of its own; see `MacSession`.)
 struct RootView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
@@ -317,12 +318,7 @@ struct RootView: View {
                 // boundary even without a sync round-trip.
                 BadgeService.refresh(modelContext: modelContext)
             case .background, .inactive:
-                #if os(iOS)
-                // A Mac app keeps its socket while it runs — the menu bar
-                // popover and the desktop widget show live data with no
-                // window focused — so only iOS lets go here.
                 syncService.disconnectWebSocket()
-                #endif
                 // The app's single widget refresh, covering everything that
                 // happened while it was open: edits made here, and anything a
                 // sync pulled in from the web or another device. Leaving is
@@ -353,7 +349,6 @@ struct RootView: View {
 
 // MARK: - Private Helpers
 
-#if os(iOS)
 /// Ensures BGTask.setTaskCompleted(success:) is called exactly once, even if both the
 /// worker task and the expiration handler fire concurrently.
 private final class BGTaskCompletionGuard: @unchecked Sendable {

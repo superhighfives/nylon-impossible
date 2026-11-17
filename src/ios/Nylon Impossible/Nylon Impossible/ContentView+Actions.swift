@@ -6,6 +6,7 @@
 //  from ContentView.swift to keep each file to a readable length.
 //
 
+#if os(iOS)
 import SwiftData
 import SwiftUI
 
@@ -46,16 +47,10 @@ extension ContentView {
     }
 
     /// The pill's text: the first todo in the list they moved to (This week
-    /// if anything went there, else Someday). On the phone, that page.
+    /// if anything went there, else Someday): that page.
     func seeOvernight() {
         let kind: SystemListKind = (preferences.lastSweep?.movedToThisWeek ?? 0) > 0 ? .thisWeek : .someday
-        if !isWide, let page = Page(systemKind: kind) {
-            select(page)
-            return
-        }
-        guard let list = orderedLists.first(where: { $0.systemKind == kind }) else { return }
-        focusColumn(list.id)
-        selectedTodoId = rows(list).first?.id
+        if let page = Page(systemKind: kind) { select(page) }
     }
 
     /// Put the overnight note away for good.
@@ -146,8 +141,7 @@ extension ContentView {
                 finished()
             }
         }
-        // Hidden first, then out of the way: the fourth column goes to Done.
-        if openColumnId == list.id { openColumnId = nil }
+        // Hidden first, then out of the way.
         if viewModel.openCollectionId == list.id { viewModel.openCollectionId = nil }
     }
 
@@ -172,20 +166,6 @@ extension ContentView {
     func openComposer(_ destination: DeepLinkDestination) {
         detailTodo = nil
         showsAccount = false
-        if isWide {
-            // Before the first sync there are no lists, so no column to focus;
-            // the board's Today column is the closest thing.
-            guard let id = destination.listId ?? timeList(.today)?.id else { return }
-            if let collectionId = destination.collectionId, openColumnId != collectionId {
-                // A column that's only now opening isn't in the board yet, so
-                // scrolling to it this update finds nothing. Ask next turn.
-                openColumnId = collectionId
-                Task { @MainActor in requestComposer(id) }
-            } else {
-                requestComposer(id)
-            }
-            return
-        }
         chosenListId = nil
         viewModel.openCollectionId = destination.collectionId
         viewModel.page = destination.page
@@ -211,15 +191,8 @@ extension ContentView {
     func applyScreenRoute() {
         guard let route = screenRoute else { return }
         switch route {
-        case .today, .overnight, .board, .loading, .empty, .syncerror, .perf: viewModel.page = .today
-        case .keys:
-            viewModel.page = .today
-            // As after a key press: the outline on Today, nothing selected.
-            selectsByKeyboard = true
+        case .today, .overnight, .loading, .empty, .syncerror, .perf: viewModel.page = .today
         case .link, .share, .sharetext, .widgets, .signin, .menubar: break
-        case .column:
-            openColumnId = collections.first?.id
-            focusedColumnId = openColumnId
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday
         case .lists: viewModel.page = .lists
@@ -230,32 +203,17 @@ extension ContentView {
             viewModel.page = .thisWeek
             viewModel.newTaskText = "Call the dentist friday"
             focusComposer = true
-        case .detail, .done, .settings, .inspector, .menu, .shortcuts:
+        case .detail, .done, .settings:
             Task {
                 try? await Task.sleep(for: .milliseconds(400))
                 switch route {
-                case .detail, .inspector:
+                case .detail:
                     viewModel.page = .thisWeek
                     let subtasks = subtasksByParent
                     if let todo = todos.first(where: { !(subtasks[$0.id] ?? []).isEmpty }) {
                         detailDetent = .large
-                        if isWide { openWide(todo) } else { detailTodo = todo }
+                        detailTodo = todo
                     }
-                case .menu:
-                    // Select a row, then open its real context menu.
-                    focusedColumnId = timeList(.thisWeek)?.id
-                    selectedTodoId = timeList(.thisWeek).flatMap { rows($0).dropFirst(2).first?.id }
-                    #if DEBUG
-                    try? await Task.sleep(for: .milliseconds(1200))
-                    ScreenRouteMenu.present()
-                    #endif
-                case .shortcuts:
-                    viewModel.page = .today
-                    showsShortcuts = true
-                case .done where isWide:
-                    showDone()
-                case .settings where isWide:
-                    widePanel = .settings
                 case .done:
                     viewModel.page = .done
                 default:
@@ -267,3 +225,4 @@ extension ContentView {
         }
     }
 }
+#endif

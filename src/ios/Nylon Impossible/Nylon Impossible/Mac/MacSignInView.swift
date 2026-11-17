@@ -10,7 +10,7 @@
 //  provider in an `ASWebAuthenticationSession` and returns through the app's
 //  callback scheme, the same redirect iOS already uses for this bundle ID. A
 //  new account is created through the same flow (`transferable` sign-up).
-//  Once Clerk has a session, `RootView` swaps to the board and persists the
+//  Once Clerk has a session, `MacSession` takes over and persists the
 //  token to the shared Keychain item, the same as on iOS.
 //
 //  macOS hands the session to the default browser. When that's Chrome, the
