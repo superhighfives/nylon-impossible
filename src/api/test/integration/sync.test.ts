@@ -1,6 +1,6 @@
 import { env, SELF } from "cloudflare:test";
 import { verifyToken } from "@clerk/backend";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb, lists, todos, todoUrls } from "../../src/lib/db";
 import { cleanDb, seedTodo, seedTodoUrl, seedUser } from "../helpers";
@@ -358,6 +358,53 @@ describe("Sync endpoint", () => {
     const todo = body.todos.find((t: any) => t.id === todoId);
     expect(todo).toBeTruthy();
     expect(todo.notes).toBeNull();
+  });
+
+  // What the clean-up strips is pinned as-is, quirks included: it eats
+  // punctuation inside the URL's run (a `,` or `)` straight after it) and
+  // leaves a URL followed by `"` alone.
+  it.each([
+    ["a bare URL", "https://example.com/a", null],
+    ["a URL: prefix", "URL: https://example.com/a", null],
+    ["a URL then a full stop", "See https://example.com/a.", "See"],
+    [
+      "a URL then a full stop mid-note",
+      "See https://example.com/a. Then more",
+      "See  Then more",
+    ],
+    ["a URL then )", "(see https://example.com/a) later", "(see  later"],
+    ["a URL then ,", "https://example.com/a, then more", "then more"],
+    [
+      "a URL mid-sentence",
+      "Read https://example.com/a before lunch",
+      "Read  before lunch",
+    ],
+    [
+      'a URL then "',
+      'Quote "https://example.com/a" here',
+      'Quote "https://example.com/a" here',
+    ],
+    [
+      "a URL: line after text",
+      "Line one\nURL: https://example.com/a",
+      "Line one",
+    ],
+  ])("cleans notes with %s", async (_, notes, cleaned) => {
+    const todoId = crypto.randomUUID();
+    await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Read later",
+          notes,
+          updatedAt: new Date().toISOString(),
+        },
+      ],
+    });
+
+    const db = getDb(env.DB);
+    const [row] = await db.select().from(todos).where(eq(todos.id, todoId));
+    expect(row.notes).toBe(cleaned);
   });
 
   it("does not duplicate URLs already in todoUrls on re-sync", async () => {
@@ -850,5 +897,156 @@ describe("Sync — subtasks", () => {
     const db = getDb(env.DB);
     const [parent] = await db.select().from(todos).where(eq(todos.id, PARENT));
     expect(parent.recurrence).toBeNull();
+  });
+});
+
+describe("Sync — completing a repeat", () => {
+  const TODO = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+  const future = new Date("2099-01-01T00:00:00Z").toISOString();
+  const DAY = 24 * 60 * 60 * 1000;
+
+  // Today as a due day (UTC midnight); the test user has no time zone set, so
+  // the server reads days in UTC too.
+  const today = () => {
+    const now = new Date();
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  };
+
+  async function systemListId(systemKind: "today" | "thisWeek" | "someday") {
+    const db = getDb(env.DB);
+    const [list] = await db
+      .select({ id: lists.id })
+      .from(lists)
+      .where(
+        and(
+          eq(lists.userId, "user_test_123"),
+          eq(lists.systemKind, systemKind),
+        ),
+      );
+    return list.id;
+  }
+
+  async function storedTodo() {
+    const db = getDb(env.DB);
+    const [row] = await db.select().from(todos).where(eq(todos.id, TODO));
+    return row;
+  }
+
+  beforeEach(async () => {
+    await cleanDb();
+    mockVerifyToken.mockReset();
+    mockVerifyToken.mockResolvedValue({ sub: "user_test_123" });
+    await seedUser();
+  });
+
+  it("rolls the due date forward, stamps completedAt and places it by the new date", async () => {
+    // A weekly repeat due today in Today: its next occurrence is 7 days out,
+    // which placement puts in This week.
+    await seedTodo(TODO, "user_test_123", {
+      title: "Water plants",
+      dueDate: new Date(today()),
+      recurrence: { frequency: "weekly" },
+    });
+    const before = Date.now();
+
+    const res = await syncRequest({
+      changes: [{ id: TODO, completed: true, updatedAt: future }],
+    });
+    expect(res.status).toBe(200);
+
+    const row = await storedTodo();
+    expect(row.completed).toBe(false);
+    expect(row.dueDate?.getTime()).toBe(today() + 7 * DAY);
+    expect(row.completedAt?.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    expect(row.recurrence).toEqual({ frequency: "weekly" });
+    expect(row.listId).toBe(await systemListId("thisWeek"));
+    expect(row.listEnteredAt?.toISOString()).toBe(future);
+  });
+
+  it("moves a repeat due tomorrow back into Today", async () => {
+    await seedTodo(TODO, "user_test_123", {
+      title: "Stretch",
+      dueDate: new Date(today()),
+      recurrence: { frequency: "daily" },
+      listId: await systemListId("someday"),
+    });
+
+    await syncRequest({
+      changes: [{ id: TODO, completed: true, updatedAt: future }],
+    });
+
+    const row = await storedTodo();
+    expect(row.completed).toBe(false);
+    expect(row.dueDate?.getTime()).toBe(today() + DAY);
+    expect(row.listId).toBe(await systemListId("today"));
+  });
+
+  it("keeps the client's listId over placement when both arrive in one change", async () => {
+    await seedTodo(TODO, "user_test_123", {
+      title: "Water plants",
+      dueDate: new Date(today()),
+      recurrence: { frequency: "weekly" },
+    });
+    const someday = await systemListId("someday");
+
+    await syncRequest({
+      changes: [
+        { id: TODO, completed: true, listId: someday, updatedAt: future },
+      ],
+    });
+
+    const row = await storedTodo();
+    expect(row.completed).toBe(false);
+    expect(row.dueDate?.getTime()).toBe(today() + 7 * DAY);
+    expect(row.listId).toBe(someday);
+  });
+
+  it("rolls forward from the client's dueDate when the change carries one", async () => {
+    // Stored: due today, which would roll to tomorrow. The change moves it to
+    // 3 days out as it completes, so it rolls from there instead.
+    await seedTodo(TODO, "user_test_123", {
+      title: "Stretch",
+      dueDate: new Date(today()),
+      recurrence: { frequency: "daily" },
+    });
+
+    await syncRequest({
+      changes: [
+        {
+          id: TODO,
+          completed: true,
+          dueDate: new Date(today() + 3 * DAY).toISOString(),
+          updatedAt: future,
+        },
+      ],
+    });
+
+    const row = await storedTodo();
+    expect(row.completed).toBe(false);
+    expect(row.dueDate?.getTime()).toBe(today() + 4 * DAY);
+    expect(row.listId).toBe(await systemListId("thisWeek"));
+  });
+
+  it("completes a repeat that has subtasks like an ordinary todo", async () => {
+    const CHILD = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    await seedTodo(TODO, "user_test_123", {
+      title: "Parent",
+      dueDate: new Date(today()),
+      recurrence: { frequency: "daily" },
+    });
+    await seedTodo(CHILD, "user_test_123", { parentId: TODO });
+
+    await syncRequest({
+      changes: [{ id: TODO, completed: true, updatedAt: future }],
+    });
+
+    const row = await storedTodo();
+    expect(row.completed).toBe(true);
+    expect(row.recurrence).toBeNull();
+    expect(row.dueDate?.getTime()).toBe(today());
+    expect(row.completedAt).toBeNull();
+    const db = getDb(env.DB);
+    const [child] = await db.select().from(todos).where(eq(todos.id, CHILD));
+    expect(child.completed).toBe(true);
   });
 });
