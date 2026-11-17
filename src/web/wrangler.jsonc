@@ -42,7 +42,7 @@
 	"observability": {
 		"enabled": true
 	},
-	// Worker Previews (private beta): per-branch preview deployments created by
+	// Worker Previews: per-branch preview deployments created by
 	// `wrangler preview`. Bindings are NOT inherited from the top level, so the
 	// DB binding is repeated here, pointed at the SEPARATE preview database (not
 	// prod's) — the same DB the API preview binds to, kept isolated from prod
