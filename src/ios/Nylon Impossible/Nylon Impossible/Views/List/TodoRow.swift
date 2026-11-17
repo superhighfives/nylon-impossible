@@ -27,6 +27,8 @@ struct TodoRow: View {
     /// tap opens.
     var onSelect: (() -> Void)?
     let onOpen: () -> Void
+    /// The Mac popover: a field in the title's place while it's edited.
+    var titleField: AnyView?
 
     @Environment(\.isWideLayout) private var isWide
     @Environment(\.selectsByKeyboard) private var selectsByKeyboard
@@ -55,25 +57,12 @@ struct TodoRow: View {
             .padding(.trailing, -6)
             .padding(.vertical, -10)
 
-            Button(action: tap) {
-                VStack(alignment: .leading, spacing: Theme.Space.s1) {
-                    Text(todo.title)
-                        .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: -0.005)
-                        .foregroundStyle(checked ? Theme.Colors.inkMuted : Theme.Colors.ink)
-                        .strikethrough(checked, color: Theme.Colors.inkMuted)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                        .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: checked)
-                    if !parts.isEmpty {
-                        MetaLine(parts: parts)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            if let titleField {
+                titleField
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                titleButton(checked: checked, parts: parts)
             }
-            .buttonStyle(.plain)
-            // The row tints itself; the pointer shouldn't also morph.
-            .pointerHoverEffectDisabled(isWide)
         }
         .padding(.vertical, Theme.Space.s3)
         .frame(minHeight: Theme.Space.rowMinHeight)
@@ -83,8 +72,8 @@ struct TodoRow: View {
         // VoiceOver hears one element per row — "title, meta, done or not"
         // — that opens on double-tap, with the checkbox and the long-press
         // menu as its actions (swipe up or down): Mark done, each Move,
-        // Pin, Delete.
-        .accessibilityElement(children: .ignore)
+        // Pin, Delete. A title being edited keeps its field.
+        .accessibilityElement(children: titleField == nil ? .ignore : .contain)
         .accessibilityLabel(todo.title)
         .accessibilityValue(TodoRowAccessibility.value(parts: parts, isChecked: checked))
         .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
@@ -97,6 +86,28 @@ struct TodoRow: View {
         }
         .opacity(actions.fading.contains(todo.id) ? 0 : 1)
         .sensoryFeedback(.impact(weight: .medium), trigger: checked) { _, isChecked in isChecked }
+    }
+
+    private func titleButton(checked: Bool, parts: [MetaPart]) -> some View {
+        Button(action: tap) {
+            VStack(alignment: .leading, spacing: Theme.Space.s1) {
+                Text(todo.title)
+                    .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: -0.005)
+                    .foregroundStyle(checked ? Theme.Colors.inkMuted : Theme.Colors.ink)
+                    .strikethrough(checked, color: Theme.Colors.inkMuted)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+                    .animation(Theme.Motion.easeOutStrong(Theme.Motion.fast), value: checked)
+                if !parts.isEmpty {
+                    MetaLine(parts: parts)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // The row tints itself; the pointer shouldn't also morph.
+        .pointerHoverEffectDisabled(isWide)
     }
 
     private func tap() {

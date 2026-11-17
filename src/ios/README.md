@@ -206,7 +206,9 @@ step, not the archive.
 
 The same targets build a native SwiftUI Mac app (macOS 14+, not Catalyst)
 with the same bundle IDs, so the App Store listing is one Universal Purchase.
-Pick the "My Mac" destination, or:
+It's a menu bar app (`LSUIElement`: no Dock icon, no app menu, no board
+window): quick add over today's todos, in a popover under the icon. The web
+board is the one full editor. Pick the "My Mac" destination, or:
 
 ```bash
 cd "src/ios/Nylon Impossible"
@@ -218,34 +220,31 @@ What's Mac-only lives in `Nylon Impossible/Mac/` (each file `#if os(macOS)`);
 the few UIKit/AppKit touch points shared code needs go through
 `Platform/PlatformShims.swift`.
 
-- **Window.** The iPad board in a `NavigationSplitView`: sidebar, columns,
-  the inspector, the focused list as the window title. Menus come from
-  `BoardMenuCommand` (File ▸ New Todo ⌘N / New List ⇧⌘N, View ▸ Today ⌘1 /
-  This week ⌘2 / Someday ⌘3 / Show Done ⇧⌘D, Todo ▸ the single-key map).
-  ⌘Z and ⇧⌘Z step through the last 20 actions (`UndoHistory`, on the
-  window's undo manager; the phone layout too). Text and links dragged in
-  from other apps become todos in that column.
-- **`ContentRoot` owns the queries.** The split view's columns and the
-  inspector are separate view graphs on macOS; a `@Query` read from one of
-  them trapped AttributeGraph ("setting value during update") at launch. Keep
-  `@Query` out of `ContentView` and anything it hands to another column.
-- **Services.** The window, Settings and the menu bar icon share
-  `MacServices.shared`, so the menu bar, hotkey and Dock badge work with the
-  window closed. The WebSocket stays connected while the app runs.
+- **Services.** The popover, Settings and Sign in share
+  `MacServices.shared`. With no window to drive it, `MacSession` follows
+  Clerk's session the way `RootView` does on iOS (both run
+  `SessionLifecycle`): the first sync on sign-in, the shared session state
+  cleared on sign-out, and the socket, token, zone and sweep refreshed on
+  wake. The WebSocket stays connected while the app runs, and
+  `MacWidgetReloader` reloads the desktop widget (debounced) on every store
+  save: a Mac's widgets are visible while the app is open.
 - **Menu bar and hotkey.** `MenuBarController` owns a plain `NSStatusItem`
   (not SwiftUI's `MenuBarExtra`, which crashed the status bar window — see
-  the file's header). Its icon and the global hotkey (`GlobalHotKey`, Carbon
-  `RegisterEventHotKey`: sandbox-safe, no permission prompt) open the same
-  floating `QuickAddView` panel. Default ⌃⌥Space; both are switchable in
-  Settings.
-- **Dock badge.** `DockBadgeController` shows today's open count (the
-  `TodayDigest` set the widget uses), recomputed on every store save, on
-  `StoreChangeSignal` from the widget and share extension, on activation and
-  at midnight. Unlike iOS, the desktop widget is also reloaded (debounced) on
-  each save: a Mac's widgets are visible while the app is open.
+  the file's header), always shown, since it's the only way in. Its icon and
+  the global hotkey (`GlobalHotKey`, Carbon `RegisterEventHotKey`:
+  sandbox-safe, no permission prompt) open the same `QuickAddView` popover
+  under the icon. Default ⌃⌥Space, changeable in Settings. `nylon://add`
+  links (the widget's "+", `OpenComposerIntent`) open it on the link's list.
+- **The popover.** The composer, then Today only (`TodayDigest`, the
+  widget's set). On a row, ↵ (or a click on the title) edits the title in
+  place, ⇧↵ opens `/todo/:id` on the web (`Config.webBaseURL`), X marks it
+  done and O opens its link. Everything else about a todo is done on the
+  web. The footer opens Settings (the `Settings` scene) and quits; signed
+  out, it offers Sign in.
 - **Sign-in.** ClerkKitUI is iOS-only, so `MacSignInView` is a small view on
   ClerkKit with **Continue with Google** and **Continue with GitHub** — the
-  only strategies the production Clerk instance enables — via
+  only strategies the production Clerk instance enables, in a window of its
+  own (`MacSignInWindow`) — via
   `signInWithOAuth` in an `ASWebAuthenticationSession`. macOS hands that
   session to the default browser, and with Chrome it can stall with no page
   and no error; `MacSignInHandoff` spots a likely stall and offers Start Over
@@ -261,9 +260,9 @@ the few UIKit/AppKit touch points shared code needs go through
   the Team-prefixed form macOS accepts without a provisioning profile entry —
   and `group.com.superhighfives.Nylon-Impossible` on iOS. Use
   `AppGroup.identifier`; never spell it out.
-- **Screenshots.** The DEBUG routes run on the Mac binary:
-  `"…/Nylon Impossible.app/Contents/MacOS/Nylon Impossible" -NylonScreen board -NylonDark YES`,
-  plus `menubar`, `settings`, `share`, `widgets` and `menu`.
+- **Screenshots.** The DEBUG routes run on the Mac binary, each drawn in a
+  window of its own: `open -a "…/Nylon Impossible.app" --args -NylonScreen
+  menubar -NylonDark YES`, and `settings`, `signin`, `share` and `widgets`.
 
 ### Releasing the Mac app
 

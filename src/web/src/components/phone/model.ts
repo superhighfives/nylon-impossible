@@ -341,17 +341,27 @@ export function splitLists(lists: SerializedList[] | undefined): {
 
 /**
  * A view's identity once lists are known: "today", "thisWeek", "someday",
- * "lists" or "list:<id>". `/` is Today, and `/list/<id>` of a time list is
- * that time list, so two URLs for the same place compare equal.
+ * "lists", "list:<id>" or "todo:<id>". `/` is Today, and `/list/<id>` of a
+ * time list is that time list, so two URLs for the same place compare equal.
  */
 export function boardViewKey(
   view: BoardView | null | undefined,
   lists: SerializedList[] | undefined,
 ): string {
   if (!view) return "today";
+  if (view.kind === "todo") return `todo:${view.id}`;
   if (view.kind !== "list") return view.kind;
   const kind = lists?.find((l) => l.id === view.id)?.systemKind;
   return kind ?? `list:${view.id}`;
+}
+
+/** The view that shows a list: a time list's own, else `/list/:id`. */
+export function viewForList(
+  listId: string,
+  lists: SerializedList[] | undefined,
+): BoardView {
+  const kind = lists?.find((l) => l.id === listId)?.systemKind;
+  return kind ? { kind } : { kind: "list", id: listId };
 }
 
 /** The view for a `boardViewKey`, or null for a key that names no view. */

@@ -94,7 +94,7 @@ struct CompleteTodoIntent: AppIntent {
         }
 
         WidgetRefresh.reload()
-        // A running Mac app refreshes its Dock badge and syncs; see
+        // A running Mac app syncs; see
         // `StoreChangeSignal`.
         StoreChangeSignal.post()
 

@@ -23,13 +23,10 @@
 //  draws an iPad run at landscape size; see `drawsLandscape`. The route skips sign-in and runs on in-memory sample data, so
 //  it never touches the real store or the network.
 //
-//  On a Mac the same routes run against the board window:
-//
-//    "Nylon Impossible.app/Contents/MacOS/Nylon Impossible" -NylonScreen board
-//
-//  `settings` draws the Settings window's view, `menubar` the menu bar
-//  extra's quick-add, `share` the share extension at its Mac sheet size, and
-//  `widgets` the desktop sizes. `menu` right-clicks the selected row.
+//  On a Mac the route is drawn in a window of its own, as the app has none:
+//  `menubar` the menu bar popover, `settings` the Settings window's view,
+//  `signin` the sign-in window's, `share` the share extension at its Mac
+//  sheet size, and `widgets` the desktop sizes.
 //
 //  States for the quality pass, on either layout: signin (the signed-out
 //  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
@@ -52,7 +49,7 @@ enum ScreenRoute: String, CaseIterable {
     /// The board with the Keyboard shortcuts sheet open.
     case shortcuts
     case signin, loading, empty, syncerror, perf
-    /// macOS: the menu bar extra's quick-add, drawn in the window.
+    /// macOS: the menu bar popover, drawn in a window.
     case menubar
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
@@ -167,9 +164,15 @@ struct ScreenRouteRoot: View {
         switch route {
         case .share, .sharetext: shareSheet
         case .signin:
-            SignInView()
-                .environment(Clerk.shared)
-                .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
+            Group {
+                #if os(macOS)
+                MacSignInView {}
+                #else
+                SignInView()
+                #endif
+            }
+            .environment(Clerk.shared)
+            .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
         case .widgets:
             WidgetGallery(container: container)
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
@@ -186,7 +189,7 @@ struct ScreenRouteRoot: View {
                 .background(Color(nsColor: .windowBackgroundColor))
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
         case .menubar:
-            QuickAddView(presentation: .menuBar)
+            QuickAddView()
                 .environment(authService)
                 .environment(syncService)
                 .environment(\.screenRoute, route)

@@ -329,6 +329,8 @@ describe("board URLs", () => {
       kind: "list",
       id: "abc d",
     });
+    expect(parseBoardPath("/todo/t%201")).toEqual({ kind: "todo", id: "t 1" });
+    expect(parseBoardPath("/todo/")).toBeNull();
     expect(parseBoardPath("/privacy")).toBeNull();
   });
 
@@ -339,6 +341,7 @@ describe("board URLs", () => {
       "/someday",
       "/lists",
       "/list/x",
+      "/todo/x",
     ]) {
       const view = parseBoardPath(path);
       expect(view && boardPath(view)).toBe(path);

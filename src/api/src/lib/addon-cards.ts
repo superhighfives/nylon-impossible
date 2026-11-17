@@ -341,7 +341,7 @@ function overflowRow(text: string, url: string): Widget {
  * today"), chosen by the view's kind so your lists keep their names.
  */
 function nameInSentence(name: string, view: BoardView): string {
-  return view.kind === "list" || view.kind === "lists"
+  return view.kind === "list" || view.kind === "lists" || view.kind === "todo"
     ? name
     : TIME_LIST_NAMES_IN_SENTENCE[view.kind];
 }

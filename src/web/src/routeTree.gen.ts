@@ -21,6 +21,7 @@ import { Route as ConnectGmailAddonRouteImport } from './routes/connect/gmail-ad
 import { Route as DocsIndexRouteImport } from './routes/docs/index'
 import { Route as DocsApiRouteImport } from './routes/docs/api'
 import { Route as BoardListIdRouteImport } from './routes/_board.list.$id'
+import { Route as BoardTodoIdRouteImport } from './routes/_board.todo.$id'
 
 const BoardRoute = BoardRouteImport.update({
   id: '/_board',
@@ -81,6 +82,11 @@ const BoardListIdRoute = BoardListIdRouteImport.update({
   path: '/list/$id',
   getParentRoute: () => BoardRoute,
 } as any)
+const BoardTodoIdRoute = BoardTodoIdRouteImport.update({
+  id: '/todo/$id',
+  path: '/todo/$id',
+  getParentRoute: () => BoardRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof BoardIndexRoute
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/docs/api': typeof DocsApiRoute
   '/docs/': typeof DocsIndexRoute
   '/list/$id': typeof BoardListIdRoute
+  '/todo/$id': typeof BoardTodoIdRoute
 }
 export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
@@ -107,6 +114,7 @@ export interface FileRoutesByTo {
   '/': typeof BoardIndexRoute
   '/docs': typeof DocsIndexRoute
   '/list/$id': typeof BoardListIdRoute
+  '/todo/$id': typeof BoardTodoIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -122,6 +130,7 @@ export interface FileRoutesById {
   '/_board/': typeof BoardIndexRoute
   '/docs/': typeof DocsIndexRoute
   '/_board/list/$id': typeof BoardListIdRoute
+  '/_board/todo/$id': typeof BoardTodoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/docs/api'
     | '/docs/'
     | '/list/$id'
+    | '/todo/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/privacy'
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/'
     | '/docs'
     | '/list/$id'
+    | '/todo/$id'
   id:
     | '__root__'
     | '/_board'
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/_board/'
     | '/docs/'
     | '/_board/list/$id'
+    | '/_board/todo/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -261,6 +273,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BoardListIdRouteImport
       parentRoute: typeof BoardRoute
     }
+    '/_board/todo/$id': {
+      id: '/_board/todo/$id'
+      path: '/todo/$id'
+      fullPath: '/todo/$id'
+      preLoaderRoute: typeof BoardTodoIdRouteImport
+      parentRoute: typeof BoardRoute
+    }
   }
 }
 
@@ -271,6 +290,7 @@ interface BoardRouteChildren {
   BoardTodayRoute: typeof BoardTodayRoute
   BoardIndexRoute: typeof BoardIndexRoute
   BoardListIdRoute: typeof BoardListIdRoute
+  BoardTodoIdRoute: typeof BoardTodoIdRoute
 }
 
 const BoardRouteChildren: BoardRouteChildren = {
@@ -280,6 +300,7 @@ const BoardRouteChildren: BoardRouteChildren = {
   BoardTodayRoute: BoardTodayRoute,
   BoardIndexRoute: BoardIndexRoute,
   BoardListIdRoute: BoardListIdRoute,
+  BoardTodoIdRoute: BoardTodoIdRoute,
 }
 
 const BoardRouteWithChildren = BoardRoute._addFileChildren(BoardRouteChildren)

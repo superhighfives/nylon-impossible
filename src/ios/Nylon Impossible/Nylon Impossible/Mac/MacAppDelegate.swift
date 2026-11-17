@@ -4,9 +4,8 @@
 //
 //  The Mac's application delegate: the few things SwiftUI's `App` has no
 //  hook for. `nylon://` URLs (the widget's "+", a typed link) are parked on
-//  `QuickActionService` like the iOS scene delegate does, and closing the
-//  last window leaves the app running so the menu bar extra, the hotkey and
-//  the Dock badge keep working.
+//  `QuickActionService` like the iOS scene delegate does, and closing
+//  Settings or Sign in leaves the app running: the menu bar icon is the app.
 //
 
 #if os(macOS)
@@ -18,7 +17,7 @@ final class MacAppDelegate: NSObject, NSApplicationDelegate {
         MacServices.shared.start()
     }
 
-    /// The menu bar extra and the hotkey are still useful with no window.
+    /// The app is the menu bar icon; it has no window to close.
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         false
     }

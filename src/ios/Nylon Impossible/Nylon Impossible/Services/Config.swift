@@ -57,4 +57,26 @@ enum Config {
         return URL(string: "https://api.nylonimpossible.com")!
         #endif
     }()
+
+    // MARK: - Web
+    // The web app, where the Mac's menu bar hands a todo over (`/todo/:id`).
+    // It sits beside the API: the API's host without its `api.` prefix, and
+    // locally the web dev server on :3000 beside the API's :8787.
+    static let webBaseURL: URL = webBase(forAPI: apiBaseURL)
+
+    static func webBase(forAPI api: URL) -> URL {
+        guard var components = URLComponents(url: api, resolvingAgainstBaseURL: false) else { return api }
+        if let host = components.host, host.hasPrefix("api.") {
+            components.host = String(host.dropFirst(4))
+        } else if components.port == 8787 {
+            components.port = 3000
+        }
+        components.path = ""
+        return components.url ?? api
+    }
+
+    /// The web app's page for one todo.
+    static func webURL(forTodo id: UUID, base: URL = webBaseURL) -> URL {
+        base.appending(path: "todo/\(id.uuidString.lowercased())")
+    }
 }

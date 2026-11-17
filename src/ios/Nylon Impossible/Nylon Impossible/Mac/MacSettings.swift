@@ -2,8 +2,7 @@
 //  MacSettings.swift
 //  Nylon Impossible
 //
-//  The Mac-only preferences: the menu bar icon, the quick-add hotkey and the
-//  Dock badge. Per-Mac, so they live in this Mac's UserDefaults rather than
+//  The Mac-only preferences: the quick-add hotkey. Per-Mac, so they live in this Mac's UserDefaults rather than
 //  the account (theme and timezone, which follow you across devices, stay on
 //  `UserPreferencesService`).
 //
@@ -22,22 +21,15 @@ final class MacSettings {
         case unavailable
     }
 
+    /// `mac.showsMenuBarIcon` and `mac.showsDockBadge` are still in older
+    /// installs' defaults, unread: the icon is the app now, and there's no
+    /// Dock icon to badge.
     enum Key {
-        static let showsMenuBarIcon = "mac.showsMenuBarIcon"
-        static let showsDockBadge = "mac.showsDockBadge"
         static let hotKeyEnabled = "mac.hotKeyEnabled"
         static let hotKey = "mac.hotKey"
     }
 
     @ObservationIgnored private let defaults: UserDefaults
-
-    var showsMenuBarIcon: Bool {
-        didSet { defaults.set(showsMenuBarIcon, forKey: Key.showsMenuBarIcon) }
-    }
-
-    var showsDockBadge: Bool {
-        didSet { defaults.set(showsDockBadge, forKey: Key.showsDockBadge) }
-    }
 
     var hotKeyEnabled: Bool {
         didSet { defaults.set(hotKeyEnabled, forKey: Key.hotKeyEnabled) }
@@ -56,8 +48,6 @@ final class MacSettings {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        showsMenuBarIcon = defaults.object(forKey: Key.showsMenuBarIcon) as? Bool ?? true
-        showsDockBadge = defaults.object(forKey: Key.showsDockBadge) as? Bool ?? true
         hotKeyEnabled = defaults.object(forKey: Key.hotKeyEnabled) as? Bool ?? true
         hotKey = defaults.data(forKey: Key.hotKey)
             .flatMap { try? JSONDecoder().decode(HotKeyShortcut.self, from: $0) }

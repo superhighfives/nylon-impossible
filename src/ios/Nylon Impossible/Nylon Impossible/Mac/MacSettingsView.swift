@@ -2,11 +2,11 @@
 //  MacSettingsView.swift
 //  Nylon Impossible
 //
-//  The Settings window (⌘,). The same contents as iOS Settings — appearance,
-//  timezone (automatic, or picked by hand), your account, signing out and
-//  deleting the account — plus the Mac's own: the menu bar icon, the
-//  quick-add hotkey and the Dock badge. A native grouped form, because that's
-//  what a Mac Settings window is; the words and the order follow the app.
+//  The Settings window, opened from the popover's footer. The same contents
+//  as iOS Settings — appearance, timezone (automatic, or picked by hand),
+//  your account, signing out and deleting the account — plus the Mac's own:
+//  the quick-add hotkey. A native grouped form, because that's what a Mac
+//  Settings window is; the words and the order follow the app.
 //
 
 #if os(macOS)
@@ -42,7 +42,6 @@ struct MacGeneralSettings: View {
     @State private var isRecording = false
 
     var body: some View {
-        @Bindable var settings = settings
         Form {
             Section {
                 Picker("Appearance", selection: Binding(
@@ -91,8 +90,6 @@ struct MacGeneralSettings: View {
             }
 
             Section("This Mac") {
-                Toggle("Show Nylon in the menu bar", isOn: $settings.showsMenuBarIcon)
-                Toggle("Show today’s count on the Dock icon", isOn: $settings.showsDockBadge)
                 Toggle("Quick add from anywhere", isOn: Binding(
                     get: { settings.hotKeyEnabled },
                     set: { enabled in

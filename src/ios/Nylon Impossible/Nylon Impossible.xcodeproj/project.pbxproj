@@ -802,6 +802,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Impossible/Nylon Impossible-macOS.entitlements";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© Charlie Gleason";
+				"INFOPLIST_KEY_LSUIElement[sdk=macosx*]" = YES;
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -849,6 +850,7 @@
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "Nylon Impossible/Nylon Impossible-macOS.entitlements";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "© Charlie Gleason";
+				"INFOPLIST_KEY_LSUIElement[sdk=macosx*]" = YES;
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

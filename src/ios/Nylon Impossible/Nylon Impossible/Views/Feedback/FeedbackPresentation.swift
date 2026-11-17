@@ -7,9 +7,8 @@
 //  with a snapshot of the window attached. (The system screenshot itself
 //  can't be read without Photos access, so the app draws its own window —
 //  the same pixels.) The sheet is presented from the topmost view
-//  controller, so it opens over the detail or account sheet too. On a Mac,
-//  Help ▸ Send Feedback… snapshots the board window and opens the sheet on
-//  it.
+//  controller, so it opens over the detail or account sheet too. On a Mac it
+//  snapshots the front window.
 //
 //  `feedbackPresentation` keeps the service's idea of the current screen,
 //  colour scheme and window size up to date, and shows "Filed #N" when an
@@ -47,7 +46,7 @@ extension FeedbackService {
     /// Open the sheet with the window as it looks now attached.
     func presentWithSnapshot() {
         #if os(macOS)
-        let snapshot = MacFeedbackSnapshot.boardWindow()
+        let snapshot = MacFeedbackSnapshot.frontWindow()
         #else
         let snapshot = FeedbackPresenter.snapshotKeyWindow()
         #endif
@@ -277,10 +276,10 @@ private extension UIFont {
 
 @MainActor
 enum MacFeedbackSnapshot {
-    /// The board window's content as it looks now, at the screen's scale.
+    /// The front window's content as it looks now, at the screen's scale.
     /// Drawn from the view, so it needs no Screen Recording permission.
-    static func boardWindow() -> (image: CGImage, size: CGSize)? {
-        guard let window = NSApp.windows.first(where: { MacScenes.isBoardWindow($0) && $0.isVisible }),
+    static func frontWindow() -> (image: CGImage, size: CGSize)? {
+        guard let window = NSApp.windows.first(where: { $0.isVisible && !($0 is NSPanel) }),
               let view = window.contentView,
               let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
         view.cacheDisplay(in: view.bounds, to: rep)

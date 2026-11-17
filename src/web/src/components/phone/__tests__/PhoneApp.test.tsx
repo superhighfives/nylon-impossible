@@ -10,6 +10,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -45,6 +46,8 @@ const startingTodos = [
   }),
 ];
 let todos: TodoWithUrls[] = startingTodos;
+/** The todos query's refetch; a test can have it bring a todo in. */
+const refetch = vi.fn(async () => {});
 const { byKind, collections } = splitLists(lists);
 const place = vi.fn();
 /** The client's Reduce motion hint; the drag tests turn it off. */
@@ -76,7 +79,7 @@ vi.mock("../useBoardData", () => ({
     loading: false,
     todosLoading: false,
     error: null,
-    refetch: vi.fn(),
+    refetch,
     isFetching: false,
   }),
 }));
@@ -103,7 +106,10 @@ vi.mock("../../FeedbackDialog", () => ({
   useCanSendFeedback: () => false,
 }));
 vi.mock("../Composer", () => ({ Composer: () => null }));
-vi.mock("../DetailSheet", () => ({ DetailSheet: () => null }));
+vi.mock("../DetailSheet", () => ({
+  DetailSheet: ({ todo }: { todo: TodoWithUrls | null }) =>
+    todo ? <div role="dialog" aria-label={`Detail for ${todo.title}`} /> : null,
+}));
 vi.mock("../ContextMenu", () => ({
   ContextMenu: ({ todo }: { todo: TodoWithUrls | null }) =>
     todo ? <div role="dialog" aria-label={`Menu for ${todo.title}`} /> : null,
@@ -225,6 +231,79 @@ describe("PhoneApp", () => {
     expect(
       within(switcher()).getByRole("button", { name: "This week" }),
     ).toHaveAttribute("aria-current", "page");
+  });
+});
+
+describe("PhoneApp /todo/:id", () => {
+  afterEach(() => {
+    todos = startingTodos;
+  });
+
+  it("opens the todo's detail over its page, and the URL names the page", () => {
+    todos = [
+      ...startingTodos,
+      makeTodo({ id: "week", title: "Send invoice", listId: "list-week" }),
+    ];
+    const onNavigate = vi.fn();
+    render(
+      <PhoneApp view={{ kind: "todo", id: "week" }} onNavigate={onNavigate} />,
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Detail for Send invoice" }),
+    ).toBeInTheDocument();
+    expect(
+      within(switcher()).getByRole("button", { name: "This week" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenLastCalledWith({ kind: "thisWeek" });
+  });
+
+  it("opens a todo in one of your lists on Lists, with /list/:id", () => {
+    todos = [
+      ...startingTodos,
+      makeTodo({ id: "milk", title: "Milk", listId: "list-groceries" }),
+    ];
+    const onNavigate = vi.fn();
+    render(
+      <PhoneApp view={{ kind: "todo", id: "milk" }} onNavigate={onNavigate} />,
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Detail for Milk" }),
+    ).toBeInTheDocument();
+    expect(onNavigate).toHaveBeenLastCalledWith({
+      kind: "list",
+      id: "list-groceries",
+    });
+  });
+
+  it("sends an unknown or done todo to /", async () => {
+    for (const id of ["nope", "finished"]) {
+      const onNavigate = vi.fn();
+      render(<PhoneApp view={{ kind: "todo", id }} onNavigate={onNavigate} />);
+      await waitFor(() => expect(onNavigate).toHaveBeenCalledTimes(1));
+      expect(onNavigate).toHaveBeenLastCalledWith(null);
+      expect(screen.queryByRole("dialog", { name: /^Detail for/ })).toBeNull();
+      cleanup();
+    }
+  });
+
+  it("looks again for a todo that isn't in yet, as one just added on the Mac", async () => {
+    refetch.mockClear();
+    refetch.mockImplementationOnce(async () => {
+      todos = [
+        ...startingTodos,
+        makeTodo({ id: "new", title: "Call Kaiser", listId: "list-today" }),
+      ];
+    });
+    const onNavigate = vi.fn();
+    render(
+      <PhoneApp view={{ kind: "todo", id: "new" }} onNavigate={onNavigate} />,
+    );
+    expect(
+      await screen.findByRole("dialog", { name: "Detail for Call Kaiser" }),
+    ).toBeInTheDocument();
+    expect(refetch).toHaveBeenCalledTimes(1);
+    expect(onNavigate).not.toHaveBeenCalledWith(null);
   });
 });
 
