@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { focusOnBoard } from "./boardDom";
 import { type Board, commandForKey } from "./commands";
-import { isTypingTarget } from "./keys";
+import { isColumnField, isNativeControl, isTypingTarget } from "./keys";
 
 /**
  * The board's one keydown listener: each key is a command in `commands.ts`,
@@ -32,8 +32,15 @@ export function useBoardKeys({
         (afterG ? commandForKey(e, { afterG: true }) : null) ??
         commandForKey(e);
       if (!hit) return;
-      const { command, arg } = hit;
-      if (!command.anywhere && isTypingTarget(e.target)) return;
+      const { command, arg, anywhere } = hit;
+      if (
+        !anywhere &&
+        isTypingTarget(e.target) &&
+        !(command.leavesColumnFields && isColumnField(e.target))
+      ) {
+        return;
+      }
+      if (command.native && isNativeControl(e.target)) return;
       if (command.admin && !admin) return;
       if (modal) return;
       // Keys that act on a todo act on the selection while focus is on the

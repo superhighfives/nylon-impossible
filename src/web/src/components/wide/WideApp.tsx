@@ -44,7 +44,14 @@ import {
   sheetScrollTarget,
   shownColumns,
 } from "./board";
-import { columnRows, rowById } from "./boardDom";
+import {
+  columnHead,
+  columnRows,
+  rowById,
+  sectionOf,
+  sheetPopup,
+  sidebar,
+} from "./boardDom";
 import { COLUMN_WIDTH, Column } from "./Column";
 import { CommandPalette } from "./CommandPalette";
 import { COMMANDS, type JumpTarget, keyHint } from "./commands";
@@ -54,6 +61,13 @@ import { type PaletteState, paletteGroups } from "./paletteGroups";
 import { ShortcutsOverlay } from "./ShortcutsOverlay";
 import { Sidebar } from "./Sidebar";
 import { SkeletonComposer } from "./Skeleton";
+import {
+  isColumnSection,
+  type KeySection,
+  SHEET,
+  SIDEBAR,
+  sectionOrder,
+} from "./sections";
 import { settleTiming } from "./settle";
 import { holdLeavingSheet, type Placed, slideColumns, spanOf } from "./slide";
 import { Toolbar } from "./Toolbar";
@@ -121,6 +135,10 @@ const SHEET_EXIT_MS = 1000;
  * selects, a second click, a double click or Enter opens it in a sheet laid
  * on the board right after its column, and while a todo is open the sheet
  * follows the selection. The columns after it slide along to make room.
+ *
+ * The keyboard is on or in one section at a time: the sidebar, a column or
+ * the sheet (`sections.ts`). Which one follows focus, and is drawn as the
+ * section's `data-key-section`, outlined while the keyboard is in use.
  * Rows, menus, the composer and the detail are the phone's components at
  * board density, driven by the same `useBoardData`.
  */
@@ -173,6 +191,7 @@ export function WideApp({
   const [palette, setPalette] = useState<PaletteState | null>(null);
   const [sheetEl, setSheetEl] = useState<HTMLElement | null>(null);
   const boardRow = useRef<HTMLElement>(null);
+  const boardRoot = useRef<HTMLDivElement>(null);
   const [shortcuts, setShortcuts] = useState(false);
   const [feedback, setFeedback] = useState(false);
   const canSendFeedback = useCanSendFeedback();
@@ -187,6 +206,18 @@ export function WideApp({
   const pendingFocus = useRef<PendingFocus | null>(null);
   /** The last todo selected in each column, so going back lands on it. */
   const lastSelected = useRef(new Map<string, string>());
+  /** The section with the keyboard; at first, Today (`keyAt`). */
+  const [keySection, setKeySection] = useState<KeySection | null>(null);
+  /** Set while focus goes to a column's head to put the keyboard on it. */
+  const headOn = useRef(false);
+  /** The column whose Add has the keyboard but isn't typing. */
+  const [addIdle, setAddIdle] = useState<string | null>(null);
+  /** Bumped to put the keyboard on the sheet once it shows (Return). */
+  const [sheetFocus, setSheetFocus] = useState(0);
+  /** The column the keyboard was last on or in. */
+  const cameFrom = useRef<string | null>(null);
+  /** Where n opened Quick add from, to go back to. */
+  const quickAddFrom = useRef<Element | null>(null);
 
   const now = new Date();
   const overnight = useOvernightNote(todos, byKind.today?.id);
@@ -249,7 +280,25 @@ export function WideApp({
   /** The column the selection is in: a list id, Done, or none (never hidden). */
   const selectionColumn =
     selectedIn && columnIds.includes(selectedIn) ? selectedIn : null;
-  const currentColumn = selectionColumn ?? todayId;
+  // The sections in Tab order, and the one with the keyboard. One that's
+  // gone (a hidden column, the closed sheet) hands it to the column the
+  // keyboard was last in, else Today.
+  const sections = sectionOrder(columnIds, sheetColumn);
+  const keyAt: KeySection =
+    keySection && sections.includes(keySection.id)
+      ? keySection
+      : {
+          id:
+            cameFrom.current && sections.includes(cameFrom.current)
+              ? cameFrom.current
+              : (todayId ?? DONE_COLUMN),
+          level: "on",
+        };
+  if (isColumnSection(keyAt.id)) cameFrom.current = keyAt.id;
+  else if (keyAt.id === SHEET) cameFrom.current = sheetColumn;
+  const keyOn = (id: string) => (keyAt.id === id ? keyAt.level : undefined);
+  const currentColumn =
+    selectionColumn ?? (isColumnSection(keyAt.id) ? keyAt.id : todayId);
 
   // --- Board motion -------------------------------------------------------
   // After every render: the closing sheet leaves the row, the columns that
@@ -517,10 +566,71 @@ export function WideApp({
     });
   };
 
-  const closeDetail = () => {
+  /** Close the open todo; `toRow` puts the keyboard back on its row. */
+  const closeDetail = (toRow: boolean) => {
+    const open = detailId;
     setDetailId(null);
-    // Back to the selected row, which is where the keyboard left off.
-    requestAnimationFrame(() => selectedRow()?.focus());
+    if (toRow) requestAnimationFrame(() => rowById(open)?.focus());
+  };
+
+  // --- Sections -------------------------------------------------------------
+  // Focus says which section has the keyboard: wherever it lands, a click or
+  // a key, the section it's in takes it. Focus outside them (the toolbar, a
+  // popup) leaves it where it was.
+
+  useEffect(() => {
+    const root = boardRoot.current;
+    if (!root) return;
+    const onFocus = (e: FocusEvent) => {
+      const at = sectionOf(e.target as Element);
+      if (!at) return;
+      // A column's head is "on" the column only when the keys put it there;
+      // a click on the column's space, or going to an empty column, is in.
+      const on = at.anchor && (!isColumnSection(at.id) || headOn.current);
+      const level = on ? "on" : "in";
+      setKeySection((cur) =>
+        cur?.id === at.id && cur.level === level ? cur : { id: at.id, level },
+      );
+    };
+    root.addEventListener("focusin", onFocus);
+    return () => root.removeEventListener("focusin", onFocus);
+  }, []);
+
+  /**
+   * Put the keyboard on a section, with nothing in it chosen: the sidebar
+   * or the sheet itself, or a column's head. Leaving for the sidebar or a
+   * column lets go of the selected todo; the sheet keeps it.
+   */
+  const toSection = (id: string) => {
+    if (id === SIDEBAR) {
+      setSelectedId(null);
+      sidebar()?.focus();
+    } else if (id === SHEET) {
+      sheetPopup()?.focus({ preventScroll: true });
+    } else {
+      const head = columnHead(id);
+      const section = head?.closest<HTMLElement>("[data-column]");
+      if (!head || !section) return;
+      revealColumn(section);
+      setSelectedId(null);
+      setUrlColumn(id);
+      headOn.current = true;
+      head.focus({ preventScroll: true });
+      headOn.current = false;
+    }
+    setKeySection({ id, level: "on" });
+  };
+
+  /** A column's Add: typing, or on it ready to type (`typing` false). */
+  const focusAdd = (listId: string, typing: boolean) => {
+    const field = composers.current.get(listId);
+    const section = field?.closest<HTMLElement>("[data-column]");
+    if (!field || !section) return;
+    revealColumn(section);
+    setSelectedId(null);
+    setUrlColumn(listId);
+    setAddIdle(typing ? null : listId);
+    field.focus({ preventScroll: true });
   };
 
   // --- Hidden columns -------------------------------------------------------
@@ -661,6 +771,9 @@ export function WideApp({
 
   const board = createBoard({
     columnIds,
+    sections,
+    keySection: keyAt,
+    cameFrom: cameFrom.current ?? todayId ?? DONE_COLUMN,
     currentColumn,
     selectionColumn,
     detailOpen: !!detailTodo,
@@ -669,12 +782,18 @@ export function WideApp({
     todoById,
     doneById,
     selectedRow,
+    sheetRow: () => rowById(detailId),
     focusColumn,
+    toSection,
+    hasAdd: (listId) => composers.current.has(listId),
+    focusAdd,
+    focusSheetTitle: () =>
+      sheetPopup()?.querySelector<HTMLElement>("[data-detail-title]")?.focus(),
     clearSelection: () => setSelectedId(null),
     focusNeighbour: (row) => focusNeighbour(row),
     moveTodo: (todo, listId) => moveTodo(todo, listId),
-    open: (todo) => onOpen(todo),
-    closeDetail: () => closeDetail(),
+    open: (todo) => onOpen(todo, "keyboard"),
+    closeDetail,
     openDueMenu: (todo, row) => {
       const rect = row.getBoundingClientRect();
       setMenu({
@@ -686,7 +805,10 @@ export function WideApp({
     openMoveTo: (todo) => setPalette({ mode: "move", todoId: todo.id }),
     jump,
     startGo: go.start,
-    newTodo: () => setQuickAdd(true),
+    newTodo: () => {
+      quickAddFrom.current = document.activeElement;
+      setQuickAdd(true);
+    },
     newList: () => setNewListOpen(true),
     togglePalette: () => setPalette((p) => (p ? null : { mode: "all" })),
     goToList: () => setPalette({ mode: "lists" }),
@@ -696,8 +818,8 @@ export function WideApp({
     },
   });
 
-  // Moving with the keys adds a bar beside the selected row (TodoRow).
-  const boardRoot = useRef<HTMLDivElement>(null);
+  // Moving with the keys adds a bar beside the selected row (TodoRow), and
+  // the outline to the section with the keyboard.
   useKeyboardModality(boardRoot);
 
   useBoardKeys({
@@ -773,10 +895,16 @@ export function WideApp({
     </div>
   ) : null;
 
-  const onOpen = (todo: TodoWithUrls) => {
+  /**
+   * Open a todo beside its column. From the keyboard (Return), the keyboard
+   * goes on its sheet; after a click it stays on the row, so ↓ moves on and
+   * the sheet follows.
+   */
+  const onOpen = (todo: TodoWithUrls, by?: "keyboard" | "pointer") => {
     if (drag.justDragged.current) return;
     select(todo);
     setDetailId(todo.id);
+    if (by === "keyboard") setSheetFocus((n) => n + 1);
   };
   /**
    * A single todo just added, from a column's Add or Quick add: it opens
@@ -844,6 +972,8 @@ export function WideApp({
         title={list.name}
         subline={columnSubline(kind, now, timeZone)}
         sheetOpen={sheetColumn === list.id}
+        keySection={keyOn(list.id)}
+        addSelected={addIdle === list.id}
         rows={rowsFor(list.id)}
         resetKey={todos}
         subtasksOf={subtasksOf}
@@ -890,6 +1020,13 @@ export function WideApp({
             timeZone={timeZone}
             onView={viewList}
             onAdded={onAdded}
+            idle={addIdle === list.id}
+            onIdleChange={(idle) =>
+              setAddIdle((cur) =>
+                idle ? list.id : cur === list.id ? null : cur,
+              )
+            }
+            onLeaveDown={() => columnRows(list.id)[0]?.focus()}
             textareaRef={(el) => {
               if (el) composers.current.set(list.id, el);
               else composers.current.delete(list.id);
@@ -966,6 +1103,7 @@ export function WideApp({
       onRestore={actions.restore}
       onBackgroundClick={() => softFocus(DONE_COLUMN)}
       loading={loading}
+      keySection={keyOn(DONE_COLUMN)}
     />
   );
 
@@ -1002,13 +1140,18 @@ export function WideApp({
           onShortcuts={() => setShortcuts(true)}
           onFeedback={canSendFeedback ? () => setFeedback(true) : undefined}
           loading={loading}
+          keySection={keyOn(SIDEBAR)}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <Toolbar
             onSearch={() => setPalette({ mode: "all" })}
             quickAdd={{
               open: quickAdd,
-              onOpenChange: setQuickAdd,
+              onOpenChange: (open) => {
+                // The toolbar's button: back to the selection on close.
+                if (open) quickAddFrom.current = null;
+                setQuickAdd(open);
+              },
               startListId:
                 selectionColumn && selectionColumn !== DONE_COLUMN
                   ? selectionColumn
@@ -1019,7 +1162,15 @@ export function WideApp({
               isVisible: (id) => columnIds.includes(id),
               onView: viewList,
               onAdded,
-              returnFocus: selectedRow,
+              // Back to the section n opened it from, else the selection.
+              returnFocus: () => {
+                const from = quickAddFrom.current;
+                return from instanceof HTMLElement &&
+                  from.isConnected &&
+                  sectionOf(from)?.anchor
+                  ? from
+                  : selectedRow();
+              },
             }}
             newList={{
               open: newListOpen,
@@ -1132,7 +1283,9 @@ export function WideApp({
         listInSentence={listInSentence}
         timeZone={timeZone}
         actions={actions}
-        onClose={closeDetail}
+        onClose={() => closeDetail(true)}
+        keySection={keyOn(SHEET)}
+        focusRequest={sheetFocus}
       />
 
       <ShortcutsOverlay

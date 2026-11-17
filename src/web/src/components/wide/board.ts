@@ -8,10 +8,21 @@ import {
   focusedColumn,
   focusedRow,
   inSidebar,
+  sectionOf,
   sidebarItemFor,
   stepSidebar,
 } from "./boardDom";
 import type { Board, JumpTarget } from "./commands";
+import {
+  adjacentSection,
+  isColumnSection,
+  type KeySection,
+  nextSection,
+  SHEET,
+  SIDEBAR,
+  stepIn,
+  stepOut,
+} from "./sections";
 
 /** One place on the wide board's row, left to right. */
 export type BoardSlot =
@@ -92,7 +103,16 @@ export function sheetScrollTarget(
 export interface BoardContext {
   /** The columns with rows, left to right (not the sheet). */
   columnIds: string[];
-  /** The selection's column if it's on screen, else Today. */
+  /** The sections in Tab order: the sidebar, the columns, the sheet. */
+  sections: string[];
+  /**
+   * The section with the keyboard as `WideApp` last saw it: where keys act
+   * when focus is outside the sections (the toolbar, nowhere).
+   */
+  keySection: KeySection;
+  /** The column the keyboard was last on or in: Return on the sidebar's entry. */
+  cameFrom: string;
+  /** The selection's column if it's on screen, else the keyboard's, else Today. */
   currentColumn: string | null;
   selectionColumn: string | null;
   detailOpen: boolean;
@@ -101,7 +121,17 @@ export interface BoardContext {
   todoById: (id: string | undefined) => TodoWithUrls | undefined;
   doneById: (id: string | undefined) => TodoWithUrls | undefined;
   selectedRow: () => HTMLElement | null;
+  /** The open todo's row. */
+  sheetRow: () => HTMLElement | null;
   focusColumn: (listId: string, index?: number, rowId?: string) => void;
+  /** Put the keyboard on a section, with nothing in it chosen. */
+  toSection: (id: string) => void;
+  /** Whether a column has Add (every column but Done). */
+  hasAdd: (listId: string) => boolean;
+  /** Put the keyboard on a column's Add: typing, or on it ready to type. */
+  focusAdd: (listId: string, typing: boolean) => void;
+  /** Into the open todo's title, ready to edit. */
+  focusSheetTitle: () => void;
   /** Let go of the selected todo; its column remembers it. */
   clearSelection: () => void;
   /** Before a row leaves its column, hand focus (and the selection) on. */
@@ -109,7 +139,8 @@ export interface BoardContext {
   /** Move a todo to another list; the selection goes with it. */
   moveTodo: (todo: TodoWithUrls, listId: string) => void;
   open: (todo: TodoWithUrls) => void;
-  closeDetail: () => void;
+  /** Close the open todo; `toRow` puts the keyboard back on its row. */
+  closeDetail: (toRow: boolean) => void;
   openDueMenu: (todo: TodoWithUrls, row: HTMLElement) => void;
   openMoveTo: (todo: TodoWithUrls) => void;
   jump: (target: JumpTarget) => void;
@@ -124,14 +155,42 @@ export interface BoardContext {
 
 /**
  * The board the command registry runs against. Commands act on the selected
- * row (or the focused one); ↑ ↓ → act on the sidebar when focus is there.
+ * row (or the focused one, or the open todo from its sheet); the arrows,
+ * Tab, Return and Esc move between and within sections (`sections.ts`).
  */
 export function createBoard(ctx: BoardContext): Board {
   const { actions } = ctx;
 
+  /**
+   * Where the keyboard is: the section focus is in, on it if focus is on its
+   * anchor. A column's head is either: a click on the column's space puts
+   * focus there, in it; Esc puts it there, on it. Focus elsewhere (the
+   * toolbar, nowhere) leaves the keyboard where it was.
+   */
+  const here = (): KeySection => {
+    const at = sectionOf(document.activeElement);
+    if (!at) return ctx.keySection;
+    if (!isColumnSection(at.id)) {
+      return { id: at.id, level: at.anchor ? "on" : "in" };
+    }
+    if (!at.anchor) return { id: at.id, level: "in" };
+    return {
+      id: at.id,
+      level: ctx.keySection.id === at.id ? ctx.keySection.level : "in",
+    };
+  };
+  /** Focus is on a column's Add. */
+  const onAdd = () =>
+    !!(document.activeElement as HTMLElement | null)?.closest(
+      "[data-column-composer]",
+    );
+
   /** The selected row and its todo: open, or finished (in Done). */
   const current = () => {
-    const row = focusedRow() ?? ctx.selectedRow();
+    const row =
+      here().id === SHEET
+        ? ctx.sheetRow()
+        : (focusedRow() ?? ctx.selectedRow());
     return {
       row,
       todo: ctx.todoById(row?.dataset.rowId),
@@ -139,29 +198,40 @@ export function createBoard(ctx: BoardContext): Board {
     };
   };
   /** With no row, the column focus is in (its title, after a click). */
-  const focusColumnId = () => {
+  const focusedColumnId = () => {
     const column = focusedColumn();
     return column && ctx.columnIds.includes(column) ? column : null;
   };
   const rowColumn = (row: HTMLElement | null) =>
     row?.dataset.rowList && ctx.columnIds.includes(row.dataset.rowList)
       ? row.dataset.rowList
-      : (focusColumnId() ?? ctx.currentColumn);
+      : (focusedColumnId() ?? ctx.currentColumn);
 
   return {
     moveRow: (delta) => {
       if (inSidebar()) return stepSidebar(delta);
+      if (here().id === SHEET) return;
+      const add = onAdd();
       const { row } = current();
-      const column = rowColumn(row);
+      const column = add ? focusedColumnId() : rowColumn(row);
       if (!column) return;
       const rows = columnRows(column);
+      // Add sits above the first todo: ↓ from it is the first todo.
+      if (add) {
+        if (delta > 0) rows[0]?.focus();
+        return;
+      }
       const at = row ? rows.indexOf(row) : -1;
       // From a column with nothing selected, ↓ starts at the top, ↑ at the end.
       if (at === -1) (delta > 0 ? rows[0] : rows.at(-1))?.focus();
-      else rows[at + delta]?.focus();
+      // ↑ from the first todo reaches Add.
+      else if (at === 0 && delta < 0 && ctx.hasAdd(column)) {
+        ctx.focusAdd(column, false);
+      } else rows[at + delta]?.focus();
     },
     moveColumn: (delta) => {
-      if (inSidebar()) {
+      const at = here();
+      if (at.id === SIDEBAR && at.level === "in") {
         // → goes into the column, as a click; New list, Settings and
         // Keyboard shortcuts take Enter instead.
         const el = document.activeElement as HTMLElement;
@@ -170,33 +240,74 @@ export function createBoard(ctx: BoardContext): Board {
         }
         return;
       }
+      // On a section, or the sheet: the adjacent section.
+      if (at.level === "on" || at.id === SHEET) {
+        const to = adjacentSection(ctx.sections, at.id, delta);
+        if (to) ctx.toSection(to);
+        return;
+      }
+      // In a column: the same place in the next one, skipping the sheet.
+      const add = onAdd();
       const { row } = current();
-      const column = rowColumn(row);
+      const column = add ? focusedColumnId() : rowColumn(row);
       if (!column) return;
-      const at = ctx.columnIds.indexOf(column);
-      if (at === 0 && delta === -1) {
+      const index = ctx.columnIds.indexOf(column);
+      if (index === 0 && delta === -1) {
         // Into the sidebar, as Esc: let go of the todo; → reselects it.
         sidebarItemFor(column)?.focus();
         ctx.clearSelection();
         return;
       }
-      const to = ctx.columnIds[at + delta];
+      const to = ctx.columnIds[index + delta];
       if (!to) return;
-      const index = row ? columnRows(column).indexOf(row) : 0;
-      ctx.focusColumn(to, Math.max(0, index));
+      if (add && ctx.hasAdd(to)) return ctx.focusAdd(to, false);
+      const position = row ? columnRows(column).indexOf(row) : 0;
+      ctx.focusColumn(to, Math.max(0, position));
+    },
+    nextSection: (delta) => {
+      ctx.toSection(nextSection(ctx.sections, here().id, delta));
     },
     back: () => {
-      if (ctx.detailOpen) return ctx.closeDetail();
-      // Into the sidebar at this column, letting go of the todo. → back in
-      // reselects the column's last todo.
-      sidebarItemFor(
-        ctx.selectionColumn ?? focusColumnId() ?? ctx.currentColumn,
-      )?.focus();
-      ctx.clearSelection();
+      const at = here();
+      const out = stepOut(at, ctx.detailOpen);
+      switch (out.to) {
+        case "section":
+          return ctx.toSection(out.id);
+        case "entry":
+          // Into the sidebar at this column, letting go of the todo. → back
+          // in reselects the column's last todo.
+          sidebarItemFor(out.column)?.focus();
+          return ctx.clearSelection();
+        case "close":
+          return ctx.closeDetail(false);
+        case "close-to-row":
+          return ctx.closeDetail(true);
+      }
     },
     open: () => {
-      const { todo } = current();
-      if (todo) ctx.open(todo);
+      const at = here();
+      const step = stepIn(at.id, {
+        rows: isColumnSection(at.id) ? columnRows(at.id).length : 0,
+        hasAdd: ctx.hasAdd(at.id),
+        cameFrom: ctx.cameFrom,
+      });
+      switch (step.to) {
+        case "entry":
+          sidebarItemFor(step.column)?.focus();
+          return;
+        case "title":
+          return ctx.focusSheetTitle();
+        case "row":
+          return ctx.focusColumn(at.id, 0);
+        case "add":
+          return ctx.focusAdd(at.id, false);
+      }
+    },
+    addHere: () => {
+      const at = here();
+      if (isColumnSection(at.id) && ctx.hasAdd(at.id)) {
+        ctx.focusAdd(at.id, true);
+      } else ctx.newTodo();
     },
     done: () => {
       const { row, todo, done } = current();

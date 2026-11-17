@@ -17,6 +17,8 @@ export type JumpTarget =
 export interface Board {
   moveRow: (delta: 1 | -1) => void;
   moveColumn: (delta: 1 | -1) => void;
+  /** Tab (1) and ⇧Tab (-1): the next or previous section, wrapping. */
+  nextSection: (delta: 1 | -1) => void;
   back: () => void;
   open: () => void;
   openLink: () => void;
@@ -26,7 +28,10 @@ export interface Board {
   pin: () => void;
   due: () => void;
   remove: () => void;
+  /** Quick add. */
   newTodo: () => void;
+  /** n: type in the Add of the column the keyboard is on or in, else Quick add. */
+  addHere: () => void;
   newList: () => void;
   undo: () => void;
   redo: () => void;
@@ -49,9 +54,14 @@ interface Binding {
   mod?: boolean;
   /** Only straight after G. */
   afterG?: boolean;
-  /** Passed to `run`: which of your lists ⇧4…⇧9 means. */
+  /** Passed to `run`: which of your lists ⇧4…⇧9 means, or `ADD_HERE`. */
   arg?: number;
+  /** This way of pressing it works while typing in a field (⌘N). */
+  anywhere?: boolean;
 }
+
+/** n's `arg`: add where the keyboard is, rather than in Quick add. */
+const ADD_HERE = 1;
 
 export type CommandGroup = "Move around" | "Todo" | "Go to" | "Create" | "Help";
 
@@ -67,7 +77,15 @@ export interface Command {
   needsSelection?: boolean;
   /** Works while typing in a field (⌘K). */
   anywhere?: boolean;
-  /** Enter is handled by the focused button; listed, never matched. */
+  /**
+   * Works while typing in a column's own field, its Add or its title being
+   * renamed (Tab, which leaves it for the next section).
+   */
+  leavesColumnFields?: boolean;
+  /**
+   * A focused button or link takes the key itself (Enter presses it); the
+   * board only acts where there's none, on a section or on Add.
+   */
   native?: boolean;
   /** Admins only. */
   admin?: boolean;
@@ -121,17 +139,35 @@ export const COMMANDS: Command[] = [
     run: (b) => b.moveColumn(1),
   },
   {
+    id: "next-section",
+    label: "Next section",
+    keys: [["⇥"]],
+    bindings: [{ key: "Tab", shift: false }],
+    group: "Move around",
+    leavesColumnFields: true,
+    run: (b) => b.nextSection(1),
+  },
+  {
+    id: "previous-section",
+    label: "Previous section",
+    keys: [["⇧", "⇥"]],
+    bindings: [{ key: "Tab", shift: true }],
+    group: "Move around",
+    leavesColumnFields: true,
+    run: (b) => b.nextSection(-1),
+  },
+  {
     id: "open",
-    label: "Open, or go into a list",
+    label: "Step in, or open",
     keys: [["↵"]],
-    bindings: [],
+    bindings: [{ key: "Enter" }],
     native: true,
     group: "Move around",
     run: (b) => b.open(),
   },
   {
     id: "back",
-    label: "Back out: close, then the sidebar",
+    label: "Step out, or close",
     keys: [["Esc"]],
     bindings: [{ key: "Escape" }],
     group: "Move around",
@@ -297,11 +333,15 @@ export const COMMANDS: Command[] = [
   {
     id: "new-todo",
     label: "New todo",
-    keys: [["N"]],
-    bindings: [{ key: "n" }],
+    keys: [["N"], ["⌘", "N"]],
+    // n adds where you are; ⌘N, and the palette, always open Quick add.
+    bindings: [
+      { key: "n", arg: ADD_HERE },
+      { key: "n", mod: true, anywhere: true },
+    ],
     group: "Create",
     palette: () => "New todo",
-    run: (b) => b.newTodo(),
+    run: (b, arg) => (arg === ADD_HERE ? b.addHere() : b.newTodo()),
   },
   {
     id: "new-list",
@@ -334,7 +374,7 @@ export const COMMANDS: Command[] = [
     id: "shortcuts",
     label: "Keyboard shortcuts",
     keys: [["?"]],
-    bindings: [{ key: "?", shift: true }],
+    bindings: [{ key: "?" }],
     group: "Help",
     palette: () => "Keyboard shortcuts",
     run: (b) => b.shortcuts(),
@@ -389,11 +429,12 @@ function matches(b: Binding, e: KeyEventLike, afterG: boolean): boolean {
   if (!!b.mod !== mod || e.altKey) return false;
   if (b.code) return e.code === b.code && !!e.shiftKey === !!b.shift;
   if (!b.key) return false;
-  // Letters compare case-blind; Shift has to match where it's part of the
-  // binding (⇧N), and is ignored for keys that need it to type (?).
+  // Letters compare case-blind. Shift has to match for letters (⇧N) and
+  // where the binding names it (⇥, ⇧⇥), and is ignored for keys that need
+  // it to type (?).
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if (key !== b.key) return false;
-  if (b.key.length === 1 && /[a-z]/.test(b.key)) {
+  if (b.shift !== undefined || /^[a-z]$/.test(b.key)) {
     return !!e.shiftKey === !!b.shift;
   }
   return true;
@@ -403,11 +444,16 @@ function matches(b: Binding, e: KeyEventLike, afterG: boolean): boolean {
 export function commandForKey(
   e: KeyEventLike,
   { afterG = false }: { afterG?: boolean } = {},
-): { command: Command; arg?: number } | null {
+): { command: Command; arg?: number; anywhere?: boolean } | null {
   for (const command of COMMANDS) {
-    if (command.native) continue;
     for (const b of command.bindings) {
-      if (matches(b, e, afterG)) return { command, arg: b.arg };
+      if (matches(b, e, afterG)) {
+        return {
+          command,
+          arg: b.arg,
+          anywhere: command.anywhere || b.anywhere,
+        };
+      }
     }
   }
   return null;

@@ -33,6 +33,7 @@ export function DoneColumn({
   onRestore,
   onBackgroundClick,
   loading = false,
+  keySection,
 }: {
   todos: TodoWithUrls[];
   listName: (id: string) => string;
@@ -50,6 +51,8 @@ export function DoneColumn({
    * among the first three columns, so the skeleton's fade has ended by it.
    */
   loading?: boolean;
+  /** The board's keyboard is on Done or in it: marks it for the outline. */
+  keySection?: "on" | "in";
 }) {
   const groups = groupDoneByDay(todos, now, timeZone);
   // One tab stop: the selected row, else the first.
@@ -64,10 +67,11 @@ export function DoneColumn({
       aria-labelledby={headingId}
       data-column={DONE_COLUMN}
       data-slide={DONE_COLUMN}
+      data-key-section={keySection}
       onClick={(e) => {
         if (isColumnBackground(e.target)) onBackgroundClick?.();
       }}
-      className={`relative flex h-full ${COLUMN_WIDTH} flex-col border-x border-n-hairline ${TINTED}`}
+      className={`n-section-outline relative flex h-full ${COLUMN_WIDTH} flex-col border-x border-n-hairline ${TINTED}`}
     >
       <ColumnHeader
         listId={DONE_COLUMN}

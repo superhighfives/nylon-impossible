@@ -173,8 +173,10 @@ const focusedTitle = () =>
   (document.activeElement as HTMLElement | null)
     ?.closest("[data-row-id]")
     ?.textContent?.trim();
-const press = (key: string) =>
-  fireEvent.keyDown(document.activeElement ?? window, { key });
+const press = (key: string, init: KeyboardEventInit = {}) =>
+  fireEvent.keyDown(document.activeElement ?? window, { key, ...init });
+/** ⌘N: Quick add, from anywhere. */
+const quickAddKey = () => press("n", { metaKey: true });
 
 /** The selected todo, and the column it's in. */
 const selection = () => {
@@ -980,10 +982,10 @@ describe("WideApp", () => {
     expect(option(/^New list/)).toHaveTextContent("⇧N");
   });
 
-  it("n opens quick add on the selection's column, ⇧N the New list popover", async () => {
+  it("⌘N opens quick add on the selection's column, ⇧N the New list popover", async () => {
     render(<WideApp />);
     act(() => rowButton("Read Piranesi").focus());
-    press("n");
+    quickAddKey();
     const quick = await screen.findByRole("dialog", { name: "Quick add" });
     expect(
       within(quick).getByRole("textbox", { name: "New todo in someday" }),
@@ -1050,14 +1052,18 @@ describe("WideApp", () => {
     expect(container()).toHaveAttribute("data-selected");
   });
 
-  it("Esc closes the open todo, then goes to the column's sidebar item", async () => {
+  it("Esc closes the open todo, steps out to its column, then goes to the column's sidebar item", async () => {
     render(<WideApp />);
-    act(() => rowButton("Send invoice").focus());
-    await userEvent.keyboard("{Enter}");
+    await userEvent.dblClick(rowButton("Send invoice"));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     press("Escape");
     expect(screen.queryByRole("dialog")).toBeNull();
-    act(() => rowButton("Send invoice").focus());
+    expect(document.activeElement).toBe(rowButton("Send invoice"));
+    press("Escape");
+    expect(document.activeElement).toHaveAttribute(
+      "data-column-head",
+      "list-week",
+    );
     press("Escape");
     expect(document.activeElement).toHaveAccessibleName("This week");
     // Into the sidebar lets go of the todo…
@@ -1492,14 +1498,15 @@ describe("WideApp", () => {
     });
   });
 
-  it("Esc from inside the sheet closes it and leaves the selection on its row", async () => {
+  it("Esc from inside the sheet steps out to it, then closes it and leaves the selection on its row", async () => {
     render(<WideApp />);
     await userEvent.dblClick(rowButton("Send invoice"));
-    const title = within(await screen.findByRole("dialog")).getByRole(
-      "textbox",
-      { name: "Title" },
-    );
+    const sheet = await screen.findByRole("dialog");
+    const title = within(sheet).getByRole("textbox", { name: "Title" });
     act(() => title.focus());
+    await userEvent.keyboard("{Escape}");
+    expect(document.activeElement).toBe(sheet);
+    expect(sheet).toHaveAttribute("data-key-section", "on");
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     await act(async () => {
@@ -1518,10 +1525,10 @@ describe("WideApp", () => {
     ).toHaveValue("Send invoice");
   });
 
-  it("Enter opens, the detail follows the selection, and Esc closes it", async () => {
+  it("a click-open leaves the keyboard on the row: ↓ moves on, the sheet follows, and Esc closes it", async () => {
     render(<WideApp />);
-    rowButton("Review PR").focus();
-    await userEvent.keyboard("{Enter}");
+    await userEvent.click(rowButton("Review PR"));
+    await userEvent.click(rowButton("Review PR"));
     const title = () =>
       within(screen.getByRole("dialog")).getByRole("textbox", {
         name: "Title",
@@ -1529,8 +1536,9 @@ describe("WideApp", () => {
     expect(title()).toHaveValue("Review PR");
     // Focus stays on the board, so arrowing shows each todo.
     expect(focusedTitle()).toContain("Review PR");
-    press("j");
+    press("ArrowDown");
     expect(title()).toHaveValue("Call Mum");
+    expect(selection()).toEqual({ id: "t2", column: "list-today" });
 
     press("Escape");
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -1681,15 +1689,20 @@ describe("WideApp", () => {
       expect(sheetTitle()).toBe("Walk dog");
       expect(document.activeElement).toBe(add);
 
-      // Esc leaves Add, then closes the todo onto its row.
+      // Esc stops typing and stays on Add, then closes the todo there, then
+      // steps out to the column.
       await userEvent.keyboard("{Escape}");
-      expect(document.activeElement).not.toBe(add);
+      expect(document.activeElement).toBe(add);
+      expect(add).toHaveAttribute("readonly");
       expect(sheetTitle()).toBe("Walk dog");
       press("Escape");
       expect(sheet()).toBeNull();
-      expect(
-        rowButton("Walk dog").closest("[data-row-container]"),
-      ).toHaveAttribute("data-selected");
+      expect(document.activeElement).toBe(add);
+      press("Escape");
+      expect(document.activeElement).toHaveAttribute(
+        "data-column-head",
+        "list-today",
+      );
     });
 
     it("from one of your lists' Add: beside that list", async () => {
@@ -1740,7 +1753,7 @@ describe("WideApp", () => {
 
     it("from Quick add: behind the popover, which keeps focus, with no toast", async () => {
       render(<WideApp />);
-      press("n");
+      quickAddKey();
       const popup = await screen.findByRole("dialog", { name: "Quick add" });
       await userEvent.click(
         within(popup).getByRole("button", { name: "Groceries" }),
@@ -1771,7 +1784,7 @@ describe("WideApp", () => {
 
     it("a pasted list from Quick add opens nothing", async () => {
       render(<WideApp />);
-      press("n");
+      quickAddKey();
       const popup = await screen.findByRole("dialog", { name: "Quick add" });
       await userEvent.click(
         within(popup).getByRole("textbox", { name: "New todo in today" }),
@@ -2018,6 +2031,422 @@ describe("WideApp", () => {
       expect.objectContaining({ name: "Studio B" }),
       expect.anything(),
     );
+  });
+  describe("sections (Tab, Return, Esc, the outline)", () => {
+    const board = () =>
+      document.querySelector<HTMLElement>("[data-wide-ready]") as HTMLElement;
+    /** The section with the keyboard, and whether it's on it or in it. */
+    const keyed = () => {
+      const all = [
+        ...document.querySelectorAll<HTMLElement>("[data-key-section]"),
+      ];
+      expect(all.length).toBe(1);
+      const el = all[0];
+      const id =
+        el.tagName === "ASIDE"
+          ? "sidebar"
+          : el.hasAttribute("data-detail-column")
+            ? "sheet"
+            : el.dataset.column;
+      return `${id} ${el.dataset.keySection}`;
+    };
+    const tab = () => press("Tab");
+    const backTab = () => press("Tab", { shiftKey: true });
+    const add = (name: string) =>
+      screen.getByRole("textbox", {
+        name: `New todo in ${name}`,
+      }) as HTMLTextAreaElement;
+    const sheet = () =>
+      document.querySelector<HTMLElement>("[data-detail-column]");
+    const nextFrame = () =>
+      act(async () => {
+        await new Promise((r) => requestAnimationFrame(r));
+      });
+
+    it("starts on Today with no outline, which the first key press shows", () => {
+      render(<WideApp />);
+      expect(keyed()).toBe("list-today on");
+      expect(board()).not.toHaveAttribute("data-keyboard");
+      tab();
+      expect(board()).toHaveAttribute("data-keyboard");
+      expect(keyed()).toBe("list-week on");
+      fireEvent.pointerDown(document.body);
+      expect(board()).not.toHaveAttribute("data-keyboard");
+      press("ArrowLeft");
+      expect(board()).toHaveAttribute("data-keyboard");
+      expect(keyed()).toBe("list-today on");
+    });
+
+    it("Tab and ⇧Tab visit every section, the sheet straight after its column, and wrap", async () => {
+      render(<WideApp />);
+      await userEvent.dblClick(rowButton("Send invoice"));
+      expect(sheet()).not.toBeNull();
+      expect(keyed()).toBe("list-week in");
+      const visited = [];
+      for (let i = 0; i < 8; i++) {
+        tab();
+        visited.push(keyed());
+      }
+      expect(visited).toEqual([
+        "sheet on",
+        "list-someday on",
+        "list-groceries on",
+        "list-studio on",
+        "done on",
+        "sidebar on",
+        "list-today on",
+        "list-week on",
+      ]);
+      const back = [];
+      for (let i = 0; i < 8; i++) {
+        backTab();
+        back.push(keyed());
+      }
+      expect(back).toEqual([
+        "list-today on",
+        "sidebar on",
+        "done on",
+        "list-studio on",
+        "list-groceries on",
+        "list-someday on",
+        "sheet on",
+        "list-week on",
+      ]);
+      // Each "on" puts focus on the section itself, nothing selected.
+      expect(document.activeElement).toHaveAttribute(
+        "data-column-head",
+        "list-week",
+      );
+      expect(selection()).toBeNull();
+    });
+
+    it("← → move to the adjacent section and don't wrap; ← from This week reaches an empty Today", () => {
+      todos = todos.filter((t) => t.listId !== "list-today" || t.completed);
+      render(<WideApp />);
+      tab();
+      expect(keyed()).toBe("list-week on");
+      press("ArrowLeft");
+      expect(keyed()).toBe("list-today on");
+      expect(document.activeElement).toHaveAttribute(
+        "data-column-head",
+        "list-today",
+      );
+      press("h");
+      expect(keyed()).toBe("sidebar on");
+      expect(document.activeElement).toBe(
+        screen.getByRole("complementary", { name: "Sidebar" }),
+      );
+      press("ArrowLeft");
+      expect(keyed()).toBe("sidebar on");
+      press("ArrowRight");
+      expect(keyed()).toBe("list-today on");
+      backTab();
+      backTab();
+      expect(keyed()).toBe("done on");
+      press("l");
+      expect(keyed()).toBe("done on");
+    });
+
+    it("Return on a column steps in to its first todo, or Add when it has none", () => {
+      todos = todos.filter((t) => t.listId !== "list-today" || t.completed);
+      render(<WideApp />);
+      tab();
+      press("Enter");
+      expect(selection()).toEqual({ id: "w1", column: "list-week" });
+      expect(keyed()).toBe("list-week in");
+      press("Escape");
+      press("ArrowLeft");
+      press("Enter");
+      expect(document.activeElement).toBe(add("today"));
+      expect(add("today")).toHaveAttribute("readonly");
+      expect(keyed()).toBe("list-today in");
+    });
+
+    it("Return on the sidebar goes to the entry for the column it came from", () => {
+      render(<WideApp />);
+      backTab();
+      expect(keyed()).toBe("sidebar on");
+      press("Enter");
+      expect(document.activeElement).toHaveAccessibleName("Today");
+      press("Escape");
+      expect(keyed()).toBe("sidebar on");
+      // From Done, Tab wraps to the sidebar, and Return goes to Done's entry.
+      backTab();
+      expect(keyed()).toBe("done on");
+      tab();
+      press("Enter");
+      expect(document.activeElement).toHaveAttribute(
+        "data-sidebar-item",
+        "done",
+      );
+      expect(keyed()).toBe("sidebar in");
+    });
+
+    it("Esc from a todo steps out to its column with nothing selected, then to the sidebar on its entry", () => {
+      render(<WideApp />);
+      act(() => rowButton("Renew passport").focus());
+      expect(keyed()).toBe("list-week in");
+      press("Escape");
+      expect(keyed()).toBe("list-week on");
+      expect(
+        rowButton("Renew passport").closest("[data-row-container]"),
+      ).not.toHaveAttribute("data-selected");
+      press("Escape");
+      expect(document.activeElement).toHaveAttribute(
+        "data-sidebar-list",
+        "list-week",
+      );
+      expect(keyed()).toBe("sidebar in");
+      press("Escape");
+      expect(keyed()).toBe("sidebar on");
+      // Esc on the sidebar's section goes nowhere.
+      press("Escape");
+      expect(keyed()).toBe("sidebar on");
+    });
+
+    it("↑ from the first todo reaches Add, ready to type with the row's keyboard look; ↓ comes back", () => {
+      render(<WideApp />);
+      act(() => rowButton("Send invoice").focus());
+      press("ArrowUp");
+      const field = add("this week");
+      expect(document.activeElement).toBe(field);
+      expect(field).toHaveAttribute("readonly");
+      expect(field.closest("form")).toHaveClass("bg-n-fill");
+      expect(field.closest("form")).not.toHaveClass("n-focus-within");
+      expect(
+        field
+          .closest("[data-column-composer]")
+          ?.querySelector("[data-row-selection-bar]"),
+      ).toBeInTheDocument();
+      expect(selection()).toBeNull();
+      press("j");
+      expect(selection()).toEqual({ id: "w1", column: "list-week" });
+      press("k");
+      expect(document.activeElement).toBe(field);
+    });
+
+    it("Return on Add starts typing; Esc stops and stays on Add, keeping what's typed", async () => {
+      render(<WideApp />);
+      act(() => rowButton("Send invoice").focus());
+      press("ArrowUp");
+      const field = add("this week");
+      await userEvent.keyboard("{Enter}");
+      expect(field).not.toHaveAttribute("readonly");
+      expect(smartCreate).not.toHaveBeenCalled();
+      await userEvent.keyboard("Milk");
+      expect(field).toHaveValue("Milk");
+      await userEvent.keyboard("{Escape}");
+      expect(document.activeElement).toBe(field);
+      expect(field).toHaveAttribute("readonly");
+      expect(field).toHaveValue("Milk");
+      // Esc again steps out to the column.
+      press("Escape");
+      expect(keyed()).toBe("list-week on");
+    });
+
+    it("↓ from Add with nothing typed goes to the first todo", async () => {
+      render(<WideApp />);
+      await userEvent.click(add("this week"));
+      expect(add("this week")).not.toHaveAttribute("readonly");
+      await userEvent.keyboard("{ArrowDown}");
+      expect(selection()).toEqual({ id: "w1", column: "list-week" });
+    });
+
+    it("Tab while typing in Add moves to the next section and keeps what's typed", async () => {
+      render(<WideApp />);
+      await userEvent.click(add("this week"));
+      await userEvent.keyboard("Half typed");
+      tab();
+      expect(keyed()).toBe("list-someday on");
+      expect(add("this week")).toHaveValue("Half typed");
+    });
+
+    it("Tab while renaming a column saves the name and moves to the next section", async () => {
+      render(<WideApp />);
+      await userEvent.click(
+        within(column("Groceries")).getByRole("button", {
+          name: "Groceries",
+        }),
+      );
+      const name = screen.getByRole("textbox", { name: "List name" });
+      await userEvent.clear(name);
+      await userEvent.keyboard("Shopping");
+      tab();
+      expect(updateList).toHaveBeenCalledWith({
+        id: "list-groceries",
+        input: { name: "Shopping" },
+      });
+      await nextFrame();
+      expect(keyed()).toBe("list-studio on");
+      expect(document.activeElement).toHaveAttribute(
+        "data-column-head",
+        "list-studio",
+      );
+    });
+
+    it("n on a column types in its Add", () => {
+      render(<WideApp />);
+      tab();
+      tab();
+      expect(keyed()).toBe("list-someday on");
+      press("n");
+      expect(document.activeElement).toBe(add("someday"));
+      expect(add("someday")).not.toHaveAttribute("readonly");
+    });
+
+    it("n in a column types in its Add", () => {
+      render(<WideApp />);
+      act(() => rowButton("Mix the EP").focus());
+      press("n");
+      expect(document.activeElement).toBe(add("Studio"));
+      expect(add("Studio")).not.toHaveAttribute("readonly");
+      expect(screen.queryByRole("dialog", { name: "Quick add" })).toBeNull();
+    });
+
+    it("n in the sidebar opens Quick add", async () => {
+      render(<WideApp />);
+      backTab();
+      press("n");
+      expect(
+        await screen.findByRole("dialog", { name: "Quick add" }),
+      ).toBeInTheDocument();
+    });
+
+    it("n in Done opens Quick add", async () => {
+      render(<WideApp />);
+      act(() => rowButton("Ship the zine").focus());
+      press("n");
+      expect(
+        await screen.findByRole("dialog", { name: "Quick add" }),
+      ).toBeInTheDocument();
+    });
+
+    it("n on the sheet opens Quick add", async () => {
+      render(<WideApp />);
+      act(() => rowButton("Send invoice").focus());
+      await userEvent.keyboard("{Enter}");
+      await waitFor(() => expect(document.activeElement).toBe(sheet()));
+      press("n");
+      expect(
+        await screen.findByRole("dialog", { name: "Quick add" }),
+      ).toBeInTheDocument();
+    });
+
+    it("⌘N opens Quick add while typing", async () => {
+      render(<WideApp />);
+      await userEvent.click(add("today"));
+      await userEvent.keyboard("Typing");
+      quickAddKey();
+      expect(
+        await screen.findByRole("dialog", { name: "Quick add" }),
+      ).toBeInTheDocument();
+    });
+
+    it("Return on a todo puts the keyboard on its sheet: keys act on it, Return goes into the title, Tab wraps, Esc steps out, Esc closes", async () => {
+      render(<WideApp />);
+      act(() => rowButton("Send invoice").focus());
+      await userEvent.keyboard("{Enter}");
+      const popup = await screen.findByRole("dialog");
+      await waitFor(() => expect(document.activeElement).toBe(popup));
+      expect(keyed()).toBe("sheet on");
+      const title = within(popup).getByRole("textbox", { name: "Title" });
+
+      // Typing doesn't edit it; p pins it.
+      await userEvent.keyboard("q");
+      expect(title).toHaveValue("Send invoice");
+      press("p");
+      expect(update).toHaveBeenCalledWith({
+        id: "w1",
+        input: expect.objectContaining({ pinned: true }),
+      });
+
+      // Return: into the title, ready to edit.
+      press("Enter");
+      expect(document.activeElement).toBe(title);
+      expect(keyed()).toBe("sheet in");
+
+      // Tab wraps within the sheet, from its first stop to its last and back.
+      press("Tab", { shiftKey: true });
+      const last = document.activeElement as HTMLElement;
+      expect(popup.contains(last)).toBe(true);
+      expect(last).not.toBe(title);
+      expect(keyed()).toBe("sheet in");
+      press("Tab");
+      expect(document.activeElement).toBe(title);
+
+      // Esc steps out to the sheet; Esc again closes it onto its row.
+      press("Escape");
+      expect(document.activeElement).toBe(popup);
+      expect(keyed()).toBe("sheet on");
+      press("Escape");
+      expect(sheet()).toBeNull();
+      await nextFrame();
+      expect(selection()).toEqual({ id: "w1", column: "list-week" });
+    });
+
+    it("Tab from the sheet goes to the next section; arrows don't move its todo", async () => {
+      render(<WideApp />);
+      act(() => rowButton("Send invoice").focus());
+      await userEvent.keyboard("{Enter}");
+      const popup = await screen.findByRole("dialog");
+      await waitFor(() => expect(document.activeElement).toBe(popup));
+      press("ArrowDown");
+      expect(document.activeElement).toBe(popup);
+      tab();
+      expect(keyed()).toBe("list-someday on");
+      // The sheet stays open beside its column.
+      expect(sheet()).not.toBeNull();
+    });
+
+    it("a click on a row, the sidebar or the sheet moves the keyboard there", async () => {
+      render(<WideApp />);
+      await userEvent.click(rowButton("Mix the EP"));
+      expect(keyed()).toBe("list-studio in");
+      await userEvent.click(screen.getByRole("heading", { name: "Lists" }));
+      expect(keyed().startsWith("sidebar")).toBe(true);
+      await userEvent.dblClick(rowButton("Parmesan"));
+      expect(keyed()).toBe("list-groceries in");
+      await userEvent.click(within(sheet() as HTMLElement).getByText(/^In /));
+      expect(keyed().startsWith("sheet")).toBe(true);
+      // Toolbar clicks leave it where it was.
+      await userEvent.click(screen.getByRole("button", { name: /Search/ }));
+      expect(keyed().startsWith("sheet")).toBe(true);
+    });
+
+    it("draws the outline as an overlay: only the marker attribute changes", () => {
+      render(<WideApp />);
+      const week = column("This week");
+      const before = week.className;
+      expect(week).not.toHaveAttribute("data-key-section");
+      tab();
+      expect(week).toHaveAttribute("data-key-section", "on");
+      expect(week.className).toBe(before);
+      for (const el of [
+        week,
+        column("Done"),
+        screen.getByRole("complementary", { name: "Sidebar" }),
+      ]) {
+        expect(el).toHaveClass("n-section-outline", "relative");
+      }
+    });
+
+    it("the shortcuts dialog lists the section keys", async () => {
+      render(<WideApp />);
+      fireEvent.keyDown(window, { key: "?" });
+      const dialog = await screen.findByRole("dialog", {
+        name: "Keyboard shortcuts",
+      });
+      const dialogKeys = (label: string) =>
+        within(dialog)
+          .getByText(label, { selector: "dt" })
+          .nextElementSibling?.textContent?.replace(/\s/g, "");
+      expect(dialogKeys("Next section")).toBe("⇥");
+      expect(dialogKeys("Previous section")).toBe("⇧⇥");
+      expect(dialogKeys("Step in, or open")).toBe("↵");
+      expect(dialogKeys("Step out, or close")).toBe("Esc");
+      expect(dialogKeys("Column left, or into the sidebar")).toBe("Hor←");
+      expect(dialogKeys("New todo")).toBe("Nor⌘N");
+    });
   });
 });
 
@@ -2666,16 +3095,15 @@ describe("WideApp hidden columns", () => {
     expect(copy).toHaveClass("invisible");
   });
 
-  it("puts the eye after its entry, so it's on top and the next Tab stop", async () => {
+  it("puts the eye after its entry, so it's on top, but out of the Tab order", () => {
     render(<WideApp />);
     const entry = sidebarEntry("Groceries");
     const eye = eyeOf("list-groceries");
     expect(
       entry.compareDocumentPosition(eye) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
-    entry.focus();
-    await userEvent.tab();
-    expect(eye).toHaveFocus();
+    // Tab moves between sections; the palette's Hide column reaches it.
+    expect(eye).toHaveAttribute("tabindex", "-1");
   });
 
   it("opens the same menu when the eye is right-clicked", async () => {
