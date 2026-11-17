@@ -326,7 +326,7 @@ echo "stalls"
 # OPEN_PRS what `gh pr list` prints (after its --jq), MERGE_FAIL refuses merges.
 T0=$FOREMAN_NOW
 SHA_A=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa SHA_B=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-GATE="" MERGE_FAIL="" OPEN_PRS="" PR_BODY="Closes #1"
+GATE="" MERGE_FAIL="" OPEN_PRS="" PR_BODY="Closes #1" PR_VIEW_FAIL=""
 open_pr() { printf '7\tforeman/1-x\t%s\n' "$1"; }
 mp() { # [--dry-run] -> merge_pass's log
   (
@@ -337,7 +337,7 @@ mp() { # [--dry-run] -> merge_pass's log
       case "$1 $2" in
         "pr list") printf '%s' "$OPEN_PRS" ;;
         "pr merge") [ -z "$MERGE_FAIL" ] ;;
-        "pr view") [[ " $* " == *" --json body "* ]] && printf '%s' "$PR_BODY" || echo null ;;
+        "pr view") [ -n "$PR_VIEW_FAIL" ] && return 1; [[ " $* " == *" --json body "* ]] && printf '%s' "$PR_BODY" || echo null ;;
         *) return 0 ;;
       esac
     }
@@ -404,12 +404,20 @@ expect "so do fixes and resolved, any case"        "yes yes"  "$(echo 'This FIXE
 expect "Part of #1 doesn't"                        "no"   "$(echo 'Part of #1: the Mac half.' | closes 1 && echo yes || echo no)"
 expect "nor does closing another issue"            "no no"  "$(echo 'Closes #12' | closes 1 && echo yes || echo no) $(echo 'Closes #2, part of #1' | closes 1 && echo yes || echo no)"
 expect "nor a word that ends in close"             "no"   "$(echo 'Foreclosed #1' | closes 1 && echo yes || echo no)"
+expect "nor a different repo's #1"                "no"   "$(echo 'Closes someone/else#1' | closes 1 && echo yes || echo no)"
+expect "owner/repo#1 and the issue's URL close it" "yes yes"  "$(echo 'Closes superhighfives/nylon-impossible#1' | closes 1 && echo yes) $(echo 'Fixes https://github.com/superhighfives/nylon-impossible/issues/1' | closes 1 && echo yes)"
 
 fresh; GATE="merge $SHA_A"; PR_BODY="Closes #1"; mp >/dev/null
 expect "a PR that closes its issue sets it Done"   "yes no"  "$(called "status 1 Done") $(grep -q '^issue comment' "$CALLS" && echo yes || echo no)"
 fresh; GATE="merge $SHA_A"; PR_BODY="Part of #1: the first half."; mp >/dev/null
 expect "one that doesn't puts it back in Ready"    "yes no"  "$(called "status 1 Ready") $(called "status 1 Done")"
 expect "and says so on the issue"                  "yes"  "$(grep -q '^issue comment 1 ' "$CALLS" && echo yes || echo no)"
+fresh; GATE="merge $SHA_A"; PR_BODY=""; mp >/dev/null
+expect "an empty body puts it back in Ready too"   "yes"  "$(called "status 1 Ready")"
+fresh; GATE="merge $SHA_A"; PR_VIEW_FAIL=1; mp >/dev/null
+expect "a body it can't read moves nothing"        "no no"  "$(called "status 1 Done") $(called "status 1 Ready")"
+expect "and alerts"                                "yes"  "$(called "alert merged #7 but couldn't read its body")"
+PR_VIEW_FAIL=""
 PR_BODY="Closes #1"
 
 fresh; GATE="wait: checks pending"; mp >/dev/null

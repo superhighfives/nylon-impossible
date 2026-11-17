@@ -409,8 +409,9 @@ issue_of() { # branch -> the issue a foreman/<n>-<slug> branch builds, or nothin
   sed -nE 's#^foreman/([0-9]+)-.*#\1#p' <<<"$1"
 }
 
-closes() { # issue, PR body on stdin -> success if the body closes that issue, as GitHub reads it
-  grep -qiE "(^|[^[:alnum:]])(close[sd]?|fix(e[sd])?|resolve[sd]?):? +#$1([^0-9]|$)"
+closes() { # issue, PR body on stdin -> success if the body closes that issue: #n, owner/repo#n or its URL
+  local ref="(#|$OWNER/$REPO#|https://github\.com/$OWNER/$REPO/issues/)$1"
+  grep -qiE "(^|[^[:alnum:]])(close[sd]?|fix(e[sd])?|resolve[sd]?):? +$ref([^0-9]|$)"
 }
 
 # A build that was too big ships its first slice and says "Part of #n" (#690).
@@ -419,7 +420,13 @@ closes() { # issue, PR body on stdin -> success if the body closes that issue, a
 # finishes it. Anything else puts it back in Ready, for the next build.
 after_merge() { # board_json issue pr
   local body
-  body=$(gh pr view "$3" -R "$OWNER/$REPO" --json body --jq .body) || { log "couldn't read #$3's body; left #$2 as it is"; return 0; }
+  # A failed read leaves the issue where it is rather than guess Done, and
+  # alerts, since nothing else will move it.
+  body=$(gh pr view "$3" -R "$OWNER/$REPO" --json body --jq .body) || {
+    log "couldn't read #$3's body; left #$2 as it is"
+    alert "merged #$3 but couldn't read its body, so #$2 wasn't moved. Set it to Done, or Ready if there's more to build."
+    return 0
+  }
   if closes "$2" <<<"$body"; then set_status "$1" "$2" Done || true; return 0; fi
   log "#$3 doesn't close #$2; back to Ready for the rest"
   set_status "$1" "$2" Ready || true
