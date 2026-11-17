@@ -94,7 +94,6 @@ function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
           />
         )
       )}
-      {/* The notes glyph stands alone; its word is for the accessible name. */}
       {part.kind === "link" && link ? (
         // Wide: a real link. It opens in a new tab without changing the
         // selection, and stays out of the tab order (O opens it).
@@ -108,7 +107,7 @@ function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
           {part.text}
         </a>
       ) : (
-        part.kind !== "notes" && part.text
+        part.text
       )}
       {part.kind === "link" && part.more > 0 && ` +${part.more}`}
     </span>

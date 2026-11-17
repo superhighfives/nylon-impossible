@@ -44,6 +44,16 @@ describe("TodoRow", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
+  it("shows the notes' length after their glyph", () => {
+    setup();
+    const notes = screen.getByText("2 words");
+    expect(notes).not.toHaveAttribute("data-meta-chip");
+    expect(notes.querySelector("svg")).toHaveClass("lucide-file-text");
+    expect(
+      screen.getByRole("button", { hidden: true, name: "Water the plants" }),
+    ).toHaveAttribute("aria-description", "3 days overdue, Notes, 2 words");
+  });
+
   it("overdue stays red text, not a chip", () => {
     setup();
     const overdue = screen.getByText("3 days overdue");
@@ -78,7 +88,7 @@ describe("TodoRow", () => {
 
   it("subtasks, notes and links stay plain text", () => {
     expect(metaChip({ kind: "subtasks", text: "1/3" })).toBeNull();
-    expect(metaChip({ kind: "notes", text: "Notes" })).toBeNull();
+    expect(metaChip({ kind: "notes", text: "2 words" })).toBeNull();
     expect(
       metaChip({ kind: "link", text: "a.com", href: "https://a.com", more: 0 }),
     ).toBeNull();

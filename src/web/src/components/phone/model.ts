@@ -7,6 +7,7 @@ import {
   BOARD_TIME_KINDS,
   type BoardTimeKind,
   type BoardView,
+  countWords,
   type DueLabel,
   dayKeyIn,
   daysBetweenKeys,
@@ -44,6 +45,11 @@ export type PageKey = (typeof PAGES)[number]["key"];
 
 export function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+/** "1 word", "42 words", "1,240 words": in full, grouped for the locale. */
+export function wordCountLabel(words: number): string {
+  return `${words.toLocaleString()} ${words === 1 ? "word" : "words"}`;
 }
 
 // The due label is shared with the Gmail card, so it lives in shared.
@@ -105,8 +111,8 @@ export type MetaPart =
 
 /**
  * The meta line under a row's title, in spec order, showing only what's set:
- * Pinned, due, repeat, subtasks n/m, a notes glyph, the first link's domain
- * (and how many more links there are).
+ * Pinned, due, repeat, subtasks n/m, the notes glyph and their length ("42
+ * words"), the first link's domain (and how many more links there are).
  */
 export function rowMeta(
   todo: TodoWithUrls,
@@ -132,7 +138,8 @@ export function rowMeta(
     const done = subtasks.filter((s) => s.completed).length;
     parts.push({ kind: "subtasks", text: `${done}/${subtasks.length}` });
   }
-  if (todo.notes?.trim()) parts.push({ kind: "notes", text: "Notes" });
+  const words = countWords(todo.notes);
+  if (words > 0) parts.push({ kind: "notes", text: wordCountLabel(words) });
   const firstLink = [...todo.urls].sort(byPosition)[0];
   if (firstLink) {
     parts.push({
@@ -158,7 +165,7 @@ export function metaSummary(parts: MetaPart[]): string {
         case "subtasks":
           return `${p.text} subtasks`;
         case "notes":
-          return "Has notes";
+          return `Notes, ${p.text}`;
         case "link":
           return p.more > 0
             ? `Link to ${p.text} and ${p.more} more`

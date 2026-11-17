@@ -17,7 +17,8 @@ enum MetaPart: Hashable, Sendable {
     case due(String, overdue: Bool, today: Bool = false)
     case repeats(String)
     case subtasks(done: Int, total: Int)
-    case notes
+    /// The notes glyph, and how many words the notes run to: "42 words".
+    case notes(words: Int)
     /// The first link's domain, and how many more links there are:
     /// "visitlisboa.com +2".
     case link(String, more: Int = 0)
@@ -159,6 +160,43 @@ enum LinkLabel {
     }
 }
 
+enum NoteLength {
+    /// How many words `text` runs to: runs of non-whitespace characters, so
+    /// markdown symbols and URLs each count as written. The web's
+    /// `countWords` (src/shared) counts the same way, with JavaScript's `\s`
+    /// as whitespace; keep the two, and their tests, in step.
+    static func words(_ text: String?) -> Int {
+        guard let text else { return 0 }
+        var count = 0
+        var inWord = false
+        for scalar in text.unicodeScalars {
+            if isSpace(scalar) {
+                inWord = false
+            } else if !inWord {
+                inWord = true
+                count += 1
+            }
+        }
+        return count
+    }
+
+    /// "1 word", "42 words", "1,240 words": in full, grouped for the locale.
+    static func label(_ words: Int, locale: Locale = .current) -> String {
+        let number = words.formatted(.number.locale(locale))
+        return "\(number) \(words == 1 ? "word" : "words")"
+    }
+
+    /// JavaScript's `\s`: Unicode's white space plus the byte order mark,
+    /// less NEL (U+0085), which JavaScript doesn't treat as space.
+    private static func isSpace(_ scalar: Unicode.Scalar) -> Bool {
+        switch scalar.value {
+        case 0xFEFF: return true
+        case 0x85: return false
+        default: return scalar.properties.isWhitespace
+        }
+    }
+}
+
 enum TodoMeta {
     /// The meta line for a top-level todo: only what's set, in spec order.
     static func parts(
@@ -182,9 +220,8 @@ enum TodoMeta {
         if !live.isEmpty {
             parts.append(.subtasks(done: live.filter(\.isCompleted).count, total: live.count))
         }
-        if let notes = todo.itemNotes, !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            parts.append(.notes)
-        }
+        let words = NoteLength.words(todo.itemNotes)
+        if words > 0 { parts.append(.notes(words: words)) }
         let firstLink = todo.urls.sorted { $0.position < $1.position }.first?.url ?? todo.pendingUrls.first
         if let firstLink, let domain = LinkLabel.domain(firstLink) {
             let total = max(todo.urls.count, todo.pendingUrls.count)
@@ -194,14 +231,14 @@ enum TodoMeta {
     }
 
     /// A spoken version of the meta line for VoiceOver.
-    static func accessibilityText(_ parts: [MetaPart]) -> String {
+    static func accessibilityText(_ parts: [MetaPart], locale: Locale = .current) -> String {
         parts.map { part -> String in
             switch part {
             case .pinned: return "Pinned"
             case .due(let text, let overdue, _): return overdue ? text : "Due \(text)"
             case .repeats(let text): return "Repeats \(text.lowercased())"
             case .subtasks(let done, let total): return "\(done) of \(total) subtasks done"
-            case .notes: return "Has notes"
+            case .notes(let words): return "Notes, \(NoteLength.label(words, locale: locale))"
             case .link(let domain, let more):
                 return more > 0 ? "Link to \(domain) and \(more) more" : "Link to \(domain)"
             }

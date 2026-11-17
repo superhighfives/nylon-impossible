@@ -138,7 +138,7 @@ struct MetaChipTests {
     func plain() {
         #expect(MetaPart.due("3 days overdue", overdue: true).chip == nil)
         #expect(MetaPart.subtasks(done: 1, total: 4).chip == nil)
-        #expect(MetaPart.notes.chip == nil)
+        #expect(MetaPart.notes(words: 2).chip == nil)
         #expect(MetaPart.link("visitlisboa.com", more: 2).chip == nil)
     }
 
