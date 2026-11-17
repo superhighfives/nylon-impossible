@@ -477,6 +477,101 @@ struct SyncServiceTests {
         #expect(items[0].urls.first?.title == "Example")
     }
 
+    @Test("Updates a link the device already has with every field the server sends")
+    @MainActor
+    func updatesExistingUrlFields() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        let todoId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        let remoteDate = Date(timeIntervalSince1970: 1700000000)
+
+        func response(_ url: APITodoUrl) -> SyncResponse {
+            SyncResponse(
+                todos: [APITodo(
+                    id: todoId,
+                    userId: "user_test_123",
+                    title: "Task with URL",
+                    notes: nil,
+                    completed: false,
+                    position: "a0",
+                    dueDate: nil,
+                    createdAt: remoteDate,
+                    updatedAt: remoteDate,
+                    urls: [url]
+                )],
+                syncedAt: "2025-06-01T00:00:00.000Z",
+                conflicts: []
+            )
+        }
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        // First sync: the link arrives with its preview showing and no image yet.
+        api.syncResponse = response(APITodoUrl(
+            id: "url-id-1",
+            todoId: todoId,
+            url: "https://example.com",
+            title: "Example",
+            description: nil,
+            siteName: "Example Site",
+            favicon: nil,
+            image: nil,
+            showPreview: true,
+            position: "a0",
+            fetchStatus: .fetched,
+            fetchedAt: remoteDate,
+            createdAt: remoteDate,
+            updatedAt: Date(timeIntervalSince1970: 1700000100)
+        ))
+        await service.sync()
+
+        // Second sync: Show as URL, a fetched image, a new position and address.
+        let changed = APITodoUrl(
+            id: "url-id-1",
+            todoId: todoId,
+            url: "https://example.com/moved",
+            title: "Example",
+            description: nil,
+            siteName: "Example Site",
+            favicon: nil,
+            image: "https://example.com/og.png",
+            showPreview: false,
+            position: "a1",
+            fetchStatus: .fetched,
+            fetchedAt: remoteDate,
+            createdAt: remoteDate,
+            updatedAt: Date(timeIntervalSince1970: 1700000200)
+        )
+        api.syncResponse = response(changed)
+        await service.sync()
+
+        func storedUrl() throws -> TodoUrl? {
+            try context.fetch(FetchDescriptor<TodoItem>()).first?.urls.first
+        }
+
+        let stored = try #require(try storedUrl())
+        #expect(stored.showPreview == false)
+        #expect(stored.image == "https://example.com/og.png")
+        #expect(stored.position == "a1")
+        #expect(stored.updatedAt == changed.updatedAt)
+        #expect(stored.url == "https://example.com/moved")
+
+        // Third sync, identical to the second: nothing reverts.
+        await service.sync()
+
+        let unchanged = try #require(try storedUrl())
+        #expect(try context.fetch(FetchDescriptor<TodoUrl>()).count == 1)
+        #expect(unchanged.showPreview == false)
+        #expect(unchanged.image == "https://example.com/og.png")
+        #expect(unchanged.position == "a1")
+        #expect(unchanged.url == "https://example.com/moved")
+        #expect(unchanged.updatedAt == changed.updatedAt)
+    }
+
     @Test("Sets error state when API throws")
     @MainActor
     func setsErrorStateOnAPIFailure() async throws {

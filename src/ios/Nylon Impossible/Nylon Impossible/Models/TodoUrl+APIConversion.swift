@@ -25,6 +25,24 @@ extension TodoUrl {
             updatedAt: api.updatedAt
         )
     }
+
+    /// Overwrites every field `init(from:)` sets except `id`, so a link the
+    /// device already has ends up the same as a fresh insert. Keep the two in
+    /// step when a field is added.
+    func apply(_ api: APITodoUrl) {
+        url = api.url
+        title = api.title
+        itemDescription = api.description
+        siteName = api.siteName
+        favicon = api.favicon
+        image = api.image
+        showPreview = api.showsPreview
+        position = api.position
+        fetchStatus = api.fetchStatus.rawValue
+        fetchedAt = api.fetchedAt
+        createdAt = api.createdAt
+        updatedAt = api.updatedAt
+    }
 }
 
 extension APITodoUrl {
