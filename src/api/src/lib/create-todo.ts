@@ -68,8 +68,9 @@ export interface CreateSmartTodoResult {
  * Core of the smart-create path, shared by the `POST /todos/smart` REST
  * handler and the Gmail add-on. Given a resolved `userId` and free text, it
  * creates a top-level todo (prepended to its list), extracts + attaches URLs
- * in the background, and pokes connected clients to sync. Keeping this in one place means URL handling, positioning, and
- * `notifySync` behave identically everywhere.
+ * in the background, and pokes connected clients to sync. Keeping this in one
+ * place means URL handling, positioning, and `notifySync` behave identically
+ * everywhere.
  */
 export async function createSmartTodo(
   db: Db,
@@ -122,9 +123,9 @@ export async function createSmartTodo(
 
   // Pre-titled attachments (e.g. a Gmail thread permalink) skip the fetch: the
   // title is already known and the target sits behind auth. Normalize through
-  // the same http/https gate as parsed URLs (a caller-supplied
-  // value is untrusted input, so a `javascript:`/`data:` string can't slip
-  // through to a persisted, clickable link), then dedupe within the group and against the
+  // the same http/https gate as parsed URLs (a caller-supplied value is
+  // untrusted input, so a `javascript:`/`data:` string can't slip through to a
+  // persisted, clickable link), then dedupe within the group and against the
   // fetched set (via a running `Set`) so a URL never lands in both places.
   const seenUrls = new Set(fetchedUrls);
   const attachedUrls = (options.attachedUrls ?? [])
@@ -192,29 +193,34 @@ export async function createSmartTodo(
     ]);
   }
 
-  // Fetch the created todo to return
-  const created = await db
-    .select()
-    .from(todos)
-    .where(eq(todos.id, todoId))
-    .then((rows) => rows[0]);
-  // The links just inserted, so a client can show them before its next sync.
-  const urls =
-    totalUrls > 0
-      ? await db
-          .select()
-          .from(todoUrls)
-          .where(eq(todoUrls.todoId, todoId))
-          .orderBy(todoUrls.position)
-      : [];
-
-  // Fetch metadata for the pending links in the background, then name the todo
-  // after what came back if its title is still the "Check {domain}"
-  // placeholder. Attachments already carry their title and must not be
-  // re-fetched. Started after the read-back above, so the response always
-  // shows the links as inserted.
-  if (pendingLinks.length > 0) {
-    options.waitUntil(finishTodoLinks(db, env, userId, pendingLinks));
+  let created: typeof todos.$inferSelect;
+  let urls: (typeof todoUrls.$inferSelect)[];
+  try {
+    // Fetch the created todo to return
+    created = await db
+      .select()
+      .from(todos)
+      .where(eq(todos.id, todoId))
+      .then((rows) => rows[0]);
+    // The links just inserted, so a client can show them before its next sync.
+    urls =
+      totalUrls > 0
+        ? await db
+            .select()
+            .from(todoUrls)
+            .where(eq(todoUrls.todoId, todoId))
+            .orderBy(todoUrls.position)
+        : [];
+  } finally {
+    // Fetch metadata for the pending links in the background, then name the
+    // todo after what came back if its title is still the "Check {domain}"
+    // placeholder. Attachments already carry their title and must not be
+    // re-fetched. Started after the read-back above, so the response always
+    // shows the links as inserted, but in a `finally` so a failed read-back
+    // can't leave them `pending` for good.
+    if (pendingLinks.length > 0) {
+      options.waitUntil(finishTodoLinks(db, env, userId, pendingLinks));
+    }
   }
 
   Sentry.addBreadcrumb({
