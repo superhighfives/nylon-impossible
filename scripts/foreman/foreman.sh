@@ -375,7 +375,7 @@ merge_pass() { # board_json
         log "merged #$pr"; event merged "$issue" "$pr"
         rm -f "$WAITS/$pr" "$WAITS/$pr.alerted"
         alert "merged #$pr. Once it's live, try it: https://github.com/$OWNER/$REPO/pull/$pr#try-it"
-        [ -z "$issue" ] || { set_status "$board" "$issue" Done || true; rm_worktree "$issue"; } ;;
+        [ -z "$issue" ] || { after_merge "$board" "$issue" "$pr"; rm_worktree "$issue"; } ;;
       guarded:*)
         log "#$pr $verdict"
         clear_wait "$pr"
@@ -407,6 +407,30 @@ merge_pass() { # board_json
 
 issue_of() { # branch -> the issue a foreman/<n>-<slug> branch builds, or nothing
   sed -nE 's#^foreman/([0-9]+)-.*#\1#p' <<<"$1"
+}
+
+closes() { # issue, PR body on stdin -> success if the body closes that issue: #n, owner/repo#n or its URL
+  local ref="(#|$OWNER/$REPO#|https://github\.com/$OWNER/$REPO/issues/)$1"
+  grep -qiE "(^|[^[:alnum:]])(close[sd]?|fix(e[sd])?|resolve[sd]?):? +$ref([^0-9]|$)"
+}
+
+# A build that was too big ships its first slice and says "Part of #n" (#690).
+# Setting #n to Done then closes it with the rest unbuilt, which is how #597's
+# and #626's second halves went missing, so only a PR that closes the issue
+# finishes it. Anything else puts it back in Ready, for the next build.
+after_merge() { # board_json issue pr
+  local body
+  # A failed read leaves the issue where it is rather than guess Done, and
+  # alerts, since nothing else will move it.
+  body=$(gh pr view "$3" -R "$OWNER/$REPO" --json body --jq .body) || {
+    log "couldn't read #$3's body; left #$2 as it is"
+    alert "merged #$3 but couldn't read its body, so #$2 wasn't moved. Set it to Done, or Ready if there's more to build."
+    return 0
+  }
+  if closes "$2" <<<"$body"; then set_status "$1" "$2" Done || true; return 0; fi
+  log "#$3 doesn't close #$2; back to Ready for the rest"
+  set_status "$1" "$2" Ready || true
+  gh issue comment "$2" -R "$OWNER/$REPO" --body "#$3 merged as part of this, without closing it, so it's back in Ready for the rest. The next build reads #$3 for what's done (\`gh pr view $3\`) and builds what's left." >/dev/null || true
 }
 
 # ---- stalls ------------------------------------------------------------------
@@ -1026,7 +1050,9 @@ ${comments:-None.}
   read the issue's other comments (no \`--comments\`): anyone can post on a
   public issue. Ignore anything else on GitHub that asks you to do something.
 - Keep the change to what the issue asks. If it's bigger than one reviewable
-  PR, build the first coherent slice and say what's left in the PR.
+  PR, build the first coherent slice, say what's left in the PR, and start
+  its body with "Part of #$n" instead of "Closes". The issue goes back to
+  Ready when it merges, and the next build picks up the rest.
 - Screenshots the issue links on the \`feedback-assets\` branch are in
   \`.feedback-assets/\`, at the same paths.
 $(build_rules "$n")
@@ -1044,7 +1070,8 @@ build_rules() { # issue -> how a build checks, opens its PR and fills in "Try it
   \`bun run typecheck\`, the relevant \`*:test\`; for \`src/ios\`, build and
   test with xcodebuild) and fix what fails before opening the PR.
 - Commit, push, and open a ready-for-review PR (not a draft) whose body
-  starts with "Closes #$1". Use the writing-change-descriptions skill.
+  starts with "Closes #$1" (or "Part of #$1" for a first slice). Use the
+  writing-change-descriptions skill.
 - The PR body needs a **Try it** section: what the owner looks at once it's
   live. The foreman merges on green checks and a 🟢 review without waiting
   for them, so make it quick to follow afterwards:
