@@ -99,7 +99,7 @@ function canvasBlob(
   return new Promise((resolve, reject) =>
     canvas.toBlob(
       (blob) =>
-        blob ? resolve(blob) : reject(new Error("Couldn't encode image")),
+        blob ? resolve(blob) : reject(new Error("Couldn’t encode image")),
       type,
       quality,
     ),
