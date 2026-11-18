@@ -81,7 +81,7 @@ function CodeBlock({ text, className }: { text: string; className: string }) {
         setCopied(true);
         setOpen(true);
       },
-      (err: unknown) => toast.error(messageFromError(err, "Couldn't copy")),
+      (err: unknown) => toast.error(messageFromError(err, "Couldn’t copy")),
     );
   };
 
