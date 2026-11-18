@@ -7,9 +7,11 @@
  *   case        a capital after the first word that isn't a proper noun
  *               ("Keyboard Shortcuts")
  *
- * Strings come from the web app (JSX text, aria-label, title, placeholder),
- * the Apple apps (Text, Label, Button, .navigationTitle and friends, string
- * catalogs) and the Gmail add-on's cards.
+ * Strings come from the web app (JSX text, string literals in a JSX
+ * expression, aria-label, title, placeholder, and toast messages in `.ts`
+ * and `.tsx`), the Apple apps (Text, Label, Button, .navigationTitle and
+ * friends, toasts, `text:` arguments, string catalogs) and the Gmail
+ * add-on's cards.
  *
  *   node src/shared/copy/lint.mjs            report, always exit 0
  *   node src/shared/copy/lint.mjs --strict   exit 1 on web or Apple findings
@@ -244,13 +246,46 @@ function templateText(node) {
 
 const WEB_ATTRIBUTES = new Set(["aria-label", "title", "placeholder"]);
 
+/** `toast.error("…")` and friends, and `showActionToast("…", …)`. */
+function isToastCall(callee, sf) {
+  const name = callee.getText(sf);
+  return name === "showActionToast" || /^toast\.\w+$/.test(name);
+}
+
+/**
+ * The strings an expression can show: a literal itself, or the literals on
+ * either side of `?:`, `??`, `||` and `&&`. Anything else (a variable, a
+ * call, a comparison's operands) isn't copy.
+ */
+function shownStrings(node) {
+  if (ts.isParenthesizedExpression(node)) return shownStrings(node.expression);
+  if (ts.isConditionalExpression(node)) {
+    return [...shownStrings(node.whenTrue), ...shownStrings(node.whenFalse)];
+  }
+  if (ts.isBinaryExpression(node)) {
+    const op = node.operatorToken.kind;
+    if (
+      op === ts.SyntaxKind.QuestionQuestionToken ||
+      op === ts.SyntaxKind.BarBarToken
+    ) {
+      return [...shownStrings(node.left), ...shownStrings(node.right)];
+    }
+    if (op === ts.SyntaxKind.AmpersandAmpersandToken) {
+      return shownStrings(node.right);
+    }
+    return [];
+  }
+  const text = templateText(node);
+  return text == null ? [] : [{ node, text }];
+}
+
 export function extractJsx(source, fileName = "file.tsx") {
   const sf = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TSX,
+    fileName.endsWith(".ts") ? ts.ScriptKind.TS : ts.ScriptKind.TSX,
   );
   const found = [];
   const add = (node, text) => {
@@ -262,9 +297,19 @@ export function extractJsx(source, fileName = "file.tsx") {
       line: sf.getLineAndCharacterOfPosition(pos).line + 1,
     });
   };
+  const addShown = (node) => {
+    for (const shown of shownStrings(node)) add(shown.node, shown.text);
+  };
   const visit = (node) => {
     if (ts.isJsxText(node)) {
       add(node, node.text);
+    } else if (
+      ts.isJsxExpression(node) &&
+      node.expression &&
+      (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent))
+    ) {
+      // Element content: `{due ? due.text : "Due date"}`
+      addShown(node.expression);
     } else if (
       ts.isJsxAttribute(node) &&
       WEB_ATTRIBUTES.has(node.name.getText(sf)) &&
@@ -275,6 +320,12 @@ export function extractJsx(source, fileName = "file.tsx") {
         : node.initializer;
       const text = init && templateText(init);
       if (text != null) add(init, text);
+    } else if (ts.isCallExpression(node)) {
+      const [first, second] = node.arguments;
+      if (first && isToastCall(node.expression, sf)) addShown(first);
+      if (second && node.expression.getText(sf) === "messageFromError") {
+        addShown(second);
+      }
     }
     ts.forEachChild(node, visit);
   };
@@ -349,9 +400,14 @@ const SWIFT_CALLS = [
   "help",
   "alert",
   "confirmationDialog",
+  // The widget's `message("…")`, and ToastCenter's own `show("…", action:)`
+  "show",
+  "message",
 ];
 const SWIFT_CALL = new RegExp(
-  `(?<![\\w.])\\.?(?:${SWIFT_CALLS.join("|")})\\(\\s*"`,
+  // `actions.toasts.show("…")` too: other calls after a `.` are someone
+  // else's method, not a view
+  `(?:(?<![\\w.])\\.?(?:${SWIFT_CALLS.join("|")})|(?<!\\w)toasts\\.show)\\(\\s*"`,
   "g",
 );
 
@@ -388,17 +444,57 @@ function readSwiftString(source, from) {
   return { text, end: i };
 }
 
-export function extractSwift(source) {
+/**
+ * The string literals in a labelled argument, from just after `label:` to
+ * the `,` or `)` that ends it: `text: pinned ? "Pinned" : "Pin"` gives both.
+ * Literals inside a nested call (`format("%d", n)`) are its arguments, not
+ * what's shown, so they're skipped.
+ */
+function readSwiftArgument(source, from) {
   const found = [];
-  for (const match of source.matchAll(SWIFT_CALL)) {
-    const from = match.index + match[0].length;
-    const { text } = readSwiftString(source, from);
-    const clean = tidy(text);
-    if (!hasLetters(clean)) continue;
-    const line = source.slice(0, from).split("\n").length;
-    found.push({ text: clean, line });
+  let depth = 0;
+  for (let i = from; i < source.length; i++) {
+    const c = source[i];
+    if (c === '"') {
+      const { text, end } = readSwiftString(source, i + 1);
+      if (depth === 0) found.push({ text, at: i + 1 });
+      i = end;
+    } else if (c === "(" || c === "[" || c === "{") {
+      depth++;
+    } else if (c === ")" || c === "]" || c === "}") {
+      if (depth === 0) break;
+      depth--;
+    } else if (c === "," && depth === 0) {
+      break;
+    }
   }
   return found;
+}
+
+const SWIFT_TEXT_ARGUMENT = /(?<![\w.])text:\s*/g;
+
+export function extractSwift(source) {
+  const found = [];
+  const add = (text, from) => {
+    const clean = tidy(text);
+    if (!hasLetters(clean)) return;
+    const line = source.slice(0, from).split("\n").length;
+    found.push({ text: clean, line });
+  };
+  for (const match of source.matchAll(SWIFT_CALL)) {
+    const from = match.index + match[0].length;
+    add(readSwiftString(source, from).text, from);
+  }
+  for (const match of source.matchAll(SWIFT_TEXT_ARGUMENT)) {
+    // A declaration (`text: String`) has no literal before its `,` or `)`
+    for (const { text, at } of readSwiftArgument(
+      source,
+      match.index + match[0].length,
+    )) {
+      add(text, at);
+    }
+  }
+  return found.sort((a, b) => a.line - b.line);
 }
 
 /** A string catalog's keys are its source-language strings. */
@@ -443,7 +539,10 @@ export const SOURCES = [
     files: () =>
       walk(
         join(REPO_ROOT, "src/web/src"),
-        (name) => name.endsWith(".tsx") && !name.includes(".test."),
+        (name) =>
+          /\.tsx?$/.test(name) &&
+          !name.endsWith(".d.ts") &&
+          !name.includes(".test."),
         (name) => name === "__tests__" || name === "test",
       ),
     extract: extractJsx,

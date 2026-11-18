@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { displayTitle, rowMeta } from "@/components/phone/model";
+import { toast } from "@/lib/toast";
 import type { TodoWithUrls } from "@/types/database";
 import {
   useCreateTodo,
   useDeleteTodo,
+  useProcessTodo,
   useSmartCreate,
   useTodos,
   useUpdateTodo,
@@ -456,5 +458,29 @@ describe("useSmartCreate", () => {
     expect(rowMeta(row, [], now, "UTC")).toMatchObject([
       { kind: "link", text: "example.com", fetching: true },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// useProcessTodo
+// ---------------------------------------------------------------------------
+
+describe("useProcessTodo", () => {
+  it("says a todo, not a task, when there are no links", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json({ status: "ok", links: 0 }, { status: 200 }),
+      ),
+    );
+    const info = vi.spyOn(toast, "info");
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useProcessTodo(), {
+      wrapper: Wrapper,
+    });
+    await act(() => result.current.mutateAsync("todo-1"));
+    expect(info).toHaveBeenCalledWith("No links to process on this todo");
+    info.mockRestore();
+    vi.unstubAllGlobals();
   });
 });

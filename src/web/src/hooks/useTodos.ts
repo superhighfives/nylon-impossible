@@ -549,7 +549,7 @@ export function useProcessTodo() {
       queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
       notifyChanged();
       if (result.links === 0) {
-        toast.info("No links to process on this task");
+        toast.info("No links to process on this todo");
       }
     },
     onError: (err) => {

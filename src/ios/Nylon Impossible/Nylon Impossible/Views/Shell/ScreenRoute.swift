@@ -183,6 +183,7 @@ struct ScreenRouteRoot: View {
                 ShareSheetView(url: "https://www.visitlisboa.com/tram-28", lists: lists, onSave: { _ in }, onCancel: {})
             } else {
                 ShareSheetView(
+                    // copy-lint-ignore: three sample todos someone shared, not copy
                     text: "Parmesan\nCoffee beans\nBook the dentist friday",
                     lists: lists,
                     onSave: { _ in },
