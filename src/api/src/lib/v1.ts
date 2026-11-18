@@ -113,6 +113,7 @@ export async function listV1Lists(db: Db, userId: string): Promise<V1List[]> {
 /**
  * One of the user's lists by id, or by alias (`today`, `this-week`,
  * `someday`). Null for an unknown id and for another user's list alike.
+ * List ids are stored lowercase, so the id matches in either case.
  */
 export async function findV1List(
   db: Db,
@@ -127,7 +128,9 @@ export async function findV1List(
     .where(
       and(
         eq(lists.userId, userId),
-        systemKind ? eq(lists.systemKind, systemKind) : eq(lists.id, idOrAlias),
+        systemKind
+          ? eq(lists.systemKind, systemKind)
+          : eq(lists.id, idOrAlias.toLowerCase()),
       ),
     )
     .limit(1);

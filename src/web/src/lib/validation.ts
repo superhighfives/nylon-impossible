@@ -13,13 +13,15 @@ export const recurrenceSchema = z.object({
 // created at runtime) and dashless 32-hex from migration 0023's
 // `lower(hex(randomblob(16)))` (every pre-existing user's system lists). A
 // plain `.uuid()` check rejects the latter, which broke per-column create and
-// cross-list drag for migrated accounts.
+// cross-list drag for migrated accounts. Either case passes, and the output is
+// lowercased, because list ids are stored and looked up lowercase (#705).
 export const listIdSchema = z
   .string()
   .regex(
     /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[0-9a-f]{32})$/i,
     "Invalid list id",
-  );
+  )
+  .transform((id) => id.toLowerCase());
 
 export const createTodoSchema = z.object({
   title: z
