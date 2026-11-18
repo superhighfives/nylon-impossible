@@ -49,6 +49,7 @@ CF_ACCOUNT_ID="${FOREMAN_CF_ACCOUNT_ID:-1f12960834ae2c36ac08812df07167c2}" # Clo
 # board at any time, so each run reads which one it has (spec_column).
 SPEC_COL="Specced" SPEC_OLD="Specced"
 KINDS="feature fix refactor a11y test chore" # the kind:* labels
+WAITING_LABEL="waiting-on-owner" # derived each tick by waiting_pass; the owner never sets it
 
 HOME_DIR="${FOREMAN_HOME:-$HOME/.foreman}"
 CLONE="$HOME_DIR/repo"
@@ -181,7 +182,7 @@ board_json() { # every item, in board order, with status and issue details
           status: fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
           content { __typename
             ... on Issue { number title state author { login } labels(first: 20) { nodes { name } } }
-            ... on PullRequest { number state }
+            ... on PullRequest { number state headRefName }
             ... on DraftIssue { title body }
           }
         } }
@@ -2094,6 +2095,122 @@ $(norm_title <<<"$title")"
   [ "${#filed[@]}" = 0 ] || alert "the scout added ${#filed[@]} draft item(s) to Ideas"
 }
 
+# ---- waiting on the owner ---------------------------------------------------
+# One list of what only the owner can move, which the digest prints and
+# waiting_pass mirrors in the waiting-on-owner label, so the board can filter
+# to it. The label is derived each tick, never remembered: whatever ends a
+# wait (removing needs-decision, a reply, a merge) happens outside the foreman.
+
+owner_waits() { # board_json -> "<i|p><n to label, or ->\t#<n> <title>: <why>" per wait; non-zero if any read failed
+  local board="$1" status=0 issues nd om n title body problems last seen
+  # Labels can only be set by people with write access, so they're trusted as
+  # they are. A PR's wait goes on its issue, which is what the board tracks;
+  # the dependency bundle has none, so it carries the label itself.
+  issues=$(gh issue list -R "$OWNER/$REPO" --state open --label needs-decision --limit 100 --json number,title) || { status=1; issues='[]'; }
+  nd=$(gh pr list -R "$OWNER/$REPO" --state open --label needs-decision --limit 100 --json number,title,headRefName,author) || { status=1; nd='[]'; }
+  om=$(gh pr list -R "$OWNER/$REPO" --state open --label owner-merge --limit 100 --json number,title,headRefName,author) || { status=1; om='[]'; }
+  jq -r '.[] | "i\(.number)\t#\(.number) \(.title): needs your decision"' <<<"$issues"
+  local pr_target='def ours: .author.login? as $a | $a == $owner or $a == $agent;
+    def target: (.headRefName // "") as $b
+      | if ours and ($b | test("^foreman/[0-9]+-")) then "i" + ($b | capture("^foreman/(?<n>[0-9]+)-").n)
+        elif $deps and ours and ($b | startswith("foreman/deps-")) then "p\(.number)"
+        else "-" end;'
+  jq -r --arg owner "$OWNER" --arg agent "$AGENT" --argjson deps false \
+    "$pr_target"' .[] | "\(target)\t#\(.number) \(.title): needs your decision"' <<<"$nd"
+  jq -r --arg owner "$OWNER" --arg agent "$AGENT" --argjson deps true \
+    "$pr_target"' .[] | "\(target)\t#\(.number) \(.title): yours to merge"' <<<"$om"
+  # Specs with open questions, unless needs-decision already listed them, once
+  # the foreman has answered the owner's latest reply: settle_pass's test. A
+  # spec with no Open questions section hasn't been drafted yet, so it's the
+  # foreman's turn, not the owner's.
+  while IFS=$'\t' read -r n title; do
+    [ -n "$n" ] || continue
+    body=$(gh issue view "$n" -R "$OWNER/$REPO" --json body --jq .body) || { status=1; continue; }
+    # Not piped into grep -q: under pipefail, its early exit would fail the pipe.
+    problems=$(spec_problems "" <<<"$body")
+    grep -qxF "\"## Open questions\" doesn't read \"None.\"" <<<"$problems" || continue
+    last=$(owner_last_comment "$n") || { status=1; continue; }
+    seen=$(cat "$SPECS/$n" 2>/dev/null || true)
+    [ "$seen" = "$last" ] || continue
+    printf 'i%s\t#%s %s: its spec has questions for you\n' "$n" "$n" "$title"
+  done < <(jq -r --arg owner "$OWNER" --arg agent "$AGENT" --arg col "$SPEC_COL" '
+    .items.nodes[]
+    | select(.status.name == $col and .content.__typename == "Issue" and .content.state == "OPEN")
+    | select(.content.author.login == $owner or .content.author.login == $agent)
+    | select([.content.labels.nodes[].name] | index("spec") and (index("needs-decision") | not))
+    | "\(.content.number)\t\(.content.title)"' <<<"$board")
+  return "$status"
+}
+
+labelled_waiting() { # -> "i<n>" or "p<n>" per issue or PR carrying $WAITING_LABEL, open or closed; non-zero if GitHub can't be read
+  local issues prs
+  issues=$(gh issue list -R "$OWNER/$REPO" --state all --label "$WAITING_LABEL" --limit 200 --json number --jq '.[] | "i\(.number)"') || return 1
+  prs=$(gh pr list -R "$OWNER/$REPO" --state all --label "$WAITING_LABEL" --limit 200 --json number --jq '.[] | "p\(.number)"') || return 1
+  printf '%s\n%s\n' "$issues" "$prs" | grep . || true
+}
+
+ensure_waiting_label() { # -> 0 once the repo has $WAITING_LABEL, creating it the first time
+  [ -e "$ONCE/label-$WAITING_LABEL" ] && return 0
+  local names
+  names=$(gh label list -R "$OWNER/$REPO" --search "$WAITING_LABEL" --limit 100 --json name --jq '.[].name') || return 1
+  if ! grep -qxF "$WAITING_LABEL" <<<"$names"; then
+    gh label create "$WAITING_LABEL" -R "$OWNER/$REPO" --color FBCA04 \
+      --description "Set by the foreman: the next step is the owner's" >/dev/null || return 1
+    log "created the $WAITING_LABEL label"
+  fi
+  mkdir -p "$ONCE" && touch "$ONCE/label-$WAITING_LABEL"
+}
+
+# The dependency bundle isn't an issue, so it isn't on the board until it
+# waits on the owner: then it goes in In review, and to Done once it's merged
+# or closed.
+bundle_board() { # board_json targets -> adds each waiting bundle (p<n>) to the board; moves closed bundles to Done
+  local board="$1" n item
+  while read -r n; do
+    [ -n "$n" ] || continue
+    jq -e --argjson n "$n" '.items.nodes[] | select(.content.__typename == "PullRequest" and .content.number == $n)' <<<"$board" >/dev/null && continue
+    if dry; then log "would add #$n to the board in In review"; continue; fi
+    item=$(gh project item-add "$PROJECT" --owner "$OWNER" --url "https://github.com/$OWNER/$REPO/pull/$n" --format json --jq .id) \
+      || { log "couldn't add #$n to the board"; continue; }
+    set_item_status "$board" "$item" "In review" && log "added #$n to the board in In review"
+  done < <(sed -n 's/^p//p' <<<"$2")
+  while IFS=$'\t' read -r item n; do
+    [ -n "$item" ] || continue
+    if dry; then log "would set #$n to Done"; continue; fi
+    set_item_status "$board" "$item" Done && log "#$n is closed; set it to Done"
+  done < <(jq -r '.items.nodes[]
+    | select(.content.__typename == "PullRequest" and (.content.headRefName // "" | startswith("foreman/deps-")))
+    | select(.content.state != "OPEN" and .status.name? != "Done")
+    | "\(.id)\t\(.content.number)"' <<<"$board")
+}
+
+edit_waiting() { # i<n>|p<n> add|remove -> one label edit, on the issue or the PR
+  local n="${1#?}" cmd="issue"
+  [ "${1:0:1}" = p ] && cmd="pr"
+  gh "$cmd" edit "$n" -R "$OWNER/$REPO" "--$2-label" "$WAITING_LABEL" >/dev/null
+}
+
+waiting_pass() { # board_json -> $WAITING_LABEL on exactly what owner_waits lists; no label changes if a read fails
+  local board="$1" waits have want t can_add=1
+  # A partial picture would strip the label from things still waiting.
+  waits=$(owner_waits "$board") || { log "couldn't read everything that waits on the owner; no $WAITING_LABEL changes this tick"; return 0; }
+  have=$(labelled_waiting) || { log "couldn't list what has $WAITING_LABEL; no changes this tick"; return 0; }
+  want=$(cut -f1 <<<"$waits" | grep -v '^-$' | grep . | sort -u || true)
+  bundle_board "$board" "$want"
+  for t in $want; do
+    grep -qxF "$t" <<<"$have" && continue
+    if dry; then log "would label #${t#?} $WAITING_LABEL"; continue; fi
+    [ "$can_add" = 1 ] && ! ensure_waiting_label && { can_add=0; log "couldn't make sure the $WAITING_LABEL label exists"; }
+    [ "$can_add" = 1 ] || continue
+    if edit_waiting "$t" add; then log "labelled #${t#?} $WAITING_LABEL"; else log "couldn't label #${t#?} $WAITING_LABEL"; fi
+  done
+  for t in $have; do
+    grep -qxF "$t" <<<"$want" && continue
+    if dry; then log "would unlabel #${t#?} $WAITING_LABEL"; continue; fi
+    if edit_waiting "$t" remove; then log "unlabelled #${t#?} $WAITING_LABEL"; else log "couldn't unlabel #${t#?} $WAITING_LABEL"; fi
+  done
+}
+
 # ---- the digest ----
 # Shell only: events.jsonl and GitHub's own fields, so nothing on GitHub can
 # steer what it says. The last 24 hours, in four sections.
@@ -2132,24 +2249,7 @@ digest_merged() { # since-epoch -> "- " lines: PRs merged since then, with their
 }
 
 digest_waiting() { # board_json -> "- " lines: what's waiting on the owner
-  local board="$1" n title body
-  {
-    gh issue list -R "$OWNER/$REPO" --state open --label needs-decision --limit 100 --json number,title
-    gh pr list -R "$OWNER/$REPO" --state open --label needs-decision --limit 100 --json number,title
-  } | jq -r '.[] | "- #\(.number) \(.title): needs your decision"'
-  gh pr list -R "$OWNER/$REPO" --state open --label owner-merge --limit 100 --json number,title \
-    --jq '.[] | "- #\(.number) \(.title): yours to merge"'
-  # Specs with open questions, unless needs-decision already listed them.
-  while IFS=$'\t' read -r n title; do
-    [ -n "$n" ] || continue
-    body=$(gh issue view "$n" -R "$OWNER/$REPO" --json body --jq .body 2>/dev/null) || continue
-    spec_problems "" <<<"$body" | grep -qF '"## Open questions"' && echo "- #$n $title: its spec has questions for you"
-  done < <(jq -r --arg owner "$OWNER" --arg agent "$AGENT" --arg col "$SPEC_COL" '
-    .items.nodes[]
-    | select(.status.name == $col and .content.__typename == "Issue" and .content.state == "OPEN")
-    | select(.content.author.login == $owner or .content.author.login == $agent)
-    | select([.content.labels.nodes[].name] | index("spec") and (index("needs-decision") | not))
-    | "\(.content.number)\t\(.content.title)"' <<<"$board")
+  owner_waits "$1" | cut -f2- | sed 's/^/- /'
 }
 
 digest_date() { perl -MPOSIX=strftime -e 'print strftime("%A %-d %B", localtime shift), "\n"' "$(now)"; } # "Thursday 5 November"
@@ -2330,6 +2430,8 @@ cmd_tick() {
   spec_pass "$board"
   routines_pass "$board"
   shots_pass
+  # Before the PR limit: the tick returns early once it builds or triages.
+  waiting_pass "$board"
 
   local open; open=$(agent_pr_count)
   if [ "$open" -ge "$MAX_AGENT_PRS" ]; then log "$open agent PRs open; not starting another"; return 0; fi

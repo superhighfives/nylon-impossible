@@ -1439,12 +1439,14 @@ gh() { # applies --jq itself, like gh
       case "$*" in *"--state merged"*) out="$D_MERGED" ;; *owner-merge*) out="$D_OM" ;; *) out='[]' ;; esac ;;
     "issue list")
       case "$*" in *needs-decision*) out="$D_ND" ;; *) out='[]' ;; esac ;;
-    "issue view") out=$(jq -cn --arg b "${SPEC_OK/None./1. Retry?}" '{body:$b}') ;;
+    "issue view") out=$(jq -cn --arg b "${D_BODY:-${SPEC_OK/None./1. Retry?}}" '{body:$b}') ;;
     *) return 0 ;;
   esac
   if [ -n "$jqf" ]; then jq -r "$jqf" <<<"$out"; else echo "$out"; fi
 }
 TOKEN_CODE=0
+# #51 is the Sentry sweep's: filed with its questions, and marked as answered (0).
+mkdir -p "$SPECS"; echo 0 > "$SPECS/51"
 body=$(digest_body "$DIGEST_BOARD")
 expect "four sections"                         "### Merged|### Waiting on you|### Found|### Problems"  "$(grep '^### ' <<<"$body" | paste -sd'|' -)"
 expect "merged in the last day, with issues"   "- #143 Fix save (#43, #44)"  "$(sed -n '/### Merged/,/###/p' <<<"$body" | grep '^- ')"
@@ -1452,6 +1454,9 @@ expect "waiting: decisions, merges and specs"  "- #52 Pick a colour: needs your 
   "$(sed -n '/### Waiting on you/,/### Found/p' <<<"$body" | grep '^- ' | paste -sd'|' -)"
 expect "the same on a Define board"            "- #51 Crash on save: its spec has questions for you" \
   "$(on_board "$(define "$DIGEST_BOARD")" digest_waiting "$(define "$DIGEST_BOARD")" | grep spec)"
+# A spec the foreman hasn't drafted has no Open questions section: its turn, not the owner's.
+expect "a never-drafted spec isn't waiting on the owner" "" \
+  "$(D_BODY="${SPEC_OK/'## Open questions'/'## Questions'}" digest_waiting "$DIGEST_BOARD" | grep spec)"
 
 # The HTML part: escaped, then linked, so a title can't add markup.
 html=$(printf '%s\n' '**Sunday 1 November**: the last 24 hours.' '' '### Merged' '' '- #143 Use <b> & </b> (#43)' '' '### Found' '' 'None.' | digest_html)
@@ -1536,6 +1541,133 @@ routine_digest "$EMPTY_BOARD" >/dev/null
 expect "so no email"                           no   "$(called 'curl ')"
 expect "and no alert"                          no   "$(called 'alert ')"
 expect "it logs nothing to say"                "digest ok nothing to say"  "$(digest_ok)"
+
+echo "waiting on the owner"
+
+# gh, stubbed: W_* are what each list returns (gh applies --jq itself), the
+# spec bodies and the owner's comments are files per issue, and W_FAIL makes
+# any call matching it fail.
+W_ISSUES='[]' W_ND='[]' W_OM='[]' W_HAVE_I='[]' W_HAVE_P='[]' W_LABELS='[{"name":"waiting-on-owner"}]' W_FAIL=""
+gh() {
+  local out jqf="" prev="" a n
+  for a in "$@"; do [ "$prev" = --jq ] && jqf="$a"; prev="$a"; done
+  echo "gh $*" >> "$CALLS"
+  if [ -n "$W_FAIL" ]; then case "$*" in *$W_FAIL*) return 1 ;; esac; fi
+  case "$1 $2" in
+    "issue list") case "$*" in *needs-decision*) out="$W_ISSUES" ;; *waiting-on-owner*) out="$W_HAVE_I" ;; *) out='[]' ;; esac ;;
+    "pr list")
+      case "$*" in *needs-decision*) out="$W_ND" ;; *owner-merge*) out="$W_OM" ;; *waiting-on-owner*) out="$W_HAVE_P" ;; *) out='[]' ;; esac ;;
+    "issue view") out=$(jq -cn --arg b "$(cat "$tmp/wbody-$3" 2>/dev/null)" '{body:$b}') ;;
+    api\ repos/*) n=$(sed -E 's#.*/issues/([0-9]+)/comments#\1#' <<<"$2"); out=$(cat "$tmp/wcomments-$n" 2>/dev/null || echo '[]') ;;
+    "label list") out="$W_LABELS" ;;
+    "project item-add") out='{"id":"PVTI_new"}' ;;
+    *) return 0 ;;
+  esac
+  if [ -n "$jqf" ]; then jq -r "$jqf" <<<"$out"; else echo "$out"; fi
+}
+W_BOARD='{"id":"P","field":{"id":"F","options":[{"id":"o-define","name":"Define"},{"id":"o-ready","name":"Ready"},{"id":"o-review","name":"In review"},{"id":"o-done","name":"Done"}]},"items":{"nodes":[
+  {"id":"I61","status":{"name":"Define"},"content":{"__typename":"Issue","number":61,"title":"Answered","state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"spec"}]}}},
+  {"id":"I62","status":{"name":"Define"},"content":{"__typename":"Issue","number":62,"title":"Replied","state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"spec"}]}}},
+  {"id":"I63","status":{"name":"Define"},"content":{"__typename":"Issue","number":63,"title":"Undrafted","state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"spec"}]}}},
+  {"id":"I64","status":{"name":"Define"},"content":{"__typename":"Issue","number":64,"title":"Settled","state":"OPEN","author":{"login":"superhighfives"},"labels":{"nodes":[{"name":"spec"}]}}},
+  {"id":"I65","status":{"name":"Define"},"content":{"__typename":"Issue","number":65,"title":"Sentry","state":"OPEN","author":{"login":"nylon-foreman"},"labels":{"nodes":[{"name":"spec"}]}}},
+  {"id":"I66","status":{"name":"Define"},"content":{"__typename":"Issue","number":66,"title":"Stranger","state":"OPEN","author":{"login":"stranger"},"labels":{"nodes":[{"name":"spec"}]}}}
+]}}'
+OPEN_SPEC="${SPEC_OK/None./1. Which colour?}"
+for n in 61 62 65 66; do echo "$OPEN_SPEC" > "$tmp/wbody-$n"; done
+echo "${OPEN_SPEC/'## Open questions'/'## Questions'}" > "$tmp/wbody-63"
+echo "$SPEC_OK" > "$tmp/wbody-64"
+comments() { jq -cn --args '[$ARGS.positional[] | {id:(.|tonumber), user:{login:"superhighfives"}}]' "$@"; }
+comments 700 > "$tmp/wcomments-61"; comments 700 701 > "$tmp/wcomments-62"; comments 700 > "$tmp/wcomments-64"
+rm -rf "$SPECS" "$ONCE"; mkdir -p "$SPECS"
+echo 700 > "$SPECS/61"; echo 700 > "$SPECS/62"; echo 700 > "$SPECS/64"; echo 0 > "$SPECS/65"; echo 0 > "$SPECS/66"
+spec_column "$W_BOARD"
+targets() { owner_waits "$W_BOARD" | cut -f1 | paste -sd' ' -; }
+expect "specs: answered, and filed with questions; not a reply, an undraft, None. or a stranger's"  "i61 i65"  "$(targets)"
+W_ISSUES='[{"number":70,"title":"Build stopped"}]'
+W_ND='[{"number":171,"title":"Rounds out","headRefName":"foreman/71-x","author":{"login":"nylon-foreman"}}]'
+W_OM='[{"number":172,"title":"Guarded","headRefName":"foreman/72-y","author":{"login":"nylon-foreman"}},
+  {"number":173,"title":"Bundle","headRefName":"foreman/deps-2026-11-01","author":{"login":"nylon-foreman"}},
+  {"number":174,"title":"Theirs","headRefName":"foreman/74-z","author":{"login":"stranger"}}]'
+expect "an issue's needs-decision, a PR's on its issue, owner-merge on its issue, the bundle itself" \
+  "i70 i71 i72 p173 - i61 i65"  "$(targets)"
+expect "the digest's lines come from the same list" \
+  "- #70 Build stopped: needs your decision|- #171 Rounds out: needs your decision|- #172 Guarded: yours to merge|- #173 Bundle: yours to merge|- #174 Theirs: yours to merge|- #61 Answered: its spec has questions for you|- #65 Sentry: its spec has questions for you" \
+  "$(digest_waiting "$W_BOARD" | paste -sd'|' -)"
+
+edits() { grep -oE 'gh (issue|pr) edit [0-9]+ .*--(add|remove)-label waiting-on-owner' "$CALLS" | sed -E 's/ -R [^ ]+//; s/^gh //' | paste -sd'|' -; }
+: > "$CALLS"; W_HAVE_I='[{"number":61},{"number":80}]' W_HAVE_P='[]'
+waiting_pass "$W_BOARD" >/dev/null
+expect "missing ones are labelled, the rest unlabelled" \
+  "issue edit 65 --add-label waiting-on-owner|issue edit 70 --add-label waiting-on-owner|issue edit 71 --add-label waiting-on-owner|issue edit 72 --add-label waiting-on-owner|pr edit 173 --add-label waiting-on-owner|issue edit 80 --remove-label waiting-on-owner" \
+  "$(edits)"
+expect "the waiting bundle goes on the board, in In review" "yes yes" \
+  "$(called 'project item-add 1 --owner superhighfives --url https://github.com/superhighfives/nylon-impossible/pull/173') $(called '--id PVTI_new --field-id F --single-select-option-id o-review')"
+expect "a stranger's foreman/ PR labels nothing" no "$(called 'edit 74 ')"
+expect "the label already exists, so it isn't created" no "$(called 'label create')"
+
+# needs-decision comes off #70, #71's PR closes, #172 loses owner-merge, the bundle merges.
+: > "$CALLS"; W_ISSUES='[]' W_ND='[]' W_OM='[]'
+W_HAVE_I='[{"number":61},{"number":65},{"number":70},{"number":71},{"number":72}]' W_HAVE_P='[{"number":173}]'
+CLOSED_BOARD=$(jq -c '.items.nodes += [{id:"I173", status:{name:"In review"}, content:{__typename:"PullRequest", number:173, state:"MERGED", headRefName:"foreman/deps-2026-11-01"}},
+  {id:"I175", status:{name:"In review"}, content:{__typename:"PullRequest", number:175, state:"CLOSED", headRefName:"foreman/75-x"}}]' <<<"$W_BOARD")
+waiting_pass "$CLOSED_BOARD" >/dev/null
+expect "once they've acted, the label comes off" \
+  "issue edit 70 --remove-label waiting-on-owner|issue edit 71 --remove-label waiting-on-owner|issue edit 72 --remove-label waiting-on-owner|pr edit 173 --remove-label waiting-on-owner" \
+  "$(edits)"
+expect "a merged bundle goes to Done, and nothing else moves" "yes 1 no" \
+  "$(called '--id I173 --field-id F --single-select-option-id o-done') $(grep -c 'project item-edit' "$CALLS") $(called 'project item-add')"
+
+: > "$CALLS"; W_OM='[{"number":176,"title":"Bundle","headRefName":"foreman/deps-2026-11-08","author":{"login":"nylon-foreman"}}]' W_HAVE_I='[{"number":61},{"number":65}]' W_HAVE_P='[]'
+W_ND='[{"number":177,"title":"Bundle","headRefName":"foreman/deps-2026-11-08","author":{"login":"nylon-foreman"}}]'
+waiting_pass "$W_BOARD" >/dev/null
+expect "a bundle with owner-merge is labelled; needs-decision alone isn't enough" "pr edit 176 --add-label waiting-on-owner" "$(edits)"
+: > "$CALLS"; W_OM='[]' W_ND='[]'
+waiting_pass "$W_BOARD" >/dev/null
+expect "one without owner-merge gets neither the label nor the board" "| no" "$(edits)| $(called 'project item-')"
+
+# A stall is timed in $WAITS, not labelled: only the labels count.
+: > "$CALLS"; mkdir -p "$WAITS"; printf '%s\n%s\n%s\n' 1 abc "checks pending" > "$WAITS/178"
+waiting_pass "$W_BOARD" >/dev/null
+expect "a stalled PR without either label puts nothing on its issue" "" "$(edits)"
+
+# The spec rule, through the pass: a reply takes it off, the next answer puts it back.
+: > "$CALLS"; comments 700 702 > "$tmp/wcomments-61"
+waiting_pass "$W_BOARD" >/dev/null
+expect "the owner replies on a spec: the foreman's turn, so it comes off" "issue edit 61 --remove-label waiting-on-owner" "$(edits)"
+: > "$CALLS"; echo 702 > "$SPECS/61"; W_HAVE_I='[{"number":65}]'
+waiting_pass "$W_BOARD" >/dev/null
+expect "answered, and still asking: back on" "issue edit 61 --add-label waiting-on-owner" "$(edits)"
+W_HAVE_I='[{"number":61},{"number":65}]'
+
+# Any read that fails: nothing changes.
+W_ISSUES='[{"number":70,"title":"Build stopped"}]' W_HAVE_I='[{"number":61},{"number":80}]'
+for f in "issue list -R superhighfives/nylon-impossible --state open --label needs-decision" "--label needs-decision --limit 100 --json number,title,headRefName" \
+         "--label owner-merge" "issue view 61" "issues/61/comments" "--state all --label waiting-on-owner"; do
+  : > "$CALLS"; W_FAIL="$f"
+  waiting_pass "$W_BOARD" >/dev/null
+  expect "a failed read ($f) changes no labels" "" "$(edits)"
+done
+W_FAIL=""
+
+# Dry runs only say what they'd do.
+: > "$CALLS"; W_OM='[{"number":173,"title":"Bundle","headRefName":"foreman/deps-2026-11-01","author":{"login":"nylon-foreman"}}]'
+out=$(DRY=1 waiting_pass "$CLOSED_BOARD" | sed -E 's/^[0-9-]+ [0-9:]+ //' | paste -sd'|' -)
+expect "the dry run logs its changes" "would label #65 waiting-on-owner|would label #70 waiting-on-owner|would label #173 waiting-on-owner|would unlabel #80 waiting-on-owner" \
+  "$(grep -oE 'would (un)?label #[0-9]+ waiting-on-owner' <<<"${out//|/$'\n'}" | paste -sd'|' -)"
+expect "and the bundle's Done" "yes" "$(grep -qF 'would set #173 to Done' <<<"$out" && echo yes || echo no)"
+expect "and edits nothing" "no no no" "$(called ' edit ') $(called 'item-') $(called 'label create')"
+
+# A repo without the label: created once, then just used.
+: > "$CALLS"; rm -rf "$ONCE"; W_LABELS='[]' W_OM='[]' W_HAVE_I='[{"number":61},{"number":65}]'
+waiting_pass "$W_BOARD" >/dev/null
+expect "a missing label is created before the first edit" \
+  "gh label create waiting-on-owner -R superhighfives/nylon-impossible --color FBCA04 --description Set by the foreman: the next step is the owner's" \
+  "$(grep 'label create' "$CALLS")"
+expect "and the edit follows" "issue edit 70 --add-label waiting-on-owner" "$(edits)"
+: > "$CALLS"; W_LABELS='[{"name":"waiting-on-owner"}]'
+waiting_pass "$W_BOARD" >/dev/null
+expect "only once" "no no" "$(called 'label create') $(called 'label list')"
 
 echo
 echo "$pass passed, $fail failed"

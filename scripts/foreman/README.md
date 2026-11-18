@@ -35,10 +35,13 @@ Each tick:
    revise at most one spec (below).
 4. **Routines.** Run the routines that are due: the shell ones, and at most
    one model-driven one (below).
-5. **Feedback.** If fewer than 5 agent PRs (`foreman/*` and `feedback/*`) are open, triage
+5. **Waiting on you.** Put `waiting-on-owner` on exactly what's waiting on
+   the owner, and take it off everything else (below). This runs before the
+   PR limit, so it happens every tick.
+6. **Feedback.** If fewer than 5 agent PRs (`foreman/*` and `feedback/*`) are open, triage
    the oldest new feedback report the owner has cleared (below), and stop
    there: a report goes ahead of Ready items.
-6. **Build.** Otherwise, if fewer than 5 agent PRs are open, take the first
+7. **Build.** Otherwise, if fewer than 5 agent PRs are open, take the first
    **Ready** issue in board order whose spec passes the check (below), and
    build it.
    - It runs headless `claude` in a fresh worktree, with the issue body and
@@ -177,6 +180,40 @@ Each PR keeps its **Try it** section for that, and the merge alert links to
 it. What's wrong is reverted or fixed forward (CLAUDE.md, "Rolling back").
 A leftover `verified` label on an old PR changes nothing.
 
+## Waiting on you
+
+The `waiting-on-owner` label marks every issue whose next step is the
+owner's, so the board's **Waiting on you** view (a board grouped by Status,
+filtered to `label:waiting-on-owner is:open`) is one place to see them, each
+in its real column. The foreman sets it and the owner never does: each tick,
+`waiting_pass` works the list out again from GitHub and the board
+(`owner_waits`), labels what's missing and unlabels what no longer applies,
+closed issues included. Nothing remembers it, so whatever ends a wait
+(removing `needs-decision`, replying on a spec, merging a PR) takes the label
+off on the next tick.
+
+What counts:
+
+| Waiting | Labelled |
+| --- | --- |
+| An open issue with `needs-decision` (a build or triage that stopped, a feedback spec with questions) | the issue |
+| An open `foreman/<n>-*` PR with `needs-decision` or `owner-merge` | `#n` |
+| An open `foreman/deps-*` PR with `owner-merge` (a dependency bundle that touches a guarded area) | the PR. It's added to the board in In review, and set to Done once it merges or closes |
+| A spec in Define whose Open questions aren't "None.", once the foreman has answered the owner's latest comment (`settle_pass`'s test) | the issue |
+
+A spec with no Open questions section hasn't been drafted yet, and one with an
+unanswered reply is waiting on the foreman, so neither counts. Nor does a
+stalled PR (below): that's usually CI or the review bot. Only PRs by the owner
+or `nylon-foreman` label an issue.
+
+`needs-decision` keeps its job as the "go again" switch for builds, triage and
+review rounds; `waiting-on-owner` only summarises it. If any read fails, the
+pass changes no labels that tick, since a partial list would strip them from
+things still waiting. The first time it has something to label, the foreman
+creates the label if the repo doesn't have it. `tick --dry-run` logs `would
+label` and `would unlabel` instead. The digest's "Waiting on you" section
+prints the same list.
+
 ## Stalls
 
 Most of the gate's `wait:` reasons have no action in the merge pass, so a PR
@@ -307,8 +344,8 @@ first run, old `shepherd-<pr>` worktrees keep working, and `shepherd` still
 works as its name in the off switches.
 
 **The digest** is `jq` over the last 24 hours of `events.jsonl`, plus `gh`
-queries for merged PRs, `needs-decision`, `owner-merge`, specs in Define whose
-open questions aren't "None.", `~/.foreman/verify/`, and `~/.foreman/waits/`
+queries for merged PRs, what's waiting on you (`owner_waits`, above),
+`~/.foreman/verify/`, and `~/.foreman/waits/`
 for open stalls. It emails the result through Cloudflare Email Sending's
 REST API, from `Nylon foreman <foreman@superhighfives.com>` to
 `hi@charliegleason.com`, with the subject `Nylon digest: <Weekday> <d>
@@ -385,8 +422,9 @@ feedback intake (whose `auto-fix` counts) and triage's outcomes, the shots'
 place in the PR body and their push to `feedback-assets`, the token's
 expiry, and the routines: schedules either side of each time, the off
 switches and pause, the PR limit, the Sentry and scout filing rules, the
-dispatch, retaking shots after a push, closing superseded dependabot PRs, and the digest's sections from
-a fixture `events.jsonl`. CI runs it whenever `scripts/foreman/` changes.
+dispatch, retaking shots after a push, closing superseded dependabot PRs, the
+`waiting-on-owner` label, and the digest's sections from a fixture
+`events.jsonl`. CI runs it whenever `scripts/foreman/` changes.
 
 ## What it trusts
 

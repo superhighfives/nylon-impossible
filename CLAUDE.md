@@ -161,6 +161,13 @@ the source of truth:
   like any other. `feedback-flow` skill.
 - `needs-decision` on an issue or PR means it's waiting on the owner. Leave a
   comment that says exactly what the decision is.
+- `waiting-on-owner` sits beside it: the foreman puts it on every issue
+  whose next step is the owner's (a `needs-decision` issue, the issue behind
+  a PR with `needs-decision` or `owner-merge`, a spec with questions for the
+  owner) and takes it off once they've acted. It's derived each tick, so
+  nobody sets or removes it by hand. The board's **Waiting on you** view
+  filters to it, grouped by Status (`scripts/foreman/README.md`, "Waiting on
+  you").
 - **The agents have their own GitHub account,** `nylon-foreman`. The
   foreman, its review rounds and its merges act as it; local sessions act as
   the owner. Its comments count alongside the owner's, `control-room-review`
