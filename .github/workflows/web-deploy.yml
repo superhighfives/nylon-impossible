@@ -441,7 +441,7 @@ jobs:
         run: bunx playwright install chromium --with-deps
 
       - name: Download preview URLs
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: preview-urls
           path: ${{ runner.temp }}
