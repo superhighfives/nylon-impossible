@@ -1152,7 +1152,14 @@ retry_run() { # kind issue pr dir log status session-id outcome-command... -> re
   RUN_EXIT="exit $status" RUN_LOGS="\`$first\`"
   shift 7
   [ "$status" != 142 ] || return 0
-  "$@" && return 0
+  # An outcome check that couldn't ask GitHub (2) isn't "nothing": resuming a
+  # run that did finish could push or comment twice, so that one isn't retried.
+  local got=0; "$@" || got=$?
+  case "$got" in
+    1) ;;
+    0) return 0 ;;
+    *) log "$kind ${pr:+#$pr }${issue:+for #$issue }ended (exit $status), but its outcome couldn't be checked; not resuming it"; return 0 ;;
+  esac
   retry="${first%.log}-retry.log"
   log "$kind ${pr:+#$pr }${issue:+for #$issue }ended with nothing (exit $status); resuming it once"
   event retried "$issue" "$pr" "$kind, exit $status"
@@ -1160,23 +1167,38 @@ retry_run() { # kind issue pr dir log status session-id outcome-command... -> re
   RUN_EXIT="exit $status, then $rs on the retry" RUN_LOGS="\`$first\` and \`$retry\`"
 }
 
+# The outcome checks below: 0 yes, 1 no, 2 GitHub couldn't be asked.
 issue_labelled() { # issue label
-  gh issue view "$1" -R "$OWNER/$REPO" --json labels --jq "[.labels[].name] | index(\"$2\")" | grep -q '[0-9]'
+  local i; i=$(gh issue view "$1" -R "$OWNER/$REPO" --json labels --jq "[.labels[].name] | index(\"$2\")") || return 2
+  grep -q '[0-9]' <<<"$i"
 }
 
 has_open_pr() { # branch
-  gh pr list -R "$OWNER/$REPO" --state open --head "$1" --json number --jq '.[0].number // empty' | grep -q .
+  local n; n=$(gh pr list -R "$OWNER/$REPO" --state open --head "$1" --json number --jq '.[0].number // empty') || return 2
+  [ -n "$n" ]
 }
 
 has_spec() { # issue -> 0 if its body has an Open questions section: a triage wrote a spec
-  gh issue view "$1" -R "$OWNER/$REPO" --json body --jq .body | tr -d '\r' | sed -E 's/[[:space:]]+$//' | grep -qxF "## Open questions"
+  local b; b=$(gh issue view "$1" -R "$OWNER/$REPO" --json body --jq .body) || return 2
+  tr -d '\r' <<<"$b" | sed -E 's/[[:space:]]+$//' | grep -qxF "## Open questions"
 }
 
-build_done() { has_open_pr "$2" || issue_labelled "$1" needs-decision; } # issue branch
-triage_done() { has_open_pr "$2" || has_spec "$1"; } # issue branch
+either() { # status status -> 0 if either check said yes, 1 if both said no, 2 if one couldn't tell
+  [ "$1" = 0 ] || [ "$2" = 0 ] && return 0
+  [ "$1" = 1 ] && [ "$2" = 1 ] && return 1; return 2
+}
+
+build_done() { # issue branch
+  local a=0 b=0; has_open_pr "$2" || a=$?; [ "$a" = 0 ] || issue_labelled "$1" needs-decision || b=$?; either "$a" "$b"
+}
+triage_done() { # issue branch
+  local a=0 b=0; has_open_pr "$2" || a=$?; [ "$a" = 0 ] || has_spec "$1" || b=$?; either "$a" "$b"
+}
 round_done() { # pr branch before-sha -> 0 if the round pushed or asked
-  git -C "$CLONE" fetch -q origin "+refs/heads/$2:refs/remotes/origin/$2" || true
-  [ "$(git -C "$CLONE" rev-parse "origin/$2" 2>/dev/null || echo "$3")" != "$3" ] || has_label "$1" needs-decision
+  git -C "$CLONE" fetch -q origin "+refs/heads/$2:refs/remotes/origin/$2" || return 2
+  [ "$(git -C "$CLONE" rev-parse "origin/$2")" = "$3" ] || return 0
+  local l; l=$(gh pr view "$1" -R "$OWNER/$REPO" --json labels --jq '[.labels[].name] | index("needs-decision")') || return 2
+  grep -q '[0-9]' <<<"$l"
 }
 
 new_worktree() { # issue branch -> a fresh worktree for the issue, on the branch, cut from origin/main, with its screenshots

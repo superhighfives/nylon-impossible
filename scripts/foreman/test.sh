@@ -251,6 +251,7 @@ REVIEW_ID=101
 ROUND_HEAD=1111111111111111111111111111111111111111
 gh() {
   echo "$*" >> "$CALLS"
+  [ "$1 $2" != "${GH_FAIL:-}" ] || return 1
   case "$1 $2" in
     "pr view")
       case "$*" in *headRefOid*) echo "$ROUND_HEAD"; return 0 ;; esac
@@ -1001,6 +1002,7 @@ mkdir -p "$LOGS" "$WORKTREES"
 HEAD_ISSUE_LABELS="" PR_OPEN=0 TRIAGE_BODY="Just the report."
 gh() {
   echo "$*" >> "$CALLS"
+  [ "$1 $2" != "${GH_FAIL:-}" ] || return 1
   case "$1 $2" in
     "pr view")
       case "$*" in *headRefOid*) echo "$ROUND_HEAD"; return 0 ;; esac
@@ -1098,6 +1100,17 @@ expect "its comment names both logs"         "yes"  "$(grep 'issue comment 22' "
 fresh; RUN_CODE=142
 build "$FB_BOARD" 22 >/dev/null
 expect "a build the timeout killed isn't retried"  "1 yes"  "$RUNS $(called 'exit 142')"
+
+fresh; GH_FAIL="pr list"
+build "$FB_BOARD" 22 >/dev/null
+expect "a build GitHub can't be asked about isn't resumed"  "1 0"  "$RUNS $(grep -c '"event":"retried"' "$EVENTS")"
+expect "but still fails as before"           "yes"  "$(called 'alert build of #22 failed')"
+GH_FAIL=""
+
+fresh; GH_FAIL="issue view"
+triage "$FB_BOARD" 22 >/dev/null
+expect "nor a triage whose spec can't be checked"  "1"  "$RUNS"
+GH_FAIL=""
 
 fresh; ACT_ON=2 ACT="TRIAGE_BODY=\$SPEC_OK"
 triage "$FB_BOARD" 22 >/dev/null
