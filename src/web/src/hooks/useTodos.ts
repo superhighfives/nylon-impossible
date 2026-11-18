@@ -4,12 +4,11 @@ import { nextDueDate } from "@nylon-impossible/shared/recurrence";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import { useEffect } from "react";
-import { z } from "zod";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
-import { messageFromError, toast } from "@/lib/toast";
+import { apiErrorFrom, messageFromError, toast } from "@/lib/toast";
 import {
   createTodo,
   deleteTodo,
@@ -24,16 +23,6 @@ import type {
   TodoWithUrls,
   UpdateTodoInput,
 } from "@/types/database";
-
-const ApiErrorSchema = z
-  .object({ error: z.string() })
-  .optional()
-  .catch(undefined);
-
-async function getApiError(response: Response): Promise<string | undefined> {
-  const body = await response.json().catch(() => undefined);
-  return ApiErrorSchema.parse(body)?.error;
-}
 
 const TODOS_QUERY_KEY = ["todos"];
 
@@ -110,7 +99,7 @@ export function useCreateTodo() {
     },
     onError: (_err, _variables, context) => {
       Sentry.captureException(_err, { tags: { mutation: "createTodo" } });
-      toast.error(messageFromError(_err, "Couldn't add todo"));
+      toast.error(messageFromError(_err, "Couldn’t add the todo"));
       if (!context) {
         return;
       }
@@ -232,7 +221,7 @@ export function useUpdateTodo() {
     },
     onError: (_err, _variables, context) => {
       Sentry.captureException(_err, { tags: { mutation: "updateTodo" } });
-      toast.error(messageFromError(_err, "Couldn't save changes"));
+      toast.error(messageFromError(_err, "Couldn’t save that change"));
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
@@ -281,7 +270,7 @@ export function useUpdateUrlPreview() {
     },
     onError: (err, _vars, context) => {
       Sentry.captureException(err, { tags: { mutation: "updateUrlPreview" } });
-      toast.error(messageFromError(err, "Couldn't update link"));
+      toast.error(messageFromError(err, "Couldn’t change the link"));
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
       }
@@ -320,7 +309,7 @@ export function useDeleteTodo() {
     },
     onError: (_err, _variables, context) => {
       Sentry.captureException(_err, { tags: { mutation: "deleteTodo" } });
-      toast.error(messageFromError(_err, "Couldn't delete todo"));
+      toast.error(messageFromError(_err, "Couldn’t delete the todo"));
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
@@ -391,8 +380,7 @@ export function useSmartCreate() {
       });
 
       if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
+        throw await apiErrorFrom(response);
       }
 
       const body: SmartCreateBody = await response.json();
@@ -539,8 +527,7 @@ export function useProcessTodo() {
       });
 
       if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
+        throw await apiErrorFrom(response);
       }
 
       return response.json() as Promise<{ status: string; links: number }>;
@@ -554,7 +541,7 @@ export function useProcessTodo() {
     },
     onError: (err) => {
       Sentry.captureException(err, { tags: { mutation: "processTodo" } });
-      toast.error(messageFromError(err, "Couldn't process todo"));
+      toast.error(messageFromError(err, "Couldn’t process the todo"));
     },
   });
 }
@@ -584,7 +571,7 @@ export function useDeleteTodoUrl() {
     },
     onError: (err, _id, context) => {
       Sentry.captureException(err, { tags: { mutation: "deleteTodoUrl" } });
-      toast.error(messageFromError(err, "Couldn't remove link"));
+      toast.error(messageFromError(err, "Couldn’t remove the link"));
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
       }
@@ -623,10 +610,7 @@ export function useAddTodoUrl() {
         },
         body: JSON.stringify({ url }),
       });
-      if (!response.ok) {
-        const message = await getApiError(response);
-        throw new Error(message ?? `Request failed (${response.status})`);
-      }
+      if (!response.ok) throw await apiErrorFrom(response);
       return response.json();
     },
     onMutate: async ({ todoId, url }) => {
@@ -667,7 +651,7 @@ export function useAddTodoUrl() {
     },
     onError: (err, _input, context) => {
       Sentry.captureException(err, { tags: { mutation: "addTodoUrl" } });
-      toast.error(messageFromError(err, "Couldn't add link"));
+      toast.error(messageFromError(err, "Couldn’t add the link"));
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
       }

@@ -1,20 +1,80 @@
 import { describe, expect, it, vi } from "vitest";
-import { messageFromError, toast, toastManager } from "../toast";
+import {
+  ApiError,
+  apiErrorFrom,
+  messageFromError,
+  toast,
+  toastManager,
+} from "../toast";
 
 describe("messageFromError", () => {
-  it("returns Error.message when present", () => {
-    expect(messageFromError(new Error("boom"), "fallback")).toBe("boom");
-  });
-
-  it("returns string when err is a non-empty string", () => {
-    expect(messageFromError("nope", "fallback")).toBe("nope");
-  });
-
-  it("falls back when err is unknown or empty", () => {
+  it("shows the action's sentence over the server's or browser's message", () => {
+    expect(
+      messageFromError(
+        new Error("Request failed (500)"),
+        "Couldn’t add the link",
+      ),
+    ).toBe("Couldn’t add the link");
+    expect(
+      messageFromError(
+        new TypeError("Failed to fetch"),
+        "Couldn’t add the link",
+      ),
+    ).toBe("Couldn’t add the link");
+    expect(
+      messageFromError(
+        new ApiError("Something went wrong. Try again.", "internal", 500),
+        "Couldn’t add the link",
+      ),
+    ).toBe("Couldn’t add the link");
+    expect(messageFromError("nope", "fallback")).toBe("fallback");
     expect(messageFromError(undefined, "fallback")).toBe("fallback");
-    expect(messageFromError(null, "fallback")).toBe("fallback");
-    expect(messageFromError("", "fallback")).toBe("fallback");
-    expect(messageFromError(new Error(), "fallback")).toBe("fallback");
+  });
+
+  it("shows invalid_url's own message, which says what to do", () => {
+    expect(
+      messageFromError(
+        new ApiError("That doesn't look like a link.", "invalid_url", 400),
+        "Couldn’t add the link",
+      ),
+    ).toBe("That doesn't look like a link.");
+  });
+
+  it("shows rate_limited's own message, which says what to do", () => {
+    expect(
+      messageFromError(
+        new ApiError(
+          "Too many requests. Try again in a minute.",
+          "rate_limited",
+          429,
+        ),
+        "Couldn’t add the todo",
+      ),
+    ).toBe("Too many requests. Try again in a minute.");
+  });
+});
+
+describe("apiErrorFrom", () => {
+  it("reads the envelope's message and code", async () => {
+    const err = await apiErrorFrom(
+      Response.json(
+        {
+          error: "Too many requests. Try again in a minute.",
+          code: "rate_limited",
+        },
+        { status: 429 },
+      ),
+    );
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.message).toBe("Too many requests. Try again in a minute.");
+    expect(err.code).toBe("rate_limited");
+    expect(err.status).toBe(429);
+  });
+
+  it("falls back to the status when the body isn't an envelope", async () => {
+    const err = await apiErrorFrom(new Response("oops", { status: 502 }));
+    expect(err.message).toBe("Request failed (502)");
+    expect(err.code).toBeUndefined();
   });
 });
 

@@ -36,7 +36,11 @@ export function useApiToken(enabled: boolean) {
   return useQuery({
     queryKey: API_TOKEN_QUERY_KEY,
     queryFn: async () => {
-      const response = await request("GET", getToken, "Couldn't load token");
+      const response = await request(
+        "GET",
+        getToken,
+        "Couldn’t load the token",
+      );
       const body = (await response.json()) as { token: ApiTokenInfo | null };
       return body.token;
     },
@@ -53,7 +57,9 @@ export function useCreateApiToken() {
       const response = await request(
         "POST",
         getToken,
-        regenerate ? "Couldn't regenerate token" : "Couldn't create token",
+        regenerate
+          ? "Couldn’t regenerate the token"
+          : "Couldn’t create the token",
       );
       return (await response.json()) as CreatedApiToken;
     },
@@ -69,7 +75,7 @@ export function useRevokeApiToken() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      await request("DELETE", getToken, "Couldn't revoke token");
+      await request("DELETE", getToken, "Couldn’t revoke the token");
     },
     onSuccess: () => {
       queryClient.setQueryData(API_TOKEN_QUERY_KEY, null);

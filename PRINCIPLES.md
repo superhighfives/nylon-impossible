@@ -60,6 +60,7 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 - Short and specific: "Moved to this week", not "Your todo has been moved successfully".
 - Toasts name what happened and, when it can be reversed, offer Undo.
 - Adding somewhere off-screen toasts the same words everywhere: "Added to someday", "3 todos added to Groceries", and from Gmail and Siri, which have no date chip, "Added to this week · due Fri" ("due today", "due tomorrow"). The web and iPhone offer "View". The menu bar doesn't, an exception to principle 5: the toast already names where the todo went, and the popover shows only Today, so View would have to open a browser.
+- A failed action toasts its own sentence, the same on every platform, with the article and a curly apostrophe: "Couldn’t add the link", "Couldn’t rename the list", "Couldn’t delete your account. Try again." Not the server's or browser's message ("Request failed (500)", "Failed to fetch"), except the API's messages that say what to do: "That doesn't look like a link." and "Too many requests. Try again in a minute."
 - Empty states say what's true and, when it helps, where to look next: "Nothing today." with "4 waiting in this week".
 
 ## Visual

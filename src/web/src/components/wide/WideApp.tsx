@@ -740,7 +740,7 @@ export function WideApp({
   const copyListId = (list: SerializedList) => {
     navigator.clipboard.writeText(list.id).then(
       () => toast.success("Copied"),
-      (err: unknown) => toast.error(messageFromError(err, "Couldn't copy")),
+      (err: unknown) => toast.error(messageFromError(err, "Couldn’t copy")),
     );
   };
 

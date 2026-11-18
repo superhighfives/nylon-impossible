@@ -64,6 +64,9 @@ beforeEach(() => {
     expect(new Headers(init?.headers).get("Authorization")).toBe(
       "Bearer session-jwt",
     );
+    if (path === "/users/me" && method === "DELETE") {
+      return json({ error: "Request failed (500)", code: "internal" }, 500);
+    }
     if (path === "/users/me") return json(USER);
     if (path !== "/users/me/api-token") throw new Error(`unexpected ${path}`);
     if (failNext === method) return json({ error: "x", code: "x" }, 500);
@@ -233,7 +236,9 @@ describe("SettingsScreen: API token", () => {
         await screen.findByRole("button", { name: "Regenerate" }),
       );
       await waitFor(() =>
-        expect(toast.error).toHaveBeenCalledWith("Couldn't regenerate token"),
+        expect(toast.error).toHaveBeenCalledWith(
+          "Couldn’t regenerate the token",
+        ),
       );
     });
   });
@@ -270,7 +275,7 @@ describe("SettingsScreen: API token", () => {
       renderSettings();
       fireEvent.click(await screen.findByRole("button", { name: "Revoke" }));
       await waitFor(() =>
-        expect(toast.error).toHaveBeenCalledWith("Couldn't revoke token"),
+        expect(toast.error).toHaveBeenCalledWith("Couldn’t revoke the token"),
       );
       expect(
         screen.getByRole("button", { name: "Revoke" }),
@@ -283,7 +288,7 @@ describe("SettingsScreen: API token", () => {
     renderSettings();
     fireEvent.click(await createButton());
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Couldn't create token"),
+      expect(toast.error).toHaveBeenCalledWith("Couldn’t create the token"),
     );
     await act(async () => {});
     expect(screen.queryByRole("textbox", { name: "API token" })).toBeNull();
@@ -293,5 +298,53 @@ describe("SettingsScreen: API token", () => {
     renderSettings(false);
     await act(async () => {});
     expect(tokenRequests()).toEqual([]);
+  });
+});
+
+describe("SettingsScreen: account deletion", () => {
+  const CONFIRM =
+    "Delete your account? This permanently deletes your account, todos and lists. This can’t be undone.";
+
+  it("says what deleting removes, in the apps' words", async () => {
+    renderSettings();
+    expect(
+      await screen.findByRole("button", { name: "Delete my account" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Permanently deletes your account, todos and lists. This can’t be undone.",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("asks first, and cancelling sends nothing", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderSettings();
+    const button = await screen.findByRole("button", {
+      name: "Delete my account",
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    expect(confirm).toHaveBeenCalledWith(CONFIRM);
+    expect(
+      fetchMock.mock.calls.some(
+        ([, init]) => (init as RequestInit | undefined)?.method === "DELETE",
+      ),
+    ).toBe(false);
+  });
+
+  it("a failure toasts the apps' sentence, not the server's message", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderSettings();
+    const button = await screen.findByRole("button", {
+      name: "Delete my account",
+    });
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button);
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "Couldn’t delete your account. Try again.",
+      ),
+    );
   });
 });

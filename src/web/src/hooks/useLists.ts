@@ -52,7 +52,7 @@ export function useCreateList() {
     },
     onError: (err, _input, context) => {
       Sentry.captureException(err, { tags: { mutation: "createList" } });
-      toast.error(messageFromError(err, "Couldn't create list"));
+      toast.error(messageFromError(err, "Couldn’t create the list"));
       if (context?.previousLists !== undefined) {
         queryClient.setQueryData(LISTS_QUERY_KEY, context.previousLists);
       }
@@ -69,6 +69,16 @@ export function useCreateList() {
       queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
     },
   });
+}
+
+/**
+ * One update covers three actions on the web, so the failure names the one
+ * that was tried: renaming, reordering, or hiding/showing the column.
+ */
+function updateListFailure(input: UpdateListInput): string {
+  if (input.name !== undefined) return "Couldn’t rename the list";
+  if (input.position !== undefined) return "Couldn’t save the new order";
+  return "Couldn’t save that change";
 }
 
 export function useUpdateList() {
@@ -106,9 +116,9 @@ export function useUpdateList() {
 
       return { previousLists };
     },
-    onError: (err, _vars, context) => {
+    onError: (err, { input }, context) => {
       Sentry.captureException(err, { tags: { mutation: "updateList" } });
-      toast.error(messageFromError(err, "Couldn't update list"));
+      toast.error(messageFromError(err, updateListFailure(input)));
       if (context?.previousLists) {
         queryClient.setQueryData(LISTS_QUERY_KEY, context.previousLists);
       }
@@ -143,7 +153,7 @@ export function useDeleteList() {
     },
     onError: (err, _id, context) => {
       Sentry.captureException(err, { tags: { mutation: "deleteList" } });
-      toast.error(messageFromError(err, "Couldn't delete list"));
+      toast.error(messageFromError(err, "Couldn’t delete the list"));
       if (context?.previousLists) {
         queryClient.setQueryData(LISTS_QUERY_KEY, context.previousLists);
       }

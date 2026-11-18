@@ -225,7 +225,7 @@ struct MacAccountSettings: View {
             if isSignedIn {
                 Section {
                     HStack {
-                        Button("Delete account…", role: .destructive) { confirmsDelete = true }
+                        Button("Delete my account…", role: .destructive) { confirmsDelete = true }
                             .disabled(isDeleting)
                         if isDeleting { ProgressView().controlSize(.small) }
                     }
@@ -233,7 +233,7 @@ struct MacAccountSettings: View {
                         Text(deleteMessage).foregroundStyle(Theme.Colors.overdue)
                     }
                 } footer: {
-                    Text("Permanently deletes your account and all of your todos. This can’t be undone.")
+                    Text("Permanently deletes your account, todos and lists. This can’t be undone.")
                         .foregroundStyle(.secondary)
                 }
             }
@@ -243,7 +243,7 @@ struct MacAccountSettings: View {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) { Task { await performDelete() } }
         } message: {
-            Text("This permanently deletes your account and all of your todos. This can’t be undone.")
+            Text("This permanently deletes your account, todos and lists. This can’t be undone.")
         }
     }
 

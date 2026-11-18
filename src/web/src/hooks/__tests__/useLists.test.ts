@@ -3,8 +3,9 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "@/lib/toast";
 import type { SerializedList } from "@/types/database";
-import { useCreateList, useUpdateList } from "../useLists";
+import { useCreateList, useDeleteList, useUpdateList } from "../useLists";
 
 vi.mock("@/server/lists", () => ({
   getLists: vi.fn(),
@@ -22,6 +23,7 @@ import * as serverLists from "@/server/lists";
 const mockGetLists = vi.mocked(serverLists.getLists);
 const mockCreateList = vi.mocked(serverLists.createList);
 const mockUpdateList = vi.mocked(serverLists.updateList);
+const mockDeleteList = vi.mocked(serverLists.deleteList);
 
 function makeList(overrides?: Partial<SerializedList>): SerializedList {
   return {
@@ -146,5 +148,55 @@ describe("useUpdateList", () => {
     expect(mockUpdateList).toHaveBeenCalledWith({
       data: { id: "list-vinyl", input: { columnHidden: true } },
     });
+  });
+});
+
+describe("failure toasts", () => {
+  const SERVER_ERROR = new Error("Request failed (500)");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetLists.mockReturnValue(new Promise(() => {}));
+  });
+
+  async function failWith(run: () => Promise<unknown>) {
+    const error = vi.spyOn(toast, "error");
+    await act(async () => {
+      await run().catch(() => {});
+    });
+    const shown = error.mock.calls.map(([message]) => message);
+    error.mockRestore();
+    return shown;
+  }
+
+  it("creating a list says the apps' sentence, not the server's", async () => {
+    mockCreateList.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCreateList(), { wrapper: Wrapper });
+    expect(
+      await failWith(() => result.current.mutateAsync({ name: "Groceries" })),
+    ).toEqual(["Couldn’t create the list"]);
+  });
+
+  it.each([
+    [{ name: "Errands" }, "Couldn’t rename the list"],
+    [{ position: "a5" }, "Couldn’t save the new order"],
+    [{ columnHidden: true }, "Couldn’t save that change"],
+  ])("updating %o names what was tried", async (input, message) => {
+    mockUpdateList.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateList(), { wrapper: Wrapper });
+    expect(
+      await failWith(() => result.current.mutateAsync({ id: "list-1", input })),
+    ).toEqual([message]);
+  });
+
+  it("deleting a list says the apps' sentence, not the server's", async () => {
+    mockDeleteList.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useDeleteList(), { wrapper: Wrapper });
+    expect(await failWith(() => result.current.mutateAsync("list-1"))).toEqual([
+      "Couldn’t delete the list",
+    ]);
   });
 });
