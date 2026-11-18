@@ -126,7 +126,10 @@ checks.
 
 **Triage.** Claude runs in a fresh worktree on `foreman/<n>-<slug>`, with the
 report's screenshots fetched into `.feedback-assets/` and the trusted
-comments in the prompt. It decides:
+comments in the prompt. Images pasted on GitHub into the owner's issue body or the
+owner's comments (not the foreman's or `claude[bot]`'s) (`github.com/user-attachments/assets/<id>`) are fetched too, into
+`.feedback-assets/user-attachments/<id>.<ext>`, for spec runs and builds
+as well. It decides:
 - **Clear** (one observable problem, its fix evident, a contained change):
   it posts a **Light spec** comment (problem, acceptance criteria, how to
   verify) and builds the fix as it would any Ready item. The PR is ready for
