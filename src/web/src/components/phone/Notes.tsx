@@ -1,3 +1,5 @@
+import { Tooltip } from "@base-ui/react/tooltip";
+import { Check, Copy } from "lucide-react";
 import { type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
@@ -6,6 +8,7 @@ import {
   type List,
   parseMarkdown,
 } from "@/lib/markdown";
+import { messageFromError, toast } from "@/lib/toast";
 
 /**
  * A blank line in the notes keeps its height when they're drawn: one line,
@@ -56,6 +59,73 @@ function inlines(nodes: Inline[]): ReactNode[] {
   });
 }
 
+/**
+ * Copy, in a code block's top-right corner: hidden until a pointer is over
+ * the block or the keyboard is on the button, and out of the way of touch,
+ * which has neither and keeps the block's own text selection (principle 6).
+ * Its tooltip reads "Copy", then "Copied" until it closes.
+ */
+const COPY_BUTTON =
+  "absolute top-0 right-0 flex size-6 cursor-pointer items-center justify-center rounded-n-chip border border-n-hairline bg-n-surface text-n-ink-muted opacity-0 pointer-events-none transition-opacity duration-(--n-duration-fast) ease-n-out n-focus-soft focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/code:pointer-events-auto group-hover/code:opacity-100 pointer-fine:hover:text-n-ink";
+
+const TOOLTIP =
+  "rounded-n-chip border border-n-hairline bg-n-surface px-2 py-1 text-xs text-n-ink shadow-[0_4px_12px_color-mix(in_srgb,black_12%,transparent)] transition-opacity duration-(--n-duration-fast) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0";
+
+function CodeBlock({ text, className }: { text: string; className: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(
+      () => {
+        setCopied(true);
+        setOpen(true);
+      },
+      (err: unknown) => toast.error(messageFromError(err, "Couldn't copy")),
+    );
+  };
+
+  return (
+    <div className={`group/code relative ${className}`}>
+      <pre className="m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap">
+        <code>{text}</code>
+      </pre>
+      <Tooltip.Root
+        open={open}
+        onOpenChange={(next) => {
+          setOpen(next);
+          if (!next) setCopied(false);
+        }}
+      >
+        <Tooltip.Trigger
+          closeOnClick={false}
+          render={
+            <button
+              type="button"
+              aria-label="Copy code"
+              onClick={copy}
+              className={COPY_BUTTON}
+            />
+          }
+        >
+          {copied ? (
+            <Check size={14} strokeWidth={2.2} aria-hidden="true" />
+          ) : (
+            <Copy size={14} strokeWidth={2.2} aria-hidden="true" />
+          )}
+        </Tooltip.Trigger>
+        <Tooltip.Portal>
+          <Tooltip.Positioner side="top" sideOffset={6} className="z-50">
+            <Tooltip.Popup className={TOOLTIP}>
+              {copied ? "Copied" : "Copy"}
+            </Tooltip.Popup>
+          </Tooltip.Positioner>
+        </Tooltip.Portal>
+      </Tooltip.Root>
+    </div>
+  );
+}
+
 function list(node: List, nested: boolean, className: string, key?: number) {
   const items = node.items.map((item, i) => (
     // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
@@ -103,15 +173,8 @@ function blocks(nodes: Block[]): ReactNode[] {
         );
       }
       case "code":
-        return (
-          <pre
-            // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
-            key={i}
-            className={`m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap ${gap}`}
-          >
-            <code>{node.text}</code>
-          </pre>
-        );
+        // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
+        return <CodeBlock key={i} text={node.text} className={gap} />;
       case "quote":
         return (
           <blockquote
@@ -215,7 +278,8 @@ export function Notes({
             Notes
           </span>
           {/* Focusable like the field it stands for: a click (but not on a
-              link, or after selecting text to copy) or Return edits. */}
+              link or a code block's Copy, or after selecting text to copy)
+              or Return edits. */}
           {/* biome-ignore lint/a11y/useSemanticElements: a textbox can't hold the links */}
           <div
             ref={shown}
@@ -227,7 +291,9 @@ export function Notes({
             tabIndex={0}
             data-notes-rendered
             onClick={(e) => {
-              if ((e.target as Element).closest("a")) return;
+              // A Copy tooltip is portaled out, but its clicks still bubble here.
+              if (!e.currentTarget.contains(e.target as Node)) return;
+              if ((e.target as Element).closest("a, button")) return;
               const selection = window.getSelection();
               if (selection && !selection.isCollapsed) return;
               edit();

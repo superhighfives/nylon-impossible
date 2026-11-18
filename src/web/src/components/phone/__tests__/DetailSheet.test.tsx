@@ -1,5 +1,6 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { toast } from "@/lib/toast";
 import type { TodoActions } from "../useTodoActions";
 import { dueIn, makeTodo, makeUrl } from "./fixtures";
 
@@ -389,6 +390,116 @@ describe("DetailSheet", () => {
       const after = rendered();
       expect(after).toHaveFocus();
       expect(after?.querySelector("strong")?.textContent).toBe("b");
+    });
+
+    describe("code blocks", () => {
+      const withCode = [
+        "Run this:",
+        "",
+        "```sh",
+        'while true; do printf "%s\\n" "$(date +%T)"; sleep 60; done',
+        "```",
+        "",
+        "```",
+        "second",
+        "```",
+      ].join("\n");
+
+      const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+      afterEach(() => {
+        if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+        else Reflect.deleteProperty(navigator, "clipboard");
+        vi.restoreAllMocks();
+      });
+
+      const stubClipboard = (writeText: (text: string) => Promise<void>) =>
+        Object.defineProperty(navigator, "clipboard", {
+          value: { writeText: vi.fn(writeText) },
+          configurable: true,
+        });
+
+      it("offers a copy button on each code block, hidden until hover or focus", () => {
+        const { rendered } = renderNotes(withCode, { column: true });
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const buttons = within(notes).getAllByRole("button", {
+          name: "Copy code",
+        });
+        expect(buttons).toHaveLength(2);
+        for (const button of buttons) {
+          // Over the block, not beside it, and only on hover or focus.
+          expect(button.className).toMatch(/\babsolute\b/);
+          expect(button.className).toMatch(/\bopacity-0\b/);
+          expect(button.className).toContain("group-hover/code:opacity-100");
+          expect(button.className).toContain("focus-visible:opacity-100");
+          expect(button.closest(".group\\/code")).not.toBeNull();
+          expect(button.tabIndex).not.toBe(-1);
+        }
+      });
+
+      it("copies the code block's text without starting to edit", async () => {
+        stubClipboard(() => Promise.resolve());
+        const { rendered } = renderNotes(withCode);
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const [first, second] = within(notes).getAllByRole("button", {
+          name: "Copy code",
+        });
+        await act(async () => {
+          fireEvent.click(first);
+        });
+        expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+          'while true; do printf "%s\\n" "$(date +%T)"; sleep 60; done',
+        );
+        expect(rendered()).not.toBeNull();
+        expect(
+          document.querySelector("textarea[placeholder='Add notes']"),
+        ).toBeNull();
+        expect(await screen.findByText("Copied")).toBeInTheDocument();
+
+        await act(async () => {
+          fireEvent.click(second);
+        });
+        expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
+          "second",
+        );
+      });
+
+      it("doesn't start editing when the tooltip is clicked", async () => {
+        stubClipboard(() => Promise.resolve());
+        const { rendered } = renderNotes(withCode);
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const [first] = within(notes).getAllByRole("button", {
+          name: "Copy code",
+        });
+        await act(async () => {
+          fireEvent.click(first);
+        });
+        const tooltip = await screen.findByText("Copied");
+        expect(notes.contains(tooltip)).toBe(false);
+        fireEvent.click(tooltip);
+        expect(rendered()).not.toBeNull();
+        expect(
+          document.querySelector("textarea[placeholder='Add notes']"),
+        ).toBeNull();
+      });
+
+      it("says so, and doesn't say Copied, when the copy fails", async () => {
+        stubClipboard(() => Promise.reject(new Error("Denied")));
+        const error = vi.spyOn(toast, "error");
+        const { rendered } = renderNotes(withCode);
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const [first] = within(notes).getAllByRole("button", {
+          name: "Copy code",
+        });
+        await act(async () => {
+          fireEvent.click(first);
+        });
+        expect(error).toHaveBeenCalledWith("Denied");
+        expect(screen.queryByText("Copied")).toBeNull();
+      });
     });
 
     it("saves exactly the Markdown typed", () => {
