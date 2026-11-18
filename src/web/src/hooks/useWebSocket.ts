@@ -31,7 +31,10 @@ async function fetchTicket(token: string): Promise<string> {
   });
   if (res.status === 401) throw new TicketUnauthorizedError();
   if (!res.ok) throw new Error(`POST /ws/ticket failed: ${res.status}`);
-  const { ticket } = (await res.json()) as { ticket: string };
+  const { ticket } = (await res.json()) as { ticket?: unknown };
+  if (typeof ticket !== "string" || !ticket) {
+    throw new Error("POST /ws/ticket returned no ticket");
+  }
   return ticket;
 }
 

@@ -193,11 +193,10 @@ final class WebSocketService {
         return matches(nsError) || nsError.underlyingErrors.contains { matches($0 as NSError) }
     }
 
-    /// Send a real failure to Sentry; leave a breadcrumb for a transient drop.
-    /// A failed ticket request is an `APIError`, which `APIService` has
-    /// already reported (or dropped as transient), so it's a breadcrumb too.
+    /// Send a real failure to Sentry; leave a breadcrumb for a transient drop,
+    /// or for a failed ticket request `APIService` has already dealt with.
     nonisolated private static func report(_ error: Error, event: String) {
-        guard !isTransientNetworkDrop(error), !(error is APIError) else {
+        guard !isTransientNetworkDrop(error), !isHandledByAPIService(error) else {
             let crumb = Breadcrumb(level: .info, category: "websocket")
             crumb.message = "\(event): \((error as NSError).domain) \((error as NSError).code)"
             SentrySDK.addBreadcrumb(crumb)
@@ -207,6 +206,15 @@ final class WebSocketService {
             scope.setTag(value: "websocket", key: "area")
             scope.setTag(value: event, key: "event")
         }
+    }
+
+    /// `APIService` reports a network, server or decoding failure itself (or
+    /// drops it as transient), and a 401 signs out rather than being a fault.
+    /// `.invalidResponse` is the one `APIError` it throws unreported.
+    nonisolated private static func isHandledByAPIService(_ error: Error) -> Bool {
+        guard let apiError = error as? APIError else { return false }
+        if case .invalidResponse = apiError { return false }
+        return true
     }
 
     private func handleDisconnect() {
