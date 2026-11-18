@@ -23,6 +23,7 @@ export const API_ERRORS = {
   invalid_url: { status: 400, message: "That doesn't look like a link." },
   list_id_required: { status: 400, message: "List ID required" },
   list_not_found: { status: 404, message: "List not found" },
+  list_id_taken: { status: 409, message: "That list ID is already in use" },
   system_list_immutable: {
     status: 403,
     message: "System lists can't be renamed, deleted, or reordered",

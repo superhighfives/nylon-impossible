@@ -46,17 +46,30 @@ export async function createList(c: Context<Env>) {
   const id = parsed.data.id ?? crypto.randomUUID();
   const now = new Date();
 
-  await db.insert(lists).values({
-    id,
-    userId,
-    name: parsed.data.name,
-    kind: "custom",
-    position: parsed.data.position ?? "a0",
-    createdAt: now,
-    updatedAt: now,
-  });
+  const [newList] = await db
+    .insert(lists)
+    .values({
+      id,
+      userId,
+      name: parsed.data.name,
+      kind: "custom",
+      position: parsed.data.position ?? "a0",
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing()
+    .returning();
 
-  const [newList] = await db.select().from(lists).where(eq(lists.id, id));
+  // The id is already a row: a retry, perhaps in a different case. The
+  // caller's own list comes back as it is (200); someone else's is a 409.
+  if (!newList) {
+    const [existing] = await db
+      .select()
+      .from(lists)
+      .where(and(eq(lists.id, id), eq(lists.userId, userId)));
+    if (!existing) return apiError(c, "list_id_taken");
+    return c.json(serializeList(existing), 200);
+  }
 
   await notifySync(c.env, userId);
 
@@ -72,7 +85,7 @@ const updateListSchema = z.object({
 // PATCH /lists/:id - rename, reposition, hide or show (`columnHidden`) a
 // custom list. Rejects system lists.
 export async function updateList(c: Context<Env>) {
-  const listId = c.req.param("id");
+  const listId = c.req.param("id")?.toLowerCase();
   if (!listId) {
     return apiError(c, "list_id_required");
   }
@@ -118,7 +131,7 @@ export async function updateList(c: Context<Env>) {
 // system lists. Returns the todo count so the client can show a "this will
 // delete N todos" warning before issuing the delete.
 export async function deleteList(c: Context<Env>) {
-  const listId = c.req.param("id");
+  const listId = c.req.param("id")?.toLowerCase();
   if (!listId) {
     return apiError(c, "list_id_required");
   }
