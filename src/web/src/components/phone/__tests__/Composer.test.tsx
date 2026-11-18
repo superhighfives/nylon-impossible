@@ -214,7 +214,7 @@ describe("Composer", () => {
     const { field } = setup();
     await user.type(field, "Renew passport{Enter}");
     await waitFor(() => expect(field).toHaveValue("Renew passport"));
-    expect(toast.error).toHaveBeenCalledWith("offline");
+    expect(toast.error).toHaveBeenCalledWith("Couldn’t add the todo");
   });
 
   it("hands back only the lines that failed from a pasted list", async () => {
@@ -229,7 +229,9 @@ describe("Composer", () => {
     await user.keyboard("{Enter}");
     await waitFor(() => expect(field).toHaveValue("Eggs tomorrow"));
     expect(mutateAsync).toHaveBeenCalledTimes(3);
-    expect(toast.error).toHaveBeenCalledWith("2 todos added. offline");
+    expect(toast.error).toHaveBeenCalledWith(
+      "2 todos added. Couldn’t add the todo",
+    );
   });
 
   it("notes when long text will spill into notes", async () => {

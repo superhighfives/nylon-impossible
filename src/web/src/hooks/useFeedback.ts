@@ -2,6 +2,7 @@ import { useAuth } from "@clerk/tanstack-react-start";
 import { useMutation } from "@tanstack/react-query";
 import { API_URL } from "@/lib/config";
 import type { FeedbackRequest, FeedbackResponse } from "@/lib/feedback";
+import { apiErrorFrom } from "@/lib/toast";
 
 async function sendFeedback(
   body: FeedbackRequest,
@@ -19,13 +20,7 @@ async function sendFeedback(
     },
     body: JSON.stringify(body),
   });
-  if (!response.ok) {
-    // The API's `{ error, code }` envelope; the message is user-facing.
-    const envelope = (await response.json().catch(() => null)) as {
-      error?: string;
-    } | null;
-    throw new Error(envelope?.error || "Couldn't send feedback");
-  }
+  if (!response.ok) throw await apiErrorFrom(response);
   return response.json();
 }
 

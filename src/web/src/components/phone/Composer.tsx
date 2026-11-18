@@ -196,7 +196,10 @@ export function Composer({
     if (failed.size > 0) {
       const unsaved = planned.filter((todo) => failed.has(todo));
       setDraft((current) => current || unsaved.map((t) => t.line).join("\n"));
-      const reason = messageFromError(firstError, "Couldn't add todo");
+      const reason = messageFromError(
+        firstError,
+        failed.size > 1 ? "Couldn’t add the todos" : "Couldn’t add the todo",
+      );
       const saved = planned.length - failed.size;
       toast.error(
         saved > 0 ? `${plural(saved, "todo")} added. ${reason}` : reason,

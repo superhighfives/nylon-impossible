@@ -85,14 +85,16 @@ export function SettingsScreen({
     if (update.timezone === timezone && update.timezoneAuto === automatic) {
       return;
     }
-    updateUser.mutate(update, { onError: fail("Couldn't change timezone") });
+    updateUser.mutate(update, {
+      onError: fail("Couldn’t change the timezone"),
+    });
   };
 
   const deleteAccount = () => {
     // One of the app's few confirmations (with Regenerate and Revoke API
     // token): it can't be undone.
     const ok = window.confirm(
-      "Permanently delete your account? All of your todos and lists will be removed and cannot be recovered.",
+      "Delete your account? This permanently deletes your account, todos and lists. This can’t be undone.",
     );
     if (!ok) return;
     deleteUser.mutate(undefined, {
@@ -100,7 +102,7 @@ export function SettingsScreen({
         onClose();
         await signOut({ redirectUrl: "/" });
       },
-      onError: fail("Couldn't delete your account"),
+      onError: fail("Couldn’t delete your account. Try again."),
     });
   };
 
@@ -122,7 +124,7 @@ export function SettingsScreen({
                   if (!selected) {
                     updateUser.mutate(
                       { theme: value },
-                      { onError: fail("Couldn't change theme") },
+                      { onError: fail("Couldn’t change the theme") },
                     );
                   }
                 }}
@@ -295,7 +297,9 @@ function ApiTokenSection({ open }: { open: boolean }) {
     create.mutate(regenerate, {
       onSuccess: ({ token }) => setFresh(token),
       onError: fail(
-        regenerate ? "Couldn't regenerate token" : "Couldn't create token",
+        regenerate
+          ? "Couldn’t regenerate the token"
+          : "Couldn’t create the token",
       ),
     });
   };
@@ -310,7 +314,7 @@ function ApiTokenSection({ open }: { open: boolean }) {
     }
     revoke.mutate(undefined, {
       onSuccess: () => toast.success("Token revoked"),
-      onError: fail("Couldn't revoke token"),
+      onError: fail("Couldn’t revoke the token"),
     });
   };
 
@@ -318,7 +322,7 @@ function ApiTokenSection({ open }: { open: boolean }) {
     if (!fresh) return;
     navigator.clipboard
       .writeText(fresh)
-      .then(() => toast.success("Copied"), fail("Couldn't copy"));
+      .then(() => toast.success("Copied"), fail("Couldn’t copy"));
   };
 
   const docsLink = (

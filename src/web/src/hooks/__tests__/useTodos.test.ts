@@ -7,12 +7,15 @@ import { displayTitle, rowMeta } from "@/components/phone/model";
 import { toast } from "@/lib/toast";
 import type { TodoWithUrls } from "@/types/database";
 import {
+  useAddTodoUrl,
   useCreateTodo,
   useDeleteTodo,
+  useDeleteTodoUrl,
   useProcessTodo,
   useSmartCreate,
   useTodos,
   useUpdateTodo,
+  useUpdateUrlPreview,
 } from "../useTodos";
 
 // ---------------------------------------------------------------------------
@@ -24,6 +27,8 @@ vi.mock("@/server/todos", () => ({
   createTodo: vi.fn(),
   updateTodo: vi.fn(),
   deleteTodo: vi.fn(),
+  deleteTodoUrl: vi.fn(),
+  updateTodoUrlPreview: vi.fn(),
 }));
 
 vi.mock("@/hooks/useWebSocket", () => ({
@@ -44,6 +49,8 @@ const mockGetTodos = vi.mocked(serverTodos.getTodos);
 const mockCreateTodo = vi.mocked(serverTodos.createTodo);
 const mockUpdateTodo = vi.mocked(serverTodos.updateTodo);
 const mockDeleteTodo = vi.mocked(serverTodos.deleteTodo);
+const mockDeleteTodoUrl = vi.mocked(serverTodos.deleteTodoUrl);
+const mockUpdateTodoUrlPreview = vi.mocked(serverTodos.updateTodoUrlPreview);
 
 // ---------------------------------------------------------------------------
 // Test fixtures
@@ -481,6 +488,154 @@ describe("useProcessTodo", () => {
     await act(() => result.current.mutateAsync("todo-1"));
     expect(info).toHaveBeenCalledWith("No links to process on this todo");
     info.mockRestore();
+    vi.unstubAllGlobals();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Failure toasts: the apps' sentence, except messages that say what to do
+// ---------------------------------------------------------------------------
+
+describe("failure toasts", () => {
+  const SERVER_ERROR = new Error("Request failed (500)");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetTodos.mockReturnValue(new Promise(() => {}));
+  });
+
+  async function failWith(run: () => Promise<unknown>) {
+    const error = vi.spyOn(toast, "error");
+    await act(async () => {
+      await run().catch(() => {});
+    });
+    const shown = error.mock.calls.map(([message]) => message);
+    error.mockRestore();
+    return shown;
+  }
+
+  function apiFails(body: unknown, status: number) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json(body, { status })),
+    );
+  }
+
+  it("adding a todo", async () => {
+    mockCreateTodo.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCreateTodo(), { wrapper: Wrapper });
+    expect(
+      await failWith(() => result.current.mutateAsync({ title: "Buy milk" })),
+    ).toEqual(["Couldn’t add the todo"]);
+  });
+
+  it("editing a todo", async () => {
+    mockUpdateTodo.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateTodo(), { wrapper: Wrapper });
+    expect(
+      await failWith(() =>
+        result.current.mutateAsync({
+          id: "todo-1",
+          input: { title: "Buy oat milk" },
+        }),
+      ),
+    ).toEqual(["Couldn’t save that change"]);
+  });
+
+  it("deleting a todo", async () => {
+    mockDeleteTodo.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useDeleteTodo(), { wrapper: Wrapper });
+    expect(await failWith(() => result.current.mutateAsync("todo-1"))).toEqual([
+      "Couldn’t delete the todo",
+    ]);
+  });
+
+  it("changing a link", async () => {
+    mockUpdateTodoUrlPreview.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateUrlPreview(), {
+      wrapper: Wrapper,
+    });
+    expect(
+      await failWith(() =>
+        result.current.mutateAsync({ id: "url-1", showPreview: false }),
+      ),
+    ).toEqual(["Couldn’t change the link"]);
+  });
+
+  it("removing a link", async () => {
+    mockDeleteTodoUrl.mockRejectedValue(SERVER_ERROR);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useDeleteTodoUrl(), {
+      wrapper: Wrapper,
+    });
+    expect(await failWith(() => result.current.mutateAsync("url-1"))).toEqual([
+      "Couldn’t remove the link",
+    ]);
+  });
+
+  it("adding a link, when the API fails", async () => {
+    apiFails({ error: "Request failed (500)", code: "internal" }, 500);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAddTodoUrl(), { wrapper: Wrapper });
+    expect(
+      await failWith(() =>
+        result.current.mutateAsync({ todoId: "todo-1", url: "example.com" }),
+      ),
+    ).toEqual(["Couldn’t add the link"]);
+    vi.unstubAllGlobals();
+  });
+
+  it("adding a link that isn't one shows invalid_url's own message", async () => {
+    apiFails(
+      { error: "That doesn't look like a link.", code: "invalid_url" },
+      400,
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAddTodoUrl(), { wrapper: Wrapper });
+    expect(
+      await failWith(() =>
+        result.current.mutateAsync({ todoId: "todo-1", url: "nope" }),
+      ),
+    ).toEqual(["That doesn't look like a link."]);
+    vi.unstubAllGlobals();
+  });
+
+  it("processing a todo, when the browser can't reach the API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useProcessTodo(), {
+      wrapper: Wrapper,
+    });
+    expect(await failWith(() => result.current.mutateAsync("todo-1"))).toEqual([
+      "Couldn’t process the todo",
+    ]);
+    vi.unstubAllGlobals();
+  });
+
+  it("processing a todo too often shows rate_limited's own message", async () => {
+    apiFails(
+      {
+        error: "Too many requests. Try again in a minute.",
+        code: "rate_limited",
+      },
+      429,
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useProcessTodo(), {
+      wrapper: Wrapper,
+    });
+    expect(await failWith(() => result.current.mutateAsync("todo-1"))).toEqual([
+      "Too many requests. Try again in a minute.",
+    ]);
     vi.unstubAllGlobals();
   });
 });

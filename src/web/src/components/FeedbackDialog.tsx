@@ -83,7 +83,7 @@ export function FeedbackDialog({
             },
           ]);
         } catch {
-          toast.error("Couldn't read that image");
+          toast.error("Couldn’t read that image");
         } finally {
           setPreparing((n) => n - 1);
         }
@@ -143,7 +143,7 @@ export function FeedbackDialog({
           });
         },
         onError: (err) =>
-          toast.error(messageFromError(err, "Couldn't send feedback")),
+          toast.error(messageFromError(err, "Couldn’t send that. Try again.")),
       },
     );
   };

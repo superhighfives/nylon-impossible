@@ -1876,7 +1876,7 @@ describe("WideApp", () => {
       await settle();
       expect(sheet()).toBeNull();
       expect(add).toHaveValue("Get Rex");
-      expect(toast.error).toHaveBeenCalledWith("Offline");
+      expect(toast.error).toHaveBeenCalledWith("Couldn’t add the todo");
     });
 
     it("from Quick add: behind the popover, which keeps focus, with no toast", async () => {
@@ -3961,7 +3961,7 @@ describe("WideApp copy list ID", () => {
       within(menu).getByRole("menuitem", { name: "Copy list ID" }),
     );
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith("Couldn't copy"),
+      expect(toast.error).toHaveBeenCalledWith("Couldn’t copy"),
     );
     expect(toast.success).not.toHaveBeenCalled();
   });
