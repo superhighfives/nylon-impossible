@@ -137,10 +137,19 @@ describe("DetailSheet", () => {
       );
       // The row wraps rather than squeezing the stamps into two lines beside
       // Delete (#730); jsdom has no layout, so this checks the flex setup.
+      // The row breaks lines on the stamps' one-line width, so that box has
+      // to keep its content-sized basis: a zero basis or grow would let it
+      // shrink beside Delete instead of dropping below it.
       const footer = screen.getByRole("button", {
         name: "Delete",
       }).parentElement;
       expect(footer).toHaveClass("flex-wrap", "justify-between");
+      expect(footer).not.toHaveClass("flex-nowrap");
+      const stamps = screen.getByText(/^Created /).parentElement?.parentElement;
+      expect(stamps?.parentElement).toBe(footer);
+      expect(stamps?.className).not.toMatch(
+        /(^|\s)(flex-1|flex-auto|grow|basis-\S+)(\s|$)/,
+      );
     },
   );
 
