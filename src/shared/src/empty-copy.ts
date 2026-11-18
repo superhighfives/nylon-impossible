@@ -6,11 +6,14 @@ import { TIME_LIST_NAMES_IN_SENTENCE } from "./list-name";
  * layouts and the Gmail card (in Swift, `EmptyCopy`): "Nothing today.",
  * "A clear week.", and "Nothing here yet." for Someday and your lists.
  */
+const NOTHING_YET = "Nothing here yet.";
+
 export const EMPTY_COPY = {
   today: "Nothing today.",
   thisWeek: "A clear week.",
-  someday: "Nothing here yet.",
-  list: "Nothing here yet.",
+  // One string for both, as Swift's `EmptyCopy.list`, so they can't drift.
+  someday: NOTHING_YET,
+  list: NOTHING_YET,
 } as const;
 
 /**
