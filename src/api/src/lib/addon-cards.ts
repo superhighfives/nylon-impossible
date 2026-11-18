@@ -16,7 +16,9 @@ import {
   type BoardView,
   boardUrl,
   dueLabel,
+  EMPTY_COPY,
   TIME_LIST_NAMES_IN_SENTENCE,
+  waitingIn,
 } from "@nylon-impossible/shared";
 
 // ---------------------------------------------------------------------------
@@ -406,11 +408,12 @@ export function buildHomepageCard(
   const thisWeek = rowsFor(idFor("thisWeek"));
   const someday = rowsFor(idFor("someday"));
 
-  const waiting = thisWeek.filter((todo) => !todo.done).length;
-  const todayEmpty =
-    waiting > 0
-      ? `Nothing today. ${waiting} waiting in this week.`
-      : "Nothing today.";
+  // As the apps draw it: the words, then what's waiting next on a line of
+  // its own. Text only; a card line can't step to another section.
+  const emptyLine = (words: string, next: BoardTimeKind, rows: AddonTodo[]) => {
+    const waiting = rows.filter((todo) => !todo.done).length;
+    return waiting > 0 ? `${words}<br>${waitingIn(waiting, next)}` : words;
+  };
 
   const sections: Section[] = [
     {
@@ -442,11 +445,11 @@ export function buildHomepageCard(
     },
     todoSection(baseUrl, input, "Today", { kind: "today" }, today, {
       limit: ADDON_SECTION_LIMIT,
-      empty: todayEmpty,
+      empty: emptyLine(EMPTY_COPY.today, "thisWeek", thisWeek),
     }),
     todoSection(baseUrl, input, "This week", { kind: "thisWeek" }, thisWeek, {
       limit: ADDON_SECTION_LIMIT,
-      empty: "Nothing this week.",
+      empty: emptyLine(EMPTY_COPY.thisWeek, "someday", someday),
     }),
   ];
 
@@ -457,7 +460,7 @@ export function buildHomepageCard(
     budget -= Math.min(limit, rows.length);
     return todoSection(baseUrl, input, name, view, rows, {
       limit,
-      empty: `Nothing in ${nameInSentence(name, view)}.`,
+      empty: view.kind === "someday" ? EMPTY_COPY.someday : EMPTY_COPY.list,
       collapsed: true,
     });
   };

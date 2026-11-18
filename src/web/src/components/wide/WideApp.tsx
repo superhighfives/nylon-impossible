@@ -3,6 +3,9 @@ import {
   BOARD_TIME_KINDS,
   type BoardTimeKind,
   type BoardView,
+  EMPTY_COPY,
+  EMPTY_NEXT,
+  waitingIn,
 } from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { List } from "lucide-react";
@@ -83,12 +86,6 @@ const TIME_TITLES: Record<BoardTimeKind, string> = {
   someday: "Someday",
 };
 const EMPTY_ROWS: TodoWithUrls[] = [];
-
-const EMPTY_COPY: Record<string, string> = {
-  today: "Nothing today.",
-  thisWeek: "A clear week.",
-  someday: "Nothing here yet.",
-};
 
 /** Bring a row into view within its column, without scrolling the board. */
 function revealInColumn(row: HTMLElement) {
@@ -962,6 +959,18 @@ export function WideApp({
       ?.focus({ preventScroll: true });
   };
 
+  /**
+   * Under an empty Today or This week: "4 waiting in this week →", when the
+   * next time list has todos. It goes to that column, selecting nothing.
+   */
+  const waitingFor = (kind: BoardTimeKind | null) => {
+    const next = kind ? EMPTY_NEXT[kind] : undefined;
+    const id = next ? byKind[next]?.id : undefined;
+    const count = id ? rowsFor(id).length : 0;
+    if (!next || !id || count === 0) return null;
+    return { text: waitingIn(count, next), onGo: () => toSection(id) };
+  };
+
   const renderColumn = (list: SerializedList) => {
     const kind = list.systemKind ?? null;
     return (
@@ -988,7 +997,8 @@ export function WideApp({
         loading={loading}
         position={columnIds.indexOf(list.id)}
         error={errorView}
-        empty={EMPTY_COPY[kind ?? ""] ?? "Nothing here yet."}
+        empty={EMPTY_COPY[kind ?? "list"]}
+        waiting={waitingFor(kind)}
         onRename={
           kind
             ? undefined

@@ -145,6 +145,7 @@
 				Services/WidgetServerRefresh.swift,
 				Theme/Theme.swift,
 				Utils/DeepLink.swift,
+				Utils/EmptyCopy.swift,
 				Utils/FractionalIndexing.swift,
 				Utils/KeychainHelper.swift,
 				Utils/Recurrence.swift,

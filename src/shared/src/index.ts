@@ -3,6 +3,7 @@ export * from "./addon-state";
 export * from "./api-v1";
 export * from "./board-path";
 export * from "./due-date";
+export * from "./empty-copy";
 export * from "./link";
 export * from "./list-name";
 export * from "./recurrence";

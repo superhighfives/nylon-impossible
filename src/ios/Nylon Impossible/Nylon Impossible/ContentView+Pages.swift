@@ -74,7 +74,7 @@ extension ContentView {
             subtasks: subtasksByParent,
             lists: orderedLists,
             actions: actions,
-            empty: ("Nothing here yet.", nil),
+            empty: (EmptyCopy.list, nil),
             onOpen: open
         ) {
             Masthead(title: list.name, subline: MastheadCopy.todos(rows.count), back: ("Lists", closeCollection)) {
@@ -134,12 +134,12 @@ extension ContentView {
         switch page {
         case .today:
             let waiting = count(.thisWeek)
-            return ("Nothing today.", waiting > 0 ? ("\(waiting) waiting in this week", { select(.thisWeek) }) : nil)
+            return (EmptyCopy.today, waiting > 0 ? (EmptyCopy.waiting(waiting, in: "this week"), { select(.thisWeek) }) : nil)
         case .thisWeek:
             let waiting = count(.someday)
-            return ("A clear week.", waiting > 0 ? ("\(waiting) waiting in someday", { select(.someday) }) : nil)
+            return (EmptyCopy.thisWeek, waiting > 0 ? (EmptyCopy.waiting(waiting, in: "someday"), { select(.someday) }) : nil)
         default:
-            return ("Nothing here yet.", nil)
+            return (EmptyCopy.list, nil)
         }
     }
 }
