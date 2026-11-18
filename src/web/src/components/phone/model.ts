@@ -395,28 +395,37 @@ export function daysToWeekday(
   return diff === 0 ? 7 : diff;
 }
 
-export interface DueChoice {
-  label: string;
-  day: Date | null;
-}
+/**
+ * One of the Due choices: a quick day, Pick a date… (which opens the
+ * calendar), or No date (which clears it).
+ */
+export type DueChoice =
+  | { kind: "day"; label: string; day: Date }
+  | { kind: "pick"; label: "Pick a date…" }
+  | { kind: "clear"; label: "No date" };
 
 /**
- * The quick due choices the detail's Due chip and the context menu's Due…
- * both offer: Today, Tomorrow, Friday, Next week, No date.
+ * Every Due choice list (the wide menu's Due view and the detail's Due, in
+ * both variants) in the iPhone's order: Today, Tomorrow, Friday, Next week,
+ * Pick a date…, then No date only when a date is set, after a divider.
  */
-export function dueChoices(now: Date, timeZone: string): DueChoice[] {
+export function dueChoices(
+  now: Date,
+  timeZone: string,
+  hasDue: boolean,
+): DueChoice[] {
+  const day = (label: string, offset: number): DueChoice => ({
+    kind: "day",
+    label,
+    day: dayFromToday(now, timeZone, offset),
+  });
   return [
-    { label: "Today", day: dayFromToday(now, timeZone, 0) },
-    { label: "Tomorrow", day: dayFromToday(now, timeZone, 1) },
-    {
-      label: "Friday",
-      day: dayFromToday(now, timeZone, daysToWeekday(now, timeZone, 5)),
-    },
-    {
-      label: "Next week",
-      day: dayFromToday(now, timeZone, daysToWeekday(now, timeZone, 1)),
-    },
-    { label: "No date", day: null },
+    day("Today", 0),
+    day("Tomorrow", 1),
+    day("Friday", daysToWeekday(now, timeZone, 5)),
+    day("Next week", daysToWeekday(now, timeZone, 1)),
+    { kind: "pick", label: "Pick a date…" },
+    ...(hasDue ? [{ kind: "clear", label: "No date" } as const] : []),
   ];
 }
 

@@ -99,3 +99,20 @@ How the wide board (the web) shows each interaction state, with a pointer and by
 - **Dragging by touch.** A finger holds a row for 450ms within 10px to lift it, with the row's menu; moving turns that into a drag. The gap goes where the line would, and there's one on the board at a time: its own column closes up once the finger leaves it, and the column under the finger parts.
 - **Moving.** Moving a todo (1 / 2 / 3, Move to…, the menu's Move) keeps it selected, and the keyboard goes with it to its new column. Done and Delete hand the selection to the next todo.
 - **Dividers.** Every divider (between columns, the header rule, the sidebar edge, the toolbar's bottom) is `hairline`, 1px/1pt, drawn once. The open todo's sheet has none: its own `surface`, radius and shadow set it apart. With Increase Contrast (`prefers-contrast: more` on the web) every colour with a `highContrast` value takes it.
+
+## Todo menu
+
+One todo menu, in one order and with the same words, for every layout (principle 5). The wide board's right-click menu shows all of it; the phone layouts show part of it.
+
+| Item | Web wide | Web phone | iPhone |
+| --- | --- | --- | --- |
+| Mark done | ✓ | (the checkbox) | (the checkbox) |
+| Move to … | Flat: "Move to Today" etc., then "Move to a list…" | Grouped under "Move to", More | Grouped under "Move to", More |
+| Open link | With a link | (the row's link) | (the row's link) |
+| Pin to top / Unpin | ✓ | ✓ | ✓ |
+| Due… | ✓ | (the detail) | (the detail) |
+| Delete | ✓ | ✓ | ✓ |
+
+A layout may leave items out, but never reorders or renames them. The header (the web phone's title card, the iPhone's lifted row) and how More opens are each platform's own (principle 6).
+
+Every Due choice list (the wide menu's Due view, the detail on the web and the iPhone) is the same: Today, Tomorrow, Friday, Next week, Pick a date…, then No date, after a divider, only when a date is set.

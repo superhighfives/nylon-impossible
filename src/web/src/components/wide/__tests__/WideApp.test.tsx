@@ -975,13 +975,43 @@ describe("WideApp", () => {
     expect(focusedTitle()).toContain("Renew passport");
   });
 
-  it("d opens the Due menu for the focused todo", async () => {
+  it("d opens the Due view in the iPhone's order, No date only with a date", async () => {
     render(<WideApp />);
     rowButton("Review PR").focus();
     press("d");
     const menu = await screen.findByRole("menu", { name: "Due" });
+    const names = Array.from(
+      menu.querySelectorAll('[role="menuitem"], [role="menuitemradio"]'),
+    ).map((i) => i.textContent);
+    // The first item is the way back to the menu.
+    expect(names).toEqual([
+      "Due",
+      "Today",
+      "Tomorrow",
+      "Friday",
+      "Next week",
+      "Pick a date…",
+    ]);
+  });
+
+  it("d's No date clears a todo's date, after a divider", async () => {
+    todos = todos.map((t) =>
+      t.id === "t1" ? { ...t, dueDate: "2026-10-18T00:00:00.000Z" } : t,
+    );
+    render(<WideApp />);
+    rowButton("Review PR").focus();
+    press("d");
+    const menu = await screen.findByRole("menu", { name: "Due" });
+    const items = Array.from(
+      menu.querySelectorAll('[role="menuitem"], [role="menuitemradio"]'),
+    );
+    expect(items.map((i) => i.textContent).slice(-2)).toEqual([
+      "Pick a date…",
+      "No date",
+    ]);
+    expect(within(menu).getByRole("separator")).toBeInTheDocument();
     await userEvent.click(
-      within(menu).getByRole("menuitemradio", { name: "No date" }),
+      within(menu).getByRole("menuitem", { name: "No date" }),
     );
     expect(update).toHaveBeenCalledWith({
       id: "t1",
@@ -1010,6 +1040,37 @@ describe("WideApp", () => {
       ["Pin to top", "P"],
       ["Due…", "D"],
       ["Delete", "⌫"],
+    ]);
+  });
+
+  it("right-click on a todo with a link reads the canonical todo menu", async () => {
+    todos = [
+      makeTodo({
+        id: "w9",
+        title: "Plan Lisbon trip",
+        listId: "list-week",
+        urls: [makeUrl({ id: "u1", position: "a0" })],
+      }),
+    ];
+    render(<WideApp />);
+    fireEvent.contextMenu(rowButton("Plan Lisbon trip"), {
+      clientX: 200,
+      clientY: 200,
+    });
+    const menu = await screen.findByRole("menu", { name: "Todo actions" });
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.querySelector("span")?.textContent),
+    ).toEqual([
+      "Mark done",
+      "Move to Today",
+      "Move to Someday",
+      "Move to a list…",
+      "Open link",
+      "Pin to top",
+      "Due…",
+      "Delete",
     ]);
   });
 

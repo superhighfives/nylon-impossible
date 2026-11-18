@@ -23,6 +23,8 @@ function setup(
     onMove: vi.fn(),
     onTogglePin: vi.fn(),
     onDelete: vi.fn(),
+    // Even with a way to set Due, the phone menu leaves Due… to the detail.
+    onSetDue: vi.fn(),
   };
   render(
     <ContextMenu
@@ -116,6 +118,20 @@ describe("ContextMenu", () => {
     const { todo, onDelete } = setup();
     await userEvent.click(screen.getByRole("menuitem", { name: "Delete" }));
     expect(onDelete).toHaveBeenCalledWith(todo);
+  });
+
+  it("is Move to, Pin to top and Delete in that order, with no Due…", () => {
+    setup();
+    const menu = screen.getByRole("menu", { name: "Todo actions" });
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["This week", "Someday", "Pin to top", "Delete"]);
+    expect(within(menu).getByRole("group", { name: "Move to" })).toBe(
+      within(menu).getAllByRole("menuitem")[0]?.parentElement,
+    );
+    expect(screen.queryByRole("menuitem", { name: /Due/ })).toBeNull();
   });
 
   it("arrow keys move between items", async () => {

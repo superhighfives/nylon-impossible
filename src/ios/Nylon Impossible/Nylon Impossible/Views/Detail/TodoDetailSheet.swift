@@ -240,16 +240,14 @@ extension TodoDetailSheet {
 
     @ViewBuilder
     var dueMenuItems: some View {
-        DueMenuItems(hasDue: false) { setDue($0) }
-        Button {
-            withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { showsDatePicker.toggle() }
-        } label: {
-            Label(showsDatePicker ? "Hide calendar" : "Pick a date…", systemImage: Theme.Icon.due)
-        }
-        if todo.dueDate != nil {
-            Divider()
-            Button("No date", role: .destructive) { setDue(nil) }
-        }
+        DueMenuItems(
+            hasDue: todo.dueDate != nil,
+            showsDatePicker: showsDatePicker,
+            set: { setDue($0) },
+            pickDate: {
+                withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) { showsDatePicker.toggle() }
+            }
+        )
     }
 
     @ViewBuilder
