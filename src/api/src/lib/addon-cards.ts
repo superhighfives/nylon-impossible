@@ -17,6 +17,8 @@ import {
   boardUrl,
   dueLabel,
   EMPTY_COPY,
+  type RecurrenceFrequency,
+  repeatLabel,
   TIME_LIST_NAMES_IN_SENTENCE,
   waitingIn,
 } from "@nylon-impossible/shared";
@@ -183,7 +185,8 @@ export interface AddonTodo {
   listId: string;
   dueDate: Date | null;
   pinned: boolean;
-  repeats: boolean;
+  /** How often it repeats, or null when it doesn't. */
+  repeat: RecurrenceFrequency | null;
   /**
    * Ticked within `ADDON_DONE_WINDOW_MS`: it stays in place, checked and
    * struck through, so it can be unticked. No Undo on homepage rows.
@@ -227,18 +230,19 @@ function plural(n: number, word: string): string {
 
 /**
  * The row's meta line, in the apps' words: Pinned, then the due label
- * ("Today", "Tomorrow", "Fri", "Oct 30", "3 days overdue"), then Repeat.
+ * ("Today", "Tomorrow", "Fri", "Oct 30", "3 days overdue"), then how often
+ * it repeats ("Weekly").
  * Undefined when there's nothing to say, so the row stays one line.
  */
 export function addonTodoMeta(
-  todo: Pick<AddonTodo, "dueDate" | "pinned" | "repeats">,
+  todo: Pick<AddonTodo, "dueDate" | "pinned" | "repeat">,
   now: Date,
   timeZone: string,
 ): string | undefined {
   const parts: string[] = [];
   if (todo.pinned) parts.push("Pinned");
   if (todo.dueDate) parts.push(dueLabel(todo.dueDate, now, timeZone).text);
-  if (todo.repeats) parts.push("Repeat");
+  if (todo.repeat) parts.push(repeatLabel({ frequency: todo.repeat }));
   return parts.length > 0 ? parts.join(" · ") : undefined;
 }
 

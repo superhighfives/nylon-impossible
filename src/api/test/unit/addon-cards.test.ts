@@ -30,7 +30,7 @@ function todo(overrides: Partial<AddonTodo> = {}): AddonTodo {
     listId: "today",
     dueDate: null,
     pinned: false,
-    repeats: false,
+    repeat: null,
     done: false,
     ...overrides,
   };
@@ -50,14 +50,14 @@ describe("addonTodoMeta", () => {
     expect(addonTodoMeta(todo({ dueDate: day(key) }), NOW, TZ)).toBe(label);
   });
 
-  it("joins Pinned, the due label and Repeat in the apps' order", () => {
+  it("joins Pinned, the due label and the frequency in the apps' order", () => {
     expect(
       addonTodoMeta(
-        todo({ pinned: true, repeats: true, dueDate: day("2026-10-23") }),
+        todo({ pinned: true, repeat: "weekly", dueDate: day("2026-10-23") }),
         NOW,
         TZ,
       ),
-    ).toBe("Pinned · Fri · Repeat");
+    ).toBe("Pinned · Fri · Weekly");
   });
 
   it("has no meta line when nothing is set", () => {

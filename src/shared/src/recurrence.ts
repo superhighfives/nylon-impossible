@@ -1,5 +1,20 @@
 import { dayKeyIn, daysBetweenKeys, dueDayKey } from "./due-date";
-import type { Recurrence } from "./schema";
+import type { Recurrence, RecurrenceFrequency } from "./schema";
+
+/**
+ * A repeat's label, in the apps' words. Shared so the web and the Gmail card
+ * read one table (iPhone: Utils/TodoMeta.swift).
+ */
+const REPEAT_LABELS: Record<RecurrenceFrequency, string> = {
+  daily: "Daily",
+  weekly: "Weekly",
+  monthly: "Monthly",
+  yearly: "Yearly",
+};
+
+export function repeatLabel(recurrence: Recurrence): string {
+  return REPEAT_LABELS[recurrence.frequency];
+}
 
 /**
  * Compute the next due date for a repeating todo: the first occurrence of the

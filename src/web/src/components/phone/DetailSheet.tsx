@@ -24,13 +24,7 @@ import {
   Repeat,
   X,
 } from "lucide-react";
-import {
-  Fragment,
-  type KeyboardEvent,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ICON_BUTTON, ROW_HOVER, SUBLINE } from "@/components/ui/styles";
 import { ViewBoundary } from "@/components/ViewBoundary";
 import {
@@ -59,14 +53,20 @@ import type { TodoActions } from "./useTodoActions";
 
 const DAY_MS = 86_400_000;
 
+const CHIP_BASE =
+  "n-hit flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast)";
+
 function chipClass(selected: boolean, strong = false) {
   const tone = selected
     ? strong
       ? "border-n-brand bg-n-brand text-n-brand-ink"
       : "border-n-fill bg-n-fill text-n-ink"
     : "border-n-hairline bg-transparent text-n-ink-muted";
-  return `n-hit flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${tone}`;
+  return `${CHIP_BASE} ${tone}`;
 }
+
+/** No date and Don’t repeat: the last chip in their rows, in red. */
+const CLEAR_CHIP_CLASS = `${CHIP_BASE} border-n-hairline bg-transparent text-n-destructive`;
 
 const PANEL_CLASS =
   "mt-2.5 flex min-w-0 animate-n-fade-in flex-wrap gap-1.5 rounded-n-field bg-n-surface p-2.5";
@@ -372,20 +372,17 @@ function DetailBody({
                 );
               }
               if (c.kind === "clear") {
+                // The last chip, in red; a divider inside a wrapping row of
+                // chips reads oddly, so unlike the menus there's none.
                 return (
-                  <Fragment key={c.label}>
-                    <hr
-                      aria-orientation="vertical"
-                      className="mx-1 h-auto w-px self-stretch border-0 bg-n-hairline"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setDue(null)}
-                      className={`${chipClass(false)} text-n-destructive`}
-                    >
-                      {c.label}
-                    </button>
-                  </Fragment>
+                  <button
+                    key={c.label}
+                    type="button"
+                    onClick={() => setDue(null)}
+                    className={CLEAR_CHIP_CLASS}
+                  >
+                    {c.label}
+                  </button>
                 );
               }
               const selected = dueKey === dueDayKey(c.day);
@@ -416,17 +413,6 @@ function DetailBody({
     }
     return (
       <fieldset aria-label="Repeat" className={className}>
-        <button
-          type="button"
-          aria-pressed={!todo.recurrence}
-          onClick={() => {
-            save({ recurrence: null });
-            setPanel(null);
-          }}
-          className={chipClass(!todo.recurrence, true)}
-        >
-          Never
-        </button>
         {REPEATS.map((frequency) => (
           <button
             key={frequency}
@@ -450,6 +436,18 @@ function DetailBody({
             {repeatLabel({ frequency })}
           </button>
         ))}
+        {todo.recurrence && (
+          <button
+            type="button"
+            onClick={() => {
+              save({ recurrence: null });
+              setPanel(null);
+            }}
+            className={CLEAR_CHIP_CLASS}
+          >
+            Don’t repeat
+          </button>
+        )}
       </fieldset>
     );
   };

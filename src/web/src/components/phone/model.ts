@@ -15,7 +15,7 @@ import {
   dueLabel,
   formatDueDay as formatDay,
   parseTodoDate,
-  type Recurrence,
+  repeatLabel,
 } from "@nylon-impossible/shared";
 import { byPosition } from "@/lib/dragOrder";
 import {
@@ -52,19 +52,9 @@ export function wordCountLabel(words: number): string {
   return `${words.toLocaleString()} ${words === 1 ? "word" : "words"}`;
 }
 
-// The due label is shared with the Gmail card, so it lives in shared.
-export { type DueLabel, daysUntil, dueLabel };
-
-const REPEAT_LABELS: Record<Recurrence["frequency"], string> = {
-  daily: "Daily",
-  weekly: "Weekly",
-  monthly: "Monthly",
-  yearly: "Yearly",
-};
-
-export function repeatLabel(recurrence: Recurrence): string {
-  return REPEAT_LABELS[recurrence.frequency];
-}
+// The due and repeat labels are shared with the Gmail card, so they live in
+// shared.
+export { type DueLabel, daysUntil, dueLabel, repeatLabel };
 
 /**
  * The title a row shows. A todo captured as a bare link reads as the fetched
