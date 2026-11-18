@@ -186,8 +186,8 @@ The `waiting-on-owner` label marks every issue whose next step is the
 owner's, so the board's **Waiting on you** view (a board grouped by Status,
 filtered to `label:waiting-on-owner is:open`) is one place to see them, each
 in its real column. The foreman sets it and the owner never does: each tick,
-`waiting_pass` works the list out again from GitHub and the board
-(`owner_waits`), labels what's missing and unlabels what no longer applies,
+`waiting_pass` works the list out again from GitHub and a fresh read of the
+board, taken after the tick's other passes have moved things (`owner_waits`), labels what's missing and unlabels what no longer applies,
 closed issues included. Nothing remembers it, so whatever ends a wait
 (removing `needs-decision`, replying on a spec, merging a PR) takes the label
 off on the next tick.
@@ -209,7 +209,8 @@ or `nylon-foreman` label an issue.
 `needs-decision` keeps its job as the "go again" switch for builds, triage and
 review rounds; `waiting-on-owner` only summarises it. If any read fails, the
 pass changes no labels that tick, since a partial list would strip them from
-things still waiting. The first time it has something to label, the foreman
+things still waiting. A bundle that can't be moved on the board (a renamed
+column) is logged, and the labels still change. The first time it has something to label, the foreman
 creates the label if the repo doesn't have it. `tick --dry-run` logs `would
 label` and `would unlabel` instead. The digest's "Waiting on you" section
 prints the same list.

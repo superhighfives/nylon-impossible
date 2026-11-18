@@ -2172,12 +2172,15 @@ bundle_board() { # board_json targets -> adds each waiting bundle (p<n>) to the 
     if dry; then log "would add #$n to the board in In review"; continue; fi
     item=$(gh project item-add "$PROJECT" --owner "$OWNER" --url "https://github.com/$OWNER/$REPO/pull/$n" --format json --jq .id) \
       || { log "couldn't add #$n to the board"; continue; }
-    set_item_status "$board" "$item" "In review" && log "added #$n to the board in In review"
+    # In a subshell: set_item_status dies on a renamed column, which mustn't end the tick.
+    if (set_item_status "$board" "$item" "In review"); then log "added #$n to the board in In review"
+    else log "couldn't set #$n to In review"; fi
   done < <(sed -n 's/^p//p' <<<"$2")
   while IFS=$'\t' read -r item n; do
     [ -n "$item" ] || continue
     if dry; then log "would set #$n to Done"; continue; fi
-    set_item_status "$board" "$item" Done && log "#$n is closed; set it to Done"
+    if (set_item_status "$board" "$item" Done); then log "#$n is closed; set it to Done"
+    else log "couldn't set #$n to Done"; fi
   done < <(jq -r '.items.nodes[]
     | select(.content.__typename == "PullRequest" and (.content.headRefName // "" | startswith("foreman/deps-")))
     | select(.content.state != "OPEN" and .status.name? != "Done")
@@ -2431,7 +2434,10 @@ cmd_tick() {
   routines_pass "$board"
   shots_pass
   # Before the PR limit: the tick returns early once it builds or triages.
-  waiting_pass "$board"
+  # On a fresh board, so a spec settle_pass moved to Ready this tick isn't
+  # still read as in $SPEC_COL. If the board can't be read, the labels wait.
+  local fresh
+  if fresh=$(board_json); then waiting_pass "$fresh"; else log "couldn't re-read the board; no $WAITING_LABEL changes this tick"; fi
 
   local open; open=$(agent_pr_count)
   if [ "$open" -ge "$MAX_AGENT_PRS" ]; then log "$open agent PRs open; not starting another"; return 0; fi

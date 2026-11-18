@@ -1617,6 +1617,11 @@ expect "once they've acted, the label comes off" \
   "$(edits)"
 expect "a merged bundle goes to Done, and nothing else moves" "yes 1 no" \
   "$(called '--id I173 --field-id F --single-select-option-id o-done') $(grep -c 'project item-edit' "$CALLS") $(called 'project item-add')"
+# A renamed Done column logs, and the labels still come off.
+: > "$CALLS"; W_HAVE_I='[{"number":61},{"number":65},{"number":70}]' W_HAVE_P='[]'
+out=$(waiting_pass "$(jq -c '.field.options |= map(select(.name != "Done"))' <<<"$CLOSED_BOARD")" 2>/dev/null)
+expect "with no Done column, the pass logs it and carries on" "yes issue edit 70 --remove-label waiting-on-owner" \
+  "$(grep -q "couldn't set #173 to Done" <<<"$out" && echo yes) $(edits)"
 
 : > "$CALLS"; W_OM='[{"number":176,"title":"Bundle","headRefName":"foreman/deps-2026-11-08","author":{"login":"nylon-foreman"}}]' W_HAVE_I='[{"number":61},{"number":65}]' W_HAVE_P='[]'
 W_ND='[{"number":177,"title":"Bundle","headRefName":"foreman/deps-2026-11-08","author":{"login":"nylon-foreman"}}]'
