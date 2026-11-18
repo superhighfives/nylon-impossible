@@ -1919,7 +1919,7 @@ describe("WideApp", () => {
       within(detail).getByRole("group", { name: "Move to list" }),
     ).toBeInTheDocument();
 
-    const due = within(detail).getByRole("button", { name: "Due date" });
+    const due = within(detail).getByRole("button", { name: "Due" });
     await userEvent.click(due);
     expect(due).toHaveAttribute("aria-expanded", "true");
     // One set of choices at a time.

@@ -99,6 +99,76 @@ describe("copy lint", () => {
     ]);
   });
 
+  it("reads strings shown from a JSX expression, not attributes", () => {
+    const found = extractJsx(
+      [
+        "export const A = () => (",
+        '  <Row className={open ? "Is Open" : "Shut"}>',
+        '    {due ? due.text : "Due date"}',
+        '    {pending && "Saving Changes"}',
+        '    {name ?? "Untitled List"}',
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: source under test
+        '    {count > 1 ? `${count} todos` : "One Todo"}',
+        '    {kind === "Big Task" ? 1 : 2}',
+        "  </Row>",
+        ");",
+      ].join("\n"),
+    );
+    expect(found.map((f) => [f.text, f.line])).toEqual([
+      ["Due date", 3],
+      ["Saving Changes", 4],
+      ["Untitled List", 5],
+      ["⁠ todos", 6],
+      ["One Todo", 6],
+    ]);
+  });
+
+  it("reads toast messages and error fallbacks in .ts files", () => {
+    const found = extractJsx(
+      [
+        "const id = <string>raw;",
+        'toast.info("No links to process on this task");',
+        'toast.error(messageFromError(err, "Couldn\'t Add Link"));',
+        'showActionToast(several ? "3 Added" : "Added", "View", go);',
+        'console.log("Not A Toast");',
+        'track("Some Event", "Other Thing");',
+      ].join("\n"),
+      "useTodos.ts",
+    );
+    expect(found.map((f) => [f.text, f.line])).toEqual([
+      ["No links to process on this task", 2],
+      ["Couldn't Add Link", 3],
+      ["3 Added", 4],
+      ["Added", 4],
+    ]);
+    expect(checkString(found[0].text, vocabulary)).toEqual([
+      { rule: "vocabulary", message: '"task": use todo' },
+    ]);
+  });
+
+  it("reads Swift toasts and text: arguments", () => {
+    const found = extractSwift(
+      [
+        'actions.toasts.show("Couldn’t Rename The List", action: nil)',
+        'message("Nothing For Today")',
+        'ChipLabel(text: label?.text ?? "Due Date", systemImage: "calendar")',
+        "PinChip(",
+        '    text: pinned ? "Pinned Todo" : "Pin",',
+        "    on: pinned",
+        ")",
+        "init(text: String, undo: Bool)",
+        'Entry(text: format("%d", n), title: "Other")',
+      ].join("\n"),
+    );
+    expect(found.map((f) => [f.text, f.line])).toEqual([
+      ["Couldn’t Rename The List", 1],
+      ["Nothing For Today", 2],
+      ["Due Date", 3],
+      ["Pinned Todo", 5],
+      ["Pin", 5],
+    ]);
+  });
+
   it("reads Swift literals, interpolations included", () => {
     const found = extractSwift(
       [

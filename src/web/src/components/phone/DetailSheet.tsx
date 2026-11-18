@@ -537,7 +537,7 @@ function DetailBody({
             aria-label={due ? `Due: ${due.text}` : undefined}
             onClick={() => toggle("due")}
           >
-            {due ? due.text : "Due date"}
+            {due ? due.text : "Due"}
           </PropertyRow>
           {panel === "due" && choices("due", choicesClass)}
           {canRepeat && (
