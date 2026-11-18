@@ -657,6 +657,70 @@ describe("WideApp", () => {
     expect(board.scrollTo).not.toHaveBeenCalled();
   });
 
+  describe("empty Today and This week: what's waiting next", () => {
+    const empty = (listId: string) => {
+      todos = todos.filter((t) => t.completed || t.listId !== listId);
+    };
+
+    it("under an empty Today, links to This week, which takes the keyboard with nothing selected", async () => {
+      empty("list-today");
+      render(<WideApp />);
+      const board = layOutBoard(300);
+      const today = column("Today");
+      expect(within(today).getByText("Nothing today.")).toBeInTheDocument();
+      const link = within(today).getByRole("button", {
+        name: "2 waiting in this week",
+      });
+      await userEvent.click(link);
+      // This week is 272–544px: the board scrolls the least that shows it.
+      expect(board.scrollTo).toHaveBeenLastCalledWith({
+        left: 544 - 300,
+        behavior: "auto",
+      });
+      const week = column("This week");
+      expect(document.activeElement).toBe(
+        week.querySelector("[data-column-head]"),
+      );
+      expect(week).toHaveAttribute("data-key-section", "on");
+      expect(focusedTitle()).toBeUndefined();
+      expect(document.querySelector("[data-selected]")).toBeNull();
+    });
+
+    it("under an empty This week, links to Someday; with nothing waiting, no link", async () => {
+      empty("list-today");
+      empty("list-week");
+      render(<WideApp />);
+      // This week is empty too, so Today has nothing to point to.
+      const today = column("Today");
+      expect(within(today).getByText("Nothing today.")).toBeInTheDocument();
+      expect(
+        within(today).queryByRole("button", { name: /waiting/ }),
+      ).toBeNull();
+      const week = column("This week");
+      expect(within(week).getByText("A clear week.")).toBeInTheDocument();
+      await userEvent.click(
+        within(week).getByRole("button", { name: "1 waiting in someday" }),
+      );
+      expect(document.activeElement).toBe(
+        column("Someday").querySelector("[data-column-head]"),
+      );
+    });
+
+    it("draws no link under an empty This week when Someday is empty", () => {
+      empty("list-week");
+      empty("list-someday");
+      render(<WideApp />);
+      const week = column("This week");
+      expect(within(week).getByText("A clear week.")).toBeInTheDocument();
+      expect(
+        within(week).queryByRole("button", { name: /waiting/ }),
+      ).toBeNull();
+      expect(
+        within(column("Someday")).getByText("Nothing here yet."),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("goes into a time list from the sidebar, back to its last selection", async () => {
     render(<WideApp />);
     const nav = screen.getByRole("navigation", { name: "Lists" });

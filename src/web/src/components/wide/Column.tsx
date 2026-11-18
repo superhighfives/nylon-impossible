@@ -1,6 +1,6 @@
 import { Menu } from "@base-ui/react/menu";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { Ellipsis } from "lucide-react";
+import { ArrowRight, Ellipsis } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { EmptyLine } from "@/components/phone/EmptyLine";
 import {
@@ -404,6 +404,7 @@ export function Column({
   icon,
   banner,
   empty,
+  waiting,
   loading,
   position = 0,
   error,
@@ -440,6 +441,11 @@ export function Column({
   /** Today's overnight pill, in the header's reserved space. */
   banner?: ReactNode;
   empty: string;
+  /**
+   * Under an empty Today or This week, when the next time list has todos:
+   * "4 waiting in this week →", which goes to that column.
+   */
+  waiting?: { text: string; onGo: () => void } | null;
   loading: boolean;
   /** Its place on the board, from 0: placeholder rows fade along it. */
   position?: number;
@@ -578,6 +584,16 @@ export function Column({
                   } ${gap ? "invisible" : ""}`}
                 >
                   <EmptyLine text={empty} density="wide" />
+                  {waiting && (
+                    <button
+                      type="button"
+                      onClick={waiting.onGo}
+                      className="-mt-1 ml-[29px] flex min-h-8 w-fit cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
+                    >
+                      {waiting.text}
+                      <ArrowRight size={15} aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <ul

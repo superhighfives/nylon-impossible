@@ -1,5 +1,11 @@
 import { DndContext, DragOverlay } from "@dnd-kit/core";
-import { BOARD_TIME_KINDS, type BoardView } from "@nylon-impossible/shared";
+import {
+  BOARD_TIME_KINDS,
+  type BoardView,
+  EMPTY_COPY,
+  EMPTY_NEXT,
+  waitingIn,
+} from "@nylon-impossible/shared";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, Check, ChevronRight, Plus } from "lucide-react";
 import {
@@ -406,35 +412,21 @@ export function PhoneApp({
 
   /** Written empty states: "Nothing today." and "4 waiting in this week →". */
   function renderEmpty(kind: PageKey | null) {
-    const next =
-      kind === "today"
-        ? {
-            index: 1,
-            kind: "thisWeek" as const,
-            name: "this week",
-            text: "Nothing today.",
-          }
-        : kind === "thisWeek"
-          ? {
-              index: 2,
-              kind: "someday" as const,
-              name: "someday",
-              text: "A clear week.",
-            }
-          : null;
-    const waiting = next ? rowsFor(byKind[next.kind]?.id).length : 0;
+    const time = kind === "today" || kind === "thisWeek" ? kind : null;
+    const nextKind = time ? EMPTY_NEXT[time] : undefined;
+    const waiting = nextKind ? rowsFor(byKind[nextKind]?.id).length : 0;
     return (
       // Where the first row would sit (PhoneRows' top), the link under the
       // line's words.
       <div className="px-5 pt-2 pb-7 text-n-ink-subtle">
-        <EmptyLine text={next?.text ?? "Nothing here yet."} density="phone" />
-        {next && waiting > 0 && (
+        <EmptyLine text={EMPTY_COPY[time ?? "list"]} density="phone" />
+        {nextKind && waiting > 0 && (
           <button
             type="button"
-            onClick={() => goTo(next.index)}
+            onClick={() => goTo(BOARD_TIME_KINDS.indexOf(nextKind))}
             className="mx-auto flex w-fit min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
           >
-            {waiting} waiting in {next.name}
+            {waitingIn(waiting, nextKind)}
             <ArrowRight size={15} aria-hidden="true" />
           </button>
         )}

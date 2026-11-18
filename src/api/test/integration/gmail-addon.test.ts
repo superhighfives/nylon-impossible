@@ -448,11 +448,35 @@ describe("Gmail add-on", () => {
       const body = await res.json<any>();
       const card = body.action.navigations[0].pushCard;
 
+      // The waiting count on a second line, with no period, as the apps
+      // draw it under the words.
       expect(section(card, "Today").widgets[0].textParagraph.text).toBe(
-        "Nothing today. 1 waiting in this week.",
+        "Nothing today.<br>1 waiting in this week",
       );
       expect(section(card, "Someday · 0").widgets[0].textParagraph.text).toBe(
-        "Nothing in someday.",
+        "Nothing here yet.",
+      );
+    });
+
+    it("points an empty This week at Someday when it has todos", async () => {
+      await linkUser();
+      const somedayId = await getTimeListId("someday");
+      await seedTodo("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee", "user_test_123", {
+        title: "Read Piranesi",
+        listId: somedayId,
+      });
+
+      const token = await idToken();
+      const res = await post("/gmail-addon/homepage", token);
+      const body = await res.json<any>();
+      const card = body.action.navigations[0].pushCard;
+
+      // This week is empty too, so Today has nothing waiting to name.
+      expect(section(card, "Today").widgets[0].textParagraph.text).toBe(
+        "Nothing today.",
+      );
+      expect(section(card, "This week").widgets[0].textParagraph.text).toBe(
+        "A clear week.<br>1 waiting in someday",
       );
     });
 

@@ -54,7 +54,7 @@ struct TodayWidgetView: View {
             case .todos(let todos, let total):
                 header(count: total, showsAdd: true)
                 if todos.isEmpty {
-                    message("Nothing for today")
+                    message(EmptyCopy.today)
                 } else {
                     rows(todos, total: total)
                 }
@@ -274,7 +274,7 @@ private struct TodayRectangularView: View {
                             .foregroundStyle(.secondary)
                     }
                 } else {
-                    Text("Nothing for today").font(.body).foregroundStyle(.secondary)
+                    Text(EmptyCopy.today).font(.body).foregroundStyle(.secondary)
                 }
             }
         }
@@ -295,7 +295,7 @@ private struct TodayInlineView: View {
             if let next = todos.first {
                 Text("\(total) today · \(next.title)")
             } else {
-                Text("Nothing for today")
+                Text(EmptyCopy.today)
             }
         }
     }

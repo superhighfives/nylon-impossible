@@ -152,7 +152,7 @@ struct QuickAddView: View {
                 .padding(.horizontal, Theme.Space.s4)
                 .padding(.top, Theme.Space.s1)
             if shown.isEmpty {
-                Text("Nothing for today.")
+                Text(EmptyCopy.today)
                     .textStyle(Theme.Fonts.Role.bodyWide)
                     .foregroundStyle(Theme.Colors.inkMuted)
                     .padding(.horizontal, Theme.Space.s4)
