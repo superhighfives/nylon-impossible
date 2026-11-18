@@ -98,7 +98,7 @@ struct AddTaskIntentTests {
         let parsed = TodoDateParser.parse("Send the invoice friday", now: now)
         let due = try #require(parsed.dueDay)
         #expect(parsed.title == "Send the invoice")
-        #expect(AddTaskIntent.confirmation(listName: "this week", dueDate: due, now: now) == "Added to this week · Due Fri")
+        #expect(AddTaskIntent.confirmation(listName: "this week", dueDate: due, now: now) == "Added to this week · due Fri")
         #expect(AddTaskIntent.confirmation(listName: "today", dueDate: nil, now: now) == "Added to today")
     }
 
@@ -120,6 +120,6 @@ struct AddTaskIntentTests {
         #expect(todo.title == "Pay rent")
         #expect(todo.listKey == "W-2")
         let due = try #require(todo.dueDate)
-        #expect(AddTaskIntent.confirmation(listName: destination.nameInSentence, dueDate: due) == "Added to this week · Due Tomorrow")
+        #expect(AddTaskIntent.confirmation(listName: destination.nameInSentence, dueDate: due) == "Added to this week · due tomorrow")
     }
 }

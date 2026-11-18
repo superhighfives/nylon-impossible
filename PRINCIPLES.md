@@ -59,6 +59,7 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 - The time lists are lowercase mid-sentence: "Moved to this week", "Back in today", "Today, this week, someday.". They keep their capitals only where the name stands alone: column and page titles, the switcher, the sidebar, menu items and buttons. Your own lists keep their names everywhere: "Moved to Groceries".
 - Short and specific: "Moved to this week", not "Your todo has been moved successfully".
 - Toasts name what happened and, when it can be reversed, offer Undo.
+- Adding somewhere off-screen toasts the same words everywhere: "Added to someday", "3 todos added to Groceries", and from Gmail and Siri, which have no date chip, "Added to this week · due Fri" ("due today", "due tomorrow"). The web and iPhone offer "View". The menu bar doesn't, an exception to principle 5: the toast already names where the todo went, and the popover shows only Today, so View would have to open a browser.
 - Empty states say what's true and, when it helps, where to look next: "Nothing today." with "4 waiting in this week".
 
 ## Visual

@@ -10,6 +10,26 @@
 import Foundation
 import Observation
 
+/// Toast wording shared by more than one place, so it can't drift.
+enum ToastCopy {
+    /// "Added to someday", "3 todos added to Groceries", "Added to this week
+    /// · due Fri": the same words as the web composer and Gmail (shared's
+    /// `addedToast`). `listName` reads mid-sentence (`nameInSentence`), and
+    /// `dueLabel` is the row's due label (`DueLabel.text`) when a day was
+    /// given.
+    static func added(count: Int, listName: String, dueLabel: String? = nil) -> String {
+        let added = count > 1 ? "\(count) todos added to \(listName)" : "Added to \(listName)"
+        guard let dueLabel else { return added }
+        return "\(added) · due \(dueInSentence(dueLabel))"
+    }
+
+    /// A due label mid-sentence: "today", "tomorrow"; weekdays and months
+    /// keep their capitals ("Fri", "Mar 3").
+    static func dueInSentence(_ label: String) -> String {
+        ["Today", "Tomorrow", "Yesterday"].contains(label) ? label.lowercased() : label
+    }
+}
+
 @MainActor
 @Observable
 final class ToastCenter {

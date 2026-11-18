@@ -287,7 +287,9 @@ struct QuickAddView: View {
         guard !created.isEmpty else { return }
         let name = orderedLists.first { $0.id == (listId ?? todayList?.id) }?.nameInSentence
             ?? SystemListKind.today.nameInSentence
-        actions.toasts.show(created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)", action: nil)
+        // No "View": the popover shows only Today, so it would have to open a
+        // browser (PRINCIPLES.md, principle 5's exception).
+        actions.toasts.show(ToastCopy.added(count: created.count, listName: name), action: nil)
     }
 }
 #endif

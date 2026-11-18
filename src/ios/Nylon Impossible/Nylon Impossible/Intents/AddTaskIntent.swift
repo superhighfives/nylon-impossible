@@ -107,10 +107,13 @@ struct AddTaskIntent: AppIntent {
         return (today?.id, SystemListKind.today.nameInSentence)
     }
 
-    /// "Added to this week · Due Fri", or "Added to today" with no due day.
+    /// "Added to this week · due Fri", or "Added to today" with no due day.
     static func confirmation(listName: String, dueDate: Date?, now: Date = Date()) -> String {
-        guard let dueDate else { return "Added to \(listName)" }
-        return "Added to \(listName) · \(DueLabel.chip(for: dueDate, now: now))"
+        ToastCopy.added(
+            count: 1,
+            listName: listName,
+            dueLabel: dueDate.map { DueLabel.text(for: $0, now: now).text }
+        )
     }
 
     /// iOS retries from a background task. A Mac has none; the intent runs
