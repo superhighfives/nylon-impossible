@@ -39,7 +39,7 @@ extension ContentView {
         noteAdded(created, to: listId)
         guard !created.isEmpty, let listId, listId != currentListId else { return }
         let name = orderedLists.first { $0.id == listId }?.nameInSentence ?? "List"
-        let message = created.count > 1 ? "\(created.count) added to \(name)" : "Added to \(name)"
+        let message = ToastCopy.added(count: created.count, listName: name)
         let lists = orderedLists
         actions.toasts.show(message, actionLabel: "View", action: { [viewModel] in
             viewModel.show(listId: listId, in: lists)

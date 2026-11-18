@@ -1,4 +1,5 @@
 import {
+  addedToast,
   type BoardTimeKind,
   listNameInSentence,
   splitTodoText,
@@ -206,11 +207,9 @@ export function Composer({
     if (!(isVisible ? isVisible(listId) : listId === currentListId)) {
       const added = targets.find((t) => t.id === listId);
       const name = added ? inSentence(added) : "list";
-      const label =
-        planned.length > 1
-          ? `${plural(planned.length, "todo")} added to ${name}`
-          : `Added to ${name}`;
-      showActionToast(label, "View", () => onView(listId));
+      showActionToast(addedToast(planned.length, name), "View", () =>
+        onView(listId),
+      );
     }
   };
 

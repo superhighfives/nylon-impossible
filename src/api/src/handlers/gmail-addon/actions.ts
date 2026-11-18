@@ -1,4 +1,5 @@
 import {
+  addedToast,
   type BoardView,
   boardUrl,
   dueLabel,
@@ -67,12 +68,16 @@ function listInSentence(data: HomepageData, listId: string): string {
 }
 
 /** "Added to today", or "Added to today · due Fri" when a date was typed. */
-function addedToast(created: { listId: string; dueDate: string | null }) {
-  return (data: HomepageData, now: Date) => {
-    const where = `Added to ${listInSentence(data, created.listId)}`;
-    if (!created.dueDate) return where;
-    return `${where} · due ${dueLabel(created.dueDate, now, data.timeZone).text}`;
-  };
+function addedNotification(created: {
+  listId: string;
+  dueDate: string | null;
+}) {
+  return (data: HomepageData, now: Date) =>
+    addedToast(
+      1,
+      listInSentence(data, created.listId),
+      created.dueDate && dueLabel(created.dueDate, now, data.timeZone).text,
+    );
 }
 
 /**
@@ -160,7 +165,7 @@ export async function gmailAddonQuickAdd(c: Context<Env>) {
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 
-  return refreshedHomepage(c, resolved.userId, addedToast(todo));
+  return refreshedHomepage(c, resolved.userId, addedNotification(todo));
 }
 
 // POST /gmail-addon/actions/add-from-message — add the open message as a todo.

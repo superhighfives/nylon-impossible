@@ -634,7 +634,7 @@ describe("Gmail add-on", () => {
       });
       const body = await res.json<any>();
       expect(body.renderActions.action.notification.text).toBe(
-        "Added to today · due Tomorrow",
+        "Added to today · due tomorrow",
       );
 
       const [row] = await getDb(env.DB)
