@@ -508,6 +508,36 @@ describe("Sync endpoint", () => {
     expect(over.status).toBe(400);
   });
 
+  it("keeps every link when one save adds more than fit in one insert", async () => {
+    const now = new Date().toISOString();
+    const todoId = "550e8400-e29b-41d4-a716-446655440017";
+    const links = Array.from(
+      { length: 50 },
+      (_, i) => `https://quiche.industries/reading/${i}`,
+    );
+
+    const res = await syncRequest({
+      changes: [
+        {
+          id: todoId,
+          title: "Reading list",
+          notes: links.join("\n"),
+          completed: false,
+          position: "a0",
+          updatedAt: now,
+        },
+      ],
+    });
+    expect(res.status).toBe(200);
+
+    const db = getDb(env.DB);
+    const urls = await db
+      .select()
+      .from(todoUrls)
+      .where(eq(todoUrls.todoId, todoId));
+    expect(urls.map((u) => u.url).sort()).toEqual([...links].sort());
+  });
+
   it("extracts URLs from both title and notes when both contain URLs", async () => {
     const now = new Date().toISOString();
     const todoId = "550e8400-e29b-41d4-a716-446655440013";

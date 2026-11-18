@@ -399,7 +399,11 @@ function matchLink(
  * Where the `*` or `_` run of `marker` that opens at `from` closes, or -1.
  * Runs of the other length are stepped over, so `*a **b** c*` pairs its
  * outer stars. A search that reaches a place an earlier failed one passed
- * would fail the same way from there, so it stops.
+ * would fail the same way from there, so it stops. That holds because the
+ * scan from any position it records doesn't depend on where it started:
+ * `closes` only needs `j > from`, true of every recorded position; escapes
+ * and code spans are resolved where they sit; and the memo is per marker.
+ * (Checked against the old parser on 700,000 random strings, in #714.)
  */
 function findCloser(
   s: string,

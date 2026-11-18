@@ -31,4 +31,13 @@ describe("chunkForD1", () => {
   it("returns no batches for an empty list", () => {
     expect(chunkForD1([])).toEqual([]);
   });
+
+  it("fits multi-row inserts by the parameters each row binds", () => {
+    const rows = Array.from({ length: 50 }, (_, i) => i);
+    const batches = chunkForD1(rows, 15);
+    expect(batches.map((b) => b.length * 15)).toSatisfy((sizes: number[]) =>
+      sizes.every((n) => n <= D1_MAX_BOUND_PARAMS),
+    );
+    expect(batches.flat()).toEqual(rows);
+  });
 });
