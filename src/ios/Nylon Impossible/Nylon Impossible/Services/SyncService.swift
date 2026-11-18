@@ -314,13 +314,7 @@ final class SyncService {
             var updatedUrls: [TodoUrl] = []
             for remoteUrl in remoteUrls {
                 if let existing = existingById[remoteUrl.id] {
-                    existing.title = remoteUrl.title
-                    existing.itemDescription = remoteUrl.description
-                    existing.siteName = remoteUrl.siteName
-                    existing.favicon = remoteUrl.favicon
-                    existing.fetchStatus = remoteUrl.fetchStatus.rawValue
-                    existing.fetchedAt = remoteUrl.fetchedAt
-                    existing.updatedAt = remoteUrl.updatedAt
+                    existing.apply(remoteUrl)
                     updatedUrls.append(existing)
                 } else {
                     let newUrl = TodoUrl(from: remoteUrl)
