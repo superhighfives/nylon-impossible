@@ -491,7 +491,9 @@ function DetailBody({
   );
 
   const footer = (className: string, deleteClass: string) => (
-    <div className={`flex items-center justify-between gap-4 ${className}`}>
+    <div
+      className={`flex flex-wrap items-center justify-between gap-x-4 ${className}`}
+    >
       <button
         type="button"
         onClick={() => {
@@ -502,9 +504,11 @@ function DetailBody({
       >
         Delete
       </button>
-      {/* Each stamp stays whole, and Edited wraps onto its own line when
-          both don't fit. Every stamp carries its "·" in front, and the
-          negative margin pushes the one starting each line into the
+      {/* Beside Delete when the stamps fit there on one line; otherwise
+          they drop below it, left-aligned, as on iOS. Each stamp stays
+          whole, and Edited wraps onto its own line only when even the full
+          width won't hold both. Every stamp carries its "·" in front, and
+          the negative margin pushes the one starting each line into the
           clipped edge. */}
       <div className="min-w-0 overflow-hidden text-[0.8125rem] text-n-ink-muted">
         <div className="-ml-3 flex flex-wrap">
