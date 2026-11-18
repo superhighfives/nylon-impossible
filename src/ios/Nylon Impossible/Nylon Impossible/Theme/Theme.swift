@@ -209,8 +209,6 @@ enum Theme {
     }
 
     enum Space {
-        static let unit: CGFloat = 4
-        static let s0: CGFloat = 0
         static let s1: CGFloat = 4
         static let s2: CGFloat = 8
         static let s3: CGFloat = 12
