@@ -151,6 +151,10 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
+    # For the `smoke` job, which tests this preview.
+    outputs:
+      web_url: ${{ steps.web.outputs.url }}
+      api_url: ${{ steps.api.outputs.url }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -201,6 +205,7 @@ jobs:
       # Deploy the API preview first and capture its URL — the web build bakes it
       # in at compile time (VITE_API_BASE_URL), so it must exist before the build.
       - name: Deploy preview API
+        id: api
         working-directory: src/api
         run: |
           # GitHub runs this with `bash -e`, and `set -uo pipefail` does not
@@ -236,6 +241,7 @@ jobs:
             exit 1
           fi
           echo "API_PREVIEW_URL=$url" >> "$GITHUB_ENV"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "API preview: $url"
 
       # Worker Previews inherit neither the top-level config's secrets nor
@@ -277,6 +283,7 @@ jobs:
           SENTRY_WEB_PROJECT: ${{ secrets.SENTRY_WEB_PROJECT }}
 
       - name: Deploy preview Web
+        id: web
         working-directory: src/web
         run: |
           # GitHub runs this with `bash -e`, and `set -uo pipefail` does not
@@ -306,6 +313,7 @@ jobs:
             exit 1
           fi
           echo "WEB_PREVIEW_URL=$url" >> "$GITHUB_ENV"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Web preview: $url"
 
       # The web preview's server-side clerkMiddleware() runs on every SSR request
@@ -375,3 +383,105 @@ jobs:
                 body,
               });
             }
+
+  # The web smoke suite (src/web/e2e, #707) against the preview deploy-preview
+  # just put up: sign in, add, complete, move, edit, lists, drag, keyboard, on
+  # the wide and phone layouts. Main's ruleset requires it, and the foreman's
+  # gate waits for every check, so a PR that breaks a flow doesn't merge.
+  # Skipped (which counts as passing) whenever deploy-preview is: forks and
+  # dependabot get no preview. The workflow's per-PR concurrency group cancels
+  # a run when a new push supersedes it.
+  #
+  # Each run signs in as its own Clerk dev-instance user,
+  # smoke-pr-<n>+clerk_test@nylonimpossible.com, seeded into the preview D1
+  # that every preview shares, and deleted again at the end (global-setup.ts,
+  # global-teardown.ts).
+  smoke:
+    needs: [deploy-preview]
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: src/web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24.21.0
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Chromium
+        run: bunx playwright install chromium --with-deps
+
+      - name: Run the smoke suite
+        run: bun run e2e
+        env:
+          BASE_URL: ${{ needs.deploy-preview.outputs.web_url }}
+          API_URL: ${{ needs.deploy-preview.outputs.api_url }}
+          SMOKE_PR: ${{ github.event.pull_request.number }}
+          SMOKE_D1: preview
+          # The development instance the previews sign in against (see "Set
+          # preview API secrets" above).
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
+          # Seeds and clears the smoke user's rows in the preview D1.
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      # Every spec per project, and the failures by name, so a red check says
+      # what broke without opening the report.
+      - name: Summarise results
+        if: always()
+        env:
+          WEB_URL: ${{ needs.deploy-preview.outputs.web_url }}
+        run: |
+          results=test-results/results.json
+          if [ ! -f "$results" ]; then
+            echo "### Smoke: no results (the suite didn't run; see the log)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          rows=$(jq -c '[.suites[] | recurse(.suites[]?) | .specs[]? as $s | $s.tests[]
+            | {file: $s.file, title: $s.title, project: .projectName, status: .status}]' "$results")
+          {
+            echo "### Smoke against $WEB_URL"
+            echo
+            echo "| Spec | Test | Project | Result |"
+            echo "| --- | --- | --- | --- |"
+            jq -r '.[] | select(.status != "skipped")
+              | "| `\(.file)` | \(.title) | \(.project) | \(
+                  {expected: "✅ passed", flaky: "🟡 passed on retry", unexpected: "❌ failed"}[.status] // .status) |"' <<<"$rows"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.[] | select(.status == "unexpected") | "\(.file) › \(.title) [\(.project)]"' <<<"$rows" \
+            | while read -r failed; do
+                echo "::error title=Smoke failed::$failed"
+                echo "- ❌ **$failed**" >> "$GITHUB_STEP_SUMMARY"
+              done
+
+      - name: Upload the Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: smoke-report
+          path: |
+            src/web/playwright-report
+            src/web/test-results
+          retention-days: 7
+          if-no-files-found: ignore

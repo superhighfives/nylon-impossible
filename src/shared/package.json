@@ -16,7 +16,8 @@
     "./demo-seed": "./src/demo-seed.ts",
     "./serialize": "./src/serialize.ts",
     "./queries": "./src/queries.ts",
-    "./api-v1": "./src/api-v1.ts"
+    "./api-v1": "./src/api-v1.ts",
+    "./seed-account": "./src/seed-account.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2"

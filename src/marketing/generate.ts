@@ -32,7 +32,7 @@
  *   MARKETING_STRICT=1          Same as --strict.
  *
  * Web capture signs in through Clerk's testing helpers and screenshots the
- * real app over demo data (seed.ts). iOS capture needs no account: it launches
+ * real app over demo data (shared/src/seed-account.ts). iOS capture needs no account: it launches
  * the DEBUG build with `-NylonScreen <route>`, which skips sign-in and draws
  * the app's own in-memory sample data — the same todos the seed writes.
  *
@@ -58,9 +58,12 @@ import {
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildSeedSql,
+  findClerkUserId,
+} from "@nylon-impossible/shared/seed-account";
 import dotenv from "dotenv";
 import sharp from "sharp";
-import { buildSeedSql } from "./seed";
 import {
   describeError,
   ensureBooted,
@@ -407,23 +410,17 @@ function wrangler(args: string[]): void {
 /** The Clerk user id for the account the capture signs in as. */
 async function clerkUserId(email: string): Promise<string> {
   if (process.env.MARKETING_USER_ID) return process.env.MARKETING_USER_ID;
-  const res = await fetch(
-    `https://api.clerk.com/v1/users?email_address=${encodeURIComponent(email)}`,
-    { headers: { Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}` } },
+  const id = await findClerkUserId(
+    process.env.CLERK_SECRET_KEY as string,
+    email,
   );
-  if (!res.ok) {
-    throw new Error(
-      `Clerk user lookup failed: ${res.status} ${await res.text()}`,
-    );
-  }
-  const users = (await res.json()) as { id: string }[];
-  if (!users[0]) throw new Error(`No Clerk user with email ${email}`);
-  return users[0].id;
+  if (!id) throw new Error(`No Clerk user with email ${email}`);
+  return id;
 }
 
 /**
  * Apply migrations and replace the capture account's data with the demo set
- * (seed.ts), against both workers' configs like `bun run db:migrate` does.
+ * (shared/src/seed-account.ts), against both workers' configs like `bun run db:migrate` does.
  * Runs inside the web capture phase, so a failure here degrades to the cached
  * screenshots like any other capture flake.
  */
@@ -1300,7 +1297,7 @@ async function runWebStep(): Promise<void> {
 //
 // The same screen on iOS and on web, side by side, so a mismatch shows up in
 // review instead of being discovered later. Both sides draw the same demo
-// data (seed.ts mirrors the iOS SampleData), in the same zone and theme, at
+// data (seed-account.ts mirrors the iOS SampleData), in the same zone and theme, at
 // the same logical size: web's viewport is the device's point size. Never
 // published; marketing.yml uploads it as an artifact.
 // ---------------------------------------------------------------------------

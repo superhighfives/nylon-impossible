@@ -1,6 +1,6 @@
 ---
 name: marketing-screenshots
-description: How nylon-impossible's marketing screenshot pipeline works and the rules that keep it from failing deploys. Use when touching src/marketing/ (generate.ts, seed.ts, manifest.json, audit.ts, simulator.ts), marketing.yml, the landing-page or App Store screenshots, the iOS/web parity sheet (--parity), the -NylonScreen debug routes, or when a marketing run flakes.
+description: How nylon-impossible's marketing screenshot pipeline works and the rules that keep it from failing deploys. Use when touching src/marketing/ (generate.ts, src/shared/src/seed-account.ts, manifest.json, audit.ts, simulator.ts), marketing.yml, the landing-page or App Store screenshots, the iOS/web parity sheet (--parity), the -NylonScreen debug routes, or when a marketing run flakes.
 ---
 
 # Marketing screenshots
@@ -42,8 +42,9 @@ same weekday and date.
 
 - **Web** signs in with Clerk's testing helpers and shoots desktop (1440×900)
   and phone (390×844) in light and dark. `generate.ts` applies the local D1
-  migrations and writes the demo data (`seed.ts`, which mirrors the iOS
-  sample data) itself, inside the best-effort web phase — the seed needs the
+  migrations and writes the demo data (`src/shared/src/seed-account.ts`, which
+  mirrors the iOS sample data and is shared with the web smoke suite in
+  `src/web/e2e`) itself, inside the best-effort web phase — the seed needs the
   capture account's Clerk id, so there's no separate workflow step.
 - **iOS** needs no account. It launches the DEBUG build with
   `-NylonScreen <route>` (plus `-NylonDark`), which skips sign-in and draws

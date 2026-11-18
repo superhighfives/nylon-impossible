@@ -186,8 +186,21 @@ expect "pending checks wait"                           "wait: checks pending"   
 reset; VIEW=$(view "$HEAD_SHA" '[{"status":"COMPLETED","conclusion":"FAILURE"}]')
 expect "a failed check waits"                          "wait: checks red"                "$(gate 7)"
 
+# #707: the web smoke suite runs as `smoke` after the preview deploys, so it's
+# still running (or failed) when every other check is green.
+SMOKE_AFTER='[{"name":"deploy-test","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"deploy-preview","status":"COMPLETED","conclusion":"SUCCESS"},{"name":"ios-ok","status":"COMPLETED","conclusion":"SUCCESS"}'
+reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"IN_PROGRESS\",\"conclusion\":null}]")
+expect "a running smoke check waits"                   "wait: checks pending"            "$(gate 7)"
+reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"COMPLETED\",\"conclusion\":\"FAILURE\"}]")
+expect "a failed smoke check waits"                    "wait: checks red"                "$(gate 7)"
+# A ruleset that requires `smoke` lists it as EXPECTED before the job queues.
+reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"context\":\"smoke\",\"state\":\"EXPECTED\"}]")
+expect "an expected smoke check waits"                 "wait: checks pending"            "$(gate 7)"
+reset; VIEW=$(view "$HEAD_SHA" "$SMOKE_AFTER,{\"name\":\"smoke\",\"status\":\"COMPLETED\",\"conclusion\":\"SKIPPED\"}]")
+expect "a skipped smoke check (no preview) merges"     "merge $HEAD_SHA"                 "$(gate 7)"
+
 reset; VIEW=$(view "$HEAD_SHA" '[]')
-expect "no checks at all waits"                        "wait: checks none"               "$(gate 7)"
+expect "no checks at all waits"                      "wait: checks none"               "$(gate 7)"
 
 reset; THREADS=2
 expect_prefix "the owner's open threads wait"          "wait: 2 unresolved"              "$(gate 7)"

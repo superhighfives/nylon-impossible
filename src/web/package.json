@@ -9,6 +9,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "test": "vitest run",
+    "e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "format": "biome format --write --config-path ../..",
     "lint": "biome lint --config-path ../..",
@@ -49,9 +50,11 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@clerk/testing": "^2.2.36",
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/workers-types": "^5.20261028.1",
     "@effect/tsgo": "^0.69.0",
+    "@playwright/test": "1.62.1",
     "@tanstack/devtools-vite": "^0.8.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
