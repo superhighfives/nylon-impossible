@@ -24,7 +24,13 @@ import {
   Repeat,
   X,
 } from "lucide-react";
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  type KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { ICON_BUTTON, ROW_HOVER, SUBLINE } from "@/components/ui/styles";
 import { ViewBoundary } from "@/components/ViewBoundary";
 import {
@@ -324,7 +330,7 @@ function DetailBody({
     setPicking(false);
   };
 
-  const dueChoices = dueChoicesFor(now, timeZone);
+  const dueChoices = dueChoicesFor(now, timeZone, dueKey !== null);
 
   const choices = (p: Exclude<Panel, null>, className: string) => {
     if (p === "list") {
@@ -352,9 +358,37 @@ function DetailBody({
         <div className={className}>
           <fieldset aria-label="Due" className="flex min-w-0 flex-wrap gap-1.5">
             {dueChoices.map((c) => {
-              const selected = c.day
-                ? dueKey === dueDayKey(c.day)
-                : dueKey === null;
+              if (c.kind === "pick") {
+                return (
+                  <button
+                    key={c.label}
+                    type="button"
+                    aria-expanded={picking}
+                    onClick={() => setPicking((p) => !p)}
+                    className={chipClass(picking)}
+                  >
+                    {c.label}
+                  </button>
+                );
+              }
+              if (c.kind === "clear") {
+                return (
+                  <Fragment key={c.label}>
+                    <hr
+                      aria-orientation="vertical"
+                      className="mx-1 h-auto w-px self-stretch border-0 bg-n-hairline"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDue(null)}
+                      className={`${chipClass(false)} text-n-destructive`}
+                    >
+                      {c.label}
+                    </button>
+                  </Fragment>
+                );
+              }
+              const selected = dueKey === dueDayKey(c.day);
               return (
                 <button
                   key={c.label}
@@ -367,14 +401,6 @@ function DetailBody({
                 </button>
               );
             })}
-            <button
-              type="button"
-              aria-expanded={picking}
-              onClick={() => setPicking((p) => !p)}
-              className={chipClass(picking)}
-            >
-              Pick a date…
-            </button>
           </fieldset>
           {picking && (
             <div className="mt-2 w-full">
@@ -537,7 +563,7 @@ function DetailBody({
             aria-label={due ? `Due: ${due.text}` : undefined}
             onClick={() => toggle("due")}
           >
-            {due ? due.text : "Due date"}
+            {due ? due.text : "Due"}
           </PropertyRow>
           {panel === "due" && choices("due", choicesClass)}
           {canRepeat && (

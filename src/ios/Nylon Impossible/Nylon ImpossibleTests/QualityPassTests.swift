@@ -54,6 +54,17 @@ struct RowAccessibilityTests {
         #expect(Set(actions.map(\.id)).count == actions.count)
     }
 
+    @Test("the actions keep Mark done first, then the long-press menu's order")
+    func actionsFollowTheMenu() {
+        let todo = TodoItem(title: "Plan Lisbon trip", position: "a0")
+        todo.listKey = "today"
+        let names = TodoRowAccessibility.actions(for: todo, isChecked: false, lists: lists).map(\.name)
+        let menu = TodoMenuItem.items(pinned: false).map(\.title)
+        #expect(names.first == "Mark done")
+        // The moves stand in for Move to, so what's left after them is the menu's tail.
+        #expect(Array(names.suffix(2)) == Array(menu.dropFirst()))
+    }
+
     @Test("Done rows finished at the same moment keep one order")
     func doneTieBreak() {
         let at = Date()
@@ -65,6 +76,38 @@ struct RowAccessibilityTests {
             let order = permutation.sorted(by: DoneHistoryView.isOrderedBefore).map(\.todo.title)
             #expect(order == ["Zebra", "Email the landlord", "Pick up dry cleaning"])
         }
+    }
+}
+
+@Suite("Todo menu")
+struct TodoMenuTests {
+    @Test("the long-press menu is Move to, Pin to top and Delete, in that order")
+    func menuOrder() {
+        #expect(TodoMenuItem.items(pinned: false).map(\.title) == ["Move to", "Pin to top", "Delete"])
+        #expect(TodoMenuItem.items(pinned: true).map(\.title) == ["Move to", "Unpin", "Delete"])
+    }
+
+    @Test("the Due choices end with Pick a date…, then No date only with a date")
+    func dueChoices() {
+        #expect(DueMenuChoice.choices(hasDue: false).map(\.title)
+            == ["Today", "Tomorrow", "Friday", "Next week", "Pick a date…"])
+        #expect(DueMenuChoice.choices(hasDue: true).map(\.title)
+            == ["Today", "Tomorrow", "Friday", "Next week", "Pick a date…", "No date"])
+    }
+
+    @Test("each quick Due choice sets its day; Pick a date… and No date set none")
+    func dueChoiceDays() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "America/Los_Angeles"))
+        // Sunday 18 October 2026, mid-morning in Los Angeles.
+        let now = try #require(ISO8601DateFormatter().date(from: "2026-10-18T17:00:00Z"))
+        func day(_ choice: DueMenuChoice) -> Date? { choice.day(now: now, calendar: calendar) }
+        #expect(day(.today) == DueLabel.inDays(0, now: now, calendar: calendar))
+        #expect(day(.tomorrow) == DueLabel.inDays(1, now: now, calendar: calendar))
+        #expect(day(.friday) == DueLabel.inDays(5, now: now, calendar: calendar))
+        #expect(day(.nextWeek) == DueLabel.inDays(1, now: now, calendar: calendar))
+        #expect(day(.pickDate) == nil)
+        #expect(day(.noDate) == nil)
     }
 }
 

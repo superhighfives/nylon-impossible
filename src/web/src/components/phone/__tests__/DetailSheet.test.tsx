@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { TodoActions } from "../useTodoActions";
-import { makeTodo, makeUrl } from "./fixtures";
+import { dueIn, makeTodo, makeUrl } from "./fixtures";
 
 const createTodo = vi.hoisted(() => vi.fn());
 
@@ -21,6 +21,68 @@ vi.mock("@/hooks/useTodos", () => {
 import { DetailSheet } from "../DetailSheet";
 
 describe("DetailSheet", () => {
+  describe.each([
+    ["phone", undefined],
+    ["column", "column"],
+  ] as const)("Due, %s", (_, variant) => {
+    function openDue(dueDate: string | null) {
+      const save = vi.fn();
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      render(
+        <DetailSheet
+          todo={makeTodo({ dueDate })}
+          subtasks={[]}
+          listTargets={[]}
+          listName={() => "Today"}
+          listInSentence={() => "today"}
+          timeZone="UTC"
+          actions={{ save, destroy: vi.fn() } as unknown as TodoActions}
+          onClose={vi.fn()}
+          variant={variant}
+          container={variant ? container : undefined}
+          animated={false}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^Due/ }));
+      const group = screen.getByRole("group", { name: "Due" });
+      const names = within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+      return { save, group, names };
+    }
+
+    it("is labelled Due, and offers no No date when there's no date", () => {
+      expect(screen.queryByRole("button", { name: "Due date" })).toBeNull();
+      const { names } = openDue(null);
+      expect(names).toEqual([
+        "Today",
+        "Tomorrow",
+        "Friday",
+        "Next week",
+        "Pick a date…",
+      ]);
+    });
+
+    it("ends with No date after a divider when a date is set", () => {
+      const { save, group, names } = openDue(dueIn(1));
+      expect(names).toEqual([
+        "Today",
+        "Tomorrow",
+        "Friday",
+        "Next week",
+        "Pick a date…",
+        "No date",
+      ]);
+      expect(within(group).getByRole("separator")).toBeInTheDocument();
+      fireEvent.click(within(group).getByRole("button", { name: "No date" }));
+      expect(save).toHaveBeenCalledWith(expect.any(String), {
+        dueDate: null,
+        recurrence: null,
+      });
+    });
+  });
+
   it("keeps each footer stamp whole, so Edited wraps as one piece", () => {
     render(
       <DetailSheet

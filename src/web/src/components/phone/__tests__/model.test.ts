@@ -4,6 +4,7 @@ import {
   boardViewKey,
   displayTitle,
   dueChipText,
+  dueChoices,
   dueLabel,
   groupDoneByDay,
   mastheadSubline,
@@ -32,6 +33,40 @@ describe("dueLabel", () => {
     // 01:00 UTC on the 19th is still the 18th in Los Angeles.
     const lateEvening = new Date("2026-10-19T01:00:00.000Z");
     expect(dueLabel(dueIn(0), lateEvening, TZ).text).toBe("Today");
+  });
+});
+
+describe("dueChoices", () => {
+  const labels = (hasDue: boolean) =>
+    dueChoices(NOW, TZ, hasDue).map((c) => c.label);
+
+  it("lists the days, then Pick a date…, then No date when a date is set", () => {
+    expect(labels(true)).toEqual([
+      "Today",
+      "Tomorrow",
+      "Friday",
+      "Next week",
+      "Pick a date…",
+      "No date",
+    ]);
+  });
+
+  it("leaves No date out when there's no date to clear", () => {
+    expect(labels(false)).toEqual([
+      "Today",
+      "Tomorrow",
+      "Friday",
+      "Next week",
+      "Pick a date…",
+    ]);
+  });
+
+  it("gives each day its date, Pick a date… and No date none", () => {
+    const [today, tomorrow, , , pick, clear] = dueChoices(NOW, TZ, true);
+    expect(today).toMatchObject({ kind: "day", day: new Date(dueIn(0)) });
+    expect(tomorrow).toMatchObject({ kind: "day", day: new Date(dueIn(1)) });
+    expect(pick).toEqual({ kind: "pick", label: "Pick a date…" });
+    expect(clear).toEqual({ kind: "clear", label: "No date" });
   });
 });
 

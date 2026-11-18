@@ -17,6 +17,7 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  Fragment,
   type KeyboardEvent,
   useEffect,
   useMemo,
@@ -96,8 +97,10 @@ export type MenuView = "main" | "due" | "more";
 
 /**
  * The row's context menu, from a long-press, right-click, the context-menu
- * key or Shift+F10 (and `d` on wide, straight into Due): Move to …, Due…,
- * Pin/Unpin, Delete. Delete isn't confirmed — it shows an Undo toast instead.
+ * key or Shift+F10 (and `d` on wide, straight into Due). On phone it's Move
+ * to …, Pin/Unpin, Delete; on wide, `commands`. Both are the canonical todo
+ * menu in PRINCIPLES.md, or a part of it in its order. Delete isn't
+ * confirmed — it shows an Undo toast instead.
  *
  * Move to is a group: the other time lists, with an arrow pointing the way
  * they lie (Today ← This week → Someday), the two lists you moved to most
@@ -132,7 +135,7 @@ export function ContextMenu({
   onMove: (todo: TodoWithUrls, listId: string) => void;
   onTogglePin: (todo: TodoWithUrls) => void;
   onDelete: (todo: TodoWithUrls) => void;
-  /** Shows "Due…" when given. */
+  /** What the Due view (wide's Due…, or `d`) sets. */
   onSetDue?: (todo: TodoWithUrls, day: Date | null) => void;
   timeZone?: string;
   /** Viewport point to open beside, instead of centred. */
@@ -140,7 +143,7 @@ export function ContextMenu({
   initialView?: MenuView;
   /**
    * Wide: the items, from the board's command registry, with their keys.
-   * Replaces the phone's Move to …, Due…, Pin and Delete.
+   * Replaces the phone's Move to …, Pin and Delete.
    */
   commands?: MenuCommand[];
 }) {
@@ -329,25 +332,8 @@ export function ContextMenu({
                       )}
                     </div>
                   )}
-                  {onSetDue && (
-                    <button
-                      ref={moveTargets.length === 0 ? firstItem : undefined}
-                      type="button"
-                      role="menuitem"
-                      aria-haspopup="menu"
-                      onClick={() => setView("due")}
-                      className={item}
-                    >
-                      <span className="flex-1">Due…</span>
-                      <CalendarIcon size={iconSize} aria-hidden="true" />
-                    </button>
-                  )}
                   <button
-                    ref={
-                      moveTargets.length === 0 && !onSetDue
-                        ? firstItem
-                        : undefined
-                    }
+                    ref={moveTargets.length === 0 ? firstItem : undefined}
                     type="button"
                     role="menuitem"
                     onClick={() => run(onTogglePin)}
@@ -424,19 +410,45 @@ export function ContextMenu({
                       <ChevronLeft size={iconSize} aria-hidden="true" />
                       <span className="flex-1">Due</span>
                     </button>
-                    {dueChoices(now, timeZone).map((c) => {
-                      const selected = c.day
-                        ? dueKey === dueDayKey(c.day)
-                        : dueKey === null;
+                    {dueChoices(now, timeZone, dueKey !== null).map((c) => {
+                      if (c.kind === "pick") {
+                        return (
+                          <button
+                            key={c.label}
+                            type="button"
+                            role="menuitem"
+                            aria-expanded={picking}
+                            onClick={() => setPicking((p) => !p)}
+                            className={item}
+                          >
+                            <span className="flex-1">{c.label}</span>
+                            <CalendarIcon size={iconSize} aria-hidden="true" />
+                          </button>
+                        );
+                      }
+                      if (c.kind === "clear") {
+                        return (
+                          <Fragment key={c.label}>
+                            <hr className="m-0 h-1.5 border-0 border-t border-n-hairline bg-n-fill" />
+                            <button
+                              type="button"
+                              role="menuitem"
+                              onClick={() => run((t) => onSetDue?.(t, null))}
+                              className={`${item} text-n-destructive`}
+                            >
+                              <span className="flex-1">{c.label}</span>
+                            </button>
+                          </Fragment>
+                        );
+                      }
+                      const selected = dueKey === dueDayKey(c.day);
                       return (
                         <button
                           key={c.label}
                           type="button"
                           role="menuitemradio"
                           aria-checked={selected}
-                          onClick={() =>
-                            run((t) => onSetDue?.(t, c.day ?? null))
-                          }
+                          onClick={() => run((t) => onSetDue?.(t, c.day))}
                           className={`${item} ${selected ? "font-semibold" : ""}`}
                         >
                           <span className="flex-1">{c.label}</span>
@@ -449,16 +461,6 @@ export function ContextMenu({
                         </button>
                       );
                     })}
-                    <button
-                      type="button"
-                      role="menuitem"
-                      aria-expanded={picking}
-                      onClick={() => setPicking((p) => !p)}
-                      className={item}
-                    >
-                      <span className="flex-1">Pick a date…</span>
-                      <CalendarIcon size={iconSize} aria-hidden="true" />
-                    </button>
                   </div>
                   {picking && (
                     <div className="border-t border-n-hairline p-2">
