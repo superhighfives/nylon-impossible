@@ -568,7 +568,7 @@ describe("DetailSheet", () => {
         await act(async () => {
           fireEvent.click(first);
         });
-        expect(error).toHaveBeenCalledWith("Denied");
+        expect(error).toHaveBeenCalledWith("Couldn’t copy");
         expect(screen.queryByText("Copied")).toBeNull();
       });
     });
