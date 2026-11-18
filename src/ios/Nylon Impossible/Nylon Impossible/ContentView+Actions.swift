@@ -192,7 +192,7 @@ extension ContentView {
         guard let route = screenRoute else { return }
         switch route {
         case .today, .overnight, .loading, .empty, .syncerror, .perf: viewModel.page = .today
-        case .link, .share, .sharetext, .widgets, .signin, .menubar: break
+        case .link, .share, .sharetext, .widgets, .signin, .menubar, .feedback: break
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday
         case .lists: viewModel.page = .lists

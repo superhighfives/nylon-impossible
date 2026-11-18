@@ -167,6 +167,12 @@ struct FeedbackTests {
         #expect(request.description == "The tick jumps")
         #expect(request.images.first?.contentType == "image/png")
         #expect(request.context.screen == "Today")
+        // The issue's `platform:` label: the Mac's own on a Mac (#742).
+        #if os(macOS)
+        #expect(request.context.platform == "mac")
+        #else
+        #expect(request.context.platform == "ios")
+        #endif
         #expect(feedback.lastFiled?.issueNumber == 1)
         #expect(feedback.isPresented == false)
         #expect(feedback.text.isEmpty)

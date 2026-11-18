@@ -20,7 +20,9 @@
 //  touches the real store or the network.
 //
 //  On a Mac the route is drawn in a window of its own, as the app has none:
-//  `menubar` the menu bar popover, `settings` the Settings window's view,
+//  `menubar` the menu bar popover (as an admin, so the footer shows Send
+//  feedback…), `feedback` the form Send feedback… opens, with the popover's
+//  snapshot attached, `settings` the Settings window's view,
 //  `signin` the sign-in window's, `share` the share extension at its Mac
 //  sheet size, and `widgets` the desktop sizes. Any other route draws the
 //  popover there too, since the Mac has no other view of a list.
@@ -42,6 +44,8 @@ enum ScreenRoute: String, CaseIterable {
     case signin, loading, empty, syncerror, perf
     /// macOS: the menu bar popover, drawn in a window.
     case menubar
+    /// macOS: the feedback form, as Send feedback… opens it from the popover.
+    case feedback
 
     /// The route from `-NylonScreen <name>`, in DEBUG builds only.
     static var launch: ScreenRoute? {
@@ -155,7 +159,8 @@ struct ScreenRouteRoot: View {
                 .background(Color(nsColor: .windowBackgroundColor))
                 .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
         default:
-            QuickAddView()
+            // As an admin on its own route, so the shot shows every footer item.
+            QuickAddView(onFeedback: route == .menubar || route == .feedback ? {} : nil)
                 .environment(authService)
                 .environment(syncService)
                 .environment(\.screenRoute, route)

@@ -5,7 +5,7 @@
 //  The Mac's own pieces, as logic: a menu bar app with no board window, the
 //  quick-add hotkey (key codes, modifiers, what Settings shows, what's
 //  refused, how it's stored), the Settings and Sign in windows, the popover's
-//  rows and keys, the sign-in providers, and the widget's large family on the
+//  rows and keys, Send feedback…, the sign-in providers, and the widget's large family on the
 //  desktop. The Carbon registration itself isn't exercised —
 //  claiming a system-wide hotkey from a test run would steal it from whatever
 //  the machine running the tests is doing.
@@ -235,6 +235,131 @@ struct QuickAddViewTests {
         #expect(try web("https://api.nylonimpossible.com") == "https://nylonimpossible.com")
         #expect(try web("https://api.preview.example.com/") == "https://preview.example.com")
         #expect(try web("http://localhost:8787") == "http://localhost:3000")
+    }
+}
+
+@Suite("Send feedback on the Mac")
+@MainActor
+struct MacFeedbackTests {
+    @Test("An admin's footer has Send feedback… between Settings… and Quit Nylon; anyone else's doesn't")
+    func footer() {
+        #expect(QuickAddFooterItem.items(showsFeedback: true).map(\.title) == ["Settings…", "Send feedback…", "Quit Nylon"])
+        #expect(QuickAddFooterItem.items(showsFeedback: false).map(\.title) == ["Settings…", "Quit Nylon"])
+    }
+
+    @Test("⇧⌘F, as in the old Help menu")
+    func shortcut() {
+        #expect(FeedbackService.shortcut.key == KeyEquivalent("f"))
+        #expect(FeedbackService.shortcut.modifiers == [.command, .shift])
+    }
+
+    @Test("The snapshot is taken before the menu bar window closes, then the form opens with it")
+    func handoffOrder() throws {
+        let image = try #require(Self.image())
+        var steps: [String] = []
+        MacFeedbackHandoff.send(
+            snapshot: {
+                steps.append("snapshot")
+                return MacFeedbackSnapshot(image: image, size: CGSize(width: 380, height: 320), colorScheme: .dark)
+            },
+            close: { steps.append("close") },
+            open: { steps.append($0 == nil ? "open" : "open with snapshot") }
+        )
+        #expect(steps == ["snapshot", "close", "open with snapshot"])
+    }
+
+    @Test("A window's snapshot is its content at its size")
+    func snapshotOfWindow() throws {
+        let size = CGSize(width: 200, height: 120)
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(rootView: Color.red.frame(width: size.width, height: size.height))
+        defer { window.close() }
+        let snapshot = try #require(MacFeedbackSnapshot.of(window))
+        #expect(snapshot.size == size)
+        #expect(snapshot.image.width >= Int(size.width))
+        #expect(MacFeedbackSnapshot.of(nil) == nil)
+    }
+
+    @Test("Send feedback… opens the form in its own window, in front, with the snapshot attached")
+    func opensForm() async throws {
+        let feedback = FeedbackService(apiService: MockAPIService())
+        let form = MacFeedbackWindow(feedback: feedback)
+        var activated = 0
+        form.activate = { activated += 1 }
+        let image = try #require(Self.image())
+        let size = CGSize(width: 380, height: 320)
+
+        let attaching = form.show(snapshot: MacFeedbackSnapshot(image: image, size: size, colorScheme: .dark))
+        let window = try #require(form.window)
+        defer { window.close() }
+        #expect(feedback.isPresented)
+        #expect(form.isVisible)
+        #expect(activated == 1)
+        #expect(window.title == "Send feedback")
+        let content = try #require(window.contentViewController)
+        #expect(String(describing: type(of: content)).contains("MacFeedbackRoot"))
+        #expect(feedback.screen == "Menu bar")
+        #expect(feedback.viewport == size)
+        #expect(feedback.colorScheme == .dark)
+        await attaching?.value
+        #expect(feedback.images.count == 1)
+
+        // Choosing it again brings the same window back.
+        form.show(snapshot: nil)
+        #expect(form.window === window)
+    }
+
+    @Test("Closing the window keeps the draft; Cancel drops it")
+    func closing() throws {
+        let feedback = FeedbackService(apiService: MockAPIService())
+        let form = MacFeedbackWindow(feedback: feedback)
+        form.activate = {}
+        var filed = 0
+        form.onFiled = { filed += 1 }
+        form.show(snapshot: nil)
+        feedback.text = "The tick jumps"
+        form.close()
+        #expect(!form.isVisible)
+        #expect(feedback.isPresented == false)
+        #expect(feedback.text == "The tick jumps")
+
+        form.show(snapshot: nil)
+        defer { form.window?.close() }
+        feedback.discard()
+        form.finish()
+        #expect(!form.isVisible)
+        #expect(filed == 0)
+    }
+
+    @Test("Once it's filed, the form closes and the menu bar window comes back for \"Filed #N\"")
+    func filed() async throws {
+        let api = MockAPIService()
+        let feedback = FeedbackService(apiService: api)
+        let form = MacFeedbackWindow(feedback: feedback)
+        form.activate = {}
+        var filed = 0
+        form.onFiled = { filed += 1 }
+        form.show(snapshot: nil)
+        defer { form.window?.close() }
+        feedback.text = "The tick jumps"
+        #expect(await feedback.submit())
+        form.finish()
+        #expect(!form.isVisible)
+        #expect(filed == 1)
+        #expect(api.lastFeedbackRequest?.context.platform == "mac")
+        #expect(api.lastFeedbackRequest?.context.screen == "Menu bar")
+    }
+
+    private static func image() -> CGImage? {
+        let context = CGContext(
+            data: nil, width: 8, height: 8, bitsPerComponent: 8, bytesPerRow: 0,
+            space: CGColorSpace(name: CGColorSpace.sRGB)!,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        )
+        context?.setFillColor(CGColor(red: 1, green: 0.9, blue: 0.16, alpha: 1))
+        context?.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        return context?.makeImage()
     }
 }
 

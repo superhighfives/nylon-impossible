@@ -22,6 +22,9 @@
 //  Esc puts the old title back. Clicking a row's title edits it too.
 //  Anything else about a todo happens on the web.
 //
+//  The footer is Settings… and Quit Nylon, with Send feedback… (⇧⌘F)
+//  between them for an admin (`MacFeedbackWindow`).
+//
 
 #if os(macOS)
 import AppKit
@@ -30,6 +33,8 @@ import SwiftUI
 
 struct QuickAddView: View {
     var onDismiss: () -> Void = {}
+    /// Send feedback…; nil hides it (not an admin).
+    var onFeedback: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
     @Environment(\.screenRoute) private var screenRoute
@@ -37,6 +42,7 @@ struct QuickAddView: View {
     @Environment(\.openSettings) private var openSettings
     @Environment(AuthService.self) private var authService
     @Environment(SyncService.self) private var syncService
+    @Environment(FeedbackService.self) private var feedback: FeedbackService?
     @Query(sort: \TodoItem.createdAt, order: .reverse) var todos: [TodoItem]
     @Query(sort: \TodoListModel.position) private var lists: [TodoListModel]
 
@@ -117,6 +123,7 @@ struct QuickAddView: View {
             guard note.object is QuickAddPanel else { return }
             backToField()
             if let link = QuickActionService.shared.take() { follow(link) }
+            showFiled()
         }
     }
 
@@ -229,23 +236,6 @@ struct QuickAddView: View {
         .padding(.bottom, Theme.Space.s1)
     }
 
-    private var footer: some View {
-        HStack {
-            Button("Settings…") {
-                MacServices.shared.showSettings { openSettings() }
-                onDismiss()
-            }
-            Spacer()
-            Button("Quit Nylon") { NSApp.terminate(nil) }
-                .keyboardShortcut("q")
-        }
-        .buttonStyle(.borderless)
-        .textStyle(Theme.Fonts.Role.meta)
-        .foregroundStyle(Theme.Colors.inkMuted)
-        .padding(.horizontal, Theme.Space.s4)
-        .padding(.vertical, Theme.Space.s2)
-    }
-
     private var signedOut: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s3) {
             Text("Nylon")
@@ -290,6 +280,67 @@ struct QuickAddView: View {
         // No "View": the popover shows only Today, so it would have to open a
         // browser (PRINCIPLES.md, principle 5's exception).
         actions.toasts.show(ToastCopy.added(count: created.count, listName: name), action: nil)
+    }
+}
+// MARK: - Footer
+
+extension QuickAddView {
+    private var footer: some View {
+        HStack(spacing: Theme.Space.s4) {
+            ForEach(QuickAddFooterItem.items(showsFeedback: onFeedback != nil), id: \.self) { item in
+                if item == .quit { Spacer() }
+                footerButton(item)
+            }
+        }
+        .buttonStyle(.borderless)
+        .textStyle(Theme.Fonts.Role.meta)
+        .foregroundStyle(Theme.Colors.inkMuted)
+        .padding(.horizontal, Theme.Space.s4)
+        .padding(.vertical, Theme.Space.s2)
+    }
+
+    @ViewBuilder
+    private func footerButton(_ item: QuickAddFooterItem) -> some View {
+        switch item {
+        case .settings:
+            Button(item.title) {
+                MacServices.shared.showSettings { openSettings() }
+                onDismiss()
+            }
+        case .feedback:
+            Button(item.title) { onFeedback?() }
+                .keyboardShortcut(FeedbackService.shortcut.key, modifiers: FeedbackService.shortcut.modifiers)
+        case .quit:
+            Button(item.title) { NSApp.terminate(nil) }
+                .keyboardShortcut("q")
+        }
+    }
+
+    /// "Filed #N" once the feedback form has sent, as on the iPhone.
+    private func showFiled() {
+        guard let feedback, let filed = feedback.lastFiled else { return }
+        feedback.lastFiled = nil
+        actions.toasts.show("Filed #\(filed.issueNumber)", actionLabel: "View", action: {
+            openURL(filed.issueUrl)
+        })
+    }
+}
+
+/// The popover's footer, in order: Quit Nylon sits on the right.
+enum QuickAddFooterItem: Hashable {
+    case settings, feedback, quit
+
+    var title: String {
+        switch self {
+        case .settings: return "Settings…"
+        case .feedback: return "Send feedback…"
+        case .quit: return "Quit Nylon"
+        }
+    }
+
+    /// Send feedback… is there only for an admin.
+    static func items(showsFeedback: Bool) -> [QuickAddFooterItem] {
+        showsFeedback ? [.settings, .feedback, .quit] : [.settings, .quit]
     }
 }
 #endif

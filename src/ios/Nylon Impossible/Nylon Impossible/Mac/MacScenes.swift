@@ -42,10 +42,13 @@ struct MacSettingsRoot: View {
 /// The menu bar icon's popover (see `MenuBarController`).
 struct MacMenuBarRoot: View {
     var onDismiss: () -> Void
+    var onFeedback: () -> Void
     private let services = MacServices.shared
 
     var body: some View {
-        QuickAddView(onDismiss: onDismiss)
+        // Send feedback… is an admin's only.
+        QuickAddView(onDismiss: onDismiss, onFeedback: services.preferencesService.isAdmin ? onFeedback : nil)
+            .environment(services.feedbackService)
             .environment(services.authService)
             .environment(services.syncService)
             .environment(Clerk.shared)
@@ -83,6 +86,10 @@ enum MacScreenRouteWindow {
     private static var window: NSWindow?
 
     static func show(_ route: ScreenRoute) {
+        if route == .feedback {
+            showFeedback()
+            return
+        }
         let root = ScreenRouteRoot(route: route)
             .frame(minWidth: 480, minHeight: 360)
             .background(Theme.Colors.fill)
@@ -96,6 +103,27 @@ enum MacScreenRouteWindow {
         // the capture is clean.
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+    }
+
+    /// Send feedback… as the popover's footer does it: the popover, as an
+    /// admin, snapshotted, closed, then the form in its own window.
+    private static func showFeedback() {
+        let panel = QuickAddPanel.make(content: NSHostingView(rootView: ScreenRouteRoot(route: .feedback)))
+        panel.center()
+        self.window = panel
+        NSApp.activate(ignoringOtherApps: true)
+        panel.orderFront(nil)
+        let services = MacServices.shared
+        services.feedbackWindow.theme = { ScreenRoute.forcesDark ? "dark" : "light" }
+        Task { @MainActor in
+            // Let the sample todos draw before the snapshot.
+            try? await Task.sleep(for: .seconds(1))
+            MacFeedbackHandoff.send(
+                snapshot: { MacFeedbackSnapshot.of(panel) },
+                close: { panel.orderOut(nil) },
+                open: services.showFeedback
+            )
+        }
     }
 }
 #endif
