@@ -77,6 +77,18 @@ final class MockAPIService: APIProviding {
         return processTodoLinkCount
     }
 
+    var createWsTicketResponse = "mock-ticket"
+    var createWsTicketError: Error?
+    var createWsTicketCallCount = 0
+
+    func createWsTicket() async throws -> String {
+        createWsTicketCallCount += 1
+        if let error = createWsTicketError {
+            throw error
+        }
+        return createWsTicketResponse
+    }
+
     var submitFeedbackResult = FeedbackResult(
         issueNumber: 1,
         issueUrl: URL(string: "https://github.com/superhighfives/nylon-feedback/issues/1")!

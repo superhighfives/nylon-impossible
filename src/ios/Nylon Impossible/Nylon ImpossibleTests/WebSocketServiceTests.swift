@@ -74,3 +74,36 @@ struct WebSocketServiceTests {
         ))
     }
 }
+
+@Suite("WebSocket URL")
+struct WebSocketURLTests {
+    @Test("the socket URL carries the ticket and no session token")
+    func ticketOnly() throws {
+        let url = try #require(WebSocketService.socketURL(
+            apiBaseURL: URL(string: "https://api.nylonimpossible.com")!,
+            ticket: "abc-DEF_123"
+        ))
+        #expect(url.absoluteString == "wss://api.nylonimpossible.com/ws?ticket=abc-DEF_123")
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(items.map(\.name) == ["ticket"])
+        #expect(!url.absoluteString.contains("token"))
+    }
+
+    @Test("a local http API gets a ws socket")
+    func localScheme() {
+        let url = WebSocketService.socketURL(
+            apiBaseURL: URL(string: "http://localhost:8787")!,
+            ticket: "t"
+        )
+        #expect(url?.absoluteString == "ws://localhost:8787/ws?ticket=t")
+    }
+
+    @Test("the ticket is percent-encoded")
+    func encoded() {
+        let url = WebSocketService.socketURL(
+            apiBaseURL: URL(string: "https://api.nylonimpossible.com")!,
+            ticket: "a+b/c=&d"
+        )
+        #expect(url?.absoluteString == "wss://api.nylonimpossible.com/ws?ticket=a%2Bb%2Fc%3D%26d")
+    }
+}

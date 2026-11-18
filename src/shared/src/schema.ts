@@ -258,6 +258,22 @@ export const apiTokens = sqliteTable("api_tokens", {
   lastUsedAt: integer("last_used_at", { mode: "timestamp" }),
 });
 
+// One-use tickets for opening the live-sync WebSocket, so a session token
+// never goes in the /ws URL. Only the SHA-256 hex is kept. A ticket is issued
+// by POST /ws/ticket, deleted by its first use at GET /ws, and refused after
+// `expires_at` (30 seconds); expired rows are swept on each issue.
+export const wsTickets = sqliteTable(
+  "ws_tickets",
+  {
+    ticketHash: text("ticket_hash").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: integer("expires_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (table) => [index("idx_ws_tickets_expires_at").on(table.expiresAt)],
+);
+
 // Relations (for relational query API)
 export const usersRelations = relations(users, ({ many }) => ({
   todos: many(todos),
@@ -304,3 +320,4 @@ export type List = typeof lists.$inferSelect;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type ApiToken = typeof apiTokens.$inferSelect;
 export type NewApiToken = typeof apiTokens.$inferInsert;
+export type WsTicket = typeof wsTickets.$inferSelect;
