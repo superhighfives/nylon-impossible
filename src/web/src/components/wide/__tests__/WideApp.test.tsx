@@ -23,6 +23,7 @@ import {
   makeTodo,
   makeUrl,
 } from "@/components/phone/__tests__/fixtures";
+import { LONG_PRESS_MS } from "@/components/phone/TodoRow";
 import type { TodoWithUrls } from "@/types/database";
 
 const update = vi.fn();
@@ -2619,6 +2620,9 @@ describe("WideApp drag and drop", () => {
     expect(shell).toHaveClass("opacity-35");
     expect(entry).toHaveClass("bg-n-brand", "text-n-brand-ink");
     expect(document.querySelector("[data-drag-preview]")).toBeInTheDocument();
+    // A mouse drag parts nothing, and its preview isn't the lifted row.
+    expect(document.querySelector("[data-drop-gap]")).toBeNull();
+    expect(document.querySelector("[data-lifted]")).toBeNull();
     fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
     expect(shell).not.toHaveClass("opacity-35");
     expect(entry).not.toHaveClass("bg-n-brand");
@@ -2705,6 +2709,453 @@ describe("WideApp drag and drop", () => {
     } finally {
       lists = before;
     }
+  });
+
+  describe("by touch", () => {
+    const animate = vi.fn();
+    const realAnimate = Element.prototype.animate;
+    const layoutProps = (["offsetTop", "offsetHeight"] as const).map(
+      (prop) =>
+        [
+          prop,
+          Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop),
+        ] as const,
+    );
+
+    beforeEach(() => {
+      animate.mockReset();
+      Element.prototype.animate = animate;
+      // jsdom has no layout: a row sits at its index × ROW in its list, as
+      // laid out, whatever transform parts it.
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+        configurable: true,
+        get(this: HTMLElement) {
+          const parent = this.parentElement;
+          return parent && this.matches("li")
+            ? [...parent.children].indexOf(this) * ROW
+            : 0;
+        },
+      });
+      Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.matches("li") ? ROW : 0;
+        },
+      });
+      document.documentElement.style.setProperty("--n-duration-base", "220ms");
+      document.documentElement.style.setProperty(
+        "--n-ease-out-strong",
+        "cubic-bezier(0.23, 1, 0.32, 1)",
+      );
+      update.mockImplementation(({ id, input }) => {
+        todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
+      });
+    });
+
+    afterEach(() => {
+      reducedMotion = "reduce";
+      // dnd-kit lets go of the document's click a moment after a drag.
+      if (vi.isFakeTimers()) vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+      Element.prototype.animate = realAnimate;
+      for (const [prop, descriptor] of layoutProps) {
+        if (descriptor) {
+          Object.defineProperty(HTMLElement.prototype, prop, descriptor);
+        }
+      }
+      document.documentElement.removeAttribute("style");
+    });
+
+    /** A row's slot in its column. */
+    const shell = (id: string) =>
+      document
+        .querySelector(`[data-column] [data-row-id="${id}"]`)
+        ?.closest("li") as HTMLElement;
+    const container = (id: string) =>
+      shell(id).querySelector("[data-row-container]") as HTMLElement;
+    const gaps = () => [
+      ...document.querySelectorAll<HTMLElement>("[data-drop-gap]"),
+    ];
+    const gapIn = (name: string) =>
+      column(name).querySelector<HTMLElement>("[data-drop-gap]");
+    const shift = (id: string) => shell(id).style.transform;
+    const menu = () => screen.queryByRole("menu", { name: "Todo actions" });
+    const lifted = () =>
+      document.querySelector<HTMLElement>("[data-drag-preview][data-lifted]");
+
+    /**
+     * A drag dnd-kit's touch sensor started, driven through the handlers:
+     * the finger goes down `grab` px into the row, then moves by `deltaY`.
+     */
+    const driveTouch = (id: string, grab = 22) => {
+      const listId = todo(id).listId;
+      const index = todos
+        .filter((t) => t.listId === listId)
+        .findIndex((t) => t.id === id);
+      const top = 168 + index * ROW + grab;
+      const activatorEvent = {
+        type: "touchstart",
+        touches: [{ clientX: 100, clientY: top }],
+      };
+      const ev = (over: string | null, deltaY: number) =>
+        ({
+          active: { id, data: { current: { todo: todo(id) } } },
+          over: over ? { id: over } : null,
+          activatorEvent,
+          delta: { x: 0, y: deltaY },
+        }) as never;
+      act(() => dnd.onDragStart?.(ev(null, 0)));
+      return {
+        move: (over: string | null, deltaY: number) =>
+          act(() => dnd.onDragMove?.(ev(over, deltaY))),
+        end: (over: string | null, deltaY: number) =>
+          act(() => dnd.onDragEnd?.(ev(over, deltaY))),
+        cancel: () => act(() => dnd.onDragCancel?.(ev(null, 0))),
+      };
+    };
+
+    const touches = (x: number, y: number) => ({
+      touches: [{ clientX: x, clientY: y }],
+      changedTouches: [{ clientX: x, clientY: y }],
+    });
+    /** dnd-kit's overlay lets go of its card a microtask after the drop. */
+    const overlayGone = () =>
+      act(async () => {
+        vi.advanceTimersByTime(100);
+        await Promise.resolve();
+      });
+    /** A finger down on `el`, as the browser sends it: pointer, then touch. */
+    const fingerDown = (el: Element, x = 100, y = 100) => {
+      fireEvent.pointerDown(el, {
+        pointerType: "touch",
+        button: 0,
+        isPrimary: true,
+        clientX: x,
+        clientY: y,
+      });
+      fireEvent.touchStart(el, touches(x, y));
+    };
+
+    it("lifts a row only after a 450ms hold within 10px", async () => {
+      vi.useFakeTimers();
+      render(<WideApp />);
+      fingerDown(container("t1"));
+      act(() => vi.advanceTimersByTime(LONG_PRESS_MS - 1));
+      expect(lifted()).toBeNull();
+      act(() => vi.advanceTimersByTime(1));
+      expect(lifted()).toBeInTheDocument();
+      // Lifted, raised and tilted, with no faded original or line.
+      expect(lifted()).toHaveClass("n-lifted");
+      expect(lifted()?.style.getPropertyValue("--n-drag-tilt")).toMatch(/deg$/);
+      expect(shell("t1")).toHaveClass("opacity-0");
+      expect(shell("t1")).not.toHaveClass("opacity-35");
+      fireEvent.touchEnd(container("t1"), touches(100, 100));
+      await overlayGone();
+      expect(lifted()).toBeNull();
+      expect(shell("t1")).not.toHaveClass("opacity-0");
+      expect(update).not.toHaveBeenCalled();
+
+      // Past the slop before the hold is up: a scroll, not a lift.
+      fireEvent.keyDown(document, { key: "Escape" });
+      fingerDown(container("t2"));
+      act(() => vi.advanceTimersByTime(200));
+      fireEvent.pointerMove(container("t2"), {
+        pointerType: "touch",
+        clientX: 100,
+        clientY: 115,
+      });
+      fireEvent.touchMove(container("t2"), touches(100, 115));
+      act(() => vi.advanceTimersByTime(LONG_PRESS_MS));
+      expect(lifted()).toBeNull();
+      expect(menu()).toBeNull();
+    });
+
+    it("the hold opens the row's menu, selected; moving after the lift closes it and drags", async () => {
+      vi.useFakeTimers();
+      render(<WideApp />);
+      fingerDown(container("t2"));
+      act(() => vi.advanceTimersByTime(LONG_PRESS_MS));
+      expect(menu()).toBeInTheDocument();
+      expect(container("t2")).toHaveAttribute("data-selected");
+      // Let go without moving: the menu stays, nothing is saved.
+      fireEvent.pointerUp(container("t2"), { pointerType: "touch" });
+      fireEvent.touchEnd(container("t2"), touches(100, 100));
+      await overlayGone();
+      expect(menu()).toBeInTheDocument();
+      expect(lifted()).toBeNull();
+      expect(update).not.toHaveBeenCalled();
+      fireEvent.keyDown(document.activeElement ?? document, {
+        key: "Escape",
+      });
+      act(() => vi.advanceTimersByTime(500));
+      expect(menu()).toBeNull();
+
+      // Held again, then moved past the slop: the menu closes, it drags.
+      fingerDown(container("t2"));
+      act(() => vi.advanceTimersByTime(LONG_PRESS_MS));
+      expect(menu()).toBeInTheDocument();
+      fireEvent.touchMove(container("t2"), touches(100, 130));
+      act(() => vi.advanceTimersByTime(500));
+      expect(menu()).toBeNull();
+      expect(lifted()).toBeInTheDocument();
+      fireEvent.touchEnd(container("t2"), touches(100, 130));
+      await overlayGone();
+      expect(lifted()).toBeNull();
+    });
+
+    it("parts its own column around a soft yellow gap, with no line", () => {
+      reducedMotion = "no-preference";
+      render(<WideApp />);
+      const top = layOut("Today");
+      const drag = driveTouch("t1");
+      // Over its own slot: its own space is the gap.
+      expect(gapIn("Today")).toHaveStyle({ top: "0px", height: `${ROW}px` });
+      expect(gapIn("Today")?.firstElementChild).toHaveClass("bg-n-brand-soft");
+      // Down 80: past Call Mum's middle, not Water plants'.
+      drag.move("col:list-today", 80);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shell("t2").style.transition).toContain("transform");
+      expect(shift("t3")).toBe("");
+      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+      expect(gapIn("Today")).toHaveClass("transition-[top]");
+      expect(gaps()).toHaveLength(1);
+      expect(line()).toBeNull();
+      expect(top).toBe(168);
+
+      drag.end("col:list-today", 80);
+      expect(update).toHaveBeenCalledTimes(1);
+      const { id, input } = update.mock.calls[0][0];
+      expect(id).toBe("t1");
+      expect(input.position > "a1" && input.position < "a2").toBe(true);
+      expect(gaps()).toEqual([]);
+    });
+
+    it("closes up its own column over another, which parts instead", () => {
+      render(<WideApp />);
+      layOut("Today");
+      layOut("This week");
+      const drag = driveTouch("t1");
+      // 30px into This week's rows (Today's and This week's line up):
+      // after Send invoke's middle, before Renew passport's.
+      drag.move("col:list-week", 8);
+      expect(gapIn("Today")).toBeNull();
+      expect(gapIn("This week")).toHaveStyle({ top: `${ROW}px` });
+      expect(gaps()).toHaveLength(1);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shift("t3")).toBe(`translateY(${-ROW}px)`);
+      expect(shift("w1")).toBe("");
+      expect(shift("w2")).toBe(`translateY(${ROW}px)`);
+      expect(line()).toBeNull();
+
+      // Below This week's rows: last.
+      drag.move("col:list-week", 200);
+      expect(gapIn("This week")).toHaveStyle({ top: `${2 * ROW}px` });
+      expect(shift("w2")).toBe("");
+      drag.end("col:list-week", 200);
+      expect(update).toHaveBeenCalledWith({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-week" }),
+      });
+      expect(update.mock.calls[0][0].input.position > "a1").toBe(true);
+    });
+
+    it("keeps a pinned row's gap among the pinned", () => {
+      todos = todos.map((t) =>
+        t.id === "t1" || t.id === "t2" ? { ...t, pinned: true } : t,
+      );
+      render(<WideApp />);
+      layOut("Today");
+      const drag = driveTouch("t1");
+      drag.move("col:list-today", 4 * ROW);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shift("t3")).toBe("");
+      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+    });
+
+    it("opens the top of an empty column", () => {
+      render(<WideApp />);
+      layOut("Today");
+      layOut("Someday");
+      const drag = driveTouch("t1");
+      drag.move("col:list-someday", 100);
+      expect(gapIn("Someday")).toHaveStyle({ top: "0px" });
+      drag.end("col:list-someday", 100);
+      expect(update).toHaveBeenCalledWith({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-someday" }),
+      });
+    });
+
+    it("moves to a sidebar list with no gap anywhere", () => {
+      render(<WideApp />);
+      layOut("Today");
+      const drag = driveTouch("t1");
+      drag.move("col:list-today", 80);
+      drag.move("side:list-groceries", 300);
+      expect(gaps()).toEqual([]);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      drag.end("side:list-groceries", 300);
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "t1",
+          input: expect.objectContaining({ listId: "list-groceries" }),
+        }),
+      );
+    });
+
+    it("saves nothing released where it started, over nothing, or cancelled", () => {
+      render(<WideApp />);
+      layOut("Today");
+      let drag = driveTouch("t2");
+      drag.move("col:list-today", 60);
+      drag.move("col:list-today", 2);
+      drag.end("col:list-today", 2);
+      // Over Done, the open todo or nothing: no gap, and back it goes.
+      drag = driveTouch("t2");
+      drag.move("col:list-today", 60);
+      drag.move(null, 400);
+      expect(gaps()).toEqual([]);
+      drag.end(null, 400);
+      drag = driveTouch("t2");
+      drag.move("col:list-today", 60);
+      expect(shift("t3")).toBe(`translateY(${-ROW}px)`);
+      drag.cancel();
+      expect(shift("t3")).toBe("");
+      expect(gaps()).toEqual([]);
+      expect(update).not.toHaveBeenCalled();
+      expect(rowIds("list-today")).toEqual(["t1", "t2", "t3"]);
+    });
+
+    it("scrolls the board near its side edges, following the finger", () => {
+      vi.useFakeTimers();
+      render(<WideApp />);
+      const board = layOutBoard(600);
+      const scrolled = () =>
+        vi
+          .mocked(board.scrollBy)
+          .mock.calls.map(([arg]) => (arg as ScrollToOptions).left ?? 0);
+      // Only touch events: dnd-kit's touch sensor sends no pointer moves.
+      const finger = (x: number) =>
+        window.dispatchEvent(
+          Object.assign(new Event("touchmove"), {
+            touches: [{ clientX: x, clientY: 300 }],
+          }),
+        );
+      const drag = driveTouch("t1");
+      drag.move("col:list-today", 40);
+      finger(830);
+      act(() => vi.advanceTimersByTime(100));
+      expect(scrolled().length).toBeGreaterThan(0);
+      expect(scrolled().every((left) => left > 0)).toBe(true);
+      vi.mocked(board.scrollBy).mockClear();
+      finger(500);
+      act(() => vi.advanceTimersByTime(100));
+      expect(scrolled()).toEqual([]);
+      drag.end("col:list-studio", 40);
+      expect(update).toHaveBeenCalledWith({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-studio" }),
+      });
+    });
+
+    it("eases the rows into the new order, holding them where they parted", () => {
+      reducedMotion = "no-preference";
+      const { rerender } = render(<WideApp />);
+      layOut("Today");
+      const drag = driveTouch("t1");
+      drag.move("col:list-today", 80);
+      const callMum = shell("t2");
+      drag.end("col:list-today", 80);
+      rerender(<WideApp />);
+      expect(rowIds("list-today")).toEqual(["t2", "t1", "t3"]);
+      const framesOf = (el: Element) =>
+        animate.mock.calls
+          .filter((_, i) => animate.mock.contexts[i] === el)
+          .map(([frames]) => frames);
+      // Call Mum is held where it parted to until the new order renders,
+      // which is where it lands: it doesn't spring back first.
+      expect(framesOf(callMum)[0]).toEqual([
+        { transform: `translateY(${-ROW}px)` },
+        { transform: `translateY(${-ROW}px)` },
+      ]);
+      // Review PR eases down from its old place.
+      expect(framesOf(shell("t1"))).toContainEqual([
+        { transform: `translateY(${-ROW}px)` },
+        { transform: "none" },
+      ]);
+    });
+
+    it("doesn't animate under reduced motion", () => {
+      const { rerender } = render(<WideApp />);
+      layOut("Today");
+      const drag = driveTouch("t1");
+      drag.move("col:list-today", 80);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shell("t2").style.transition).toBe("none");
+      expect(gapIn("Today")).not.toHaveClass("transition-[top]");
+      drag.end("col:list-today", 80);
+      rerender(<WideApp />);
+      expect(rowIds("list-today")).toEqual(["t2", "t1", "t3"]);
+      expect(animate).not.toHaveBeenCalled();
+    });
+
+    it("a tap selects and a second tap opens; the checkbox ticks and never lifts", () => {
+      vi.useFakeTimers();
+      render(<WideApp />);
+      const tap = (el: Element) => {
+        fingerDown(el);
+        fireEvent.pointerUp(el, { pointerType: "touch" });
+        fireEvent.touchEnd(el, touches(100, 100));
+        fireEvent.click(el, { detail: 1 });
+      };
+      tap(container("t2"));
+      expect(container("t2")).toHaveAttribute("data-selected");
+      expect(document.querySelector("[data-detail-column]")).toBeNull();
+      tap(container("t2"));
+      expect(
+        document.querySelector("[data-detail-column]"),
+      ).toBeInTheDocument();
+
+      const check = container("t3").querySelector(
+        "[data-row-check]",
+      ) as HTMLElement;
+      fingerDown(check);
+      act(() => vi.advanceTimersByTime(LONG_PRESS_MS * 2));
+      expect(lifted()).toBeNull();
+      expect(menu()).toBeNull();
+      fireEvent.click(check, { detail: 1 });
+      expect(check).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("a mouse drag stays as it was: 6px, the line, no hold and no parting", () => {
+      vi.useFakeTimers();
+      render(<WideApp />);
+      layOut("Today");
+      const sensors = dnd.sensors ?? [];
+      expect(sensors.map((s) => s.options)).toEqual([
+        { activationConstraint: { delay: LONG_PRESS_MS, tolerance: 10 } },
+        { activationConstraint: { distance: 6 } },
+      ]);
+      // No hold with a mouse: no menu, no lift.
+      fireEvent.pointerDown(container("t1"), {
+        pointerType: "mouse",
+        button: 0,
+        isPrimary: true,
+        clientX: 100,
+        clientY: 100,
+      });
+      act(() => vi.advanceTimersByTime(LONG_PRESS_MS * 2));
+      expect(menu()).toBeNull();
+      expect(lifted()).toBeNull();
+      fireEvent.pointerUp(document, { pointerType: "mouse" });
+
+      start("t1");
+      move("t1", "col:list-today", 168 + 2 * ROW + 30);
+      expect(line()).toBeInTheDocument();
+      expect(gaps()).toEqual([]);
+      for (const id of ["t2", "t3"]) expect(shift(id)).toBe("");
+      end("t1", "col:list-today");
+    });
   });
 
   describe("easing rows into place", () => {

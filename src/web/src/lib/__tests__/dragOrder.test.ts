@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   byPosition,
   clampToTier,
+  columnGapTop,
+  columnPart,
   dropLineY,
   dropPlacement,
+  dropSlot,
   gapTop,
   partOffset,
   positionAt,
@@ -265,5 +268,90 @@ describe("the gap a touch drag opens", () => {
 
   it("is null before the rows are measured", () => {
     expect(gapTop([], 0, 0)).toBeNull();
+  });
+});
+
+describe("a touch drag across the board's columns", () => {
+  // Rows 40 tall from 8; a column's spans, n rows long.
+  const spansOf = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      top: 8 + i * 40,
+      bottom: 48 + i * 40,
+    }));
+
+  describe("the slot, as the line's rule", () => {
+    const spans = spansOf(5);
+
+    it("in its own column: the upper half goes above, the lower half below", () => {
+      // Dragging "a" (index 2): over "b"'s upper half, before it among the
+      // others; over its lower half, after it.
+      expect(dropSlot(list, list[2], spans, 2, 8 + 3 * 40 + 10)).toBe(2);
+      expect(dropSlot(list, list[2], spans, 2, 8 + 3 * 40 + 30)).toBe(3);
+      // Below the rows, last.
+      expect(dropSlot(list, list[2], spans, 2, 400)).toBe(4);
+    });
+
+    it("in another column: the same halves, and last below the rows", () => {
+      const stranger = row("x", "a5");
+      expect(dropSlot(list, stranger, spans, -1, 8 + 3 * 40 + 10)).toBe(3);
+      expect(dropSlot(list, stranger, spans, -1, 8 + 3 * 40 + 30)).toBe(4);
+      expect(dropSlot(list, stranger, spans, -1, 999)).toBe(5);
+      // Above everything, an unpinned todo still lands after the pinned.
+      expect(dropSlot(list, stranger, spans, -1, 0)).toBe(2);
+    });
+
+    it("keeps a pinned todo among the pinned", () => {
+      expect(dropSlot(list, list[0], spans, 0, 999)).toBe(1);
+      const pinned = row("x", "a5", true);
+      expect(dropSlot(list, pinned, spans, -1, 999)).toBe(2);
+    });
+
+    it("is first in an empty column", () => {
+      expect(dropSlot([], row("x", "a0"), [], -1, 300)).toBe(0);
+    });
+  });
+
+  describe("the parting", () => {
+    const offsets = (from: number | null, slot: number | null, n = 5) =>
+      Array.from({ length: n }, (_, i) => columnPart(from, slot, i, 40));
+
+    it("parts its own column as the phone does", () => {
+      expect(offsets(1, 3)).toEqual([0, 0, -40, -40, 0]);
+      expect(offsets(1, 0)).toEqual([40, 0, 0, 0, 0]);
+    });
+
+    it("closes its own column up once the finger leaves it", () => {
+      expect(offsets(1, null)).toEqual([0, 0, -40, -40, -40]);
+    });
+
+    it("opens another column at the slot", () => {
+      expect(offsets(null, 2)).toEqual([0, 0, 40, 40, 40]);
+      expect(offsets(null, 5)).toEqual([0, 0, 0, 0, 0]);
+    });
+
+    it("leaves a column the drag has nothing to do with", () => {
+      expect(offsets(null, null)).toEqual([0, 0, 0, 0, 0]);
+    });
+  });
+
+  describe("the gap", () => {
+    it("in its own column, is where the rows part", () => {
+      expect(columnGapTop(spansOf(5), 1, 3)).toBe(gapTop(spansOf(5), 1, 3));
+    });
+
+    it("in another column, sits above the slot's row, or below the last", () => {
+      const spans = spansOf(3);
+      expect(columnGapTop(spans, null, 0)).toBe(8);
+      expect(columnGapTop(spans, null, 2)).toBe(88);
+      expect(columnGapTop(spans, null, 3)).toBe(128);
+      // Where the parted rows leave room for it.
+      const drawn = spans.map((s, i) => s.top + columnPart(null, 1, i, 40));
+      expect(drawn).toEqual([8, 88, 128]);
+      expect(columnGapTop(spans, null, 1)).toBe(48);
+    });
+
+    it("is at the top of an empty column", () => {
+      expect(columnGapTop([], null, 0)).toBe(0);
+    });
   });
 });

@@ -36,17 +36,43 @@ export interface SettleTiming {
   easing: string;
 }
 
-/** Each row's place in `listIds`' columns, captured just before a drop. */
-export function captureRows(listIds: string[]): SettleFrom {
+/**
+ * Each row's place in `listIds`' columns, captured just before a drop.
+ * `shift` is how far a row is drawn from its laid-out place, by its column
+ * and index there: the rows a touch drag has parted.
+ */
+export function captureRows(
+  listIds: string[],
+  shift?: (listId: string, index: number) => number,
+): SettleFrom {
   const from: SettleFrom = new Map();
   for (const listId of new Set(listIds)) {
-    for (const el of columnRows(listId)) {
+    columnRows(listId).forEach((el, i) => {
       const li = el.closest("li");
       const id = el.dataset.rowId;
-      if (li && id) from.set(id, { listId, top: li.offsetTop });
-    }
+      if (li && id) {
+        from.set(id, { listId, top: li.offsetTop + (shift?.(listId, i) ?? 0) });
+      }
+    });
   }
   return from;
+}
+
+/**
+ * Hold each captured row where it was drawn, until the drop's new order
+ * renders and `settleRows` eases it on, so rows a touch drag parted don't
+ * spring back for a frame in between.
+ */
+export function holdRows(from: SettleFrom) {
+  for (const listId of new Set([...from.values()].map((r) => r.listId))) {
+    for (const el of columnRows(listId)) {
+      const li = el.closest("li");
+      const was = el.dataset.rowId ? from.get(el.dataset.rowId) : undefined;
+      if (!li || !was || was.top === li.offsetTop) continue;
+      const hold = { transform: `translateY(${was.top - li.offsetTop}px)` };
+      li.animate?.([hold, hold], { duration: SETTLE_TTL_MS });
+    }
+  }
 }
 
 /** The drag preview's box, while it's on screen. */

@@ -2,6 +2,7 @@ import { DndContext } from "@dnd-kit/core";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { makeTodo } from "@/components/phone/__tests__/fixtures";
 import { Column } from "../Column";
 
 const column = (
@@ -135,6 +136,43 @@ describe("Column", () => {
       "ring-n-canvas",
       "animate-n-dot-in",
     );
+  });
+
+  it("lets a finger hold a row with no callout or text selection, panning until it lifts", () => {
+    render(
+      <DndContext>
+        <Column
+          listId="today"
+          title="Today"
+          subline=""
+          rows={[makeTodo({ id: "t1", title: "Review PR" })]}
+          subtasksOf={() => []}
+          checked={new Set()}
+          collapsing={new Set()}
+          highlightedId={null}
+          selectedId={null}
+          indicator={null}
+          composer={null}
+          empty="Nothing today."
+          loading={false}
+          error={null}
+          now={new Date()}
+          timeZone="UTC"
+          onCheck={vi.fn()}
+          onOpen={vi.fn()}
+          onMenu={vi.fn()}
+        />
+      </DndContext>,
+    );
+    const row = document.querySelector("[data-row-container]");
+    expect(row).toHaveClass(
+      "select-none",
+      "[-webkit-touch-callout:none]",
+      "touch-pan-x",
+      "touch-pan-y",
+    );
+    // The checkbox's hit area is a 44px square (`size-11`).
+    expect(row?.querySelector("[data-row-check]")).toHaveClass("size-11");
   });
 
   it("gives Today no ⋯ menu, so no Hide column", () => {
