@@ -88,21 +88,7 @@ export function renderCss(tokens) {
     out.push(`  --n-font-${kebab(name)}: ${cssFontFamily(tokens, name)};`);
   }
   out.push("");
-  for (const [density, styles] of entries(tokens.type)) {
-    for (const [name, t] of entries(styles)) {
-      const p = `--n-type-${density}-${kebab(name)}`;
-      out.push(`  ${p}-font: var(--n-font-${t.font});`);
-      out.push(`  ${p}-size: ${t.size / 16}rem;`);
-      out.push(`  ${p}-line-height: ${t.lineHeight / 16}rem;`);
-      out.push(`  ${p}-weight: ${t.weight};`);
-    }
-  }
-  out.push("");
-  for (const [step, px] of entries(tokens.space.scale)) {
-    out.push(`  --n-space-${step}: ${px / 16}rem;`);
-  }
-  out.push(`  --n-row-min-height: ${tokens.space.rowMinHeight / 16}rem;`);
-  out.push("");
+  // No type or space: the web doesn't read them (see their $comment).
   for (const [name, px] of entries(tokens.radius)) {
     out.push(`  --n-radius-${kebab(name)}: ${px / 16}rem;`);
   }
@@ -129,12 +115,12 @@ export function renderCss(tokens) {
       `board.hatch.angle must be 45, 135, 225 or 315, not ${board.hatch.angle}: the web's hatch tile only joins up at those angles`,
     );
   }
-  out.push(`  --n-board-hatch-spacing: ${board.hatch.spacing / 16}rem;`);
   out.push(`  --n-board-hatch-angle: ${board.hatch.angle}deg;`);
   out.push(`  --n-board-hatch-width: ${board.hatch.width / 16}rem;`);
   out.push(`  --n-board-hatch-opacity: ${board.hatch.opacity};`);
   // One line per square tile, corner to corner: `spacing` apart at 45°, and
   // a whole pixel wide so every tile draws the same and the lines can't band.
+  // The web draws from the tile alone, so `spacing` isn't emitted itself.
   out.push(
     `  --n-board-hatch-tile: ${Math.round(board.hatch.spacing * Math.SQRT2) / 16}rem;`,
   );
@@ -414,7 +400,6 @@ export function renderSwift(tokens) {
 
   // Spacing / radii
   out.push("    enum Space {");
-  out.push(`        static let unit: CGFloat = ${tokens.space.unit}`);
   for (const [step, px] of entries(tokens.space.scale)) {
     out.push(`        static let s${step}: CGFloat = ${px}`);
   }

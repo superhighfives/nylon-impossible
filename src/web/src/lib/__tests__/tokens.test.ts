@@ -1,4 +1,6 @@
 // @vitest-environment node
+import { readdirSync, readFileSync } from "node:fs";
+import { join, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   loadTokens,
@@ -8,6 +10,17 @@ import {
   renderSwift,
   staleOutputs,
 } from "../../../../shared/design/generate.mjs";
+
+const WEB_SRC = join(import.meta.dirname, "../..");
+
+/** Every source file under src/web/src, bar tests and tokens.css itself. */
+function webSources(): string[] {
+  return readdirSync(WEB_SRC, { recursive: true, encoding: "utf8" })
+    .filter((path) => /\.(css|tsx?)$/.test(path))
+    .filter((path) => !path.split(sep).includes("__tests__"))
+    .map((path) => join(WEB_SRC, path))
+    .filter((path) => path !== OUTPUTS.css);
+}
 
 describe("design token generator", () => {
   const tokens = loadTokens();
@@ -79,7 +92,6 @@ describe("design token generator", () => {
     const css = renderCss(tokens);
     expect(css).toContain("--n-board-column-min-width: 17rem;");
     expect(css).toContain("--n-board-column-max-width: 26rem;");
-    expect(css).toContain("--n-board-hatch-spacing: 0.75rem;");
     expect(css).toContain("--n-board-hatch-angle: 45deg;");
     expect(css).toContain("--n-board-hatch-width: 0.0625rem;");
     expect(css).toContain("--n-board-hatch-opacity: 0.4;");
@@ -152,6 +164,36 @@ describe("design token generator", () => {
     );
     expect(swift).toContain("typealias PlatformFont = UIFont");
     expect(swift).toContain("UIColor { traits in");
+  });
+
+  it("every generated CSS variable is read by the web", () => {
+    const declared = new Set(
+      [...renderCss(tokens).matchAll(/^\s*(--n-[a-z0-9-]+):/gm)].map(
+        ([, name]) => name,
+      ),
+    );
+    expect(declared.size).toBeGreaterThan(0);
+    const sources = webSources().map((path) => readFileSync(path, "utf8"));
+    // The literal name covers var(--n-x) and Tailwind's -(--n-x) shorthand.
+    const unread = [...declared].filter(
+      (name) => !sources.some((source) => source.includes(name)),
+    );
+    expect(
+      unread,
+      "tokens.css defines variables nothing under src/web/src reads; drop them from the generator",
+    ).toEqual([]);
+  });
+
+  it("emits no type or space for the web, and no space unit or s0 for Apple", () => {
+    const css = renderCss(tokens);
+    expect(css).not.toContain("--n-type-");
+    expect(css).not.toContain("--n-space-");
+    expect(css).not.toContain("--n-row-min-height");
+    const swift = renderSwift(tokens);
+    expect(swift).not.toContain("static let unit");
+    expect(swift).not.toContain("static let s0");
+    expect(swift).toContain("static let s1: CGFloat = 4");
+    expect(swift).toContain("static let rowMinHeight: CGFloat = 44");
   });
 
   it("builds the same theme for macOS from AppKit types", () => {
