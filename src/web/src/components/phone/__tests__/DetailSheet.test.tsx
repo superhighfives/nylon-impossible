@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { toast } from "@/lib/toast";
 import type { TodoActions } from "../useTodoActions";
 import { dueIn, makeTodo, makeUrl } from "./fixtures";
 
@@ -404,6 +405,13 @@ describe("DetailSheet", () => {
         "```",
       ].join("\n");
 
+      const clipboard = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+      afterEach(() => {
+        if (clipboard) Object.defineProperty(navigator, "clipboard", clipboard);
+        else Reflect.deleteProperty(navigator, "clipboard");
+        vi.restoreAllMocks();
+      });
+
       const stubClipboard = (writeText: (text: string) => Promise<void>) =>
         Object.defineProperty(navigator, "clipboard", {
           value: { writeText: vi.fn(writeText) },
@@ -455,6 +463,42 @@ describe("DetailSheet", () => {
         expect(navigator.clipboard.writeText).toHaveBeenLastCalledWith(
           "second",
         );
+      });
+
+      it("doesn't start editing when the tooltip is clicked", async () => {
+        stubClipboard(() => Promise.resolve());
+        const { rendered } = renderNotes(withCode);
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const [first] = within(notes).getAllByRole("button", {
+          name: "Copy code",
+        });
+        await act(async () => {
+          fireEvent.click(first);
+        });
+        const tooltip = await screen.findByText("Copied");
+        expect(notes.contains(tooltip)).toBe(false);
+        fireEvent.click(tooltip);
+        expect(rendered()).not.toBeNull();
+        expect(
+          document.querySelector("textarea[placeholder='Add notes']"),
+        ).toBeNull();
+      });
+
+      it("says so, and doesn't say Copied, when the copy fails", async () => {
+        stubClipboard(() => Promise.reject(new Error("Denied")));
+        const error = vi.spyOn(toast, "error");
+        const { rendered } = renderNotes(withCode);
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const [first] = within(notes).getAllByRole("button", {
+          name: "Copy code",
+        });
+        await act(async () => {
+          fireEvent.click(first);
+        });
+        expect(error).toHaveBeenCalledWith("Denied");
+        expect(screen.queryByText("Copied")).toBeNull();
       });
     });
 

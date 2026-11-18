@@ -291,6 +291,8 @@ export function Notes({
             tabIndex={0}
             data-notes-rendered
             onClick={(e) => {
+              // A Copy tooltip is portaled out, but its clicks still bubble here.
+              if (!e.currentTarget.contains(e.target as Node)) return;
               if ((e.target as Element).closest("a, button")) return;
               const selection = window.getSelection();
               if (selection && !selection.isCollapsed) return;
