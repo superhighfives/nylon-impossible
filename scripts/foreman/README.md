@@ -49,6 +49,24 @@ Each tick:
    - Or the result is a question: the issue gets `needs-decision` and goes
      back to Define.
 
+## Headless runs
+
+`claude -p` exits when the model ends its turn, and anything it left in the
+background dies with it. So every run the foreman starts (builds, triages,
+review rounds, spec runs and routines) goes through one launcher,
+`headless`, which sets `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS=1` and
+`BASH_MAX_TIMEOUT_MS=3600000`: nothing goes to the background, and a Bash
+call may run for an hour in the foreground. The build, triage, round and
+spec prompts say the same in `headless_rules`.
+
+A build, triage or review round that still ends with none of its outcomes
+(a PR or a question; a PR or a spec; a push or a question) is resumed once:
+`claude -p --resume` on the session the first run started, in the same
+worktree, with its own timeout. The retry is quiet, a `retried` event and a
+log line. If it ends with nothing too, the foreman fails it as before, and
+the comment names both logs. A run the timeout killed (exit 142) isn't
+retried, and spec runs and routines never are.
+
 ## Specs
 
 The template and the rules for arguing it are in the `prd` skill
@@ -140,8 +158,8 @@ as well. It decides:
   start revisions even though it has `needs-decision`, which comes off when
   **Open questions** reads "None."; then it goes to Ready and is built. One
   whose triage spec has no questions at all goes straight to Ready.
-- **Neither** (a failed run): `needs-decision`, a comment with the log's
-  path, and back to Ideas. Removing `needs-decision` triages it again.
+- **Neither** (a failed run, even after its retry): `needs-decision`, a
+  comment with both logs' paths, and back to Ideas. Removing `needs-decision` triages it again.
 
 Feedback PRs are ordinary `foreman/*` PRs: the same rounds and gate.
 
@@ -222,8 +240,8 @@ is 🟡 or 🔴 on the head commit:
 
 **It hands the PR to you** with `needs-decision`, a comment and an alert when:
 - a finding is your call;
-- a round pushes nothing, since without a new commit there's no new review,
-  so it could never reach 🟢 on its own;
+- a round pushes nothing, even after its retry, since without a new commit
+  there's no new review, so it could never reach 🟢 on its own;
 - 3 rounds pass without reaching 🟢.
 
 **Removing `needs-decision` re-arms it.** The next run clears the

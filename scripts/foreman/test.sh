@@ -19,6 +19,10 @@ export FOREMAN_OPERATOR_PLISTS="$tmp/LaunchAgents"
 # shellcheck source=SCRIPTDIR/foreman.sh
 source "$here/foreman.sh"
 set +e
+# Stubbed further down; the headless-run cases need the real ones back.
+eval "real_$(declare -f run_claude)"
+eval "real_$(declare -f event)"
+eval "real_$(declare -f install_operator)"
 
 pass=0 fail=0
 expect() { # name expected actual
@@ -970,6 +974,163 @@ expect "neither: needs-decision"                      "yes"  "$(called '--add-la
 expect "and a comment"                                "yes"  "$(called 'issue comment 22')"
 expect "back in Ideas"                                "yes"  "$(called '--single-select-option-id o-ideas')"
 expect "and re-armed for when the label comes off"    "no"   "$([ -e "$FEEDBACK/22" ] && echo yes || echo no)"
+
+echo "headless runs"
+
+# $SHIM stands in for the operator's shim: it records the environment and
+# flags each run got, and on call $SHIM_ACT_ON runs $SHIM_ACT in the run's
+# directory (a push, say).
+SHIM="$tmp/shim" SHIM_LOG="$tmp/shim-log" SHIM_COUNT="$tmp/shim-count"
+export SHIM_LOG SHIM_COUNT SHIM_ACT="" SHIM_ACT_ON=0 SHIM_EXIT=0
+cat > "$SHIM" <<'EOF'
+#!/usr/bin/env bash
+n=$(( $(cat "$SHIM_COUNT" 2>/dev/null || echo 0) + 1 )); echo "$n" > "$SHIM_COUNT"
+echo "env ${CLAUDE_CODE_DISABLE_BACKGROUND_TASKS:-unset} ${BASH_MAX_TIMEOUT_MS:-unset}" >> "$SHIM_LOG"
+for a in "$@"; do case "$a" in --session-id|--resume|--disallowedTools|--restricted) printf 'flag %s\n' "$a" >> "$SHIM_LOG" ;; esac; done
+[ "$n" != "$SHIM_ACT_ON" ] || eval "$SHIM_ACT"
+exit "$SHIM_EXIT"
+EOF
+chmod +x "$SHIM"
+shim_reset() { : > "$SHIM_LOG"; rm -f "$SHIM_COUNT"; SHIM_ACT="" SHIM_ACT_ON=0 SHIM_EXIT=0; }
+shim_calls() { cat "$SHIM_COUNT" 2>/dev/null || echo 0; }
+shim_envs() { grep '^env ' "$SHIM_LOG" | sort -u | paste -sd'|' -; }
+run_claude() { real_run_claude "$@"; }
+event() { real_event "$@"; }
+mkdir -p "$LOGS" "$WORKTREES"
+
+HEAD_ISSUE_LABELS="" PR_OPEN=0 TRIAGE_BODY="Just the report."
+gh() {
+  echo "$*" >> "$CALLS"
+  case "$1 $2" in
+    "pr view")
+      case "$*" in *headRefOid*) echo "$ROUND_HEAD"; return 0 ;; esac
+      local want; want=$(sed -E 's/.*index\("([^"]+)"\).*/\1/' <<<"$*")
+      case ",$LABELS," in *",$want,"*) echo 0 ;; *) echo null ;; esac ;;
+    "pr edit") case "$*" in *"--add-label "*) LABELS="$LABELS,${*##*--add-label }" ;; esac ;;
+    "pr list") [ "$PR_OPEN" = 0 ] || echo 31 ;;
+    "issue view")
+      case "$*" in
+        *index*) case ",$HEAD_ISSUE_LABELS," in *,needs-decision,*) echo 0 ;; *) echo null ;; esac ;;
+        *"--json body --jq"*) printf '%s\n' "$TRIAGE_BODY" ;;
+        *) jq -cn --arg b "$TRIAGE_BODY" --arg l "$HEAD_ISSUE_LABELS" '{body:$b, title:"t", labels:($l | split(",") | map({name:.}))}' ;;
+      esac ;;
+    "issue edit") case "$*" in *"--add-label needs-decision"*) HEAD_ISSUE_LABELS="$HEAD_ISSUE_LABELS,needs-decision" ;; esac ;;
+    api\ repos/*/reviews) echo "[$(review "$ROUND_HEAD" "🟡 Approved with comments" 2026-11-01T09:00:00Z 202)]" ;;
+    *) return 0 ;;
+  esac
+}
+
+shim_reset
+real_run_claude "$tmp" "$tmp/run.log" "hi"
+expect "run_claude: no background tasks, an hour per Bash call"  "env 1 3600000"  "$(shim_envs)"
+
+shim_reset
+routine_claude scout "hi" --restricted >/dev/null
+expect "routine_claude: the same"            "env 1 3600000"  "$(shim_envs)"
+expect "with the routine's own flags"        "yes"  "$(grep -qx 'flag --restricted' "$SHIM_LOG" && echo yes)"
+
+shim_reset; : > "$CALLS"; rm -rf "$SPECS"
+spec_round "$FB_BOARD" 22 0 revise >/dev/null
+expect "spec_round: the same"                "env 1 3600000"  "$(shim_envs)"
+expect "still with its denied tools"         "yes"  "$(grep -qx 'flag --disallowedTools' "$SHIM_LOG" && echo yes)"
+expect "and no retry"                        "1"    "$(shim_calls)"
+
+# Review rounds run for real against the fixture origin, on a branch of their own.
+g push -q -f origin "$BASE:refs/heads/round-706"
+round() { : > "$CALLS"; : > "$EVENTS"; rm -f "$ROUNDS/31"; LABELS=""; review_round 31 round-706 30 >/dev/null; }
+
+shim_reset
+round
+expect "review_round: the same, both times"  "env 1 3600000"  "$(shim_envs)"
+expect "a round that pushes nothing and asks nothing is resumed once"  "2"  "$(shim_calls)"
+expect "the first run picks the session, the retry resumes it"  "flag --session-id|flag --resume" "$(grep '^flag' "$SHIM_LOG" | paste -sd'|' -)"
+expect "nothing twice: handed over as before"  "yes"  "$(called '--add-label needs-decision')"
+expect "naming both logs"                    "yes"  "$(grep 'pr comment 31' "$CALLS" | grep -q -- '-retry.log' && echo yes)"
+expect "the retry is an event"               "1"    "$(grep -c '"event":"retried"' "$EVENTS")"
+
+shim_reset; SHIM_ACT_ON=2 SHIM_ACT='git commit -q --allow-empty -m fix && git push -q origin HEAD:refs/heads/round-706'
+round
+expect "a retry that pushes: no hand-over"   "2 no no"  "$(shim_calls) $(called '--add-label needs-decision') $(called 'pr comment')"
+expect "and no alert"                        "no"   "$(called 'alert ')"
+expect "only the retried event"              "1"    "$(grep -c '"event":"retried"' "$EVENTS")"
+
+shim_reset; SHIM_ACT_ON=1 SHIM_ACT='git commit -q --allow-empty -m fix && git push -q origin HEAD:refs/heads/round-706'
+round
+expect "a round that pushes first time isn't resumed"  "1 0"  "$(shim_calls) $(grep -c '"event":"retried"' "$EVENTS")"
+
+shim_reset; SHIM_EXIT=142
+round
+expect "a round the timeout killed isn't retried"  "1"  "$(shim_calls)"
+
+echo "build and triage retries"
+
+# run_claude stubbed: on call $ACT_ON it runs $ACT (opens the PR, asks, writes a spec).
+new_worktree() { :; }; prompt_for() { echo build; }; feedback_prompt() { echo triage; }
+# shellcheck disable=SC2329 # opened_pr calls it; the real one is put back below
+install_operator() { :; }; unset -f opened_pr
+RUNS=0 ACT="" ACT_ON=0 RUN_CODE=0
+run_claude() { RUNS=$((RUNS + 1)); echo "run_claude $*" >> "$CALLS"; [ "$RUNS" != "$ACT_ON" ] || eval "$ACT"; return "$RUN_CODE"; }
+eval "$(sed -n '/^opened_pr() {/,/^}/p' "$here/foreman.sh")"
+fresh() { : > "$CALLS"; : > "$EVENTS"; rm -rf "$FEEDBACK"; RUNS=0 ACT="" ACT_ON=0 RUN_CODE=0 PR_OPEN=0 HEAD_ISSUE_LABELS="" TRIAGE_BODY="Just the report."; }
+
+fresh; ACT_ON=2 ACT='PR_OPEN=1'
+build "$FB_BOARD" 22 >/dev/null
+expect "a build with no PR and no question is resumed once"  "2"  "$RUNS"
+expect "the retry resumes the first run's session"  "yes"  "$(grep -c -- '--resume' "$CALLS" | grep -qx 1 && grep -q -- '--session-id' "$CALLS" && echo yes)"
+expect "its PR goes to In review"            "yes"  "$(called '--single-select-option-id o-review')"
+expect "with no needs-decision or comment"   "no no"  "$(called '--add-label needs-decision') $(called 'issue comment')"
+expect "and no alert"                        "no"   "$(called 'alert ')"
+expect "it logs a retried event"             "1"    "$(grep -c '"event":"retried"' "$EVENTS")"
+
+fresh; ACT_ON=1 ACT='PR_OPEN=1'
+build "$FB_BOARD" 22 >/dev/null
+expect "a build that opens its PR first time isn't resumed"  "1 0"  "$RUNS $(grep -c '"event":"retried"' "$EVENTS")"
+
+fresh; ACT_ON=1 ACT='HEAD_ISSUE_LABELS=needs-decision'
+build "$FB_BOARD" 22 >/dev/null
+expect "nor one that asks a question"        "1"    "$RUNS"
+
+fresh
+build "$FB_BOARD" 22 >/dev/null
+expect "a build with nothing twice fails as before"  "2 yes yes"  "$RUNS $(called '--add-label needs-decision') $(called 'alert build of #22 failed')"
+expect "its comment names both logs"         "yes"  "$(grep 'issue comment 22' "$CALLS" | grep -q "build-22-.*\\.log\` and \`.*-retry\\.log" && echo yes)"
+
+fresh; RUN_CODE=142
+build "$FB_BOARD" 22 >/dev/null
+expect "a build the timeout killed isn't retried"  "1 yes"  "$RUNS $(called 'exit 142')"
+
+fresh; ACT_ON=2 ACT="TRIAGE_BODY=\$SPEC_OK"
+triage "$FB_BOARD" 22 >/dev/null
+expect "a triage with no PR and no spec is resumed once"  "2"  "$RUNS"
+expect "and its spec is handled as normal"   "yes no"  "$(called '--add-label spec') $(called 'issue comment')"
+
+fresh; ACT_ON=2 ACT='PR_OPEN=1'
+triage "$FB_BOARD" 22 >/dev/null
+expect "a triage whose retry opens the PR"   "2 yes no"  "$RUNS $(called '--single-select-option-id o-review') $(called 'issue comment')"
+
+fresh; ACT_ON=1 ACT="TRIAGE_BODY=\$SPEC_OK"
+triage "$FB_BOARD" 22 >/dev/null
+expect "a triage that specs first time isn't resumed"  "1"  "$RUNS"
+
+fresh
+triage "$FB_BOARD" 22 >/dev/null
+expect "a triage with nothing twice fails as before"  "2 yes yes"  "$RUNS $(called '--add-label needs-decision') $(called '--single-select-option-id o-ideas')"
+expect "its comment names both logs"         "yes"  "$(grep 'issue comment 22' "$CALLS" | grep -q "triage-22-.*\\.log\` and \`.*-retry\\.log" && echo yes)"
+install_operator() { real_install_operator "$@"; }
+
+echo "headless prompts"
+
+gh() { case "$1 $2" in "issue view") echo "# #9: t" ;; *) return 0 ;; esac; }
+headless_line="it ends the moment you stop"
+unset -f prompt_for feedback_prompt
+eval "$(sed -n '/^prompt_for() {/,/^}/p; /^feedback_prompt() {/,/^}/p' "$here/foreman.sh")"
+expect "the build prompt says to finish in the foreground"  "yes"  "$(prompt_for 9 | grep -q "$headless_line" && echo yes)"
+expect "so does the triage prompt"           "yes"  "$(feedback_prompt 9 | grep -q "$headless_line" && echo yes)"
+expect "and the round prompt"                "yes"  "$(round_prompt 9 foreman/9-x 9 1 'r' '' | grep -q "$headless_line" && echo yes)"
+expect "and the spec prompt"                 "yes"  "$(spec_prompt 9 draft | grep -q "$headless_line" && echo yes)"
+expect "the preview wait is one foreground loop"  "yes no"  \
+  "$(build_rules 9 | tr '\n' ' ' | grep -q 'one *foreground loop' && echo yes) $(build_rules 9 | tr '\n' ' ' | grep -qE 'Wait for it \(up to 20 *minutes\)' && echo yes || echo no)"
+event() { :; }
 
 echo "before/after shots"
 
