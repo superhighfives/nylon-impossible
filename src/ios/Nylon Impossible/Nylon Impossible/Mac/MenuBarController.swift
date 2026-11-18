@@ -79,6 +79,15 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         item?.button?.highlight(false)
     }
 
+    /// Send feedback…: snapshot the popover as it is, close it, open the form.
+    func sendFeedback() {
+        MacFeedbackHandoff.send(
+            snapshot: { MacFeedbackSnapshot.of(panel) },
+            close: close,
+            open: services.showFeedback
+        )
+    }
+
     func windowDidResignKey(_ notification: Notification) {
         // A click on the icon itself resigns key first; leave that to toggle(),
         // or it would close here and reopen there.
@@ -87,7 +96,10 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     }
 
     private func makePanel() -> QuickAddPanel {
-        let root = MacMenuBarRoot { [weak self] in self?.close() }
+        let root = MacMenuBarRoot(
+            onDismiss: { [weak self] in self?.close() },
+            onFeedback: { [weak self] in self?.sendFeedback() }
+        )
         let panel = QuickAddPanel.make(content: NSHostingView(rootView: root))
         panel.isMovableByWindowBackground = false
         panel.delegate = self

@@ -24,9 +24,12 @@ final class MacServices {
     let syncService: SyncService
     let preferencesService: UserPreferencesService
     let settings: MacSettings
+    /// Send feedback…, for an admin.
+    let feedbackService: FeedbackService
     @ObservationIgnored private(set) var hotKey: GlobalHotKey?
     @ObservationIgnored private(set) lazy var menuBar = MenuBarController(services: self)
     @ObservationIgnored private(set) lazy var signInWindow = MacSignInWindow()
+    @ObservationIgnored private(set) lazy var feedbackWindow = makeFeedbackWindow()
     @ObservationIgnored private lazy var session = MacSession(services: self)
     @ObservationIgnored private let widgetReloader = MacWidgetReloader()
 
@@ -41,6 +44,7 @@ final class MacServices {
         let apiService = APIService(authService: auth)
         preferencesService = UserPreferencesService(apiService: apiService, cache: .standard)
         settings = MacSettings()
+        feedbackService = FeedbackService(apiService: apiService)
     }
 
     /// Everything the app is: the session, the menu bar icon, the hotkey, and
@@ -95,6 +99,18 @@ final class MacServices {
     /// The sign-in window, in front.
     func showSignIn() {
         signInWindow.show()
+    }
+
+    /// The feedback form, in front, with the menu bar window's snapshot.
+    func showFeedback(snapshot: MacFeedbackSnapshot?) {
+        feedbackWindow.show(snapshot: snapshot)
+    }
+
+    private func makeFeedbackWindow() -> MacFeedbackWindow {
+        let window = MacFeedbackWindow(feedback: feedbackService)
+        window.theme = { [unowned self] in self.preferencesService.theme }
+        window.onFiled = { [weak self] in self?.menuBar.show() }
+        return window
     }
 
     /// Register (or re-register) the global hotkey from Settings. It opens the
