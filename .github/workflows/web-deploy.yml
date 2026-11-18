@@ -151,10 +151,6 @@ jobs:
       contents: read
       pull-requests: write
       issues: write
-    # For the `smoke` job, which tests this preview.
-    outputs:
-      web_url: ${{ steps.web.outputs.url }}
-      api_url: ${{ steps.api.outputs.url }}
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -336,6 +332,20 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
 
+      # For the `smoke` job, which tests this preview. Not job outputs: the
+      # workers.dev subdomain is a secret value, so GitHub drops any output
+      # containing it ("Skip output … since it may contain secret"), and the
+      # suite ran with an empty BASE_URL. An artifact isn't masked.
+      - name: Save preview URLs for the smoke job
+        run: |
+          printf 'BASE_URL=%s\nAPI_URL=%s\n' "$WEB_PREVIEW_URL" "$API_PREVIEW_URL" > "$RUNNER_TEMP/preview-urls.env"
+      - name: Upload preview URLs
+        uses: actions/upload-artifact@v7
+        with:
+          name: preview-urls
+          path: ${{ runner.temp }}/preview-urls.env
+          retention-days: 1
+
       - name: Comment preview URLs on PR
         uses: actions/github-script@v9
         env:
@@ -430,11 +440,18 @@ jobs:
       - name: Install Chromium
         run: bunx playwright install chromium --with-deps
 
+      - name: Download preview URLs
+        uses: actions/download-artifact@v7
+        with:
+          name: preview-urls
+          path: ${{ runner.temp }}
+
+      - name: Load preview URLs
+        run: cat "$RUNNER_TEMP/preview-urls.env" >> "$GITHUB_ENV"
+
       - name: Run the smoke suite
         run: bun run e2e
         env:
-          BASE_URL: ${{ needs.deploy-preview.outputs.web_url }}
-          API_URL: ${{ needs.deploy-preview.outputs.api_url }}
           SMOKE_PR: ${{ github.event.pull_request.number }}
           SMOKE_D1: preview
           # The development instance the previews sign in against (see "Set
@@ -449,8 +466,6 @@ jobs:
       # what broke without opening the report.
       - name: Summarise results
         if: always()
-        env:
-          WEB_URL: ${{ needs.deploy-preview.outputs.web_url }}
         run: |
           results=test-results/results.json
           if [ ! -f "$results" ]; then
@@ -460,7 +475,7 @@ jobs:
           rows=$(jq -c '[.suites[] | recurse(.suites[]?) | .specs[]? as $s | $s.tests[]
             | {file: $s.file, title: $s.title, project: .projectName, status: .status}]' "$results")
           {
-            echo "### Smoke against $WEB_URL"
+            echo "### Smoke against $BASE_URL"
             echo
             echo "| Spec | Test | Project | Result |"
             echo "| --- | --- | --- | --- |"
