@@ -23,6 +23,15 @@ struct TodoTextTests {
         #expect(split.title.count <= 120)
     }
 
+    @Test("notes keep up to 100,000 characters, as on the web")
+    func notesCap() {
+        #expect(TodoText.notesMax == 100_000)
+        let kept = TodoText.split("Title\n" + String(repeating: "a", count: 100_000))
+        #expect(kept.notes?.utf16.count == 100_000)
+        let capped = TodoText.split("Title\n" + String(repeating: "a", count: 100_050))
+        #expect(capped.notes?.utf16.count == 100_000)
+    }
+
     @Test("an overlong bare URL is titled by its host")
     func longURL() {
         let url = "https://example.com/" + String(repeating: "a", count: 600)

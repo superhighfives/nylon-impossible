@@ -1,3 +1,4 @@
+import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { describe, expect, it } from "vitest";
 import { parseInline, parseMarkdown, safeHref } from "../markdown";
 
@@ -170,9 +171,21 @@ describe("parseInline", () => {
 
   it("stays quick and shallow on a run of markers", () => {
     const started = performance.now();
-    parseMarkdown("*".repeat(10_000));
-    parseMarkdown("[".repeat(5_000) + "](".repeat(2_500));
+    parseMarkdown("*".repeat(TODO_NOTES_MAX));
+    parseMarkdown(
+      "[".repeat(TODO_NOTES_MAX / 2) + "](".repeat(TODO_NOTES_MAX / 4),
+    );
     expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
+  it("stays quick on markers that never close, at the notes limit", () => {
+    const fill = (unit: string) =>
+      unit.repeat(Math.floor(TODO_NOTES_MAX / unit.length));
+    for (const unit of ["*a ", "**a ", "_a ", "[a](b", "![", "*[_(`a "]) {
+      const started = performance.now();
+      parseMarkdown(fill(unit));
+      expect(performance.now() - started, unit).toBeLessThan(500);
+    }
   });
 });
 

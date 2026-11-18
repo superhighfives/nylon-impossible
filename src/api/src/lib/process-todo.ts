@@ -6,7 +6,9 @@
  * when a fetch didn't land the first time.
  */
 
+import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import * as Sentry from "@sentry/cloudflare";
+import { getTableColumns } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
 import { eq, type getDb, inArray, todos, todoUrls } from "./db";
 import { notifySync } from "./notify-sync";
@@ -24,6 +26,22 @@ export interface TodoLinkRef {
   id: string;
   todoId: string;
   url: string;
+}
+
+/** Every column a link row can bind, so a batch of them fits D1's cap. */
+const TODO_URL_PARAMS = Object.keys(getTableColumns(todoUrls)).length;
+
+/**
+ * Insert link rows in batches D1 accepts. Notes can hold thousands of links,
+ * and one `values(...)` binds every column of every row.
+ */
+export async function insertTodoUrls(
+  db: Db,
+  rows: (typeof todoUrls.$inferInsert)[],
+): Promise<void> {
+  for (const batch of chunkForD1(rows, TODO_URL_PARAMS)) {
+    await db.insert(todoUrls).values(batch);
+  }
 }
 
 /** Compare links by normalized href so a trailing slash isn't a new link. */
@@ -81,16 +99,15 @@ export async function queueTodoLinks(
     .filter((row) => options.refetch === true || row.fetchStatus !== "fetched")
     .map((row) => ({ id: row.id, todoId, url: row.url }));
 
-  if (queued.length > 0) {
+  // Half the cap per batch leaves room for the SET values beside the ids.
+  for (const ids of chunkForD1(
+    queued.map((link) => link.id),
+    2,
+  )) {
     await db
       .update(todoUrls)
       .set({ fetchStatus: "pending", updatedAt: now })
-      .where(
-        inArray(
-          todoUrls.id,
-          queued.map((link) => link.id),
-        ),
-      );
+      .where(inArray(todoUrls.id, ids));
   }
 
   if (newUrls.length > 0) {
@@ -110,7 +127,7 @@ export async function queueTodoLinks(
       createdAt: now,
       updatedAt: now,
     }));
-    await db.insert(todoUrls).values(rows);
+    await insertTodoUrls(db, rows);
     queued.push(...rows.map((row) => ({ id: row.id, todoId, url: row.url })));
   }
 

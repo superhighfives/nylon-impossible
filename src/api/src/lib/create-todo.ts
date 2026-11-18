@@ -16,7 +16,7 @@ import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
 import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
 import { notifySync } from "./notify-sync";
-import { finishTodoLinks } from "./process-todo";
+import { finishTodoLinks, insertTodoUrls } from "./process-todo";
 
 type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
@@ -170,7 +170,7 @@ export async function createSmartTodo(
   const totalUrls = fetchedUrls.length + attachedUrls.length;
   if (totalUrls > 0) {
     const urlPositions = generateNKeysBetween(null, null, totalUrls);
-    await db.insert(todoUrls).values([
+    await insertTodoUrls(db, [
       ...pendingLinks.map((link, i) => ({
         ...link,
         position: urlPositions[i],

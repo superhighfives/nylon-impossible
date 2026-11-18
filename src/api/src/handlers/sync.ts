@@ -34,7 +34,7 @@ import { ensureUser } from "../lib/ensure-user";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { pinnedRequestFields, resolvePinned } from "../lib/pinned";
-import { finishTodoLinks } from "../lib/process-todo";
+import { finishTodoLinks, insertTodoUrls } from "../lib/process-todo";
 import {
   cascadeCompletion,
   effectiveRecurrence,
@@ -483,7 +483,7 @@ export async function syncTodos(c: Context<Env>) {
           updatedAt: now,
         };
       });
-      await db.insert(todoUrls).values(urlRows);
+      await insertTodoUrls(db, urlRows);
 
       if (!explicitUrls && notes) {
         const cleanedNotes = notes

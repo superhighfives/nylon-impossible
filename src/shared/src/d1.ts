@@ -12,11 +12,15 @@ export const D1_MAX_BOUND_PARAMS = 100;
  * batch fits in a single `inArray(...)` statement. A given id appears in
  * exactly one batch and order is preserved, so callers that group results by
  * id keep their per-id ordering.
+ *
+ * For a multi-row insert, pass the parameters each row binds (its column
+ * count is a safe ceiling) and each batch fits in one `values(...)`.
  */
-export function chunkForD1<T>(ids: readonly T[]): T[][] {
+export function chunkForD1<T>(ids: readonly T[], paramsPerItem = 1): T[][] {
+  const size = Math.max(1, Math.floor(D1_MAX_BOUND_PARAMS / paramsPerItem));
   const batches: T[][] = [];
-  for (let i = 0; i < ids.length; i += D1_MAX_BOUND_PARAMS) {
-    batches.push(ids.slice(i, i + D1_MAX_BOUND_PARAMS));
+  for (let i = 0; i < ids.length; i += size) {
+    batches.push(ids.slice(i, i + size));
   }
   return batches;
 }

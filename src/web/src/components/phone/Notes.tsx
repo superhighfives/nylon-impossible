@@ -1,4 +1,5 @@
 import { Tooltip } from "@base-ui/react/tooltip";
+import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { Check, Copy } from "lucide-react";
 import { type ReactNode, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
@@ -16,6 +17,11 @@ import { messageFromError, toast } from "@/lib/toast";
  * text (principle 8).
  */
 const GAP = "mt-[1lh]";
+
+/** Notes this long or longer show their count while you edit them. */
+const NOTES_COUNT_FROM = TODO_NOTES_MAX * 0.9;
+
+const count = (n: number) => n.toLocaleString("en-US");
 
 const LINK =
   "rounded-[0.125rem] text-n-ink underline decoration-n-ink-subtle underline-offset-2 n-focus pointer-fine:hover:decoration-n-ink";
@@ -203,6 +209,10 @@ export function NotesMarkdown({ text }: { text: string }) {
  * Return edits, with the caret at the end; blur or Esc draws them again, and
  * Esc leaves the keyboard on them. Empty notes are always the editor, with
  * its "Add notes" placeholder. The stored string is only ever what was typed.
+ *
+ * The editor stops at `TODO_NOTES_MAX`, saying so once per edit, and from
+ * `NOTES_COUNT_FROM` shows a count on the label's line, which is there
+ * either way, so nothing moves when it appears (principle 8).
  */
 export function Notes({
   value,
@@ -226,7 +236,9 @@ export function Notes({
   const [editing, setEditing] = useState(false);
   const editor = useRef<HTMLTextAreaElement>(null);
   const shown = useRef<HTMLDivElement>(null);
+  const warned = useRef(false);
   const empty = value.trim() === "";
+  const counted = value.length >= NOTES_COUNT_FROM;
 
   const edit = () => {
     flushSync(() => setEditing(true));
@@ -241,16 +253,35 @@ export function Notes({
     <div>
       {editing || empty ? (
         <>
-          <label htmlFor={id} className={label}>
-            Notes
-          </label>
+          <div className="flex items-baseline justify-between gap-4">
+            <label htmlFor={id} className={label}>
+              Notes
+            </label>
+            {counted && (
+              <span id={`${id}-count`} className={`${label} tabular-nums`}>
+                {count(value.length)} / {count(TODO_NOTES_MAX)}
+              </span>
+            )}
+          </div>
           <textarea
             id={id}
             ref={editor}
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            maxLength={TODO_NOTES_MAX}
+            aria-describedby={counted ? `${id}-count` : undefined}
+            onChange={(e) => {
+              const next = e.target.value;
+              if (next.length >= TODO_NOTES_MAX && !warned.current) {
+                warned.current = true;
+                toast.info(
+                  `Notes can be up to ${count(TODO_NOTES_MAX)} characters`,
+                );
+              }
+              onChange(next);
+            }}
             onFocus={() => setEditing(true)}
             onBlur={() => {
+              warned.current = false;
               onBlur();
               setEditing(false);
             }}
