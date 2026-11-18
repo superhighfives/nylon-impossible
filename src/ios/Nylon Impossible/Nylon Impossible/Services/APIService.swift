@@ -135,6 +135,7 @@ protocol APIProviding: Sendable {
     func deleteMe() async throws
     func processTodo(todoId: String) async throws -> Int
     func submitFeedback(_ request: FeedbackRequest) async throws -> FeedbackResult
+    func createWsTicket() async throws -> String
 
     // MARK: - Lists
     func listLists() async throws -> [APIList]
@@ -245,6 +246,17 @@ final class APIService: APIProviding {
     /// answers 403 to anyone else.
     func submitFeedback(_ request: FeedbackRequest) async throws -> FeedbackResult {
         try await post(path: "/feedback", body: request)
+    }
+
+    // MARK: - Live sync
+
+    /// A one-use ticket for opening the live-sync WebSocket, so the session
+    /// token goes in a header rather than the socket's URL. It expires after
+    /// 30 seconds, so fetch a new one for every connect.
+    func createWsTicket() async throws -> String {
+        struct TicketResponse: Decodable { let ticket: String }
+        let response: TicketResponse = try await post(path: "/ws/ticket", body: EmptyBody())
+        return response.ticket
     }
 
     // MARK: - Lists

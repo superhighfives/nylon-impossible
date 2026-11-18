@@ -30,6 +30,8 @@ export {
   todoUrls,
   type User,
   users,
+  type WsTicket,
+  wsTickets,
 } from "@nylon-impossible/shared/schema";
 
 export function getDb(d1: D1Database) {

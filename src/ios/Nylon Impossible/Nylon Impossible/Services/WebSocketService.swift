@@ -9,7 +9,7 @@ import Sentry
 @Observable
 @MainActor
 final class WebSocketService {
-    private let authService: AuthService
+    private let apiService: any APIProviding
     private var task: URLSessionWebSocketTask?
     private var reconnectTask: Task<Void, Never>?
     private var reconnectDelay: TimeInterval = 1.0
@@ -21,8 +21,8 @@ final class WebSocketService {
     private static let maxReconnectDelay: TimeInterval = 30.0
     private static let initialReconnectDelay: TimeInterval = 1.0
 
-    init(authService: AuthService) {
-        self.authService = authService
+    init(apiService: any APIProviding) {
+        self.apiService = apiService
     }
 
     func connect() {
@@ -55,15 +55,8 @@ final class WebSocketService {
 
     private func doConnect() async {
         do {
-            let token = try await authService.getToken()
-
-            let baseString = Config.apiBaseURL.absoluteString
-            let wsScheme = baseString.hasPrefix("https") ? "wss" : "ws"
-            let wsBase = baseString.replacingOccurrences(of: "https://", with: "\(wsScheme)://")
-                .replacingOccurrences(of: "http://", with: "\(wsScheme)://")
-            let urlString = "\(wsBase)/ws?token=\(token)"
-
-            guard let url = URL(string: urlString) else { return }
+            let ticket = try await apiService.createWsTicket()
+            guard let url = Self.socketURL(apiBaseURL: Config.apiBaseURL, ticket: ticket) else { return }
 
             let session = URLSession(configuration: .default)
             let wsTask = session.webSocketTask(with: url)
@@ -82,6 +75,18 @@ final class WebSocketService {
             print("[WebSocket] Connect error: \(error)")
             scheduleReconnect()
         }
+    }
+
+    /// `…/ws?ticket=…` on the API's host, with `ws` or `wss` to match its
+    /// scheme. Only the one-use ticket goes in the URL, never the session token.
+    nonisolated static func socketURL(apiBaseURL: URL, ticket: String) -> URL? {
+        let baseString = apiBaseURL.absoluteString
+        let wsScheme = baseString.hasPrefix("https") ? "wss" : "ws"
+        let wsBase = baseString.replacingOccurrences(of: "https://", with: "\(wsScheme)://")
+            .replacingOccurrences(of: "http://", with: "\(wsScheme)://")
+        let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
+        guard let encoded = ticket.addingPercentEncoding(withAllowedCharacters: unreserved) else { return nil }
+        return URL(string: "\(wsBase)/ws?ticket=\(encoded)")
     }
 
     private func receiveLoop() {
@@ -189,8 +194,10 @@ final class WebSocketService {
     }
 
     /// Send a real failure to Sentry; leave a breadcrumb for a transient drop.
+    /// A failed ticket request is an `APIError`, which `APIService` has
+    /// already reported (or dropped as transient), so it's a breadcrumb too.
     nonisolated private static func report(_ error: Error, event: String) {
-        guard !isTransientNetworkDrop(error) else {
+        guard !isTransientNetworkDrop(error), !(error is APIError) else {
             let crumb = Breadcrumb(level: .info, category: "websocket")
             crumb.message = "\(event): \((error as NSError).domain) \((error as NSError).code)"
             SentrySDK.addBreadcrumb(crumb)

@@ -33,8 +33,9 @@ final class SyncService {
 
     init(authService: AuthService) {
         self.authService = authService
-        self._apiService = APIService(authService: authService)
-        self.webSocketService = WebSocketService(authService: authService)
+        let apiService = APIService(authService: authService)
+        self._apiService = apiService
+        self.webSocketService = WebSocketService(apiService: apiService)
 
         // Load last synced time from UserDefaults
         if let timestamp = UserDefaults.standard.object(forKey: lastSyncedAtKey) as? Date {

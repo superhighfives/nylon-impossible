@@ -80,8 +80,18 @@ vi.mock("@clerk/tanstack-react-start", () => ({
 }));
 
 vi.mock("@/lib/config", () => ({
+  API_URL: "https://api.example.com",
   WS_URL: "wss://api.example.com/ws",
 }));
+
+// POST /ws/ticket: a new ticket per call, "ticket-1", "ticket-2"…
+let ticketCount = 0;
+const fetchMock = vi.fn(async () => {
+  ticketCount += 1;
+  return new Response(JSON.stringify({ ticket: `ticket-${ticketCount}` }), {
+    status: 200,
+  });
+});
 
 const captureExceptionMock = vi.fn();
 vi.mock("@/lib/sentry", () => ({
@@ -134,23 +144,33 @@ describe("useWebSocketConnection", () => {
     mockIsSignedIn = true;
     mockGetToken.mockResolvedValue("test-token");
     captureExceptionMock.mockReset();
+    ticketCount = 0;
+    fetchMock.mockClear();
     vi.stubGlobal("WebSocket", MockWebSocket);
+    vi.stubGlobal("fetch", fetchMock);
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("connects to the WebSocket URL with the auth token appended", async () => {
+  it("fetches a ticket with the session token and connects with only the ticket", async () => {
     const { Wrapper } = createWrapper();
     renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
 
     await flushEffects();
 
-    expect(lastCreatedWs).not.toBeNull();
-    expect(lastCreatedWs?.url).toBe(
-      "wss://api.example.com/ws?token=test-token",
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.com/ws/ticket",
+      {
+        method: "POST",
+        headers: { Authorization: "Bearer test-token" },
+      },
     );
+    expect(lastCreatedWs).not.toBeNull();
+    expect(lastCreatedWs?.url).toBe("wss://api.example.com/ws?ticket=ticket-1");
+    expect(lastCreatedWs?.url).not.toContain("token");
   });
 
   it("does not connect when the user is not signed in", async () => {
@@ -282,8 +302,7 @@ describe("useWebSocketConnection", () => {
       renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
 
       await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
+        for (let i = 0; i < 5; i++) await Promise.resolve();
       });
 
       expect(lastCreatedWs).toBeNull();
@@ -299,10 +318,118 @@ describe("useWebSocketConnection", () => {
       // Advance past the initial 1s retry delay — the second getToken call resolves.
       await act(async () => {
         vi.advanceTimersByTime(1100);
-        await Promise.resolve();
-        await Promise.resolve();
+        for (let i = 0; i < 5; i++) await Promise.resolve();
       });
 
+      expect(lastCreatedWs).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reports a failed ticket request, backs off and retries without opening a socket", async () => {
+    vi.useFakeTimers();
+
+    try {
+      fetchMock.mockImplementationOnce(
+        async () => new Response("nope", { status: 503 }),
+      );
+
+      const { Wrapper } = createWrapper();
+      renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(lastCreatedWs).toBeNull();
+      expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+      expect(captureExceptionMock.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          tags: { area: "websocket", event: "ticket-fetch-failed" },
+        }),
+      );
+
+      // Not before the 1s back-off.
+      await act(async () => {
+        vi.advanceTimersByTime(900);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        vi.advanceTimersByTime(200);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(lastCreatedWs?.url).toBe(
+        "wss://api.example.com/ws?ticket=ticket-1",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("backs off on a network failure fetching the ticket, and reports it", async () => {
+    vi.useFakeTimers();
+
+    try {
+      fetchMock.mockImplementationOnce(async () => {
+        throw new TypeError("Failed to fetch");
+      });
+
+      const { Wrapper } = createWrapper();
+      renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(lastCreatedWs).toBeNull();
+      expect(captureExceptionMock).toHaveBeenCalledTimes(1);
+      expect(captureExceptionMock.mock.calls[0][1]).toEqual(
+        expect.objectContaining({
+          tags: { area: "websocket", event: "ticket-fetch-failed" },
+        }),
+      );
+
+      await act(async () => {
+        vi.advanceTimersByTime(1100);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(lastCreatedWs).not.toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("backs off on a 401 from the ticket request without reporting it", async () => {
+    vi.useFakeTimers();
+
+    try {
+      fetchMock.mockImplementationOnce(
+        async () => new Response("", { status: 401 }),
+      );
+
+      const { Wrapper } = createWrapper();
+      renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(lastCreatedWs).toBeNull();
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(1100);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(lastCreatedWs).not.toBeNull();
     } finally {
       vi.useRealTimers();
@@ -318,8 +445,7 @@ describe("useWebSocketConnection", () => {
 
       // Flush the async getToken() call using microtasks (unaffected by fake timers)
       await act(async () => {
-        await Promise.resolve();
-        await Promise.resolve();
+        for (let i = 0; i < 5; i++) await Promise.resolve();
       });
 
       expect(lastCreatedWs).not.toBeNull();
@@ -334,11 +460,16 @@ describe("useWebSocketConnection", () => {
       // Advance past the initial 1 second reconnect delay
       await act(async () => {
         vi.advanceTimersByTime(1100);
-        await Promise.resolve();
-        await Promise.resolve();
+        for (let i = 0; i < 5; i++) await Promise.resolve();
       });
 
       expect(lastCreatedWs).not.toBe(firstWs);
+      // A ticket is single-use, so the reconnect fetched a new one.
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(firstWs.url).toBe("wss://api.example.com/ws?ticket=ticket-1");
+      expect(lastCreatedWs?.url).toBe(
+        "wss://api.example.com/ws?ticket=ticket-2",
+      );
     } finally {
       vi.useRealTimers();
     }

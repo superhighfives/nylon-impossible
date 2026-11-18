@@ -7,7 +7,7 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { WS_URL } from "@/lib/config";
+import { API_URL, WS_URL } from "@/lib/config";
 import { Sentry } from "@/lib/sentry";
 
 const TODOS_QUERY_KEY = ["todos"];
@@ -16,6 +16,24 @@ const LISTS_QUERY_KEY = ["lists"];
 
 const MAX_RECONNECT_DELAY = 30_000;
 const INITIAL_RECONNECT_DELAY = 1_000;
+
+/** The ticket request answered 401: signed out mid-session, not a fault. */
+class TicketUnauthorizedError extends Error {}
+
+/**
+ * A one-use ticket for opening the socket, so the session token goes in a
+ * header rather than the /ws URL. Fetched fresh for every connect.
+ */
+async function fetchTicket(token: string): Promise<string> {
+  const res = await fetch(`${API_URL}/ws/ticket`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) throw new TicketUnauthorizedError();
+  if (!res.ok) throw new Error(`POST /ws/ticket failed: ${res.status}`);
+  const { ticket } = (await res.json()) as { ticket: string };
+  return ticket;
+}
 
 interface WebSocketSync {
   notifyChanged: () => void;
@@ -64,47 +82,9 @@ export function useWebSocketConnection(): WebSocketSync {
     async function connect() {
       if (!mountedRef.current) return;
 
+      let token: string | null;
       try {
-        const token = await getToken();
-        if (!token || !mountedRef.current) return;
-
-        const ws = new WebSocket(`${WS_URL}?token=${token}`);
-
-        ws.onopen = () => {
-          reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
-          // Fetch latest on connect/reconnect to catch missed changes
-          queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-        };
-
-        ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            if (data.type === "sync") {
-              queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
-              // While a list change of ours is in flight, a refetch could
-              // land before it's saved and undo its optimistic update (a
-              // hidden column flashing back). Its onSettled refetches anyway.
-              if (!queryClient.isMutating({ mutationKey: LISTS_QUERY_KEY })) {
-                queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
-              }
-            }
-          } catch (error) {
-            Sentry.captureException(error, {
-              tags: { area: "websocket", event: "parse-error" },
-            });
-          }
-        };
-
-        ws.onclose = () => {
-          wsRef.current = null;
-          scheduleReconnect();
-        };
-
-        ws.onerror = () => {
-          // onclose will fire after onerror, handling reconnection
-        };
-
-        wsRef.current = ws;
+        token = await getToken();
       } catch (error) {
         // Token fetch failed — log once per attempt and back off so we don't
         // hammer Clerk while auth is unavailable.
@@ -112,7 +92,63 @@ export function useWebSocketConnection(): WebSocketSync {
           tags: { area: "websocket", event: "token-fetch-failed" },
         });
         scheduleReconnect();
+        return;
       }
+      if (!token || !mountedRef.current) return;
+
+      let ticket: string;
+      try {
+        ticket = await fetchTicket(token);
+      } catch (error) {
+        if (!(error instanceof TicketUnauthorizedError)) {
+          Sentry.captureException(error, {
+            tags: { area: "websocket", event: "ticket-fetch-failed" },
+          });
+        }
+        scheduleReconnect();
+        return;
+      }
+      if (!mountedRef.current) return;
+
+      const ws = new WebSocket(
+        `${WS_URL}?ticket=${encodeURIComponent(ticket)}`,
+      );
+
+      ws.onopen = () => {
+        reconnectDelayRef.current = INITIAL_RECONNECT_DELAY;
+        // Fetch latest on connect/reconnect to catch missed changes
+        queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "sync") {
+            queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY });
+            // While a list change of ours is in flight, a refetch could
+            // land before it's saved and undo its optimistic update (a
+            // hidden column flashing back). Its onSettled refetches anyway.
+            if (!queryClient.isMutating({ mutationKey: LISTS_QUERY_KEY })) {
+              queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+            }
+          }
+        } catch (error) {
+          Sentry.captureException(error, {
+            tags: { area: "websocket", event: "parse-error" },
+          });
+        }
+      };
+
+      ws.onclose = () => {
+        wsRef.current = null;
+        scheduleReconnect();
+      };
+
+      ws.onerror = () => {
+        // onclose will fire after onerror, handling reconnection
+      };
+
+      wsRef.current = ws;
     }
 
     connect();

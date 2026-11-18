@@ -31,14 +31,16 @@ import { getTodo, listTodos } from "./handlers/todos";
 import { deleteMe, getMe, updateMe } from "./handlers/users";
 import { v1List, v1Lists, v1ListTodos, v1Todo } from "./handlers/v1";
 import { clerkWebhook } from "./handlers/webhooks";
+import { createWsTicket } from "./handlers/ws-ticket";
 import { verifyGoogleIdToken } from "./lib/addon-auth";
 import { tokenMiddleware } from "./lib/api-token";
-import { authMiddleware, requireAdmin, verifyClerkJWT } from "./lib/auth";
+import { authMiddleware, requireAdmin } from "./lib/auth";
 import { getDb } from "./lib/db";
 import { apiError } from "./lib/errors";
 import { runListSweep } from "./lib/list-sweep";
 import { withRetry } from "./lib/retry";
 import { beforeSend } from "./lib/sentry";
+import { redeemWsTicket } from "./lib/ws-ticket";
 import type { Env } from "./types";
 
 export { UserSync } from "./durable-objects/UserSync";
@@ -74,23 +76,26 @@ app.use("*", (c, next) => {
 app.get("/", (c) => c.text("OK"));
 app.get("/health", (c) => c.text("OK"));
 
-// WebSocket upgrade — auth via query param
+// WebSocket upgrade. Auth is a one-use ticket from POST /ws/ticket, never a
+// session token: a URL ends up in logs.
 app.get("/ws", async (c) => {
   if (c.req.header("Upgrade") !== "websocket") {
     return apiError(c, "websocket_upgrade_required");
   }
 
-  const token = c.req.query("token");
-  const auth = await verifyClerkJWT(token ? `Bearer ${token}` : null, c.env);
-
-  if (!auth) {
+  const userId = await redeemWsTicket(getDb(c.env.DB), c.req.query("ticket"));
+  if (!userId) {
     return apiError(c, "unauthorized");
   }
 
-  const id = c.env.USER_SYNC.idFromName(auth.userId);
+  const id = c.env.USER_SYNC.idFromName(userId);
   const stub = c.env.USER_SYNC.get(id);
   return stub.fetch(c.req.raw);
 });
+
+// The ticket itself takes a session token, in the Authorization header.
+app.use("/ws/ticket", authMiddleware);
+app.post("/ws/ticket", createWsTicket);
 
 // Auth middleware for todo routes
 app.use("/todos/*", authMiddleware);
