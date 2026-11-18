@@ -71,10 +71,14 @@ function d1Targets(): string[][] {
  * Run `sql` with `--command`, not `--file`: on a remote D1, `--file` goes
  * through D1's import, which holds the whole database while it runs, and
  * every open PR's preview shares this one. The seed is a few KB.
+ *
+ * Leading `--` comment lines are dropped: wrangler parses a value that
+ * starts with `--` as another flag ("Unknown arguments").
  */
 function execute(sql: string): void {
+  const command = sql.replace(/^(\s*--[^\n]*\n)+/, "");
   for (const flags of d1Targets()) {
-    wrangler(["d1", "execute", "DB", ...flags, "--command", sql]);
+    wrangler(["d1", "execute", "DB", ...flags, "--command", command]);
   }
 }
 
