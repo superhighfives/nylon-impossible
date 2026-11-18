@@ -88,6 +88,27 @@ export function slotAt(mids: number[], y: number): number {
   return i === -1 ? mids.length : i;
 }
 
+/**
+ * The slot a todo dragged to `y` lands in, among a column's other rows: the
+ * gap nearer `y` (`slotAt` over the rows' middles), clamped to its tier.
+ * `rows` is every row in the column, top to bottom, in the same coordinates
+ * as `y`, including the dragged one at `dragged` (-1 when it's from another
+ * column); `items` is the column's order. The line and the touch gap both
+ * come from it, so a finger and a pointer land a todo in the same place.
+ */
+export function dropSlot<T extends Orderable>(
+  items: T[],
+  item: T,
+  rows: RowSpan[],
+  dragged: number,
+  y: number,
+): number {
+  const mids = rows
+    .filter((_, i) => i !== dragged)
+    .map((r) => (r.top + r.bottom) / 2);
+  return dropPlacement(items, item, slotAt(mids, y)).index;
+}
+
 /** A row's vertical extent, in any one coordinate space. */
 export interface RowSpan {
   top: number;
@@ -160,4 +181,42 @@ export function gapTop(
   const at = spans[slot];
   if (!own || !at) return null;
   return slot > from ? at.bottom - (own.bottom - own.top) : at.top;
+}
+
+/**
+ * How far the row at `index` of one board column shifts during a touch drag.
+ * `from` is the dragged row's index if it started in this column, else null;
+ * `slot` is the gap's slot among the column's other rows if the finger is
+ * over this column, else null. Its own column parts around the gap
+ * (`partOffset`) or, once the finger leaves, closes up; another column parts
+ * to open the gap. One column holds the gap at a time.
+ */
+export function columnPart(
+  from: number | null,
+  slot: number | null,
+  index: number,
+  height: number,
+): number {
+  if (from !== null) {
+    // Closing up: as if the dragged row were headed for the end.
+    return index === from
+      ? 0
+      : partOffset(from, slot ?? Infinity, index, height);
+  }
+  return slot !== null && index >= slot ? height : 0;
+}
+
+/**
+ * Where the gap a touch drag opens in a board column starts, in the rows'
+ * coordinates: as `gapTop` in the dragged row's own column (`from`), and in
+ * another column above the row at `slot`, below the last row, or at the top
+ * of an empty column.
+ */
+export function columnGapTop(
+  spans: RowSpan[],
+  from: number | null,
+  slot: number,
+): number {
+  if (from !== null) return gapTop(spans, from, slot) ?? 0;
+  return spans[slot]?.top ?? spans.at(-1)?.bottom ?? 0;
 }

@@ -982,6 +982,8 @@ export function WideApp({
         highlightedId={menu?.id ?? null}
         selectedId={selectedId}
         indicator={drag.indicator}
+        touch={drag.touch}
+        animate={animated}
         settle={drag.settle}
         loading={loading}
         position={columnIds.indexOf(list.id)}
@@ -1226,7 +1228,11 @@ export function WideApp({
         </div>
         <DragOverlay dropAnimation={null}>
           {drag.dragging ? (
-            <DragPreview todo={drag.dragging} tilt={drag.tilt} />
+            <DragPreview
+              todo={drag.dragging}
+              tilt={drag.tilt}
+              lifted={drag.touch !== null}
+            />
           ) : null}
         </DragOverlay>
       </DndContext>

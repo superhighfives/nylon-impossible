@@ -72,7 +72,7 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 
 ## States
 
-How the wide board (the web) shows each interaction state. Colours are `tokens.json` names; hover and fills ease over `motion.fast` and respect reduced motion. Touch layouts, the menu bar popover and Gmail follow their own conventions (principle 6).
+How the wide board (the web) shows each interaction state, with a pointer and by touch. Colours are `tokens.json` names; hover and fills ease over `motion.fast` and respect reduced motion. The phone layouts, the menu bar popover and Gmail follow their own conventions (principle 6).
 
 | State | Rows (columns, Done, an open todo) | Column head | Sidebar entry | Composer | Palette item |
 | --- | --- | --- | --- | --- | --- |
@@ -84,14 +84,17 @@ How the wide board (the web) shows each interaction state. Colours are `tokens.j
 | Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface` plus the 3px `brand` ring | — |
 | Focused by click | Same as selected by click | Nothing visible | Nothing extra | Same as by keyboard | — |
 | Column holds the selection | — | — | 3px `ink` bar | — | — |
-| Drop target | A 2pt/2px `brand` line in the gap where the todo will land, with an 8pt `brand` dot at its leading end | — | `brand` fill, `brandInk` text | — | — |
+| Drop target with a pointer | A 2pt/2px `brand` line in the gap where the todo will land, with an 8pt `brand` dot at its leading end | — | `brand` fill, `brandInk` text | — | — |
+| Drop target by touch | Rows part around a `brandSoft` gap the dragged row's height, no line | — | `brand` fill, `brandInk` text | — | — |
 | Column as a drop target | The line only, no column fill | — | — | — | — |
-| Dragging (source) | The original row stays, faded to 35% | — | — | — | — |
-| Drag preview | `surface` card, `hairline` border, field radius, tilted at random up to 1.5° either way, checkbox and title | — | — | — | — |
+| Dragging (source) with a pointer | The original row stays, faded to 35% | — | — | — | — |
+| Drag preview with a pointer | `surface` card, `hairline` border, field radius, tilted at random up to 1.5° either way, checkbox and title | — | — | — | — |
+| Dragging by touch | The row lifts, raised and tilted, and follows the finger; no faded original | — | — | — | — |
 
 - **Section with the keyboard.** The sidebar, a column or the open todo that has the keyboard shows a 4pt/4px `sectionOutline` (ink at 8%) drawn inside its edges: a frame, not a selection, and never `brand`. It shows whether the keyboard is on the section or in it, follows "Keyboard or pointer", and changes none of the looks inside it. At launch the keyboard is on Today, with the outline hidden until the first key press.
 - **Two bars, two roles.** The row's keyboard bar is `inkMuted`; the sidebar's bar for the column holding the selection is `ink`.
 - **Keyboard or pointer** is the last input: a key press (not a modifier alone) turns the keyboard looks on, a pointer press turns them off. The rows' bar and the column head's tint follow it, not the browser's own guess at `:focus-visible`.
 - **Dropping.** The whole column accepts a drop, and the line always shows where the todo will land: over a row, the gap its nearer half points to; below the rows or in an empty column, after the last row. Releasing puts the todo where the line was. Done and an open todo aren't drop targets, and nothing draws a line over the sidebar.
+- **Dragging by touch.** A finger holds a row for 450ms within 10px to lift it, with the row's menu; moving turns that into a drag. The gap goes where the line would, and there's one on the board at a time: its own column closes up once the finger leaves it, and the column under the finger parts.
 - **Moving.** Moving a todo (1 / 2 / 3, Move to…, the menu's Move) keeps it selected, and the keyboard goes with it to its new column. Done and Delete hand the selection to the next todo.
 - **Dividers.** Every divider (between columns, the header rule, the sidebar edge, the toolbar's bottom) is `hairline`, 1px/1pt, drawn once. The open todo's sheet has none: its own `surface`, radius and shadow set it apart. With Increase Contrast (`prefers-contrast: more` on the web) every colour with a `highContrast` value takes it.

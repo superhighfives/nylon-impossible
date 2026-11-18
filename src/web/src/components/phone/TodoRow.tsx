@@ -129,13 +129,14 @@ function MetaLine({ parts, links }: { parts: MetaPart[]; links?: boolean }) {
 }
 
 /**
- * The row's slot: collapses out when done, fades while being dragged, and
- * rises above the others while lifted.
+ * The row's slot: collapses out when done, fades while being dragged, rises
+ * above the others while lifted, and empties while a card stands in for it.
  */
 function RowShell({
   collapsing,
   dragging,
   lifted = false,
+  away = false,
   rowRef,
   style,
   children,
@@ -143,6 +144,7 @@ function RowShell({
   collapsing: boolean;
   dragging: boolean;
   lifted?: boolean;
+  away?: boolean;
   rowRef?: Ref<HTMLLIElement>;
   style?: CSSProperties;
   children: ReactNode;
@@ -158,9 +160,11 @@ function RowShell({
       } ${
         collapsing
           ? "grid-rows-[0fr] opacity-0"
-          : dragging
-            ? "grid-rows-[1fr] opacity-35"
-            : "grid-rows-[1fr] opacity-100"
+          : away
+            ? "grid-rows-[1fr] opacity-0"
+            : dragging
+              ? "grid-rows-[1fr] opacity-35"
+              : "grid-rows-[1fr] opacity-100"
       }`}
       aria-hidden={collapsing || undefined}
     >
@@ -254,8 +258,8 @@ export interface TodoRowProps {
   /** `at` is the pointer, for a right-click; absent from the keyboard. */
   onMenu: (todo: TodoWithUrls, at?: { x: number; y: number }) => void;
   /**
-   * `wide` is the board's density: 15px body, the row tinted and rounded
-   * inside its column's gutter, and no long-press (a pointer drags instead).
+   * `wide` is the board's density: 15px body, and the row tinted and rounded
+   * inside its column's gutter.
    */
   density?: "phone" | "wide";
   /** Being dragged by a pointer: the original stays in place, faded. */
@@ -267,7 +271,12 @@ export interface TodoRowProps {
   lifted?: boolean;
   /** Phone: a touch drag's tilt, in degrees, while `lifted`. */
   tilt?: number;
-  /** Phone: the row's slot's style, for a drag's offsets. */
+  /**
+   * Wide: lifted by a finger. The card that follows it stands in for the
+   * row, so its slot is left empty: the gap, while the finger's over it.
+   */
+  away?: boolean;
+  /** The row's slot's style, for a touch drag's offsets. */
   rowStyle?: CSSProperties;
   /** Extra props for the row's main button — drag listeners, data hooks. */
   bodyProps?: HTMLAttributes<HTMLButtonElement> &
@@ -283,7 +292,7 @@ export interface TodoRowProps {
 /**
  * One todo: checkbox, title (up to three lines) and a meta line. No handles,
  * chevrons or toolbars. On the phone a tap opens the detail; on wide a click
- * selects and a second click opens. Long-press (phone), right-click, the
+ * or tap selects and a second one opens. Long-press (touch), right-click, the
  * context-menu key or Shift+F10 open the menu.
  */
 export const TodoRow = memo(function TodoRow(props: TodoRowProps) {
@@ -293,6 +302,58 @@ export const TodoRow = memo(function TodoRow(props: TodoRowProps) {
     <PhoneTodoRow {...props} />
   );
 });
+
+/**
+ * A touch long-press that opens the row's menu: held `LONG_PRESS_MS` within
+ * `LONG_PRESS_SLOP`, it ticks and calls `open`. A mouse, trackpad or pen
+ * drags instead, and right-clicks for the menu. `fired` is set once it has
+ * opened the menu, so the click that may follow the finger lifting is
+ * ignored.
+ */
+function useLongPress(open: () => void) {
+  const press = useRef<{
+    x: number;
+    y: number;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  const fired = useRef(false);
+
+  useEffect(() => () => clearTimeout(press.current?.timer), []);
+
+  const end = () => {
+    if (press.current) clearTimeout(press.current.timer);
+    press.current = null;
+  };
+
+  const start = (e: PointerEvent<HTMLElement>) => {
+    fired.current = false;
+    end();
+    if (e.button !== 0 || e.pointerType !== "touch") return;
+    press.current = {
+      x: e.clientX,
+      y: e.clientY,
+      timer: setTimeout(() => {
+        press.current = null;
+        fired.current = true;
+        navigator.vibrate?.(10);
+        open();
+      }, LONG_PRESS_MS),
+    };
+  };
+
+  const move = (e: PointerEvent<HTMLElement>) => {
+    const p = press.current;
+    if (!p) return;
+    if (
+      Math.abs(e.clientX - p.x) > LONG_PRESS_SLOP ||
+      Math.abs(e.clientY - p.y) > LONG_PRESS_SLOP
+    ) {
+      end();
+    }
+  };
+
+  return { start, move, end, fired };
+}
 
 /** Shift+F10 and the context-menu key open the row's menu. */
 function menuKey(
@@ -328,6 +389,8 @@ function WideTodoRow({
   onOpen,
   onMenu,
   dragging = false,
+  away = false,
+  rowStyle,
   bodyProps,
   bodyRef,
   rowRef,
@@ -339,6 +402,8 @@ function WideTodoRow({
   const titleButton = useRef<HTMLButtonElement | null>(null);
   // Whether the row was already selected when the pointer went down.
   const wasSelected = useRef(false);
+  // The lift also selects the row and opens its menu, under the row.
+  const longPress = useLongPress(() => onMenu(todo));
 
   const setTitleRef = (node: HTMLButtonElement | null) => {
     titleButton.current = node;
@@ -347,7 +412,13 @@ function WideTodoRow({
   };
 
   return (
-    <RowShell collapsing={collapsing} dragging={dragging} rowRef={rowRef}>
+    <RowShell
+      collapsing={collapsing}
+      dragging={dragging}
+      away={away}
+      rowRef={rowRef}
+      style={rowStyle}
+    >
       {selected && <SelectionBar />}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the title button is the keyboard path; this is the pointer's larger target */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: keys go to the title button */}
@@ -358,10 +429,24 @@ function WideTodoRow({
         onPointerDown={(e) => {
           containerProps?.onPointerDown?.(e);
           wasSelected.current = selected;
+          // The checkbox ticks on a tap, and a link opens: neither lifts.
+          if ((e.target as Element).closest("a, [data-row-check]")) {
+            longPress.end();
+            return;
+          }
+          longPress.start(e);
         }}
+        onPointerMove={longPress.move}
+        onPointerUp={longPress.end}
+        onPointerCancel={longPress.end}
+        onPointerLeave={longPress.end}
         onClick={(e) => {
           const target = e.target as Element;
           if (target.closest("a, [data-row-check]")) return;
+          if (longPress.fired.current) {
+            longPress.fired.current = false;
+            return;
+          }
           // Enter or Space on the title (a click with no detail), a double
           // click, or a click on the selection opens; any other selects.
           if (e.detail === 1 && !wasSelected.current) {
@@ -374,9 +459,14 @@ function WideTodoRow({
         onContextMenu={(e) => {
           if ((e.target as Element).closest("a")) return;
           e.preventDefault();
+          longPress.end();
+          // A long-press already opened it, under the row.
+          if (longPress.fired.current) return;
           onMenu(todo, { x: e.clientX, y: e.clientY });
         }}
-        className={`-mx-2.5 flex min-h-0 cursor-pointer items-start gap-3 overflow-clip rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none ${
+        // The browser pans until the lift; the hold shows no callout and
+        // selects no text.
+        className={`-mx-2.5 flex min-h-0 cursor-pointer touch-pan-x touch-pan-y items-start gap-3 overflow-clip rounded-n-chip px-2.5 transition-colors duration-(--n-duration-fast) select-none [-webkit-touch-callout:none] ${
           selected || highlighted ? "bg-n-fill" : ROW_HOVER
         }`}
       >
@@ -438,50 +528,11 @@ function PhoneTodoRow({
 }: TodoRowProps) {
   const parts = rowMeta(todo, subtasks, now, timeZone);
   const title = displayTitle(todo);
-  const press = useRef<{
-    x: number;
-    y: number;
-    timer: ReturnType<typeof setTimeout>;
-  } | null>(null);
-  // Set when a long-press opened the menu, so the click that follows the
-  // finger lifting doesn't also open the detail.
-  const suppressClick = useRef(false);
-
-  useEffect(() => () => clearTimeout(press.current?.timer), []);
-
-  const endPress = () => {
-    if (press.current) clearTimeout(press.current.timer);
-    press.current = null;
-  };
+  const longPress = useLongPress(() => onMenu(todo));
 
   const onPointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     bodyProps?.onPointerDown?.(e);
-    if (e.button !== 0) return;
-    suppressClick.current = false;
-    endPress();
-    // A mouse, trackpad or pen drags instead, and right-clicks for the menu.
-    if (e.pointerType !== "touch") return;
-    press.current = {
-      x: e.clientX,
-      y: e.clientY,
-      timer: setTimeout(() => {
-        press.current = null;
-        suppressClick.current = true;
-        navigator.vibrate?.(10);
-        onMenu(todo);
-      }, LONG_PRESS_MS),
-    };
-  };
-
-  const onPointerMove = (e: PointerEvent<HTMLButtonElement>) => {
-    const p = press.current;
-    if (!p) return;
-    if (
-      Math.abs(e.clientX - p.x) > LONG_PRESS_SLOP ||
-      Math.abs(e.clientY - p.y) > LONG_PRESS_SLOP
-    ) {
-      endPress();
-    }
+    longPress.start(e);
   };
 
   return (
@@ -514,21 +565,21 @@ function PhoneTodoRow({
           ref={bodyRef}
           type="button"
           onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={endPress}
-          onPointerCancel={endPress}
-          onPointerLeave={endPress}
+          onPointerMove={longPress.move}
+          onPointerUp={longPress.end}
+          onPointerCancel={longPress.end}
+          onPointerLeave={longPress.end}
           onClick={() => {
-            if (suppressClick.current) {
-              suppressClick.current = false;
+            if (longPress.fired.current) {
+              longPress.fired.current = false;
               return;
             }
             onOpen(todo);
           }}
           onContextMenu={(e) => {
             e.preventDefault();
-            endPress();
-            suppressClick.current = false;
+            longPress.end();
+            longPress.fired.current = false;
             onMenu(todo, { x: e.clientX, y: e.clientY });
           }}
           onKeyDown={(e) => menuKey(e, () => onMenu(todo), bodyProps)}

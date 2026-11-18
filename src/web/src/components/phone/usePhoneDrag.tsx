@@ -2,13 +2,10 @@ import {
   type DragEndEvent,
   type DragMoveEvent,
   type DragStartEvent,
-  PointerSensor,
-  type PointerSensorOptions,
   TouchSensor,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import type { PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { previewRect, SETTLE_TTL_MS } from "@/components/wide/settle";
 import { landingSwing, pickTilt, tiltTokens } from "@/components/wide/tilt";
@@ -20,6 +17,7 @@ import {
   type RowSpan,
   slotAt,
 } from "@/lib/dragOrder";
+import { isTouchEvent, NonTouchPointerSensor } from "@/lib/dragSensors";
 import type { TodoWithUrls } from "@/types/database";
 import { LONG_PRESS_MS, LONG_PRESS_SLOP } from "./TodoRow";
 
@@ -73,33 +71,15 @@ function rowSpans(list: HTMLElement): RowSpan[] {
   }));
 }
 
-/** A touch event, without `instanceof`: desktop Firefox has no `TouchEvent`. */
-const isTouch = (e: Event): e is TouchEvent => "touches" in e;
-
 /** Where a drag started, in client coordinates, from its first event. */
 function startY(e: Event | null): number {
   if (!e) return 0;
-  if (isTouch(e)) return e.touches[0]?.clientY ?? 0;
+  if (isTouchEvent(e)) return e.touches[0]?.clientY ?? 0;
   return e instanceof MouseEvent ? e.clientY : 0;
 }
 
 /** What a phone row hands its drag: dnd-kit types `data.current` loosely. */
 type RowDragData = { todo?: TodoWithUrls; listId?: string } | undefined;
-
-/** A pointer sensor for everything but touch, which long-presses instead. */
-class NonTouchPointerSensor extends PointerSensor {
-  static override activators = [
-    {
-      eventName: "onPointerDown" as const,
-      handler: (
-        event: ReactPointerEvent,
-        options: PointerSensorOptions,
-      ): boolean =>
-        event.nativeEvent.pointerType !== "touch" &&
-        PointerSensor.activators[0].handler(event, options),
-    },
-  ];
-}
 
 /**
  * Reordering a phone page's rows. Touch lifts a row after a long-press
