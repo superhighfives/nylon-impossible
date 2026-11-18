@@ -1,3 +1,4 @@
+import type { Recurrence } from "@nylon-impossible/shared";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/lib/toast";
@@ -55,7 +56,7 @@ describe("DetailSheet", () => {
 
     it("is labelled Due, and offers no No date when there's no date", () => {
       expect(screen.queryByRole("button", { name: "Due date" })).toBeNull();
-      const { names } = openDue(null);
+      const { group, names } = openDue(null);
       expect(names).toEqual([
         "Today",
         "Tomorrow",
@@ -63,9 +64,10 @@ describe("DetailSheet", () => {
         "Next week",
         "Pick a date…",
       ]);
+      expect(within(group).queryByRole("button", { pressed: true })).toBeNull();
     });
 
-    it("ends with No date after a divider when a date is set", () => {
+    it("ends with a red No date chip, no divider, when a date is set", () => {
       const { save, group, names } = openDue(dueIn(1));
       expect(names).toEqual([
         "Today",
@@ -75,10 +77,79 @@ describe("DetailSheet", () => {
         "Pick a date…",
         "No date",
       ]);
-      expect(within(group).getByRole("separator")).toBeInTheDocument();
-      fireEvent.click(within(group).getByRole("button", { name: "No date" }));
+      expect(within(group).queryByRole("separator")).toBeNull();
+      const clear = within(group).getByRole("button", { name: "No date" });
+      expect(clear).toHaveClass("text-n-destructive");
+      expect(clear).not.toHaveClass("text-n-ink-muted");
+      fireEvent.click(clear);
       expect(save).toHaveBeenCalledWith(expect.any(String), {
         dueDate: null,
+        recurrence: null,
+      });
+    });
+  });
+
+  describe.each([
+    ["phone", undefined],
+    ["column", "column"],
+  ] as const)("Repeat, %s", (_, variant) => {
+    function openRepeat(recurrence: Recurrence | null) {
+      const save = vi.fn();
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      render(
+        <DetailSheet
+          todo={makeTodo({ dueDate: dueIn(1), recurrence })}
+          subtasks={[]}
+          listTargets={[]}
+          listName={() => "Today"}
+          listInSentence={() => "today"}
+          timeZone="UTC"
+          actions={{ save, destroy: vi.fn() } as unknown as TodoActions}
+          onClose={vi.fn()}
+          variant={variant}
+          container={variant ? container : undefined}
+          animated={false}
+        />,
+      );
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: recurrence ? "Weekly" : "Repeat",
+          expanded: false,
+        }),
+      );
+      const group = screen.getByRole("group", { name: "Repeat" });
+      const names = within(group)
+        .getAllByRole("button")
+        .map((b) => b.textContent);
+      return { save, group, names };
+    }
+
+    it("lists the frequencies, with nothing pressed, when nothing repeats", () => {
+      const { group, names } = openRepeat(null);
+      expect(names).toEqual(["Daily", "Weekly", "Monthly", "Yearly"]);
+      expect(within(group).queryByRole("button", { pressed: true })).toBeNull();
+    });
+
+    it("ends with a red Don’t repeat chip when it repeats, and no Never", () => {
+      const { save, group, names } = openRepeat({ frequency: "weekly" });
+      expect(names).toEqual([
+        "Daily",
+        "Weekly",
+        "Monthly",
+        "Yearly",
+        "Don’t repeat",
+      ]);
+      expect(names).not.toContain("Never");
+      expect(
+        within(group).getByRole("button", { pressed: true }),
+      ).toHaveTextContent("Weekly");
+      expect(within(group).queryByRole("separator")).toBeNull();
+      const clear = within(group).getByRole("button", { name: "Don’t repeat" });
+      expect(clear).toHaveClass("text-n-destructive");
+      expect(clear).not.toHaveClass("text-n-ink-muted");
+      fireEvent.click(clear);
+      expect(save).toHaveBeenCalledWith(expect.any(String), {
         recurrence: null,
       });
     });

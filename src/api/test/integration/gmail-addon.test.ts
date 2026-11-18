@@ -1,4 +1,5 @@
 import { env, SELF } from "cloudflare:test";
+import type { Recurrence } from "@nylon-impossible/shared";
 import { and, eq } from "drizzle-orm";
 import { generateKeyPair, type JWTVerifyGetKey, SignJWT } from "jose";
 import {
@@ -400,17 +401,18 @@ describe("Gmail add-on", () => {
 
     it("labels due days the way the apps do", async () => {
       await linkUser();
-      const rows: [string, Date | null, boolean][] = [
-        ["Overdue", dueIn(-3), false],
-        ["Due today", dueIn(0), false],
-        ["Due tomorrow", dueIn(1), false],
-        ["Pinned, no due", null, true],
+      const rows: [string, Date | null, boolean, Recurrence | null][] = [
+        ["Overdue", dueIn(-3), false, null],
+        ["Due today", dueIn(0), false, null],
+        ["Due tomorrow", dueIn(1), false, null],
+        ["Pinned, no due", null, true, null],
+        ["Weekly, due today", dueIn(0), false, { frequency: "weekly" }],
       ];
-      for (const [i, [title, dueDate, pinned]] of rows.entries()) {
+      for (const [i, [title, dueDate, pinned, recurrence]] of rows.entries()) {
         await seedTodo(
           `bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb${i}`,
           "user_test_123",
-          { title, dueDate, pinned, position: `a${i}` },
+          { title, dueDate, pinned, recurrence, position: `a${i}` },
         );
       }
 
@@ -432,6 +434,7 @@ describe("Gmail add-on", () => {
         "Due today": "Today",
         "Due tomorrow": "Tomorrow",
         "Pinned, no due": "Pinned",
+        "Weekly, due today": "Today · Weekly",
       });
     });
 

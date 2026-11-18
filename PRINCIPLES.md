@@ -115,4 +115,4 @@ One todo menu, in one order and with the same words, for every layout (principle
 
 A layout may leave items out, but never reorders or renames them. The header (the web phone's title card, the iPhone's lifted row) and how More opens are each platform's own (principle 6).
 
-Every Due choice list (the wide menu's Due view, the detail on the web and the iPhone) is the same: Today, Tomorrow, Friday, Next week, Pick a date…, then No date, after a divider, only when a date is set.
+Every Due choice list (the wide menu's Due view, the detail on the web and the iPhone) is the same: Today, Tomorrow, Friday, Next week, Pick a date…, then No date, only when a date is set. Repeat is the same shape: Daily, Weekly, Monthly, Yearly, then Don’t repeat, only when it repeats. The clear option is red-11. In a menu it sits after a divider; in the web detail's row of chips it's the last chip, with no divider.

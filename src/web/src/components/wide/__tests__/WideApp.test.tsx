@@ -994,7 +994,7 @@ describe("WideApp", () => {
     ]);
   });
 
-  it("d's No date clears a todo's date, after a divider", async () => {
+  it("d's No date clears a todo's date, in red after a divider", async () => {
     todos = todos.map((t) =>
       t.id === "t1" ? { ...t, dueDate: "2026-10-18T00:00:00.000Z" } : t,
     );
@@ -1009,10 +1009,12 @@ describe("WideApp", () => {
       "Pick a date…",
       "No date",
     ]);
-    expect(within(menu).getByRole("separator")).toBeInTheDocument();
-    await userEvent.click(
-      within(menu).getByRole("menuitem", { name: "No date" }),
+    const clear = within(menu).getByRole("menuitem", { name: "No date" });
+    expect(clear.previousElementSibling).toBe(
+      within(menu).getByRole("separator"),
     );
+    expect(clear).toHaveClass("text-n-destructive");
+    await userEvent.click(clear);
     expect(update).toHaveBeenCalledWith({
       id: "t1",
       input: { dueDate: null, recurrence: null },

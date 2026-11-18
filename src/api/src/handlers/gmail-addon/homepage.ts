@@ -67,7 +67,7 @@ export async function loadHomepageData(
       listId: t.listId,
       dueDate: t.dueDate,
       pinned: t.pinned,
-      repeats: t.recurrence != null,
+      repeat: t.recurrence?.frequency ?? null,
       done: t.completed,
     })),
   };
