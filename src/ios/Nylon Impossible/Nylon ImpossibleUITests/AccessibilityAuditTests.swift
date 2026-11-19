@@ -69,17 +69,27 @@ final class AccessibilityAuditTests: NylonUITestCase {
             // Let the route's own delayed presentation (sheets, panels) land.
             sleep(1)
             let window = app.windows.firstMatch.frame
-            do {
-                try app.performAccessibilityAudit(for: .all) { issue in
-                    if AuditAllowance.allows(issue, route: route, window: window) { return true }
-                    let element = issue.element.map { "\($0.elementType.rawValue) “\($0.label)” \($0.frame)" } ?? "–"
-                    failures.append(
-                        "\(route): \(issue.auditType.rawValue) — \(issue.compactDescription) — \(element) — \(issue.detailedDescription)"
-                    )
-                    return true
+            // The audit gives up with code -56 ("failed to complete in time")
+            // when the CI simulator is slow; that's not a finding, so run it
+            // once more before counting the route as a failure.
+            for attempt in 1...2 {
+                do {
+                    try app.performAccessibilityAudit(for: .all) { issue in
+                        if AuditAllowance.allows(issue, route: route, window: window) { return true }
+                        let element = issue.element.map { "\($0.elementType.rawValue) “\($0.label)” \($0.frame)" } ?? "–"
+                        failures.append(
+                            "\(route): \(issue.auditType.rawValue) — \(issue.compactDescription) — \(element) — \(issue.detailedDescription)"
+                        )
+                        return true
+                    }
+                } catch {
+                    if attempt == 1, (error as NSError).code == -56 {
+                        failures.removeAll { $0.hasPrefix("\(route): ") }
+                        continue
+                    }
+                    failures.append("\(route): audit threw \(error)")
                 }
-            } catch {
-                failures.append("\(route): audit threw \(error)")
+                break
             }
             app.terminate()
         }
