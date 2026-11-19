@@ -253,11 +253,15 @@ jobs:
   # simulator (#707). They have their own scheme, "Nylon Impossible UI Tests";
   # the app's scheme that `test` runs is unit tests only. They drive the DEBUG
   # `-NylonScreen` routes over in-memory sample data, so there's no network or
-  # account. They run when `test` does, and gate through `ios-ok`.
+  # account. They run after `test`, on their own, because the timing checks
+  # (the Done hold, the toast under load) and the audits need the runner to
+  # themselves. `!cancelled()` lets them run whether `test` passed or failed, and
+  # they gate through `ios-ok`.
   ui-test:
-    needs: changes
+    needs: [changes, test]
     if: >-
-      needs.changes.outputs.ios == 'true'
+      !cancelled()
+      && needs.changes.outputs.ios == 'true'
       && (github.event_name != 'pull_request'
         || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: xcode-27
