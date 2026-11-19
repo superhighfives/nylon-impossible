@@ -6,7 +6,13 @@
 //
 
 import Foundation
+// Only the app links Sentry; the share extension and the widget compile this
+// file too, and an `import Sentry` they don't link only resolves when the app's
+// module happens to be built first. SENTRY_LINKED is set on the app target.
+// Sentry isn't started in the extensions, so the calls were no-ops there.
+#if SENTRY_LINKED
 import Sentry
+#endif
 import SwiftData
 
 enum SharedModelContainer {
@@ -18,10 +24,12 @@ enum SharedModelContainer {
         // location to write to; run from memory rather than trap on a `!`, the
         // same trade as the fallbacks below.
         guard let appGroupURL = AppGroup.containerURL else {
+            #if SENTRY_LINKED
             SentrySDK.capture(message: "App Group container unavailable") { scope in
                 scope.setTag(value: "SharedModelContainer.appGroup", key: "area")
                 scope.setLevel(.error)
             }
+            #endif
             return inMemoryContainer(for: schema)
         }
 
@@ -102,9 +110,11 @@ enum SharedModelContainer {
     }
 
     private static func capture(_ error: Error, stage: String) {
+        #if SENTRY_LINKED
         SentrySDK.capture(error: error) { scope in
             scope.setTag(value: "SharedModelContainer.\(stage)", key: "area")
         }
+        #endif
     }
 
     /// Best-effort delete of the SQLite store (plus its WAL/SHM sidecar files)

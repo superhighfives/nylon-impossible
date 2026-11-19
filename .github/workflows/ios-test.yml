@@ -51,7 +51,9 @@ jobs:
       && (github.event_name != 'pull_request'
         || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: xcode-27
-    timeout-minutes: 20
+    # The iPhone leg is ~10 minutes of tests plus ~3 of Release build; 20 left
+    # too little headroom for a slow simulator.
+    timeout-minutes: 30
     # Run the suite on the iPhone and on the Mac, which builds the same
     # targets for macOS. fail-fast off so one family's failure doesn't hide
     # the other's results.
@@ -105,6 +107,7 @@ jobs:
         run: rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData
 
       - name: Run tests
+        id: ios_tests
         if: matrix.family != 'macOS'
         env:
           FAMILY: ${{ matrix.family }}
@@ -139,6 +142,7 @@ jobs:
       # Mac app. Unsigned — CI has no Mac development profile, and the unit
       # tests don't touch the App Group or the shared Keychain item.
       - name: Run macOS tests
+        id: mac_tests
         if: matrix.family == 'macOS'
         run: |
           sw_vers
@@ -150,13 +154,32 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             -quiet
 
+      # Deploy to TestFlight archives Release, and the tests above build
+      # Debug, so code that only compiles under `#if DEBUG` passed every check
+      # and then broke the upload after merge (#750). Build Release for the
+      # same platform the archive targets. Unsigned, since signing needs the
+      # deploy secrets PRs don't get, but a compile error is what this catches.
+      - name: Build Release
+        env:
+          PLATFORM: ${{ matrix.family == 'macOS' && 'macOS' || 'iOS' }}
+        run: |
+          xcodebuild build \
+            -project "Nylon Impossible.xcodeproj" \
+            -scheme "Nylon Impossible" \
+            -configuration Release \
+            -destination "generic/platform=$PLATFORM" \
+            CODE_SIGNING_ALLOWED=NO \
+            -quiet
+
       # `-quiet` keeps a passing run readable, but it also swallows the reason a
       # test host dies: a crash shows up as every pending test "failing" in
       # 0.000 seconds with nothing else logged, which is undiagnosable from the
       # log alone. The result bundle holds the real failure messages, so read it
       # back into the log — an artifact alone is no use to anyone without a Mac.
+      # Only when the tests failed: a Release build error is already in the
+      # log, and the bundle from a passing test run would only confuse it.
       - name: Summarise test failures
-        if: failure()
+        if: failure() && (steps.ios_tests.outcome == 'failure' || steps.mac_tests.outcome == 'failure')
         run: |
           if [ ! -d TestResults.xcresult ]; then
             echo "No result bundle — the failure was before or outside the test run."
@@ -217,7 +240,7 @@ jobs:
 
       # Kept as well, for anyone with a Mac who wants to open the bundle.
       - name: Upload test results
-        if: failure()
+        if: failure() && (steps.ios_tests.outcome == 'failure' || steps.mac_tests.outcome == 'failure')
         uses: actions/upload-artifact@v4
         with:
           name: ios-test-results-${{ matrix.family }}
