@@ -1,32 +1,26 @@
 import { getUserTimezone } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
-import { resolveNylonUser } from "../../lib/addon-auth";
 import { buildContextualCard } from "../../lib/addon-cards";
-import { getDb } from "../../lib/db";
 import { listListsForUser } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import {
   cardResponse,
-  connectResponse,
   loadMessageContext,
   readAddonEvent,
   requestBaseUrl,
+  withLinkedUser,
 } from "./shared";
 
 // POST /gmail-addon/contextual — panel opened with a message in context.
 export async function gmailAddonContextual(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
-
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims);
-  }
+  const linked = await withLinkedUser(c);
+  if (linked.response) return linked.response;
+  const { db, userId } = linked;
 
   const [event, lists, timeZone] = await Promise.all([
     readAddonEvent(c),
-    listListsForUser(db, resolved.userId),
-    getUserTimezone(db, resolved.userId),
+    listListsForUser(db, userId),
+    getUserTimezone(db, userId),
   ]);
   const message = await loadMessageContext(event, timeZone);
   const card = buildContextualCard(requestBaseUrl(c), message, lists);

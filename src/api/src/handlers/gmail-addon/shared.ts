@@ -2,6 +2,7 @@ import { signAddonState } from "@nylon-impossible/shared/addon-state";
 import * as Sentry from "@sentry/cloudflare";
 import type { Context } from "hono";
 import { z } from "zod/v4";
+import { resolveNylonUser } from "../../lib/addon-auth";
 import {
   ADDON_ACTIONS,
   type AddonMessage,
@@ -10,8 +11,11 @@ import {
   renderCard,
   updateCard,
 } from "../../lib/addon-cards";
+import { getDb } from "../../lib/db";
 import { fetchMessageMetadata } from "../../lib/gmail-message";
 import type { Env, GoogleIdTokenClaims } from "../../types";
+
+type Db = ReturnType<typeof getDb>;
 
 const DEFAULT_WEB_BASE_URL = "https://www.nylonimpossible.com";
 
@@ -252,4 +256,23 @@ export async function connectResponse(
   const connectUrl = await buildConnectUrl(c, claims);
   const refreshUrl = `${requestBaseUrl(c)}${ADDON_ACTIONS.refresh}`;
   return cardResponse(c, buildConnectCard(connectUrl, refreshUrl), opts);
+}
+
+export type LinkedUser =
+  | { db: Db; userId: string; response?: never }
+  | { response: Response };
+
+/** The linked Nylon user behind this request, or the connect card to send instead. */
+export async function withLinkedUser(
+  c: Context<Env>,
+  opts: { asAction?: boolean } = {},
+): Promise<LinkedUser> {
+  const claims = c.get("googleClaims");
+  const db = getDb(c.env.DB);
+
+  const resolved = await resolveNylonUser(db, c.env, claims);
+  if (resolved.status !== "linked") {
+    return { response: await connectResponse(c, claims, opts) };
+  }
+  return { db, userId: resolved.userId };
 }

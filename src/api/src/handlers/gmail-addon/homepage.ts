@@ -1,6 +1,5 @@
 import { getUserTimezone } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
-import { resolveNylonUser } from "../../lib/addon-auth";
 import {
   ADDON_DONE_WINDOW_MS,
   type AddonListOption,
@@ -8,29 +7,25 @@ import {
   buildHomepageCard,
   type Card,
 } from "../../lib/addon-cards";
-import { getDb } from "../../lib/db";
+import type { getDb } from "../../lib/db";
 import { listListsForUser, listOpenTodos } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import {
   cardResponse,
-  connectResponse,
   requestBaseUrl,
   webBaseUrl,
+  withLinkedUser,
 } from "./shared";
 
 type Db = ReturnType<typeof getDb>;
 
 // POST /gmail-addon/homepage — panel opened with no message in context.
 export async function gmailAddonHomepage(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
+  const linked = await withLinkedUser(c);
+  if (linked.response) return linked.response;
+  const { db, userId } = linked;
 
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims);
-  }
-
-  const { card } = await buildRefreshedHomepageCard(c, db, resolved.userId);
+  const { card } = await buildRefreshedHomepageCard(c, db, userId);
   return cardResponse(c, card);
 }
 
