@@ -147,6 +147,13 @@ nonisolated final class MockWebSocket: WebSocketConnecting, @unchecked Sendable 
         pongHandlers.forEach { $0(nil) }
         pongHandlers = []
     }
+
+    /// The server sends a text message, before or without any pong.
+    func deliver(_ text: String) {
+        let handlers = receiveHandlers
+        receiveHandlers = []
+        handlers.forEach { $0(.success(.string(text))) }
+    }
 }
 
 @Suite("WebSocket reconnects")
@@ -159,11 +166,13 @@ struct WebSocketReconnectTests {
         var delays: [TimeInterval] = []
         var captures: [String] = []
         var breadcrumbs: [String] = []
+        var syncs = 0
+        let api = MockAPIService()
         var service: WebSocketService!
 
         init() {
             service = WebSocketService(
-                apiService: MockAPIService(),
+                apiService: api,
                 makeSocket: { [unowned self] _ in
                     let socket = MockWebSocket()
                     self.sockets.append(socket)
@@ -175,6 +184,7 @@ struct WebSocketReconnectTests {
                     breadcrumb: { [unowned self] in self.breadcrumbs.append($0) }
                 )
             )
+            service.onSyncNeeded = { [unowned self] in self.syncs += 1 }
         }
 
         /// Lets the service's main-actor hops run until `count` sockets exist.
@@ -260,5 +270,48 @@ struct WebSocketReconnectTests {
 
         #expect(harness.captures == ["receive", "receive"])
         #expect(harness.delays == [1, 2, 4, 1, 2])
+    }
+
+    @Test("connecting while a reconnect fetches its ticket doesn't open a second socket")
+    func connectDuringReconnectTicket() async throws {
+        let harness = Harness()
+        let service = harness.service!
+        service.connect()
+        try await harness.waitForSocket(1)
+
+        // The reconnect's timer fires and it waits on its ticket, with no
+        // socket yet, when the app comes to the foreground and connects.
+        harness.api.createWsTicketHeld = true
+        harness.sockets[0].refuse()
+        for _ in 0..<1000 where harness.api.createWsTicketCallCount < 2 {
+            await Task.yield()
+        }
+        try #require(harness.api.createWsTicketCallCount == 2)
+        service.connect()
+        harness.api.createWsTicketHeld = false
+
+        try await harness.waitForSocket(2)
+        await harness.settle()
+        service.disconnect()
+
+        #expect(harness.sockets.count == 2)
+        #expect(harness.api.createWsTicketCallCount == 2)
+    }
+
+    @Test("a first sync message on opening asks for one sync, not two")
+    func oneSyncOnOpen() async throws {
+        let harness = Harness()
+        harness.service.connect()
+        try await harness.waitForSocket(1)
+
+        harness.sockets[0].deliver(#"{"type":"sync"}"#)
+        await harness.settle()
+        #expect(harness.service.isConnected)
+        #expect(harness.syncs == 1)
+
+        harness.sockets[0].deliver(#"{"type":"sync"}"#)
+        await harness.settle()
+        harness.service.disconnect()
+        #expect(harness.syncs == 2)
     }
 }

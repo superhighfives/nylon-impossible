@@ -52,6 +52,8 @@ final class WebSocketService {
     private let reporter: WebSocketErrorReporter
     private var task: (any WebSocketConnecting)?
     private var reconnectTask: Task<Void, Never>?
+    /// True while `doConnect()` is waiting on a ticket, before `task` is set.
+    private var isConnecting = false
     private(set) var reconnectDelay: TimeInterval = 1.0
     /// Whether this run of failures (since the socket last opened) has
     /// already sent Sentry an event. The rest of the run leaves breadcrumbs.
@@ -85,7 +87,8 @@ final class WebSocketService {
     }
 
     func connect() {
-        guard task == nil else { return }
+        // A reconnect that's already fetching its ticket will open the socket.
+        guard task == nil, !isConnecting else { return }
         // Connecting now supersedes a reconnect that's waiting out its delay,
         // which would otherwise open a second socket when it fires.
         reconnectTask?.cancel()
@@ -117,6 +120,8 @@ final class WebSocketService {
     // MARK: - Private
 
     private func doConnect() async {
+        isConnecting = true
+        defer { isConnecting = false }
         do {
             let ticket = try await apiService.createWsTicket()
             guard let url = Self.socketURL(apiBaseURL: Config.apiBaseURL, ticket: ticket) else { return }
@@ -168,8 +173,10 @@ final class WebSocketService {
 
                 switch result {
                 case .success(let message):
-                    self.didOpen()
-                    self.handleMessage(message)
+                    // Opening already asks for a catch-up sync, so a first
+                    // `sync` message doesn't need to ask again.
+                    let opened = self.didOpen()
+                    self.handleMessage(message, syncRequested: opened)
                     self.receiveLoop()
                 case .failure(let error):
                     // A cancelled receive is the expected result of us tearing
@@ -196,22 +203,25 @@ final class WebSocketService {
 
     /// The server accepted the handshake: the socket can send, and the next
     /// failure starts a new run with a 1 s delay and one Sentry event.
-    private func didOpen() {
-        guard !isConnected else { return }
+    /// Returns whether this call opened it (and asked for a sync).
+    @discardableResult
+    private func didOpen() -> Bool {
+        guard !isConnected else { return false }
         isConnected = true
         reconnectDelay = Self.initialReconnectDelay
         failureRunReported = false
 
         // Trigger a sync on connect to catch missed changes
         onSyncNeeded?()
+        return true
     }
 
-    private func handleMessage(_ message: URLSessionWebSocketTask.Message) {
+    private func handleMessage(_ message: URLSessionWebSocketTask.Message, syncRequested: Bool) {
         switch message {
         case .string(let text):
             guard let data = text.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: String],
-                  json["type"] == "sync" else { return }
+                  json["type"] == "sync", !syncRequested else { return }
             onSyncNeeded?()
         case .data:
             break
