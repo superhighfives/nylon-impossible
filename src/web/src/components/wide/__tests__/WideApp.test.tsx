@@ -538,7 +538,7 @@ describe("WideApp", () => {
         expect(slot.className).toMatch(/\bbg-n-(canvas|surface)\b/);
       }
     };
-    expect(board).toHaveClass("n-board-hatch");
+    expect(board).toHaveClass("n-board-overscroll");
     expectFilled();
     await userEvent.click(rowButton("Call Mum"));
     await userEvent.click(rowButton("Call Mum"));

@@ -240,25 +240,47 @@ p {
    whole-pixel tile (`--n-board-hatch-tile`, derived from `spacing`) with one
    line corner to corner (and the corners of its neighbours), which draws the
    same every time. The tile only joins up at 45° or 135°, which generate.mjs
-   enforces. Decorative, so forced colours drop it. */
+   enforces. Decorative, so forced colours drop it.
+   `--n-board-hatch-cover` is an optional layer over it: the board row sets
+   it to keep a bounce before Today plain (`n-board-overscroll`). */
 @utility n-board-hatch {
+  /* Not inherited from the row: the end before Done is hatched across. */
+  --n-board-hatch-cover: none;
   --n-board-hatch-line: color-mix(
     in srgb,
     var(--n-color-hairline) calc(var(--n-board-hatch-opacity) * 100%),
     transparent
   );
   --n-board-hatch-half: calc(var(--n-board-hatch-width) / 2);
-  background-image: linear-gradient(
-    var(--n-board-hatch-angle),
-    var(--n-board-hatch-line) 0 var(--n-board-hatch-half),
-    transparent var(--n-board-hatch-half) calc(50% - var(--n-board-hatch-half)),
-    var(--n-board-hatch-line) calc(50% - var(--n-board-hatch-half))
-      calc(50% + var(--n-board-hatch-half)),
-    transparent calc(50% + var(--n-board-hatch-half))
-      calc(100% - var(--n-board-hatch-half)),
-    var(--n-board-hatch-line) calc(100% - var(--n-board-hatch-half))
+  background-image:
+    var(--n-board-hatch-cover),
+    linear-gradient(
+      var(--n-board-hatch-angle),
+      var(--n-board-hatch-line) 0 var(--n-board-hatch-half),
+      transparent var(--n-board-hatch-half)
+        calc(50% - var(--n-board-hatch-half)),
+      var(--n-board-hatch-line) calc(50% - var(--n-board-hatch-half))
+        calc(50% + var(--n-board-hatch-half)),
+      transparent calc(50% + var(--n-board-hatch-half))
+        calc(100% - var(--n-board-hatch-half)),
+      var(--n-board-hatch-line) calc(100% - var(--n-board-hatch-half))
+    );
+  background-size:
+    100% 100%,
+    var(--n-board-hatch-tile) var(--n-board-hatch-tile);
+}
+
+/* The wide board row's own background: what a trackpad's bounce shows past
+   its ends. Hatched past Done, where the board ends; plain canvas before
+   Today, where it starts. A scroller's background stays put while its
+   content bounces, so covering its left half covers the left bounce. */
+@utility n-board-overscroll {
+  @apply n-board-hatch;
+  --n-board-hatch-cover: linear-gradient(
+    to right,
+    var(--n-color-canvas) 50%,
+    transparent 50%
   );
-  background-size: var(--n-board-hatch-tile) var(--n-board-hatch-tile);
 }
 
 /* The wide board's section with the keyboard (the sidebar, a column, the

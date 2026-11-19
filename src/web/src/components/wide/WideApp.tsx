@@ -1206,13 +1206,14 @@ export function WideApp({
           />
           {/* One row of columns that scrolls sideways; each child is named
               by `data-slide` so it slides when the row changes. The size
-              container the columns' width is a third of. Its own hatch is
-              what a trackpad's bounce shows past Done (or before Today);
-              every column fills itself so it only shows there. */}
+              container the columns' width is a third of. Its background
+              is what a trackpad's bounce shows: the hatch past Done, plain
+              before Today. Every slot fills itself so it only shows
+              there. */}
           <main
             ref={boardRow}
             aria-label="Board"
-            className="@container n-board-hatch relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
+            className="@container n-board-overscroll relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {/* Before the lists arrive, the three time columns and then
                 nothing: no Done, since your lists may come before it. The
