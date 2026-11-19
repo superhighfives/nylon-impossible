@@ -41,8 +41,9 @@ export function shownColumns(lists: SerializedList[]): SerializedList[] {
 
 /**
  * The wide board's row: `lists` (the time lists, then yours in the
- * sidebar's order, less the hidden ones), then Done, then the end: the rest
- * of the board's width, zero when the columns overflow. Nothing else is
+ * sidebar's order, less the hidden ones), then the end, then Done. The end
+ * is the hatch that keeps Done just past the board's right edge (`doneGap`),
+ * zero when the columns overflow; nothing follows Done. Nothing else is
  * swapped in or out. With a todo open, its sheet goes straight after the
  * todo's column (`sheetAfter`), and the columns after it keep their order.
  */
@@ -55,8 +56,30 @@ export function boardSlots(
     slots.push({ kind: "list", list });
     if (list.id === sheetAfter) slots.push({ kind: "sheet" });
   }
-  slots.push({ kind: "done" }, { kind: "end" });
+  slots.push({ kind: "end" }, { kind: "done" });
   return slots;
+}
+
+/** What fills the board's row before its end, in px. */
+export interface BoardFill {
+  /** The board's width: what shows at once. */
+  board: number;
+  /** A column's width; every column, Done's included, is the same. */
+  column: number;
+  /** How many columns come before the end. */
+  columns: number;
+  /** What the open todo's sheet adds: its width less the padding it lies over. 0 with none. */
+  sheet: number;
+}
+
+/**
+ * The end's width: the board left over once the columns (and sheet) are
+ * laid out, so Done starts exactly at its right edge at scroll 0, with none
+ * of it in view (principle 3). Zero once they reach the edge. Rounded up, so
+ * a fraction of a pixel never lets Done's hairline in.
+ */
+export function doneGap({ board, column, columns, sheet }: BoardFill): number {
+  return Math.max(0, Math.ceil(board - columns * column - sheet));
 }
 
 /** A horizontal stretch of the board, in its scrolled content's px. */

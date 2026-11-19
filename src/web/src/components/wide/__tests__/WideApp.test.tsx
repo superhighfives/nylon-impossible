@@ -525,32 +525,37 @@ describe("WideApp", () => {
     }
   });
 
-  it("ends the board after Done with a hairline and the hatch, and nothing to click", async () => {
+  it("ends the board on Done's hairline, with the hatch before it and nothing to click", async () => {
     render(<WideApp />);
     const board = screen.getByRole("main", { name: "Board" });
-    const end = () => board.lastElementChild as HTMLElement;
-    // Done closes on a hairline whether or not the columns fill the board.
+    const end = () =>
+      board.querySelector<HTMLElement>(":scope > [data-board-end]");
+    // Done is last, and closes on a hairline whether or not the columns
+    // fill the board.
+    expect(board.lastElementChild).toBe(column("Done"));
     expect(column("Done")).toHaveClass("border-x", "border-n-hairline");
-    expect(end()).toHaveAttribute("data-board-end");
-    expect(end().previousElementSibling).toBe(column("Done"));
-    // Fills what's left, down to nothing, so it shrinks rather than appears.
-    expect(end()).toHaveClass("n-board-hatch", "flex-1", "min-w-0");
+    expect(end()?.nextElementSibling).toBe(column("Done"));
+    // As wide as the columns leave (`doneGap`), set from the layout, down
+    // to nothing, so it resizes rather than appears.
+    expect(end()).toHaveClass("n-board-hatch", "shrink-0");
+    expect(end()).not.toHaveClass("flex-1");
+    expect(end()?.style.width).toBe("0px");
     expect(end()).toHaveAttribute("aria-hidden", "true");
-    expect(end().childElementCount).toBe(0);
+    expect(end()?.childElementCount).toBe(0);
     expect(end()).not.toHaveAttribute("tabindex");
     // A click there selects nothing and opens nothing.
     await userEvent.click(rowButton("Call Mum"));
-    await userEvent.click(end());
+    await userEvent.click(end() as HTMLElement);
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(
       rowButton("Call Mum").closest("[data-row-container]"),
     ).toHaveAttribute("data-selected");
 
-    // Still last, after Done, with a todo open.
+    // Still just before Done, which is still last, with a todo open.
     await userEvent.click(rowButton("Call Mum"));
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
-    expect(end()).toHaveAttribute("data-board-end");
-    expect(end().previousElementSibling).toBe(column("Done"));
+    expect(end()?.nextElementSibling).toBe(column("Done"));
+    expect(board.lastElementChild).toBe(column("Done"));
   });
 
   it("opening a todo changes no column's width", async () => {
@@ -584,8 +589,8 @@ describe("WideApp", () => {
         "list-groceries",
         "list-studio",
         "list-zines",
-        "done",
         "end",
+        "done",
       ]);
       for (const region of screen.getAllByRole("region")) {
         expect(region).toHaveClass(...COLUMN_WIDTH.split(" "));
@@ -601,7 +606,7 @@ describe("WideApp", () => {
       rowButton(title).closest("[data-row-container]");
     render(<WideApp />);
     expect(container("Review PR")).toHaveClass(HOVER);
-    // Done, in the tinted fourth column: no surface hover to vanish into it.
+    // Done, in its tinted column: no surface hover to vanish into it.
     const done = within(column("Done"))
       .getByText("Ship the zine")
       .closest("[data-row-container]");
@@ -1408,8 +1413,8 @@ describe("WideApp", () => {
       "list-someday",
       "list-groceries",
       "list-studio",
-      "done",
       "end",
+      "done",
     ]);
   });
 
@@ -1531,8 +1536,8 @@ describe("WideApp", () => {
       "list-someday",
       "list-groceries",
       "list-studio",
-      "done",
       "end",
+      "done",
     ]);
   });
 
@@ -1547,8 +1552,8 @@ describe("WideApp", () => {
       "list-groceries",
       "sheet",
       "list-studio",
-      "done",
       "end",
+      "done",
     ]);
   });
 
@@ -3611,8 +3616,8 @@ describe("WideApp hidden columns", () => {
       "list-week",
       "list-someday",
       "list-studio",
-      "done",
       "end",
+      "done",
     ]);
     // No toast: the muted entry is where it comes back from.
     expect(toast.success).not.toHaveBeenCalled();
@@ -3658,8 +3663,8 @@ describe("WideApp hidden columns", () => {
       "list-someday",
       "list-groceries",
       "list-studio",
-      "done",
       "end",
+      "done",
     ]);
   });
 

@@ -84,11 +84,11 @@ matrix, once it exists) and check the changed lines against it. Flag:
 - a done todo that moves to another section, column or page instead of
   leaving (principle 3, Settled "Completing a todo"). Two written
   exceptions: Gmail's card, where a ticked todo stays, crossed out, until it
-  refreshes; and the wide layout's fourth column, which shows Done by default
-  (Settled "Wide layout");
+  refreshes; and the wide layout's last column, Done (Settled "Wide
+  layout");
 - visible controls on todo rows: handles, toolbars, chevrons, per-row buttons
   (principle 4);
-- layout that jumps: space for a banner or the fourth column that's added and
+- layout that jumps: space for a banner or Done's column that's added and
   removed rather than kept (principle 8);
 - colours, type, spacing, radii or motion hard-coded instead of coming from
   `src/shared/design/tokens.json` (Visual);
