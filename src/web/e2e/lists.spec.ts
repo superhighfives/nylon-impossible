@@ -6,6 +6,7 @@ import {
   reload,
   test,
   toast,
+  watchWrite,
 } from "./fixtures";
 
 test.describe("wide", () => {
@@ -31,7 +32,10 @@ test.describe("wide", () => {
     await sidebar.getByRole("button", { name: "New list" }).click();
     const nameField = page.getByRole("textbox", { name: "Name", exact: true });
     await nameField.fill(name);
+    // The rename must not race an unconfirmed create.
+    const created = watchWrite(page, name);
     await nameField.press("Enter");
+    await created;
     await expect(entry(name)).toBeVisible();
     await expect(column(page, name)).toBeVisible();
 
@@ -43,12 +47,13 @@ test.describe("wide", () => {
     // The input replaces the heading, so the column can't be found by it now.
     const nameInput = page.getByRole("textbox", { name: "List name" });
     await nameInput.fill(renamed);
+    const saved = watchWrite(page, renamed);
     await nameInput.press("Enter");
     await expect(entry(renamed)).toBeVisible();
     await expect(column(page, renamed)).toBeVisible();
     await expect(entry(name)).toHaveCount(0);
 
-    await reload(page, layout);
+    await reload(page, layout, undefined, saved);
     await expect(entry(renamed)).toBeVisible();
     await expect(column(page, renamed)).toBeVisible();
 
@@ -87,11 +92,12 @@ test.describe("phone", () => {
     await phoneTab(page, "Lists").tap();
     const field = lists.getByRole("textbox", { name: "New list name" });
     await field.fill(name);
+    const saved = watchWrite(page, name);
     await field.press("Enter");
     // Creating a list opens it.
     await expect(lists.getByRole("heading", { level: 1, name })).toBeVisible();
 
-    await reload(page, layout, "/lists");
+    await reload(page, layout, "/lists", saved);
     await expect(
       phonePage(page, "Lists").getByRole("button", { name, exact: true }),
     ).toBeVisible();
