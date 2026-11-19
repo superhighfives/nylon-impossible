@@ -37,6 +37,10 @@ extension TodoDetailSheet {
                         scheduleSync()
                     }
                     .accessibilityLabel("Notes")
+                #if os(iOS)
+                // ⌘B, ⌘I and ⌘E, only while the cursor is in the notes.
+                if focus == .notes { NotesShortcuts() }
+                #endif
                 if hasNotes {
                     renderedNotes(style: style)
                         .opacity(rendered ? 1 : 0)
