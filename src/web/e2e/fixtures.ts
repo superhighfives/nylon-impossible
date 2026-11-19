@@ -130,12 +130,30 @@ export function sheet(page: Page): Locator {
   return page.getByRole("dialog", { name: "Todo" });
 }
 
-/** Reload (or open `path`) and wait for the board to load again. */
+/**
+ * Start listening for the next write (POST/PATCH/PUT/DELETE) the app sends.
+ * Call it before the action that saves, pass the result to `reload`: the app
+ * awaits its auth token before sending, so a reload straight after the
+ * optimistic row can beat the request and lose the write.
+ */
+export function watchWrite(page: Page): Promise<unknown> {
+  return page.waitForResponse(
+    (res) => res.request().method() !== "GET" && res.status() < 500,
+    { timeout: 30_000 },
+  );
+}
+
+/**
+ * Reload (or open `path`) and wait for the board to load again. Pass the
+ * `watchWrite` promise when the test checks that a write survived.
+ */
 export async function reload(
   page: Page,
   layout: Layout,
   path?: string,
+  saved?: Promise<unknown>,
 ): Promise<void> {
+  if (saved) await saved;
   if (path) await page.goto(path);
   else await page.reload();
   await expect(page.locator(`[data-${layout}-ready]`)).toBeAttached({

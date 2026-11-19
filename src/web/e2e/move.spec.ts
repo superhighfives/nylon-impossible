@@ -9,6 +9,7 @@ import {
   rowButton,
   test,
   toast,
+  watchWrite,
 } from "./fixtures";
 
 const TITLE = "Review PR for the sync engine";
@@ -32,6 +33,7 @@ test.describe("wide", () => {
     await expect(
       row(today, TITLE).locator("[data-row-container]"),
     ).toHaveAttribute("data-selected", "");
+    const saved = watchWrite(page);
     await page.keyboard.press("2");
 
     await expect(toast(page, "Moved to this week")).toBeVisible();
@@ -40,7 +42,7 @@ test.describe("wide", () => {
       row(thisWeek, TITLE).locator("[data-row-container]"),
     ).toHaveAttribute("data-selected", "");
 
-    await reload(page, layout);
+    await reload(page, layout, undefined, saved);
     await expect(rowButton(column(page, "This week"), TITLE)).toBeVisible();
     await expect(rowButton(column(page, "Today"), TITLE)).toHaveCount(0);
   });
@@ -63,6 +65,7 @@ test.describe("phone", () => {
     await longPress(page, rowButton(today, TITLE));
     const menu = page.getByRole("menu", { name: "Todo actions" });
     await expect(menu).toBeVisible();
+    const saved = watchWrite(page);
     await menu.getByRole("menuitem", { name: "Move to Someday" }).tap();
 
     await expect(toast(page, "Moved to someday")).toBeVisible();
@@ -70,7 +73,7 @@ test.describe("phone", () => {
     await phoneTab(page, "Someday").tap();
     await expect(rowButton(phonePage(page, "Someday"), TITLE)).toBeVisible();
 
-    await reload(page, layout);
+    await reload(page, layout, undefined, saved);
     await phoneTab(page, "Someday").tap();
     await expect(rowButton(phonePage(page, "Someday"), TITLE)).toBeVisible();
   });

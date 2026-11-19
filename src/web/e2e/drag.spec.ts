@@ -7,6 +7,7 @@ import {
   test,
   titles,
   toast,
+  watchWrite,
 } from "./fixtures";
 
 /** Studio's seeded todos, in order. */
@@ -56,12 +57,13 @@ test("dragging the first todo below the third reorders the column", async ({
     third.y + third.height * 0.8,
   );
   await expect(studio.locator("[data-drop-indicator]")).toBeVisible();
+  const saved = watchWrite(page);
   await page.mouse.up();
 
   const reordered = [STUDIO[1], STUDIO[2], STUDIO[0]];
   await expect.poll(() => titles(studio)).toEqual(reordered);
 
-  await reload(page, layout);
+  await reload(page, layout, undefined, saved);
   const after = column(page, "Studio");
   await after.scrollIntoViewIfNeeded();
   await expect.poll(() => titles(after)).toEqual(reordered);
@@ -86,12 +88,13 @@ test("dragging a todo onto another column moves it there", async ({
     target.y + target.height - 4,
   );
   await expect(thisWeek.locator("[data-drop-indicator]")).toBeVisible();
+  const saved = watchWrite(page);
   await page.mouse.up();
 
   await expect(toast(page, "Moved to this week")).toBeVisible();
   await expect(rowButton(thisWeek, title)).toBeVisible();
   await expect(rowButton(someday, title)).toHaveCount(0);
 
-  await reload(page, layout);
+  await reload(page, layout, undefined, saved);
   await expect(rowButton(column(page, "This week"), title)).toBeVisible();
 });
