@@ -27,6 +27,10 @@
 //  sheet size, and `widgets` the desktop sizes. Any other route draws the
 //  popover there too, since the Mac has no other view of a list.
 //
+//  toast and toasterror draw the toast's two looks over Today: on the
+//  iPhone an Undo toast ("Done · Undo") and a "Couldn’t …" one, and in the
+//  Mac's menu bar popover "Added to Groceries" and the same failure.
+//
 //  States for the quality pass, on the iPhone: signin (the signed-out
 //  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
 //  Today, two waiting in This week), syncerror (Today under the sync error
@@ -42,6 +46,8 @@ enum ScreenRoute: String, CaseIterable {
     case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
     case share, sharetext, widgets
     case signin, loading, empty, syncerror, perf
+    /// The toast's yellow look and its red failure look, held on screen.
+    case toast, toasterror
     /// macOS: the menu bar popover, drawn in a window.
     case menubar
     /// macOS: the feedback form, as Send feedback… opens it from the popover.
@@ -216,6 +222,24 @@ struct ScreenRouteRoot: View {
             .preferredColorScheme(ScreenRoute.forcesDark ? .dark : .light)
     }
     #endif
+}
+
+extension ToastCenter {
+    /// The `toast` and `toasterror` routes' toast, up for the whole run so
+    /// a screenshot can't miss it. A no-op on any other route.
+    func showForScreenshot(_ route: ScreenRoute) {
+        guard route == .toast || route == .toasterror else { return }
+        duration = .seconds(3600)
+        if route == .toasterror {
+            showError("Couldn’t save that change")
+            return
+        }
+        #if os(macOS)
+        show(ToastCopy.added(count: 1, listName: "Groceries"), action: nil)
+        #else
+        show("Done") {}
+        #endif
+    }
 }
 
 /// The prototype's sample todos, dated relative to today.

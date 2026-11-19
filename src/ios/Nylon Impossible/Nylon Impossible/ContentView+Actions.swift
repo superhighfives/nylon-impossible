@@ -81,7 +81,7 @@ extension ContentView {
             syncService.syncAfterAction()
             return true
         } catch {
-            actions.toasts.show("Couldn’t create the list", action: nil)
+            actions.toasts.showError("Couldn’t create the list")
             return false
         }
     }
@@ -99,7 +99,7 @@ extension ContentView {
                 try await viewModel.reorderList(list, prev: prev, next: next, apiService: apiService)
                 syncService.syncAfterAction()
             } catch {
-                actions.toasts.show("Couldn’t save the new order", action: nil)
+                actions.toasts.showError("Couldn’t save the new order")
             }
         }
     }
@@ -112,7 +112,7 @@ extension ContentView {
                 try await viewModel.renameList(list, name: name, apiService: apiService)
                 syncService.syncAfterAction()
             } catch {
-                actions.toasts.show("Couldn’t rename the list", action: nil)
+                actions.toasts.showError("Couldn’t rename the list")
             }
         }
     }
@@ -128,7 +128,7 @@ extension ContentView {
             // No API (DEBUG screen routes, tests): fail like a network error
             // does, so the toast that said "Deleted" isn't silently undone.
             guard let apiService = syncService.apiService else {
-                actions.toasts.show("Couldn’t delete the list", action: nil)
+                actions.toasts.showError("Couldn’t delete the list")
                 return finished()
             }
             Task {
@@ -136,7 +136,7 @@ extension ContentView {
                     try await viewModel.deleteList(list, apiService: apiService, context: modelContext)
                     syncService.syncAfterAction()
                 } catch {
-                    actions.toasts.show("Couldn’t delete the list", action: nil)
+                    actions.toasts.showError("Couldn’t delete the list")
                 }
                 finished()
             }
@@ -192,6 +192,9 @@ extension ContentView {
         guard let route = screenRoute else { return }
         switch route {
         case .today, .overnight, .loading, .empty, .syncerror, .perf: viewModel.page = .today
+        case .toast, .toasterror:
+            viewModel.page = .today
+            actions.toasts.showForScreenshot(route)
         case .link, .share, .sharetext, .widgets, .signin, .menubar, .feedback: break
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday

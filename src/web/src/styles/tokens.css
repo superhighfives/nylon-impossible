@@ -18,6 +18,8 @@
   --n-color-ink-subtle: #838383;
   --n-color-overdue: #ce2c31;
   --n-color-destructive: #ce2c31;
+  --n-color-destructive-solid: #ce2c31;
+  --n-color-destructive-solid-ink: #ffffff;
   --n-color-destructive-fill: #feebec;
   --n-color-notice: #b54700;
   --n-color-notice-fill: #fff1e0;
@@ -88,6 +90,7 @@
     --n-color-ink-subtle: #5c5c5c;
     --n-color-overdue: #a11c21;
     --n-color-destructive: #a11c21;
+    --n-color-destructive-solid: #a11c21;
   }
 
   .dark {
@@ -98,5 +101,6 @@
     --n-color-ink-subtle: #a8a8a8;
     --n-color-overdue: #ffb8b5;
     --n-color-destructive: #ffb8b5;
+    --n-color-destructive-solid: #a11c21;
   }
 }

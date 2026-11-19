@@ -54,6 +54,7 @@ struct TodoActionsTests {
         #expect(!todo.pinned)
         #expect(fixture.actions.toasts.current?.text == "Done")
         #expect(fixture.actions.toasts.current?.actionLabel == "Undo")
+        #expect(fixture.actions.toasts.current?.isError == false)
         #expect(fixture.mutations() == 1)
     }
 
@@ -385,6 +386,34 @@ struct ToastCenterTests {
         let toasts = ToastCenter()
         toasts.show("Couldn’t sync", action: nil)
         #expect(toasts.current?.actionLabel == nil)
+    }
+
+    @Test("a failure toast is an error; an Undo, a View and the history's aren't")
+    func errorFlag() {
+        let toasts = ToastCenter()
+        toasts.showError("Couldn’t save that change")
+        #expect(toasts.current?.isError == true)
+        #expect(toasts.current?.actionLabel == nil)
+        toasts.show("Done") {}
+        #expect(toasts.current?.isError == false)
+        #expect(toasts.current?.actionLabel == "Undo")
+        toasts.show("Added to Groceries", actionLabel: "View") {}
+        #expect(toasts.current?.isError == false)
+        toasts.show(.undo, .done(UndoHistory.Entry(text: "Done", undo: { true }, redo: { true })))
+        #expect(toasts.current?.isError == false)
+    }
+
+    @Test("an error toast is red with white ink; the rest are yellow with brandInk")
+    func toastColours() throws {
+        let toasts = ToastCenter()
+        toasts.showError("Couldn’t rename the list")
+        let error = try #require(toasts.current)
+        #expect(ToastView.fill(error) == Theme.Colors.destructiveSolid)
+        #expect(ToastView.ink(error) == Theme.Colors.destructiveSolidInk)
+        toasts.show("Done") {}
+        let done = try #require(toasts.current)
+        #expect(ToastView.fill(done) == Theme.Colors.brand)
+        #expect(ToastView.ink(done) == Theme.Colors.brandInk)
     }
 
     @Test("an undo or redo from the history toasts it with nothing to tap")

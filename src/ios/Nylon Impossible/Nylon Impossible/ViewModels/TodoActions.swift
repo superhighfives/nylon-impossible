@@ -472,7 +472,7 @@ final class TodoActions {
             // The row already shows the change; say it didn't stick rather
             // than let it vanish on the next launch without syncing.
             print("[TodoActions] Save failed: \(error)")
-            toasts.show("Couldn’t save that change", action: nil)
+            toasts.showError("Couldn’t save that change")
         }
     }
 }

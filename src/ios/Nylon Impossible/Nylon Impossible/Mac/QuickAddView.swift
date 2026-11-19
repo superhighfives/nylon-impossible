@@ -115,6 +115,9 @@ struct QuickAddView: View {
         .environment(\.selectsByKeyboard, true)
         .task {
             actions.configure(context: modelContext) { syncService.syncAfterAction() }
+            #if DEBUG
+            if let screenRoute { actions.toasts.showForScreenshot(screenRoute) }
+            #endif
         }
         .onExitCommand(perform: onDismiss)
         // The panel is reused, so take the field every time it opens, and

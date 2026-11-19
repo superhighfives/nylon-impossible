@@ -63,7 +63,7 @@ extension TodoDetailSheet {
             todo.urls.first { $0.id == url.id }?.showPreview = showPreview
             await loadUrls()
         } catch {
-            actions.toasts.show("Couldn’t change the link", action: nil)
+            actions.toasts.showError("Couldn’t change the link")
         }
     }
 
@@ -84,7 +84,7 @@ extension TodoDetailSheet {
             await loadUrls()
         } catch {
             restore(before)
-            actions.toasts.show("Couldn’t retry the link", action: nil)
+            actions.toasts.showError("Couldn’t retry the link")
         }
     }
 
@@ -115,7 +115,7 @@ extension TodoDetailSheet {
                 try? modelContext.save()
             }
         } catch {
-            actions.toasts.show("Couldn’t remove the link", action: nil)
+            actions.toasts.showError("Couldn’t remove the link")
         }
     }
 
@@ -163,7 +163,7 @@ extension TodoDetailSheet {
             withAnimation(Theme.Motion.easeOutStrong(Theme.Motion.base)) {
                 urls.removeAll { $0.id == pending.id }
             }
-            actions.toasts.show("Couldn’t add the link", action: nil)
+            actions.toasts.showError("Couldn’t add the link")
         }
     }
 
