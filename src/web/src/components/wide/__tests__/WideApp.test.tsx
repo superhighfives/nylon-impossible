@@ -1789,7 +1789,7 @@ describe("WideApp", () => {
     expect(screen.queryByRole("group", { name: "Add to list" })).toBeNull();
   });
 
-  describe("adding opens the new todo, and focus stays in Add", () => {
+  describe("adding only adds: nothing opens or is selected, and focus stays in Add", () => {
     const sheet = () =>
       document.querySelector<HTMLElement>("[data-detail-column]");
     const sheetTitle = () =>
@@ -1797,35 +1797,36 @@ describe("WideApp", () => {
       within(sheet() as HTMLElement).getByRole<HTMLTextAreaElement>("textbox", {
         name: "Title",
       }).value;
+    const selected = () =>
+      [...document.querySelectorAll<HTMLElement>("[data-selected]")].map(
+        (row) => row.querySelector<HTMLElement>("[data-row-id]")?.dataset.rowId,
+      );
     /** Lets each add's save land, as the composer awaits them in turn. */
     const settle = () => act(async () => {});
+    /**
+     * Lets an add land and draws the board again, as the todos query would
+     * once the mock's save is in `todos`.
+     */
+    const land = async (view: ReturnType<typeof render>) => {
+      await settle();
+      view.rerender(<WideApp />);
+    };
 
-    it("from Today's Add: beside Today, the next add replaces it, and Esc lands on it", async () => {
-      render(<WideApp />);
+    it("from Today's Add: no sheet, no selection, and Add is cleared and keeps focus", async () => {
+      const view = render(<WideApp />);
       const add = screen.getByRole("textbox", { name: "New todo in today" });
       await userEvent.type(add, "Get Rex{Enter}");
-      await settle();
-      expect(sheetTitle()).toBe("Get Rex");
-      expect(slides().indexOf("sheet")).toBe(
-        slides().indexOf("list-today") + 1,
-      );
+      await land(view);
+      expect(rowButton("Get Rex")).toBeInTheDocument();
+      expect(sheet()).toBeNull();
+      expect(selected()).toEqual([]);
       expect(document.activeElement).toBe(add);
       expect(add).toHaveValue("");
 
-      await userEvent.type(add, "Walk dog{Enter}");
-      await settle();
-      expect(sheetTitle()).toBe("Walk dog");
-      expect(document.activeElement).toBe(add);
-
-      // Esc stops typing and stays on Add, then closes the todo there, then
-      // steps out to the column.
+      // Esc stops typing and stays on Add, then steps out to the column.
       await userEvent.keyboard("{Escape}");
       expect(document.activeElement).toBe(add);
       expect(add).toHaveAttribute("readonly");
-      expect(sheetTitle()).toBe("Walk dog");
-      press("Escape");
-      expect(sheet()).toBeNull();
-      expect(document.activeElement).toBe(add);
       press("Escape");
       expect(document.activeElement).toHaveAttribute(
         "data-column-head",
@@ -1833,18 +1834,73 @@ describe("WideApp", () => {
       );
     });
 
-    it("from one of your lists' Add: beside that list", async () => {
-      render(<WideApp />);
+    it("from one of your lists' Add: the same", async () => {
+      const view = render(<WideApp />);
       const add = screen.getByRole("textbox", {
         name: "New todo in Groceries",
       });
       await userEvent.type(add, "Buy stamps{Enter}");
-      await settle();
-      expect(sheetTitle()).toBe("Buy stamps");
+      await land(view);
+      expect(rowButton("Buy stamps")).toBeInTheDocument();
+      expect(sheet()).toBeNull();
+      expect(column("Groceries")).not.toHaveAttribute("data-sheet-open");
+      expect(selected()).toEqual([]);
+      expect(document.activeElement).toBe(add);
+      expect(add).toHaveValue("");
+    });
+
+    it("leaves a row selected before the add as the selection", async () => {
+      const view = render(<WideApp />);
+      await userEvent.click(rowButton("Send invoice"));
+      expect(selected()).toEqual(["w1"]);
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.type(add, "Get Rex{Enter}");
+      await land(view);
+      expect(selected()).toEqual(["w1"]);
+      expect(
+        rowButton("Get Rex").closest("[data-row-container]"),
+      ).not.toHaveAttribute("data-selected");
+      expect(sheet()).toBeNull();
+      expect(document.activeElement).toBe(add);
+    });
+
+    it("↓ then Return opens the new todo beside its column, with the keyboard on the sheet", async () => {
+      const view = render(<WideApp />);
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.type(add, "Get Rex{Enter}");
+      await land(view);
+      await userEvent.keyboard("{ArrowDown}");
+      expect(selection()).toEqual({ id: "added-1", column: "list-today" });
+      expect(sheet()).toBeNull();
+      await userEvent.keyboard("{Enter}");
+      const popup = await screen.findByRole("dialog");
+      expect(sheetTitle()).toBe("Get Rex");
       expect(slides().indexOf("sheet")).toBe(
-        slides().indexOf("list-groceries") + 1,
+        slides().indexOf("list-today") + 1,
       );
-      expect(column("Groceries")).toHaveAttribute("data-sheet-open");
+      await waitFor(() => expect(document.activeElement).toBe(popup));
+    });
+
+    it("↓ from Add after an add goes to a pinned todo first", async () => {
+      todos = todos.map((t) => (t.id === "t2" ? { ...t, pinned: true } : t));
+      const view = render(<WideApp />);
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.type(add, "Get Rex{Enter}");
+      await land(view);
+      await userEvent.keyboard("{ArrowDown}");
+      expect(selection()).toEqual({ id: "t2", column: "list-today" });
+    });
+
+    it("leaves an open todo open", async () => {
+      const view = render(<WideApp />);
+      await userEvent.dblClick(rowButton("Send invoice"));
+      expect(sheetTitle()).toBe("Send invoice");
+      const add = screen.getByRole("textbox", { name: "New todo in today" });
+      await userEvent.type(add, "Get Rex{Enter}");
+      await land(view);
+      expect(rowButton("Get Rex")).toBeInTheDocument();
+      expect(sheetTitle()).toBe("Send invoice");
+      expect(selected()).toEqual(["w1"]);
       expect(document.activeElement).toBe(add);
     });
 
@@ -1879,8 +1935,9 @@ describe("WideApp", () => {
       expect(toast.error).toHaveBeenCalledWith("Couldn’t add the todo");
     });
 
-    it("from Quick add: behind the popover, which keeps focus, with no toast", async () => {
-      render(<WideApp />);
+    it("from Quick add: nothing opens or is selected behind the popover, which keeps focus, with no toast", async () => {
+      const view = render(<WideApp />);
+      await userEvent.click(rowButton("Read Piranesi"));
       quickAddKey();
       const popup = await screen.findByRole("dialog", { name: "Quick add" });
       await userEvent.click(
@@ -1890,24 +1947,21 @@ describe("WideApp", () => {
         name: "New todo in Groceries",
       });
       await userEvent.type(field, "Call vet{Enter}");
-      await settle();
-      expect(sheetTitle()).toBe("Call vet");
-      expect(slides().indexOf("sheet")).toBe(
-        slides().indexOf("list-groceries") + 1,
-      );
+      await land(view);
+      expect(rowButton("Call vet")).toBeInTheDocument();
+      expect(sheet()).toBeNull();
+      expect(selected()).toEqual(["s1"]);
       expect(screen.getByRole("dialog", { name: "Quick add" })).toBe(popup);
       expect(document.activeElement).toBe(field);
+      expect(field).toHaveValue("");
       expect(toast.success).not.toHaveBeenCalled();
-      expect(
-        rowButton("Call vet").closest("[data-row-container]"),
-      ).toHaveAttribute("data-selected");
 
-      // A pasted list opens nothing new.
+      // A pasted list opens nothing either.
       await userEvent.paste("Eggs\nFlour");
       await userEvent.keyboard("{Enter}");
-      await settle();
+      await land(view);
       expect(smartCreate).toHaveBeenCalledTimes(3);
-      expect(sheetTitle()).toBe("Call vet");
+      expect(sheet()).toBeNull();
     });
 
     it("a pasted list from Quick add opens nothing", async () => {
@@ -4020,7 +4074,7 @@ describe("WideApp, a row that fails to draw", () => {
     expect(rowButton("Olive oil")).toBeInTheDocument();
   });
 
-  it("survives a smart-create that answers without urls, with the todo open beside Today", async () => {
+  it("survives a smart-create that answers without urls, with the todo opened beside Today", async () => {
     liveCache = true;
     vi.stubGlobal(
       "fetch",
@@ -4054,6 +4108,7 @@ describe("WideApp, a row that fails to draw", () => {
         ?.find((t) => t.id === "added-1")?.urls,
     ).toEqual([]);
     expect(rowButton("Read")).toBeInTheDocument();
+    await userEvent.keyboard("{ArrowDown}{Enter}");
     expect(document.querySelector("[data-detail-column]")).toBeInTheDocument();
     expect(screen.queryByText("Couldn't show this")).toBeNull();
   });

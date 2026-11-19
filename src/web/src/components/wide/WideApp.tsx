@@ -903,15 +903,6 @@ export function WideApp({
     setDetailId(todo.id);
     if (by === "keyboard") setSheetFocus((n) => n + 1);
   };
-  /**
-   * A single todo just added, from a column's Add or Quick add: it opens
-   * beside its column and becomes the selection, while focus stays where
-   * you were typing (the sheet doesn't take it).
-   */
-  const onAdded = (todo: TodoWithUrls) => {
-    select(todo);
-    setDetailId(todo.id);
-  };
   /** The right-click menu: the registry's menu commands for this todo. */
   const menuCommands = (todo: TodoWithUrls): MenuCommand[] =>
     COMMANDS.flatMap((c) => {
@@ -1031,7 +1022,6 @@ export function WideApp({
             targets={targets}
             timeZone={timeZone}
             onView={viewList}
-            onAdded={onAdded}
             idle={addIdle === list.id}
             onIdleChange={(idle) =>
               setAddIdle((cur) =>
@@ -1173,7 +1163,6 @@ export function WideApp({
               countFor: (id) => rowsFor(id).length,
               isVisible: (id) => columnIds.includes(id),
               onView: viewList,
-              onAdded,
               // Back to the section n opened it from, else the selection.
               returnFocus: () => {
                 const from = quickAddFrom.current;
