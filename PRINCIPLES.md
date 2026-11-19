@@ -70,6 +70,7 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 - Colors that must be told apart also differ in lightness, not hue alone.
 - Touch targets are at least 44 points on touch screens.
 - Motion respects reduced motion: transitions shorten to a fade or nothing.
+- Toasts are a pill with an outline action, on every platform. One that reports something done is `brand` with `brandInk` text; a failure is `destructiveSolid` with `destructiveSolidInk` text and the alert icon. `destructiveSolid` is red-11's light value (`#CE2C31`) in both appearances, and like every colour with a `highContrast` value it takes the darker `#A11C21` with Increase Contrast. The action and × focus with a 2px ring in the toast's own ink, since a `brand` ring can't be seen on yellow.
 - Focus is always visible to the keyboard: a selected row is tinted, and moving with the keyboard adds a bar beside it, as in the sidebar; a soft tinted background elsewhere. A mouse click never draws a keyboard-strength ring. The full set is under States.
 
 ## States
