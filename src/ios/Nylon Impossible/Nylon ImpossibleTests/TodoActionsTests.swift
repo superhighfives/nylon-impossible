@@ -394,10 +394,10 @@ struct ToastCenterTests {
         toasts.showError("Couldn’t save that change")
         #expect(toasts.current?.isError == true)
         #expect(toasts.current?.actionLabel == nil)
-        toasts.show("Done") {}
+        toasts.show("Done", action: {})
         #expect(toasts.current?.isError == false)
         #expect(toasts.current?.actionLabel == "Undo")
-        toasts.show("Added to Groceries", actionLabel: "View") {}
+        toasts.show("Added to Groceries", actionLabel: "View", action: {})
         #expect(toasts.current?.isError == false)
         toasts.show(.undo, .done(UndoHistory.Entry(text: "Done", undo: { true }, redo: { true })))
         #expect(toasts.current?.isError == false)
@@ -410,7 +410,7 @@ struct ToastCenterTests {
         let error = try #require(toasts.current)
         #expect(ToastView.fill(error) == Theme.Colors.destructiveSolid)
         #expect(ToastView.ink(error) == Theme.Colors.destructiveSolidInk)
-        toasts.show("Done") {}
+        toasts.show("Done", action: {})
         let done = try #require(toasts.current)
         #expect(ToastView.fill(done) == Theme.Colors.brand)
         #expect(ToastView.ink(done) == Theme.Colors.brandInk)
@@ -420,7 +420,7 @@ struct ToastCenterTests {
     func historyToasts() {
         let toasts = ToastCenter()
         let entry = UndoHistory.Entry(text: "Moved to this week", undo: { true }, redo: { true })
-        toasts.show("Done") {}
+        toasts.show("Done", action: {})
         toasts.show(.undo, .done(entry))
         #expect(toasts.current?.text == "Undone: Moved to this week")
         #expect(toasts.current?.actionLabel == nil)

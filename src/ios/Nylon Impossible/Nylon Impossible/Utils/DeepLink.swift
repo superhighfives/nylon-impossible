@@ -20,7 +20,7 @@ nonisolated enum DeepLink: Equatable, Sendable {
     /// Which list a deep link names. The three time lists go by their kind
     /// rather than their id: ids are per account, and a widget or a URL
     /// someone typed has no way to know them.
-    enum ListTarget: Equatable, Sendable {
+    nonisolated enum ListTarget: Equatable, Sendable {
         case today
         case thisWeek
         case someday
