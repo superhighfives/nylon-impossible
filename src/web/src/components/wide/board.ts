@@ -72,14 +72,19 @@ export interface BoardFill {
   sheet: number;
 }
 
+/** What three fractional column widths can fall short of the board by. */
+const SUBPIXEL = 0.01;
+
 /**
  * The end's width: the board left over once the columns (and sheet) are
  * laid out, so Done starts exactly at its right edge at scroll 0, with none
  * of it in view (principle 3). Zero once they reach the edge. Rounded up, so
- * a fraction of a pixel never lets Done's hairline in.
+ * a fraction of a pixel never lets Done's hairline in. Columns a third of
+ * the board are fractional, so three can sum to a hair under it; less than
+ * `SUBPIXEL` left over is float error, not room for a hatch.
  */
 export function doneGap({ board, column, columns, sheet }: BoardFill): number {
-  return Math.max(0, Math.ceil(board - columns * column - sheet));
+  return Math.max(0, Math.ceil(board - columns * column - sheet - SUBPIXEL));
 }
 
 /** A horizontal stretch of the board, in its scrolled content's px. */

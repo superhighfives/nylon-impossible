@@ -91,7 +91,7 @@ describe("design token generator", () => {
   it("emits the board's column widths and hatch, for the web only", () => {
     const css = renderCss(tokens);
     expect(css).toContain("--n-board-column-min-width: 17rem;");
-    expect(css).toContain("--n-board-column-max-width: 26rem;");
+    expect(css).toContain("--n-board-column-max-width: 35rem;");
     expect(css).toContain("--n-board-hatch-angle: 45deg;");
     expect(css).toContain("--n-board-hatch-width: 0.0625rem;");
     expect(css).toContain("--n-board-hatch-opacity: 0.4;");
