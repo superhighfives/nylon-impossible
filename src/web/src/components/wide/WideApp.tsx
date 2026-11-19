@@ -55,7 +55,12 @@ import {
   sheetPopup,
   sidebar,
 } from "./boardDom";
-import { COLUMN_PADDING, COLUMN_WIDTH, Column } from "./Column";
+import {
+  COLUMN_HEAD_HEIGHT,
+  COLUMN_PADDING,
+  COLUMN_WIDTH,
+  Column,
+} from "./Column";
 import { CommandPalette } from "./CommandPalette";
 import { COMMANDS, type JumpTarget, keyHint } from "./commands";
 import { DONE_COLUMN, DoneColumn } from "./DoneColumn";
@@ -1119,7 +1124,7 @@ export function WideApp({
       data-lists-error
       className={`flex h-full ${COLUMN_WIDTH} flex-col bg-n-canvas`}
     >
-      <div aria-hidden="true" className="h-[10.5rem] shrink-0" />
+      <div aria-hidden="true" className={`${COLUMN_HEAD_HEIGHT} shrink-0`} />
       <div className={`pt-2.5 ${COLUMN_PADDING}`}>
         {loadError("lists", refetchLists, listsFetching)}
       </div>
