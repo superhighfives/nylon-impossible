@@ -16,6 +16,8 @@
  * account, a local developer account and each smoke run's user.
  */
 
+import { createHash } from "node:crypto";
+
 export type SeedListKind = "today" | "thisWeek" | "someday";
 
 interface SeedList {
@@ -136,9 +138,9 @@ export function buildSeedSql(opts: {
   /**
    * Prefix for every row id. The default suits the one marketing account on
    * a local D1; the smoke suite passes one per run, because every preview
-   * shares one D1 and a fixed prefix would clear another run's rows. The
-   * LIKE that clears old rows reads `_` and `%` as wildcards, so a per-run
-   * prefix should avoid them.
+   * shares one D1 and a fixed prefix would clear another run's rows. Ids are
+   * a UUID hashed from the prefix and the row's name, because the API rejects
+   * any other shape in a list id.
    */
   idPrefix?: string;
 }): string {
@@ -155,7 +157,14 @@ export function buildSeedSql(opts: {
   const todayMidnight = Math.floor(Date.parse(`${todayKey}T00:00:00Z`) / 1000);
   const createdS = nowS - 6 * DAY_S;
   const prefix = opts.idPrefix ?? "mktg_";
-  const id = (suffix: string) => `${prefix}${suffix}`;
+  const ids = new Set<string>();
+  const id = (suffix: string) => {
+    const hex = createHash("sha256").update(`${prefix}${suffix}`).digest("hex");
+    // Version 4 and variant 1 bits, so it passes any UUID check.
+    const uuid = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+    ids.add(uuid);
+    return uuid;
+  };
   const user = sql(opts.userId);
 
   const lines: string[] = [
@@ -164,10 +173,11 @@ export function buildSeedSql(opts: {
     `DELETE FROM todo_urls WHERE todo_id IN (SELECT id FROM todos WHERE user_id = ${user});`,
     `DELETE FROM todos WHERE user_id = ${user};`,
     `DELETE FROM lists WHERE user_id = ${user};`,
-    // Ids are fixed, so clear any left by a seed for a different account.
-    `DELETE FROM todo_urls WHERE id LIKE ${sql(`${prefix}%`)};`,
-    `DELETE FROM todos WHERE id LIKE ${sql(`${prefix}%`)};`,
-    `DELETE FROM lists WHERE id LIKE ${sql(`${prefix}%`)};`,
+    // Ids are fixed, so clear any left by a seed for a different account
+    // (filled in once every id is known).
+    "",
+    "",
+    "",
     // Pin the timezone the browser runs in, follow the system theme (the
     // capture sets the colour scheme), and clear the last sweep so the
     // overnight note stays out of the shots.
@@ -240,6 +250,16 @@ export function buildSeedSql(opts: {
       );
     }
   }
+
+  const idList = [...ids].map(sql).join(", ");
+  const at = lines.indexOf("");
+  lines.splice(
+    at,
+    3,
+    `DELETE FROM todo_urls WHERE id IN (${idList});`,
+    `DELETE FROM todos WHERE id IN (${idList});`,
+    `DELETE FROM lists WHERE id IN (${idList});`,
+  );
 
   return `${lines.join("\n")}\n`;
 }
