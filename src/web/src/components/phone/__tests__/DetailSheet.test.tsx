@@ -1,6 +1,6 @@
 import { type Recurrence, TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/lib/toast";
 import type { TodoActions } from "../useTodoActions";
 import { dueIn, makeTodo, makeUrl } from "./fixtures";
@@ -604,6 +604,161 @@ describe("DetailSheet", () => {
       // Drawn, not edited: no count.
       expect(screen.queryByText(/\/ 100,000$/)).toBeNull();
       info.mockRestore();
+    });
+
+    for (const column of [false, true]) {
+      const layout = column ? "on the wide board" : "in the phone sheet";
+
+      it(`draws code smaller than the text around it, ${layout}`, () => {
+        const { rendered } = renderNotes(
+          "Run `ls` here:\n\n```\nwhile true; do date; done\n```",
+          { column },
+        );
+        const notes = rendered();
+        if (!notes) throw new Error("not rendered");
+        const inline = within(notes).getByText("ls");
+        expect(inline.tagName).toBe("CODE");
+        expect(inline).toHaveClass("n-code");
+        const pre = notes.querySelector("pre");
+        expect(pre).toHaveClass("n-code");
+        // Only the block is scaled, not its code again.
+        expect(pre?.querySelector("code")).not.toHaveClass("n-code");
+      });
+    }
+
+    describe("formatting shortcuts", () => {
+      const platform = (name: string) =>
+        vi.spyOn(navigator, "platform", "get").mockReturnValue(name);
+      beforeEach(() => {
+        platform("MacIntel");
+      });
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      const editing = (notes: string, column = false) => {
+        const view = renderNotes(notes, { column });
+        const shown = view.rendered();
+        if (shown) fireEvent.click(shown);
+        const field = view.editor();
+        if (!field) throw new Error("no editor");
+        fireEvent.focus(field);
+        return { ...view, field };
+      };
+      const select = (field: HTMLTextAreaElement, text: string) => {
+        const at = field.value.indexOf(text);
+        field.setSelectionRange(at, at + text.length);
+      };
+      const selected = (field: HTMLTextAreaElement) =>
+        field.value.slice(field.selectionStart, field.selectionEnd);
+
+      for (const column of [false, true]) {
+        const layout = column ? "on the wide board" : "in the phone sheet";
+
+        it(`wraps and unwraps with ⌘B, ⌘I and ⌘E, ${layout}`, () => {
+          const { field } = editing("Very Fancy chair", column);
+          select(field, "Fancy");
+          expect(fireEvent.keyDown(field, { key: "b", metaKey: true })).toBe(
+            false,
+          );
+          expect(field.value).toBe("Very **Fancy** chair");
+          expect(selected(field)).toBe("Fancy");
+          fireEvent.keyDown(field, { key: "b", metaKey: true });
+          expect(field.value).toBe("Very Fancy chair");
+
+          fireEvent.keyDown(field, { key: "i", metaKey: true });
+          expect(field.value).toBe("Very *Fancy* chair");
+          fireEvent.keyDown(field, { key: "i", metaKey: true });
+          fireEvent.keyDown(field, { key: "e", metaKey: true });
+          expect(field.value).toBe("Very `Fancy` chair");
+          expect(selected(field)).toBe("Fancy");
+        });
+      }
+
+      it("leaves Ctrl+B and Ctrl+E to the text field on a Mac", () => {
+        const { field } = editing("Very Fancy chair");
+        select(field, "Fancy");
+        for (const key of "bie") {
+          expect(fireEvent.keyDown(field, { key, ctrlKey: true })).toBe(true);
+          expect(
+            fireEvent.keyDown(field, { key, metaKey: true, ctrlKey: true }),
+          ).toBe(true);
+        }
+        expect(field.value).toBe("Very Fancy chair");
+      });
+
+      it("uses Ctrl, not the Windows key, off a Mac", () => {
+        platform("Win32");
+        const { field } = editing("Very Fancy chair");
+        select(field, "Fancy");
+        expect(fireEvent.keyDown(field, { key: "b", metaKey: true })).toBe(
+          true,
+        );
+        expect(field.value).toBe("Very Fancy chair");
+        expect(fireEvent.keyDown(field, { key: "b", ctrlKey: true })).toBe(
+          false,
+        );
+        expect(field.value).toBe("Very **Fancy** chair");
+      });
+
+      it("inserts the pair at the caret, with the caret between", () => {
+        const { field } = editing("");
+        fireEvent.keyDown(field, { key: "b", metaKey: true });
+        expect(field.value).toBe("****");
+        expect(field.selectionStart).toBe(2);
+        expect(field.selectionEnd).toBe(2);
+        // Caps Lock doesn't change it, and italic in empty bold is both.
+        fireEvent.keyDown(field, { key: "I", metaKey: true });
+        expect(field.value).toBe("******");
+        expect(field.selectionStart).toBe(3);
+      });
+
+      it("doesn't strip bold with ⌘I", () => {
+        const { field } = editing("**bold**");
+        select(field, "bold");
+        fireEvent.keyDown(field, { key: "i", metaKey: true });
+        expect(field.value).toBe("***bold***");
+      });
+
+      it("saves the formatted text like typing", () => {
+        const { field, save } = editing("Very Fancy chair");
+        select(field, "Fancy");
+        fireEvent.keyDown(field, { key: "e", metaKey: true });
+        fireEvent.blur(field);
+        expect(save).toHaveBeenCalledWith(expect.any(String), {
+          notes: "Very `Fancy` chair",
+        });
+      });
+
+      it("changes nothing when wrapping would pass the limit", () => {
+        const full = "a".repeat(TODO_NOTES_MAX - 3);
+        const { field } = editing(full);
+        field.setSelectionRange(0, 1);
+        expect(fireEvent.keyDown(field, { key: "b", metaKey: true })).toBe(
+          false,
+        );
+        expect(field.value).toBe(full);
+        fireEvent.keyDown(field, { key: "i", metaKey: true });
+        expect(field.value).toBe(`*a*${full.slice(1)}`);
+      });
+
+      it("takes no other ⌘ letter, and leaves ⌘K to Search and commands", () => {
+        const { field } = editing("Very Fancy chair");
+        select(field, "Fancy");
+        for (const key of "acdfghjklmnopqrstuvwxyz") {
+          for (const mod of [{ metaKey: true }, { ctrlKey: true }]) {
+            expect(fireEvent.keyDown(field, { key, ...mod })).toBe(true);
+          }
+        }
+        // Shift and Option change the meaning: ⌘⇧B isn't bold.
+        expect(
+          fireEvent.keyDown(field, { key: "b", metaKey: true, shiftKey: true }),
+        ).toBe(true);
+        expect(
+          fireEvent.keyDown(field, { key: "b", metaKey: true, altKey: true }),
+        ).toBe(true);
+        expect(field.value).toBe("Very Fancy chair");
+      });
     });
 
     it("saves exactly the Markdown typed", () => {

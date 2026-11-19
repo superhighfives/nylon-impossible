@@ -387,7 +387,14 @@ export function renderSwift(tokens) {
     "        }",
     "",
   );
+  out.push(
+    "        /// Code in the notes, inline and in blocks, at this fraction of the",
+    "        /// notes' own size, so it reads as part of the note.",
+    `        static let codeScale: CGFloat = ${tokens.type.codeScale}`,
+    "",
+  );
   for (const [density, styles] of entries(tokens.type)) {
+    if (typeof styles !== "object") continue;
     out.push(`        enum ${density[0].toUpperCase()}${density.slice(1)} {`);
     for (const [name, t] of entries(styles)) {
       out.push(

@@ -1101,6 +1101,21 @@ describe("WideApp", () => {
     // Redo straight after Undo, under Help.
     const labels = [...dialog.querySelectorAll("dt")].map((d) => d.textContent);
     expect(labels.indexOf("Redo")).toBe(labels.indexOf("Undo") + 1);
+    // The notes editor's own keys, in their own group after Create.
+    const groups = [...dialog.querySelectorAll("h3")].map((h) => h.textContent);
+    expect(groups.indexOf("Notes")).toBe(groups.indexOf("Create") + 1);
+    const notes = within(
+      within(dialog).getByRole("heading", { name: "Notes" })
+        .parentElement as HTMLElement,
+    );
+    expect(notes.getAllByRole("term").map((dt) => dt.textContent)).toEqual([
+      "Bold",
+      "Italic",
+      "Code",
+    ]);
+    expect(dialogKeys("Bold")).toBe("⌘B");
+    expect(dialogKeys("Italic")).toBe("⌘I");
+    expect(dialogKeys("Code")).toBe("⌘E");
     fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
     await act(async () => {});
 
