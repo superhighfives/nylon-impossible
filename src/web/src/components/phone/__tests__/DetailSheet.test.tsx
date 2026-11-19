@@ -1,6 +1,6 @@
 import { type Recurrence, TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/lib/toast";
 import type { TodoActions } from "../useTodoActions";
 import { dueIn, makeTodo, makeUrl } from "./fixtures";
@@ -627,6 +627,15 @@ describe("DetailSheet", () => {
     }
 
     describe("formatting shortcuts", () => {
+      const platform = (name: string) =>
+        vi.spyOn(navigator, "platform", "get").mockReturnValue(name);
+      beforeEach(() => {
+        platform("MacIntel");
+      });
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
       const editing = (notes: string, column = false) => {
         const view = renderNotes(notes, { column });
         const shown = view.rendered();
@@ -657,14 +666,40 @@ describe("DetailSheet", () => {
           fireEvent.keyDown(field, { key: "b", metaKey: true });
           expect(field.value).toBe("Very Fancy chair");
 
-          fireEvent.keyDown(field, { key: "i", ctrlKey: true });
+          fireEvent.keyDown(field, { key: "i", metaKey: true });
           expect(field.value).toBe("Very *Fancy* chair");
-          fireEvent.keyDown(field, { key: "i", ctrlKey: true });
+          fireEvent.keyDown(field, { key: "i", metaKey: true });
           fireEvent.keyDown(field, { key: "e", metaKey: true });
           expect(field.value).toBe("Very `Fancy` chair");
           expect(selected(field)).toBe("Fancy");
         });
       }
+
+      it("leaves Ctrl+B and Ctrl+E to the text field on a Mac", () => {
+        const { field } = editing("Very Fancy chair");
+        select(field, "Fancy");
+        for (const key of "bie") {
+          expect(fireEvent.keyDown(field, { key, ctrlKey: true })).toBe(true);
+          expect(
+            fireEvent.keyDown(field, { key, metaKey: true, ctrlKey: true }),
+          ).toBe(true);
+        }
+        expect(field.value).toBe("Very Fancy chair");
+      });
+
+      it("uses Ctrl, not the Windows key, off a Mac", () => {
+        platform("Win32");
+        const { field } = editing("Very Fancy chair");
+        select(field, "Fancy");
+        expect(fireEvent.keyDown(field, { key: "b", metaKey: true })).toBe(
+          true,
+        );
+        expect(field.value).toBe("Very Fancy chair");
+        expect(fireEvent.keyDown(field, { key: "b", ctrlKey: true })).toBe(
+          false,
+        );
+        expect(field.value).toBe("Very **Fancy** chair");
+      });
 
       it("inserts the pair at the caret, with the caret between", () => {
         const { field } = editing("");

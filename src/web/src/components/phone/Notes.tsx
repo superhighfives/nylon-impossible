@@ -212,13 +212,23 @@ export function NotesMarkdown({ text }: { text: string }) {
 }
 
 /**
+ * The shortcuts' modifier: ⌘ on Apple platforms, where Ctrl+B and Ctrl+E
+ * move the caret in a text field and stay that way, and Ctrl elsewhere.
+ */
+function formatModifier(e: KeyboardEvent): boolean {
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform)
+    ? e.metaKey && !e.ctrlKey
+    : e.ctrlKey && !e.metaKey;
+}
+
+/**
  * ⌘B, ⌘I or ⌘E (Ctrl elsewhere) in the editor: bold, italic or inline code
  * (`notesFormat`). The edit goes through `insertText`, so it lands on the
  * browser's own undo stack (one ⌘Z) and reaches `onChange` like typing.
  * Returns whether the key was one of them.
  */
 function format(e: KeyboardEvent<HTMLTextAreaElement>): boolean {
-  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return false;
+  if (!formatModifier(e) || e.altKey || e.shiftKey) return false;
   const marker = NOTES_SHORTCUTS.get(e.key.toLowerCase());
   if (!marker) return false;
   e.preventDefault();
