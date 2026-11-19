@@ -1231,4 +1231,56 @@ describe("Gmail add-on", () => {
       expect(openSection.widgets[0].decoratedText.text).toBe("Now visible");
     });
   });
+
+  // Every route answers an unlinked Google identity with the connect card,
+  // and none of them touch the user's todos on the way.
+  describe("unlinked", () => {
+    const todoId = "66666666-6666-6666-6666-666666666666";
+    // A body each route would act on if the identity were linked.
+    const event = {
+      commonEventObject: {
+        formInputs: { todoText: { stringInputs: { value: ["Buy stamps"] } } },
+        parameters: { todoId, subject: "Q3 planning notes" },
+      },
+      gmail: { threadId: "thread-xyz", subject: "Q3 planning notes" },
+    };
+    const routes = [
+      { path: "/gmail-addon/homepage", asAction: false },
+      { path: "/gmail-addon/contextual", asAction: false },
+      { path: "/gmail-addon/actions/refresh", asAction: true },
+      { path: "/gmail-addon/actions/quick-add", asAction: true },
+      { path: "/gmail-addon/actions/add-from-message", asAction: true },
+      { path: "/gmail-addon/actions/undo-add", asAction: true },
+      { path: "/gmail-addon/actions/toggle", asAction: true },
+    ];
+
+    it.each(routes)(
+      "$path answers with the connect card and writes nothing",
+      async ({ path, asAction }) => {
+        await seedTodo(todoId, "user_test_123", {
+          title: "Leave me",
+          completed: false,
+        });
+
+        const res = await post(path, await idToken(), event);
+        expect(res.status).toBe(200);
+        const body = await res.json<any>();
+        // Triggers push the card; actions update the current one in place.
+        const card = asAction
+          ? body.renderActions.action.navigations[0].updateCard
+          : body.action.navigations[0].pushCard;
+        expect(card.header.title).toBe("Connect Nylon");
+
+        const db = getDb(env.DB);
+        const rows = await db
+          .select()
+          .from(todos)
+          .where(eq(todos.userId, "user_test_123"));
+        expect(rows).toHaveLength(1);
+        expect(rows[0].id).toBe(todoId);
+        expect(rows[0].completed).toBe(false);
+        expect(await db.select().from(gmailAddonLinks)).toHaveLength(0);
+      },
+    );
+  });
 });
