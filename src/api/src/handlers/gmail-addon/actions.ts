@@ -7,7 +7,6 @@ import {
 } from "@nylon-impossible/shared";
 import { verifyListOwnership } from "@nylon-impossible/shared/queries";
 import type { Context } from "hono";
-import { resolveNylonUser } from "../../lib/addon-auth";
 import {
   ADDON_DONE_VALUE,
   type AddonAdded,
@@ -27,7 +26,6 @@ import { buildRefreshedHomepageCard, type HomepageData } from "./homepage";
 import {
   type AddonEvent,
   cardResponse,
-  connectResponse,
   MAX_ADDON_TODO_TEXT,
   messageFromAction,
   readAddonEvent,
@@ -35,6 +33,7 @@ import {
   readParameter,
   requestBaseUrl,
   webBaseUrl,
+  withLinkedUser,
 } from "./shared";
 
 type Db = ReturnType<typeof getDb>;
@@ -129,67 +128,55 @@ async function selectedListId(
 // finishes on the web side, so this button lets the user pull the linked state
 // in: linked → swap in the homepage card; still unlinked → re-show connect.
 export async function gmailAddonRefresh(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
+  const linked = await withLinkedUser(c, { asAction: true });
+  if (linked.response) return linked.response;
+  const { userId } = linked;
 
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims, { asAction: true });
-  }
-
-  return refreshedHomepage(c, resolved.userId, "Connected");
+  return refreshedHomepage(c, userId, "Connected");
 }
 
 // POST /gmail-addon/actions/quick-add — submit the homepage composer. The text
 // goes through smart-create, so typed dates ("Call Sam tomorrow") set Due.
 export async function gmailAddonQuickAdd(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
-
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims, { asAction: true });
-  }
+  const linked = await withLinkedUser(c, { asAction: true });
+  if (linked.response) return linked.response;
+  const { db, userId } = linked;
 
   const event = await readAddonEvent(c);
   const text = readFormInput(event, QUICK_ADD_INPUT);
   if (!text) {
-    return refreshedHomepage(c, resolved.userId, "Type a todo first");
+    return refreshedHomepage(c, userId, "Type a todo first");
   }
   if (text.length > MAX_ADDON_TODO_TEXT) {
-    return refreshedHomepage(c, resolved.userId, "That todo is too long");
+    return refreshedHomepage(c, userId, "That todo is too long");
   }
 
-  const { todo } = await createSmartTodo(db, c.env, resolved.userId, text, {
-    listId: await selectedListId(db, resolved.userId, event),
+  const { todo } = await createSmartTodo(db, c.env, userId, text, {
+    listId: await selectedListId(db, userId, event),
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 
-  return refreshedHomepage(c, resolved.userId, addedNotification(todo));
+  return refreshedHomepage(c, userId, addedNotification(todo));
 }
 
 // POST /gmail-addon/actions/add-from-message — add the open message as a todo.
 // The card stays on the message and leads with "Added to <list>", with Open in
 // Nylon and Undo, rather than only flashing a toast.
 export async function gmailAddonAddFromMessage(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
-
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims, { asAction: true });
-  }
+  const linked = await withLinkedUser(c, { asAction: true });
+  if (linked.response) return linked.response;
+  const { db, userId } = linked;
 
   const event = await readAddonEvent(c);
   const message = messageFromAction(event);
   const text = readFormInput(event, QUICK_ADD_INPUT);
   if (!text) {
-    return refreshedContextual(c, resolved.userId, message, {
+    return refreshedContextual(c, userId, message, {
       notification: "Add a title first",
     });
   }
   if (text.length > MAX_ADDON_TODO_TEXT) {
-    return refreshedContextual(c, resolved.userId, message, {
+    return refreshedContextual(c, userId, message, {
       notification: "That todo is too long",
     });
   }
@@ -198,8 +185,8 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
   // link keeps the subject as its label even if the user edits the todo title.
   const subject = readParameter(event, "subject");
 
-  const { todo } = await createSmartTodo(db, c.env, resolved.userId, text, {
-    listId: await selectedListId(db, resolved.userId, event),
+  const { todo } = await createSmartTodo(db, c.env, userId, text, {
+    listId: await selectedListId(db, userId, event),
     // Attach the thread permalink with the subject as its title so it renders
     // as an email link (subject + Gmail icon) without a doomed metadata fetch.
     attachedUrls: permalink
@@ -208,7 +195,7 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
     waitUntil: (p) => c.executionCtx.waitUntil(p),
   });
 
-  const lists = await listListsForUser(db, resolved.userId);
+  const lists = await listListsForUser(db, userId);
   const list = lists.find((l) => l.id === todo.listId);
   const card = buildContextualCard(requestBaseUrl(c), message, lists, {
     todoId: todo.id,
@@ -224,13 +211,9 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
 // to <list>": delete the todo add-from-message just made, and go back to the
 // card for the message.
 export async function gmailAddonUndoAdd(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
-
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims, { asAction: true });
-  }
+  const linked = await withLinkedUser(c, { asAction: true });
+  if (linked.response) return linked.response;
+  const { db, userId } = linked;
 
   const event = await readAddonEvent(c);
   const todoId = readParameter(event, "todoId");
@@ -238,12 +221,12 @@ export async function gmailAddonUndoAdd(c: Context<Env>) {
   if (todoId) {
     const deleted = await db
       .delete(todos)
-      .where(and(eq(todos.id, todoId), eq(todos.userId, resolved.userId)))
+      .where(and(eq(todos.id, todoId), eq(todos.userId, userId)))
       .returning({ id: todos.id });
     removed = deleted.length > 0;
-    if (removed) await notifySync(c.env, resolved.userId);
+    if (removed) await notifySync(c.env, userId);
   }
-  return refreshedContextual(c, resolved.userId, messageFromAction(event), {
+  return refreshedContextual(c, userId, messageFromAction(event), {
     notification: "Removed",
     stateChanged: removed,
   });
@@ -260,47 +243,37 @@ export async function gmailAddonUndoAdd(c: Context<Env>) {
 // done rather than reopening it. When the box's state doesn't come through
 // (unticked, or a host that leaves it out), the toggle flips what's stored.
 export async function gmailAddonToggle(c: Context<Env>) {
-  const claims = c.get("googleClaims");
-  const db = getDb(c.env.DB);
-
-  const resolved = await resolveNylonUser(db, c.env, claims);
-  if (resolved.status !== "linked") {
-    return connectResponse(c, claims, { asAction: true });
-  }
+  const linked = await withLinkedUser(c, { asAction: true });
+  if (linked.response) return linked.response;
+  const { db, userId } = linked;
 
   const event = await readAddonEvent(c);
   const todoId = readParameter(event, "todoId");
-  if (!todoId) return refreshedHomepage(c, resolved.userId, "Done");
+  if (!todoId) return refreshedHomepage(c, userId, "Done");
 
   const [before] = await db
     .select({ listId: todos.listId, completed: todos.completed })
     .from(todos)
-    .where(and(eq(todos.id, todoId), eq(todos.userId, resolved.userId)));
+    .where(and(eq(todos.id, todoId), eq(todos.userId, userId)));
   const ticked =
     readFormInput(event, doneInputName(todoId)) === ADDON_DONE_VALUE;
   const done = ticked || !before?.completed;
-  const updated = await setTodoCompleted(
-    db,
-    c.env,
-    resolved.userId,
-    todoId,
-    done,
-  );
+  const updated = await setTodoCompleted(db, c.env, userId, todoId, done);
 
   if (!done && updated) {
     const listId = updated.listId;
     return refreshedHomepage(
       c,
-      resolved.userId,
+      userId,
       (data) => `Back in ${listInSentence(data, listId)}`,
     );
   }
 
   if (!updated || updated.completed || !updated.dueDate || !before) {
-    return refreshedHomepage(c, resolved.userId, "Done");
+    return refreshedHomepage(c, userId, "Done");
   }
   const nextDue = updated.dueDate;
-  return refreshedHomepage(c, resolved.userId, (data, now) => {
+  return refreshedHomepage(c, userId, (data, now) => {
     const next = dueLabel(nextDue, now, data.timeZone).text;
     const where =
       updated.listId === before.listId
