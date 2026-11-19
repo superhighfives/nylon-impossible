@@ -525,6 +525,20 @@ describe("WideApp", () => {
     }
   });
 
+  it("hatches what a trackpad's bounce shows past Done, and nowhere else", () => {
+    render(<WideApp />);
+    const board = screen.getByRole("main", { name: "Board" });
+    // The row's own background is the hatch; every slot in it fills itself,
+    // so the hatch only shows past its ends.
+    expect(board).toHaveClass("n-board-hatch");
+    for (const slot of board.querySelectorAll(":scope > [data-column]")) {
+      expect(slot.className).toMatch(/\bbg-n-(canvas|surface)\b/);
+    }
+    expect(board.querySelector(":scope > [data-board-end]")).toHaveClass(
+      "bg-n-canvas",
+    );
+  });
+
   it("ends the board on Done's hairline, with the hatch before it and nothing to click", async () => {
     render(<WideApp />);
     const board = screen.getByRole("main", { name: "Board" });

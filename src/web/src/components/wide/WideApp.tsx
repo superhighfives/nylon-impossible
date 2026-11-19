@@ -1103,7 +1103,8 @@ export function WideApp({
 
   // The board's end, before Done: the hatch, as wide as the columns leave,
   // so Done starts just past the right edge (`fitBoardEnd`). Always in the
-  // row, so it resizes rather than appears. Nothing in it to click
+  // row, so it resizes rather than appears. Filled first, so the row's own
+  // hatch doesn't show through and double its lines. Nothing in it to click
   // (principle 4).
   const renderEnd = () => (
     <div
@@ -1111,7 +1112,7 @@ export function WideApp({
       aria-hidden="true"
       data-slide="end"
       data-board-end
-      className="n-board-hatch shrink-0"
+      className="n-board-hatch shrink-0 bg-n-canvas"
     />
   );
 
@@ -1205,11 +1206,13 @@ export function WideApp({
           />
           {/* One row of columns that scrolls sideways; each child is named
               by `data-slide` so it slides when the row changes. The size
-              container the columns' width is a third of. */}
+              container the columns' width is a third of. Its own hatch is
+              what a trackpad's bounce shows past Done (or before Today);
+              every column fills itself so it only shows there. */}
           <main
             ref={boardRow}
             aria-label="Board"
-            className="@container relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
+            className="@container n-board-hatch relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {/* Before the lists arrive, the three time columns and then
                 nothing: no Done, since your lists may come before it. The
@@ -1224,7 +1227,7 @@ export function WideApp({
                     key="skeleton-rest"
                     aria-hidden="true"
                     data-skeleton-rest
-                    className="min-w-0 flex-1"
+                    className="min-w-0 flex-1 bg-n-canvas"
                   />,
                 ]
               : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
