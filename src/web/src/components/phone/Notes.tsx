@@ -1,7 +1,14 @@
 import { Tooltip } from "@base-ui/react/tooltip";
 import { TODO_NOTES_MAX } from "@nylon-impossible/shared";
 import { Check, Copy } from "lucide-react";
-import { type ReactNode, useId, useMemo, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { flushSync } from "react-dom";
 import {
   type Block,
@@ -10,6 +17,7 @@ import {
   parseMarkdown,
 } from "@/lib/markdown";
 import { messageFromError, toast } from "@/lib/toast";
+import { NOTES_SHORTCUTS, toggleMarker } from "./notesFormat";
 
 /**
  * A blank line in the notes keeps its height when they're drawn: one line,
@@ -37,7 +45,7 @@ function inlines(nodes: Inline[]): ReactNode[] {
       case "code":
         return (
           // biome-ignore lint/suspicious/noArrayIndexKey: parsed fresh from the text each render
-          <code key={i} className="rounded-[0.25rem] bg-n-fill px-1">
+          <code key={i} className="n-code rounded-[0.25rem] bg-n-fill px-1">
             {node.text}
           </code>
         );
@@ -93,7 +101,7 @@ function CodeBlock({ text, className }: { text: string; className: string }) {
 
   return (
     <div className={`group/code relative ${className}`}>
-      <pre className="m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap">
+      <pre className="n-code m-0 rounded-n-chip bg-n-fill px-2 break-words whitespace-pre-wrap">
         <code>{text}</code>
       </pre>
       <Tooltip.Root
@@ -204,11 +212,50 @@ export function NotesMarkdown({ text }: { text: string }) {
 }
 
 /**
+ * ⌘B, ⌘I or ⌘E (Ctrl elsewhere) in the editor: bold, italic or inline code
+ * (`notesFormat`). The edit goes through `insertText`, so it lands on the
+ * browser's own undo stack (one ⌘Z) and reaches `onChange` like typing.
+ * Returns whether the key was one of them.
+ */
+function format(e: KeyboardEvent<HTMLTextAreaElement>): boolean {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey) return false;
+  const marker = NOTES_SHORTCUTS.get(e.key.toLowerCase());
+  if (!marker) return false;
+  e.preventDefault();
+  const field = e.currentTarget;
+  const edit = toggleMarker(
+    field.value,
+    field.selectionStart,
+    field.selectionEnd,
+    marker,
+    TODO_NOTES_MAX,
+  );
+  if (!edit) return true;
+  field.setSelectionRange(edit.from, edit.to);
+  const native =
+    typeof document.execCommand === "function" &&
+    document.execCommand(
+      edit.insert ? "insertText" : "delete",
+      false,
+      edit.insert,
+    );
+  if (!native) {
+    // No editing commands (jsdom): the same edit, without the undo step.
+    field.setRangeText(edit.insert, edit.from, edit.to);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  field.setSelectionRange(edit.selectionStart, edit.selectionEnd);
+  return true;
+}
+
+/**
  * The open todo's Notes: drawn as Markdown while you aren't editing them,
  * the plain text you typed while you are. A click (anywhere but a link) or
  * Return edits, with the caret at the end; blur or Esc draws them again, and
  * Esc leaves the keyboard on them. Empty notes are always the editor, with
  * its "Add notes" placeholder. The stored string is only ever what was typed.
+ *
+ * While editing, ⌘B, ⌘I and ⌘E format the selection (`format`).
  *
  * The editor stops at `TODO_NOTES_MAX`, saying so once per edit, and from
  * `NOTES_COUNT_FROM` shows a count on the label's line, which is there
@@ -286,6 +333,7 @@ export function Notes({
               setEditing(false);
             }}
             onKeyDown={(e) => {
+              if (format(e)) return;
               if (e.key !== "Escape") return;
               // Esc leaves the notes, not the sheet.
               e.preventDefault();

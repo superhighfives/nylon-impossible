@@ -63,7 +63,13 @@ interface Binding {
 /** n's `arg`: add where the keyboard is, rather than in Quick add. */
 const ADD_HERE = 1;
 
-export type CommandGroup = "Move around" | "Todo" | "Go to" | "Create" | "Help";
+export type CommandGroup =
+  | "Move around"
+  | "Todo"
+  | "Go to"
+  | "Create"
+  | "Notes"
+  | "Help";
 
 export interface Command {
   id: string;
@@ -353,6 +359,33 @@ export const COMMANDS: Command[] = [
     run: (b) => b.newList(),
   },
 
+  // Notes: listed only. The notes editor binds them itself (`Notes`), since
+  // they work only while typing there, where the board's keys don't.
+  {
+    id: "notes-bold",
+    label: "Bold",
+    keys: [["⌘", "B"]],
+    bindings: [],
+    group: "Notes",
+    run: () => {},
+  },
+  {
+    id: "notes-italic",
+    label: "Italic",
+    keys: [["⌘", "I"]],
+    bindings: [],
+    group: "Notes",
+    run: () => {},
+  },
+  {
+    id: "notes-code",
+    label: "Code",
+    keys: [["⌘", "E"]],
+    bindings: [],
+    group: "Notes",
+    run: () => {},
+  },
+
   // Help
   {
     id: "undo",
@@ -395,6 +428,7 @@ export const GROUPS: CommandGroup[] = [
   "Todo",
   "Go to",
   "Create",
+  "Notes",
   "Help",
 ];
 

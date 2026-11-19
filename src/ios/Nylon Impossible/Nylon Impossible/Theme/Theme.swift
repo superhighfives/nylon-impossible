@@ -194,6 +194,10 @@ enum Theme {
             var font: Font { Font(uiFont) }
         }
 
+        /// Code in the notes, inline and in blocks, at this fraction of the
+        /// notes' own size, so it reads as part of the note.
+        static let codeScale: CGFloat = 0.85
+
         enum Phone {
             static let display = Style(size: 34, lineHeight: 40, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle)
             static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2)

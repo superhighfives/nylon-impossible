@@ -196,6 +196,17 @@ describe("design token generator", () => {
     expect(swift).toContain("static let rowMinHeight: CGFloat = 44");
   });
 
+  it("sizes code in the notes at type.codeScale on both platforms", () => {
+    expect(tokens.type.codeScale).toBe(0.85);
+    expect(renderSwift(tokens)).toContain(
+      "static let codeScale: CGFloat = 0.85",
+    );
+    // The web copies it by hand, like all of its type.
+    const styles = readFileSync(join(WEB_SRC, "styles.css"), "utf8");
+    const utility = styles.match(/@utility n-code \{([^}]*)\}/)?.[1];
+    expect(utility).toContain(`font-size: ${tokens.type.codeScale}em;`);
+  });
+
   it("builds the same theme for macOS from AppKit types", () => {
     const swift = renderSwift(tokens);
     expect(swift).toContain("#if os(macOS)");
