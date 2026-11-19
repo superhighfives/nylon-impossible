@@ -6,14 +6,59 @@
 import Foundation
 import Sentry
 
+/// The parts of `URLSessionWebSocketTask` the service uses, so tests can
+/// stand in a socket whose handshake fails.
+nonisolated protocol WebSocketConnecting: AnyObject, Sendable {
+    func resume()
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?)
+    func send(
+        _ message: URLSessionWebSocketTask.Message,
+        completionHandler: @escaping @Sendable (Error?) -> Void
+    )
+    func receive(
+        completionHandler: @escaping @Sendable (Result<URLSessionWebSocketTask.Message, Error>) -> Void
+    )
+    func sendPing(pongReceiveHandler: @escaping @Sendable (Error?) -> Void)
+}
+
+extension URLSessionWebSocketTask: WebSocketConnecting {}
+
+/// Where socket failures go: Sentry events, or breadcrumbs for the rest.
+struct WebSocketErrorReporter {
+    var capture: (Error, _ event: String) -> Void
+    var breadcrumb: (String) -> Void
+
+    static let sentry = WebSocketErrorReporter(
+        capture: { error, event in
+            SentrySDK.capture(error: error) { scope in
+                scope.setTag(value: "websocket", key: "area")
+                scope.setTag(value: event, key: "event")
+            }
+        },
+        breadcrumb: { message in
+            let crumb = Breadcrumb(level: .info, category: "websocket")
+            crumb.message = message
+            SentrySDK.addBreadcrumb(crumb)
+        }
+    )
+}
+
 @Observable
 @MainActor
 final class WebSocketService {
     private let apiService: any APIProviding
-    private var task: URLSessionWebSocketTask?
+    private let makeSocket: (URL) -> any WebSocketConnecting
+    private let sleep: (TimeInterval) async throws -> Void
+    private let reporter: WebSocketErrorReporter
+    private var task: (any WebSocketConnecting)?
     private var reconnectTask: Task<Void, Never>?
-    private var reconnectDelay: TimeInterval = 1.0
+    private(set) var reconnectDelay: TimeInterval = 1.0
+    /// Whether this run of failures (since the socket last opened) has
+    /// already sent Sentry an event. The rest of the run leaves breadcrumbs.
+    private var failureRunReported = false
 
+    /// True once the server has accepted the handshake (a pong or a message
+    /// has come back), not merely once the socket has been started.
     private(set) var isConnected: Bool = false
 
     var onSyncNeeded: (() -> Void)?
@@ -21,12 +66,30 @@ final class WebSocketService {
     private static let maxReconnectDelay: TimeInterval = 30.0
     private static let initialReconnectDelay: TimeInterval = 1.0
 
-    init(apiService: any APIProviding) {
+    init(
+        apiService: any APIProviding,
+        makeSocket: @escaping (URL) -> any WebSocketConnecting = { url in
+            URLSession(configuration: .default).webSocketTask(with: url)
+        },
+        sleep: @escaping (TimeInterval) async throws -> Void = { delay in
+            try await Task.sleep(for: .seconds(delay))
+        },
+        // Optional because a default argument can't reach the main-actor
+        // `.sentry`.
+        reporter: WebSocketErrorReporter? = nil
+    ) {
         self.apiService = apiService
+        self.makeSocket = makeSocket
+        self.sleep = sleep
+        self.reporter = reporter ?? .sentry
     }
 
     func connect() {
         guard task == nil else { return }
+        // Connecting now supersedes a reconnect that's waiting out its delay,
+        // which would otherwise open a second socket when it fires.
+        reconnectTask?.cancel()
+        reconnectTask = nil
 
         Task {
             await doConnect()
@@ -58,20 +121,24 @@ final class WebSocketService {
             let ticket = try await apiService.createWsTicket()
             guard let url = Self.socketURL(apiBaseURL: Config.apiBaseURL, ticket: ticket) else { return }
 
-            let session = URLSession(configuration: .default)
-            let wsTask = session.webSocketTask(with: url)
+            let wsTask = makeSocket(url)
             self.task = wsTask
             wsTask.resume()
 
-            isConnected = true
-            reconnectDelay = Self.initialReconnectDelay
-
-            // Trigger a sync on connect to catch missed changes
-            onSyncNeeded?()
+            // `resume()` only starts the handshake; a refused one (a 401, a
+            // 5xx) fails later, in `receive`. The server sends nothing on
+            // connect, so a pong is the first proof that it accepted.
+            wsTask.sendPing { [weak self] error in
+                guard error == nil else { return }
+                Task { @MainActor [weak self] in
+                    guard let self, self.task === wsTask else { return }
+                    self.didOpen()
+                }
+            }
 
             receiveLoop()
         } catch {
-            Self.report(error, event: "connect")
+            report(error, event: "connect")
             print("[WebSocket] Connect error: \(error)")
             scheduleReconnect()
         }
@@ -101,6 +168,7 @@ final class WebSocketService {
 
                 switch result {
                 case .success(let message):
+                    self.didOpen()
                     self.handleMessage(message)
                     self.receiveLoop()
                 case .failure(let error):
@@ -118,12 +186,24 @@ final class WebSocketService {
                         self.isConnected = false
                         return
                     }
-                    Self.report(error, event: "receive")
+                    self.report(error, event: "receive")
                     print("[WebSocket] Receive error: \(error)")
                     self.handleDisconnect()
                 }
             }
         }
+    }
+
+    /// The server accepted the handshake: the socket can send, and the next
+    /// failure starts a new run with a 1 s delay and one Sentry event.
+    private func didOpen() {
+        guard !isConnected else { return }
+        isConnected = true
+        reconnectDelay = Self.initialReconnectDelay
+        failureRunReported = false
+
+        // Trigger a sync on connect to catch missed changes
+        onSyncNeeded?()
     }
 
     private func handleMessage(_ message: URLSessionWebSocketTask.Message) {
@@ -193,19 +273,17 @@ final class WebSocketService {
         return matches(nsError) || nsError.underlyingErrors.contains { matches($0 as NSError) }
     }
 
-    /// Send a real failure to Sentry; leave a breadcrumb for a transient drop,
-    /// or for a failed ticket request `APIService` has already dealt with.
-    nonisolated private static func report(_ error: Error, event: String) {
-        guard !isTransientNetworkDrop(error), !isHandledByAPIService(error) else {
-            let crumb = Breadcrumb(level: .info, category: "websocket")
-            crumb.message = "\(event): \((error as NSError).domain) \((error as NSError).code)"
-            SentrySDK.addBreadcrumb(crumb)
+    /// Send a real failure to Sentry, once per run of failures; leave a
+    /// breadcrumb for the rest of the run, for a transient drop, or for a
+    /// failed ticket request `APIService` has already dealt with.
+    private func report(_ error: Error, event: String) {
+        guard !Self.isTransientNetworkDrop(error), !Self.isHandledByAPIService(error),
+              !failureRunReported else {
+            reporter.breadcrumb("\(event): \((error as NSError).domain) \((error as NSError).code)")
             return
         }
-        SentrySDK.capture(error: error) { scope in
-            scope.setTag(value: "websocket", key: "area")
-            scope.setTag(value: event, key: "event")
-        }
+        failureRunReported = true
+        reporter.capture(error, event)
     }
 
     /// `APIService` reports a network, server or decoding failure itself (or
@@ -226,7 +304,11 @@ final class WebSocketService {
     private func scheduleReconnect() {
         reconnectTask?.cancel()
         reconnectTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(reconnectDelay))
+            do {
+                try await sleep(reconnectDelay)
+            } catch {
+                return
+            }
             guard !Task.isCancelled else { return }
 
             reconnectDelay = min(reconnectDelay * 2, Self.maxReconnectDelay)
