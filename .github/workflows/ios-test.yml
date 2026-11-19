@@ -51,7 +51,9 @@ jobs:
       && (github.event_name != 'pull_request'
         || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: xcode-27
-    timeout-minutes: 20
+    # The iPhone leg is ~10 minutes of tests plus ~3 of Release build; 20 left
+    # too little headroom for a slow simulator.
+    timeout-minutes: 30
     # Run the suite on the iPhone and on the Mac, which builds the same
     # targets for macOS. fail-fast off so one family's failure doesn't hide
     # the other's results.
