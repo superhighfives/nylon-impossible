@@ -194,7 +194,9 @@ extension ContentView {
         case .today, .overnight, .loading, .empty, .syncerror, .perf: viewModel.page = .today
         case .toast, .toasterror:
             viewModel.page = .today
+            #if DEBUG
             actions.toasts.showForScreenshot(route)
+            #endif
         case .link, .share, .sharetext, .widgets, .signin, .menubar, .feedback: break
         case .week: viewModel.page = .thisWeek
         case .someday: viewModel.page = .someday
