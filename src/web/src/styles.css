@@ -26,6 +26,8 @@
   --color-n-ink-subtle: var(--n-color-ink-subtle);
   --color-n-overdue: var(--n-color-overdue);
   --color-n-destructive: var(--n-color-destructive);
+  --color-n-destructive-solid: var(--n-color-destructive-solid);
+  --color-n-destructive-solid-ink: var(--n-color-destructive-solid-ink);
   --color-n-destructive-fill: var(--n-color-destructive-fill);
   --color-n-notice: var(--n-color-notice);
   --color-n-notice-fill: var(--n-color-notice-fill);
@@ -201,6 +203,18 @@ p {
     outline: 3px solid var(--n-color-brand);
     outline-offset: -3px;
     box-shadow: inset 0 0 0 4px var(--n-color-ink);
+  }
+}
+
+/* The toast's focus ring: 2px in the toast's own ink (`brandInk` on the
+   yellow pill, `destructiveSolidInk` on the red one), which its action and
+   × already take as their text colour. `n-focus`'s brand ring would vanish
+   on the yellow pill. */
+@utility n-focus-toast {
+  outline: none;
+  &:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 1px;
   }
 }
 

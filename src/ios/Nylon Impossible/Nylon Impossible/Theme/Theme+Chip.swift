@@ -15,7 +15,7 @@ extension Theme {
         static let paddingX: CGFloat = 7
     }
 
-    /// The toast's action (Undo), a brand fill with dark ink.
+    /// The toast's action (Undo), an outline in the pill's ink.
     enum ToastAction {
         static let height: CGFloat = 36
         static let radius: CGFloat = 11

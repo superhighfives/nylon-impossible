@@ -5,9 +5,11 @@
 
 import SwiftUI
 
-/// The toast pill: inverted colours, the message, and its action (Undo) as
-/// a filled button: bold dark ink on a brand yellow fill, the yellow-as-fill
-/// that Settled "Brand accent" allows.
+/// The toast pill, the web's (principle 5): a brand yellow pill with
+/// `brandInk` text, and its action (Undo) as an outline button in that ink,
+/// the yellow-as-fill with dark ink and lines that Settled "Brand accent"
+/// allows. A failure ("Couldn’t …") is a `destructiveSolid` red pill with
+/// white ink and the alert icon (Settled "Destructive and overdue red").
 ///
 /// VoiceOver hears the toast as an announcement that says how to undo, and
 /// can undo without finding the pill: a two-finger double-tap (the Magic
@@ -36,10 +38,10 @@ struct ToastView: View {
                 }
                 .textStyle(Theme.Fonts.Role.control)
                 .fontWeight(.regular)
-                .foregroundStyle(Theme.Colors.canvas)
+                .foregroundStyle(Self.ink(toast))
                 .padding(.leading, Theme.Space.s4)
                 .padding(.trailing, toast.actionLabel == nil ? Theme.Space.s4 : Theme.Space.s1)
-                .background(Theme.Colors.ink, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .background(Self.fill(toast), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
                 .padding(.horizontal, Theme.Space.s4)
                 .id(toast.id)
@@ -54,18 +56,34 @@ struct ToastView: View {
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: toasts.current)
     }
 
+    /// The pill's fill: red for a failure, brand yellow for the rest.
+    static func fill(_ toast: ToastCenter.Toast) -> Color {
+        toast.isError ? Theme.Colors.destructiveSolid : Theme.Colors.brand
+    }
+
+    /// The text, icon and outline on that fill.
+    static func ink(_ toast: ToastCenter.Toast) -> Color {
+        toast.isError ? Theme.Colors.destructiveSolidInk : Theme.Colors.brandInk
+    }
+
     @ViewBuilder
     private func content(_ toast: ToastCenter.Toast, stacked: Bool) -> some View {
-        Text(toast.text)
-            .fixedSize(horizontal: false, vertical: true)
-            .layoutPriority(1)
-            .padding(.top, Theme.Space.s3)
-            .padding(.bottom, stacked && toast.actionLabel != nil ? 0 : Theme.Space.s3)
+        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s1) {
+            if toast.isError {
+                Image(systemName: Theme.Icon.error)
+                    .accessibilityHidden(true)
+            }
+            Text(toast.text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .layoutPriority(1)
+        .padding(.top, Theme.Space.s3)
+        .padding(.bottom, stacked && toast.actionLabel != nil ? 0 : Theme.Space.s3)
         if let label = toast.actionLabel {
             Button { toasts.performAction() } label: {
                 Text(label)
                     .fontWeight(.bold)
-                    .foregroundStyle(Theme.Colors.brandInk)
+                    .foregroundStyle(Self.ink(toast))
                     // The action never wraps mid-word (on the Mac it split
                     // "Un/do" when the pill was narrow); at accessibility
                     // sizes it drops under the message instead.
@@ -73,11 +91,11 @@ struct ToastView: View {
                     .fixedSize(horizontal: true, vertical: false)
                     .padding(.horizontal, Theme.ToastAction.paddingX)
                     .frame(minHeight: Theme.ToastAction.height)
-                    .background(
-                        Theme.Colors.brand,
-                        in: RoundedRectangle(cornerRadius: Theme.ToastAction.radius, style: .continuous)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.ToastAction.radius, style: .continuous)
+                            .strokeBorder(Self.ink(toast), lineWidth: 1)
                     )
-                    // The 36pt fill sits in a 44pt target.
+                    // The 36pt outline sits in a 44pt target.
                     .frame(minWidth: Theme.Space.rowMinHeight, minHeight: Theme.Space.rowMinHeight)
                     .contentShape(Rectangle())
             }

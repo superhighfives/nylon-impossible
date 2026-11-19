@@ -38,6 +38,8 @@ final class ToastCenter {
         let text: String
         /// "Undo" or "View"; nil for a toast with nothing to tap.
         let actionLabel: String?
+        /// A failure ("Couldn’t …"): the red pill with the alert icon.
+        var isError = false
     }
 
     private(set) var current: Toast?
@@ -65,14 +67,16 @@ final class ToastCenter {
 
     /// Show a toast. A trailing closure is the action (Undo, View);
     /// `onExpire` runs instead if the toast times out or is replaced.
+    /// `isError` marks a failure ("Couldn’t …"), which shows red.
     func show(
         _ text: String,
         actionLabel: String? = "Undo",
+        isError: Bool = false,
         onExpire: (() -> Void)? = nil,
         action: (() -> Void)? = nil
     ) {
         expire()
-        let toast = Toast(text: text, actionLabel: action == nil ? nil : actionLabel)
+        let toast = Toast(text: text, actionLabel: action == nil ? nil : actionLabel, isError: isError)
         current = toast
         self.action = action
         self.onExpire = onExpire
@@ -82,6 +86,11 @@ final class ToastCenter {
             guard !Task.isCancelled else { return }
             self?.expire(ifCurrent: toast.id)
         }
+    }
+
+    /// A failure: "Couldn’t save that change", with nothing to tap.
+    func showError(_ text: String) {
+        show(text, isError: true, action: nil)
     }
 
     /// An undo or redo from the history: "Undone: Done", "Redone: Moved to

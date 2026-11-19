@@ -13,6 +13,19 @@ import {
 
 const WEB_SRC = join(import.meta.dirname, "../..");
 
+/** WCAG 2 contrast ratio between two `#RRGGBB` colours. */
+function contrast(a: string, b: string): number {
+  const luminance = (hex: string) => {
+    const [r, g, b] = [1, 3, 5].map((i) => {
+      const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
+      return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
 /** Every source file under src/web/src, bar tests and tokens.css itself. */
 function webSources(): string[] {
   return readdirSync(WEB_SRC, { recursive: true, encoding: "utf8" })
@@ -145,6 +158,45 @@ describe("design token generator", () => {
     const turned = structuredClone(tokens);
     turned.board.hatch.angle = 135;
     expect(renderCss(turned)).toContain("--n-board-hatch-angle: 135deg;");
+  });
+
+  it("fills the error toast with red-11's light value in every appearance, and both toasts' text passes 4.5:1", () => {
+    type Colour = {
+      light: string;
+      dark: string;
+      highContrast?: { light: string; dark: string };
+    };
+    const colour = (name: string) =>
+      (tokens.color as unknown as Record<string, Colour>)[name];
+    const solid = colour("destructiveSolid");
+    expect(solid.light).toBe("#CE2C31");
+    expect(solid.dark).toBe("#CE2C31");
+    expect(solid.highContrast).toEqual({ light: "#A11C21", dark: "#A11C21" });
+    // Every other red keeps red-11's dark value in dark appearance.
+    expect(colour("destructive")).toMatchObject({
+      light: "#CE2C31",
+      dark: "#FF9592",
+      highContrast: { light: "#A11C21", dark: "#FFB8B5" },
+    });
+    /** The four appearances: light, dark and both with Increase Contrast. */
+    const appearances = (c: Colour) => [
+      c.light,
+      c.dark,
+      c.highContrast?.light ?? c.light,
+      c.highContrast?.dark ?? c.dark,
+    ];
+    for (const [ink, fill] of [
+      ["brandInk", "brand"],
+      ["destructiveSolidInk", "destructiveSolid"],
+    ]) {
+      const inks = appearances(colour(ink));
+      appearances(colour(fill)).forEach((background, i) => {
+        expect(
+          contrast(inks[i], background),
+          `${ink} on ${fill}, appearance ${i}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      });
+    }
   });
 
   it("gives every icon both a lucide and an SF Symbol name", () => {

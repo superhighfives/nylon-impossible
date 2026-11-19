@@ -33,7 +33,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 | Selecting on wide | One click selects. A second click, a double click or Enter opens the todo in a sheet beside its column |
 | Dropping with a pointer | The todo lands in the gap nearest the pointer, shown by the drop line. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
 | Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. Two exceptions: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move; and the composer's 3px focus ring, where its `surface` fill and the caret also mark focus |
-| Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9 |
+| Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9. The error toast fills with `#CE2C31` in both appearances, with light text and a light outline. |
 | Moving between lists by drag | The web board only. On a phone layout a todo moves through its menu (Move to) |
 | Case | Sentence case for every label, title and menu item: "This week", "New list", "Keyboard shortcuts" |
 
@@ -70,6 +70,7 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 - Colors that must be told apart also differ in lightness, not hue alone.
 - Touch targets are at least 44 points on touch screens.
 - Motion respects reduced motion: transitions shorten to a fade or nothing.
+- Toasts are a pill with an outline action, on every platform. One that reports something done is `brand` with `brandInk` text; a failure is `destructiveSolid` with `destructiveSolidInk` text and the alert icon. `destructiveSolid` is red-11's light value (`#CE2C31`) in both appearances, and like every colour with a `highContrast` value it takes the darker `#A11C21` with Increase Contrast. The action and × focus with a 2px ring in the toast's own ink, since a `brand` ring can't be seen on yellow.
 - Focus is always visible to the keyboard: a selected row is tinted, and moving with the keyboard adds a bar beside it, as in the sidebar; a soft tinted background elsewhere. A mouse click never draws a keyboard-strength ring. The full set is under States.
 
 ## States

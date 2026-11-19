@@ -3,16 +3,23 @@ import { AlertCircle, X } from "lucide-react";
 import { toastManager } from "@/lib/toast";
 
 /**
- * One dark pill, "Done · Undo" style, with the action as a `brand` button:
- * a yellow fill with dark ink, as Settled "Brand accent" allows.
- * Only the newest shows; a new toast replaces the last. Token colours only.
+ * One coloured pill, "Done · Undo" style, with the action as an outline
+ * button in the pill's ink. Success and info are a `brand` yellow pill with
+ * `brandInk`: yellow only as a fill with dark ink and dark lines, as Settled
+ * "Brand accent" allows. An error is a `destructiveSolid` red pill with
+ * white ink and the alert icon (Settled "Destructive and overdue red").
+ * The action and × ring focus in the same ink. Only the newest shows; a new
+ * toast replaces the last. Token colours only.
  */
 function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
   const error = toast.type === "error";
+  const look = error
+    ? "bg-n-destructive-solid text-n-destructive-solid-ink"
+    : "bg-n-brand text-n-brand-ink";
   return (
     <Toast.Root
       toast={toast}
-      className="pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] bg-n-ink py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] text-n-canvas opacity-[calc(1-min(var(--toast-index),1))] data-limited:pointer-events-none data-limited:opacity-0 shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0"
+      className={`${look} pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] opacity-[calc(1-min(var(--toast-index),1))] data-limited:pointer-events-none data-limited:opacity-0 shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0`}
     >
       <Toast.Content className="flex min-h-9 items-center gap-1.5">
         {error && (
@@ -22,11 +29,11 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
         {/* Renders only when the toast was added with `actionProps`. */}
         <Toast.Action
           data-toast-action
-          className="h-9 shrink-0 cursor-pointer rounded-[0.6875rem] bg-n-brand px-3.5 font-bold text-n-brand-ink n-focus"
+          className={`h-9 shrink-0 cursor-pointer rounded-[0.6875rem] border px-3.5 font-bold n-focus-toast ${error ? "border-n-destructive-solid-ink text-n-destructive-solid-ink" : "border-n-brand-ink text-n-brand-ink"}`}
         />
         <Toast.Close
           aria-label="Dismiss"
-          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[0.625rem] text-n-ink-subtle n-focus"
+          className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-[0.625rem] n-focus-toast"
         >
           <X size={14} aria-hidden="true" />
         </Toast.Close>
