@@ -92,9 +92,14 @@
   }
 }
 
+/* `overscroll-behavior-x`: a trackpad's sideways swipe that runs out of
+   scroll would go back or forward a page (Chrome's swipe navigation), which
+   an app has no use for. A scroller that bounces on its own (the wide
+   board's row) sets `overscroll-behavior-x: contain` so its bounce stays. */
 html,
 body {
   height: 100%;
+  overscroll-behavior-x: none;
 }
 
 /* color-scheme lives only on <html> so its (inherited) value flows down to

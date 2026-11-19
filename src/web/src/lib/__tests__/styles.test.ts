@@ -16,6 +16,14 @@ function utility(name: string): string {
   return css.slice(start, end);
 }
 
+// A sideways trackpad swipe that runs out of scroll goes back or forward a
+// page in Chrome. The app turns that off at the root.
+it("turns off swipe navigation on the page", () => {
+  expect(css).toMatch(
+    /html,\s*body\s*\{[^}]*overscroll-behavior-x: none;[^}]*\}/,
+  );
+});
+
 describe("the board's hatch", () => {
   // A repeating gradient's period never lands on the pixel grid, so its lines
   // band (#684). A whole-pixel tile draws the same every time.
