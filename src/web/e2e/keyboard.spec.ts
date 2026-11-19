@@ -64,9 +64,7 @@ test("the keyboard moves, opens, closes and marks done", async ({
   const title = (await selected(page).innerText()).trim();
   await page.keyboard.press("Enter");
   await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page).getByLabel("Title", { exact: true })).toHaveValue(
-    title,
-  );
+  await expect(sheet(page).locator("[data-detail-title]")).toHaveValue(title);
   await page.keyboard.press("Escape");
   await expect(sheet(page)).toHaveCount(0);
 
