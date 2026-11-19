@@ -475,6 +475,86 @@ describe("useWebSocketConnection", () => {
     }
   });
 
+  it("backs off 1, 2, 4… up to 30 s when the server refuses the handshake, without reporting it", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { Wrapper } = createWrapper();
+      renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      // A refused upgrade (a 401, a 5xx) fires error then close, never open.
+      // Each retry should wait twice as long as the last, capped at 30 s.
+      for (const delay of [1000, 2000, 4000, 8000, 16000, 30000, 30000]) {
+        const refused = lastCreatedWs;
+        if (!refused) throw new Error("lastCreatedWs is null");
+        act(() => {
+          refused.onerror?.(new Event("error"));
+          refused.simulateClose();
+        });
+
+        await act(async () => {
+          vi.advanceTimersByTime(delay - 100);
+          for (let i = 0; i < 5; i++) await Promise.resolve();
+        });
+        expect(lastCreatedWs).toBe(refused);
+
+        await act(async () => {
+          vi.advanceTimersByTime(100);
+          for (let i = 0; i < 5; i++) await Promise.resolve();
+        });
+        expect(lastCreatedWs).not.toBe(refused);
+      }
+
+      // A refused handshake isn't a Sentry event at all on the web.
+      expect(captureExceptionMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts the back-off again from 1 s once a connection opens", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { Wrapper } = createWrapper();
+      renderHook(() => useWebSocketConnection(), { wrapper: Wrapper });
+
+      await act(async () => {
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      // Two refusals grow the delay to 4 s…
+      for (const delay of [1000, 2000]) {
+        const refused = lastCreatedWs;
+        act(() => refused?.simulateClose());
+        await act(async () => {
+          vi.advanceTimersByTime(delay);
+          for (let i = 0; i < 5; i++) await Promise.resolve();
+        });
+      }
+
+      // …and an accepted one puts it back to 1 s.
+      const accepted = lastCreatedWs;
+      if (!accepted) throw new Error("lastCreatedWs is null");
+      act(() => {
+        accepted.simulateOpen();
+        accepted.simulateClose();
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(1000);
+        for (let i = 0; i < 5; i++) await Promise.resolve();
+      });
+
+      expect(lastCreatedWs).not.toBe(accepted);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   describe("notifyChanged", () => {
     it("sends a 'changed' message when the WebSocket is open", async () => {
       const { Wrapper } = createWrapper();

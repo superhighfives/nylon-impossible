@@ -80,9 +80,14 @@ final class MockAPIService: APIProviding {
     var createWsTicketResponse = "mock-ticket"
     var createWsTicketError: Error?
     var createWsTicketCallCount = 0
+    /// While true, `createWsTicket()` waits, as a slow ticket request would.
+    var createWsTicketHeld = false
 
     func createWsTicket() async throws -> String {
         createWsTicketCallCount += 1
+        while createWsTicketHeld {
+            await Task.yield()
+        }
         if let error = createWsTicketError {
             throw error
         }
