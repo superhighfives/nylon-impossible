@@ -1,1 +1,6 @@
 wrangler-preview.json
+
+# Playwright smoke suite (e2e/)
+/test-results/
+/playwright-report/
+/e2e/.tmp/

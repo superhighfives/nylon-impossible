@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clerk/testing": "^2.2.36",
+    "@nylon-impossible/shared": "workspace:*",
     "dotenv": "^18.0.10",
     "playwright": "^1.62.1",
     "sharp": "^0.35.5"

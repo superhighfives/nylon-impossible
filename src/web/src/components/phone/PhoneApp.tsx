@@ -423,7 +423,7 @@ export function PhoneApp({
     return (
       // Where the first row would sit (PhoneRows' top), the link under the
       // line's words.
-      <div className="px-5 pt-2 pb-7 text-n-ink-subtle">
+      <div className="px-5 pt-2 pb-7 text-n-ink-muted">
         <EmptyLine text={EMPTY_COPY[time ?? "list"]} density="phone" />
         {nextKind && waiting > 0 && (
           <button

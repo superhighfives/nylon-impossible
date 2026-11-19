@@ -248,12 +248,107 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
-  # The one check main requires from this workflow. It passes when the tests
-  # passed, or when the PR doesn't touch iOS and they didn't need to run. A
-  # fork's iOS change fails it: the tests don't run there, and skipped isn't
-  # passed.
+  # The XCUITests (`Nylon ImpossibleUITests`: Done leaving with Undo, 500
+  # todos scrolling, pull to refresh, the accessibility audits) on an iPhone
+  # simulator (#707). They have their own scheme, "Nylon Impossible UI Tests";
+  # the app's scheme that `test` runs is unit tests only. They drive the DEBUG
+  # `-NylonScreen` routes over in-memory sample data, so there's no network or
+  # account. They run when `test` does, and gate through `ios-ok`.
+  ui-test:
+    needs: changes
+    if: >-
+      needs.changes.outputs.ios == 'true'
+      && (github.event_name != 'pull_request'
+        || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: xcode-27
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: src/ios/Nylon Impossible
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Select Xcode
+        run: "$GITHUB_WORKSPACE/.github/scripts/require-xcode-27.sh"
+
+      - name: Clear stale SwiftPM artifacts
+        run: rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData
+
+      # The same simulator pick as `test`'s iPhone leg.
+      - name: Run UI tests
+        env:
+          # xcodebuild hands TEST_RUNNER_* to the tests with the prefix
+          # stripped, so they see CI=1 and skip the timing checks.
+          TEST_RUNNER_CI: "1"
+        run: |
+          xcrun simctl list runtimes
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "No available iPhone simulator found, downloading iOS platform..."
+            xcodebuild -downloadPlatform iOS
+            DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          devices = [d for devs in data['devices'].values() for d in devs if d.get('isAvailable') and 'iPhone' in d['name']]
+          print(devices[0]['name'] if devices else 'iPhone 16 Pro')
+            ")
+          fi
+          echo "Running UI tests on: $DEVICE"
+          xcodebuild test \
+            -project "Nylon Impossible.xcodeproj" \
+            -scheme "Nylon Impossible UI Tests" \
+            -destination "platform=iOS Simulator,name=$DEVICE" \
+            -resultBundlePath UITestResults \
+            -quiet
+
+      # Every UI test and its result, and the failures by name, so a red
+      # `ios-ok` says which test broke without a Mac to open the bundle.
+      - name: Summarise UI tests
+        if: always()
+        run: |
+          if [ ! -d UITestResults.xcresult ]; then
+            echo "### UI tests: no result bundle (the failure was before or outside the test run)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          xcrun xcresulttool get test-results tests --path UITestResults.xcresult > tests.json || true
+          xcrun xcresulttool get test-results summary --path UITestResults.xcresult > summary.json || true
+          {
+            echo "### UI tests"
+            echo
+            echo "| Test | Result |"
+            echo "| --- | --- |"
+            jq -r '.. | objects | select(.nodeType? == "Test Case")
+              | "| `\(.nodeIdentifier // .name)` | \(.result) |"' tests.json 2>/dev/null || true
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '.testFailures[]? | "\(.testIdentifierString // .testName): \(.failureText)"' summary.json 2>/dev/null \
+            | while read -r failed; do
+                echo "::error title=UI test failed::$failed"
+                echo "- ❌ $failed" >> "$GITHUB_STEP_SUMMARY"
+              done
+
+      - name: Upload UI test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ui-test-results
+          path: src/ios/Nylon Impossible/UITestResults.xcresult
+          retention-days: 7
+          if-no-files-found: ignore
+
+  # The one check main requires from this workflow. It passes when the unit
+  # and UI tests passed, or when the PR doesn't touch iOS and they didn't need
+  # to run. A fork's iOS change fails it: the tests don't run there, and
+  # skipped isn't passed.
   ios-ok:
-    needs: [changes, test]
+    needs: [changes, test, ui-test]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -261,8 +356,9 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           IOS: ${{ needs.changes.outputs.ios }}
           TEST: ${{ needs.test.result }}
+          UI_TEST: ${{ needs.ui-test.result }}
         run: |
-          echo "changes=$CHANGES ios=$IOS test=$TEST"
+          echo "changes=$CHANGES ios=$IOS test=$TEST ui-test=$UI_TEST"
           [ "$CHANGES" = success ] || exit 1
           [ "$IOS" = false ] && exit 0
-          [ "$TEST" = success ]
+          [ "$TEST" = success ] && [ "$UI_TEST" = success ]
