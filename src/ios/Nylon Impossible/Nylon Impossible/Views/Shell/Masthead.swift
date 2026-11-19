@@ -113,7 +113,7 @@ private struct Squiggle: Shape {
 
 /// The written empty state: a large centred squiggle over "Nothing today."
 /// at a row title's size. Nothing here can be tapped, so the squiggle and the
-/// words are subtle, lighter than a row. When there's somewhere to go,
+/// words are muted, lighter than a row. When there's somewhere to go,
 /// "4 waiting in this week →" sits under the words.
 struct EmptyLine: View {
     let text: String
@@ -145,7 +145,7 @@ struct EmptyLine: View {
                 .buttonStyle(.plain)
             }
         }
-        .foregroundStyle(Theme.Colors.inkSubtle)
+        .foregroundStyle(Theme.Colors.inkMuted)
         .padding(.top, Theme.Space.s8)
         .padding(.horizontal, Theme.Phone.gutter)
         .frame(maxWidth: .infinity)
