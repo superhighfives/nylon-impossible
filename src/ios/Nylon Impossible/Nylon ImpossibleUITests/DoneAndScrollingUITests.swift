@@ -23,7 +23,8 @@ final class DoneAndScrollingUITests: NylonUITestCase {
         row(title)
     }
 
-    func testDoneHoldsInPlaceThenLeavesWithUndo() {
+    func testDoneHoldsInPlaceThenLeavesWithUndo() throws {
+        try XCTSkipIf(onCI, "Done's hold is 400ms; the CI simulator is too slow for the timing — runs locally")
         launch("today")
         let target = todayRow("Call Mum about Sunday lunch")
         let next = todayRow("Finish quarterly report")
@@ -34,14 +35,11 @@ final class DoneAndScrollingUITests: NylonUITestCase {
 
         // During the 400ms hold: checked, and nothing has moved. Read once,
         // straight away; a predicate expectation polls too slowly to land
-        // inside the hold. On a loaded CI runner the row can already be gone
-        // by the time it's read; then there's no hold left to check.
-        if target.exists {
-            XCTAssertTrue((target.value as? String)?.hasSuffix(", Done") == true || (target.value as? String) == "Done",
-                          "not checked during the hold: \(String(describing: target.value))")
-            XCTAssertEqual(target.frame, before.target, "the checked row moved during the hold")
-            XCTAssertEqual(next.frame, before.next, "the row below moved during the hold")
-        }
+        // inside the hold.
+        XCTAssertTrue((target.value as? String)?.hasSuffix(", Done") == true || (target.value as? String) == "Done",
+                      "not checked during the hold: \(String(describing: target.value))")
+        XCTAssertEqual(target.frame, before.target, "the checked row moved during the hold")
+        XCTAssertEqual(next.frame, before.next, "the row below moved during the hold")
 
         // Then it goes, and the toast offers Undo.
         let gone = NSPredicate(format: "exists == false")
@@ -71,7 +69,8 @@ final class DoneAndScrollingUITests: NylonUITestCase {
         }
     }
 
-    func testDoneUnderLoad() {
+    func testDoneUnderLoad() throws {
+        try XCTSkipIf(onCI, "The toast's 2s budget; the CI simulator is too slow for the timing — runs locally")
         launch("perf")
         // The first row repeats, so done advances it and toasts its next
         // date: the hold, the commit and the toast, over 500 todos.

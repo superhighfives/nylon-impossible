@@ -24,6 +24,10 @@ class NylonUITestCase: XCTestCase {
         super.tearDown()
     }
 
+    /// Running on CI (`TEST_RUNNER_CI=1` in the workflow). The simulator there
+    /// is too slow for the timing checks, which run in full locally.
+    var onCI: Bool { ProcessInfo.processInfo.environment["CI"] == "1" }
+
     /// Launch into a screen route. `contentSize` is a UIKit content size
     /// category name (UICTContentSizeCategoryAccessibilityXXXL for AX5).
     @discardableResult
