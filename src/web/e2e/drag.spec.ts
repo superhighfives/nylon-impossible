@@ -76,7 +76,7 @@ test("dragging a todo onto another column moves it there", async ({
   const thisWeek = column(page, "This week");
   await someday.scrollIntoViewIfNeeded();
 
-  const rows = thisWeek.locator("[data-row-list]");
+  const rows = thisWeek.locator("ul[data-row-list]");
   const target = await rows.boundingBox();
   if (!target) throw new Error("This week's rows aren't visible");
   await dragTo(

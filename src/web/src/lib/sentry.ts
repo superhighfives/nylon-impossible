@@ -3,6 +3,8 @@ import * as Sentry from "@sentry/react";
 export function initSentry() {
   if (typeof window === "undefined") return;
   if (!import.meta.env.VITE_SENTRY_DSN) return;
+  // Smoke runs drive the preview with Playwright and must never page anyone.
+  if (navigator.webdriver) return;
 
   Sentry.init({
     dsn: import.meta.env.VITE_SENTRY_DSN,
