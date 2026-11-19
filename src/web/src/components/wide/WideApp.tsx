@@ -1240,12 +1240,13 @@ export function WideApp({
                   ) : (
                     // The open todo's sheet: as wide as a column, laid over
                     // its column's right padding, above the columns around it.
+                    // Filled, since the sheet is inset from its edges.
                     <div
                       key="sheet"
                       ref={setSheetEl}
                       data-slide="sheet"
                       data-board-sheet
-                      className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) ${COLUMN_WIDTH}`}
+                      className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) bg-n-canvas ${COLUMN_WIDTH}`}
                     />
                   ),
                 )}
