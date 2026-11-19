@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     defaults:
       run:
@@ -32,8 +32,7 @@ jobs:
           swiftlint
 
       - name: Select Xcode
-        run: |
-          xcodebuild -version
+        run: "$GITHUB_WORKSPACE/.github/scripts/require-xcode-27.sh"
 
       - name: Run tests
         run: |
@@ -64,7 +63,7 @@ jobs:
 
   deploy:
     needs: [test]
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     permissions:
       contents: write
@@ -187,7 +186,7 @@ jobs:
   deploy-mac:
     needs: [test]
     if: ${{ vars.ENABLE_MAC_RELEASE == 'true' }}
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 40
     permissions:
       contents: read

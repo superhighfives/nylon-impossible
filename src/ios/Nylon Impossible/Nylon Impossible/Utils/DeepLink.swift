@@ -13,7 +13,7 @@
 
 import Foundation
 
-enum DeepLink: Equatable, Sendable {
+nonisolated enum DeepLink: Equatable, Sendable {
     /// Open the composer, focused, adding to `list`.
     case add(list: ListTarget)
 

@@ -237,7 +237,7 @@ extension ToastCenter {
         #if os(macOS)
         show(ToastCopy.added(count: 1, listName: "Groceries"), action: nil)
         #else
-        show("Done") {}
+        show("Done", action: {})
         #endif
     }
 }

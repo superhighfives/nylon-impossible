@@ -45,7 +45,7 @@ final class MacSession {
         let state = withObservationTracking {
             (loaded: clerk.client != nil, signedIn: clerk.user != nil)
         } onChange: { [weak self] in
-            Task { @MainActor in self?.follow() }
+            Task { @MainActor [weak self] in self?.follow() }
         }
         guard state.loaded else { return }
         let services = services

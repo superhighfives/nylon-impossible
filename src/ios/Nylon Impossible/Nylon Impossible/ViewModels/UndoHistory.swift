@@ -20,7 +20,7 @@ import Foundation
 @MainActor
 final class UndoHistory {
     /// How many actions ⌘Z can step back through.
-    static let limit = 20
+    nonisolated static let limit = 20
 
     /// One action that offered Undo. `undo` and `redo` return false when the
     /// todo or list it acts on is gone, so there's nothing left to change.
