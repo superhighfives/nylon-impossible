@@ -2390,6 +2390,23 @@ describe("WideApp", () => {
       expect(keyed()).toBe("list-today on");
     });
 
+    // Before the lists arrive only Done is there to hold the keyboard. That
+    // stand-in mustn't count as where the keyboard was, or it stays on Done
+    // and the first j selects a finished todo.
+    it("starts on Today when the lists arrive after the first render", () => {
+      listsLoading = true;
+      try {
+        const { rerender } = render(<WideApp />);
+        listsLoading = false;
+        rerender(<WideApp />);
+        expect(keyed()).toBe("list-today on");
+        press("j");
+        expect(focusedTitle()).toContain("Review PR");
+      } finally {
+        listsLoading = false;
+      }
+    });
+
     it("Tab and ⇧Tab visit every section, the sheet straight after its column, and wrap", async () => {
       render(<WideApp />);
       await userEvent.dblClick(rowButton("Send invoice"));

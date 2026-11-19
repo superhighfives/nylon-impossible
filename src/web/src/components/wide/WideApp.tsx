@@ -305,8 +305,12 @@ export function WideApp({
               : (todayId ?? DONE_COLUMN),
           level: "on",
         };
-  if (isColumnSection(keyAt.id)) cameFrom.current = keyAt.id;
-  else if (keyAt.id === SHEET) cameFrom.current = sheetColumn;
+  // Only where the keyboard really was counts: before the lists load, the
+  // fallback is Done, and remembering that would keep it there.
+  if (keyAt === keySection) {
+    if (isColumnSection(keyAt.id)) cameFrom.current = keyAt.id;
+    else if (keyAt.id === SHEET) cameFrom.current = sheetColumn;
+  }
   const keyOn = (id: string) => (keyAt.id === id ? keyAt.level : undefined);
   const currentColumn =
     selectionColumn ?? (isColumnSection(keyAt.id) ? keyAt.id : todayId);
