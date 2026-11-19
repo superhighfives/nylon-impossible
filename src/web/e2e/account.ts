@@ -22,7 +22,7 @@ export const TIME_ZONE = "UTC";
 
 export const run = process.env.SMOKE_PR || "local";
 export const email = `smoke-pr-${run}+clerk_test@nylonimpossible.com`;
-/** No `_` or `%`: the seed clears old rows with a LIKE on this prefix. */
+/** Prefix of the ids this run seeds; the seed clears them by exact id. */
 const idPrefix = `smoke-${run}-`;
 
 export function secretKey(): string {

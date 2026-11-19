@@ -410,10 +410,10 @@ function wrangler(args: string[]): void {
 /** The Clerk user id for the account the capture signs in as. */
 async function clerkUserId(email: string): Promise<string> {
   if (process.env.MARKETING_USER_ID) return process.env.MARKETING_USER_ID;
-  const id = await findClerkUserId(
-    process.env.CLERK_SECRET_KEY as string,
-    email,
-  );
+  const secretKey = process.env.CLERK_SECRET_KEY;
+  if (!secretKey)
+    throw new Error("Set CLERK_SECRET_KEY (the Clerk instance's)");
+  const id = await findClerkUserId(secretKey, email);
   if (!id) throw new Error(`No Clerk user with email ${email}`);
   return id;
 }
