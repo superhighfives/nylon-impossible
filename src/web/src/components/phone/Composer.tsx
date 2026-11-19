@@ -17,7 +17,6 @@ import {
 } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
 import { messageFromError, toast } from "@/lib/toast";
-import type { TodoWithUrls } from "@/types/database";
 import {
   draftDueDay,
   dueChipText,
@@ -65,7 +64,6 @@ export function Composer({
   variant = "floating",
   countFor,
   isVisible,
-  onAdded,
   idle = false,
   onIdleChange,
   onLeaveDown,
@@ -86,11 +84,6 @@ export function Composer({
    * toast. Defaults to just `currentListId`.
    */
   isVisible?: (listId: string) => boolean;
-  /**
-   * A single todo saved (not a pasted list, and not a failed add). The
-   * board opens it beside its column; focus stays here.
-   */
-  onAdded?: (todo: TodoWithUrls) => void;
   /**
    * `inline` on the wide board: the keyboard is on Add but not typing. The
    * field is read-only, so the board's keys act, and it looks like a row
@@ -178,16 +171,14 @@ export function Composer({
     // go back in the box, so sending again can't duplicate the ones that did.
     const failed = new Set<PlannedTodo>();
     let firstError: unknown = null;
-    let added: TodoWithUrls | undefined;
     for (const todo of [...planned].reverse()) {
       try {
-        const saved = await smartCreate.mutateAsync({
+        await smartCreate.mutateAsync({
           text: todo.text,
           listId,
           parseDate: false,
           dueDate: todo.dueDay,
         });
-        added = saved?.todos[0];
       } catch (err) {
         failed.add(todo);
         firstError ??= err;
@@ -206,7 +197,6 @@ export function Composer({
       );
       return;
     }
-    if (planned.length === 1 && added) onAdded?.(added);
     if (!(isVisible ? isVisible(listId) : listId === currentListId)) {
       const added = targets.find((t) => t.id === listId);
       const name = added ? inSentence(added) : "list";

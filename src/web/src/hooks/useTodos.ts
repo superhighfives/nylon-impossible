@@ -479,8 +479,8 @@ export function useSmartCreate() {
       }
     },
     onSuccess: (data, _input, context) => {
-      // Swap the stand-in for the saved todo straight away, so a caller can
-      // open it by its real id before the refetch lands.
+      // Swap the stand-in for the saved todo straight away, so the new row
+      // has its real id (to open it, or edit it) before the refetch lands.
       const saved = new Set(data.todos.map((todo) => todo.id));
       queryClient.setQueryData<TodoWithUrls[] | undefined>(
         TODOS_QUERY_KEY,
