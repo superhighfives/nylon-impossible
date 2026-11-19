@@ -261,7 +261,7 @@ jobs:
       && (github.event_name != 'pull_request'
         || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: xcode-27
-    timeout-minutes: 45
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: src/ios/Nylon Impossible

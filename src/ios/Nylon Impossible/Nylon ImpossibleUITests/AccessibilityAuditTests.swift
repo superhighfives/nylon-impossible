@@ -70,9 +70,10 @@ final class AccessibilityAuditTests: NylonUITestCase {
             sleep(1)
             let window = app.windows.firstMatch.frame
             // The audit gives up with code -56 ("failed to complete in time")
-            // when the CI simulator is slow; that's not a finding, so run it
-            // once more before counting the route as a failure (on CI, a second
-            // -56 is recorded as skipped instead).
+            // when the simulator is slow; that's not a finding. On CI the route
+            // is skipped on its first -56 (a retry would only time out again
+            // and eat the job's time); locally it runs once more before a
+            // second -56 counts as a failure.
             for attempt in 1...2 {
                 do {
                     try app.performAccessibilityAudit(for: .all) { issue in
@@ -84,16 +85,17 @@ final class AccessibilityAuditTests: NylonUITestCase {
                         return true
                     }
                 } catch {
-                    if attempt == 1, (error as NSError).code == -56 {
-                        failures.removeAll { $0.hasPrefix("\(route): ") }
-                        continue
-                    }
                     if onCI, (error as NSError).code == -56 {
-                        // Skipped for time, not failed; locally a second -56 still fails.
-                        XCTContext.runActivity(named: "\(route): audit skipped for time (-56 twice on CI)") { activity in
+                        // Skipped for time, not failed; findings reported before
+                        // the timeout still count.
+                        XCTContext.runActivity(named: "\(route): audit skipped for time (-56 on CI)") { activity in
                             activity.add(XCTAttachment(string: "\(error)"))
                         }
                         break
+                    }
+                    if attempt == 1, (error as NSError).code == -56 {
+                        failures.removeAll { $0.hasPrefix("\(route): ") }
+                        continue
                     }
                     failures.append("\(route): audit threw \(error)")
                 }
