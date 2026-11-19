@@ -82,13 +82,14 @@ type RowCallbacks = Pick<
 export const TINTED = "bg-n-surface";
 
 /**
- * Every column's width: a quarter of the board (`main`, the size container),
- * from the board tokens' minimum to their maximum. It follows the window
- * only, never the column count or the open sheet, so columns don't squeeze:
- * the board is one row that scrolls sideways when they don't all fit.
+ * Every column's width: a third of the board (`main`, the size container),
+ * so the three time lists fill it, from the board tokens' minimum to their
+ * maximum. It follows the window only, never the column count or the open
+ * sheet, so columns don't squeeze: the board is one row that scrolls
+ * sideways when they don't all fit.
  */
 export const COLUMN_WIDTH =
-  "w-[clamp(var(--n-board-column-min-width),25cqi,var(--n-board-column-max-width))] shrink-0";
+  "w-[clamp(var(--n-board-column-min-width),calc(100cqi/3),var(--n-board-column-max-width))] shrink-0";
 
 /**
  * A column's side padding: 24px on the left, and the sheet's overlap on the

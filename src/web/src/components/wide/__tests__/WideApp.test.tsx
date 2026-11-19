@@ -467,12 +467,12 @@ describe("WideApp", () => {
     ).not.toHaveAttribute("aria-current");
   });
 
-  it("sizes every column as a quarter of the board, between the board tokens", () => {
+  it("sizes every column as a third of the board, between the board tokens", () => {
     render(<WideApp />);
     expect(COLUMN_WIDTH).toBe(
-      "w-[clamp(var(--n-board-column-min-width),25cqi,var(--n-board-column-max-width))] shrink-0",
+      "w-[clamp(var(--n-board-column-min-width),calc(100cqi/3),var(--n-board-column-max-width))] shrink-0",
     );
-    // The quarter is of `main`, the board, whatever the sidebar takes.
+    // The third is of `main`, the board, whatever the sidebar takes.
     expect(screen.getByRole("main", { name: "Board" })).toHaveClass(
       "@container",
     );

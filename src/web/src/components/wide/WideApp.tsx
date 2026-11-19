@@ -338,7 +338,7 @@ export function WideApp({
     }
   });
 
-  // The columns are a quarter of the board wide, so a resize changes what
+  // The columns are a third of the board wide, so a resize changes what
   // they leave: refit the end before the frame paints, and record where
   // that leaves Done without sliding it there.
   useEffect(() => {
@@ -1205,7 +1205,7 @@ export function WideApp({
           />
           {/* One row of columns that scrolls sideways; each child is named
               by `data-slide` so it slides when the row changes. The size
-              container the columns' width is a quarter of. */}
+              container the columns' width is a third of. */}
           <main
             ref={boardRow}
             aria-label="Board"

@@ -86,15 +86,15 @@ describe("boardSlots' end", () => {
 });
 
 describe("doneGap", () => {
-  // The report's board: 1488px wide less the sidebar, columns a quarter of it.
+  // The report's board: 1488px wide less the sidebar, columns a third of it.
   const board = 1188;
-  const column = 297;
+  const column = 396;
   // A sheet is a column wide, less the 24px of its column it lies over.
   const sheet = column - 24;
 
-  it("fills what the time lists leave, so Done starts at the right edge", () => {
+  it("adds nothing when the time lists fill the board, so Done follows them", () => {
     const gap = doneGap({ board, column, columns: 3, sheet: 0 });
-    expect(gap).toBe(297);
+    expect(gap).toBe(0);
     // Done's left edge, at scroll 0, is the board's right edge.
     expect(3 * column + gap).toBe(board);
   });
@@ -102,26 +102,24 @@ describe("doneGap", () => {
   it("adds nothing once the columns reach or pass the edge", () => {
     expect(doneGap({ board, column, columns: 4, sheet: 0 })).toBe(0);
     expect(doneGap({ board, column, columns: 5, sheet: 0 })).toBe(0);
-    expect(doneGap({ board, column, columns: 4, sheet })).toBe(0);
+    expect(doneGap({ board, column, columns: 3, sheet })).toBe(0);
   });
 
-  it("follows a list shown or hidden, and a sheet opened", () => {
-    expect(doneGap({ board, column, columns: 2, sheet: 0 })).toBe(594);
-    expect(doneGap({ board, column, columns: 2, sheet })).toBe(321);
-    expect(doneGap({ board, column, columns: 1, sheet })).toBe(618);
+  it("follows a list hidden, and a sheet opened", () => {
+    expect(doneGap({ board, column, columns: 2, sheet: 0 })).toBe(396);
+    expect(doneGap({ board, column, columns: 2, sheet })).toBe(24);
+    expect(doneGap({ board, column, columns: 1, sheet })).toBe(420);
     // Each case ends exactly at the edge.
-    expect(1 * column + sheet + 618).toBe(board);
+    expect(1 * column + sheet + 420).toBe(board);
   });
 
-  it("follows the board's width, columns at their narrowest or widest", () => {
-    // 17rem columns on a narrow board.
-    expect(doneGap({ board: 1000, column: 272, columns: 3, sheet: 0 })).toBe(
-      184,
+  it("hatches only a board wider than three columns at their widest", () => {
+    // 35rem columns on a 2000px board: the time lists leave 320px.
+    expect(doneGap({ board: 2000, column: 560, columns: 3, sheet: 0 })).toBe(
+      320,
     );
-    // 26rem columns on a wide one: four don't fill it.
-    expect(doneGap({ board: 2000, column: 416, columns: 4, sheet: 0 })).toBe(
-      336,
-    );
+    // Up to three widest columns, they fill it.
+    expect(doneGap({ board: 1680, column: 560, columns: 3, sheet: 0 })).toBe(0);
   });
 
   it("rounds up, so no fraction of Done shows", () => {
@@ -130,6 +128,14 @@ describe("doneGap", () => {
     );
     expect(
       doneGap({ board: 1188.5, column: 297.125, columns: 4, sheet: 0 }),
+    ).toBe(0);
+  });
+
+  it("leaves no sliver when three fractional thirds fall a hair short", () => {
+    const third = 1189 / 3;
+    expect(3 * third).toBeLessThanOrEqual(1189);
+    expect(
+      doneGap({ board: 1189, column: third - 1e-9, columns: 3, sheet: 0 }),
     ).toBe(0);
   });
 });
