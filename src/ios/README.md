@@ -30,7 +30,7 @@ Native iOS client for the Nylon Impossible todo app. Built with SwiftUI and Swif
 
 ### Prerequisites
 
-- Xcode 26+
+- Xcode 27+
 - iOS 26+ Simulator or device
 - SwiftLint (`brew install swiftlint`)
 

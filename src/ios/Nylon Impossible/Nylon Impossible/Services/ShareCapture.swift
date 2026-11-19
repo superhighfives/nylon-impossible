@@ -29,7 +29,7 @@ enum ShareCapture {
 
     /// The domain a shared link shows as until its page is fetched:
     /// "visitlisboa.com". Nil for something that isn't a web link.
-    static func displayDomain(for url: String) -> String? {
+    nonisolated static func displayDomain(for url: String) -> String? {
         LinkLabel.domain(url)
     }
 

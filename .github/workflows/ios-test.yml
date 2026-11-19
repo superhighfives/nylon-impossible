@@ -50,7 +50,7 @@ jobs:
       needs.changes.outputs.ios == 'true'
       && (github.event_name != 'pull_request'
         || github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 20
     # Run the suite on the iPhone and on the Mac, which builds the same
     # targets for macOS. fail-fast off so one family's failure doesn't hide
@@ -99,8 +99,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Select Xcode
-        run: |
-          xcodebuild -version
+        run: "$GITHUB_WORKSPACE/.github/scripts/require-xcode-27.sh"
 
       - name: Clear stale SwiftPM artifacts
         run: rm -rf ~/Library/Caches/org.swift.swiftpm ~/Library/Developer/Xcode/DerivedData

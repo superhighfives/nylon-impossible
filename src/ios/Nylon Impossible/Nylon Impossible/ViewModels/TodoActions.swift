@@ -354,9 +354,10 @@ final class TodoActions {
         let hide = { [weak self] in
             guard let self else { return }
             self.setHidden { _ = self.pendingListDeletes.insert(id) }
+            weak let actions = self
             self.schedule(key) {
                 if let entry { self.history.drop(entry) }
-                commit { [weak self] in _ = self?.pendingListDeletes.remove(id) }
+                commit { _ = actions?.pendingListDeletes.remove(id) }
             }
         }
         let deleted = UndoHistory.Entry(

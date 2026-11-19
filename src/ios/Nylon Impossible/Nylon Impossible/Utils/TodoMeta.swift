@@ -154,7 +154,7 @@ enum RepeatLabel {
 
 enum LinkLabel {
     /// "visitlisboa.com" for "https://www.visitlisboa.com/tram".
-    static func domain(_ urlString: String) -> String? {
+    nonisolated static func domain(_ urlString: String) -> String? {
         guard let host = URL(string: urlString)?.host?.lowercased(), !host.isEmpty else { return nil }
         return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
     }

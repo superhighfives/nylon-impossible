@@ -72,7 +72,7 @@ jobs:
       github.event_name != 'workflow_run'
       || (github.event.workflow_run.conclusion == 'success'
           && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event))
-    runs-on: macos-26
+    runs-on: xcode-27
     # A run that rebuilds the iOS screenshots spends about 42 minutes in the
     # publish step alone, and the parity sheet up to about 37 more when its
     # own iOS shots aren't cached. At 45 the job timed out in the parity
@@ -144,8 +144,8 @@ jobs:
           path: |
             src/marketing/source/ios-*.png
             src/marketing/source/parity/ios-*.png
-          key: marketing-ios-v2-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
-          restore-keys: marketing-ios-v2-${{ runner.os }}-
+          key: marketing-ios-v3-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
+          restore-keys: marketing-ios-v3-${{ runner.os }}-
 
       - name: Decide whether to rebuild iOS screenshots
         id: ios
@@ -167,7 +167,7 @@ jobs:
 
       - name: Select Xcode
         if: steps.ios.outputs.skip != '1'
-        run: xcodebuild -version
+        run: "$GITHUB_WORKSPACE/.github/scripts/require-xcode-27.sh"
 
       - name: Ensure iOS simulator platform is available
         if: steps.ios.outputs.skip != '1'
@@ -273,7 +273,7 @@ jobs:
           path: |
             src/marketing/source/ios-*.png
             src/marketing/source/parity/ios-*.png
-          key: marketing-ios-v2-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
+          key: marketing-ios-v3-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
 
       - name: Save last good web screenshots
         if: always() && steps.captured.outputs.web_present == '1'
