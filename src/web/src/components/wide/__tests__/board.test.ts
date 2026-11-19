@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeList } from "@/components/phone/__tests__/fixtures";
-import { boardSlots, revealSpan, sheetScrollTarget } from "../board";
+import { boardSlots, doneGap, revealSpan, sheetScrollTarget } from "../board";
 
 const lists = [
   makeList("today", "Today", "today", "a0"),
@@ -15,15 +15,15 @@ const names = (sheetAfter: string | null) =>
   );
 
 describe("boardSlots", () => {
-  it("is the time lists, every list in order, then Done and the end, with no sheet", () => {
+  it("is the time lists, every list in order, then the end and Done, with no sheet", () => {
     expect(names(null)).toEqual([
       "today",
       "week",
       "someday",
       "groceries",
       "studio",
-      "done",
       "end",
+      "done",
     ]);
   });
 
@@ -35,8 +35,8 @@ describe("boardSlots", () => {
       "sheet",
       "groceries",
       "studio",
-      "done",
       "end",
+      "done",
     ]);
     expect(names("groceries")).toEqual([
       "today",
@@ -45,8 +45,8 @@ describe("boardSlots", () => {
       "groceries",
       "sheet",
       "studio",
-      "done",
       "end",
+      "done",
     ]);
   });
 
@@ -58,7 +58,7 @@ describe("boardSlots", () => {
       boardSlots(hidden, null).map((s) =>
         s.kind === "list" ? s.list.id : s.kind,
       ),
-    ).toEqual(["today", "week", "someday", "studio", "done", "end"]);
+    ).toEqual(["today", "week", "someday", "studio", "end", "done"]);
   });
 
   it("has no sheet beside a hidden column", () => {
@@ -74,6 +74,63 @@ describe("boardSlots", () => {
 
   it("has no sheet for a column that isn't on the board", () => {
     expect(names("gone")).not.toContain("sheet");
+  });
+});
+
+describe("boardSlots' end", () => {
+  it("comes straight before Done, with nothing after Done", () => {
+    for (const sheetAfter of [null, "someday", "studio"]) {
+      expect(names(sheetAfter).slice(-2)).toEqual(["end", "done"]);
+    }
+  });
+});
+
+describe("doneGap", () => {
+  // The report's board: 1488px wide less the sidebar, columns a quarter of it.
+  const board = 1188;
+  const column = 297;
+  // A sheet is a column wide, less the 24px of its column it lies over.
+  const sheet = column - 24;
+
+  it("fills what the time lists leave, so Done starts at the right edge", () => {
+    const gap = doneGap({ board, column, columns: 3, sheet: 0 });
+    expect(gap).toBe(297);
+    // Done's left edge, at scroll 0, is the board's right edge.
+    expect(3 * column + gap).toBe(board);
+  });
+
+  it("adds nothing once the columns reach or pass the edge", () => {
+    expect(doneGap({ board, column, columns: 4, sheet: 0 })).toBe(0);
+    expect(doneGap({ board, column, columns: 5, sheet: 0 })).toBe(0);
+    expect(doneGap({ board, column, columns: 4, sheet })).toBe(0);
+  });
+
+  it("follows a list shown or hidden, and a sheet opened", () => {
+    expect(doneGap({ board, column, columns: 2, sheet: 0 })).toBe(594);
+    expect(doneGap({ board, column, columns: 2, sheet })).toBe(321);
+    expect(doneGap({ board, column, columns: 1, sheet })).toBe(618);
+    // Each case ends exactly at the edge.
+    expect(1 * column + sheet + 618).toBe(board);
+  });
+
+  it("follows the board's width, columns at their narrowest or widest", () => {
+    // 17rem columns on a narrow board.
+    expect(doneGap({ board: 1000, column: 272, columns: 3, sheet: 0 })).toBe(
+      184,
+    );
+    // 26rem columns on a wide one: four don't fill it.
+    expect(doneGap({ board: 2000, column: 416, columns: 4, sheet: 0 })).toBe(
+      336,
+    );
+  });
+
+  it("rounds up, so no fraction of Done shows", () => {
+    expect(doneGap({ board: 1189, column: 297.25, columns: 3, sheet: 0 })).toBe(
+      298,
+    );
+    expect(
+      doneGap({ board: 1188.5, column: 297.125, columns: 4, sheet: 0 }),
+    ).toBe(0);
   });
 });
 

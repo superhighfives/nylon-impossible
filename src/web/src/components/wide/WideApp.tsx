@@ -72,7 +72,13 @@ import {
   sectionOrder,
 } from "./sections";
 import { settleTiming } from "./settle";
-import { holdLeavingSheet, type Placed, slideColumns, spanOf } from "./slide";
+import {
+  fitBoardEnd,
+  holdLeavingSheet,
+  type Placed,
+  slideColumns,
+  spanOf,
+} from "./slide";
 import { Toolbar } from "./Toolbar";
 import { DragPreview, useBoardDrag } from "./useBoardDrag";
 import { useBoardKeys } from "./useBoardKeys";
@@ -298,9 +304,10 @@ export function WideApp({
     selectionColumn ?? (isColumnSection(keyAt.id) ? keyAt.id : todayId);
 
   // --- Board motion -------------------------------------------------------
-  // After every render: the closing sheet leaves the row, the columns that
-  // moved slide to their new places, and a todo that opened or changed
-  // column brings its column and sheet into view together.
+  // After every render: the closing sheet leaves the row, the end resizes
+  // to keep Done just out of view, the columns that moved slide to their
+  // new places, and a todo that opened or changed column brings its column
+  // and sheet into view together.
 
   const placed = useRef<Placed>(new Map());
   const revealedFor = useRef<string | null>(null);
@@ -308,6 +315,7 @@ export function WideApp({
     const row = boardRow.current;
     if (!row) return;
     holdLeavingSheet(sheetEl, !!sheet?.leaving);
+    fitBoardEnd(row);
     slideColumns(row, placed.current, animated ? settleTiming() : null);
     if (sheetColumn === revealedFor.current) return;
     if (!sheetColumn) {
@@ -329,6 +337,20 @@ export function WideApp({
       row.scrollTo?.({ left, behavior: animated ? "smooth" : "auto" });
     }
   });
+
+  // The columns are a quarter of the board wide, so a resize changes what
+  // they leave: refit the end before the frame paints, and record where
+  // that leaves Done without sliding it there.
+  useEffect(() => {
+    const row = boardRow.current;
+    if (!row || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => {
+      fitBoardEnd(row);
+      slideColumns(row, placed.current, null);
+    });
+    observer.observe(row);
+    return () => observer.disconnect();
+  }, []);
 
   // --- Focus ----------------------------------------------------------------
 
@@ -1089,16 +1111,17 @@ export function WideApp({
   );
   const skeleton = loading && timeLists.length === 0;
 
-  // The board's end, past Done: the hatch, in whatever width the columns
-  // leave. Always in the row, so it shrinks rather than appears. Nothing in
-  // it to click (principle 4).
+  // The board's end, before Done: the hatch, as wide as the columns leave,
+  // so Done starts just past the right edge (`fitBoardEnd`). Always in the
+  // row, so it resizes rather than appears. Nothing in it to click
+  // (principle 4).
   const renderEnd = () => (
     <div
       key="end"
       aria-hidden="true"
       data-slide="end"
       data-board-end
-      className="n-board-hatch min-w-0 flex-1"
+      className="n-board-hatch shrink-0"
     />
   );
 

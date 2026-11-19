@@ -1,3 +1,4 @@
+import { doneGap } from "./board";
 import type { SettleTiming } from "./settle";
 
 /**
@@ -74,6 +75,32 @@ export function holdLeavingSheet(sheet: HTMLElement | null, leaving: boolean) {
   sheet.style.position = "absolute";
   sheet.style.left = `${left}px`;
   sheet.style.marginLeft = "0";
+}
+
+/**
+ * Size the board's end (the hatch before Done) so Done starts just past the
+ * row's right edge (`doneGap`). Widths come from the layout, unrounded; a
+ * slide's transform moves a child without changing them. A closing sheet,
+ * held out of the row, takes no room.
+ */
+export function fitBoardEnd(board: HTMLElement) {
+  const end = board.querySelector<HTMLElement>(":scope > [data-board-end]");
+  // Done follows the end (`boardSlots`).
+  const done = end?.nextElementSibling;
+  if (!end || !done) return;
+  const sheet = board.querySelector<HTMLElement>(":scope > [data-board-sheet]");
+  const sheetWidth =
+    sheet && sheet.style.position !== "absolute"
+      ? sheet.getBoundingClientRect().width +
+        (Number.parseFloat(getComputedStyle(sheet).marginLeft) || 0)
+      : 0;
+  const width = doneGap({
+    board: board.getBoundingClientRect().width,
+    column: done.getBoundingClientRect().width,
+    columns: board.querySelectorAll(":scope > [data-column]").length - 1,
+    sheet: sheetWidth,
+  });
+  end.style.width = `${width}px`;
 }
 
 /** The `[left, right]` of a row child, in the row's scrolled content. */
