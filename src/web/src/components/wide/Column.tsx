@@ -96,7 +96,7 @@ export const COLUMN_WIDTH =
  * right, open or not. The sheet only ever covers that padding, so opening a
  * todo never rewraps the column's text (principle 8).
  */
-const COLUMN_PADDING = "pl-6 pr-(--n-sheet-overlap)";
+export const COLUMN_PADDING = "pl-6 pr-(--n-sheet-overlap)";
 
 /** Behind the open sheet, the column recedes; its selected row doesn't. */
 const RECEDE = "opacity-(--n-sheet-recede)";

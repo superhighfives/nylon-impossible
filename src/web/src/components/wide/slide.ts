@@ -86,7 +86,8 @@ export function holdLeavingSheet(sheet: HTMLElement | null, leaving: boolean) {
 export function fitBoardEnd(board: HTMLElement) {
   const end = board.querySelector<HTMLElement>(":scope > [data-board-end]");
   // Done follows the end and is the last `[data-column]` (`boardSlots`), so
-  // its width stands for every column's and the rest are the others. A slot
+  // its width stands for every column's and the rest are the others, with
+  // the lists' error in the first column's place when they failed. A slot
   // between the two, or a column after Done, would size the end wrong with
   // nothing in jsdom to notice: WideApp's "ends the board on Done's hairline"
   // test holds the order.
@@ -101,7 +102,10 @@ export function fitBoardEnd(board: HTMLElement) {
   const width = doneGap({
     board: board.getBoundingClientRect().width,
     column: done.getBoundingClientRect().width,
-    columns: board.querySelectorAll(":scope > [data-column]").length - 1,
+    columns:
+      board.querySelectorAll(
+        ":scope > [data-column], :scope > [data-lists-error]",
+      ).length - 1,
     sheet: sheetWidth,
   });
   end.style.width = `${width}px`;

@@ -92,6 +92,9 @@ export function PhoneApp({
     error,
     refetch,
     isFetching,
+    listsFailed,
+    refetchLists,
+    listsFetching,
   } = useBoardData();
   const createList = useCreateList();
 
@@ -356,6 +359,23 @@ export function PhoneApp({
     if (detailId && !todosLoading && !detailTodo) setDetailId(null);
   }, [detailId, detailTodo, todosLoading]);
 
+  /** A failed load: what didn't load, and Try again. */
+  const loadError = (what: string, retry: () => unknown, fetching: boolean) => (
+    <div className="mx-5 mt-7" role="alert">
+      <p className="font-n-display text-[1.375rem] font-semibold text-n-ink">
+        Couldn’t load your {what}.
+      </p>
+      <button
+        type="button"
+        onClick={() => retry()}
+        disabled={fetching}
+        className="-ml-2 mt-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-[0.9375rem] font-medium text-n-ink-muted n-focus"
+      >
+        {fetching ? "Trying again…" : "Try again"}
+      </button>
+    </div>
+  );
+
   const renderRows = (listId: string | undefined, emptyFor: PageKey | null) => {
     const rows = listId ? drag.ordered(listId, rowsFor(listId)) : EMPTY;
     if (loading) {
@@ -368,23 +388,8 @@ export function PhoneApp({
         </p>
       );
     }
-    if (error) {
-      return (
-        <div className="mx-5 mt-7" role="alert">
-          <p className="font-n-display text-[1.375rem] font-semibold text-n-ink">
-            Couldn’t load your todos.
-          </p>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            disabled={isFetching}
-            className="-ml-2 mt-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-[0.9375rem] font-medium text-n-ink-muted n-focus"
-          >
-            {isFetching ? "Trying again…" : "Try again"}
-          </button>
-        </div>
-      );
-    }
+    if (listsFailed) return loadError("lists", refetchLists, listsFetching);
+    if (error) return loadError("todos", refetch, isFetching);
     if (!listId || rows.length === 0) return renderEmpty(emptyFor);
     return (
       <ViewBoundary view="phone-list" resetKey={todos} className="px-5">
@@ -485,6 +490,16 @@ export function PhoneApp({
               subline={plural(count, "todo")}
             />
             {renderRows(collection.id, null)}
+          </>
+        );
+      }
+      // No lists to show, and no New list on its own: that would read as
+      // an account with every list deleted.
+      if (listsFailed) {
+        return (
+          <>
+            <Masthead title="Lists" subline={null} />
+            {loadError("lists", refetchLists, listsFetching)}
           </>
         );
       }

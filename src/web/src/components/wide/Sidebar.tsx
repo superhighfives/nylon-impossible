@@ -199,6 +199,7 @@ export function Sidebar({
   onShortcuts,
   onFeedback,
   loading = false,
+  listsFailed = false,
   keySection,
 }: {
   timeLists: SerializedList[];
@@ -220,6 +221,11 @@ export function Sidebar({
   /** Lists haven't arrived: draw the time lists as placeholders. */
   loading?: boolean;
   /**
+   * Lists failed to load: no lists, and no New list on its own, which would
+   * read as an account with every list deleted. The board says what failed.
+   */
+  listsFailed?: boolean;
+  /**
    * The board's keyboard is on the sidebar (`on`, the sidebar itself
    * focused) or in it (`in`, an entry). Marks it for the outline.
    */
@@ -238,68 +244,70 @@ export function Sidebar({
         <p className="m-0 px-2.5 font-n-display text-xl font-extrabold tracking-[-0.02em] text-n-ink">
           Nylon
         </p>
-        <nav aria-label="Lists">
-          <ul className="flex flex-col gap-0.5">
-            {/* Before the lists arrive the time lists are already known by
-              name, so they hold their place (not focusable; the columns
-              say "Loading…"). */}
-            {loading &&
-              timeLists.length === 0 &&
-              TIME_PLACEHOLDERS.map((name) => (
-                <li
-                  key={name}
-                  aria-hidden="true"
-                  data-skeleton-entry
-                  className="flex h-9 items-center gap-2 px-2.5 text-[0.9375rem] font-semibold text-n-ink"
-                >
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
-                  <span className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse" />
-                </li>
-              ))}
-            {timeLists.map((list) => (
-              <ListEntry
-                key={list.id}
-                list={list}
-                count={countFor(list.id)}
-                current={selectionColumn === list.id}
-                strong
-                onSelect={onTimeList}
-              />
-            ))}
-          </ul>
-          <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-xs font-semibold text-n-ink-muted">
-            Lists
-          </h2>
-          <ul className="flex flex-col gap-0.5">
-            {collections.map((list) => (
-              <ListEntry
-                key={list.id}
-                list={list}
-                count={countFor(list.id)}
-                current={selectionColumn === list.id}
-                onSelect={onCollection}
-                onToggleColumn={onToggleColumn}
-              />
-            ))}
-            <li>
-              <NewListPopover
-                side="right"
-                onCreate={onCreateList}
-                trigger={
-                  <button
-                    type="button"
-                    data-sidebar-nav
-                    aria-keyshortcuts="Shift+N"
-                    className={`${ENTRY} font-medium text-n-ink-muted`}
+        {!listsFailed && (
+          <nav aria-label="Lists">
+            <ul className="flex flex-col gap-0.5">
+              {/* Before the lists arrive the time lists are already known by
+                name, so they hold their place (not focusable; the columns
+                say "Loading…"). */}
+              {loading &&
+                timeLists.length === 0 &&
+                TIME_PLACEHOLDERS.map((name) => (
+                  <li
+                    key={name}
+                    aria-hidden="true"
+                    data-skeleton-entry
+                    className="flex h-9 items-center gap-2 px-2.5 text-[0.9375rem] font-semibold text-n-ink"
                   >
-                    <Plus size={15} aria-hidden="true" className="shrink-0" />
-                    New list
-                  </button>
-                }
-              />
-            </li>
-          </ul>
-        </nav>
+                    <span className="min-w-0 flex-1 truncate">{name}</span>
+                    <span className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse" />
+                  </li>
+                ))}
+              {timeLists.map((list) => (
+                <ListEntry
+                  key={list.id}
+                  list={list}
+                  count={countFor(list.id)}
+                  current={selectionColumn === list.id}
+                  strong
+                  onSelect={onTimeList}
+                />
+              ))}
+            </ul>
+            <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-xs font-semibold text-n-ink-muted">
+              Lists
+            </h2>
+            <ul className="flex flex-col gap-0.5">
+              {collections.map((list) => (
+                <ListEntry
+                  key={list.id}
+                  list={list}
+                  count={countFor(list.id)}
+                  current={selectionColumn === list.id}
+                  onSelect={onCollection}
+                  onToggleColumn={onToggleColumn}
+                />
+              ))}
+              <li>
+                <NewListPopover
+                  side="right"
+                  onCreate={onCreateList}
+                  trigger={
+                    <button
+                      type="button"
+                      data-sidebar-nav
+                      aria-keyshortcuts="Shift+N"
+                      className={`${ENTRY} font-medium text-n-ink-muted`}
+                    >
+                      <Plus size={15} aria-hidden="true" className="shrink-0" />
+                      New list
+                    </button>
+                  }
+                />
+              </li>
+            </ul>
+          </nav>
+        )}
         <nav aria-label="More" className="mt-auto flex flex-col gap-0.5">
           <SidebarButton
             onClick={onDone}
