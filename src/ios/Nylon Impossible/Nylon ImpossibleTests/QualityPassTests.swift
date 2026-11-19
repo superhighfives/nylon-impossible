@@ -131,11 +131,11 @@ struct ToastAssistiveTests {
     }
 
     @Test("VoiceOver's announcement says how to undo")
-    func announcement() {
+    func announcement() throws {
         let toasts = ToastCenter()
         toasts.show("Done", action: {})
-        let toast = try? #require(toasts.current)
-        #expect(toast.map(ToastView.announcement(for:)) == "Done. Undo: double-tap with two fingers.")
+        let toast = try #require(toasts.current)
+        #expect(ToastView.announcement(for: toast) == "Done. Undo: double-tap with two fingers.")
         toasts.show("Couldn’t save that change", action: nil)
         #expect(toasts.current.map(ToastView.announcement(for:)) == "Couldn’t save that change")
     }

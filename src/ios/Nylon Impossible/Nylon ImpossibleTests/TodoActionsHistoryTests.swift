@@ -157,10 +157,10 @@ struct TodoActionsHistoryTests {
         let studio = TodoListModel(id: "studio", userId: "u1", name: "Studio", kind: "custom", systemKind: nil)
         fixture.context.insert(studio)
         fixture.actions.delete(todo)
-        weak var deleted = fixture.actions.history.past.last
+        weak let deleted = fixture.actions.history.past.last
         fixture.actions.flush()
         fixture.actions.deleteList(studio, todoCount: 0) { finished in finished() }
-        weak var deletedList = fixture.actions.history.past.last
+        weak let deletedList = fixture.actions.history.past.last
         fixture.actions.flush()
 
         #expect(fixture.actions.history.past.isEmpty)
