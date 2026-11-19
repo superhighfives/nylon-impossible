@@ -136,11 +136,15 @@ export function sheet(page: Page): Locator {
  * Start listening for the next write (POST/PATCH/PUT/DELETE) the app sends.
  * Call it before the action that saves, pass the result to `reload`: the app
  * awaits its auth token before sending, so a reload straight after the
- * optimistic row can beat the request and lose the write.
+ * optimistic row can beat the request and lose the write. Pass `body` to wait
+ * for the write that carries that text, not just the first one.
  */
-export function watchWrite(page: Page): Promise<unknown> {
+export function watchWrite(page: Page, body?: string): Promise<unknown> {
   return page.waitForResponse(
-    (res) => res.request().method() !== "GET" && res.status() < 500,
+    (res) =>
+      res.request().method() !== "GET" &&
+      res.status() < 500 &&
+      (!body || (res.request().postData() ?? "").includes(body)),
     { timeout: 30_000 },
   );
 }

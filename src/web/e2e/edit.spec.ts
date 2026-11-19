@@ -37,7 +37,7 @@ test("opening a todo and editing its title and notes saves them", async ({
 
   await open.locator("[data-detail-title]").fill(newTitle);
   await open.getByRole("textbox", { name: "Notes" }).fill(notes);
-  const saved = watchWrite(page);
+  const saved = watchWrite(page, notes);
   await open.getByRole("button", { name: "Close" }).click();
   await expect(open).toHaveCount(0);
   await expect(rowButton(today(), newTitle)).toBeVisible();
