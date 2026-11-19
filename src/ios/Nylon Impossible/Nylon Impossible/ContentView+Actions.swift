@@ -231,3 +231,10 @@ extension ContentView {
     }
 }
 #endif
+
+// THROWAWAY (#756): a DEBUG-only symbol called without a guard. Reverted next commit.
+#if DEBUG
+private func releaseCheckProbe() {}
+#endif
+
+private func releaseCheckProbeCaller() { releaseCheckProbe() }
