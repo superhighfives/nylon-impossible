@@ -1,6 +1,11 @@
+import type { Page } from "@playwright/test";
 import { column, expect, phonePage, rowButton, test, toast } from "./fixtures";
 
 const TITLE = "Call Mum about Sunday lunch";
+
+// A Done row's button also names where the todo came from ("… Today").
+const doneRow = (page: Page) =>
+  column(page, "Done").getByRole("button", { name: new RegExp(`^${TITLE}`) });
 
 // Principle 3 and Settled "Completing a todo": a checked todo leaves straight
 // away, with Undo. On wide it shows in the Done column (Settled "Wide layout").
@@ -22,7 +27,7 @@ test("a todo marked done leaves its list, and Undo brings it back", async ({
   const done = toast(page, "Done");
   await expect(done).toBeVisible();
   if (layout === "wide") {
-    await expect(rowButton(column(page, "Done"), TITLE)).toBeVisible();
+    await expect(doneRow(page)).toBeVisible();
   }
 
   const undo = done.getByRole("button", { name: "Undo" });
@@ -31,6 +36,6 @@ test("a todo marked done leaves its list, and Undo brings it back", async ({
 
   await expect(rowButton(today, TITLE)).toBeVisible();
   if (layout === "wide") {
-    await expect(rowButton(column(page, "Done"), TITLE)).toHaveCount(0);
+    await expect(doneRow(page)).toHaveCount(0);
   }
 });

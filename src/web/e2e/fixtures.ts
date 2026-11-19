@@ -113,7 +113,9 @@ export function rowButton(scope: Locator, title: string): Locator {
 /** Rows' titles in a column or page, top to bottom. */
 export async function titles(scope: Locator): Promise<string[]> {
   const texts = await scope
-    .locator("li[data-phone-row]:not([aria-hidden]) [data-row-id] > span")
+    .locator(
+      "li[data-phone-row]:not([aria-hidden]) [data-row-id] > span:first-child",
+    )
     .allInnerTexts();
   return texts.map((t) => t.trim());
 }

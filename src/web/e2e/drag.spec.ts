@@ -48,13 +48,15 @@ test("dragging the first todo below the third reorders the column", async ({
   await studio.scrollIntoViewIfNeeded();
   expect(await titles(studio)).toEqual(STUDIO);
 
-  const third = await rowButton(studio, STUDIO[2]).boundingBox();
-  if (!third) throw new Error("the third row isn't visible");
+  // The column closes up under the dragged row, so aim for the foot of the
+  // list rather than the third row's lower half.
+  const rows = await studio.locator("ul[data-row-list]").boundingBox();
+  if (!rows) throw new Error("Studio's rows aren't visible");
   await dragTo(
     page,
     rowButton(studio, STUDIO[0]),
-    third.x + third.width / 2,
-    third.y + third.height * 0.8,
+    rows.x + rows.width / 2,
+    rows.y + rows.height - 4,
   );
   await expect(studio.locator("[data-drop-indicator]")).toBeVisible();
   const saved = watchWrite(page);

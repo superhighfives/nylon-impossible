@@ -11,9 +11,11 @@ import {
 
 /** The title of the selected todo on the board. */
 function selected(page: Page) {
-  return page.locator(
-    '[data-layout="wide"] [data-row-container][data-selected] [data-row-id] > span',
-  );
+  return page
+    .locator(
+      '[data-layout="wide"] [data-row-container][data-selected] [data-row-id] > span:first-child',
+    )
+    .first();
 }
 
 test.skip(

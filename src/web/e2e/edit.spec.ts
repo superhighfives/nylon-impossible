@@ -6,6 +6,7 @@ import {
   rowButton,
   sheet,
   test,
+  watchWrite,
 } from "./fixtures";
 
 const TITLE = "Review PR for the sync engine";
@@ -31,16 +32,17 @@ test("opening a todo and editing its title and notes saves them", async ({
   }
   const open = sheet(page);
   await expect(open).toBeVisible();
-  await expect(open.getByLabel("Title", { exact: true })).toHaveValue(TITLE);
+  await expect(open.locator("[data-detail-title]")).toHaveValue(TITLE);
   await expect(open.getByRole("button", { name: /^save$/i })).toHaveCount(0);
 
-  await open.getByLabel("Title", { exact: true }).fill(newTitle);
+  await open.locator("[data-detail-title]").fill(newTitle);
   await open.getByRole("textbox", { name: "Notes" }).fill(notes);
+  const saved = watchWrite(page);
   await open.getByRole("button", { name: "Close" }).click();
   await expect(open).toHaveCount(0);
   await expect(rowButton(today(), newTitle)).toBeVisible();
 
-  await reload(page, layout);
+  await reload(page, layout, undefined, saved);
   await expect(rowButton(today(), newTitle)).toBeVisible();
   await expect(rowButton(today(), TITLE)).toHaveCount(0);
   // The notes reached D1 too.

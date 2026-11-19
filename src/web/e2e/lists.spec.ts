@@ -40,9 +40,8 @@ test.describe("wide", () => {
       .getByRole("heading", { level: 2 })
       .getByRole("button", { name, exact: true })
       .click();
-    const nameInput = column(page, name).getByRole("textbox", {
-      name: "List name",
-    });
+    // The input replaces the heading, so the column can't be found by it now.
+    const nameInput = page.getByRole("textbox", { name: "List name" });
     await nameInput.fill(renamed);
     await nameInput.press("Enter");
     await expect(entry(renamed)).toBeVisible();
