@@ -539,6 +539,8 @@ describe("WideApp", () => {
       }
     };
     expect(board).toHaveClass("n-board-overscroll");
+    // A swipe past an end bounces here instead of going back a page.
+    expect(board).toHaveClass("overscroll-x-contain");
     expectFilled();
     await userEvent.click(rowButton("Call Mum"));
     await userEvent.click(rowButton("Call Mum"));

@@ -1209,11 +1209,12 @@ export function WideApp({
               container the columns' width is a third of. Its background
               is what a trackpad's bounce shows: the hatch past Done, plain
               before Today. Every slot fills itself so it only shows
-              there. */}
+              there. Its overscroll stays its own, so a swipe past an end
+              bounces rather than going back a page. */}
           <main
             ref={boardRow}
             aria-label="Board"
-            className="@container n-board-overscroll relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
+            className="@container n-board-overscroll relative flex min-h-0 flex-1 overflow-x-auto overscroll-x-contain [scrollbar-width:thin]"
           >
             {/* Before the lists arrive, the three time columns and then
                 nothing: no Done, since your lists may come before it. The
