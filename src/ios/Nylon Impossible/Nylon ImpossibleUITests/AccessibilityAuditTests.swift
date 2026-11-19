@@ -133,6 +133,15 @@ enum AuditAllowance {
             return true
         }
 
+        // The share sheet and the composer don't scale some text at the
+        // largest sizes: #763 (kind:a11y). Only Dynamic Type, only these
+        // routes, only the "partially" findings. Remove this with the fix
+        // for #763.
+        if issue.auditType == .dynamicType, ["share", "sharetext", "composer"].contains(route),
+           detail.contains("partially") || issue.compactDescription.contains("partially") {
+            return true
+        }
+
         // At AX sizes the switcher's titles don't all fit beside Done's check
         // and the avatar, so they scroll sideways (keeping the current one in
         // view), and "Lists" sits past the edge. The audit samples the

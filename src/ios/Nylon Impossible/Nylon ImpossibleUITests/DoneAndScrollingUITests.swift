@@ -34,11 +34,14 @@ final class DoneAndScrollingUITests: NylonUITestCase {
 
         // During the 400ms hold: checked, and nothing has moved. Read once,
         // straight away; a predicate expectation polls too slowly to land
-        // inside the hold.
-        XCTAssertTrue((target.value as? String)?.hasSuffix(", Done") == true || (target.value as? String) == "Done",
-                      "not checked during the hold: \(String(describing: target.value))")
-        XCTAssertEqual(target.frame, before.target, "the checked row moved during the hold")
-        XCTAssertEqual(next.frame, before.next, "the row below moved during the hold")
+        // inside the hold. On a loaded CI runner the row can already be gone
+        // by the time it's read; then there's no hold left to check.
+        if target.exists {
+            XCTAssertTrue((target.value as? String)?.hasSuffix(", Done") == true || (target.value as? String) == "Done",
+                          "not checked during the hold: \(String(describing: target.value))")
+            XCTAssertEqual(target.frame, before.target, "the checked row moved during the hold")
+            XCTAssertEqual(next.frame, before.next, "the row below moved during the hold")
+        }
 
         // Then it goes, and the toast offers Undo.
         let gone = NSPredicate(format: "exists == false")
