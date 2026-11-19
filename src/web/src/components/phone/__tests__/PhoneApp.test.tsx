@@ -49,6 +49,10 @@ let todos: TodoWithUrls[] = startingTodos;
 /** The todos query's refetch; a test can have it bring a todo in. */
 const refetch = vi.fn(async () => {});
 const { byKind, collections } = splitLists(lists);
+/** The lists' load failed: none arrived, with an error instead. */
+let listsFailed = false;
+let listsFetching = false;
+const refetchLists = vi.fn(async () => {});
 const place = vi.fn();
 /** The client's Reduce motion hint; the drag tests turn it off. */
 let reducedMotion = "reduce";
@@ -56,10 +60,10 @@ let reducedMotion = "reduce";
 vi.mock("../useBoardData", () => ({
   useBoardData: () => ({
     timeZone: "UTC",
-    lists,
+    lists: listsFailed ? undefined : lists,
     todos,
-    byKind,
-    collections,
+    byKind: listsFailed ? {} : byKind,
+    collections: listsFailed ? [] : collections,
     listName: (id: string) => lists.find((l) => l.id === id)?.name ?? "List",
     listInSentence: (id: string) => {
       const list = lists.find((l) => l.id === id);
@@ -81,6 +85,9 @@ vi.mock("../useBoardData", () => ({
     error: null,
     refetch,
     isFetching: false,
+    listsFailed,
+    refetchLists,
+    listsFetching,
   }),
 }));
 vi.mock("../OvernightNote", async (importOriginal) => ({
@@ -339,6 +346,44 @@ describe("PhoneApp empty states", () => {
         name: "2 waiting in someday",
       }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("PhoneApp, lists that fail to load", () => {
+  beforeEach(() => {
+    listsFailed = true;
+    refetchLists.mockClear();
+  });
+  afterEach(() => {
+    listsFailed = false;
+    listsFetching = false;
+  });
+
+  it("says so on every page but Done, with Try again, and no New list on its own", async () => {
+    const { rerender } = render(<PhoneApp />);
+    for (const key of ["today", "thisWeek", "someday", "lists"]) {
+      const alert = within(page(key)).getByRole("alert");
+      expect(alert).toHaveTextContent("Couldn’t load your lists.");
+      expect(
+        within(alert).getByRole("button", { name: "Try again" }),
+      ).toBeInTheDocument();
+    }
+    // Not an empty account: no empty states, and Lists has no New list.
+    expect(screen.queryByText("Nothing today.")).toBeNull();
+    expect(
+      within(page("lists")).queryByRole("textbox", { name: "New list name" }),
+    ).toBeNull();
+    expect(within(page("done")).queryByRole("alert")).toBeNull();
+
+    await userEvent.click(
+      within(page("today")).getByRole("button", { name: "Try again" }),
+    );
+    expect(refetchLists).toHaveBeenCalledTimes(1);
+    listsFetching = true;
+    rerender(<PhoneApp />);
+    expect(
+      within(page("today")).getByRole("button", { name: "Trying again…" }),
+    ).toBeDisabled();
   });
 });
 

@@ -55,7 +55,12 @@ import {
   sheetPopup,
   sidebar,
 } from "./boardDom";
-import { COLUMN_WIDTH, Column } from "./Column";
+import {
+  COLUMN_HEAD_HEIGHT,
+  COLUMN_PADDING,
+  COLUMN_WIDTH,
+  Column,
+} from "./Column";
 import { CommandPalette } from "./CommandPalette";
 import { COMMANDS, type JumpTarget, keyHint } from "./commands";
 import { DONE_COLUMN, DoneColumn } from "./DoneColumn";
@@ -177,6 +182,9 @@ export function WideApp({
     error,
     refetch,
     isFetching,
+    listsFailed,
+    refetchLists,
+    listsFetching,
   } = useBoardData();
   const createList = useCreateList();
   const updateList = useUpdateList();
@@ -898,21 +906,23 @@ export function WideApp({
     if (detailId && !todosLoading && !detailTodo) setDetailId(null);
   }, [detailId, detailTodo, todosLoading]);
 
-  const errorView = error ? (
+  /** A failed load: what didn't load, and Try again. */
+  const loadError = (what: string, retry: () => unknown, fetching: boolean) => (
     <div className="mt-4" role="alert">
       <p className="m-0 font-n-display text-[1.125rem] font-semibold text-n-ink">
-        Couldn’t load your todos.
+        Couldn’t load your {what}.
       </p>
       <button
         type="button"
-        onClick={() => refetch()}
-        disabled={isFetching}
+        onClick={() => retry()}
+        disabled={fetching}
         className="-ml-2 mt-1 min-h-11 cursor-pointer rounded-n-chip px-2 text-[0.9375rem] font-medium text-n-ink-muted n-focus"
       >
-        {isFetching ? "Trying again…" : "Try again"}
+        {fetching ? "Trying again…" : "Try again"}
       </button>
     </div>
-  ) : null;
+  );
+  const errorView = error ? loadError("todos", refetch, isFetching) : null;
 
   /**
    * Open a todo beside its column. From the keyboard (Return), the keyboard
@@ -1101,6 +1111,26 @@ export function WideApp({
   );
   const skeleton = loading && timeLists.length === 0;
 
+  /**
+   * The lists failed to load: no columns to put "Couldn’t load your todos."
+   * in, and none drawn either, or it reads as an account with every list
+   * deleted. The message takes the first column's place, at its width and
+   * where its error would sit, and Done and the hatch follow as usual.
+   */
+  const renderListsError = () => (
+    <div
+      key="lists-error"
+      data-slide="lists-error"
+      data-lists-error
+      className={`flex h-full ${COLUMN_WIDTH} flex-col bg-n-canvas`}
+    >
+      <div aria-hidden="true" className={`${COLUMN_HEAD_HEIGHT} shrink-0`} />
+      <div className={`pt-2.5 ${COLUMN_PADDING}`}>
+        {loadError("lists", refetchLists, listsFetching)}
+      </div>
+    </div>
+  );
+
   // The board's end, before Done: the hatch, as wide as the columns leave,
   // so Done starts just past the right edge (`fitBoardEnd`). Always in the
   // row, so it resizes rather than appears. Filled first, so the row's own
@@ -1166,6 +1196,7 @@ export function WideApp({
           onShortcuts={() => setShortcuts(true)}
           onFeedback={canSendFeedback ? () => setFeedback(true) : undefined}
           loading={loading}
+          listsFailed={listsFailed}
           keySection={keyOn(SIDEBAR)}
         />
         <div className="flex min-w-0 flex-1 flex-col">
@@ -1232,26 +1263,30 @@ export function WideApp({
                     className="min-w-0 flex-1 bg-n-canvas"
                   />,
                 ]
-              : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
-                  slot.kind === "list" ? (
-                    renderColumn(slot.list)
-                  ) : slot.kind === "done" ? (
-                    renderDone()
-                  ) : slot.kind === "end" ? (
-                    renderEnd()
-                  ) : (
-                    // The open todo's sheet: as wide as a column, laid over
-                    // its column's right padding, above the columns around it.
-                    // Filled, since the sheet is inset from its edges.
-                    <div
-                      key="sheet"
-                      ref={setSheetEl}
-                      data-slide="sheet"
-                      data-board-sheet
-                      className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) bg-n-canvas ${COLUMN_WIDTH}`}
-                    />
+              : [
+                  listsFailed ? renderListsError() : null,
+                  ...boardSlots(boardLists, sheet?.column ?? null).map(
+                    (slot) =>
+                      slot.kind === "list" ? (
+                        renderColumn(slot.list)
+                      ) : slot.kind === "done" ? (
+                        renderDone()
+                      ) : slot.kind === "end" ? (
+                        renderEnd()
+                      ) : (
+                        // The open todo's sheet: as wide as a column, laid over
+                        // its column's right padding, above the columns around it.
+                        // Filled, since the sheet is inset from its edges.
+                        <div
+                          key="sheet"
+                          ref={setSheetEl}
+                          data-slide="sheet"
+                          data-board-sheet
+                          className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) bg-n-canvas ${COLUMN_WIDTH}`}
+                        />
+                      ),
                   ),
-                )}
+                ]}
           </main>
         </div>
         <DragOverlay dropAnimation={null}>

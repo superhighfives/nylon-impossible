@@ -96,7 +96,13 @@ export const COLUMN_WIDTH =
  * right, open or not. The sheet only ever covers that padding, so opening a
  * todo never rewraps the column's text (principle 8).
  */
-const COLUMN_PADDING = "pl-6 pr-(--n-sheet-overlap)";
+export const COLUMN_PADDING = "pl-6 pr-(--n-sheet-overlap)";
+
+/**
+ * A column header's height. Anything that stands in for a column (the lists
+ * error) uses it too, so what's below starts where a column's todos would.
+ */
+export const COLUMN_HEAD_HEIGHT = "h-[10.5rem]";
 
 /** Behind the open sheet, the column recedes; its selected row doesn't. */
 const RECEDE = "opacity-(--n-sheet-recede)";
@@ -197,7 +203,7 @@ export function ColumnHeader({
 
   return (
     <header
-      className={`relative flex h-[10.5rem] shrink-0 flex-col justify-end pb-[1.125rem] transition-opacity ${COLUMN_PADDING} ${
+      className={`relative flex ${COLUMN_HEAD_HEIGHT} shrink-0 flex-col justify-end pb-[1.125rem] transition-opacity ${COLUMN_PADDING} ${
         sheetOpen ? RECEDE : ""
       }`}
     >

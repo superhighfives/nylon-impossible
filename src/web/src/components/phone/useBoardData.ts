@@ -20,12 +20,24 @@ const EMPTY: TodoWithUrls[] = [];
 export function useBoardData() {
   const { timeZone } = useHints();
   useLocalMidnightTick();
-  const { data: lists, error: listsError } = useLists();
+  const {
+    data: lists,
+    error: listsError,
+    refetch: refetchLists,
+    isFetching: listsFetching,
+    errorUpdateCount: listsErrors,
+  } = useLists();
   const { data: todosData, error, refetch, isFetching } = useTodos();
   // Loading means "no data yet", not `isLoading`: that's false while a query
   // is idle, which it is in the server render and before the client's first
   // fetch starts, so the board painted empty (just "Nothing done yet.").
-  const listsLoading = lists === undefined && !listsError;
+  // No lists to draw, and an error instead: not an empty account. A failed
+  // refetch keeps the lists already shown, so only the first load counts.
+  // React Query clears the error while Try again runs, with no data to fall
+  // back on, so it goes by whether one ever came: "Trying again…", not the
+  // skeleton.
+  const listsFailed = lists === undefined && (!!listsError || listsErrors > 0);
+  const listsLoading = lists === undefined && !listsFailed;
   const todosLoading = todosData === undefined && !error;
   const todos = todosData ?? EMPTY;
 
@@ -132,6 +144,9 @@ export function useBoardData() {
     error,
     refetch,
     isFetching,
+    listsFailed,
+    refetchLists,
+    listsFetching,
   };
 }
 

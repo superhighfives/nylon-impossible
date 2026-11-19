@@ -47,18 +47,37 @@ let listsLoading = false;
 let todosLoading = false;
 const sweptAt = new Date().toISOString();
 
-vi.mock("@/hooks/useLists", () => ({
-  useLists: () => ({
-    data: listsLoading ? undefined : lists,
-    // As in the server render: no data, but nothing fetching yet either, so
-    // `isLoading` is false. The board has to go by the missing data.
-    isLoading: false,
-    error: null,
-  }),
-  useCreateList: () => ({ mutate: createList }),
-  useUpdateList: () => ({ mutate: updateList }),
-  useDeleteList: () => ({ mutate: deleteList }),
+/**
+ * The real lists query, fetching with `getLists`, for the tests of a failed
+ * load. Render inside a `QueryClientProvider`.
+ */
+let liveLists = false;
+vi.mock("@/server/lists", () => ({
+  getLists: vi.fn(),
+  createList: vi.fn(),
+  updateList: vi.fn(),
+  deleteList: vi.fn(),
 }));
+vi.mock("@/hooks/useLists", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/useLists")>();
+  return {
+    useLists: () =>
+      liveLists
+        ? // biome-ignore lint/correctness/useHookAtTopLevel: `liveLists` is fixed for a whole test
+          actual.useLists()
+        : {
+            data: listsLoading ? undefined : lists,
+            // As in the server render: no data, but nothing fetching yet
+            // either, so `isLoading` is false. The board has to go by the
+            // missing data.
+            isLoading: false,
+            error: null,
+          },
+    useCreateList: () => ({ mutate: createList }),
+    useUpdateList: () => ({ mutate: updateList }),
+    useDeleteList: () => ({ mutate: deleteList }),
+  };
+});
 /**
  * The real todos cache and smart-create, for the tests that need what the
  * mutation itself puts in the cache. Render inside `withCache`'s provider.
@@ -159,6 +178,7 @@ vi.mock("@dnd-kit/core", async (importOriginal) => {
 });
 
 import { toast } from "@/lib/toast";
+import { getLists } from "@/server/lists";
 import { COLUMN_WIDTH } from "../Column";
 import { WideApp } from "../WideApp";
 
@@ -436,6 +456,73 @@ describe("WideApp", () => {
       ).toEqual(["Today", "This week", "Someday"]);
     } finally {
       listsLoading = false;
+    }
+  });
+
+  it("says the lists didn't load, in the first column's place, and Try again brings the board", async () => {
+    liveLists = true;
+    let answer: (value: typeof lists) => void = () => {};
+    vi.mocked(getLists)
+      .mockRejectedValueOnce(new Error("500"))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    try {
+      render(
+        <QueryClientProvider client={queryClient}>
+          <WideApp />
+        </QueryClientProvider>,
+      );
+      const alert = await screen.findByRole("alert");
+      expect(alert).toHaveTextContent("Couldn’t load your lists.");
+      const board = screen.getByRole("main", { name: "Board" });
+      expect(board.firstElementChild).toContainElement(alert);
+      expect(board.firstElementChild).toHaveClass(...COLUMN_WIDTH.split(" "));
+      // Not an empty account: no time columns, and no sidebar of just
+      // New list. Done (the todos did load) and the hatch follow.
+      expect(
+        [...board.querySelectorAll<HTMLElement>(":scope > [data-column]")].map(
+          (c) => c.dataset.column,
+        ),
+      ).toEqual(["done"]);
+      const sidebar = screen.getByRole("complementary", { name: "Sidebar" });
+      expect(
+        within(sidebar).queryByRole("button", { name: "New list" }),
+      ).toBeNull();
+      expect(
+        within(sidebar).queryByRole("navigation", { name: "Lists" }),
+      ).toBeNull();
+
+      await userEvent.click(
+        within(alert).getByRole("button", { name: "Try again" }),
+      );
+      expect(
+        await screen.findByRole("button", { name: "Trying again…" }),
+      ).toBeDisabled();
+      expect(getLists).toHaveBeenCalledTimes(2);
+      act(() => answer(lists));
+      await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+      expect(
+        screen.getAllByRole("region").map((r) => r.getAttribute("data-column")),
+      ).toEqual([
+        "list-today",
+        "list-week",
+        "list-someday",
+        "list-groceries",
+        "list-studio",
+        "done",
+      ]);
+      expect(
+        within(sidebar).getByRole("button", { name: "New list" }),
+      ).toBeInTheDocument();
+    } finally {
+      liveLists = false;
     }
   });
 
