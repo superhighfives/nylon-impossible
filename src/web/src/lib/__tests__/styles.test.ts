@@ -22,8 +22,21 @@ describe("the board's hatch", () => {
   it("repeats a whole-pixel tile rather than a repeating gradient", () => {
     const hatch = utility("n-board-hatch");
     expect(hatch).not.toContain("repeating-linear-gradient");
-    expect(hatch).toContain(
-      "background-size: var(--n-board-hatch-tile) var(--n-board-hatch-tile);",
+    // The tile is the second layer; the first is the cover (below).
+    expect(hatch).toMatch(
+      /background-size:\s*100% 100%,\s*var\(--n-board-hatch-tile\) var\(--n-board-hatch-tile\);/,
+    );
+  });
+
+  // The row's own hatch shows a trackpad's bounce past Done, but the bounce
+  // before Today stays plain: its left half is covered with canvas. The
+  // hatch resets the cover, so the end before Done doesn't inherit it.
+  it("covers the board row's left half, and nothing else's", () => {
+    expect(utility("n-board-hatch")).toContain("--n-board-hatch-cover: none;");
+    const overscroll = utility("n-board-overscroll");
+    expect(overscroll).toContain("@apply n-board-hatch;");
+    expect(overscroll).toMatch(
+      /--n-board-hatch-cover: linear-gradient\(\s*to right,\s*var\(--n-color-canvas\) 50%,\s*transparent 50%\s*\)/,
     );
   });
 

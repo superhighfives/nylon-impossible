@@ -410,6 +410,8 @@ describe("WideApp", () => {
       ).toEqual(["Today", "This week", "Someday"]);
       expect(board.lastElementChild).toHaveAttribute("data-skeleton-rest");
       expect(board.lastElementChild?.childElementCount).toBe(0);
+      // Filled, so the row's hatch (a bounce's) doesn't show through.
+      expect(board.lastElementChild).toHaveClass("bg-n-canvas");
       // Placeholder rows fade by column, gone by the fourth.
       expect(
         [...board.querySelectorAll<HTMLElement>("[data-skeleton-rows]")].map(
@@ -523,6 +525,26 @@ describe("WideApp", () => {
     } finally {
       todosLoading = false;
     }
+  });
+
+  it("hatches what a trackpad's bounce shows past Done, and nowhere else", async () => {
+    render(<WideApp />);
+    const board = screen.getByRole("main", { name: "Board" });
+    // The row's own background is the hatch; every slot in it, the open
+    // todo's sheet included, fills itself, so the hatch only shows past its
+    // ends.
+    const expectFilled = () => {
+      for (const slot of board.children) {
+        expect(slot.className).toMatch(/\bbg-n-(canvas|surface)\b/);
+      }
+    };
+    expect(board).toHaveClass("n-board-overscroll");
+    expectFilled();
+    await userEvent.click(rowButton("Call Mum"));
+    await userEvent.click(rowButton("Call Mum"));
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(board.querySelector(":scope > [data-board-sheet]")).not.toBeNull();
+    expectFilled();
   });
 
   it("ends the board on Done's hairline, with the hatch before it and nothing to click", async () => {

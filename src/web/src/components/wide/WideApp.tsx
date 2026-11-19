@@ -1103,7 +1103,8 @@ export function WideApp({
 
   // The board's end, before Done: the hatch, as wide as the columns leave,
   // so Done starts just past the right edge (`fitBoardEnd`). Always in the
-  // row, so it resizes rather than appears. Nothing in it to click
+  // row, so it resizes rather than appears. Filled first, so the row's own
+  // hatch doesn't show through and double its lines. Nothing in it to click
   // (principle 4).
   const renderEnd = () => (
     <div
@@ -1111,7 +1112,7 @@ export function WideApp({
       aria-hidden="true"
       data-slide="end"
       data-board-end
-      className="n-board-hatch shrink-0"
+      className="n-board-hatch shrink-0 bg-n-canvas"
     />
   );
 
@@ -1205,11 +1206,14 @@ export function WideApp({
           />
           {/* One row of columns that scrolls sideways; each child is named
               by `data-slide` so it slides when the row changes. The size
-              container the columns' width is a third of. */}
+              container the columns' width is a third of. Its background
+              is what a trackpad's bounce shows: the hatch past Done, plain
+              before Today. Every slot fills itself so it only shows
+              there. */}
           <main
             ref={boardRow}
             aria-label="Board"
-            className="@container relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
+            className="@container n-board-overscroll relative flex min-h-0 flex-1 overflow-x-auto [scrollbar-width:thin]"
           >
             {/* Before the lists arrive, the three time columns and then
                 nothing: no Done, since your lists may come before it. The
@@ -1224,7 +1228,7 @@ export function WideApp({
                     key="skeleton-rest"
                     aria-hidden="true"
                     data-skeleton-rest
-                    className="min-w-0 flex-1"
+                    className="min-w-0 flex-1 bg-n-canvas"
                   />,
                 ]
               : boardSlots(boardLists, sheet?.column ?? null).map((slot) =>
@@ -1237,12 +1241,13 @@ export function WideApp({
                   ) : (
                     // The open todo's sheet: as wide as a column, laid over
                     // its column's right padding, above the columns around it.
+                    // Filled, since the sheet is inset from its edges.
                     <div
                       key="sheet"
                       ref={setSheetEl}
                       data-slide="sheet"
                       data-board-sheet
-                      className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) ${COLUMN_WIDTH}`}
+                      className={`relative top-0 bottom-0 z-10 -ml-(--n-sheet-overlap) bg-n-canvas ${COLUMN_WIDTH}`}
                     />
                   ),
                 )}

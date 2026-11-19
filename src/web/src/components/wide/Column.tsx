@@ -518,7 +518,7 @@ export function Column({
       }}
       data-sheet-open={sheetOpen ? "" : undefined}
       data-key-section={keySection}
-      className={`n-section-outline relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline first:border-l-0`}
+      className={`n-section-outline relative flex h-full ${COLUMN_WIDTH} flex-col border-l border-n-hairline bg-n-canvas first:border-l-0`}
     >
       <ColumnHeader
         listId={listId}
