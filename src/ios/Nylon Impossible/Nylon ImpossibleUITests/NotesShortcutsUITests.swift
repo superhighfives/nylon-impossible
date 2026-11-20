@@ -71,12 +71,15 @@ final class NotesShortcutsUITests: NylonUITestCase {
         expectNotes("Run `ls`")
 
         // Saves like typing: close the sheet and open the todo again.
-        let row = row("Plan Lisbon trip")
-        for _ in 0..<3 where !row.isHittable {
+        // Wait for the sheet's own field to go, not for the row to be
+        // hittable: asked mid-dismissal, isHittable fails the test outright.
+        for _ in 0..<3 where notes.exists {
             let top = app.windows.firstMatch.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12))
             top.press(forDuration: 0.05, thenDragTo: top.withOffset(CGVector(dx: 0, dy: 700)))
-            _ = row.wait(for: \.isHittable, toEqual: true, timeout: 2)
+            _ = notes.waitForNonExistence(timeout: 2)
         }
+        let row = row("Plan Lisbon trip")
+        waitFor(row)
         // The row counts the saved notes' words.
         XCTAssertTrue(row.label.contains("Notes, 2 words") || (row.value as? String)?.contains("Notes, 2 words") == true,
                       "the row doesn't show the saved notes: \(row.label)")
