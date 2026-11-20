@@ -51,7 +51,7 @@
   },
   "devDependencies": {
     "@clerk/testing": "^2.2.36",
-    "@cloudflare/vite-plugin": "^1.53.1",
+    "@cloudflare/vite-plugin": "^1.69.1",
     "@cloudflare/workers-types": "^5.20261028.1",
     "@effect/tsgo": "^0.69.0",
     "@playwright/test": "1.65.1",
