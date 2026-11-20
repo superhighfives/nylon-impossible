@@ -334,12 +334,17 @@ jobs:
             echo
           } >> "$GITHUB_STEP_SUMMARY"
           # A test that passes on its retry can still be listed in
-          # testFailures, so report failures only when the run failed.
-          [ "$(jq -r '.result // ""' summary.json 2>/dev/null)" = "Failed" ] || exit 0
+          # testFailures. Keep it visible as a warning, so a test that
+          # flakes on every run doesn't go unnoticed.
+          if [ "$(jq -r '.result // ""' summary.json 2>/dev/null)" = "Failed" ]; then
+            level=error; title="UI test failed"; mark="❌"
+          else
+            level=warning; title="UI test passed on retry"; mark="⚠️"
+          fi
           jq -r '.testFailures[]? | "\(.testIdentifierString // .testName): \(.failureText)"' summary.json 2>/dev/null \
             | while read -r failed; do
-                echo "::error title=UI test failed::$failed"
-                echo "- ❌ $failed" >> "$GITHUB_STEP_SUMMARY"
+                echo "::$level title=$title::$failed"
+                echo "- $mark $failed" >> "$GITHUB_STEP_SUMMARY"
               done
 
       - name: Upload UI test results
