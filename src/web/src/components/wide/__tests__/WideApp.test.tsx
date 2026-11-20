@@ -1137,6 +1137,26 @@ describe("WideApp", () => {
     });
   });
 
+  it(". opens the right-click menu, as ⇧F10 and the Menu key do", async () => {
+    render(<WideApp />);
+    for (const init of [
+      { key: "." },
+      { key: "F10", shiftKey: true },
+      { key: "ContextMenu" },
+    ]) {
+      rowButton("Review PR").focus();
+      fireEvent.keyDown(window, init);
+      const menu = await screen.findByRole("menu", { name: "Todo actions" });
+      expect(within(menu).getByText("Mark done")).toBeInTheDocument();
+      fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("menu", { name: "Todo actions" }),
+        ).not.toBeInTheDocument(),
+      );
+    }
+  });
+
   it("right-click opens the registry's commands with their keys", async () => {
     render(<WideApp />);
     fireEvent.contextMenu(rowButton("Review PR"), {

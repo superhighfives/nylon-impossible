@@ -825,12 +825,12 @@ export function WideApp({
     moveTodo: (todo, listId) => moveTodo(todo, listId),
     open: (todo) => onOpen(todo, "keyboard"),
     closeDetail,
-    openDueMenu: (todo, row) => {
+    openMenu: (todo, row, view) => {
       const rect = row.getBoundingClientRect();
       setMenu({
         id: todo.id,
         anchor: { x: rect.left, y: rect.bottom + 4 },
-        view: "due",
+        view,
       });
     },
     openMoveTo: (todo) => setPalette({ mode: "move", todoId: todo.id }),
