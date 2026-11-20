@@ -44,12 +44,12 @@ const ZONES =
 const pretty = (zone: string) => zone.replace(/_/g, " ");
 
 const SECTION = "mx-5 border-b border-n-hairline py-5";
-const LABEL = "mb-2 block text-[0.8125rem] font-semibold text-n-ink-muted";
-const HINT = "mt-2 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted";
+const LABEL = "mb-2 block text-n-phone-label text-n-ink-muted";
+const HINT = "mt-2 text-n-phone-meta text-n-ink-muted";
 const BUTTON =
-  "min-h-11 cursor-pointer rounded-n-chip border border-n-hairline px-3.5 text-[0.9375rem] font-medium n-focus disabled:opacity-50";
+  "min-h-11 cursor-pointer rounded-n-chip border border-n-hairline px-3.5 text-n-phone-action n-focus disabled:opacity-50";
 const EXTERNAL_LINK =
-  "-mx-2 flex min-h-11 items-center justify-between rounded-n-chip px-2 text-base text-n-ink no-underline n-focus";
+  "-mx-2 flex min-h-11 items-center justify-between rounded-n-chip px-2 text-n-phone-item text-n-ink no-underline n-focus";
 
 /**
  * Settings for the phone: theme, the timezone (Automatic follows this device;
@@ -128,7 +128,7 @@ export function SettingsScreen({
                     );
                   }
                 }}
-                className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-n-chip border px-3.5 text-[0.9375rem] font-medium n-focus disabled:opacity-50 ${
+                className={`flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-n-chip border px-3.5 text-n-phone-action n-focus disabled:opacity-50 ${
                   selected
                     ? "border-n-brand bg-n-brand text-n-brand-ink"
                     : "border-n-hairline text-n-ink-muted"
@@ -155,7 +155,7 @@ export function SettingsScreen({
             value={automatic ? AUTOMATIC : timezone}
             disabled={!user}
             onChange={(e) => setZone(e.target.value)}
-            className="min-h-11 w-full cursor-pointer appearance-none rounded-n-field border border-n-hairline bg-n-canvas py-2 pr-10 pl-3 text-base text-n-ink n-focus disabled:opacity-50 dark:bg-n-surface"
+            className="min-h-11 w-full cursor-pointer appearance-none rounded-n-field border border-n-hairline bg-n-canvas py-2 pr-10 pl-3 text-n-phone-item text-n-ink n-focus disabled:opacity-50 dark:bg-n-surface"
           >
             <option value={AUTOMATIC}>
               Automatic ({pretty(automatic ? timezone : detected)})
@@ -208,7 +208,7 @@ export function SettingsScreen({
         <button
           type="button"
           onClick={() => signOut({ redirectUrl: "/" })}
-          className="-ml-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-base font-medium text-n-ink n-focus"
+          className="-ml-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-n-phone-button text-n-ink n-focus"
         >
           Sign out
         </button>
@@ -217,7 +217,7 @@ export function SettingsScreen({
             type="button"
             onClick={deleteAccount}
             disabled={deleteUser.isPending || !user}
-            className="-ml-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-base font-medium text-n-overdue n-focus disabled:opacity-50"
+            className="-ml-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-n-phone-button text-n-overdue n-focus disabled:opacity-50"
           >
             {deleteUser.isPending ? "Deleting…" : "Delete my account"}
           </button>
@@ -348,7 +348,7 @@ function ApiTokenSection({ open }: { open: boolean }) {
               readOnly
               value={fresh}
               onFocus={(e) => e.currentTarget.select()}
-              className="min-h-11 min-w-0 flex-1 rounded-n-field border border-n-hairline bg-n-canvas px-3 font-mono text-[0.8125rem] text-n-ink n-focus dark:bg-n-surface"
+              className="min-h-11 min-w-0 flex-1 rounded-n-field border border-n-hairline bg-n-canvas px-3 font-mono text-n-phone-meta text-n-ink n-focus dark:bg-n-surface"
             />
             <button
               type="button"
@@ -359,14 +359,14 @@ function ApiTokenSection({ open }: { open: boolean }) {
             </button>
           </div>
           <p className={HINT}>Copy it now. You won’t see it again.</p>
-          <code className="mt-3 block rounded-n-field bg-n-fill px-3 py-2 font-mono text-xs leading-relaxed break-all text-n-ink">
+          <code className="mt-3 block rounded-n-field bg-n-fill px-3 py-2 font-mono text-n-phone-code break-all text-n-ink">
             {`curl -H "Authorization: Bearer ${fresh}" ${API_URL}/v1/lists/today/todos`}
           </code>
           <div className="mt-2">{docsLink}</div>
         </>
       ) : info ? (
         <>
-          <p className="text-base text-n-ink">{tokenDates(info)}</p>
+          <p className="text-n-phone-item text-n-ink">{tokenDates(info)}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -413,7 +413,7 @@ function Environment({ origin }: { origin: string }) {
   return (
     <section className={SECTION}>
       <h2 className={LABEL}>Environment</h2>
-      <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-xs text-n-ink-muted">
+      <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 font-mono text-n-phone-caption text-n-ink-muted">
         <dt>url</dt>
         <dd className="m-0 truncate">{env.currentUrl}</dd>
         <dt>api</dt>

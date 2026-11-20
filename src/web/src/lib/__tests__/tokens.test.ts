@@ -236,9 +236,8 @@ describe("design token generator", () => {
     ).toEqual([]);
   });
 
-  it("emits no type or space for the web, and no space unit or s0 for Apple", () => {
+  it("emits no space for the web, and no space unit or s0 for Apple", () => {
     const css = renderCss(tokens);
-    expect(css).not.toContain("--n-type-");
     expect(css).not.toContain("--n-space-");
     expect(css).not.toContain("--n-row-min-height");
     const swift = renderSwift(tokens);
@@ -253,10 +252,88 @@ describe("design token generator", () => {
     expect(renderSwift(tokens)).toContain(
       "static let codeScale: CGFloat = 0.85",
     );
-    // The web copies it by hand, like all of its type.
+    expect(renderCss(tokens)).toContain("--n-type-code-scale: 0.85;");
     const styles = readFileSync(join(WEB_SRC, "styles.css"), "utf8");
     const utility = styles.match(/@utility n-code \{([^}]*)\}/)?.[1];
-    expect(utility).toContain(`font-size: ${tokens.type.codeScale}em;`);
+    expect(utility).toContain(
+      "font-size: calc(var(--n-type-code-scale) * 1em);",
+    );
+  });
+
+  describe("type", () => {
+    const css = renderCss(tokens);
+    const swift = renderSwift(tokens);
+    type Style = {
+      font: string;
+      size: number;
+      lineHeight: number;
+      weight: number;
+      tracking?: number;
+      iosTextStyle?: string;
+    };
+    const groups = Object.entries(tokens.type).filter(
+      ([, styles]) => typeof styles === "object",
+    ) as [string, Record<string, Style>][];
+
+    // One Tailwind utility per role carries all four values, so
+    // `text-n-wide-row-title` is the whole of a row title's type.
+    it("emits each role as a Tailwind text utility with its line height, weight and tracking", () => {
+      const theme = css.slice(css.indexOf("@theme {"));
+      expect(theme.length).toBeLessThan(css.length);
+      expect(theme).toContain("--text-n-wide-row-title: 0.9375rem;");
+      expect(theme).toContain(
+        "--text-n-wide-row-title--line-height: 1.3125rem;",
+      );
+      expect(theme).toContain("--text-n-wide-row-title--font-weight: 500;");
+      expect(theme).toContain(
+        "--text-n-wide-row-title--letter-spacing: -0.005em;",
+      );
+      expect(theme).toContain("--text-n-phone-body: 1.0625rem;");
+      expect(theme).toContain("--text-n-phone-body--line-height: 1.375rem;");
+      expect(theme).toContain("--text-n-phone-body--letter-spacing: 0em;");
+      expect(theme).toContain("--text-n-landing-hero: 3rem;");
+    });
+
+    // Both apps were built to these; tokens.json takes what they render
+    // (Decisions, 2026-11-19), so nothing moves on any platform.
+    it("holds the row titles, masthead, column title and detail title both apps draw", () => {
+      const { phone, wide } = tokens.type as Record<
+        string,
+        Record<string, Style>
+      >;
+      const box = (s: Style) => [s.size, s.lineHeight, s.weight];
+      expect(box(wide.rowTitle)).toEqual([15, 21, 500]);
+      expect(box(phone.rowTitle)).toEqual([17, 23, 500]);
+      expect(box(phone.display)).toEqual([46, 46, 700]);
+      expect(box(wide.display)).toEqual([40, 40, 700]);
+      expect(box(phone.sheetTitle)).toEqual([32, 35, 700]);
+    });
+
+    it("gives every role whole-pixel values, a known font and a 100–900 weight", () => {
+      for (const [group, styles] of groups) {
+        for (const [role, s] of Object.entries(styles)) {
+          if (role.startsWith("$")) continue;
+          const name = `${group}.${role}`;
+          expect(Number.isInteger(s.size), name).toBe(true);
+          expect(Number.isInteger(s.lineHeight), name).toBe(true);
+          expect(s.lineHeight, name).toBeGreaterThanOrEqual(s.size);
+          expect(Object.keys(tokens.font), name).toContain(s.font);
+          expect([100, 200, 300, 400, 500, 600, 700, 800, 900], name).toContain(
+            s.weight,
+          );
+        }
+      }
+    });
+
+    // Apple draws the roles with a text style; the rest are the web's own.
+    it("gives Apple the roles with an iosTextStyle, tracking included", () => {
+      expect(swift).toContain(
+        "static let rowTitle = Style(size: 15, lineHeight: 21, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .subheadline, tracking: -0.005)",
+      );
+      expect(swift).toContain("let tracking: CGFloat");
+      expect(swift).not.toContain("enum Landing");
+      expect(swift).not.toMatch(/static let pageTitle = Style/);
+    });
   });
 
   it("builds the same theme for macOS from AppKit types", () => {

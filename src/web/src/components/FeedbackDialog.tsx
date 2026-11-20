@@ -179,7 +179,7 @@ export function FeedbackDialog({
           }`}
         >
           <div className="mb-3 flex items-center justify-between">
-            <Dialog.Title className="m-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
+            <Dialog.Title className="m-0 font-n-display text-n-wide-title">
               Send feedback
             </Dialog.Title>
             <Dialog.Close
@@ -189,7 +189,7 @@ export function FeedbackDialog({
               <X size={15} aria-hidden="true" />
             </Dialog.Close>
           </div>
-          <Dialog.Description className="mt-0 mb-3 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
+          <Dialog.Description className="mt-0 mb-3 text-n-wide-meta text-n-ink-muted">
             Paste, drop or add screenshots. The page, theme and window size are
             attached for you. This files a public GitHub issue, screenshots
             included.
@@ -209,7 +209,7 @@ export function FeedbackDialog({
               }}
               placeholder="What’s wrong?"
               rows={4}
-              className="field-sizing-content block max-h-60 min-h-24 w-full resize-none rounded-n-field bg-n-surface px-3.5 py-3 text-base leading-[1.45] text-n-ink n-focus placeholder:text-n-ink-muted dark:bg-n-canvas"
+              className="field-sizing-content block max-h-60 min-h-24 w-full resize-none rounded-n-field bg-n-surface px-3.5 py-3 text-n-wide-input text-n-ink n-focus placeholder:text-n-ink-muted dark:bg-n-canvas"
             />
           </label>
 
@@ -244,7 +244,7 @@ export function FeedbackDialog({
                 <button
                   type="button"
                   onClick={() => fileInput.current?.click()}
-                  className="flex size-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-n-chip border border-dashed border-n-hairline text-[0.6875rem] text-n-ink-muted n-focus pointer-fine:hover:bg-n-surface"
+                  className="flex size-16 cursor-pointer flex-col items-center justify-center gap-1 rounded-n-chip border border-dashed border-n-hairline text-n-wide-tile text-n-ink-muted n-focus pointer-fine:hover:bg-n-surface"
                 >
                   <ImagePlus size={16} aria-hidden="true" />
                   Add
@@ -266,14 +266,14 @@ export function FeedbackDialog({
           />
 
           <div className="mt-4 flex items-center justify-end gap-3">
-            <span className="mr-auto text-xs text-n-ink-muted">
+            <span className="mr-auto text-n-wide-caption text-n-ink-muted">
               <kbd className="font-n-text">⌘↩</kbd> to send
             </span>
             <button
               type="button"
               onClick={submit}
               disabled={!ready}
-              className="h-10 cursor-pointer rounded-n-field bg-n-brand px-4 text-[0.9375rem] font-semibold text-n-brand-ink n-focus transition-[opacity,transform] duration-(--n-duration-fast) active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
+              className="h-10 cursor-pointer rounded-n-field bg-n-brand px-4 text-n-wide-control text-n-brand-ink n-focus transition-[opacity,transform] duration-(--n-duration-fast) active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50"
             >
               {send.isPending ? "Sending…" : "Send"}
             </button>

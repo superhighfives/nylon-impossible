@@ -156,7 +156,7 @@ function WaitlistForm() {
 
   if (status === "joined") {
     return (
-      <p role="status" className="leading-relaxed font-medium">
+      <p role="status" className="text-n-landing-status">
         {LANDING_COPY.joined}
       </p>
     );
@@ -179,7 +179,7 @@ function WaitlistForm() {
           onChange={(event) => setEmail(event.target.value)}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
-          className="h-11 min-w-0 rounded-n-field border border-n-hairline bg-n-canvas px-4 text-base text-n-ink placeholder:text-n-ink-subtle n-focus sm:flex-1"
+          className="h-11 min-w-0 rounded-n-field border border-n-hairline bg-n-canvas px-4 text-n-landing-input text-n-ink placeholder:text-n-ink-subtle n-focus sm:flex-1"
         />
         <Button
           type="submit"
@@ -195,7 +195,7 @@ function WaitlistForm() {
         <p
           id={errorId}
           role="alert"
-          className="text-[0.9375rem] text-n-overdue"
+          className="text-n-landing-error text-n-overdue"
         >
           {error}
         </p>
@@ -209,9 +209,7 @@ export function LandingPage() {
     <div className="min-h-dvh bg-n-canvas text-n-ink">
       <div className="mx-auto max-w-6xl pr-[max(1rem,env(safe-area-inset-right,0px))] pl-[max(1rem,env(safe-area-inset-left,0px))] sm:pr-[max(2rem,env(safe-area-inset-right,0px))] sm:pl-[max(2rem,env(safe-area-inset-left,0px))]">
         <header className="flex h-16 items-center justify-between border-b border-n-hairline">
-          <span className="font-n-display text-xl font-bold tracking-[-0.02em]">
-            Nylon
-          </span>
+          <span className="font-n-display text-n-landing-wordmark">Nylon</span>
           <SignInButton mode="modal">
             <Button variant="outline">Sign in</Button>
           </SignInButton>
@@ -224,7 +222,7 @@ export function LandingPage() {
           >
             <h1
               id="landing-headline"
-              className="font-n-display text-[3rem] leading-[1.02] font-bold tracking-[-0.035em] sm:text-[4.5rem] lg:text-[5.5rem]"
+              className="font-n-display text-n-landing-hero sm:text-n-landing-hero-medium lg:text-n-landing-hero-large"
             >
               {/* One horizon per line: the order todos move in. */}
               {LANDING_COPY.headline.split(/(?<=,) /).map((line, index) => (
@@ -237,10 +235,10 @@ export function LandingPage() {
             <div className="space-y-6 lg:pb-3">
               {/* Yellow only in dark: thin yellow lines and text don't hold
                   up on white (PRINCIPLES.md, Brand accent). */}
-              <p className="inline-block rounded-full border border-n-hairline px-3 py-1 text-[0.8125rem] font-medium text-n-ink dark:border-n-brand dark:text-n-brand">
+              <p className="inline-block rounded-full border border-n-hairline px-3 py-1 text-n-landing-badge text-n-ink dark:border-n-brand dark:text-n-brand">
                 {LANDING_COPY.eyebrow}
               </p>
-              <p className="text-[1.0625rem] leading-relaxed text-n-ink-muted text-pretty">
+              <p className="text-n-landing-lede text-n-ink-muted text-pretty">
                 <strong className="font-semibold text-n-ink">
                   {LANDING_COPY.lead}
                 </strong>{" "}
@@ -280,20 +278,20 @@ export function LandingPage() {
           >
             <h2
               id="landing-horizons"
-              className="font-n-display text-[1.375rem] leading-7 font-semibold tracking-[-0.01em]"
+              className="font-n-display text-n-landing-section"
             >
               Time is the structure
             </h2>
             <ol className="mt-8 grid gap-8 sm:grid-cols-3 sm:gap-10">
               {horizons.map((horizon, index) => (
                 <li key={horizon.title} className="border-t border-n-ink pt-4">
-                  <p className="text-[0.8125rem] text-n-ink-muted tabular-nums">
+                  <p className="text-n-landing-caption text-n-ink-muted tabular-nums">
                     {String(index + 1).padStart(2, "0")}
                   </p>
-                  <h3 className="mt-1 font-n-display text-[2.125rem] leading-10 font-bold tracking-[-0.025em]">
+                  <h3 className="mt-1 font-n-display text-n-landing-figure">
                     {horizon.title}
                   </h3>
-                  <p className="mt-2 leading-relaxed text-n-ink-muted">
+                  <p className="mt-2 text-n-landing-body text-n-ink-muted">
                     {horizon.body}
                   </p>
                 </li>
@@ -307,11 +305,11 @@ export function LandingPage() {
           >
             <h2
               id="landing-platforms"
-              className="font-n-display text-[1.375rem] leading-7 font-semibold tracking-[-0.01em]"
+              className="font-n-display text-n-landing-section"
             >
               Everywhere you are
             </h2>
-            <p className="mt-2 leading-relaxed text-n-ink-muted">
+            <p className="mt-2 text-n-landing-body text-n-ink-muted">
               Synced as you type, and fine offline.
             </p>
             <ul className="mt-8 grid sm:grid-cols-2 sm:gap-x-10 lg:grid-cols-3">
@@ -320,10 +318,10 @@ export function LandingPage() {
                   key={platform.title}
                   className="border-t border-n-hairline py-5"
                 >
-                  <h3 className="font-n-display text-[1.125rem] leading-6 font-semibold">
+                  <h3 className="font-n-display text-n-landing-card-title">
                     {platform.title}
                   </h3>
-                  <p className="mt-1 leading-relaxed text-n-ink-muted">
+                  <p className="mt-1 text-n-landing-body text-n-ink-muted">
                     {platform.body}
                   </p>
                 </li>
@@ -337,7 +335,7 @@ export function LandingPage() {
           >
             <h2
               id="landing-features"
-              className="font-n-display text-[1.375rem] leading-7 font-semibold tracking-[-0.01em]"
+              className="font-n-display text-n-landing-section"
             >
               Small on purpose
             </h2>
@@ -348,7 +346,7 @@ export function LandingPage() {
                   className="border-t border-n-hairline py-5"
                 >
                   <h3 className="font-medium">{feature.title}</h3>
-                  <p className="mt-1 leading-relaxed text-n-ink-muted">
+                  <p className="mt-1 text-n-landing-body text-n-ink-muted">
                     {feature.body}
                   </p>
                 </li>
@@ -357,7 +355,7 @@ export function LandingPage() {
           </section>
         </main>
 
-        <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-n-hairline py-8 text-[0.8125rem] text-n-ink-muted">
+        <footer className="flex flex-wrap items-center justify-between gap-4 border-t border-n-hairline py-8 text-n-landing-caption text-n-ink-muted">
           <span className="font-n-display font-bold text-n-ink">Nylon</span>
           <nav aria-label="Footer" className="flex gap-5">
             <Link to="/docs/api" className={linkClass}>

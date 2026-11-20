@@ -170,6 +170,8 @@ enum Theme {
             let variationWeight: CGFloat
             let isDisplay: Bool
             let textStyle: PlatformFont.TextStyle
+            /// Letter spacing as a fraction of the size (the web's em).
+            let tracking: CGFloat
 
             /// The face at its base size, before Dynamic Type scaling.
             var baseFont: PlatformFont {
@@ -203,16 +205,25 @@ enum Theme {
         static let codeScale: CGFloat = 0.85
 
         enum Phone {
-            static let display = Style(size: 34, lineHeight: 40, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle)
-            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2)
-            static let body = Style(size: 17, lineHeight: 22, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .body)
-            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote)
+            static let display = Style(size: 46, lineHeight: 46, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle, tracking: -0.03)
+            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2, tracking: -0.01)
+            static let body = Style(size: 17, lineHeight: 22, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .body, tracking: 0)
+            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote, tracking: 0)
+            static let rowTitle = Style(size: 17, lineHeight: 23, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .body, tracking: -0.005)
+            static let sheetTitle = Style(size: 32, lineHeight: 35, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .title1, tracking: -0.025)
+            static let control = Style(size: 15, lineHeight: 20, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .subheadline, tracking: 0)
+            static let subline = Style(size: 14, lineHeight: 19, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline, tracking: 0)
+            static let chip = Style(size: 14, lineHeight: 18, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .subheadline, tracking: 0)
+            static let subtask = Style(size: 16, lineHeight: 21, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .callout, tracking: 0)
+            static let label = Style(size: 13, lineHeight: 18, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .footnote, tracking: 0)
+            static let metaChip = Style(size: 12, lineHeight: 16, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .caption1, tracking: 0)
         }
         enum Wide {
-            static let display = Style(size: 40, lineHeight: 46, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle)
-            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2)
-            static let body = Style(size: 15, lineHeight: 20, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline)
-            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote)
+            static let display = Style(size: 40, lineHeight: 40, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle, tracking: -0.03)
+            static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2, tracking: -0.01)
+            static let body = Style(size: 15, lineHeight: 20, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline, tracking: 0)
+            static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote, tracking: 0)
+            static let rowTitle = Style(size: 15, lineHeight: 21, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .subheadline, tracking: -0.005)
         }
     }
 

@@ -13,11 +13,11 @@ import { LegalPage, LegalSection } from "./LegalPage";
 const API_BASE = "https://api.nylonimpossible.com";
 
 const CODE_BLOCK =
-  "overflow-x-auto rounded-n-field bg-n-fill p-3 font-mono text-xs leading-relaxed text-n-ink";
+  "overflow-x-auto rounded-n-field bg-n-fill p-3 font-mono text-n-wide-code text-n-ink";
 
 /** Inline code. */
 function C({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-[0.8125rem]">{children}</code>;
+  return <code className="font-mono text-n-wide-meta">{children}</code>;
 }
 
 const ROUTES: { path: string; returns: ReactNode }[] = [

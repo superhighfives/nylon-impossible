@@ -12,7 +12,7 @@ export function GoHint() {
   return (
     <div
       role="status"
-      className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 animate-n-fade-in items-center gap-3 rounded-[0.75rem] border border-n-hairline bg-n-surface px-4 py-2.5 text-[0.8125rem] text-n-ink-muted shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)]"
+      className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 animate-n-fade-in items-center gap-3 rounded-[0.75rem] border border-n-hairline bg-n-surface px-4 py-2.5 text-n-wide-meta text-n-ink-muted shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)]"
     >
       {KEYS.map(([key, label]) => (
         <span key={key} className="flex items-center gap-1.5">

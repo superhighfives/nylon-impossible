@@ -9,8 +9,8 @@ import { NewListPopover } from "./NewListPopover";
 /** Droppable ids for sidebar entries, distinct from column ids. */
 export const sidebarDropId = (listId: string) => `side:${listId}`;
 
-/** The entries' type size, which the eye's row matches to line up. */
-const ENTRY_TEXT = "text-[0.9375rem]";
+/** The entries' type, which the eye's row matches to line up. */
+const ENTRY_TEXT = "text-n-wide-action";
 
 /** A sidebar entry, less its text colour: each sets one, so none compete. */
 const ENTRY = `relative flex h-9 w-full cursor-pointer items-center gap-2 rounded-[0.5rem] px-2.5 text-left ${ENTRY_TEXT} n-focus-soft transition-colors duration-(--n-duration-fast) pointer-fine:hover:bg-n-surface`;
@@ -78,7 +78,7 @@ function ListEntry({
       data-column-hidden={hidden ? "" : undefined}
       aria-describedby={`sidebar-count-${list.id}`}
       onClick={() => onSelect(list)}
-      className={`${ENTRY} ${strong ? "font-semibold" : "font-medium"} ${
+      className={`${ENTRY} ${strong ? "font-semibold" : ""} ${
         dropping
           ? "bg-n-brand text-n-brand-ink"
           : `${hidden ? "text-n-ink-muted" : "text-n-ink"} ${
@@ -241,7 +241,7 @@ export function Sidebar({
       className="n-section-outline relative flex w-60 shrink-0 flex-col border-r border-n-hairline outline-none"
     >
       <div className="flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto px-5 pt-7 pb-5 [scrollbar-width:thin]">
-        <p className="m-0 px-2.5 font-n-display text-xl font-extrabold tracking-[-0.02em] text-n-ink">
+        <p className="m-0 px-2.5 font-n-display text-n-wide-wordmark text-n-ink">
           Nylon
         </p>
         {!listsFailed && (
@@ -257,7 +257,7 @@ export function Sidebar({
                     key={name}
                     aria-hidden="true"
                     data-skeleton-entry
-                    className="flex h-9 items-center gap-2 px-2.5 text-[0.9375rem] font-semibold text-n-ink"
+                    className="flex h-9 items-center gap-2 px-2.5 text-n-wide-control text-n-ink"
                   >
                     <span className="min-w-0 flex-1 truncate">{name}</span>
                     <span className="h-2.5 w-3 rounded-n-chip bg-n-fill motion-safe:animate-pulse" />
@@ -274,7 +274,7 @@ export function Sidebar({
                 />
               ))}
             </ul>
-            <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-xs font-semibold text-n-ink-muted">
+            <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-n-wide-group-label text-n-ink-muted">
               Lists
             </h2>
             <ul className="flex flex-col gap-0.5">
@@ -297,7 +297,7 @@ export function Sidebar({
                       type="button"
                       data-sidebar-nav
                       aria-keyshortcuts="Shift+N"
-                      className={`${ENTRY} font-medium text-n-ink-muted`}
+                      className={`${ENTRY} text-n-ink-muted`}
                     >
                       <Plus size={15} aria-hidden="true" className="shrink-0" />
                       New list
@@ -343,7 +343,7 @@ export function Sidebar({
               <span className="flex-1">Send feedback</span>
               <span
                 aria-hidden="true"
-                className="font-n-text text-xs font-normal"
+                className="font-n-text text-n-wide-caption"
               >
                 f
               </span>
@@ -353,7 +353,7 @@ export function Sidebar({
             <span className="flex-1">Keyboard shortcuts</span>
             <span
               aria-hidden="true"
-              className="font-n-text text-xs font-normal"
+              className="font-n-text text-n-wide-caption"
             >
               ?
             </span>
@@ -386,7 +386,7 @@ function SidebarButton({
       aria-describedby={describedBy}
       aria-keyshortcuts={keyShortcut}
       onClick={onClick}
-      className={`${ENTRY} font-medium text-n-ink`}
+      className={`${ENTRY} text-n-ink`}
     >
       {children}
     </button>

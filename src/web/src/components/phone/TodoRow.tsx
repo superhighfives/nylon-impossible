@@ -58,14 +58,26 @@ export function metaChip(part: MetaPart): "brand" | "fill" | null {
   }
 }
 
-const CHIP =
-  "h-5 rounded-n-chip px-[0.4375rem] text-[0.75rem] leading-none font-semibold";
+const CHIP = "h-5 rounded-n-chip px-[0.4375rem]";
+/** The meta line and its chips, at each density's type. */
+const META_TEXT = {
+  phone: { line: "text-n-phone-meta", chip: "text-n-phone-meta-chip" },
+  wide: { line: "text-n-wide-meta", chip: "text-n-wide-meta-chip" },
+} as const;
 const CHIP_COLORS = {
   brand: "bg-n-brand text-n-brand-ink",
   fill: "bg-n-fill text-n-ink",
 } as const;
 
-function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
+function MetaItem({
+  part,
+  link,
+  density,
+}: {
+  part: MetaPart;
+  link?: boolean;
+  density: "phone" | "wide";
+}) {
   const Icon = part.kind === "due" ? null : META_ICONS[part.kind];
   const overdue = part.kind === "due" && part.overdue;
   const chip = metaChip(part);
@@ -73,7 +85,7 @@ function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
     <span
       data-meta-chip={chip ?? undefined}
       className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""} ${
-        chip ? `${CHIP} ${CHIP_COLORS[chip]}` : ""
+        chip ? `${CHIP} ${META_TEXT[density].chip} ${CHIP_COLORS[chip]}` : ""
       }`}
     >
       {part.kind === "link" && part.fetching ? (
@@ -114,15 +126,23 @@ function MetaItem({ part, link }: { part: MetaPart; link?: boolean }) {
   );
 }
 
-function MetaLine({ parts, links }: { parts: MetaPart[]; links?: boolean }) {
+function MetaLine({
+  parts,
+  links,
+  density,
+}: {
+  parts: MetaPart[];
+  links?: boolean;
+  density: "phone" | "wide";
+}) {
   if (parts.length === 0) return null;
   return (
     <span
       aria-hidden="true"
-      className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-[0.8125rem] leading-[1.125rem] text-n-ink-muted"
+      className={`mt-0.5 flex flex-wrap gap-x-3 gap-y-1 ${META_TEXT[density].line} text-n-ink-muted`}
     >
       {parts.map((part) => (
-        <MetaItem key={part.kind} part={part} link={links} />
+        <MetaItem key={part.kind} part={part} link={links} density={density} />
       ))}
     </span>
   );
@@ -492,14 +512,14 @@ function WideTodoRow({
             className="block w-full cursor-pointer text-left outline-none"
           >
             <span
-              className={`line-clamp-3 block text-[0.9375rem] leading-[1.4] font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
+              className={`line-clamp-3 block text-n-wide-row-title wrap-anywhere transition-colors duration-(--n-duration-fast) ${
                 checked ? "text-n-ink-muted line-through" : "text-n-ink"
               }`}
             >
               {title}
             </span>
           </button>
-          <MetaLine parts={parts} links />
+          <MetaLine parts={parts} links density="wide" />
         </div>
       </div>
     </RowShell>
@@ -588,13 +608,13 @@ function PhoneTodoRow({
           className="n-focus-inset min-w-0 flex-1 cursor-pointer touch-pan-y rounded-n-chip py-[0.6875rem] text-left select-none [-webkit-touch-callout:none]"
         >
           <span
-            className={`line-clamp-3 block text-[1.0625rem] leading-[1.35] font-medium tracking-[-0.005em] wrap-anywhere transition-colors duration-(--n-duration-fast) ${
+            className={`line-clamp-3 block text-n-phone-row-title wrap-anywhere transition-colors duration-(--n-duration-fast) ${
               checked ? "text-n-ink-muted line-through" : "text-n-ink"
             }`}
           >
             {title}
           </span>
-          <MetaLine parts={parts} />
+          <MetaLine parts={parts} density="phone" />
         </button>
       </div>
     </RowShell>

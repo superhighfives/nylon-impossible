@@ -913,14 +913,14 @@ export function WideApp({
   /** A failed load: what didn't load, and Try again. */
   const loadError = (what: string, retry: () => unknown, fetching: boolean) => (
     <div className="mt-4" role="alert">
-      <p className="m-0 font-n-display text-[1.125rem] font-semibold text-n-ink">
+      <p className="m-0 font-n-display text-n-wide-heading text-n-ink">
         Couldn’t load your {what}.
       </p>
       <button
         type="button"
         onClick={() => retry()}
         disabled={fetching}
-        className="-ml-2 mt-1 min-h-11 cursor-pointer rounded-n-chip px-2 text-[0.9375rem] font-medium text-n-ink-muted n-focus"
+        className="-ml-2 mt-1 min-h-11 cursor-pointer rounded-n-chip px-2 text-n-wide-action text-n-ink-muted n-focus"
       >
         {fetching ? "Trying again…" : "Try again"}
       </button>

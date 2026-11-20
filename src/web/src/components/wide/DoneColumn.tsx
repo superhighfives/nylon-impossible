@@ -97,7 +97,7 @@ export function DoneColumn({
           <ViewBoundary view="done" resetKey={todos} className="mt-10">
             {groups.map((group) => (
               <section key={group.label} className="pt-2 pb-1">
-                <h3 className="m-0 mb-1 text-[0.8125rem] font-semibold text-n-ink-muted">
+                <h3 className="m-0 mb-1 text-n-wide-label text-n-ink-muted">
                   {group.label}
                 </h3>
                 <ul className="m-0 list-none p-0">
@@ -177,10 +177,10 @@ function DoneRow({
           }}
           className="-ml-1.5 min-w-0 flex-1 cursor-pointer py-2.5 pr-2 pl-1.5 text-left outline-none"
         >
-          <span className="line-clamp-3 block text-[0.9375rem] leading-[1.4] text-n-ink-muted line-through wrap-anywhere">
+          <span className="line-clamp-3 block text-n-wide-row-title font-normal text-n-ink-muted line-through wrap-anywhere">
             {title}
           </span>
-          <span className="mt-0.5 block text-[0.8125rem] leading-[1.125rem] text-n-ink-muted">
+          <span className="mt-0.5 block text-n-wide-meta text-n-ink-muted">
             {where}
           </span>
         </button>

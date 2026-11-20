@@ -48,7 +48,7 @@ export function Calendar({
         >
           <ChevronLeft size={18} aria-hidden="true" />
         </button>
-        <span className="text-[0.9375rem] font-semibold text-n-ink tabular-nums">
+        <span className="text-n-phone-control text-n-ink tabular-nums">
           {monthLabel}
         </span>
         <button
@@ -66,7 +66,7 @@ export function Calendar({
             // biome-ignore lint/suspicious/noArrayIndexKey: fixed weekday order
             key={i}
             aria-hidden="true"
-            className="flex h-8 items-center justify-center text-[0.6875rem] font-medium text-n-ink-muted"
+            className="flex h-8 items-center justify-center text-n-phone-weekday text-n-ink-muted"
           >
             {d}
           </div>
@@ -96,7 +96,7 @@ export function Calendar({
               )}
               aria-pressed={selected}
               aria-current={isToday ? "date" : undefined}
-              className={`flex h-11 cursor-pointer items-center justify-center rounded-n-chip text-[0.9375rem] tabular-nums n-focus-inset ${
+              className={`flex h-11 cursor-pointer items-center justify-center rounded-n-chip text-n-phone-secondary tabular-nums n-focus-inset ${
                 selected
                   ? "bg-n-brand font-semibold text-n-brand-ink"
                   : isToday

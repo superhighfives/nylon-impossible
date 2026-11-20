@@ -34,7 +34,7 @@ export function DonePage({
       />
       {loading ? (
         <p
-          className="mx-5 mt-7 text-[0.9375rem] text-n-ink-muted"
+          className="mx-5 mt-7 text-n-phone-secondary text-n-ink-muted"
           aria-live="polite"
         >
           Loading…
@@ -46,7 +46,7 @@ export function DonePage({
       ) : (
         groups.map((group) => (
           <section key={group.label} className="px-5 pt-[1.125rem] pb-1">
-            <h2 className="mb-1.5 text-[0.8125rem] font-semibold text-n-ink-muted">
+            <h2 className="mb-1.5 text-n-phone-label text-n-ink-muted">
               {group.label}
             </h2>
             <ul>
@@ -63,10 +63,10 @@ export function DonePage({
                     </span>
                   </button>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[1.0625rem] leading-[1.35] text-n-ink-muted line-through wrap-anywhere">
+                    <div className="text-n-phone-row-title font-normal text-n-ink-muted line-through wrap-anywhere">
                       {displayTitle(todo)}
                     </div>
-                    <div className="mt-[3px] text-[0.8125rem] text-n-ink-muted">
+                    <div className="mt-[3px] text-n-phone-meta text-n-ink-muted">
                       {listName(todo.listId)}
                     </div>
                   </div>
@@ -77,7 +77,7 @@ export function DonePage({
         ))
       )}
       {groups.length > 0 && (
-        <p className="mx-5 my-3 text-[0.8125rem] text-n-ink-muted">
+        <p className="mx-5 my-3 text-n-phone-meta text-n-ink-muted">
           Tap a check to put a todo back.
         </p>
       )}

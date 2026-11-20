@@ -70,7 +70,7 @@ export function SkeletonComposer() {
         strokeWidth={2.2}
         className="mt-3 ml-[3px] shrink-0 text-n-ink-muted"
       />
-      <span className="block min-h-10 py-2.5 text-[0.9375rem] leading-5 text-n-ink-muted">
+      <span className="block min-h-10 py-2.5 text-n-wide-body text-n-ink-muted">
         Add
       </span>
     </div>
