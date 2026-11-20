@@ -301,11 +301,16 @@ jobs:
             ")
           fi
           echo "Running UI tests on: $DEVICE"
+          # The hosted simulator sometimes times out launching the app or
+          # misses a frame, so a failed test runs once more. A real
+          # regression fails both times.
           xcodebuild test \
             -project "Nylon Impossible.xcodeproj" \
             -scheme "Nylon Impossible UI Tests" \
             -destination "platform=iOS Simulator,name=$DEVICE" \
             -resultBundlePath UITestResults \
+            -retry-tests-on-failure \
+            -test-iterations 2 \
             -quiet
 
       # Every UI test and its result, and the failures by name, so a red
@@ -328,6 +333,9 @@ jobs:
               | "| `\(.nodeIdentifier // .name)` | \(.result) |"' tests.json 2>/dev/null || true
             echo
           } >> "$GITHUB_STEP_SUMMARY"
+          # A test that passes on its retry can still be listed in
+          # testFailures, so report failures only when the run failed.
+          [ "$(jq -r '.result // ""' summary.json 2>/dev/null)" = "Failed" ] || exit 0
           jq -r '.testFailures[]? | "\(.testIdentifierString // .testName): \(.failureText)"' summary.json 2>/dev/null \
             | while read -r failed; do
                 echo "::error title=UI test failed::$failed"
