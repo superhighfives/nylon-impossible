@@ -57,8 +57,13 @@ jobs:
             -resultBundlePath TestResults \
             -quiet
 
+  # The UI tests don't run on PRs while CI is on the hosted Mac (#611), so a
+  # release waits for them instead.
+  ui-test:
+    uses: ./.github/workflows/ios-ui-test.yml
+
   deploy:
-    needs: [test]
+    needs: [test, ui-test]
     runs-on: xcode-27
     timeout-minutes: 30
     permissions:
@@ -176,7 +181,7 @@ jobs:
   # src/ios/README.md. Independent of the iOS deploy job: it never blocks or
   # changes the iOS release.
   deploy-mac:
-    needs: [test]
+    needs: [test, ui-test]
     if: ${{ vars.ENABLE_MAC_RELEASE == 'true' }}
     runs-on: xcode-27
     timeout-minutes: 40
