@@ -54,7 +54,7 @@
     "@cloudflare/vite-plugin": "^1.53.1",
     "@cloudflare/workers-types": "^5.20261028.1",
     "@effect/tsgo": "^0.69.0",
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.65.1",
     "@tanstack/devtools-vite": "^0.8.5",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
