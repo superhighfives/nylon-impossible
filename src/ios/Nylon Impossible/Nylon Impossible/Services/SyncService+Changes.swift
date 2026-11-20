@@ -32,7 +32,10 @@ extension SyncService {
                 parentId: todo.isSoftDeleted ? nil : todo.parentId?.uuidString.lowercased(),
                 listId: todo.isSoftDeleted ? nil : todo.listKey?.lowercased(),
                 title: todo.isSoftDeleted ? nil : todo.title,
-                notes: todo.isSoftDeleted ? nil : todo.itemNotes,
+                // The editor stops at the limit, but notes saved before it
+                // did could be longer, and /sync rejects the whole push for
+                // one. Cut, so the rest of this device's changes still sync.
+                notes: todo.isSoftDeleted ? nil : todo.itemNotes.map { TodoText.capNotes($0) },
                 completed: todo.isSoftDeleted ? nil : todo.isCompleted,
                 position: todo.isSoftDeleted ? nil : todo.position,
                 dueDate: todo.isSoftDeleted ? nil : todo.dueDate,

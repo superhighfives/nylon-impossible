@@ -74,13 +74,15 @@ enum TodoText {
         return cut.trimmingCharacters(in: .whitespaces) + "…"
     }
 
-    private static func capNotes(_ text: String) -> String {
-        guard text.utf16.count > notesMax else { return text }
+    /// `text` cut to `max` UTF-16 units (the API's notes limit unless
+    /// given), at a character boundary, so an emoji is never split.
+    static func capNotes(_ text: String, max: Int = notesMax) -> String {
+        guard text.utf16.count > max else { return text }
         var result = ""
         var count = 0
         for character in text {
             let size = character.utf16.count
-            if count + size > notesMax { break }
+            if count + size > max { break }
             result.append(character)
             count += size
         }

@@ -108,6 +108,37 @@ struct SyncServiceTests {
         }
     }
 
+    @Test("Notes over the limit are sent cut to it, at a character boundary")
+    @MainActor
+    func capsOverlongNotes() async throws {
+        let auth = MockAuthService()
+        let api = MockAPIService()
+        let container = try makeContainer()
+        let context = container.mainContext
+
+        // Saved before the editor stopped at the limit.
+        let ascii = TodoItem(title: "Pasted", userId: "user_test_123", position: "a0")
+        ascii.itemNotes = String(repeating: "a", count: 120_000)
+        ascii.isSynced = false
+        context.insert(ascii)
+        // An emoji (2 units) straddling the limit.
+        let emoji = TodoItem(title: "Emoji", userId: "user_test_123", position: "a1")
+        emoji.itemNotes = String(repeating: "a", count: TodoText.notesMax - 1) + "😀😀"
+        emoji.isSynced = false
+        context.insert(emoji)
+        try context.save()
+
+        let service = SyncService(authService: auth, apiService: api)
+        service.setModelContext(context)
+
+        await service.sync()
+
+        let changes = api.lastSyncRequest?.changes ?? []
+        func sent(_ title: String) -> String? { changes.first { $0.title == title }?.notes }
+        #expect(sent("Pasted")?.utf16.count == TodoText.notesMax)
+        #expect(sent("Emoji") == String(repeating: "a", count: TodoText.notesMax - 1))
+    }
+
     @Test("Applies new remote todos locally")
     @MainActor
     func appliesRemoteTodos() async throws {
