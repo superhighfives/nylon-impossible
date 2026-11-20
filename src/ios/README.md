@@ -195,7 +195,8 @@ bundle exec fastlane release   # App Store
 
 In CI, `ios-deploy.yml` runs `beta` on every push to `main` that touches
 `src/ios/**` (or by hand), and `ios-release.yml` runs `release` when
-dispatched. Both build against the production API and Clerk instance.
+dispatched, once the unit tests and the UI tests (`ios-ui-test.yml`) pass.
+Both build against the production API and Clerk instance.
 
 Each embedded extension needs its own App Store provisioning profile, named in
 the Fastfile's `provisioningProfiles` dict, carrying the same App Group and
