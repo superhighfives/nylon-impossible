@@ -159,7 +159,7 @@ Key files:
 
 All protected routes use the auth middleware. Env bindings are typed via `src/api/src/types.ts`.
 
-Testing runs in the actual Workers runtime via `@cloudflare/vitest-pool-workers`. Tests live in `src/api/test/` with integration tests against a real local D1 instance.
+Testing runs in the actual Workers runtime via `@cloudflare/vitest-plugin`. Tests live in `src/api/test/` with integration tests against a real local D1 instance.
 
 ## iOS Conventions
 
