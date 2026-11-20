@@ -15,7 +15,7 @@ REST API and real-time sync service for the Nylon Impossible todo app. Built wit
 ### Development Tools
 
 - **[Biome](https://biomejs.dev/)** - Linter and formatter
-- **[Vitest](https://vitest.dev/)** + **[@cloudflare/vitest-pool-workers](https://developers.cloudflare.com/workers/testing/vitest-integration/)** - Testing in Workers runtime
+- **[Vitest](https://vitest.dev/)** + **[@cloudflare/vitest-plugin](https://developers.cloudflare.com/workers/testing/vitest-integration/)** - Testing in Workers runtime
 - **[TypeScript](https://www.typescriptlang.org/)** - Strict type checking
 
 ## API Endpoints

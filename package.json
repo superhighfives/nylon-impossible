@@ -83,9 +83,6 @@
     "vite": "^8.2.1",
     "solid-js": "^1.9.16"
   },
-  "patchedDependencies": {
-    "vitest@5.0.3": "patches/vitest@5.0.3.patch"
-  },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "drizzle-kit": "^0.31.8",

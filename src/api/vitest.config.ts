@@ -2,7 +2,7 @@ import path from "node:path";
 import {
   cloudflareTest,
   readD1Migrations,
-} from "@cloudflare/vitest-pool-workers";
+} from "@cloudflare/vitest-plugin";
 import { Log, LogLevel } from "miniflare";
 import { defineConfig } from "vitest/config";
 
@@ -40,8 +40,9 @@ export default defineConfig(async () => {
         wrangler: { configPath: "./wrangler.test.jsonc" },
         miniflare: {
           // Silence the [vpw:debug]/[vpw:info] compatibility-flag chatter that
-          // miniflare prints for every isolate. WARN keeps real problems
-          // surfaced; everything below is upstream noise.
+          // the Workers vitest plugin's miniflare prints for every isolate.
+          // WARN keeps real problems surfaced; everything below is upstream
+          // noise.
           log: new Log(LogLevel.WARN),
           bindings: {
             TEST_MIGRATIONS: migrations,
