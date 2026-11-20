@@ -253,13 +253,13 @@ jobs:
   # simulator (#707). They have their own scheme, "Nylon Impossible UI Tests";
   # the app's scheme that `test` runs is unit tests only. They drive the DEBUG
   # `-NylonScreen` routes over in-memory sample data, so there's no network or
-  # account. They run when `test` does, and gate through `ios-ok`.
+  # account. They run only when started by hand (Actions → Test iOS → Run
+  # workflow), and don't gate `ios-ok`: the hosted simulator is too slow for
+  # them to pass reliably. They go back on every PR with the self-hosted Mac
+  # (#611).
   ui-test:
     needs: changes
-    if: >-
-      needs.changes.outputs.ios == 'true'
-      && (github.event_name != 'pull_request'
-        || github.event.pull_request.head.repo.full_name == github.repository)
+    if: github.event_name == 'workflow_dispatch'
     runs-on: xcode-27
     timeout-minutes: 60
     defaults:
@@ -358,11 +358,11 @@ jobs:
           if-no-files-found: ignore
 
   # The one check main requires from this workflow. It passes when the unit
-  # and UI tests passed, or when the PR doesn't touch iOS and they didn't need
-  # to run. A fork's iOS change fails it: the tests don't run there, and
-  # skipped isn't passed.
+  # tests passed, or when the PR doesn't touch iOS and they didn't need to
+  # run. A fork's iOS change fails it: the tests don't run there, and skipped
+  # isn't passed. `ui-test` isn't part of it until #611.
   ios-ok:
-    needs: [changes, test, ui-test]
+    needs: [changes, test]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -370,9 +370,8 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           IOS: ${{ needs.changes.outputs.ios }}
           TEST: ${{ needs.test.result }}
-          UI_TEST: ${{ needs.ui-test.result }}
         run: |
-          echo "changes=$CHANGES ios=$IOS test=$TEST ui-test=$UI_TEST"
+          echo "changes=$CHANGES ios=$IOS test=$TEST"
           [ "$CHANGES" = success ] || exit 1
           [ "$IOS" = false ] && exit 0
-          [ "$TEST" = success ] && [ "$UI_TEST" = success ]
+          [ "$TEST" = success ]
