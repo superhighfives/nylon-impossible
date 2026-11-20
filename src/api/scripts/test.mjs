@@ -2,7 +2,7 @@
 /**
  * Wrapper around `vitest run` that strips two upstream log sources we can't
  * silence via configuration:
- *   - [vpw:*]  — vitest-pool-workers hardcodes its Log to LogLevel.VERBOSE
+ *   - [vpw:*]  — the Workers vitest plugin hardcodes its Log to LogLevel.VERBOSE
  *   - workerd/jsg ... CODE_MOVED — workerd C++ runtime info-level telemetry
  *
  * Forwards the exit code so CI signals correctly. Also sets WRANGLER_LOG=warn
