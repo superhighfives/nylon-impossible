@@ -961,14 +961,21 @@ export function WideApp({
     const fallback = document
       .querySelector(`[data-row-id="${CSS.escape(todo.id)}"]`)
       ?.getBoundingClientRect();
-    setMenu({
-      id: todo.id,
-      anchor: at ?? {
-        x: fallback?.left ?? 24,
-        y: (fallback?.bottom ?? 24) + 4,
-      },
-      view: "main",
-    });
+    // ⇧F10 and the Menu key open the menu under the row (`openMenu`), and
+    // the browser can then send the row its own contextmenu: the menu stays
+    // where it opened.
+    setMenu((open) =>
+      open?.id === todo.id
+        ? open
+        : {
+            id: todo.id,
+            anchor: at ?? {
+              x: fallback?.left ?? 24,
+              y: (fallback?.bottom ?? 24) + 4,
+            },
+            view: "main",
+          },
+    );
   };
 
   /**

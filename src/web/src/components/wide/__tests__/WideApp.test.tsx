@@ -1144,10 +1144,19 @@ describe("WideApp", () => {
       { key: "F10", shiftKey: true },
       { key: "ContextMenu" },
     ]) {
-      rowButton("Review PR").focus();
+      const row = rowButton("Review PR");
+      row.focus();
       fireEvent.keyDown(window, init);
       const menu = await screen.findByRole("menu", { name: "Todo actions" });
       expect(within(menu).getByText("Mark done")).toBeInTheDocument();
+      // The browser's own contextmenu that follows leaves it where it is.
+      const popup = menu.closest<HTMLElement>('[role="dialog"]');
+      const top = popup?.style.top;
+      fireEvent.contextMenu(row, {
+        clientX: 300,
+        clientY: 300,
+      });
+      expect(popup?.style.top).toBe(top);
       fireEvent.keyDown(document.activeElement ?? window, { key: "Escape" });
       await waitFor(() =>
         expect(
