@@ -19,7 +19,7 @@ export function Avatar({ size }: { size: number }) {
   return (
     <span
       style={{ width: size, height: size }}
-      className="flex shrink-0 items-center justify-center overflow-clip rounded-full bg-n-fill text-xs font-semibold text-n-ink"
+      className="flex shrink-0 items-center justify-center overflow-clip rounded-full bg-n-fill text-n-phone-initials text-n-ink"
     >
       {user?.hasImage ? (
         <img src={user.imageUrl} alt="" className="size-full object-cover" />
@@ -31,7 +31,7 @@ export function Avatar({ size }: { size: number }) {
 }
 
 const ITEM =
-  "mt-1.5 flex h-[3.25rem] w-full cursor-pointer items-center rounded-[0.875rem] bg-n-surface px-3.5 text-left text-base font-medium text-n-ink n-focus-inset dark:bg-n-fill";
+  "mt-1.5 flex h-[3.25rem] w-full cursor-pointer items-center rounded-[0.875rem] bg-n-surface px-3.5 text-left text-n-phone-button text-n-ink n-focus-inset dark:bg-n-fill";
 
 /**
  * The avatar menu: Settings, Send feedback (admins only) and Sign out, as a
@@ -76,10 +76,10 @@ export function AccountSheet({
           <div className="flex items-center gap-3 px-3 pt-3 pb-3.5">
             <Avatar size={40} />
             <div className="min-w-0">
-              <Dialog.Title className="truncate text-base font-semibold">
+              <Dialog.Title className="truncate text-n-phone-heading">
                 {user?.fullName ?? email ?? "Account"}
               </Dialog.Title>
-              <Dialog.Description className="truncate text-[0.8125rem] text-n-ink-muted">
+              <Dialog.Description className="truncate text-n-phone-meta text-n-ink-muted">
                 {user?.fullName && email ? email : "Signed in"}
               </Dialog.Description>
             </div>

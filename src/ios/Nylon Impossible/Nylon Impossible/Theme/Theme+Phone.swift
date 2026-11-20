@@ -2,13 +2,9 @@
 //  Theme+Phone.swift
 //  Nylon Impossible
 //
-//  The phone layout's type roles that tokens.json doesn't name yet: the
-//  prototype's 46pt masthead, the 32pt detail title, and the row, switcher and
-//  chip sizes. Each is built from the generated `Theme.Fonts.Style`, so it
-//  picks up bundled Archivo and Dynamic Type scaling the same way the token
-//  styles do. When the quality pass promotes these into tokens.json (they're
-//  kept here so Phase 3 web and iOS could land in parallel without both
-//  editing the generator's output), this file shrinks to nothing.
+//  The phone layout's type roles, by what they set. Each is a style that
+//  tokens.json names and Theme.swift generates, so the web's phone layout
+//  reads the same values; this only names them for the views.
 //
 
 import SwiftUI
@@ -20,53 +16,38 @@ extension Theme.Fonts {
     /// Roles on the phone layout, named for what they set.
     enum Role {
         /// The list name under the switcher ("Today"), Archivo 46 bold.
-        static let masthead = Style(
-            size: 46, lineHeight: 46, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle
-        )
+        static let masthead = Phone.display
         /// The detail sheet's title, the largest text on screen while it's open.
-        static let sheetTitle = Style(
-            size: 32, lineHeight: 35, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .title1
-        )
+        static let sheetTitle = Phone.sheetTitle
         /// Collection names on the Lists page.
         static let listName = Phone.title
         /// A todo's title in a row.
-        static let rowTitle = Style(
-            size: 17, lineHeight: 23, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .body
-        )
+        static let rowTitle = Phone.rowTitle
         /// Body copy: notes, settings rows, the composer.
         static let body = Phone.body
         /// Switcher titles and quiet buttons ("‹ Lists", "Delete").
-        static let control = Style(
-            size: 15, lineHeight: 20, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .subheadline
-        )
+        static let control = Phone.control
         /// The masthead's subline ("Sunday, October 18 · 4 todos").
-        static let subline = Style(
-            size: 14, lineHeight: 19, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline
-        )
+        static let subline = Phone.subline
         /// Chip labels.
-        static let chip = Style(
-            size: 14, lineHeight: 18, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .subheadline
-        )
+        static let chip = Phone.chip
         /// Subtask titles in the detail sheet.
-        static let subtask = Style(
-            size: 16, lineHeight: 21, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .callout
-        )
+        static let subtask = Phone.subtask
         /// The meta line and footers.
         static let meta = Phone.meta
         /// Section labels in the sheet and settings ("Notes", "Subtasks").
-        static let label = Style(
-            size: 13, lineHeight: 18, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .footnote
-        )
+        static let label = Phone.label
     }
 }
 
 extension Theme {
-    /// Tracking for the display face, as a fraction of the size (the web's
-    /// `letter-spacing` in em).
+    /// Tracking, as a fraction of the size (the web's `letter-spacing` in
+    /// em), from the styles that carry it in tokens.json.
     enum Tracking {
-        static let masthead: CGFloat = -0.03
-        static let sheetTitle: CGFloat = -0.025
-        static let title: CGFloat = -0.01
+        static let masthead = Fonts.Phone.display.tracking
+        static let sheetTitle = Fonts.Phone.sheetTitle.tracking
+        static let title = Fonts.Phone.title.tracking
+        static let rowTitle = Fonts.Phone.rowTitle.tracking
     }
 
     /// Fixed measurements of the phone layout.

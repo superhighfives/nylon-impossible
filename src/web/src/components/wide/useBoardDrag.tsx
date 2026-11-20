@@ -442,7 +442,7 @@ export function DragPreview({
         className="mt-px size-[1.375rem] shrink-0 rounded-[6px] border-[1.75px] border-n-ink"
       />
       <span
-        className={`${lifted ? "line-clamp-3 tracking-[-0.005em] wrap-anywhere" : "line-clamp-2"} text-[0.9375rem] leading-[1.4] font-medium text-n-ink`}
+        className={`${lifted ? "line-clamp-3 wrap-anywhere" : "line-clamp-2"} text-n-wide-row-title text-n-ink`}
       >
         {displayTitle(todo)}
       </span>

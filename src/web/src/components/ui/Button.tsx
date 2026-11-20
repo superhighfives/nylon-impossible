@@ -8,7 +8,7 @@ import type { ComponentProps } from "react";
  * `outline` a hairline on the canvas.
  */
 const buttonVariants = cva(
-  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-n-field font-medium n-focus transition-[background-color,color,transform] duration-(--n-duration-fast) active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex cursor-pointer items-center justify-center gap-2 rounded-n-field n-focus transition-[background-color,color,transform] duration-(--n-duration-fast) active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -17,8 +17,8 @@ const buttonVariants = cva(
           "border border-n-hairline bg-transparent text-n-ink pointer-fine:hover:bg-n-surface",
       },
       size: {
-        base: "h-10 px-4 text-[0.9375rem]",
-        lg: "h-11 px-5 text-base",
+        base: "h-10 px-4 text-n-wide-action",
+        lg: "h-11 px-5 text-n-wide-button-large",
       },
     },
     defaultVariants: {

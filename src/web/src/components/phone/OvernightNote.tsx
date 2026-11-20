@@ -73,13 +73,13 @@ export function OvernightPill({
     <div
       role="status"
       data-overnight-note
-      className="flex max-w-full animate-n-fade-in items-center gap-1.5 self-start rounded-[0.5rem] bg-n-brand py-1 pr-0.5 pl-2.5 text-[0.8125rem] font-medium text-n-brand-ink"
+      className="flex max-w-full animate-n-fade-in items-center gap-1.5 self-start rounded-[0.5rem] bg-n-brand py-1 pr-0.5 pl-2.5 text-n-phone-pill text-n-brand-ink"
     >
       <Moon size={13} aria-hidden="true" className="shrink-0" />
       <button
         type="button"
         onClick={onSee}
-        className="line-clamp-2 min-w-0 flex-1 cursor-pointer rounded-[0.25rem] text-left leading-[1.125rem] underline-offset-2 n-focus-soft pointer-fine:hover:underline"
+        className="line-clamp-2 min-w-0 flex-1 cursor-pointer rounded-[0.25rem] text-left underline-offset-2 n-focus-soft pointer-fine:hover:underline"
       >
         {overnightPillText(text)}
       </button>

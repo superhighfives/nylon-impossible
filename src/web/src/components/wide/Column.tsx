@@ -123,7 +123,7 @@ export const MENU_POPUP =
   "min-w-44 overflow-clip rounded-[0.875rem] bg-n-canvas text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill";
 
 export const MENU_ITEM =
-  "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-[0.9375rem] outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";
+  "flex h-10 w-full cursor-pointer items-center border-t border-n-hairline px-3.5 text-left text-n-wide-body outline-none first:border-t-0 data-highlighted:bg-[color-mix(in_srgb,currentColor_12%,transparent)]";
 
 /**
  * A column's title and subline on the shared baseline. Your lists' titles
@@ -184,7 +184,7 @@ export function ColumnHeader({
   };
   const titleButton = useRef<HTMLButtonElement>(null);
   const headingId = `column-${listId}-title`;
-  const titleClass = `font-n-display text-[2.5rem] leading-none font-bold tracking-[-0.03em] ${
+  const titleClass = `font-n-display text-n-wide-display ${
     muted ? "text-n-ink-muted" : "text-n-ink"
   }`;
 
@@ -595,7 +595,7 @@ export function Column({
                     <button
                       type="button"
                       onClick={waiting.onGo}
-                      className="-mt-1 ml-[29px] flex min-h-8 w-fit cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
+                      className="-mt-1 ml-[29px] flex min-h-8 w-fit cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-n-wide-body text-n-ink-muted n-focus"
                     >
                       {waiting.text}
                       <ArrowRight size={15} aria-hidden="true" />

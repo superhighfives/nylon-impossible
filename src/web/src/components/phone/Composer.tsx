@@ -245,7 +245,7 @@ export function Composer({
     >
       {/* The parsed date leads, so it's never scrolled out of view. */}
       {dueDay && hasDraft && (
-        <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-n-chip bg-n-fill pr-1 pl-2.5 text-sm font-medium whitespace-nowrap text-n-ink">
+        <span className="flex h-8 shrink-0 items-center gap-1.5 rounded-n-chip bg-n-fill pr-1 pl-2.5 text-n-phone-chip whitespace-nowrap text-n-ink">
           <Calendar size={13} aria-hidden="true" />
           Due {dueChipText(dueDay, now, timeZone)}
           <button
@@ -272,7 +272,7 @@ export function Composer({
                 onPointerDown={keepFocus}
                 onMouseDown={keepFocus}
                 onClick={() => setPickedTarget(t.id)}
-                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap transition-colors ${popover ? "n-focus-soft" : "n-focus-inset"} duration-(--n-duration-fast) ${
+                className={`n-hit flex h-8 shrink-0 cursor-pointer items-center rounded-n-chip border px-3 text-n-phone-chip whitespace-nowrap transition-colors ${popover ? "n-focus-soft" : "n-focus-inset"} duration-(--n-duration-fast) ${
                   selected
                     ? "border-n-brand bg-n-brand text-n-brand-ink"
                     : "border-n-hairline bg-transparent text-n-ink-muted"
@@ -289,7 +289,7 @@ export function Composer({
 
   const spill = spillsToNotes && (
     <p
-      className={`text-[0.8125rem] text-n-ink-muted ${inline ? "pb-2 pl-8" : popover ? "px-5 pb-2" : "px-[1.125rem] pt-2"}`}
+      className={`text-n-ink-muted ${inline ? "text-n-wide-meta pb-2 pl-8" : popover ? "text-n-wide-meta px-5 pb-2" : "text-n-phone-meta px-[1.125rem] pt-2"}`}
     >
       The rest will be saved to notes.
     </p>
@@ -335,11 +335,11 @@ export function Composer({
         }}
       >
         <p className="m-0 flex items-baseline gap-2.5 px-5 pt-5 pb-2">
-          <span className="font-n-display text-[1.625rem] leading-[1.1] font-bold tracking-[-0.025em] text-n-ink">
+          <span className="font-n-display text-n-wide-composer-title text-n-ink">
             {targetLabel}
           </span>
           {countFor && (
-            <span className="text-[0.9375rem] text-n-ink-muted tabular-nums">
+            <span className="text-n-wide-body text-n-ink-muted tabular-nums">
               {countFor(targetId)}
             </span>
           )}
@@ -362,7 +362,7 @@ export function Composer({
               if (!e.target.value) setKeepDateWords(false);
             }}
             onKeyDown={onFieldKeyDown}
-            className="field-sizing-content block max-h-40 min-h-10 w-full flex-1 resize-none bg-transparent py-2.5 text-[0.9375rem] leading-5 text-n-ink outline-none placeholder:text-n-ink-muted"
+            className="field-sizing-content block max-h-40 min-h-10 w-full flex-1 resize-none bg-transparent py-2.5 text-n-wide-body text-n-ink outline-none placeholder:text-n-ink-muted"
           />
           {hasDraft && (
             <button
@@ -378,7 +378,7 @@ export function Composer({
         </div>
         {spill}
         {chips}
-        <p className="m-0 mx-5 mt-3 border-t border-n-hairline pt-3 pb-4 text-xs text-n-ink-muted">
+        <p className="m-0 mx-5 mt-3 border-t border-n-hairline pt-3 pb-4 text-n-wide-caption text-n-ink-muted">
           Enter adds and keeps this open · Esc closes
         </p>
       </form>
@@ -426,7 +426,7 @@ export function Composer({
               if (!e.target.value) setKeepDateWords(false);
             }}
             onKeyDown={onFieldKeyDown}
-            className="field-sizing-content block max-h-40 min-h-10 w-full flex-1 resize-none rounded-n-chip bg-transparent py-2.5 text-[0.9375rem] leading-5 text-n-ink outline-none placeholder:text-n-ink-muted"
+            className="field-sizing-content block max-h-40 min-h-10 w-full flex-1 resize-none rounded-n-chip bg-transparent py-2.5 text-n-wide-body text-n-ink outline-none placeholder:text-n-ink-muted"
           />
           {hasDraft && (
             <button
@@ -475,7 +475,7 @@ export function Composer({
             if (!e.target.value) setKeepDateWords(false);
           }}
           onKeyDown={onFieldKeyDown}
-          className="field-sizing-content block max-h-[5.5rem] min-h-[3.125rem] w-full flex-1 resize-none bg-transparent px-[1.125rem] py-3.5 text-[1.0625rem] leading-[1.375rem] text-n-ink outline-none placeholder:text-n-ink-muted"
+          className="field-sizing-content block max-h-[5.5rem] min-h-[3.125rem] w-full flex-1 resize-none bg-transparent px-[1.125rem] py-3.5 text-n-phone-body text-n-ink outline-none placeholder:text-n-ink-muted"
         />
         {hasDraft && (
           <button

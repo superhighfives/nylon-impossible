@@ -19,9 +19,7 @@ extension Theme {
 
 extension Theme.Fonts.Role {
     /// A todo's title in a popover row.
-    static let rowTitleWide = Theme.Fonts.Style(
-        size: 15, lineHeight: 21, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .subheadline
-    )
+    static let rowTitleWide = Theme.Fonts.Wide.rowTitle
     /// Wide body: the popover's composer.
     static let bodyWide = Theme.Fonts.Wide.body
 }

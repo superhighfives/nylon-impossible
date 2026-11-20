@@ -20,10 +20,10 @@ export function NotFound() {
         </picture>
       </div>
       <div className="space-y-3">
-        <h1 className="font-n-display text-[2rem] leading-tight font-bold tracking-[-0.025em] text-n-ink">
+        <h1 className="font-n-display text-n-wide-page-title text-n-ink">
           Page not found
         </h1>
-        <p className="text-n-ink-muted leading-relaxed max-w-xs mx-auto">
+        <p className="text-n-wide-lede text-n-ink-muted max-w-xs mx-auto">
           The page you're looking for doesn't exist or has been moved.
         </p>
       </div>

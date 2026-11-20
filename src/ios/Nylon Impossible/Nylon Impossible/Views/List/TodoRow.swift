@@ -88,7 +88,7 @@ struct TodoRow: View {
         Button(action: onOpen) {
             VStack(alignment: .leading, spacing: Theme.Space.s1) {
                 Text(todo.title)
-                    .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: -0.005)
+                    .textStyle(isWide ? Theme.Fonts.Role.rowTitleWide : Theme.Fonts.Role.rowTitle, tracking: Theme.Tracking.rowTitle)
                     .foregroundStyle(checked ? Theme.Colors.inkMuted : Theme.Colors.ink)
                     .strikethrough(checked, color: Theme.Colors.inkMuted)
                     .lineLimit(3)

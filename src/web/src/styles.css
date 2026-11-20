@@ -138,13 +138,12 @@ code {
 }
 
 /* Code in the notes, at `type.codeScale` (0.85) of the text around it,
-   copied by hand from tokens.json like every web type value (the type
-   group's $comment). A monospace face at the text's own size is wider and
+   from tokens.json. A monospace face at the text's own size is wider and
    taller, so it wrapped and shouted. The line height stays the notes' own
    (`lh` here is the parent's), so nothing around the code moves
    (principle 8). */
 @utility n-code {
-  font-size: 0.85em;
+  font-size: calc(var(--n-type-code-scale) * 1em);
   line-height: 1lh;
 }
 

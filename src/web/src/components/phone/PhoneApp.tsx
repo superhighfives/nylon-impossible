@@ -362,14 +362,14 @@ export function PhoneApp({
   /** A failed load: what didn't load, and Try again. */
   const loadError = (what: string, retry: () => unknown, fetching: boolean) => (
     <div className="mx-5 mt-7" role="alert">
-      <p className="font-n-display text-[1.375rem] font-semibold text-n-ink">
+      <p className="font-n-display text-n-phone-title text-n-ink">
         Couldn’t load your {what}.
       </p>
       <button
         type="button"
         onClick={() => retry()}
         disabled={fetching}
-        className="-ml-2 mt-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-[0.9375rem] font-medium text-n-ink-muted n-focus"
+        className="-ml-2 mt-2 min-h-11 cursor-pointer rounded-n-chip px-2 text-n-phone-action text-n-ink-muted n-focus"
       >
         {fetching ? "Trying again…" : "Try again"}
       </button>
@@ -381,7 +381,7 @@ export function PhoneApp({
     if (loading) {
       return (
         <p
-          className="mx-5 mt-7 text-[0.9375rem] text-n-ink-muted"
+          className="mx-5 mt-7 text-n-phone-secondary text-n-ink-muted"
           aria-live="polite"
         >
           Loading…
@@ -429,7 +429,7 @@ export function PhoneApp({
           <button
             type="button"
             onClick={() => goTo(BOARD_TIME_KINDS.indexOf(nextKind))}
-            className="mx-auto flex w-fit min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-[0.9375rem] text-n-ink-muted n-focus"
+            className="mx-auto flex w-fit min-h-11 cursor-pointer items-center gap-1 rounded-n-chip px-0.5 text-n-phone-secondary text-n-ink-muted n-focus"
           >
             {waitingIn(waiting, nextKind)}
             <ArrowRight size={15} aria-hidden="true" />
@@ -525,12 +525,12 @@ export function PhoneApp({
                   onClick={() => setCollectionId(list.id)}
                   className="mx-5 flex min-h-11 w-[calc(100%-2.5rem)] cursor-pointer items-center gap-3 border-b border-n-hairline py-3.5 text-left text-n-ink n-focus-inset"
                 >
-                  <span className="min-w-0 flex-1 truncate font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
+                  <span className="min-w-0 flex-1 truncate font-n-display text-n-phone-title">
                     {list.name}
                   </span>
                   <span
                     aria-hidden="true"
-                    className="text-[0.9375rem] text-n-ink-muted tabular-nums"
+                    className="text-n-phone-secondary text-n-ink-muted tabular-nums"
                   >
                     {rowsFor(list.id).length}
                   </span>
@@ -561,7 +561,7 @@ export function PhoneApp({
               }}
               enterKeyHint="done"
               placeholder="New list"
-              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em] text-n-ink n-focus placeholder:text-n-ink-muted"
+              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-n-phone-title text-n-ink n-focus placeholder:text-n-ink-muted"
             />
           </label>
         </>
@@ -617,7 +617,7 @@ export function PhoneApp({
                       if (p.key === "lists" && active) setCollectionId(null);
                       goTo(i);
                     }}
-                    className={`n-hit h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-[0.9375rem] font-semibold tracking-[-0.01em] whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
+                    className={`n-hit h-11 shrink-0 cursor-pointer rounded-n-chip px-0 text-n-phone-switcher whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast) ${
                       active ? "text-n-ink" : "text-n-ink-muted"
                     }`}
                   >

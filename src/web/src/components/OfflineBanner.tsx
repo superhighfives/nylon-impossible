@@ -36,7 +36,7 @@ export default function OfflineBanner() {
     <output
       ref={ref}
       aria-live="polite"
-      className="fixed top-0 left-0 right-0 z-[60] bg-n-brand px-4 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 text-center text-sm font-medium text-n-brand-ink"
+      className="fixed top-0 left-0 right-0 z-[60] bg-n-brand px-4 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-2 text-center text-n-wide-secondary-strong text-n-brand-ink"
     >
       You’re offline. Changes will sync when you reconnect.
     </output>

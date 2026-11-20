@@ -99,7 +99,7 @@ export function CommandPalette({
           <Dialog.Title
             className={
               title
-                ? "m-0 truncate px-[1.125rem] pt-3.5 text-xs font-semibold text-n-ink-muted"
+                ? "m-0 truncate px-[1.125rem] pt-3.5 text-n-wide-group-label text-n-ink-muted"
                 : "sr-only"
             }
           >
@@ -125,7 +125,7 @@ export function CommandPalette({
                 setActive(0);
               }}
               onKeyDown={onKeyDown}
-              className="h-12 min-w-0 flex-1 bg-transparent text-[0.9375rem] text-n-ink outline-none placeholder:text-n-ink-muted"
+              className="h-12 min-w-0 flex-1 bg-transparent text-n-wide-body text-n-ink outline-none placeholder:text-n-ink-muted"
             />
           </div>
           <div
@@ -135,7 +135,7 @@ export function CommandPalette({
             className="min-h-0 flex-1 overflow-y-auto p-1.5 [scrollbar-width:thin]"
           >
             {items.length === 0 && (
-              <p className="m-0 px-3 py-3 text-[0.9375rem] text-n-ink-muted">
+              <p className="m-0 px-3 py-3 text-n-wide-body text-n-ink-muted">
                 Nothing matches “{query.trim()}”.
               </p>
             )}
@@ -150,7 +150,7 @@ export function CommandPalette({
               >
                 <p
                   aria-hidden="true"
-                  className="m-0 px-3 pt-2 pb-1 text-xs font-semibold text-n-ink-muted"
+                  className="m-0 px-3 pt-2 pb-1 text-n-wide-group-label text-n-ink-muted"
                 >
                   {group.label}
                 </p>
@@ -174,7 +174,7 @@ export function CommandPalette({
                       onPointerMove={() => setActive(i)}
                       onPointerDown={(e) => e.preventDefault()}
                       onClick={() => choose(item)}
-                      className={`flex h-10 cursor-pointer items-center gap-3 rounded-[0.5rem] px-3 text-[0.9375rem] ${
+                      className={`flex h-10 cursor-pointer items-center gap-3 rounded-[0.5rem] px-3 text-n-wide-body ${
                         selected ? "bg-n-fill" : ""
                       }`}
                     >
@@ -182,14 +182,14 @@ export function CommandPalette({
                         {item.label}
                       </span>
                       {item.meta && (
-                        <span className="max-w-[40%] shrink-0 truncate text-[0.8125rem] text-n-ink-muted tabular-nums">
+                        <span className="max-w-[40%] shrink-0 truncate text-n-wide-meta text-n-ink-muted tabular-nums">
                           {item.meta}
                         </span>
                       )}
                       {item.hint && (
                         <span
                           aria-hidden="true"
-                          className="shrink-0 text-[0.8125rem] text-n-ink-muted"
+                          className="shrink-0 text-n-wide-meta text-n-ink-muted"
                         >
                           {item.hint}
                         </span>
@@ -202,7 +202,7 @@ export function CommandPalette({
           </div>
           <p
             aria-hidden="true"
-            className="m-0 flex gap-4 border-t border-n-hairline px-[1.125rem] py-2.5 text-xs text-n-ink-muted"
+            className="m-0 flex gap-4 border-t border-n-hairline px-[1.125rem] py-2.5 text-n-wide-caption text-n-ink-muted"
           >
             <span>↑↓ to choose</span>
             <span>↵ to run</span>

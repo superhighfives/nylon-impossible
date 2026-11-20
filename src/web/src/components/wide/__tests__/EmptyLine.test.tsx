@@ -54,7 +54,7 @@ describe("empty line", () => {
         />
       </DndContext>,
     );
-    expectRowLine("Nothing here yet.", "text-[0.9375rem]");
+    expectRowLine("Nothing here yet.", "text-n-wide-notes");
     const { line } = emptyLine("Nothing here yet.");
     // Muted until something's dragged over it.
     expect(line.parentElement).toHaveClass("text-n-ink-subtle");
@@ -73,7 +73,7 @@ describe("empty line", () => {
         onRestore={vi.fn()}
       />,
     );
-    expectRowLine("Nothing done yet.", "text-[0.9375rem]");
+    expectRowLine("Nothing done yet.", "text-n-wide-notes");
     const { line } = emptyLine("Nothing done yet.");
     const spacer = line.previousElementSibling;
     expect(spacer).toHaveClass("h-10");
@@ -92,7 +92,7 @@ describe("empty line", () => {
     );
     const { words, line } = emptyLine("Nothing done yet.");
     expect(line).toHaveClass("items-center", "text-center");
-    expect(words).toHaveClass("text-[1.0625rem]");
+    expect(words).toHaveClass("text-n-phone-empty-line");
     expect(line.querySelector("svg")).toHaveAttribute("width", "96");
   });
 });

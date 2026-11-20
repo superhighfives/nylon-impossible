@@ -42,7 +42,7 @@ export function ViewBoundary({
       fallback={
         <p
           data-view-error
-          className={`m-0 py-2.5 text-[0.9375rem] leading-[1.4] text-n-ink-muted ${className}`}
+          className={`m-0 py-2.5 text-n-wide-notes text-n-ink-muted ${className}`}
         >
           Couldn't show this
         </p>

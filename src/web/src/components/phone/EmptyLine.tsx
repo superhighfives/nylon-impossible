@@ -35,7 +35,7 @@ export function EmptyLine({
         >
           <path d="M1 4C2.5 0.5 5.5 0.5 8 4S13.5 7.5 15 4" />
         </svg>
-        <span className="min-w-0 wrap-anywhere text-[1.0625rem] leading-[1.35]">
+        <span className="min-w-0 wrap-anywhere text-n-phone-empty-line">
           {text}
         </span>
       </p>
@@ -62,7 +62,7 @@ export function EmptyLine({
           <path d="M1 4C2.5 0.5 5.5 0.5 8 4S13.5 7.5 15 4" />
         </svg>
       </span>
-      <span className="min-w-0 flex-1 wrap-anywhere py-2.5 text-[0.9375rem] leading-[1.4]">
+      <span className="min-w-0 flex-1 wrap-anywhere py-2.5 text-n-wide-notes">
         {text}
       </span>
     </p>

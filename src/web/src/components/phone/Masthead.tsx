@@ -13,7 +13,7 @@ export function BackButton({
     <button
       type="button"
       onClick={onClick}
-      className="mt-2.5 ml-3 inline-flex min-h-11 cursor-pointer items-center gap-0.5 rounded-n-chip px-2 text-[0.9375rem] font-medium text-n-ink-muted n-focus"
+      className="mt-2.5 ml-3 inline-flex min-h-11 cursor-pointer items-center gap-0.5 rounded-n-chip px-2 text-n-phone-action text-n-ink-muted n-focus"
     >
       <ChevronLeft size={18} strokeWidth={2.2} aria-hidden="true" />
       {label}
@@ -57,13 +57,15 @@ export function Masthead({
       )}
       <h1
         id={id}
-        className={`mx-5 font-n-display text-[2.875rem] leading-none font-bold tracking-[-0.03em] text-n-ink ${
+        className={`mx-5 font-n-display text-n-phone-display text-n-ink ${
           pushed ? "mt-2" : ""
         }`}
       >
         {title}
       </h1>
-      <p className="mx-5 mt-2.5 mb-5 text-sm text-n-ink-muted">{subline}</p>
+      <p className="mx-5 mt-2.5 mb-5 text-n-phone-subline text-n-ink-muted">
+        {subline}
+      </p>
       {children}
       <div aria-hidden="true" className="mx-5 h-px bg-n-hairline" />
     </header>

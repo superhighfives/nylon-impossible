@@ -25,7 +25,7 @@ export function ShortcutsOverlay({
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-[color-mix(in_srgb,var(--n-color-canvas)_55%,transparent)] backdrop-blur-[6px] transition-opacity duration-(--n-duration-fast) data-ending-style:opacity-0 data-starting-style:opacity-0" />
         <Dialog.Popup className="fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-4rem)] w-[30rem] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[0.875rem] bg-n-canvas p-5 text-n-ink shadow-[0_10px_30px_color-mix(in_srgb,black_14%,transparent)] outline-none transition-opacity duration-(--n-duration-base) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-n-fill">
           <div className="mb-3 flex items-center justify-between">
-            <Dialog.Title className="m-0 font-n-display text-[1.375rem] font-semibold tracking-[-0.01em]">
+            <Dialog.Title className="m-0 font-n-display text-n-wide-title">
               Keyboard shortcuts
             </Dialog.Title>
             <Dialog.Close
@@ -43,14 +43,14 @@ export function ShortcutsOverlay({
             if (rows.length === 0) return null;
             return (
               <section key={group} className="mt-4 first-of-type:mt-0">
-                <h3 className="m-0 mb-1.5 text-[0.8125rem] font-semibold text-n-ink-muted">
+                <h3 className="m-0 mb-1.5 text-n-wide-label text-n-ink-muted">
                   {group}
                 </h3>
-                <dl className="m-0 grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 text-[0.9375rem]">
+                <dl className="m-0 grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 text-n-wide-body">
                   {rows.map((c) => (
                     <div key={c.id} className="contents">
                       <dt className="text-n-ink">{c.label}</dt>
-                      <dd className="m-0 flex flex-wrap justify-end gap-1.5 text-[0.8125rem] text-n-ink-muted">
+                      <dd className="m-0 flex flex-wrap justify-end gap-1.5 text-n-wide-meta text-n-ink-muted">
                         {c.keys.map((combo, i) => (
                           <span key={combo.join("+")} className="flex gap-1">
                             {i > 0 && <span className="self-center">or</span>}

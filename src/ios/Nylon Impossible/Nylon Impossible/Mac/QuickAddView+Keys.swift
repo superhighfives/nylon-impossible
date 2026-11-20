@@ -17,7 +17,7 @@ extension QuickAddView {
     func titleField(_ todo: TodoItem) -> some View {
         TextField("Title", text: editingText, axis: .vertical)
             .textFieldStyle(.plain)
-            .textStyle(Theme.Fonts.Role.rowTitleWide, tracking: -0.005)
+            .textStyle(Theme.Fonts.Role.rowTitleWide, tracking: Theme.Tracking.rowTitle)
             .foregroundStyle(Theme.Colors.ink)
             .lineLimit(1...3)
             .focused($editorFocused)

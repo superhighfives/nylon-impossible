@@ -83,7 +83,7 @@ const COPY_BUTTON =
   "absolute top-0 right-0 flex size-6 cursor-pointer items-center justify-center rounded-n-chip border border-n-hairline bg-n-surface text-n-ink-muted opacity-0 pointer-events-none transition-opacity duration-(--n-duration-fast) ease-n-out n-focus-soft focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/code:pointer-events-auto group-hover/code:opacity-100 pointer-fine:hover:text-n-ink";
 
 const TOOLTIP =
-  "rounded-n-chip border border-n-hairline bg-n-surface px-2 py-1 text-xs text-n-ink shadow-[0_4px_12px_color-mix(in_srgb,black_12%,transparent)] transition-opacity duration-(--n-duration-fast) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0";
+  "rounded-n-chip border border-n-hairline bg-n-surface px-2 py-1 text-n-phone-caption text-n-ink shadow-[0_4px_12px_color-mix(in_srgb,black_12%,transparent)] transition-opacity duration-(--n-duration-fast) ease-n-out data-ending-style:opacity-0 data-starting-style:opacity-0";
 
 function CodeBlock({ text, className }: { text: string; className: string }) {
   const [open, setOpen] = useState(false);

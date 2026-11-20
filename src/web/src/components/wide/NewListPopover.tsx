@@ -63,7 +63,7 @@ export function NewListPopover({
             finalFocus={() => returnFocus?.() ?? true}
             className={`${POPOVER_CARD} w-72 p-3`}
           >
-            <Popover.Title className="m-0 mb-2 text-[0.8125rem] font-semibold text-n-ink-muted">
+            <Popover.Title className="m-0 mb-2 text-n-wide-label text-n-ink-muted">
               New list
             </Popover.Title>
             <form
@@ -78,12 +78,12 @@ export function NewListPopover({
                 onChange={(e) => setName(e.target.value)}
                 aria-label="Name"
                 placeholder="Name"
-                className="h-9 min-w-0 flex-1 rounded-n-chip border border-n-hairline bg-transparent px-2.5 text-[0.9375rem] text-n-ink outline-none placeholder:text-n-ink-muted focus-visible:border-n-ink"
+                className="h-9 min-w-0 flex-1 rounded-n-chip border border-n-hairline bg-transparent px-2.5 text-n-wide-body text-n-ink outline-none placeholder:text-n-ink-muted focus-visible:border-n-ink"
               />
               <button
                 type="submit"
                 disabled={!name.trim()}
-                className="h-9 shrink-0 cursor-pointer rounded-n-chip bg-n-brand px-3.5 text-[0.9375rem] font-semibold text-n-brand-ink n-focus disabled:cursor-default disabled:opacity-50"
+                className="h-9 shrink-0 cursor-pointer rounded-n-chip bg-n-brand px-3.5 text-n-wide-control text-n-brand-ink n-focus disabled:cursor-default disabled:opacity-50"
               >
                 Add
               </button>

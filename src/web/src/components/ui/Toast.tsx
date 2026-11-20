@@ -19,7 +19,7 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
   return (
     <Toast.Root
       toast={toast}
-      className={`${look} pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] py-1.5 pr-1.5 pl-4 font-n-text text-[0.9375rem] opacity-[calc(1-min(var(--toast-index),1))] data-limited:pointer-events-none data-limited:opacity-0 shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0`}
+      className={`${look} pointer-events-auto absolute bottom-0 left-1/2 z-[calc(1000-var(--toast-index))] flex max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-1.5 rounded-[0.875rem] py-1.5 pr-1.5 pl-4 font-n-text text-n-wide-body opacity-[calc(1-min(var(--toast-index),1))] data-limited:pointer-events-none data-limited:opacity-0 shadow-[0_8px_24px_color-mix(in_srgb,black_18%,transparent)] transition-[opacity,translate] duration-(--n-duration-base) ease-n-out data-ending-style:translate-y-2.5 data-ending-style:opacity-0 data-starting-style:translate-y-2.5 data-starting-style:opacity-0`}
     >
       <Toast.Content className="flex min-h-9 items-center gap-1.5">
         {error && (

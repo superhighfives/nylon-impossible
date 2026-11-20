@@ -54,7 +54,7 @@ import type { TodoActions } from "./useTodoActions";
 const DAY_MS = 86_400_000;
 
 const CHIP_BASE =
-  "n-hit flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-n-chip border px-3 text-sm font-medium whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast)";
+  "n-hit flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-n-chip border px-3 text-n-phone-chip whitespace-nowrap n-focus transition-colors duration-(--n-duration-fast)";
 
 function chipClass(selected: boolean, strong = false) {
   const tone = selected
@@ -71,15 +71,13 @@ const CLEAR_CHIP_CLASS = `${CHIP_BASE} border-n-hairline bg-transparent text-n-d
 const PANEL_CLASS =
   "mt-2.5 flex min-w-0 animate-n-fade-in flex-wrap gap-1.5 rounded-n-field bg-n-surface p-2.5";
 
-const SECTION_LABEL =
-  "mb-1.5 block text-[0.8125rem] font-semibold text-n-ink-muted";
+const SECTION_LABEL = "mb-1.5 block text-n-phone-label text-n-ink-muted";
 
 /** Wide: "Add subtask" and "Paste a link", like a column's "+ Add". */
 const COLUMN_ADD = "flex min-h-11 items-center gap-4 text-n-ink-muted";
 
 /** Wide: a section label like Done's day labels, no rule above it. */
-const COLUMN_LABEL =
-  "mb-1 block text-[0.8125rem] font-semibold text-n-ink-muted";
+const COLUMN_LABEL = "mb-1 block text-n-wide-label text-n-ink-muted";
 
 /** The footer's "Created …" and "Edited …", each kept whole after a "·". */
 const STAMP =
@@ -472,7 +470,7 @@ function DetailBody({
           }
         }}
         rows={1}
-        className={`field-sizing-content block w-full resize-none rounded-n-chip bg-transparent p-0 font-n-display font-bold text-n-ink n-focus ${className}`}
+        className={`field-sizing-content block w-full resize-none rounded-n-chip bg-transparent p-0 font-n-display text-n-ink n-focus ${className}`}
       />
     </label>
   );
@@ -508,7 +506,9 @@ function DetailBody({
           width won't hold both. Every stamp carries its "·" in front, and
           the negative margin pushes the one starting each line into the
           clipped edge. */}
-      <div className="min-w-0 overflow-hidden text-[0.8125rem] text-n-ink-muted">
+      <div
+        className={`min-w-0 overflow-hidden ${columnVariant ? "text-n-wide-meta" : "text-n-phone-meta"} text-n-ink-muted`}
+      >
         <div className="-ml-3 flex flex-wrap">
           <span className={STAMP}>
             Created {stamp(todo.createdAt, now, timeZone)}
@@ -532,7 +532,7 @@ function DetailBody({
         {/* Less the sheet's inset, so its title sits on the columns'
             baseline. */}
         <header className="relative flex min-h-[calc(10.5rem-var(--n-sheet-inset))] shrink-0 flex-col justify-end px-6 pt-12 pb-[1.125rem]">
-          {titleField("text-[1.75rem] leading-[1.1] tracking-[-0.025em]")}
+          {titleField("text-n-wide-sheet-title")}
           <p className={SUBLINE}>
             {/* A todo, at a glance: the shape of a row's checkbox, where
                 your list's column has the list icon. */}
@@ -591,17 +591,14 @@ function DetailBody({
           </PropertyRow>
 
           <div className="pt-4">
-            {notesField(
-              COLUMN_LABEL,
-              "min-h-[2.625rem] text-[0.9375rem] leading-[1.4]",
-            )}
+            {notesField(COLUMN_LABEL, "min-h-[2.625rem] text-n-wide-notes")}
           </div>
 
           {canSubtask && <Subtasks parent={todo} subtasks={subtasks} column />}
 
           <Links todo={todo} column />
 
-          {footer("mt-6", "text-[0.8125rem]")}
+          {footer("mt-6", "text-n-wide-meta")}
         </div>
       </>
     );
@@ -626,7 +623,7 @@ function DetailBody({
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-[calc(3rem+env(safe-area-inset-bottom,0px))] [scrollbar-width:none]">
         <Dialog.Title className="sr-only">Todo</Dialog.Title>
-        {titleField("mb-4 text-[2rem] leading-[1.08] tracking-[-0.025em]")}
+        {titleField("mb-4 text-n-phone-sheet-title")}
 
         <div className="flex flex-wrap gap-2">
           <button
@@ -677,17 +674,14 @@ function DetailBody({
         {panel && choices(panel, PANEL_CLASS)}
 
         <hr className="mt-[1.375rem] mb-4 border-0 border-t border-n-hairline" />
-        {notesField(
-          SECTION_LABEL,
-          "min-h-[4.5rem] text-[1.0625rem] leading-[1.45]",
-        )}
+        {notesField(SECTION_LABEL, "min-h-[4.5rem] text-n-phone-notes")}
 
         {canSubtask && <Subtasks parent={todo} subtasks={subtasks} />}
 
         <Links todo={todo} />
 
         <hr className="mt-[1.375rem] mb-1.5 border-0 border-t border-n-hairline" />
-        {footer("", "text-[0.9375rem]")}
+        {footer("", "text-n-phone-action")}
       </div>
     </>
   );
@@ -712,7 +706,7 @@ function PropertyRow({
     <button
       type="button"
       {...props}
-      className={`-mx-2.5 flex min-h-11 w-[calc(100%+1.25rem)] cursor-pointer items-center gap-4 rounded-n-field px-2.5 text-left text-[0.9375rem] n-focus-inset transition-colors duration-(--n-duration-fast) ${ROW_HOVER} ${
+      className={`-mx-2.5 flex min-h-11 w-[calc(100%+1.25rem)] cursor-pointer items-center gap-4 rounded-n-field px-2.5 text-left text-n-wide-body n-focus-inset transition-colors duration-(--n-duration-fast) ${ROW_HOVER} ${
         overdue
           ? "font-medium text-n-overdue"
           : set
@@ -820,8 +814,8 @@ function Subtasks({
             <span
               className={`min-w-0 flex-1 wrap-anywhere ${
                 column
-                  ? "-ml-1.5 py-2.5 pl-1.5 text-[0.9375rem] leading-[1.4]"
-                  : "text-base"
+                  ? "-ml-1.5 py-2.5 pl-1.5 text-n-wide-notes"
+                  : "text-n-phone-item"
               } ${
                 s.completed ? "text-n-ink-muted line-through" : "text-n-ink"
               }`}
@@ -868,7 +862,7 @@ function Subtasks({
           enterKeyHint="done"
           placeholder="Add subtask"
           className={`min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-n-ink n-focus placeholder:text-n-ink-muted ${
-            column ? "text-[0.9375rem]" : "text-base"
+            column ? "text-n-wide-body" : "text-n-phone-item"
           }`}
         />
       </label>
@@ -961,7 +955,7 @@ function Links({
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
           className={`min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-n-ink n-focus placeholder:text-n-ink-muted ${
-            column ? "text-[0.9375rem]" : "text-base"
+            column ? "text-n-wide-body" : "text-n-phone-item"
           }`}
         />
       </label>
@@ -969,7 +963,7 @@ function Links({
         <p
           id={errorId}
           role="alert"
-          className={`m-0 text-[0.8125rem] text-n-destructive ${column ? "pl-10" : "pl-8"}`}
+          className={`m-0 text-n-destructive ${column ? "text-n-wide-meta pl-10" : "text-n-phone-meta pl-8"}`}
         >
           That doesn’t look like a link.
         </p>
@@ -979,7 +973,7 @@ function Links({
 }
 
 const MENU_ITEM =
-  "flex min-h-11 cursor-pointer items-center px-4 text-[0.9375rem] text-n-ink outline-none data-highlighted:bg-n-fill";
+  "flex min-h-11 cursor-pointer items-center px-4 text-n-phone-secondary text-n-ink outline-none data-highlighted:bg-n-fill";
 
 function LinkCard({
   todoId,
@@ -1031,19 +1025,19 @@ function LinkCard({
         ) : (
           <span
             aria-hidden="true"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-n-fill text-[0.8125rem] font-bold text-n-ink-muted"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-n-fill text-n-phone-label font-bold text-n-ink-muted"
           >
             {status ?? domain.charAt(0).toUpperCase()}
           </span>
         )}
         <span className="min-w-0">
           <span
-            className={`block truncate text-[0.9375rem] font-medium ${column ? "leading-[1.4]" : ""}`}
+            className={`block truncate ${column ? "text-n-wide-row-title" : "text-n-phone-action"}`}
           >
             {title}
           </span>
           <span
-            className={`block truncate text-[0.8125rem] text-n-ink-muted ${column ? "mt-0.5 leading-[1.125rem]" : ""}`}
+            className={`block truncate text-n-ink-muted ${column ? "mt-0.5 text-n-wide-meta" : "text-n-phone-meta"}`}
           >
             {isPending
               ? "Fetching title…"

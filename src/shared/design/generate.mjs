@@ -88,7 +88,10 @@ export function renderCss(tokens) {
     out.push(`  --n-font-${kebab(name)}: ${cssFontFamily(tokens, name)};`);
   }
   out.push("");
-  // No type or space: the web doesn't read them (see their $comment).
+  out.push(`  --n-type-code-scale: ${tokens.type.codeScale};`);
+  out.push("");
+  // No space: the web doesn't read it (see its $comment). Type is the
+  // @theme block below.
   for (const [name, px] of entries(tokens.radius)) {
     out.push(`  --n-radius-${kebab(name)}: ${px / 16}rem;`);
   }
@@ -167,8 +170,31 @@ export function renderCss(tokens) {
     }
     out.push("  }", "}", "");
   }
+  out.push(
+    "/* Type: one Tailwind utility per role, `text-n-<density>-<role>`, which",
+    "   sets the role's size, line height, weight and tracking together. A",
+    "   `font-*` class beside it wins over the role's weight. The family isn't",
+    "   part of it: `font-n-display` sets Archivo. */",
+    "@theme {",
+  );
+  for (const [density, styles] of typeGroups(tokens)) {
+    for (const [role, t] of entries(styles)) {
+      const name = `--text-n-${kebab(density)}-${kebab(role)}`;
+      out.push(
+        `  ${name}: ${t.size / 16}rem;`,
+        `  ${name}--line-height: ${t.lineHeight / 16}rem;`,
+        `  ${name}--font-weight: ${t.weight};`,
+        `  ${name}--letter-spacing: ${t.tracking ?? 0}em;`,
+      );
+    }
+  }
+  out.push("}", "");
   return out.join("\n");
 }
+
+/** The type groups (phone, wide, landing), leaving out scalars like codeScale. */
+const typeGroups = (tokens) =>
+  entries(tokens.type).filter(([, styles]) => typeof styles === "object");
 
 // Token names that are Swift keywords ("repeat") need backticks.
 const SWIFT_KEYWORDS = new Set([
@@ -358,6 +384,8 @@ export function renderSwift(tokens) {
     "            let variationWeight: CGFloat",
     "            let isDisplay: Bool",
     "            let textStyle: PlatformFont.TextStyle",
+    "            /// Letter spacing as a fraction of the size (the web's em).",
+    "            let tracking: CGFloat",
     "",
     "            /// The face at its base size, before Dynamic Type scaling.",
     "            var baseFont: PlatformFont {",
@@ -393,12 +421,15 @@ export function renderSwift(tokens) {
     `        static let codeScale: CGFloat = ${tokens.type.codeScale}`,
     "",
   );
-  for (const [density, styles] of entries(tokens.type)) {
-    if (typeof styles !== "object") continue;
+  // Apple gets the roles it draws: those with an iosTextStyle. The rest
+  // (the web's own sizes, the landing page) are the web's alone.
+  for (const [density, styles] of typeGroups(tokens)) {
+    const apple = entries(styles).filter(([, t]) => t.iosTextStyle);
+    if (apple.length === 0) continue;
     out.push(`        enum ${density[0].toUpperCase()}${density.slice(1)} {`);
-    for (const [name, t] of entries(styles)) {
+    for (const [name, t] of apple) {
       out.push(
-        `            static let ${name} = Style(size: ${t.size}, lineHeight: ${t.lineHeight}, weight: .${SWIFT_WEIGHTS[t.weight]}, variationWeight: ${t.weight}, isDisplay: ${t.font === "display"}, textStyle: .${t.iosTextStyle})`,
+        `            static let ${name} = Style(size: ${t.size}, lineHeight: ${t.lineHeight}, weight: .${SWIFT_WEIGHTS[t.weight]}, variationWeight: ${t.weight}, isDisplay: ${t.font === "display"}, textStyle: .${t.iosTextStyle}, tracking: ${t.tracking ?? 0})`,
       );
     }
     out.push("        }");

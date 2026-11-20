@@ -83,11 +83,11 @@ export function moveMenuFocus(e: KeyboardEvent<HTMLElement>) {
 }
 
 const ITEM_CLASS =
-  "flex h-[3.125rem] w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-4 text-left text-base first:border-t-0 n-focus-inset active:bg-n-fill pointer-fine:hover:bg-n-surface";
+  "flex h-[3.125rem] w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-4 text-left text-n-phone-item first:border-t-0 n-focus-inset active:bg-n-fill pointer-fine:hover:bg-n-surface";
 
 /** The pointer-anchored menu (wide) uses denser items. */
 const COMPACT_ITEM_CLASS =
-  "flex h-10 w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-3.5 text-left text-[0.9375rem] first:border-t-0 n-focus-soft active:bg-n-fill pointer-fine:hover:bg-n-surface";
+  "flex h-10 w-full cursor-pointer items-center gap-2.5 border-t border-n-hairline px-3.5 text-left text-n-wide-body first:border-t-0 n-focus-soft active:bg-n-fill pointer-fine:hover:bg-n-surface";
 
 const CARD = `overflow-clip ${RAISED}`;
 
@@ -240,11 +240,13 @@ export function ContextMenu({
                 className={`${compact ? "mb-1.5 px-3.5 py-2.5" : "mb-2.5 px-4 py-3.5"} ${RAISED}`}
               >
                 <Dialog.Title
-                  className={`line-clamp-3 leading-[1.35] font-medium ${compact ? "text-[0.9375rem]" : "text-[1.0625rem]"}`}
+                  className={`line-clamp-3 ${compact ? "text-n-wide-row-title" : "text-n-phone-row-title"}`}
                 >
                   {displayTitle(current)}
                 </Dialog.Title>
-                <Dialog.Description className="mt-0.5 text-[0.8125rem] text-n-ink-muted">
+                <Dialog.Description
+                  className={`mt-0.5 ${compact ? "text-n-wide-meta" : "text-n-phone-meta"} text-n-ink-muted`}
+                >
                   {where}
                   {due && ` · ${due.text}`}
                 </Dialog.Description>
@@ -273,7 +275,7 @@ export function ContextMenu({
                       <span className="min-w-0 flex-1 truncate">{c.label}</span>
                       <span
                         aria-hidden="true"
-                        className="font-n-text text-[0.8125rem] text-n-ink-muted"
+                        className={`font-n-text ${compact ? "text-n-wide-meta" : "text-n-phone-meta"} text-n-ink-muted`}
                       >
                         {c.hint}
                       </span>
@@ -294,7 +296,7 @@ export function ContextMenu({
                     <div role="group" aria-labelledby="menu-move-to">
                       <div
                         id="menu-move-to"
-                        className={`${compact ? "px-3.5" : "px-4"} pt-2.5 pb-1.5 text-[0.8125rem] font-semibold text-n-ink-muted`}
+                        className={`${compact ? "px-3.5 text-n-wide-label" : "px-4 text-n-phone-label"} pt-2.5 pb-1.5 text-n-ink-muted`}
                       >
                         Move to
                       </div>

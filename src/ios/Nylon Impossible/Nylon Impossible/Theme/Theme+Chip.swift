@@ -25,7 +25,5 @@ extension Theme {
 
 extension Theme.Fonts.Role {
     /// A meta chip's label: 12 semibold.
-    static let metaChip = Theme.Fonts.Style(
-        size: 12, lineHeight: 16, weight: .semibold, variationWeight: 600, isDisplay: false, textStyle: .caption1
-    )
+    static let metaChip = Theme.Fonts.Phone.metaChip
 }

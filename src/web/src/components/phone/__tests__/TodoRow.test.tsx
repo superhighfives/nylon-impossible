@@ -70,7 +70,7 @@ describe("TodoRow", () => {
       "text-n-brand-ink",
       "rounded-n-chip",
       "h-5",
-      "font-semibold",
+      "text-n-phone-meta-chip",
     );
   });
 
