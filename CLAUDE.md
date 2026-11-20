@@ -25,7 +25,7 @@ done, pass or fail. Without a reason to keep builds apart, use Xcode's default D
 ## Bun
 
 Bun is the package manager and script runner; Node still runs the tools.
-wrangler, vitest (and `@cloudflare/vitest-pool-workers`) and vite execute
+wrangler, vitest (and `@cloudflare/vitest-plugin`) and vite execute
 under Node via their shebangs, so don't add `--bun` to them, and keep
 `actions/setup-node` in CI.
 
@@ -37,9 +37,6 @@ under Node via their shebangs, so don't add `--bun` to them, and keep
   running anything.
 - `bunfig.toml` pins the isolated linker, so each package only sees the deps it
   declares, as it did under pnpm.
-- `patches/vitest@5.0.3.patch` is listed in `patchedDependencies` and keyed to
-  that exact version. If vitest is bumped, regenerate the patch with
-  `bun patch vitest` / `bun patch --commit`, or the API tests stop parsing.
 
 Biome config lives at the root; each workspace invokes it with
 `--config-path ../..`. Don't add a per-workspace `biome.json`.
