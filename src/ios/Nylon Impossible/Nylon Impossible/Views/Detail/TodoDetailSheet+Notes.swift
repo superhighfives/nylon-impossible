@@ -18,8 +18,21 @@ extension TodoDetailSheet {
         let style = Theme.Fonts.Role.body
         let hasNotes = Self.storedNotes(notes) != nil
         let rendered = hasNotes && !editingNotes
+        // From 90% of the limit, while editing, the count sits at the end
+        // of the label's line, which is there either way (principle 8).
+        let count = editingNotes ? NotesLimit.count(notes) : nil
         return VStack(alignment: .leading, spacing: 6) {
-            SectionLabel(text: "Notes")
+            HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s4) {
+                SectionLabel(text: "Notes")
+                if let count {
+                    Text(count)
+                        .textStyle(Theme.Fonts.Role.label)
+                        .monospacedDigit()
+                        .foregroundStyle(Theme.Colors.inkMuted)
+                        // Read with the field instead.
+                        .accessibilityHidden(true)
+                }
+            }
             ZStack(alignment: .topLeading) {
                 TextField("Add notes", text: $notes, prompt: Text("Add notes").foregroundStyle(Theme.Colors.inkMuted), axis: .vertical)
                     .textStyle(style)
@@ -29,7 +42,17 @@ extension TodoDetailSheet {
                     .disabled(rendered)
                     .opacity(rendered ? 0 : 1)
                     .accessibilityHidden(rendered)
-                    .onChange(of: notes) { _, newValue in
+                    .onChange(of: notes) { oldValue, newValue in
+                        // The field has no limit of its own: what goes past
+                        // it is put back, and changes again to what fits.
+                        let accepted = NotesLimit.accept(old: oldValue, new: newValue)
+                        if accepted != newValue {
+                            notes = accepted
+                        }
+                        if notesWarning.shouldWarn(for: accepted) {
+                            actions.toasts.show(NotesLimit.message, action: nil)
+                        }
+                        guard accepted == newValue else { return }
                         let value = Self.storedNotes(newValue)
                         guard value != todo.itemNotes else { return }
                         todo.itemNotes = value
@@ -37,6 +60,7 @@ extension TodoDetailSheet {
                         scheduleSync()
                     }
                     .accessibilityLabel("Notes")
+                    .accessibilityHint(editingNotes ? NotesLimit.spokenCount(notes) ?? "" : "")
                 #if os(iOS)
                 // ⌘B, ⌘I and ⌘E, only while the cursor is in the notes.
                 if focus == .notes { NotesShortcuts() }
@@ -53,6 +77,7 @@ extension TodoDetailSheet {
                     editingNotes = true
                 } else if old == .notes {
                     editingNotes = false
+                    notesWarning.reset()
                 }
             }
         }

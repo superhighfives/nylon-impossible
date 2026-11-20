@@ -40,9 +40,16 @@ struct TodoDetailSheet: View {
     @State var editingNotes = false
     /// When a link in the drawn notes last opened, so its tap doesn't edit.
     @State var linkOpenedAt: Date?
+    /// Whether this edit of the notes has toasted their limit yet.
+    @State var notesWarning = NotesLimit.Warning()
     /// The drawn notes' blocks, parsed once per change rather than per draw.
     @State var notesBlocks = NotesMarkdown.Cache()
     @Environment(\.openURL) var openURL
+    @Environment(\.screenRoute) var screenRoute
+    #if os(iOS)
+    /// Only moved by the `notesmax` screenshot route.
+    @State var scrollPosition = ScrollPosition()
+    #endif
 
     /// `notesShown` is the drawn notes, with the keyboard on them.
     enum Field { case title, notes, notesShown, subtask, link }
@@ -99,9 +106,38 @@ struct TodoDetailSheet: View {
             .padding(.horizontal, Theme.Phone.gutter)
             .padding(.bottom, Theme.Space.s12)
         }
+        #if os(iOS)
+        .scrollPosition($scrollPosition)
+        #endif
         .scrollDismissesKeyboard(.interactively)
         .background(Theme.Colors.canvas)
+        // The sheet covers the app's toast, so it shows its own, as the
+        // account sheet does.
+        .overlay(alignment: .bottom) {
+            ToastView(toasts: actions.toasts)
+                .padding(.bottom, Theme.Space.s4)
+        }
+        .toastMagicTap(actions.toasts)
         .task { await loadUrls() }
+        #if DEBUG
+        .onAppear {
+            // The notes at their limit, being edited, with the toast up.
+            guard screenRoute == .notesmax else { return }
+            editNotes()
+            actions.toasts.showNotesLimitForScreenshot()
+            // Back up to the label's line, which the field scrolls past to
+            // show the cursor at the end of the notes, again once the
+            // keyboard is up.
+            #if os(iOS)
+            Task { @MainActor in
+                for wait in [600, 900, 1500] {
+                    try? await Task.sleep(for: .milliseconds(wait))
+                    scrollPosition.scrollTo(edge: .top)
+                }
+            }
+            #endif
+        }
+        #endif
         .onDisappear(perform: flushEdits)
     }
 
