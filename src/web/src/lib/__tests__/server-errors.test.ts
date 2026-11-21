@@ -2,7 +2,6 @@ import { Cause } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DatabaseError,
-  ForbiddenError,
   ListNotFoundError,
   SystemListImmutableError,
   TodoNotFoundError,
@@ -76,7 +75,6 @@ describe("causeToClientError", () => {
   it.each([
     [new UnauthorizedError({}), 401, "Unauthorized"],
     [new UserNotFoundError({ userId: "u1" }), 401, "Unauthorized"],
-    [new ForbiddenError({ resource: "todo", userId: "u1" }), 403, "Forbidden"],
     [new TodoNotFoundError({ id: "t1" }), 404, "Not found"],
     [new ListNotFoundError({ id: "l1" }), 404, "Not found"],
     [

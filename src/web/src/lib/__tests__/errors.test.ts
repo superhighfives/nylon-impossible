@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   DatabaseError,
-  ForbiddenError,
   TodoNotFoundError,
   UnauthorizedError,
   UserNotFoundError,
@@ -40,15 +39,5 @@ describe("Tagged errors", () => {
     const error = new ValidationError({ errors });
     expect(error._tag).toBe("ValidationError");
     expect(error.errors).toEqual(errors);
-  });
-
-  it("ForbiddenError stores resource and userId", () => {
-    const error = new ForbiddenError({
-      resource: "todo",
-      userId: "user_789",
-    });
-    expect(error._tag).toBe("ForbiddenError");
-    expect(error.resource).toBe("todo");
-    expect(error.userId).toBe("user_789");
   });
 });

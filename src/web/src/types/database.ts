@@ -1,12 +1,3 @@
-// Re-export Drizzle-inferred types for convenience
-export type {
-  Recurrence,
-  RecurrenceFrequency,
-  Todo,
-  TodoUrl,
-  User,
-} from "@/lib/schema";
-
 import type { BoardTimeKind } from "@nylon-impossible/shared";
 import type {
   SerializedTodo,
@@ -66,9 +57,6 @@ export interface SerializedList {
   createdAt: string;
   updatedAt: string;
 }
-
-/** Fetch status for URL metadata */
-export type FetchStatus = "pending" | "fetched" | "failed";
 
 /** Serialized URL metadata from the API (the shared `serializeUrl`). */
 export type SerializedTodoUrl = SharedSerializedTodoUrl;

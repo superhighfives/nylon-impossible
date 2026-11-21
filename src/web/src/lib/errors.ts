@@ -57,14 +57,6 @@ export class ValidationError extends Data.TaggedError("ValidationError")<{
 }
 
 /**
- * Thrown when user is not authorized to access a resource
- */
-export class ForbiddenError extends Data.TaggedError("ForbiddenError")<{
-  readonly resource: string;
-  readonly userId: string;
-}> {}
-
-/**
  * Thrown when a list is not found
  */
 export class ListNotFoundError extends Data.TaggedError("ListNotFoundError")<{
