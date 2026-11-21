@@ -597,6 +597,51 @@ gh() { return 1; }
 board_json >/dev/null
 expect "a failed page fails the read"           "1"             "$?"
 
+# Builds and triages run in the background, up to $MAX_JOBS, and a running
+# one counts toward the PR limit. Each job holds $JOBS/<issue> with its pid.
+sleep 60 & LIVE=$!
+true & DEAD=$!; wait "$DEAD"
+rm -rf "$JOBS"; mkdir -p "$JOBS/11" "$JOBS/12"
+echo "$LIVE" > "$JOBS/11/pid"; echo "$DEAD" > "$JOBS/12/pid"
+expect "a live job is running"                       "11"   "$(running_jobs | paste -sd' ' -)"
+expect "and a dead one's lock is cleared"            "no"   "$([ -d "$JOBS/12" ] && echo yes || echo no)"
+
+starts() { # open-prs feedback-report -> what start_pass starts on $BOARD, as "kind#n"
+  ( STARTED=""
+    start_job() { STARTED+="$1#$2 "; }
+    feedback_next() { [ -n "$FEEDBACK_N" ] && echo "$FEEDBACK_N"; }
+    spec_ready() { return 0; }
+    FEEDBACK_N="$2"
+    start_pass "$BOARD" "$1" >/dev/null
+    echo "${STARTED% }" )
+}
+expect "Ready issues in board order, with 11 already running"  "build#16 build#18"  "$(starts 0 "")"
+expect "a report goes first and takes a slot"                   "triage#30 build#16" "$(starts 0 30)"
+expect "a running job and open PRs share the limit of 5"        "build#16"           "$(starts 3 "")"
+expect "no room, nothing starts"                                ""                   "$(starts 4 "")"
+expect "a report that's already running isn't started again"    "build#16 build#18"  "$(starts 0 11)"
+rm -rf "$JOBS/11"
+expect "three at once, at most"                                 "triage#30 build#11 build#16" "$(starts 0 30)"
+
+# start_job really starts `foreman job <kind> <issue>`, in a process group of
+# its own, so launchd's kill of the tick's group at exit misses it.
+mkdir -p "$tmp/fakebin" "$LOGS"
+printf '#!/usr/bin/env bash\necho "$@" > "%s/fakebin/args"\nsleep 30\n' "$tmp" > "$tmp/fakebin/foreman.sh"; chmod +x "$tmp/fakebin/foreman.sh"
+( BIN="$tmp/fakebin/foreman.sh"; log() { :; }; start_job build 77 )
+for _ in $(seq 50); do [ -s "$tmp/fakebin/args" ] && break; sleep 0.1; done
+JOBPID=$(cat "$JOBS/77/pid" 2>/dev/null)
+expect "a started job runs foreman job with its kind and issue"  "job build 77"  "$(cat "$tmp/fakebin/args" 2>/dev/null)"
+expect "and is running"                                          "77"           "$(running_jobs | paste -sd' ' -)"
+expect "in its own process group"                                "yes"  "$([ "$(ps -o pgid= -p "$JOBPID" | tr -d ' ')" != "$(ps -o pgid= -p $$ | tr -d ' ')" ] && echo yes || echo no)"
+expect "a second start of the same issue is refused"             "1"    "$( (log() { :; }; start_job build 77); echo $?)"
+kill "$JOBPID" 2>/dev/null; rm -rf "$JOBS/77"
+
+# A running build has no PR yet; its worktree stays.
+mkdir -p "$WORKTREES/11" "$WORKTREES/13"; mkdir -p "$JOBS/11"; echo "$LIVE" > "$JOBS/11/pid"
+REMOVED=$( ( gh() { :; }; rm_worktree() { echo "$1"; }; log() { :; }; cleanup_worktrees ) | paste -sd' ' -)
+expect "cleanup leaves a running job's worktree alone"          "13"  "$REMOVED"
+kill "$LIVE" 2>/dev/null; rm -rf "$JOBS" "$WORKTREES/11" "$WORKTREES/13"
+
 SPEC_BODY="" SPEC_LABELS="" COMMENT_IDS=""
 gh() {
   echo "$*" >> "$CALLS"
