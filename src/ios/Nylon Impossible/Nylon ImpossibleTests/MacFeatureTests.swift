@@ -654,6 +654,7 @@ struct MacWidgetTests {
         #expect(selected.count == 3)
     }
 }
+
 /// `SMAppService.mainApp`, as far as the login item sees it.
 private final class FakeLoginItemService: LoginItemService {
     var status: SMAppService.Status = .notRegistered
@@ -739,30 +740,6 @@ struct MacLoginItemTests {
         #expect(!other.isOn)
         // Signing in again starts from that "no".
         #expect(!other.signInDefault)
-    }
-
-    @Test("A Mac already signed in turns it on once, and a later off stays off")
-    func existingInstall() throws {
-        let service = FakeLoginItemService()
-        let (item, defaults) = try make(service)
-        item.restoredSession()
-        #expect(service.registers == 1)
-        #expect(item.isOn)
-        item.setEnabled(false)
-        // The next launch, with the same defaults.
-        let relaunched = MacLoginItem(service: service, defaults: defaults)
-        relaunched.restoredSession()
-        #expect(service.registers == 1)
-        #expect(!relaunched.isOn)
-    }
-
-    @Test("A fresh sign-in counts as the offer, so a later launch doesn't turn it on again")
-    func signInThenRelaunch() throws {
-        let service = FakeLoginItemService()
-        let (item, defaults) = try make(service)
-        item.signedIn(openAtLogin: false)
-        MacLoginItem(service: service, defaults: defaults).restoredSession()
-        #expect(service.registers == 0)
     }
 }
 #endif

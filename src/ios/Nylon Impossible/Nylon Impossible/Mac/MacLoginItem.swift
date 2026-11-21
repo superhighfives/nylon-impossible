@@ -8,9 +8,9 @@
 //  System Settings → General → Login Items too; Settings reads it back.
 //
 //  It's on by default with consent (App Review 2.4.5(iii)): a fresh sign-in
-//  has an "Open at login" checkbox, ticked. A Mac that was already signed in
-//  when this shipped turns it on once, at the first launch that restores its
-//  session (#787). After that, only the person turns it on or off.
+//  has an "Open at login" checkbox, ticked. After that, only the person turns
+//  it on or off. A Mac signed in before this shipped starts off: Nylon is
+//  unreleased, so there's no migration (CLAUDE.md, "Unreleased").
 //
 
 #if os(macOS)
@@ -40,8 +40,7 @@ final class MacLoginItem {
         case failed
     }
 
-    /// Set once the default has been applied: by the sign-in checkbox, or by
-    /// the one-time turn-on for a Mac that was already signed in.
+    /// Set once a sign-in has offered the checkbox.
     static let offeredKey = "mac.openAtLoginOffered"
 
     @ObservationIgnored private let service: LoginItemService
@@ -79,14 +78,6 @@ final class MacLoginItem {
     func signedIn(openAtLogin: Bool) {
         defaults.set(true, forKey: Self.offeredKey)
         if openAtLogin != isOn { setEnabled(openAtLogin) }
-    }
-
-    /// The app launched and found a session it had already. The first time,
-    /// on a Mac that never saw the checkbox, turn it on.
-    func restoredSession() {
-        guard !defaults.bool(forKey: Self.offeredKey) else { return }
-        defaults.set(true, forKey: Self.offeredKey)
-        setEnabled(true)
     }
 
     static func state(for status: SMAppService.Status) -> State {
