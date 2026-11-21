@@ -32,7 +32,7 @@ This written spec is the reference, not any one platform. The prototype artboard
 | Wide layout | One row of columns that scrolls sideways: Today, This week, Someday, every list you haven't hidden, then Done. Hide or show a list from the sidebar. Opening a todo lays a sheet beside its column |
 | Selecting on wide | One click selects. A second click, a double click or Enter opens the todo in a sheet beside its column |
 | Dropping with a pointer | The todo lands in the gap nearest the pointer, shown by the drop line. Over a row's upper half it goes above it, over the lower half below it, and below the last row it goes last |
-| Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. Two exceptions: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move; and the composer's 3px focus ring, where its `surface` fill and the caret also mark focus |
+| Brand accent | Yellow, as a fill with dark ink only. Never yellow text or thin yellow lines on white. One exception: the 2pt drop line while a todo is being dragged, where the drag preview and the faded original also mark the move. Focus is never yellow |
 | Destructive and overdue red | Radix red-11 (`#CE2C31` light), which passes 4.5:1. Not red-9. The error toast fills with `#CE2C31` in both appearances, with light text and a light outline. |
 | Moving between lists by drag | The web board only. On a phone layout a todo moves through its menu (Move to) |
 | Case | Sentence case for every label, title and menu item: "This week", "New list", "Keyboard shortcuts" |
@@ -71,7 +71,7 @@ One set of words, everywhere. Code identifiers follow the UI words where practic
 - Touch targets are at least 44 points on touch screens.
 - Motion respects reduced motion: transitions shorten to a fade or nothing.
 - Toasts are a pill with an outline action, on every platform. One that reports something done is `brand` with `brandInk` text; a failure is `destructiveSolid` with `destructiveSolidInk` text and the alert icon. `destructiveSolid` is red-11's light value (`#CE2C31`) in both appearances, and like every colour with a `highContrast` value it takes the darker `#A11C21` with Increase Contrast. The action and × focus with a 2px ring in the toast's own ink, since a `brand` ring can't be seen on yellow.
-- Focus is always visible to the keyboard: a selected row is tinted, and moving with the keyboard adds a bar beside it, as in the sidebar; a soft tinted background elsewhere. A mouse click never draws a keyboard-strength ring. The full set is under States.
+- Focus is always visible to the keyboard: a selected row is tinted, and moving with the keyboard adds a bar beside it, as in the sidebar; a soft tinted background elsewhere, 20% of the control's text colour, with one 2px `ink` ring, 2px out, on the web's buttons, chips and text fields. A text field takes the tint whenever it has focus and the ring only when focus came from the keyboard. A mouse click never draws a keyboard-strength ring. The full set is under States.
 
 ## States
 
@@ -84,8 +84,8 @@ How the wide board (the web) shows each interaction state, with a pointer and by
 | Pressed | Nothing extra: the click selects, and the selection is the feedback | — | — | — | — |
 | Selected by click | `fill`, chip radius | — | — | — | — |
 | Selected by keyboard | `fill` plus a 3px `inkMuted` bar, inset 6 | — | — | On Add, not typing: as a row, `fill` plus the `inkMuted` bar | `fill` |
-| Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface` plus the 3px `brand` ring | — |
-| Focused by click | Same as selected by click | Nothing visible | Nothing extra | Same as by keyboard | — |
+| Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface`, 20% `ink` over it, and a 2px `ink` ring, 2px out | — |
+| Focused by click | Same as selected by click | Nothing visible | Nothing extra | `surface` and the 20% `ink` tint, no ring | — |
 | Column holds the selection | — | — | 3px `ink` bar | — | — |
 | Drop target with a pointer | A 2pt/2px `brand` line in the gap where the todo will land, with an 8pt `brand` dot at its leading end | — | `brand` fill, `brandInk` text | — | — |
 | Drop target by touch | Rows part around a `brandSoft` gap the dragged row's height, no line | — | `brand` fill, `brandInk` text | — | — |

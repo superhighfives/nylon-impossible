@@ -22,6 +22,7 @@ import {
 } from "../components/ThemeSync";
 import { TimezoneSync } from "../components/TimezoneSync";
 import { Toaster } from "../components/ui";
+import { useFocusModality } from "../hooks/useFocusModality";
 import { HintsProvider } from "../hooks/useHints";
 import {
   OnlineStatusContext,
@@ -127,6 +128,7 @@ function RootDocument() {
   const { hints } = Route.useLoaderData();
   const onlineStatus = useOnlineStatusValue();
   useReloadOnNewBuild();
+  useFocusModality();
 
   return (
     <html
