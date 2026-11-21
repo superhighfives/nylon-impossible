@@ -22,8 +22,11 @@
 //  Esc puts the old title back. Clicking a row's title edits it too.
 //  Anything else about a todo happens on the web.
 //
-//  The footer is Settings… and Quit Nylon, with Send feedback… (⇧⌘F)
-//  between them for an admin (`MacFeedbackWindow`).
+//  The header is the Nylon mark, "Today" and its count, and at the right a
+//  link that opens the board on the web (⌘O from anywhere in the popover).
+//  Signed out, it's the same, with "Nylon" for "Today". The footer is
+//  Settings… and Quit Nylon, with Send feedback… (⇧⌘F) between them for an
+//  admin (`MacFeedbackWindow`). Both rules run the full width.
 //
 
 #if os(macOS)
@@ -136,7 +139,7 @@ struct QuickAddView: View {
         let subtasks = subtasksByParent
         let cursor = cursorRow(in: shown)
         return VStack(alignment: .leading, spacing: 0) {
-            header(count: all.count)
+            header(QuickAddHeaderItem.items(signedIn: true, count: all.count))
             Composer(
                 text: $text,
                 lists: orderedLists,
@@ -159,7 +162,6 @@ struct QuickAddView: View {
             )
             .padding(.horizontal, Theme.Space.s4)
             Hairline()
-                .padding(.horizontal, Theme.Space.s4)
                 .padding(.top, Theme.Space.s1)
             if shown.isEmpty {
                 Text(EmptyCopy.today)
@@ -219,42 +221,24 @@ struct QuickAddView: View {
         return nil
     }
 
-    private func header(count: Int) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Theme.Space.s2) {
-            Text("Today")
-                .textStyle(Theme.Fonts.Role.listName, tracking: Theme.Tracking.title)
-                .foregroundStyle(Theme.Colors.ink)
-            if count > 0 {
-                Text("\(count)")
-                    .textStyle(Theme.Fonts.Role.meta)
-                    .fontWeight(.medium)
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .accessibilityLabel(MastheadCopy.todos(count))
-            }
-            Spacer()
-        }
-        .padding(.horizontal, Theme.Space.s4)
-        .padding(.top, Theme.Space.s4)
-        .padding(.bottom, Theme.Space.s1)
-    }
-
     private var signedOut: some View {
-        VStack(alignment: .leading, spacing: Theme.Space.s3) {
-            Text("Nylon")
-                .textStyle(Theme.Fonts.Role.listName, tracking: Theme.Tracking.title)
-                .foregroundStyle(Theme.Colors.ink)
-            Text("Sign in to add todos from here.")
-                .textStyle(Theme.Fonts.Role.bodyWide)
-                .foregroundStyle(Theme.Colors.inkMuted)
-            Button("Sign in") {
-                MacServices.shared.showSignIn()
-                onDismiss()
+        VStack(alignment: .leading, spacing: 0) {
+            header(QuickAddHeaderItem.items(signedIn: false))
+            VStack(alignment: .leading, spacing: Theme.Space.s3) {
+                Text("Sign in to add todos from here.")
+                    .textStyle(Theme.Fonts.Role.bodyWide)
+                    .foregroundStyle(Theme.Colors.inkMuted)
+                Button("Sign in") {
+                    MacServices.shared.showSignIn()
+                    onDismiss()
+                }
             }
+            .padding(.horizontal, Theme.Space.s4)
+            .padding(.top, Theme.Space.s2)
+            .padding(.bottom, Theme.Space.s4)
             Hairline()
-            footer.padding(.horizontal, -Theme.Space.s4)
+            footer
         }
-        .padding(Theme.Space.s4)
     }
 
     /// A `nylon://add` link (the widget's "+", a Shortcut): add to its list.

@@ -18,6 +18,9 @@ final class QuickAddPanel: NSPanel {
     /// A floating, borderless-looking panel sized to `content`.
     static func make(content hosting: NSHostingView<some View>) -> QuickAddPanel {
         hosting.sizingOptions = [.preferredContentSize]
+        // The titlebar is hidden, but SwiftUI would still keep its height
+        // clear, under the 16pt the content already has at the top.
+        hosting.safeAreaRegions = []
         let panel = QuickAddPanel(
             contentRect: NSRect(x: 0, y: 0, width: QuickAddView.width, height: 320),
             styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView],

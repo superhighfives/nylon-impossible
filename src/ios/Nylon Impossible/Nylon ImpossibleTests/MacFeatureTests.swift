@@ -353,6 +353,47 @@ struct QuickAddViewTests {
         #expect(steps == ["open https://nylonimpossible.com/todo/6f1c2b9a-0d3e-4a5b-8c7d-112233445566", "dismiss"])
     }
 
+    @Test("The header's web link opens <web origin>/ and closes the popover")
+    func openNylon() throws {
+        var steps: [String] = []
+        QuickAddHandoff.openNylon(
+            base: try #require(URL(string: "https://nylonimpossible.com")),
+            open: { steps.append("open \($0.absoluteString)") },
+            dismiss: { steps.append("dismiss") }
+        )
+        #expect(steps == ["open https://nylonimpossible.com/", "dismiss"])
+    }
+
+    @Test("⌘O is the web link's, and the list leaves it alone (O alone opens a row's link)")
+    func webLinkShortcut() {
+        #expect(QuickAddHeaderItem.webLinkShortcut.key == KeyEquivalent("o"))
+        #expect(QuickAddHeaderItem.webLinkShortcut.modifiers == .command)
+        #expect(QuickAddRowCommand(key: KeyEquivalent("o"), characters: "o", modifiers: .command) == nil)
+        #expect(QuickAddRowCommand(key: KeyEquivalent("o"), characters: "o", modifiers: []) == .openLink)
+    }
+
+    @Test("The link is labelled \"Open Nylon on the web\", and VoiceOver skips the mark")
+    func webLinkLabel() {
+        #expect(QuickAddHeaderItem.webLinkTitle == "Open Nylon on the web")
+        #expect(QuickAddHeaderItem.webLinkSymbol == "rectangle.split.3x1")
+        #expect(QuickAddHeaderItem.mark.isDecorative)
+        #expect(!QuickAddHeaderItem.webLink.isDecorative)
+    }
+
+    @Test("The header is the mark, the title and its count, then the link; signed out, the same with \"Nylon\"")
+    func headerItems() {
+        #expect(QuickAddHeaderItem.items(signedIn: true, count: 3) == [.mark, .title("Today"), .count(3), .webLink])
+        #expect(QuickAddHeaderItem.items(signedIn: true, count: 0) == [.mark, .title("Today"), .webLink])
+        #expect(QuickAddHeaderItem.items(signedIn: false) == [.mark, .title("Nylon"), .webLink])
+    }
+
+    @Test("The hidden titlebar adds no space above the header")
+    func noTitlebarInset() {
+        let hosting = NSHostingView(rootView: Text("Today"))
+        _ = QuickAddPanel.make(content: hosting)
+        #expect(hosting.safeAreaRegions.isEmpty)
+    }
+
     @Test("The web origin sits beside the API")
     func webOrigin() throws {
         func web(_ api: String) throws -> String {
