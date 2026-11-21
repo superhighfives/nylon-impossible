@@ -2,7 +2,7 @@
 //  WhimsyPassTests.swift
 //  Nylon ImpossibleTests
 //
-//  #694: which meta parts a row sets on a chip.
+//  #694, #784: which meta parts a row sets on a chip (only due today).
 //
 
 import Foundation
@@ -33,13 +33,13 @@ struct MetaChipTests {
         #expect(MetaPart.due("Today", overdue: false, today: true).chip == .brand)
     }
 
-    @Test("other due days, pinned and repeat are fill chips")
-    func fillChips() {
-        #expect(MetaPart.due("Tomorrow", overdue: false).chip == .fill)
-        #expect(MetaPart.due("Fri", overdue: false).chip == .fill)
-        #expect(MetaPart.due("Oct 30", overdue: false).chip == .fill)
-        #expect(MetaPart.pinned.chip == .fill)
-        #expect(MetaPart.repeats("Weekly").chip == .fill)
+    @Test("other due days, pinned and repeat are plain text (#784)")
+    func notChips() {
+        #expect(MetaPart.due("Tomorrow", overdue: false).chip == nil)
+        #expect(MetaPart.due("Fri", overdue: false).chip == nil)
+        #expect(MetaPart.due("Oct 30", overdue: false).chip == nil)
+        #expect(MetaPart.pinned.chip == nil)
+        #expect(MetaPart.repeats("Weekly").chip == nil)
     }
 
     @Test("overdue, subtasks, notes and links stay plain")
@@ -58,7 +58,7 @@ struct MetaChipTests {
         #expect(due(12) == .due("Oct 30", overdue: false, today: false))
         #expect(due(-1) == .due("1 day overdue", overdue: true, today: false))
         #expect(due(0)?.chip == .brand)
-        #expect(due(1)?.chip == .fill)
+        #expect(due(1)?.chip == nil)
         #expect(due(-1)?.chip == nil)
     }
 

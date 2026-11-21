@@ -74,19 +74,33 @@ describe("TodoRow", () => {
     );
   });
 
-  it.each([
-    ["Tomorrow", { dueDate: dueIn(1) }],
-    ["Pinned", { pinned: true }],
-    ["Weekly", { dueDate: dueIn(3), recurrence: { frequency: "weekly" } }],
-  ] as const)("%s is a grey chip", (text, todo) => {
-    setup({ todo: makeTodo(todo) });
-    const chip = screen.getByText(text).closest("span[data-meta-chip]");
-    expect(chip).toHaveAttribute("data-meta-chip", "fill");
-    expect(chip).toHaveClass("bg-n-fill", "text-n-ink");
-    expect(chip).not.toHaveClass("bg-n-brand");
-  });
+  it.each(["phone", "wide"] as const)(
+    "on %s, Pinned, Repeat and later due days are plain meta text (#784)",
+    (density) => {
+      setup({
+        density,
+        todo: makeTodo({
+          pinned: true,
+          dueDate: dueIn(3),
+          recurrence: { frequency: "weekly" },
+        }),
+      });
+      const line = screen.getByText("Weekly").closest("span")?.parentElement;
+      expect(line).toHaveClass(`text-n-${density}-meta`, "text-n-ink-muted");
+      for (const text of ["Pinned", "Weekly", "Wed"]) {
+        const item = screen.getByText(text).closest("span");
+        expect(item).not.toHaveAttribute("data-meta-chip");
+        expect(item?.className).not.toMatch(
+          /bg-n-|rounded-n-chip|px-|meta-chip|(^| )text-n-ink( |$)/,
+        );
+      }
+      expect(document.querySelector("[data-meta-chip]")).toBeNull();
+    },
+  );
 
-  it("subtasks, notes and links stay plain text", () => {
+  it("only due today is a chip", () => {
+    expect(metaChip({ kind: "pin", text: "Pinned" })).toBeNull();
+    expect(metaChip({ kind: "repeat", text: "Weekly" })).toBeNull();
     expect(metaChip({ kind: "subtasks", text: "1/3" })).toBeNull();
     expect(metaChip({ kind: "notes", text: "2 words" })).toBeNull();
     expect(
@@ -94,7 +108,10 @@ describe("TodoRow", () => {
     ).toBeNull();
     expect(
       metaChip({ kind: "due", text: "Oct 30", overdue: false, today: false }),
-    ).toBe("fill");
+    ).toBeNull();
+    expect(
+      metaChip({ kind: "due", text: "Today", overdue: false, today: true }),
+    ).toBe("brand");
   });
 
   it("a lifted row tilts by its drag's angle", () => {

@@ -40,33 +40,21 @@ const META_ICONS = {
 } as const;
 
 /**
- * Which meta items are chips: due today in `brand`, the row's only yellow;
- * Pinned, Repeat and the other due days in `fill`. Overdue stays red text,
- * and subtasks, notes and links stay plain. Chips are information, not
- * controls: no hover, nothing to press.
+ * Which meta items are chips: only due today, in `brand`, the row's one
+ * yellow. Pinned, Repeat, the other due days, subtasks, notes and links are
+ * plain muted text, and overdue is red text (#784). A chip reads as
+ * something to press, and nothing on the meta line can be pressed.
  */
-export function metaChip(part: MetaPart): "brand" | "fill" | null {
-  switch (part.kind) {
-    case "due":
-      if (part.overdue) return null;
-      return part.today ? "brand" : "fill";
-    case "pin":
-    case "repeat":
-      return "fill";
-    default:
-      return null;
-  }
+export function metaChip(part: MetaPart): "brand" | null {
+  return part.kind === "due" && part.today && !part.overdue ? "brand" : null;
 }
 
-const CHIP = "h-5 rounded-n-chip px-[0.4375rem]";
-/** The meta line and its chips, at each density's type. */
+/** Due today's chip. */
+const CHIP = "h-5 rounded-n-chip px-[0.4375rem] bg-n-brand text-n-brand-ink";
+/** The meta line and due today's chip, at each density's type. */
 const META_TEXT = {
   phone: { line: "text-n-phone-meta", chip: "text-n-phone-meta-chip" },
   wide: { line: "text-n-wide-meta", chip: "text-n-wide-meta-chip" },
-} as const;
-const CHIP_COLORS = {
-  brand: "bg-n-brand text-n-brand-ink",
-  fill: "bg-n-fill text-n-ink",
 } as const;
 
 function MetaItem({
@@ -85,7 +73,7 @@ function MetaItem({
     <span
       data-meta-chip={chip ?? undefined}
       className={`inline-flex items-center gap-1 ${overdue ? "font-medium text-n-overdue" : ""} ${
-        chip ? `${CHIP} ${META_TEXT[density].chip} ${CHIP_COLORS[chip]}` : ""
+        chip ? `${CHIP} ${META_TEXT[density].chip}` : ""
       }`}
     >
       {part.kind === "link" && part.fetching ? (

@@ -24,24 +24,17 @@ enum MetaPart: Hashable, Sendable {
     case link(String, more: Int = 0)
 
     /// How the row's meta line sets this part: due today on a brand chip
-    /// (the only yellow on a row); pinned, repeat and other due days on a
-    /// `fill` chip; overdue, subtasks, notes and links as plain text.
+    /// (the only yellow on a row); everything else as plain text, overdue in
+    /// red (#784).
     var chip: MetaChip? {
-        switch self {
-        case .pinned, .repeats: return .fill
-        case .due(_, let overdue, let today):
-            if overdue { return nil }
-            return today ? .brand : .fill
-        case .subtasks, .notes, .link: return nil
-        }
+        if case .due(_, let overdue, let today) = self, today, !overdue { return .brand }
+        return nil
     }
 }
 
-/// A meta part's chip: a `brand` fill with `brandInk` text, or a `fill`
-/// fill with `ink` text.
+/// A meta part's chip: a `brand` fill with `brandInk` text, due today's.
 enum MetaChip: Hashable, Sendable {
     case brand
-    case fill
 }
 
 enum DueLabel {

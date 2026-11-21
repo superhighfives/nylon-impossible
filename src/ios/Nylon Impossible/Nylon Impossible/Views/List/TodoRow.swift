@@ -150,9 +150,8 @@ struct RowSelectionBar: View {
 }
 
 /// "Pinned · Fri · ↻ Weekly · 1/4 · ▤ · visitlisboa.com" — only what's set.
-/// Pinned, repeat and the due day sit on chips (`MetaPart.chip`): due today
-/// on the brand fill, the only yellow on a row, and the rest on `fill`.
-/// Overdue stays red text, and subtasks, notes and links stay plain.
+/// Due today sits on a brand chip (`MetaPart.chip`), the only yellow on a
+/// row. Overdue is red text, and everything else is plain muted text.
 struct MetaLine: View {
     let parts: [MetaPart]
 
@@ -162,8 +161,8 @@ struct MetaLine: View {
     var body: some View {
         FlowLayout(spacing: Theme.Space.s3, lineSpacing: Theme.Space.s1) {
             ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
-                if let style = part.chip {
-                    chip(style) { item(part) }
+                if part.chip == .brand {
+                    chip { item(part) }
                 } else {
                     item(part)
                 }
@@ -187,7 +186,7 @@ struct MetaLine: View {
                     .foregroundStyle(Theme.Colors.overdue)
                     .monospacedDigit()
             } else {
-                // On its chip, which sets the ink.
+                // Due today's chip sets its own ink.
                 Text(text)
                     .monospacedDigit()
             }
@@ -205,16 +204,16 @@ struct MetaLine: View {
         }
     }
 
-    /// A chip: 12pt semibold on `brand` with `brandInk`, or on `fill` with
-    /// `ink`, 20pt high with the chip radius.
-    private func chip(_ style: MetaChip, @ViewBuilder _ content: () -> some View) -> some View {
+    /// Due today's chip: 12pt semibold `brandInk` on `brand`, 20pt high
+    /// with the chip radius.
+    private func chip(@ViewBuilder _ content: () -> some View) -> some View {
         content()
             .textStyle(Theme.Fonts.Role.metaChip)
-            .foregroundStyle(style == .brand ? Theme.Colors.brandInk : Theme.Colors.ink)
+            .foregroundStyle(Theme.Colors.brandInk)
             .padding(.horizontal, Theme.Chip.paddingX)
             .frame(minHeight: chipHeight)
             .background(
-                style == .brand ? Theme.Colors.brand : Theme.Colors.fill,
+                Theme.Colors.brand,
                 in: RoundedRectangle(cornerRadius: Theme.Radius.chip, style: .continuous)
             )
     }
