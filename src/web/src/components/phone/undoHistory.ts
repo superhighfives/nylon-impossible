@@ -69,5 +69,3 @@ export function createUndoHistory(limit = UNDO_HISTORY_LIMIT) {
     },
   };
 }
-
-export type UndoHistory = ReturnType<typeof createUndoHistory>;

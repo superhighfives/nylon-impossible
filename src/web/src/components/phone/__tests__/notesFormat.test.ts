@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyNotesEdit, type NotesMarker, toggleMarker } from "../notesFormat";
+import { type NotesMarker, toggleMarker } from "../notesFormat";
 
 const MAX = 100_000;
 
@@ -14,7 +14,7 @@ function press(text: string, marker: NotesMarker, max = MAX): string | null {
   const value = text.replace(/[[\]|]/g, "");
   const edit = toggleMarker(value, start, end, marker, max);
   if (!edit) return null;
-  const next = applyNotesEdit(value, edit);
+  const next = value.slice(0, edit.from) + edit.insert + value.slice(edit.to);
   if (edit.selectionStart === edit.selectionEnd) {
     return `${next.slice(0, edit.selectionStart)}|${next.slice(edit.selectionStart)}`;
   }

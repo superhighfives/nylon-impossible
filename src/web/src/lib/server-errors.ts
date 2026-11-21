@@ -31,9 +31,6 @@ const taggedErrorToClientError = (error: {
     case "UserNotFoundError":
       return new ServerFnError("Unauthorized", 401);
 
-    case "ForbiddenError":
-      return new ServerFnError("Forbidden", 403);
-
     case "TodoNotFoundError":
     case "ListNotFoundError":
       return new ServerFnError("Not found", 404);

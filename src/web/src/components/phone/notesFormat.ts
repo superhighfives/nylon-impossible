@@ -104,8 +104,3 @@ export function toggleMarker(
     selectionEnd: end + size,
   };
 }
-
-/** `value` after `edit`. */
-export function applyNotesEdit(value: string, edit: NotesEdit): string {
-  return value.slice(0, edit.from) + edit.insert + value.slice(edit.to);
-}

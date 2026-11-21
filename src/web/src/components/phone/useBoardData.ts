@@ -149,5 +149,3 @@ export function useBoardData() {
     listsFetching,
   };
 }
-
-export type BoardData = ReturnType<typeof useBoardData>;

@@ -80,11 +80,6 @@ export const V1_ERRORS = {
 } as const;
 export type V1ErrorCode = keyof typeof V1_ERRORS;
 
-export interface V1Error {
-  error: string;
-  code: V1ErrorCode;
-}
-
 /** `limit` on `/v1/lists/:id/todos`. */
 export const V1_TODOS_DEFAULT_LIMIT = 100;
 export const V1_TODOS_MAX_LIMIT = 500;

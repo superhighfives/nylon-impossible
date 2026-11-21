@@ -2,7 +2,7 @@
 const RELATIVE_DAYS = new Set(["Today", "Tomorrow", "Yesterday"]);
 
 /** A due label inside a sentence: "today", "tomorrow", "Fri", "Mar 3". */
-export function dueInSentence(label: string): string {
+function dueInSentence(label: string): string {
   return RELATIVE_DAYS.has(label) ? label.toLowerCase() : label;
 }
 

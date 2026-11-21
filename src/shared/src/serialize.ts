@@ -13,7 +13,7 @@ import { type List, type Todo, type TodoUrl, todoUrls } from "./schema";
  * Sticky, and the API is mid expand/contract on the rename; see
  * `src/api/src/lib/pinned.ts` for the request side and the contract TODO.
  */
-export function pinnedResponseFields(pinned: boolean) {
+function pinnedResponseFields(pinned: boolean) {
   return { pinned, sticky: pinned };
 }
 

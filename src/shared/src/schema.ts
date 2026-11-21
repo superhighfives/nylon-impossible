@@ -319,5 +319,4 @@ export type Todo = typeof todos.$inferSelect;
 export type List = typeof lists.$inferSelect;
 export type TodoUrl = typeof todoUrls.$inferSelect;
 export type ApiToken = typeof apiTokens.$inferSelect;
-export type NewApiToken = typeof apiTokens.$inferInsert;
 export type WsTicket = typeof wsTickets.$inferSelect;
