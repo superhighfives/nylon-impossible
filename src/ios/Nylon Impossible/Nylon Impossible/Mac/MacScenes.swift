@@ -33,6 +33,7 @@ struct MacSettingsRoot: View {
             .environment(services.syncService)
             .environment(services.authService)
             .environment(services.settings)
+            .environment(services.loginItem)
             .environment(Clerk.shared)
             .modelContainer(services.container)
             .preferredColorScheme(MacAppearance.colorScheme(for: services.preferencesService.theme))

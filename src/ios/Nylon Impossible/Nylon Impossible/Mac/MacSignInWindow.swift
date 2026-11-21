@@ -40,6 +40,7 @@ final class MacSignInWindow {
     private func makeWindow() -> NSWindow {
         let root = MacSignInView { [weak self] in self?.close() }
             .environment(Clerk.shared)
+            .environment(MacServices.shared.loginItem)
         let window = NSWindow(contentViewController: NSHostingController(rootView: root))
         window.title = "Sign in"
         window.styleMask = [.titled, .closable]

@@ -1,0 +1,92 @@
+//
+//  MacLoginItem.swift
+//  Nylon Impossible
+//
+//  Open at login: Nylon as the Mac's login item (`SMAppService.mainApp`), so
+//  the menu bar icon and the quick-add hotkey are there after a restart. The
+//  system holds the setting, not UserDefaults, because it can be changed in
+//  System Settings → General → Login Items too; Settings reads it back.
+//
+//  It's on by default with consent (App Review 2.4.5(iii)): a fresh sign-in
+//  has an "Open at login" checkbox, ticked. After that, only the person turns
+//  it on or off. A Mac signed in before this shipped starts off: Nylon is
+//  unreleased, so there's no migration (CLAUDE.md, "Unreleased").
+//
+
+#if os(macOS)
+import Foundation
+import Observation
+import ServiceManagement
+
+/// `SMAppService` as the login item needs it, so tests use a fake rather than
+/// changing the test Mac's login items.
+protocol LoginItemService {
+    var status: SMAppService.Status { get }
+    func register() throws
+    func unregister() throws
+}
+
+extension SMAppService: LoginItemService {}
+
+@MainActor
+@Observable
+final class MacLoginItem {
+    enum State: Equatable {
+        case off
+        case on
+        /// Registered, but macOS waits for the person to allow it in Login Items.
+        case needsApproval
+        /// Turning it on failed; the toggle reads off.
+        case failed
+    }
+
+    /// Set once a sign-in has offered the checkbox.
+    static let offeredKey = "mac.openAtLoginOffered"
+
+    @ObservationIgnored private let service: LoginItemService
+    @ObservationIgnored private let defaults: UserDefaults
+    private(set) var state: State = .off
+
+    init(service: LoginItemService = SMAppService.mainApp, defaults: UserDefaults = .standard) {
+        self.service = service
+        self.defaults = defaults
+        refresh()
+    }
+
+    var isOn: Bool { state == .on || state == .needsApproval }
+
+    /// What the sign-in checkbox starts as: ticked the first time, then
+    /// whatever it is now, so signing in again doesn't undo a "no".
+    var signInDefault: Bool { !defaults.bool(forKey: Self.offeredKey) || isOn }
+
+    /// Read the system's state again: Settings does this when it opens.
+    func refresh() {
+        state = Self.state(for: service.status)
+    }
+
+    func setEnabled(_ enabled: Bool) {
+        do {
+            if enabled { try service.register() } else { try service.unregister() }
+            refresh()
+        } catch {
+            refresh()
+            if enabled { state = .failed }
+        }
+    }
+
+    /// A fresh sign-in finished, with the checkbox ticked or not.
+    func signedIn(openAtLogin: Bool) {
+        defaults.set(true, forKey: Self.offeredKey)
+        if openAtLogin != isOn { setEnabled(openAtLogin) }
+    }
+
+    static func state(for status: SMAppService.Status) -> State {
+        switch status {
+        case .enabled: return .on
+        case .requiresApproval: return .needsApproval
+        case .notRegistered, .notFound: return .off
+        @unknown default: return .off
+        }
+    }
+}
+#endif
