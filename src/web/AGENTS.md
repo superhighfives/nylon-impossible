@@ -58,6 +58,8 @@ Tailwind utilities with an `n-` prefix:
 | `rounded-n-chip`, `rounded-n-field` | Radius 6 and 10 |
 | `duration-(--n-duration-fast)`, `ease-n-out` | Motion |
 
-Focus rings use the `n-focus` utility (`n-focus-inset` inside clipped rows),
-and `n-hit` grows a small control's target to 44×44. Dark mode is the `.dark`
-class on `<html>`; tokens switch under it, so components rarely need `dark:`.
+Focus uses the `n-focus` utility (`n-focus-inset` inside clipped rows): the
+soft 20% tint plus a 2px `ink` ring from the keyboard, decided per control
+type in CSS, so don't style a control's focus by hand. `n-hit` grows a small
+control's target to 44×44. Dark mode is the `.dark` class on `<html>`;
+tokens switch under it, so components rarely need `dark:`.

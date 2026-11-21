@@ -188,32 +188,50 @@ p {
   }
 }
 
-/* Focus ring: a yellow fill ring with a hairline of ink inside it, so it
-   reads on paper-white (where yellow alone is ~1.3:1) as well as on dark.
-   `n-focus-inset` draws it inside the element for controls that sit in an
+/* Focus: the soft tint `n-focus-soft` uses (20% of the control's own text
+   colour), plus one 2px `ink` ring, 2px out, from the keyboard. No yellow
+   and no second line (#773). The tint is a background-image, so it sits over
+   a control's own fill instead of replacing it.
+
+   A button or chip shows both on `:focus-visible`, so a click draws neither.
+   A text field (any `input`: the web has no checkbox or button inputs)
+   matches `:focus-visible` however it was focused, so it takes
+   the tint whenever it has focus and the ring only when focus arrived from
+   the keyboard (`<html data-key-focus>`, useFocusModality). `n-focus-inset`
+   draws the ring inside the element for controls that sit in an
    overflow-clipped row. */
 @utility n-focus {
   outline: none;
-  &:focus-visible {
-    outline: 3px solid var(--n-color-brand);
-    outline-offset: 1px;
-    box-shadow: 0 0 0 1px var(--n-color-ink);
+  &:not(textarea, select, input):focus-visible,
+  &:is(textarea, select, input):focus {
+    --n-focus-tint: color-mix(in srgb, currentColor 20%, transparent);
+    background-image: linear-gradient(var(--n-focus-tint), var(--n-focus-tint));
+  }
+  &:not(textarea, select, input):focus-visible,
+  :where([data-key-focus]) &:is(textarea, select, input):focus {
+    outline: 2px solid var(--n-color-ink);
+    outline-offset: 2px;
   }
 }
 
 @utility n-focus-inset {
   outline: none;
-  &:focus-visible {
-    outline: 3px solid var(--n-color-brand);
-    outline-offset: -3px;
-    box-shadow: inset 0 0 0 4px var(--n-color-ink);
+  &:not(textarea, select, input):focus-visible,
+  &:is(textarea, select, input):focus {
+    --n-focus-tint: color-mix(in srgb, currentColor 20%, transparent);
+    background-image: linear-gradient(var(--n-focus-tint), var(--n-focus-tint));
+  }
+  &:not(textarea, select, input):focus-visible,
+  :where([data-key-focus]) &:is(textarea, select, input):focus {
+    outline: 2px solid var(--n-color-ink);
+    outline-offset: -2px;
   }
 }
 
 /* The toast's focus ring: 2px in the toast's own ink (`brandInk` on the
    yellow pill, `destructiveSolidInk` on the red one), which its action and
-   × already take as their text colour. `n-focus`'s brand ring would vanish
-   on the yellow pill. */
+   × already take as their text colour, so the ring matches the pill's own
+   text rather than `n-focus`'s page `ink`. */
 @utility n-focus-toast {
   outline: none;
   &:focus-visible {
@@ -313,13 +331,17 @@ p {
   }
 }
 
-/* The ring on a container whose field has keyboard focus: the composers,
-   whose bare text fields draw no outline of their own. Yellow alone — the ink
-   hairline reads as a second ring around a filled field. */
+/* `n-focus`'s text-field look on a container whose bare field draws none
+   of its own: the composers. The tint while its field has focus, and the
+   ring when that focus arrived from the keyboard. */
 @utility n-focus-within {
-  &:has(textarea:focus-visible, input:focus-visible) {
-    outline: 3px solid var(--n-color-brand);
-    outline-offset: 1px;
+  &:has(textarea:focus, input:focus) {
+    --n-focus-tint: color-mix(in srgb, var(--n-color-ink) 20%, transparent);
+    background-image: linear-gradient(var(--n-focus-tint), var(--n-focus-tint));
+  }
+  :where([data-key-focus]) &:has(textarea:focus, input:focus) {
+    outline: 2px solid var(--n-color-ink);
+    outline-offset: 2px;
   }
 }
 
