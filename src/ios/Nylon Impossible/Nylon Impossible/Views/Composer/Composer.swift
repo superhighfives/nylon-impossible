@@ -54,8 +54,10 @@ struct Composer: View {
     var offersChips = true
 
     @State private var keepWords = false
-    @State private var wasFocused = false
-    @State private var refocusAfterResize = false
+    /// The text size the field was last built at (see `field`). It follows
+    /// `dynamicTypeSize` while the field doesn't have focus, so a focused
+    /// field keeps the size it gained focus at.
+    @State private var fieldSize: DynamicTypeSize?
     @FocusState private var isFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -114,23 +116,17 @@ struct Composer: View {
             if newValue.isEmpty { keepWords = false }
         }
         .onChange(of: isFocused) { _, focused in
-            // The field is rebuilt when the text size changes (see `field`),
-            // and the old one lets go of focus: hand it to the new one.
-            if !focused, refocusAfterResize {
-                refocusAfterResize = false
-                isFocused = true
-                return
-            }
-            wasFocused = focused
+            // Catch up with a size change made while it had focus.
+            if !focused { fieldSize = dynamicTypeSize }
             onFocusChange?(focused)
         }
-        // `isFocused` has already dropped by now; `wasFocused` hasn't. If the
-        // rebuild kept the focus after all, don't arm: nothing would clear
-        // the flag, and it would undo the next real blur.
-        .onChange(of: dynamicTypeSize) {
-            refocusAfterResize = wasFocused && !isFocused
+        .onChange(of: dynamicTypeSize) { _, size in
+            if !isFocused { fieldSize = size }
         }
-        .onAppear(perform: takeFocusIfRequested)
+        .onAppear {
+            fieldSize = dynamicTypeSize
+            takeFocusIfRequested()
+        }
         .onChange(of: focusRequested) { takeFocusIfRequested() }
     }
 
@@ -144,8 +140,11 @@ struct Composer: View {
             // A vertical field keeps the height it grew to when the text
             // size goes up and back down, which pushed the rows under it
             // 33pt down. A fresh field per size measures afresh; the
-            // draft is in `text`, and `body` gives the new field the focus.
-            .id(dynamicTypeSize)
+            // draft is in `text`. A focused field isn't rebuilt until it
+            // lets go: rebuilding drops the focus and the keyboard, and the
+            // page re-lays out under them, so the audit's Dynamic Type pass
+            // saw text behind the focused composer that didn't grow (#763).
+            .id(isFocused ? fieldSize ?? dynamicTypeSize : dynamicTypeSize)
             .focused($isFocused)
             .submitLabel(.return)
             .onChange(of: text, handleReturn)
