@@ -3,7 +3,7 @@ import { createMiddleware } from "hono/factory";
 import { createRemoteJWKSet, type JWTVerifyGetKey, jwtVerify } from "jose";
 import type { Env, GoogleIdTokenClaims } from "../types";
 import { clerkClient } from "./clerk";
-import { eq, type getDb, gmailAddonLinks, users } from "./db";
+import { type Db, eq, gmailAddonLinks, users } from "./db";
 import { apiError } from "./errors";
 
 // Google's public signing keys. `createRemoteJWKSet` fetches and caches them
@@ -117,7 +117,7 @@ export type ResolveNylonUserResult =
  *   3. No match — return `unlinked` so the caller can show a connect card.
  */
 export async function resolveNylonUser(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   env: Env["Bindings"],
   claims: GoogleIdTokenClaims,
 ): Promise<ResolveNylonUserResult> {

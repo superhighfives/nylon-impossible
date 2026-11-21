@@ -127,18 +127,11 @@ export async function updateMe(c: Context<Env>) {
     return apiError(c, "no_valid_fields");
   }
 
-  await db
+  const [user] = await db
     .update(users)
     .set({ ...updates, updatedAt: new Date() })
-    .where(eq(users.id, userId));
-
-  // Fetch updated user
-  const user = await db
-    .select(userColumns)
-    .from(users)
     .where(eq(users.id, userId))
-    .limit(1)
-    .then((rows) => rows[0]);
+    .returning(userColumns);
 
   if (!user) {
     return apiError(c, "user_not_found");

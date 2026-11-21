@@ -5,7 +5,7 @@ import {
 } from "@nylon-impossible/shared/demo-seed";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
-import { eq, type getDb, lists, todos, todoUrls, users } from "./db";
+import { type Db, eq, lists, todos, todoUrls, users } from "./db";
 
 // D1 caps bound parameters at 100 per statement (see chunkForD1 in
 // @nylon-impossible/shared/d1 for the general case). The demo-todo row here
@@ -43,7 +43,7 @@ const SYSTEM_LISTS = [
  */
 export async function ensureUser(
   env: Env["Bindings"],
-  db: ReturnType<typeof getDb>,
+  db: Db,
   userId: string,
 ): Promise<"ok" | "email_conflict"> {
   const [existingUser] = await db
@@ -106,7 +106,7 @@ export async function ensureUser(
 // across the user's system lists with fractional positions in declared
 // order. Due dates are relative to now so the seed never goes stale.
 async function seedDemoTodos(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   userId: string,
   systemLists: { id: string; systemKind: string }[],
 ): Promise<void> {

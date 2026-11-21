@@ -1,8 +1,7 @@
 import { getSystemListId } from "@nylon-impossible/shared/queries";
-import { and, eq, type getDb, lt, lte, todos, users } from "./db";
+import { and, type Db, eq, lt, lte, todos, users } from "./db";
 import { notifySync } from "./notify-sync";
 
-type Db = ReturnType<typeof getDb>;
 type Bindings = { USER_SYNC: DurableObjectNamespace };
 
 const DAY_MS = 24 * 60 * 60 * 1000;

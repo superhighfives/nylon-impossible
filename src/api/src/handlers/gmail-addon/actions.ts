@@ -18,7 +18,7 @@ import {
   QUICK_ADD_LIST_INPUT,
 } from "../../lib/addon-cards";
 import { createSmartTodo } from "../../lib/create-todo";
-import { and, eq, getDb, todos } from "../../lib/db";
+import { and, type Db, eq, getDb, todos } from "../../lib/db";
 import { notifySync } from "../../lib/notify-sync";
 import { listListsForUser, setTodoCompleted } from "../../lib/todos-core";
 import type { Env } from "../../types";
@@ -35,8 +35,6 @@ import {
   webBaseUrl,
   withLinkedUser,
 } from "./shared";
-
-type Db = ReturnType<typeof getDb>;
 
 /**
  * Rebuild the homepage card from the current state, with a toast. The toast

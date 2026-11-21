@@ -34,10 +34,7 @@ export async function listTodos(c: Context<Env>) {
 
 // GET /todos/:id - Get a single todo with URLs
 export async function getTodo(c: Context<Env>) {
-  const todoId = c.req.param("id")?.toLowerCase();
-  if (!todoId) {
-    return apiError(c, "todo_id_required");
-  }
+  const todoId = c.req.param("id")?.toLowerCase() ?? "";
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
