@@ -34,6 +34,10 @@ final class MacServices {
     @ObservationIgnored private let widgetReloader = MacWidgetReloader()
 
     @ObservationIgnored private var hasStarted = false
+    /// Brings the app forward before Settings opens. Tests replace it: a real
+    /// activation mid-run traps the test host in SwiftData's didBecomeActive
+    /// observer.
+    @ObservationIgnored var activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }
 
     var container: ModelContainer { SharedModelContainer.shared }
 
@@ -97,7 +101,7 @@ final class MacServices {
     /// it moves before it's drawn. One that's already open stays put.
     func showSettings(_ open: () -> Void) {
         let wasOpen = Self.settingsWindow?.isVisible == true
-        MacWindowOpening.open(open)
+        MacWindowOpening.open(activate: activate, open)
         if !wasOpen, let window = Self.settingsWindow { menuBar.place(window) }
     }
 

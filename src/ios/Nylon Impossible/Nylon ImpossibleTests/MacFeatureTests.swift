@@ -154,8 +154,13 @@ struct MenuBarAppTests {
     func settingsPlacement() async throws {
         let services = MacServices.shared
         let anchor = try #require(services.menuBar.anchor, "the test host has the menu bar icon")
+        let activate = services.activate
+        services.activate = {}
         MacServices.settingsWindow?.close()
-        defer { MacServices.settingsWindow?.close() }
+        defer {
+            MacServices.settingsWindow?.close()
+            services.activate = activate
+        }
 
         /// Where a window under the icon goes, kept on screen as `place` keeps
         /// it (a short display, like CI's, pushes a tall window up from the bottom).
