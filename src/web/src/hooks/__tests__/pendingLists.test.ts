@@ -194,6 +194,8 @@ describe("adding to a list that's still saving", () => {
     expect(sentListIds()).toEqual([REAL_ID]);
   });
 
+  // useCreateList's onSuccess moves cached todos from the temp- id to the
+  // real one; without it the row drops out of the list until its add returns.
   it("keeps the waiting row in the list once it has its real id", async () => {
     const create = deferred<SerializedList>();
     mockCreateList.mockReturnValue(create.promise);
@@ -313,6 +315,34 @@ describe("moving to a list that's still saving", () => {
     expect(mockUpdateTodo).toHaveBeenCalledWith({
       data: { id: "todo-1", input: { listId: REAL_ID, position: "a0" } },
     });
+  });
+
+  it("keeps the moved todo in the list once it has its real id", async () => {
+    const create = deferred<SerializedList>();
+    mockCreateList.mockReturnValue(create.promise);
+    // The move stays in flight after the list is saved.
+    mockUpdateTodo.mockReturnValue(new Promise(() => {}));
+    const { queryClient, result } = setup([makeTodo()]);
+    const tempId = await startList(queryClient, () =>
+      result.current.createList.mutateAsync({ name: "Slow list" }),
+    );
+    act(() => {
+      result.current.updateTodo
+        .mutateAsync({ id: "todo-1", input: { listId: tempId } })
+        .catch(() => {});
+    });
+    await waitFor(() =>
+      expect(
+        queryClient.getQueryData<TodoWithUrls[]>(["todos"])?.[0]?.listId,
+      ).toBe(tempId),
+    );
+    await act(async () => {
+      create.resolve(makeList());
+    });
+    await waitFor(() => expect(mockUpdateTodo).toHaveBeenCalled());
+    expect(
+      queryClient.getQueryData<TodoWithUrls[]>(["todos"])?.[0]?.listId,
+    ).toBe(REAL_ID);
   });
 
   it("leaves the todo where it was if the create fails, and only the create toasts", async () => {
