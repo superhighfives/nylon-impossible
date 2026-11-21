@@ -581,6 +581,22 @@ out=$( (spec_column "$(jq -c '.field.options |= map(select(.name != "Specced"))'
 expect "neither stops the run"                               "1 foreman: no status called 'Define' or 'Specced' on the board" "$? $out"
 expect "spec runs on a Define board"                         "14 17 20"  "$(on_board "$DEFINE_BOARD" spec_issues "$DEFINE_BOARD" | paste -sd' ' -)"
 
+# GitHub pages a board at 100 items. The second page has to be read too, or
+# every item past the 100th (Ready included) is invisible.
+gh() {
+  echo "$*" >> "$CALLS"
+  case "$*" in
+    *after=c1*) echo '{"id":"P","items":{"pageInfo":{"hasNextPage":false,"endCursor":"c2"},"nodes":[{"id":"I101"}]}}' ;;
+    *) echo '{"id":"P","items":{"pageInfo":{"hasNextPage":true,"endCursor":"c1"},"nodes":[{"id":"I1"},{"id":"I100"}]}}' ;;
+  esac
+}
+: > "$CALLS"
+expect "the board reads every page, in order"   "I1 I100 I101"  "$(board_json | jq -r '.items.nodes[].id' | paste -sd' ' -)"
+expect "in two requests"                        "2"             "$(grep -c 'api graphql' "$CALLS")"
+gh() { return 1; }
+board_json >/dev/null
+expect "a failed page fails the read"           "1"             "$?"
+
 SPEC_BODY="" SPEC_LABELS="" COMMENT_IDS=""
 gh() {
   echo "$*" >> "$CALLS"
