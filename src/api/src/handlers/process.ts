@@ -19,12 +19,7 @@ import type { Env } from "../types";
  * backs that per-link retry.)
  */
 export async function processTodo(c: Context<Env>) {
-  const idParam = c.req.param("id");
-  if (!idParam) {
-    return apiError(c, "todo_id_required");
-  }
-
-  const todoId = idParam.toLowerCase();
+  const todoId = c.req.param("id")?.toLowerCase() ?? "";
   const userId = c.get("userId");
   const db = getDb(c.env.DB);
 

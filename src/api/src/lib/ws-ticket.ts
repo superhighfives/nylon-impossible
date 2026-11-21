@@ -1,5 +1,5 @@
 import { hashApiToken } from "./api-token";
-import { eq, type getDb, lt, wsTickets } from "./db";
+import { type Db, eq, lt, wsTickets } from "./db";
 
 // One-use tickets for GET /ws, so a Clerk session token never goes in the
 // WebSocket URL (RFC 9700 §2.1). D1 keeps only each ticket's SHA-256, hashed
@@ -21,10 +21,7 @@ function generateTicket(): string {
  * Issues a ticket for `userId`, and sweeps every ticket already past its
  * expiry, so the table stays small without a cron.
  */
-export async function issueWsTicket(
-  db: ReturnType<typeof getDb>,
-  userId: string,
-): Promise<string> {
+export async function issueWsTicket(db: Db, userId: string): Promise<string> {
   const ticket = generateTicket();
   const now = Date.now();
   await db.batch([
@@ -44,7 +41,7 @@ export async function issueWsTicket(
  * step, so a ticket works at most once, even under concurrent upgrades.
  */
 export async function redeemWsTicket(
-  db: ReturnType<typeof getDb>,
+  db: Db,
   ticket: string | undefined,
 ): Promise<string | null> {
   if (!ticket) return null;

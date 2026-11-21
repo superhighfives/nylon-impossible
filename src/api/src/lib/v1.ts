@@ -12,8 +12,8 @@ import { loadUrlsByTodoId } from "@nylon-impossible/shared/serialize";
 import {
   and,
   asc,
+  type Db,
   eq,
-  type getDb,
   inArray,
   type List,
   lists,
@@ -26,8 +26,6 @@ import {
 // serializeUrl on purpose: those follow the apps, these only ever grow
 // (src/shared/src/api-v1.ts). userId, email, position, systemKind and a
 // link's fetch state never go out.
-
-type Db = ReturnType<typeof getDb>;
 
 const KIND: Record<NonNullable<List["systemKind"]>, V1ListKind> = {
   today: "today",

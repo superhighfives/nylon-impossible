@@ -14,11 +14,10 @@ import {
 import * as Sentry from "@sentry/cloudflare";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import type { Env } from "../types";
-import { and, eq, type getDb, isNull, todos, todoUrls } from "./db";
+import { and, type Db, eq, isNull, todos, todoUrls } from "./db";
 import { notifySync } from "./notify-sync";
 import { finishTodoLinks, insertTodoUrls } from "./process-todo";
 
-type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
 
 export interface CreateSmartTodoOptions {

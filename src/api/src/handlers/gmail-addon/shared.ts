@@ -11,11 +11,9 @@ import {
   renderCard,
   updateCard,
 } from "../../lib/addon-cards";
-import { getDb } from "../../lib/db";
+import { type Db, getDb } from "../../lib/db";
 import { fetchMessageMetadata } from "../../lib/gmail-message";
 import type { Env, GoogleIdTokenClaims } from "../../types";
-
-type Db = ReturnType<typeof getDb>;
 
 const DEFAULT_WEB_BASE_URL = "https://www.nylonimpossible.com";
 

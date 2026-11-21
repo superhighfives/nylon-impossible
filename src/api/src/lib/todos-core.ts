@@ -12,9 +12,9 @@ import type { Env } from "../types";
 import {
   and,
   asc,
+  type Db,
   desc,
   eq,
-  type getDb,
   gte,
   isNull,
   lists,
@@ -24,7 +24,6 @@ import {
 } from "./db";
 import { notifySync } from "./notify-sync";
 
-type Db = ReturnType<typeof getDb>;
 type Bindings = Env["Bindings"];
 
 /**

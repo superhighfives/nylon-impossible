@@ -11,7 +11,6 @@ import {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -19,7 +18,6 @@ import { drizzle } from "drizzle-orm/d1";
 
 // Re-export schema from shared package
 export {
-  type ApiToken,
   apiTokens,
   gmailAddonLinks,
   type List,
@@ -28,15 +26,15 @@ export {
   type TodoUrl,
   todos,
   todoUrls,
-  type User,
   users,
-  type WsTicket,
   wsTickets,
 } from "@nylon-impossible/shared/schema";
 
 export function getDb(d1: D1Database) {
   return drizzle(d1);
 }
+
+export type Db = ReturnType<typeof getDb>;
 
 export {
   and,
@@ -51,7 +49,6 @@ export {
   isNull,
   lt,
   lte,
-  ne,
   or,
   sql,
 };

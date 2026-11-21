@@ -16,12 +16,9 @@ export const API_ERRORS = {
     status: 400,
     message: "Expected WebSocket upgrade",
   },
-  todo_id_required: { status: 400, message: "Todo ID required" },
-  user_id_required: { status: 400, message: "User ID required" },
   todo_not_found: { status: 404, message: "Todo not found" },
   link_not_found: { status: 404, message: "Link not found" },
   invalid_url: { status: 400, message: "That doesn't look like a link." },
-  list_id_required: { status: 400, message: "List ID required" },
   list_not_found: { status: 404, message: "List not found" },
   list_id_taken: { status: 409, message: "That list ID is already in use" },
   system_list_immutable: {

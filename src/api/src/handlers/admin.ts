@@ -68,8 +68,7 @@ export async function listUsers(c: Context<Env>) {
 
 // DELETE /admin/users/:id
 export async function deleteUserAsAdmin(c: Context<Env>) {
-  const id = c.req.param("id");
-  if (!id) return apiError(c, "user_id_required");
+  const id = c.req.param("id") ?? "";
   const db = getDb(c.env.DB);
 
   const existing = await db

@@ -10,7 +10,7 @@ import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import * as Sentry from "@sentry/cloudflare";
 import { getTableColumns } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
-import { eq, type getDb, inArray, todos, todoUrls } from "./db";
+import { type Db, eq, inArray, todos, todoUrls } from "./db";
 import { notifySync } from "./notify-sync";
 import {
   extractUrlsFromText,
@@ -18,8 +18,6 @@ import {
   titleFromUrlMetadata,
 } from "./url-helpers";
 import { fetchUrlMetadataResult } from "./url-metadata";
-
-type Db = ReturnType<typeof getDb>;
 
 /** A link row queued for fetching. */
 export interface TodoLinkRef {

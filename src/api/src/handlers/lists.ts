@@ -1,14 +1,36 @@
 import { serializeList as serializeSharedList } from "@nylon-impossible/shared/serialize";
 import type { Context } from "hono";
 import { z } from "zod/v4";
-import { and, count, eq, getDb, lists, todos } from "../lib/db";
+import { and, count, type Db, eq, getDb, lists, todos } from "../lib/db";
 import { apiError, apiValidationError, readJsonBody } from "../lib/errors";
 import { listIdSchema } from "../lib/list-id";
 import { notifySync } from "../lib/notify-sync";
 import type { Env } from "../types";
 
-function serializeList(list: typeof lists.$inferSelect) {
+type ListRow = typeof lists.$inferSelect;
+
+function serializeList(list: ListRow) {
   return { ...serializeSharedList(list), id: list.id.toLowerCase() };
+}
+
+// The caller's own custom list, or the error to return instead: 404 if it
+// isn't theirs (or doesn't exist), 403 if it's a system list.
+async function findOwnCustomList(
+  c: Context<Env>,
+  db: Db,
+  listId: string,
+  userId: string,
+): Promise<{ list: ListRow } | { response: Response }> {
+  const [list] = await db
+    .select()
+    .from(lists)
+    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
+
+  if (!list) return { response: apiError(c, "list_not_found") };
+  if (list.kind === "system") {
+    return { response: apiError(c, "system_list_immutable") };
+  }
+  return { list };
 }
 
 // GET /lists - all of the user's lists (system + custom), position order
@@ -85,10 +107,7 @@ const updateListSchema = z.object({
 // PATCH /lists/:id - rename, reposition, hide or show (`columnHidden`) a
 // custom list. Rejects system lists.
 export async function updateList(c: Context<Env>) {
-  const listId = c.req.param("id")?.toLowerCase();
-  if (!listId) {
-    return apiError(c, "list_id_required");
-  }
+  const listId = c.req.param("id")?.toLowerCase() ?? "";
   const json = await readJsonBody(c);
   if (!json.ok) return json.response;
   const parsed = updateListSchema.safeParse(json.body);
@@ -99,17 +118,8 @@ export async function updateList(c: Context<Env>) {
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  const [existing] = await db
-    .select()
-    .from(lists)
-    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
-
-  if (!existing) {
-    return apiError(c, "list_not_found");
-  }
-  if (existing.kind === "system") {
-    return apiError(c, "system_list_immutable");
-  }
+  const found = await findOwnCustomList(c, db, listId, userId);
+  if ("response" in found) return found.response;
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
@@ -118,9 +128,13 @@ export async function updateList(c: Context<Env>) {
   if (parsed.data.columnHidden !== undefined)
     updates.columnHidden = parsed.data.columnHidden;
 
-  await db.update(lists).set(updates).where(eq(lists.id, listId));
-
-  const [updated] = await db.select().from(lists).where(eq(lists.id, listId));
+  // Deleted since the check above: nothing comes back.
+  const [updated] = await db
+    .update(lists)
+    .set(updates)
+    .where(and(eq(lists.id, listId), eq(lists.userId, userId)))
+    .returning();
+  if (!updated) return apiError(c, "list_not_found");
 
   await notifySync(c.env, userId);
 
@@ -131,24 +145,12 @@ export async function updateList(c: Context<Env>) {
 // system lists. Returns the todo count so the client can show a "this will
 // delete N todos" warning before issuing the delete.
 export async function deleteList(c: Context<Env>) {
-  const listId = c.req.param("id")?.toLowerCase();
-  if (!listId) {
-    return apiError(c, "list_id_required");
-  }
+  const listId = c.req.param("id")?.toLowerCase() ?? "";
   const db = getDb(c.env.DB);
   const userId = c.get("userId");
 
-  const [existing] = await db
-    .select()
-    .from(lists)
-    .where(and(eq(lists.id, listId), eq(lists.userId, userId)));
-
-  if (!existing) {
-    return apiError(c, "list_not_found");
-  }
-  if (existing.kind === "system") {
-    return apiError(c, "system_list_immutable");
-  }
+  const found = await findOwnCustomList(c, db, listId, userId);
+  if ("response" in found) return found.response;
 
   const [{ todoCount }] = await db
     .select({ todoCount: count() })

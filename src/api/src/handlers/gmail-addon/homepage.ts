@@ -7,7 +7,7 @@ import {
   buildHomepageCard,
   type Card,
 } from "../../lib/addon-cards";
-import type { getDb } from "../../lib/db";
+import type { Db } from "../../lib/db";
 import { listListsForUser, listOpenTodos } from "../../lib/todos-core";
 import type { Env } from "../../types";
 import {
@@ -16,8 +16,6 @@ import {
   webBaseUrl,
   withLinkedUser,
 } from "./shared";
-
-type Db = ReturnType<typeof getDb>;
 
 // POST /gmail-addon/homepage — panel opened with no message in context.
 export async function gmailAddonHomepage(c: Context<Env>) {
