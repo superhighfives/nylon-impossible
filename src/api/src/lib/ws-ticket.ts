@@ -1,4 +1,5 @@
 import { hashApiToken } from "./api-token";
+import { base64url } from "./base64url";
 import { type Db, eq, lt, wsTickets } from "./db";
 
 // One-use tickets for GET /ws, so a Clerk session token never goes in the
@@ -10,11 +11,7 @@ export const WS_TICKET_TTL_MS = 30_000;
 
 /** 32 random bytes, base64url without padding. */
 function generateTicket(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+  return base64url(crypto.getRandomValues(new Uint8Array(32)));
 }
 
 /**
