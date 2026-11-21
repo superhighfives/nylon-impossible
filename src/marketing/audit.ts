@@ -469,8 +469,8 @@ async function keyboardWalk(page: Page) {
         const el = document.activeElement as HTMLElement | null;
         if (!el || el === document.body) return { name: "(body)", visible: false };
         // Focus is visible when something changes with it: an outline (the
-        // yellow ring), a box-shadow or a background (the wide board's soft
-        // focus), on the element or one of its near ancestors. Compare
+        // `ink` ring), a box-shadow or a background (the soft tint, a colour
+        // or `n-focus`'s background-image), on the element or one of its near ancestors. Compare
         // focused with blurred.
         const chain: HTMLElement[] = [];
         for (let n: HTMLElement | null = el; n && chain.length < 5; n = n.parentElement) {
@@ -488,7 +488,7 @@ async function keyboardWalk(page: Page) {
                 cs.outlineStyle !== "none" && cs.outlineWidth !== "0px"
                   ? `${cs.outlineStyle} ${cs.outlineColor}`
                   : "";
-              return `${outline}|${cs.boxShadow}|${cs.backgroundColor}`;
+              return `${outline}|${cs.boxShadow}|${cs.backgroundColor}|${cs.backgroundImage}`;
             }),
           );
         }

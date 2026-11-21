@@ -199,6 +199,31 @@ describe("design token generator", () => {
     }
   });
 
+  it("draws the web's focus ring in ink, 3:1 against the canvas, surface and fill under it in every appearance (#773)", () => {
+    type Colour = {
+      light: string;
+      dark: string;
+      highContrast?: { light: string; dark: string };
+    };
+    const colour = (name: string) =>
+      (tokens.color as unknown as Record<string, Colour>)[name];
+    const appearances = (c: Colour) => [
+      c.light,
+      c.dark,
+      c.highContrast?.light ?? c.light,
+      c.highContrast?.dark ?? c.dark,
+    ];
+    const ring = appearances(colour("ink"));
+    for (const under of ["canvas", "surface", "fill"]) {
+      appearances(colour(under)).forEach((background, i) => {
+        expect(
+          contrast(ring[i], background),
+          `ink ring on ${under}, appearance ${i}`,
+        ).toBeGreaterThanOrEqual(3);
+      });
+    }
+  });
+
   it("gives every icon both a lucide and an SF Symbol name", () => {
     for (const [name, icon] of Object.entries(tokens.icons)) {
       if (name.startsWith("$")) continue;
