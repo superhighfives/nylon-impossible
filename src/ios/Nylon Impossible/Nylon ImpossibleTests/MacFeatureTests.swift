@@ -157,12 +157,11 @@ struct MenuBarAppTests {
         MacServices.settingsWindow?.close()
         defer { MacServices.settingsWindow?.close() }
 
-        /// Where the top of a window under the icon goes: 4 points below the menu bar.
-        let top = anchor.icon.minY - MacWindowPlacement.gap
+        /// Where a window under the icon goes, kept on screen as `place` keeps
+        /// it (a short display, like CI's, pushes a tall window up from the bottom).
         func expectUnderIcon(_ window: NSWindow) {
-            let x = MacWindowPlacement.origin(for: window.frame.size, under: anchor.icon, in: anchor.screen).x
-            #expect(window.frame.minX == x)
-            #expect(window.frame.maxY == top)
+            let origin = MacWindowPlacement.origin(for: window.frame.size, under: anchor.icon, in: anchor.screen)
+            #expect(window.frame.origin == origin)
         }
 
         var window = try await Self.openSettings()
