@@ -211,10 +211,6 @@ struct QuickAddView: View {
             }
             footer
         }
-        .overlay(alignment: .bottom) {
-            ToastView(toasts: actions.toasts)
-                .padding(.bottom, Theme.Space.s3)
-        }
     }
 
     /// The row keys that aren't obvious, on their own line above the footer,

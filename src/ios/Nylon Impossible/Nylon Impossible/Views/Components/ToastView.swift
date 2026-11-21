@@ -15,15 +15,22 @@ import SwiftUI
 /// can undo without finding the pill: a two-finger double-tap (the Magic
 /// Tap) runs the action, from anywhere on the screen. `ToastCenter` keeps
 /// the toast up longer while VoiceOver or Switch Control is running.
+///
+/// `compact` is the Mac menu bar's: one line in the popover's header, sized
+/// for a pointer rather than a 44pt touch, cut off with the whole text in
+/// its tooltip (VoiceOver reads it whole anyway).
 struct ToastView: View {
     let toasts: ToastCenter
+    var compact = false
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         ZStack {
-            if let toast = toasts.current {
+            if let toast = toasts.current, compact {
+                compactPill(toast)
+            } else if let toast = toasts.current {
                 // The action sits beside the message, which wraps if it must.
                 // Only at accessibility text sizes does it drop underneath.
                 // (A ViewThatFits here could pick the stacked layout for a
@@ -64,6 +71,42 @@ struct ToastView: View {
     /// The text, icon and outline on that fill.
     static func ink(_ toast: ToastCenter.Toast) -> Color {
         toast.isError ? Theme.Colors.destructiveSolidInk : Theme.Colors.brandInk
+    }
+
+    private func compactPill(_ toast: ToastCenter.Toast) -> some View {
+        HStack(spacing: Theme.Space.s2) {
+            if toast.isError {
+                Image(systemName: Theme.Icon.error)
+                    .accessibilityHidden(true)
+            }
+            Text(toast.text)
+                .lineLimit(1)
+                .truncationMode(.tail)
+            if let label = toast.actionLabel {
+                Button { toasts.performAction() } label: {
+                    Text(label)
+                        .fontWeight(.bold)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .padding(.horizontal, Theme.Space.s2)
+                        .overlay(Capsule().strokeBorder(Self.ink(toast), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .textStyle(Theme.Fonts.Role.meta)
+        .foregroundStyle(Self.ink(toast))
+        .padding(.horizontal, Theme.Space.s2)
+        .padding(.vertical, Theme.Space.s1)
+        .background(Self.fill(toast), in: Capsule())
+        .help(toast.text)
+        .id(toast.id)
+        .transition(.opacity)
+        .accessibilityElement(children: .contain)
+        .accessibilityAddTraits(.updatesFrequently)
+        .onAppear {
+            AccessibilityNotification.Announcement(Self.announcement(for: toast)).post()
+        }
     }
 
     @ViewBuilder

@@ -28,9 +28,9 @@
 //  popover there too, since the Mac has no other view of a list; `composer`
 //  draws it with "Dentist friday" typed in the field.
 //
-//  toast and toasterror draw the toast's two looks over Today: on the
-//  iPhone an Undo toast ("Done · Undo") and a "Couldn’t …" one, and in the
-//  Mac's menu bar popover "Added to Groceries" and the same failure.
+//  toast and toasterror draw the toast's two looks over Today, an Undo toast
+//  ("Done · Undo") and a "Couldn’t …" one: on the iPhone, and in the Mac's
+//  menu bar popover, where the toast sits in the header.
 //
 //  States for the quality pass, on the iPhone: signin (the signed-out
 //  screen), loading (no lists yet: "Getting your lists…"), empty (nothing in
@@ -236,11 +236,7 @@ extension ToastCenter {
             showError("Couldn’t save that change")
             return
         }
-        #if os(macOS)
-        show(ToastCopy.added(count: 1, listName: "Groceries"), action: nil)
-        #else
         show("Done", action: {})
-        #endif
     }
 }
 
