@@ -25,7 +25,8 @@
 //  snapshot attached, `settings` the Settings window's view,
 //  `signin` the sign-in window's, `share` the share extension at its Mac
 //  sheet size, and `widgets` the desktop sizes. Any other route draws the
-//  popover there too, since the Mac has no other view of a list.
+//  popover there too, since the Mac has no other view of a list; `composer`
+//  draws it with "Dentist friday" typed in the field.
 //
 //  toast and toasterror draw the toast's two looks over Today: on the
 //  iPhone an Undo toast ("Done · Undo") and a "Couldn’t …" one, and in the

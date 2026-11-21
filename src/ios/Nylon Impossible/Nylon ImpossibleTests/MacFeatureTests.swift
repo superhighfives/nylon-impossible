@@ -301,6 +301,52 @@ struct QuickAddViewTests {
         #expect(!QuickAddView.todayRows(all, lists: lists, userId: Self.userId, hidden: [hidden], now: now).contains { $0.id == hidden })
     }
 
+    private func popoverFixture() throws -> (container: ModelContainer, actions: TodoActions, lists: [TodoListModel]) {
+        let container = try ModelContainer(
+            for: TodoItem.self, TodoUrl.self, TodoListModel.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let context = container.mainContext
+        let lists = [
+            TodoListModel(id: "today", userId: Self.userId, name: "Today", kind: "system", systemKind: .today),
+            TodoListModel(id: "week", userId: Self.userId, name: "This week", kind: "system", systemKind: .thisWeek),
+            TodoListModel(id: "groceries", userId: Self.userId, name: "Groceries"),
+        ]
+        lists.forEach(context.insert)
+        let actions = TodoActions()
+        actions.configure(context: context) {}
+        return (container, actions, lists)
+    }
+
+    @Test("Typing shows no chips: no list chips and no \"Due Fri ×\", even for a draft that names a date")
+    func noChips() {
+        // The menu bar's composer, with "Dentist friday" typed.
+        #expect(!Composer.showsChips(offersChips: QuickAddView.offersChips, menuBarKeys: true, isFocused: true, hasDraft: true))
+        // The iPhone's still shows them, on focus or with a draft.
+        #expect(Composer.showsChips(offersChips: true, menuBarKeys: false, isFocused: true, hasDraft: false))
+        #expect(Composer.showsChips(offersChips: true, menuBarKeys: false, isFocused: false, hasDraft: true))
+    }
+
+    @Test("Return adds each line to Today, as typed, with no due date")
+    func addsToTodayAsTyped() throws {
+        let fixture = try popoverFixture()
+        let created = QuickAddView.add("Dentist friday\nPay rent tomorrow", with: fixture.actions, lists: fixture.lists, userId: Self.userId)
+        #expect(created.map(\.title) == ["Dentist friday", "Pay rent tomorrow"])
+        #expect(created.allSatisfy { $0.listKey == "today" && $0.dueDate == nil })
+    }
+
+    @Test("A nylon://add link that names a list still adds to Today")
+    func listLinkAddsToToday() throws {
+        let fixture = try popoverFixture()
+        let url = try #require(URL(string: "nylon://add?list=groceries"))
+        let link = try #require(DeepLink(url: url))
+        #expect(link == .add(list: .list("groceries")))
+        // The popover takes the link only to open; the add path has no list
+        // to follow, so Groceries never gets the todo.
+        let created = QuickAddView.add("Parmesan", with: fixture.actions, lists: fixture.lists, userId: Self.userId)
+        #expect(created.map(\.listKey) == ["today"])
+    }
+
     @Test("↵ edits a row's title and ⇧↵ opens it on the web")
     func returnKeys() {
         #expect(QuickAddRowCommand(key: .return, characters: "\r", modifiers: []) == .edit)

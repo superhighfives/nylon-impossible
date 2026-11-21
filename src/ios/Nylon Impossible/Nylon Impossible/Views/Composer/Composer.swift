@@ -13,7 +13,8 @@
 //  `allowsEmptySubmit` lets it be sent as-is.
 //
 //  In the Mac's menu bar popover the same composer is a quiet "+ Add" row
-//  (`style: .inline`): no glass, and the chips under the field.
+//  (`style: .inline`): no glass, and, for now, no chips at all
+//  (`offersChips: false`), so what's typed goes to Today as typed.
 //
 
 import SwiftUI
@@ -48,6 +49,9 @@ struct Composer: View {
     /// list below (`onDown`).
     var menuBarKeys = false
     var onDown: (() -> Void)?
+    /// False in the Mac's menu bar, for now: no list chips and no "Due Fri ×",
+    /// ⇥ picks nothing, and Return sends the text without parsing a date.
+    var offersChips = true
 
     @State private var keepWords = false
     @State private var wasFocused = false
@@ -71,13 +75,21 @@ struct Composer: View {
     /// line is parsed when it's added, so a pasted list whose third line ends
     /// "friday" still shows the chip — and × keeps the words on every line.
     private var typedDue: Date? {
-        guard !keepWords, hasDraft else { return nil }
+        guard offersChips, !keepWords, hasDraft else { return nil }
         return text.split(whereSeparator: \.isNewline).lazy
             .compactMap { TodoDateParser.parse(String($0)).dueDay }
             .first
     }
 
-    private var showsChips: Bool { menuBarKeys ? hasDraft : (isFocused || hasDraft) }
+    private var showsChips: Bool {
+        Self.showsChips(offersChips: offersChips, menuBarKeys: menuBarKeys, isFocused: isFocused, hasDraft: hasDraft)
+    }
+
+    /// Whether the chip row is under the field.
+    static func showsChips(offersChips: Bool, menuBarKeys: Bool, isFocused: Bool, hasDraft: Bool) -> Bool {
+        guard offersChips else { return false }
+        return menuBarKeys ? hasDraft : (isFocused || hasDraft)
+    }
 
     /// The grabber only shows while the keyboard is up, and not in the share
     /// sheet, which has no keyboard to hand back.
@@ -150,7 +162,7 @@ struct Composer: View {
                 return .handled
             }
             .onKeyPress(keys: [.tab], phases: .down) { press in
-                guard menuBarKeys, hasDraft, !lists.isEmpty else { return .ignored }
+                guard menuBarKeys, offersChips, hasDraft, !lists.isEmpty else { return .ignored }
                 let at = lists.firstIndex { $0.id == targetId } ?? 0
                 let step = press.modifiers.contains(.shift) ? -1 : 1
                 let next = lists[(at + step + lists.count) % lists.count]
@@ -364,7 +376,7 @@ struct Composer: View {
 
     private func submit() {
         guard canSubmit else { return }
-        onSubmit(targetId, !keepWords)
+        onSubmit(targetId, offersChips && !keepWords)
         keepWords = false
         // Keep focus for rapid entry.
         isFocused = true

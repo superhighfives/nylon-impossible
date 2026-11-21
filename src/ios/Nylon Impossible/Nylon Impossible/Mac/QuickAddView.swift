@@ -4,17 +4,19 @@
 //
 //  The Mac app: the popover the menu bar icon and the global hotkey open. A
 //  helper, not a full app (the web board is the one full editor), so it stays
-//  small: the composer — list chips, the "Due Fri ×" chip from
-//  `TodoDateParser`, Return adds and keeps the field focused for the next one
-//  — over today's count and the next few todos for today, each with its
-//  checkbox. "Today" here is `TodayDigest`, the same set the widget shows.
-//  There's no switcher and no lists; the composer's list chips are how a todo
-//  goes somewhere else.
+//  small: the composer — Return adds to Today and keeps the field focused for
+//  the next one — over today's count and the next few todos for today, each
+//  with its checkbox. "Today" here is `TodayDigest`, the same set the widget
+//  shows. There's no switcher and no lists.
+//
+//  For now (#782) it only adds to Today, and what you type is the title as
+//  typed: the composer has no chips (no list chips, no "Due Fri ×"), and a
+//  `nylon://add` link that names another list still adds to Today. The
+//  iPhone's composer keeps both; `Self.offersChips` brings them back here.
 //
 //  It works without the mouse. The field takes focus every time the popover
-//  opens (the panel is reused, so `onAppear` only fires once). The list chips
-//  show once you type; ⇥ and ⇧⇥ step through them. Return adds and stays;
-//  Esc clears the field, then closes. ↓ goes into the list, where the
+//  opens (the panel is reused, so `onAppear` only fires once). Return adds
+//  and stays; Esc clears the field, then closes. ↓ goes into the list, where the
 //  selected row has the board's fill and bar, and keys act on it
 //  (`QuickAddRowCommand`): ↵ edits the title in place, ⇧↵ opens the todo on
 //  the web, X marks it done (staying in the slot), O opens its link; ↑ from
@@ -51,7 +53,6 @@ struct QuickAddView: View {
 
     @State var actions = TodoActions()
     @State private var text = ""
-    @State private var chosenListId: String?
     @State var focusRequested = true
     /// The keyboard's row in the list, by id; `cursorSlot` keeps its place
     /// when a done todo leaves.
@@ -65,6 +66,8 @@ struct QuickAddView: View {
     /// How many of today's todos the list shows before "+N more".
     static let rowLimit = 5
     static let width: CGFloat = 380
+    /// The composer's chips, off for now: it only adds to Today, as typed.
+    static let offersChips = false
 
     private var userId: String? {
         screenRoute != nil ? "sample-user" : authService.userId
@@ -86,7 +89,7 @@ struct QuickAddView: View {
         Self.todayRows(todos, lists: lists, userId: userId, hidden: actions.pendingDeletes)
     }
 
-    /// The popover's rows: today's, whichever list the composer is adding to.
+    /// The popover's rows: today's.
     static func todayRows(
         _ todos: [TodoItem],
         lists: [TodoListModel],
@@ -120,15 +123,18 @@ struct QuickAddView: View {
             actions.configure(context: modelContext) { syncService.syncAfterAction() }
             #if DEBUG
             if let screenRoute { actions.toasts.showForScreenshot(screenRoute) }
+            // A draft that names a day, to show the field has no chips under it.
+            if screenRoute == .composer { text = "Dentist friday" }
             #endif
         }
         .onExitCommand(perform: onDismiss)
-        // The panel is reused, so take the field every time it opens, and
-        // pick up the list a `nylon://add` link names.
+        // The panel is reused, so take the field every time it opens. A
+        // `nylon://add` link has done its job by opening it: whichever list
+        // it names, the todo goes to Today.
         .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) { note in
             guard note.object is QuickAddPanel else { return }
             backToField()
-            if let link = QuickActionService.shared.take() { follow(link) }
+            _ = QuickActionService.shared.take()
             showFiled()
         }
     }
@@ -144,7 +150,7 @@ struct QuickAddView: View {
                 text: $text,
                 lists: orderedLists,
                 currentListId: todayList?.id,
-                chosenListId: $chosenListId,
+                chosenListId: .constant(nil),
                 focusRequested: $focusRequested,
                 onSubmit: add,
                 style: .inline,
@@ -158,7 +164,8 @@ struct QuickAddView: View {
                     }
                 },
                 menuBarKeys: true,
-                onDown: { intoList(shown) }
+                onDown: { intoList(shown) },
+                offersChips: Self.offersChips
             )
             .padding(.horizontal, Theme.Space.s4)
             Hairline()
@@ -241,32 +248,22 @@ struct QuickAddView: View {
         }
     }
 
-    /// A `nylon://add` link (the widget's "+", a Shortcut): add to its list.
-    private func follow(_ link: DeepLink) {
-        switch link {
-        case .add(let target):
-            let id: String?
-            if let kind = target.systemKind {
-                id = orderedLists.first { $0.systemKind == kind }?.id
-            } else if case .list(let listId) = target {
-                id = orderedLists.first { $0.id == listId }?.id
-            } else {
-                id = nil
-            }
-            chosenListId = id == todayList?.id ? nil : id
-        }
-    }
-
-    private func add(_ listId: String?, _ parseDates: Bool) {
+    /// The composer's target is ignored: it has no chips to pick another.
+    private func add(_: String?, _: Bool) {
         let draft = text
         text = ""
-        let created = actions.add(draft: draft, to: listId, parseDates: parseDates, userId: userId)
+        let created = Self.add(draft, with: actions, lists: lists, userId: userId)
         guard !created.isEmpty else { return }
-        let name = orderedLists.first { $0.id == (listId ?? todayList?.id) }?.nameInSentence
-            ?? SystemListKind.today.nameInSentence
         // No "View": the popover shows only Today, so it would have to open a
         // browser (PRINCIPLES.md, principle 5's exception).
-        actions.toasts.show(ToastCopy.added(count: created.count, listName: name), action: nil)
+        actions.toasts.show(ToastCopy.added(count: created.count, listName: SystemListKind.today.nameInSentence), action: nil)
+    }
+
+    /// Add each line to Today, as typed: no due date from its words.
+    @discardableResult
+    static func add(_ draft: String, with actions: TodoActions, lists: [TodoListModel], userId: String?) -> [TodoItem] {
+        let todayId = lists.first { $0.systemKind == .today }?.id
+        return actions.add(draft: draft, to: todayId, parseDates: false, userId: userId)
     }
 }
 // MARK: - Footer
