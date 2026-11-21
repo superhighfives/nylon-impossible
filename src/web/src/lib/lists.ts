@@ -1,17 +1,13 @@
+import { chunkForD1 } from "@nylon-impossible/shared/d1";
 import { DEMO_SEED_TODOS } from "@nylon-impossible/shared/demo-seed";
-import { and, eq } from "drizzle-orm";
+import { and, eq, getTableColumns } from "drizzle-orm";
 import { generateNKeysBetween } from "fractional-indexing";
 import type { DbClient } from "./db";
 import { lists, todos, todoUrls } from "./schema";
 
-// D1 caps bound parameters at 100 per statement. The demo-todo row here sets
-// 10 fields explicitly; NOT NULL columns left unset (listEnteredAt,
-// needsInput, pinned) may still bind hidden default params, so budget for up
-// to 13 and chunk conservatively.
-const TODO_INSERT_CHUNK_SIZE = 6;
-// The demo-url row sets all non-null-default-only columns explicitly, no
-// hidden extras.
-const TODO_URL_INSERT_CHUNK_SIZE = 7;
+// Every column a row can bind, so a batch of them fits D1's cap.
+const TODO_PARAMS = Object.keys(getTableColumns(todos)).length;
+const TODO_URL_PARAMS = Object.keys(getTableColumns(todoUrls)).length;
 
 const SYSTEM_LISTS = [
   { name: "Today", systemKind: "today" as const },
@@ -113,10 +109,8 @@ export async function seedDemoTodos(
   });
 
   const todoRows = seeded.map(({ row }) => row);
-  for (let i = 0; i < todoRows.length; i += TODO_INSERT_CHUNK_SIZE) {
-    await db
-      .insert(todos)
-      .values(todoRows.slice(i, i + TODO_INSERT_CHUNK_SIZE));
+  for (const batch of chunkForD1(todoRows, TODO_PARAMS)) {
+    await db.insert(todos).values(batch);
   }
 
   const urlRows = seeded.flatMap(({ seed, row }) => {
@@ -143,9 +137,7 @@ export async function seedDemoTodos(
     });
   });
 
-  for (let i = 0; i < urlRows.length; i += TODO_URL_INSERT_CHUNK_SIZE) {
-    await db
-      .insert(todoUrls)
-      .values(urlRows.slice(i, i + TODO_URL_INSERT_CHUNK_SIZE));
+  for (const batch of chunkForD1(urlRows, TODO_URL_PARAMS)) {
+    await db.insert(todoUrls).values(batch);
   }
 }

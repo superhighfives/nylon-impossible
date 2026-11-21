@@ -3,10 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { D1Database } from "@cloudflare/workers-types";
+import { D1_MAX_BOUND_PARAMS } from "@nylon-impossible/shared/d1";
+import { DEMO_SEED_TODOS } from "@nylon-impossible/shared/demo-seed";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { describe, expect, it } from "vitest";
-import { ensureSystemLists } from "./lists";
+import { ensureSystemLists, seedDemoTodos } from "./lists";
 import * as schema from "./schema";
 
 const MIGRATIONS_DIR = path.join(__dirname, "../../../api/migrations");
@@ -14,7 +16,11 @@ const MIGRATIONS_DIR = path.join(__dirname, "../../../api/migrations");
 // The three D1 statement methods Drizzle calls, backed by node:sqlite, with
 // the API's real migrations applied. The unique index on
 // (user_id, system_kind) is what this test is about, so a mock won't do.
-function createTestD1(): D1Database {
+// `onBind` sees each statement's parameters: node:sqlite doesn't enforce
+// D1's cap on them, so a test has to count them itself.
+function createTestD1(
+  onBind: (params: unknown[]) => void = () => {},
+): D1Database {
   const sqlite = new DatabaseSync(":memory:");
   for (const file of readdirSync(MIGRATIONS_DIR).sort()) {
     if (file.endsWith(".sql")) {
@@ -25,6 +31,7 @@ function createTestD1(): D1Database {
   function prepare(query: string) {
     return {
       bind(...params: (string | number | null)[]) {
+        onBind(params);
         return {
           async all() {
             return { results: sqlite.prepare(query).all(...params) };
@@ -47,8 +54,8 @@ function createTestD1(): D1Database {
 }
 
 // A Drizzle client over a fresh database holding one user, user_1.
-async function createTestDb() {
-  const db = drizzle(createTestD1(), { schema });
+async function createTestDb(onBind?: (params: unknown[]) => void) {
+  const db = drizzle(createTestD1(onBind), { schema });
   await db.run(
     sql`insert into users (id, email) values ('user_1', 'new@example.com')`,
   );
@@ -83,5 +90,27 @@ describe("ensureSystemLists", () => {
 
     expect(await ensureSystemLists(db, "user_1")).toHaveLength(3);
     expect(await ensureSystemLists(db, "user_1")).toBeNull();
+  });
+});
+
+describe("seedDemoTodos", () => {
+  it("inserts every demo todo and link within D1's parameter cap", async () => {
+    let maxParams = 0;
+    const db = await createTestDb((params) => {
+      maxParams = Math.max(maxParams, params.length);
+    });
+    const systemLists = await ensureSystemLists(db, "user_1");
+    if (!systemLists) throw new Error("system lists weren't created");
+
+    maxParams = 0;
+    await seedDemoTodos(db, "user_1", systemLists);
+
+    const links = DEMO_SEED_TODOS.flatMap((t) => t.urls ?? []);
+    expect(await db.query.todos.findMany()).toHaveLength(
+      DEMO_SEED_TODOS.length,
+    );
+    expect(await db.query.todoUrls.findMany()).toHaveLength(links.length);
+    expect(maxParams).toBeGreaterThan(0);
+    expect(maxParams).toBeLessThanOrEqual(D1_MAX_BOUND_PARAMS);
   });
 });

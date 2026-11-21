@@ -7,6 +7,7 @@ import {
 } from "@nylon-impossible/shared/api-v1";
 import type { Context } from "hono";
 import { z } from "zod/v4";
+import { base64url } from "../lib/base64url";
 import {
   and,
   asc,
@@ -38,11 +39,9 @@ const openCursor = z.object({
 });
 const doneCursor = z.object({ d: z.tuple([z.number().int(), z.string()]) });
 
-function encodeCursor(value: unknown): string {
-  return btoa(JSON.stringify(value))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+// Cursor JSON is ASCII, so its UTF-8 bytes are what `btoa` once saw directly.
+export function encodeCursor(value: unknown): string {
+  return base64url(new TextEncoder().encode(JSON.stringify(value)));
 }
 
 function decodeCursor(cursor: string): unknown {

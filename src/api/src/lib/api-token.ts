@@ -5,6 +5,7 @@ import {
 import * as Sentry from "@sentry/cloudflare";
 import { createMiddleware } from "hono/factory";
 import type { Env } from "../types";
+import { base64url } from "./base64url";
 import { and, apiTokens, eq, getDb, isNull, lt, or } from "./db";
 import { apiError } from "./errors";
 
@@ -13,11 +14,8 @@ const LAST_USED_INTERVAL_MS = 60 * 60 * 1000;
 
 /** `nyl_` and 32 random bytes, base64url without padding. */
 export function generateApiToken(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const base64 = btoa(String.fromCharCode(...bytes));
   return (
-    API_TOKEN_PREFIX +
-    base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")
+    API_TOKEN_PREFIX + base64url(crypto.getRandomValues(new Uint8Array(32)))
   );
 }
 
