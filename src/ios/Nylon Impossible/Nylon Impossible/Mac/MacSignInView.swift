@@ -38,6 +38,7 @@ struct MacSignInView: View {
     let onDone: () -> Void
 
     @Environment(Clerk.self) private var clerk
+    @Environment(MacLoginItem.self) private var loginItem
     @AppStorage(MacSignInView.lastProviderKey) private var lastProvider: String?
     @State private var working: OAuthProvider?
     @State private var message: String?
@@ -46,6 +47,8 @@ struct MacSignInView: View {
     @State private var signInTask: Task<Void, Never>?
     /// Where the sign-in in flight went, and whether to offer help with it.
     @State private var handoff: MacSignInHandoff?
+    /// Open at login, ticked by default; applied once the sign-in finishes.
+    @State private var openAtLogin: Bool?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.Space.s4) {
@@ -85,6 +88,13 @@ struct MacSignInView: View {
                     .accessibilityHint(lastProvider == entry.key ? "You used this last time." : "")
                 }
             }
+
+            Toggle("Open at login", isOn: Binding(
+                get: { openAtLogin ?? loginItem.signInDefault },
+                set: { openAtLogin = $0 }
+            ))
+            .toggleStyle(.checkbox)
+            .disabled(working != nil)
 
             if let provider = working {
                 Text("Finish signing in with \(provider.name) in the browser window. It closes on its own when you’re done.")
@@ -182,6 +192,7 @@ struct MacSignInView: View {
                 let result = try await clerk.auth.signInWithOAuth(provider: provider)
                 if Self.isComplete(result) {
                     lastProvider = key
+                    loginItem.signedIn(openAtLogin: openAtLogin ?? loginItem.signInDefault)
                     onDone()
                 } else {
                     message = "This account needs another step. Sign in on nylonimpossible.com first, then try again here."

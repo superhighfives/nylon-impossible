@@ -51,6 +51,9 @@ final class MacSession {
         let services = services
         if state.signedIn {
             guard wasSignedIn != true else { return }
+            // A session found at launch, not one a sign-in just made: the
+            // sign-in window's checkbox decides those.
+            if wasSignedIn == nil { services.loginItem.restoredSession() }
             wasSignedIn = true
             SessionLifecycle.didSignIn(auth: services.authService)
             Task {
