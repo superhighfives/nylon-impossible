@@ -713,6 +713,30 @@ struct MacLoginItemTests {
         #expect(!item.isOn)
     }
 
+    @Test("A failed turn-on stays shown when Settings opens again, until it's tried again")
+    func failureStays() throws {
+        let service = FakeLoginItemService()
+        service.fails = true
+        let (item, _) = try make(service)
+        item.signedIn(openAtLogin: true)
+        item.refresh()
+        #expect(item.state == .failed)
+        service.fails = false
+        item.setEnabled(true)
+        #expect(item.state == .on)
+        item.setEnabled(false)
+        #expect(item.state == .off)
+    }
+
+    @Test("Turning it off in Settings counts as a choice, so the next sign-in starts unticked")
+    func settingsChoiceCounts() throws {
+        let service = FakeLoginItemService()
+        let (item, _) = try make(service)
+        item.setEnabled(true)
+        item.setEnabled(false)
+        #expect(!item.signInDefault)
+    }
+
     @Test("Waiting for approval reads as on, with the approval line")
     func needsApproval() throws {
         let service = FakeLoginItemService()

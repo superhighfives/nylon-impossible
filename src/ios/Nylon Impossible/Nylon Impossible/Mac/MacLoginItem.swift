@@ -40,8 +40,9 @@ final class MacLoginItem {
         case failed
     }
 
-    /// Set once a sign-in has offered the checkbox.
-    static let offeredKey = "mac.openAtLoginOffered"
+    /// Set once the person has chosen: with the sign-in checkbox, or with the
+    /// Settings toggle.
+    static let chosenKey = "mac.openAtLoginChosen"
 
     @ObservationIgnored private let service: LoginItemService
     @ObservationIgnored private let defaults: UserDefaults
@@ -57,26 +58,30 @@ final class MacLoginItem {
 
     /// What the sign-in checkbox starts as: ticked the first time, then
     /// whatever it is now, so signing in again doesn't undo a "no".
-    var signInDefault: Bool { !defaults.bool(forKey: Self.offeredKey) || isOn }
+    var signInDefault: Bool { !defaults.bool(forKey: Self.chosenKey) || isOn }
 
-    /// Read the system's state again: Settings does this when it opens.
+    /// Read the system's state again: Settings does this when it opens. A
+    /// failed turn-on stays until it's on or tried again, since one at sign-in
+    /// fails after its window has closed.
     func refresh() {
-        state = Self.state(for: service.status)
+        let now = Self.state(for: service.status)
+        if state == .failed, now == .off { return }
+        state = now
     }
 
     func setEnabled(_ enabled: Bool) {
+        defaults.set(true, forKey: Self.chosenKey)
         do {
             if enabled { try service.register() } else { try service.unregister() }
-            refresh()
+            state = Self.state(for: service.status)
         } catch {
-            refresh()
-            if enabled { state = .failed }
+            state = enabled ? .failed : Self.state(for: service.status)
         }
     }
 
     /// A fresh sign-in finished, with the checkbox ticked or not.
     func signedIn(openAtLogin: Bool) {
-        defaults.set(true, forKey: Self.offeredKey)
+        defaults.set(true, forKey: Self.chosenKey)
         if openAtLogin != isOn { setEnabled(openAtLogin) }
     }
 

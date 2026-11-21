@@ -5,8 +5,9 @@
 //  The Settings window, opened from the popover's footer. The same contents
 //  as iOS Settings — appearance, timezone (automatic, or picked by hand),
 //  your account, signing out and deleting the account — plus the Mac's own:
-//  open at login and the quick-add hotkey. A native grouped form, because that's what a Mac
-//  Settings window is; the words and the order follow the app.
+//  open at login and the quick-add hotkey. A native grouped form, because
+//  that's what a Mac Settings window is; the words and the order follow the
+//  app.
 //
 
 #if os(macOS)
