@@ -125,6 +125,8 @@ extension QuickAddView {
             } else {
                 actions.toasts.show("No link on this todo", action: nil)
             }
+        case .showKeys:
+            keysHintDismissed = false
         }
         return .handled
     }

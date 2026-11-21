@@ -57,6 +57,7 @@ struct QuickAddView: View {
     /// The row whose title is being edited in place.
     @State var editing: QuickAddTitleEdit?
     @FocusState var listFocused: Bool
+    @AppStorage(QuickAddKeysHint.dismissedKey) var keysHintDismissed = false
     @FocusState var editorFocused: Bool
 
     /// How many of today's todos the list shows before "+N more".
@@ -195,15 +196,10 @@ struct QuickAddView: View {
                         .padding(.bottom, Theme.Space.s2)
                 }
             }
-            if let hint = keysHint {
-                Text(hint)
-                    .textStyle(Theme.Fonts.Role.meta)
-                    .foregroundStyle(Theme.Colors.inkMuted)
-                    .padding(.horizontal, Theme.Space.s4)
-                    .padding(.bottom, Theme.Space.s2)
-                    .accessibilityHidden(true)
-            }
             Hairline()
+            if QuickAddKeysHint.shows(hasTodos: !shown.isEmpty, dismissed: keysHintDismissed) {
+                keysHint
+            }
             footer
         }
         .overlay(alignment: .bottom) {
@@ -212,11 +208,26 @@ struct QuickAddView: View {
         }
     }
 
-    /// The keys that work where the keyboard is, under the list.
-    private var keysHint: String? {
-        if editing != nil { return "↵ save · Esc keep the old title" }
-        if listFocused { return "↵ edit · ⇧↵ open on the web · X done · O link · ↑ or N to type" }
-        return nil
+    /// The row keys that aren't obvious, on their own line above the footer,
+    /// with × to dismiss them. VoiceOver reads each row's actions instead.
+    private var keysHint: some View {
+        let text = QuickAddKeysHint.text(editing: editing != nil)
+        return HStack(spacing: Theme.Space.s2) {
+            Text(text ?? QuickAddKeysHint.keys)
+                .lineLimit(1)
+                .opacity(text == nil ? 0 : 1)
+            Spacer()
+            Button { keysHintDismissed = true } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.borderless)
+            .help("Hide these keys. ? brings them back.")
+        }
+        .textStyle(Theme.Fonts.Role.meta)
+        .foregroundStyle(Theme.Colors.inkMuted)
+        .padding(.horizontal, Theme.Space.s4)
+        .padding(.top, Theme.Space.s2)
+        .accessibilityHidden(true)
     }
 
     private func header(count: Int) -> some View {

@@ -23,6 +23,9 @@ enum QuickAddRowCommand: Equatable {
     case done
     /// O: open its first link.
     case openLink
+    /// ?: bring back the keys hint after it was dismissed, as ? opens
+    /// Keyboard shortcuts on the web.
+    case showKeys
 
     init?(key: KeyEquivalent, characters: String, modifiers: EventModifiers) {
         // ⌘ and ⌃ combinations belong to the system and the Edit menu.
@@ -40,8 +43,30 @@ enum QuickAddRowCommand: Equatable {
         case "n": self = .backToField
         case "x": self = .done
         case "o": self = .openLink
+        case "?": self = .showKeys
         default: return nil
         }
+    }
+}
+
+/// The line of keys above the popover's footer: only the ones that aren't
+/// obvious. ↵, Esc and the arrows are left out.
+enum QuickAddKeysHint {
+    static let keys = "⇧↵ open on the web · X done · O link"
+    /// `UserDefaults`, per Mac: the × hides it until ? brings it back.
+    static let dismissedKey = "quickAddKeysHintDismissed"
+
+    /// Whether its line is there. It doesn't follow the keyboard, so the
+    /// popover keeps its height as ↓ and ↑ move between the field and the
+    /// list (principle 8).
+    static func shows(hasTodos: Bool, dismissed: Bool) -> Bool {
+        hasTodos && !dismissed
+    }
+
+    /// Its text, or nil while a title is edited: ↵ saves and Esc keeps the
+    /// old title, which needn't be said. The line stays, empty.
+    static func text(editing: Bool) -> String? {
+        editing ? nil : keys
     }
 }
 
