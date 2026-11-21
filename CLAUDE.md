@@ -6,6 +6,17 @@ This file is the repo-specific part.
 Read [PRINCIPLES.md](PRINCIPLES.md) before any UI or copy change. Its Settled
 table needs a written reason to reopen.
 
+## Unreleased
+
+Nylon is unreleased, and the owner is its only user (2026-11-20). Nothing
+needs migrating: no install, setting or default has to carry over from an
+older build. Don't write migration paths for existing installs, and don't ask
+the owner how existing users should be treated. A spec can change the default
+for everyone.
+
+The production D1 database still holds the owner's own todos, so schema
+changes still follow expand/contract (`d1-migrations` skill).
+
 ## Layout
 
 Bun workspaces: `src/shared`, `src/web`, `src/api`, `src/admin`,
