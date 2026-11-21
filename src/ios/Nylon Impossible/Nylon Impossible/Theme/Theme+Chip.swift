@@ -2,14 +2,13 @@
 //  Theme+Chip.swift
 //  Nylon Impossible
 //
-//  The measurements of the rows' meta chips and the toast's Undo button.
+//  The measurements of due today's meta chip and the toast's Undo button.
 //
 
 import SwiftUI
 
 extension Theme {
-    /// A chip on a row's meta line: due today (brand), and pinned, repeat
-    /// and other due days (fill).
+    /// Due today's chip on a row's meta line, the only one.
     enum Chip {
         static let height: CGFloat = 20
         static let paddingX: CGFloat = 7
