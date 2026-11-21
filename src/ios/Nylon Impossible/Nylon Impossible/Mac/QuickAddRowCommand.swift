@@ -3,7 +3,8 @@
 //  Nylon Impossible
 //
 //  The popover's rows, as logic: what each key does on the selected row,
-//  editing a title in place, and handing a todo to the web.
+//  editing a title in place, and handing a todo (or the whole board) to the
+//  web.
 //
 
 #if os(macOS)
@@ -72,6 +73,13 @@ enum QuickAddHandoff {
     /// closes.
     static func openOnWeb(_ id: UUID, base: URL = Config.webBaseURL, open: (URL) -> Void, dismiss: () -> Void) {
         open(Config.webURL(forTodo: id, base: base))
+        dismiss()
+    }
+
+    /// The header's web link and ⌘O: the board at `/` in the default
+    /// browser, and the popover closes.
+    static func openNylon(base: URL = Config.webBaseURL, open: (URL) -> Void, dismiss: () -> Void) {
+        open(URL(string: "/", relativeTo: base)?.absoluteURL ?? base)
         dismiss()
     }
 }
