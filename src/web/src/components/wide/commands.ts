@@ -27,6 +27,8 @@ export interface Board {
   moveTo: () => void;
   pin: () => void;
   due: () => void;
+  /** The right-click menu, under the selected row. */
+  menu: () => void;
   remove: () => void;
   /** Quick add. */
   newTodo: () => void;
@@ -252,6 +254,20 @@ export const COMMANDS: Command[] = [
     needsSelection: true,
     menu: () => "Due…",
     run: (b) => b.due(),
+  },
+  {
+    id: "menu",
+    label: "Open menu",
+    keys: [["."], ["⇧", "F10"]],
+    // ⇧F10 and the Menu key are how Windows and Linux open a context menu.
+    bindings: [
+      { key: "." },
+      { key: "F10", shift: true },
+      { key: "ContextMenu" },
+    ],
+    group: "Todo",
+    needsSelection: true,
+    run: (b) => b.menu(),
   },
   {
     id: "delete",

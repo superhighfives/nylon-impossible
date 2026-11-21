@@ -1,4 +1,5 @@
 import type { BoardTimeKind } from "@nylon-impossible/shared";
+import type { MenuView } from "@/components/phone/ContextMenu";
 import type { TodoActions } from "@/components/phone/useTodoActions";
 import { byPosition } from "@/lib/dragOrder";
 import { toast } from "@/lib/toast";
@@ -169,7 +170,8 @@ export interface BoardContext {
   open: (todo: TodoWithUrls) => void;
   /** Close the open todo; `toRow` puts the keyboard back on its row. */
   closeDetail: (toRow: boolean) => void;
-  openDueMenu: (todo: TodoWithUrls, row: HTMLElement) => void;
+  /** The right-click menu, under `row`, at `view`. */
+  openMenu: (todo: TodoWithUrls, row: HTMLElement, view: MenuView) => void;
   openMoveTo: (todo: TodoWithUrls) => void;
   jump: (target: JumpTarget) => void;
   startGo: () => void;
@@ -373,7 +375,11 @@ export function createBoard(ctx: BoardContext): Board {
     },
     due: () => {
       const { row, todo } = current();
-      if (row && todo) ctx.openDueMenu(todo, row);
+      if (row && todo) ctx.openMenu(todo, row, "due");
+    },
+    menu: () => {
+      const { row, todo } = current();
+      if (row && todo) ctx.openMenu(todo, row, "main");
     },
     remove: () => {
       const { row, todo, done } = current();
