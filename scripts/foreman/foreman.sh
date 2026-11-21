@@ -10,6 +10,7 @@
 #   foreman tick [--dry-run]           what the job runs
 #   foreman build <issue> [--dry-run]  build one issue now, ignoring the board
 #   foreman triage <issue> [--dry-run] triage one feedback report now
+#   foreman job build|triage <issue>   what a tick starts in the background
 #   foreman shots <pr>                 retake a PR's before/after shots from its saved plan
 #   foreman gate <pr>                  print the merge gate's verdict for a PR
 #   foreman routine <name> [--dry-run] run one routine now, ignoring its schedule
@@ -27,6 +28,7 @@ OWNER=superhighfives
 REPO=nylon-impossible
 PROJECT=1
 MAX_AGENT_PRS=5
+MAX_JOBS="${FOREMAN_MAX_JOBS:-3}" # builds and triages running at once, in the background
 MODEL="${FOREMAN_MODEL:-opus}"
 BUILD_TIMEOUT="${FOREMAN_BUILD_TIMEOUT:-7200}" # seconds
 REVIEW_BOT="control-room-review[bot]"
@@ -66,6 +68,7 @@ SHOTS="$HOME_DIR/shots"   # per PR: its shot plan and the images being captured
 ONCE="$HOME_DIR/once"     # markers for alerts that go out once
 ROUTINES="$HOME_DIR/routines" # per routine: when it last ran, and <name>.off to turn it off here
 DISPATCH="$HOME_DIR/dispatch" # per PR: an operator job dispatch started (was shepherd/)
+JOBS="$HOME_DIR/jobs"     # per issue: the pid of its build or triage, while one runs
 OPERATOR_PLISTS="${FOREMAN_OPERATOR_PLISTS:-$HOME/Library/LaunchAgents}" # where the operator's jobs live
 TOKEN_FILE="${FOREMAN_TOKEN_FILE:-$HOME_DIR/github-token}" # $AGENT's token, chmod 600
 CF_TOKEN_FILE="${FOREMAN_CF_TOKEN_FILE:-$HOME_DIR/cloudflare-email-token}" # Email Sending, for the digest; chmod 600
@@ -1234,7 +1237,12 @@ build() { # board_json issue
   log "building #$n on $branch"
   set_status "$board" "$n" "In progress" || true
   event started "$n"
-  new_worktree "$n" "$branch"
+  # Jobs share the clone, so a fetch can lose a race for a ref lock.
+  if ! new_worktree "$n" "$branch"; then
+    log "couldn't make a worktree for #$n; back to Ready"
+    set_status "$board" "$n" "Ready" || true
+    return 0
+  fi
   out="$LOGS/build-$n-$(date +%Y%m%d-%H%M%S).log"; sid=$(session_id)
   run_claude "$dir" "$out" "$(prompt_for "$n")" --session-id "$sid" || status=$?
   retry_run build "$n" "" "$dir" "$out" "$status" "$sid" build_done "$n" "$branch"
@@ -2494,12 +2502,71 @@ self_update() { # run the merged foreman next tick (atomic: this process keeps i
   log "updated $BIN from origin/main"
 }
 
+# ---- background jobs ---------------------------------------------------------
+# A build or triage runs for up to $BUILD_TIMEOUT, so the tick starts each one
+# in the background (`foreman job`) and returns: the next tick can merge, run
+# review rounds and specs, and start more, up to $MAX_JOBS. Each job holds
+# $JOBS/<issue>, with its pid; one whose process has gone is cleared.
+
+job_running() { # issue -> 0 if a background job for it is alive
+  local pid; pid=$(cat "$JOBS/$1/pid" 2>/dev/null) || return 1
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+running_jobs() { # -> the issues with a live job, one a line; clears the locks of jobs that have gone
+  local d n
+  for d in "$JOBS"/*; do
+    [ -d "$d" ] || continue
+    n=$(basename "$d")
+    if job_running "$n"; then echo "$n"; else rm -rf "$d"; fi
+  done
+}
+
+start_job() { # kind issue -> `foreman job <kind> <issue>` in the background, holding the issue's lock
+  local pid
+  if dry; then log "would start a $1 of #$2"; return 0; fi
+  mkdir -p "$JOBS"
+  mkdir "$JOBS/$2" 2>/dev/null || { log "#$2 already has a job"; return 1; }
+  # Its own process group (set -m): when the tick exits, launchd kills what's
+  # left in the tick's group, and the job has to outlive it.
+  set -m
+  nohup "$BIN" job "$1" "$2" >> "$LOGS/foreman.log" 2>&1 < /dev/null &
+  pid=$!
+  set +m
+  echo "$pid" > "$JOBS/$2/pid"
+  log "started a $1 of #$2 (pid $pid)"
+}
+
+start_pass() { # board_json open-agent-prs -> starts triages and builds in the background while there's room
+  local board="$1" open="$2" running busy room n
+  running=$(running_jobs); busy=$(grep -c . <<<"$running" || true)
+  # A running job will open a PR, so it counts toward the PR limit too.
+  room=$((MAX_AGENT_PRS - open - busy))
+  [ $((MAX_JOBS - busy)) -lt "$room" ] && room=$((MAX_JOBS - busy))
+  if [ "$room" -le 0 ]; then log "$busy running, $open agent PRs open; not starting another"; return 0; fi
+  # Feedback first: a report is the owner saying "this is wrong now".
+  n=$(feedback_next "$board") || n=""
+  if [ -n "$n" ] && ! grep -qx "$n" <<<"$running"; then
+    start_job triage "$n" && room=$((room - 1)) && running+=$'\n'"$n"
+  fi
+  for n in $(ready_issues "$board"); do
+    [ "$room" -gt 0 ] || return 0
+    grep -qx "$n" <<<"$running" && continue
+    # One that fails the spec check goes back to $SPEC_COL; try the next.
+    spec_ready "$board" "$n" || continue
+    start_job build "$n" && room=$((room - 1)) && running+=$'\n'"$n"
+  done
+  [ -n "$(ready_issues "$board")" ] || log "nothing Ready"
+}
+
 cleanup_worktrees() { # remove worktrees whose issue no longer has an open PR or build
   local d n
   for d in "$WORKTREES"/*; do
     [ -d "$d" ] || continue
     n=$(basename "$d")
     case "$n" in dispatch-*|shepherd-*) continue ;; esac # dispatch removes its own
+    # A running build or triage has no PR yet; its worktree is in use.
+    job_running "$n" && continue
     if gh pr list -R "$OWNER/$REPO" --state open --json headRefName \
          --jq ".[] | select(.headRefName | startswith(\"foreman/$n-\")) | 1" | grep -q .; then continue; fi
     dry && { log "would remove worktree $n"; continue; }
@@ -2537,17 +2604,9 @@ cmd_tick() {
   local fresh
   if fresh=$(board_json); then waiting_pass "$fresh"; else log "couldn't re-read the board; no $WAITING_LABEL changes this tick"; fi
 
-  local open; open=$(agent_pr_count)
-  if [ "$open" -ge "$MAX_AGENT_PRS" ]; then log "$open agent PRs open; not starting another"; return 0; fi
-  local n
-  # Feedback first: a report is the owner saying "this is wrong now".
-  n=$(feedback_next "$board") || n=""
-  if [ -n "$n" ]; then triage "$board" "$n"; return 0; fi
-  for n in $(ready_issues "$board"); do
-    # One that fails the spec check goes back to $SPEC_COL; try the next.
-    if spec_ready "$board" "$n"; then build "$board" "$n"; return 0; fi
-  done
-  log "nothing Ready"
+  local open
+  if ! open=$(agent_pr_count); then log "couldn't count the agent PRs; not starting anything"; return 0; fi
+  start_pass "$board" "$open"
 }
 
 cmd_build() {
@@ -2566,6 +2625,20 @@ cmd_build() {
   spec_column "$board"
   spec_ready "$board" "$n" || die "#$n's spec isn't ready to build; see the comment on it"
   build "$board" "$n"
+}
+
+cmd_job() { # build|triage issue: one the tick started; it reads the board itself, since the tick's is old by now
+  local kind="${1:?build or triage}" n="${2:?issue number}" board
+  mkdir -p "$HOME_DIR"
+  trap 'rm -rf "$JOBS/$n"' EXIT
+  use_token
+  board=$(board_json) || die "#$n: couldn't read the board"
+  spec_column "$board"
+  case "$kind" in
+    build)  build "$board" "$n" ;;
+    triage) triage "$board" "$n" ;;
+    *)      die "unknown job: $kind" ;;
+  esac
 }
 
 cmd_triage() {
@@ -2690,6 +2763,7 @@ main() {
     tick)      cmd_tick "$@" ;;
     build)     cmd_build "$@" ;;
     triage)    cmd_triage "$@" ;;
+    job)       cmd_job "$@" ;;
     shots)     cmd_shots "$@" ;;
     gate)      cmd_gate "$@" ;;
     routine)   cmd_routine "$@" ;;

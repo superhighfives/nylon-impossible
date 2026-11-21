@@ -38,12 +38,11 @@ Each tick:
 5. **Waiting on you.** Put `waiting-on-owner` on exactly what's waiting on
    the owner, and take it off everything else (below). This runs before the
    PR limit, so it happens every tick.
-6. **Feedback.** If fewer than 5 agent PRs (`foreman/*` and `feedback/*`) are open, triage
-   the oldest new feedback report the owner has cleared (below), and stop
-   there: a report goes ahead of Ready items.
-7. **Build.** Otherwise, if fewer than 5 agent PRs are open, take the first
-   **Ready** issue in board order whose spec passes the check (below), and
-   build it.
+6. **Feedback.** Builds and triages run as background jobs (below), up to 3
+   at once. While there's room, start a triage of the oldest new feedback
+   report the owner has cleared (below): a report goes ahead of Ready items.
+7. **Build.** Fill any room left with the first **Ready** issues in board
+   order whose spec passes the check (below), one build each.
    - It runs headless `claude` in a fresh worktree, with the issue body and
      the trusted comments as the prompt.
    - The result is a PR, with a **Try it** section, which then goes to In
@@ -51,6 +50,27 @@ Each tick:
      changes the Apple app (below).
    - Or the result is a question: the issue gets `needs-decision` and goes
      back to Define.
+
+## Background jobs
+
+A build or a triage runs for up to two hours, and a tick that waited for it
+did nothing else: no merges, review rounds or specs, and no second build
+(#802). So the tick starts each one as `foreman job build|triage <n>` in the
+background and returns.
+
+- **Room.** At most 3 jobs run at once (`FOREMAN_MAX_JOBS`), and a running
+  job counts toward the limit of 5 agent PRs, since it will open one.
+- **Locks.** A job holds `~/.foreman/jobs/<n>/`, with its pid, and removes it
+  when it ends. A tick clears the lock of a job whose process has gone, skips
+  an issue whose job is still running, and leaves that job's worktree alone.
+- **Process group.** Each job runs in its own process group. When a tick
+  exits, launchd kills what's left in the tick's group, and the job has to
+  outlive it.
+- **Shared clone.** Jobs make their worktrees from the one clone. A build
+  whose worktree can't be made (a fetch that lost a race for a ref lock) goes
+  back to Ready for the next tick.
+- Two builds that change the same files open conflicting PRs. The second
+  one's operator rebases it.
 
 ## Headless runs
 
