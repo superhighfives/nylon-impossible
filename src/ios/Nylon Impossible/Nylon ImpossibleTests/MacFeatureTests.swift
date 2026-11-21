@@ -132,6 +132,127 @@ struct MenuBarAppTests {
         signIn.close()
         #expect(!signIn.isVisible)
     }
+
+    @Test("Sign in opens under the menu bar icon, and stays put while it's open")
+    func signInPlacement() throws {
+        let signIn = MacSignInWindow()
+        signIn.activate = {}
+        var placed: [NSWindow] = []
+        signIn.place = { placed.append($0) }
+
+        signIn.show()
+        let window = try #require(signIn.window)
+        defer { window.close() }
+        #expect(placed.count == 1)
+        #expect(placed.first === window)
+
+        signIn.show()
+        #expect(placed.count == 1)
+    }
+
+    @Test("Settings opens under the menu bar icon, stays put while it's open, and comes back under it")
+    func settingsPlacement() async throws {
+        let services = MacServices.shared
+        let anchor = try #require(services.menuBar.anchor, "the test host has the menu bar icon")
+        MacServices.settingsWindow?.close()
+        defer { MacServices.settingsWindow?.close() }
+
+        /// Where a window under the icon goes, kept on screen as `place` keeps
+        /// it (a short display, like CI's, pushes a tall window up from the bottom).
+        func expectUnderIcon(_ window: NSWindow) {
+            let origin = MacWindowPlacement.origin(for: window.frame.size, under: anchor.icon, in: anchor.screen)
+            // SwiftUI's layout can still trim a point off the height after `place`.
+            #expect(abs(window.frame.origin.x - origin.x) <= 2)
+            #expect(abs(window.frame.origin.y - origin.y) <= 2)
+        }
+
+        var window = try await Self.openSettings()
+        expectUnderIcon(window)
+
+        // Moved, then chosen again while it's open: it stays where it was put.
+        window.setFrameOrigin(CGPoint(x: 100, y: 100))
+        window = try await Self.openSettings()
+        #expect(window.frame.origin == CGPoint(x: 100, y: 100))
+
+        // Closed and opened again: back under the icon, not where it was left.
+        window.close()
+        window = try await Self.openSettings()
+        expectUnderIcon(window)
+    }
+
+    /// Settings… as the popover's footer chooses it, with SwiftUI's own
+    /// `openSettings`; returns the window once it's showing.
+    private static func openSettings() async throws -> NSWindow {
+        let host = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 40, height: 40), styleMask: [.titled], backing: .buffered, defer: false)
+        host.isReleasedWhenClosed = false
+        let opened = SettingsOpener.opened
+        host.contentView = NSHostingView(rootView: SettingsOpener())
+        host.orderFront(nil)
+        defer { host.close() }
+        for _ in 0..<50 where SettingsOpener.opened == opened {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        #expect(SettingsOpener.opened == opened + 1)
+        // Let SwiftUI's first layout settle the window's height.
+        try await Task.sleep(for: .milliseconds(300))
+        let window = try #require(MacServices.settingsWindow, "Settings opened")
+        #expect(window.isVisible)
+        return window
+    }
+}
+
+/// Calls `showSettings` with the environment's `openSettings` as it appears,
+/// as the popover's Settings… does.
+private struct SettingsOpener: View {
+    @MainActor static var opened = 0
+    @Environment(\.openSettings) private var openSettings
+
+    var body: some View {
+        Color.clear.onAppear {
+            MacServices.shared.showSettings { openSettings() }
+            Self.opened += 1
+        }
+    }
+}
+
+@Suite("Window placement")
+struct MacWindowPlacementTests {
+    /// A 1440-point-wide screen under a 24-point menu bar, and an icon near its right.
+    private static let screen = CGRect(x: 0, y: 0, width: 1440, height: 876)
+    private static let icon = CGRect(x: 1200, y: 876, width: 30, height: 24)
+
+    @Test("The popover opens centred under the icon, 4 points below the menu bar")
+    func popover() {
+        let origin = MacWindowPlacement.origin(for: CGSize(width: 380, height: 320), under: Self.icon, in: Self.screen)
+        #expect(origin == CGPoint(x: 1215 - 190, y: 876 - 320 - 4))
+    }
+
+    @Test("A window too wide to centre under the icon keeps 8 points in from the screen's right")
+    func clampedRight() {
+        let origin = MacWindowPlacement.origin(for: CGSize(width: 560, height: 588), under: Self.icon, in: Self.screen)
+        #expect(origin == CGPoint(x: 1440 - 560 - 8, y: 876 - 588 - 4))
+    }
+
+    @Test("And 8 points in from the left, with the icon at the far left")
+    func clampedLeft() {
+        let icon = CGRect(x: 10, y: 876, width: 30, height: 24)
+        let origin = MacWindowPlacement.origin(for: CGSize(width: 560, height: 588), under: icon, in: Self.screen)
+        #expect(origin.x == 8)
+    }
+
+    @Test("A window taller than the room under the menu bar stays 8 points above the screen's bottom")
+    func clampedBottom() {
+        let origin = MacWindowPlacement.origin(for: CGSize(width: 560, height: 900), under: Self.icon, in: Self.screen)
+        #expect(origin.y == 8)
+    }
+
+    @Test("On a second screen, it stays on the icon's screen")
+    func secondScreen() {
+        let screen = CGRect(x: 1440, y: 0, width: 1920, height: 1056)
+        let icon = CGRect(x: 3300, y: 1056, width: 30, height: 24)
+        let origin = MacWindowPlacement.origin(for: CGSize(width: 560, height: 588), under: icon, in: screen)
+        #expect(origin == CGPoint(x: 1440 + 1920 - 560 - 8, y: 1056 - 588 - 4))
+    }
 }
 
 @Suite("Menu bar popover")
@@ -308,6 +429,25 @@ struct MacFeedbackTests {
         // Choosing it again brings the same window back.
         form.show(snapshot: nil)
         #expect(form.window === window)
+    }
+
+    @Test("The form opens under the menu bar icon, and stays put while it's open")
+    func placement() throws {
+        let form = MacFeedbackWindow(feedback: FeedbackService(apiService: MockAPIService()))
+        form.activate = {}
+        var placed: [NSWindow] = []
+        form.place = { placed.append($0) }
+
+        form.show(snapshot: nil)
+        let window = try #require(form.window)
+        defer { window.close() }
+        #expect(placed.count == 1)
+        #expect(placed.first === window)
+        // Placed at its full size, so it isn't pushed off the screen's edge.
+        #expect(window.contentLayoutRect.size == CGSize(width: 560, height: 560))
+
+        form.show(snapshot: nil)
+        #expect(placed.count == 1)
     }
 
     @Test("Closing the window keeps the draft; Cancel drops it")

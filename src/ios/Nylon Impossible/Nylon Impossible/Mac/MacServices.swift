@@ -28,7 +28,7 @@ final class MacServices {
     let feedbackService: FeedbackService
     @ObservationIgnored private(set) var hotKey: GlobalHotKey?
     @ObservationIgnored private(set) lazy var menuBar = MenuBarController(services: self)
-    @ObservationIgnored private(set) lazy var signInWindow = MacSignInWindow()
+    @ObservationIgnored private(set) lazy var signInWindow = makeSignInWindow()
     @ObservationIgnored private(set) lazy var feedbackWindow = makeFeedbackWindow()
     @ObservationIgnored private lazy var session = MacSession(services: self)
     @ObservationIgnored private let widgetReloader = MacWidgetReloader()
@@ -91,9 +91,19 @@ final class MacServices {
         }
     }
 
-    /// Settings, in front. `open` is the popover's `openSettings`.
+    /// Settings, in front, under the menu bar icon. `open` is the popover's
+    /// `openSettings`. SwiftUI opens it where it last was, or in the middle
+    /// of the screen; it has made the window by the time `open` returns, so
+    /// it moves before it's drawn. One that's already open stays put.
     func showSettings(_ open: () -> Void) {
+        let wasOpen = Self.settingsWindow?.isVisible == true
         MacWindowOpening.open(open)
+        if !wasOpen, let window = Self.settingsWindow { menuBar.place(window) }
+    }
+
+    /// SwiftUI's Settings window, once it's been opened.
+    static var settingsWindow: NSWindow? {
+        NSApp.windows.first { $0.identifier?.rawValue == "com_apple_SwiftUI_Settings_window" }
     }
 
     /// The sign-in window, in front.
@@ -106,8 +116,15 @@ final class MacServices {
         feedbackWindow.show(snapshot: snapshot)
     }
 
+    private func makeSignInWindow() -> MacSignInWindow {
+        let window = MacSignInWindow()
+        window.place = { [weak self] in self?.menuBar.place($0) }
+        return window
+    }
+
     private func makeFeedbackWindow() -> MacFeedbackWindow {
         let window = MacFeedbackWindow(feedback: feedbackService)
+        window.place = { [weak self] in self?.menuBar.place($0) }
         window.theme = { [unowned self] in self.preferencesService.theme }
         window.onFiled = { [weak self] in self?.menuBar.show() }
         return window
