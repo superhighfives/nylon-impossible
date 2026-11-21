@@ -98,8 +98,11 @@ struct MacGeneralSettings: View {
                     set: { loginItem.setEnabled($0) }
                 ))
                 switch loginItem.state {
-                case .failed:
+                case .failedToTurnOn:
                     Text("Couldn’t turn on open at login")
+                        .foregroundStyle(Theme.Colors.overdue)
+                case .failedToTurnOff:
+                    Text("Couldn’t turn off open at login")
                         .foregroundStyle(Theme.Colors.overdue)
                 case .needsApproval:
                     HStack {

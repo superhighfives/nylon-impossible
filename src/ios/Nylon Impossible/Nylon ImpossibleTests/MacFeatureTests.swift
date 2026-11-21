@@ -672,6 +672,7 @@ private final class FakeLoginItemService: LoginItemService {
 
     func unregister() throws {
         unregisters += 1
+        if fails { throw CocoaError(.featureUnsupported) }
         status = .notRegistered
     }
 }
@@ -709,7 +710,7 @@ struct MacLoginItemTests {
         service.fails = true
         let (item, _) = try make(service)
         item.setEnabled(true)
-        #expect(item.state == .failed)
+        #expect(item.state == .failedToTurnOn)
         #expect(!item.isOn)
     }
 
@@ -720,12 +721,25 @@ struct MacLoginItemTests {
         let (item, _) = try make(service)
         item.signedIn(openAtLogin: true)
         item.refresh()
-        #expect(item.state == .failed)
+        #expect(item.state == .failedToTurnOn)
         service.fails = false
         item.setEnabled(true)
         #expect(item.state == .on)
         item.setEnabled(false)
         #expect(item.state == .off)
+    }
+
+    @Test("A failed turn-off leaves the toggle on, with its own failure line")
+    func failedUnregister() throws {
+        let service = FakeLoginItemService()
+        let (item, _) = try make(service)
+        item.setEnabled(true)
+        service.fails = true
+        item.setEnabled(false)
+        #expect(item.state == .failedToTurnOff)
+        #expect(item.isOn)
+        item.refresh()
+        #expect(item.state == .failedToTurnOff)
     }
 
     @Test("Turning it off in Settings counts as a choice, so the next sign-in starts unticked")

@@ -37,7 +37,9 @@ final class MacLoginItem {
         /// Registered, but macOS waits for the person to allow it in Login Items.
         case needsApproval
         /// Turning it on failed; the toggle reads off.
-        case failed
+        case failedToTurnOn
+        /// Turning it off failed; the toggle reads on.
+        case failedToTurnOff
     }
 
     /// Set once the person has chosen: with the sign-in checkbox, or with the
@@ -54,18 +56,19 @@ final class MacLoginItem {
         refresh()
     }
 
-    var isOn: Bool { state == .on || state == .needsApproval }
+    var isOn: Bool { state == .on || state == .needsApproval || state == .failedToTurnOff }
 
     /// What the sign-in checkbox starts as: ticked the first time, then
     /// whatever it is now, so signing in again doesn't undo a "no".
     var signInDefault: Bool { !defaults.bool(forKey: Self.chosenKey) || isOn }
 
     /// Read the system's state again: Settings does this when it opens. A
-    /// failed turn-on stays until it's on or tried again, since one at sign-in
-    /// fails after its window has closed.
+    /// failure stays while the system hasn't changed, since one at sign-in
+    /// happens after its window has closed.
     func refresh() {
         let now = Self.state(for: service.status)
-        if state == .failed, now == .off { return }
+        if state == .failedToTurnOn, now == .off { return }
+        if state == .failedToTurnOff, now != .off { return }
         state = now
     }
 
@@ -75,7 +78,7 @@ final class MacLoginItem {
             if enabled { try service.register() } else { try service.unregister() }
             state = Self.state(for: service.status)
         } catch {
-            state = enabled ? .failed : Self.state(for: service.status)
+            state = enabled ? .failedToTurnOn : .failedToTurnOff
         }
     }
 
