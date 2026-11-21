@@ -322,6 +322,36 @@ struct QuickAddViewTests {
         #expect(QuickAddRowCommand(key: .escape, characters: "", modifiers: []) == .backToField)
     }
 
+    @Test("? brings the keys hint back")
+    func questionMarkShowsKeys() {
+        #expect(QuickAddRowCommand(key: KeyEquivalent("?"), characters: "?", modifiers: .shift) == .showKeys)
+        #expect(QuickAddRowCommand(key: KeyEquivalent("?"), characters: "?", modifiers: [.shift, .command]) == nil)
+    }
+
+    @Test("The keys hint names only the keys that aren't obvious, and nothing while a title is edited")
+    func keysHintText() {
+        #expect(QuickAddKeysHint.text(editing: false) == "⇧↵ open on the web · X done · O link")
+        #expect(QuickAddKeysHint.text(editing: true) == nil)
+    }
+
+    @Test("The keys hint shows with todos until it's dismissed, wherever the keyboard is")
+    func keysHintShows() {
+        #expect(QuickAddKeysHint.shows(hasTodos: true, dismissed: false))
+        #expect(!QuickAddKeysHint.shows(hasTodos: true, dismissed: true))
+        #expect(!QuickAddKeysHint.shows(hasTodos: false, dismissed: false))
+    }
+
+    @Test("Dismissing the keys hint is kept in UserDefaults, so it stays gone after a relaunch")
+    func keysHintDismissalPersists() throws {
+        let suite = "QuickAddKeysHintTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let stored = AppStorage(wrappedValue: false, QuickAddKeysHint.dismissedKey, store: defaults)
+        stored.wrappedValue = true
+        #expect(defaults.bool(forKey: QuickAddKeysHint.dismissedKey))
+        #expect(AppStorage(wrappedValue: false, QuickAddKeysHint.dismissedKey, store: defaults).wrappedValue)
+    }
+
     @Test("Saving a title trims it; an empty or unchanged one keeps the old title")
     func titleEdit() {
         var edit = QuickAddTitleEdit(id: UUID(), original: "Call Kaiser")
