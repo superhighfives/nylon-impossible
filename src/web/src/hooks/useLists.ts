@@ -1,11 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
+import {
+  listCreateFailed,
+  listCreateSaved,
+  listCreateStarted,
+} from "@/lib/pending-lists";
 import { Sentry } from "@/lib/sentry";
 import { messageFromError, toast } from "@/lib/toast";
 import { createList, deleteList, getLists, updateList } from "@/server/lists";
 import type {
   CreateListInput,
   SerializedList,
+  TodoWithUrls,
   UpdateListInput,
 } from "@/types/database";
 
@@ -42,6 +48,8 @@ export function useCreateList() {
         createdAt: now,
         updatedAt: now,
       };
+      // An add or move aimed at the new list before it's saved waits on this.
+      listCreateStarted(optimisticList.id);
 
       queryClient.setQueryData<SerializedList[]>(LISTS_QUERY_KEY, [
         ...(previousLists ?? []),
@@ -56,6 +64,7 @@ export function useCreateList() {
       if (context?.previousLists !== undefined) {
         queryClient.setQueryData(LISTS_QUERY_KEY, context.previousLists);
       }
+      if (context) listCreateFailed(context.optimisticId);
     },
     onSuccess: (created, _input, context) => {
       // Swap the optimistic row for the real one now, so a caller that opens
@@ -63,6 +72,21 @@ export function useCreateList() {
       queryClient.setQueryData<SerializedList[]>(LISTS_QUERY_KEY, (lists) =>
         lists?.map((l) => (l.id === context?.optimisticId ? created : l)),
       );
+      if (context) {
+        // Todos already shown in the new list (an add or move waiting on
+        // this create) follow it to its real id, so they don't drop out of
+        // it until their own request returns.
+        queryClient.setQueryData<TodoWithUrls[]>(["todos"], (todos) =>
+          todos?.some((t) => t.listId === context.optimisticId)
+            ? todos.map((t) =>
+                t.listId === context.optimisticId
+                  ? { ...t, listId: created.id }
+                  : t,
+              )
+            : todos,
+        );
+        listCreateSaved(context.optimisticId, created.id);
+      }
       notifyChanged();
     },
     onSettled: () => {

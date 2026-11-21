@@ -19,6 +19,7 @@ vi.mock("@/lib/toast", async (importOriginal) => ({
   },
 }));
 
+import { ListNotSavedError } from "@/lib/pending-lists";
 import { toast } from "@/lib/toast";
 import { Composer } from "../Composer";
 import { dueIn, NOW, TZ } from "./fixtures";
@@ -215,6 +216,17 @@ describe("Composer", () => {
     await user.type(field, "Renew passport{Enter}");
     await waitFor(() => expect(field).toHaveValue("Renew passport"));
     expect(toast.error).toHaveBeenCalledWith("Couldn’t add the todo");
+  });
+
+  // #783: the list's create has toasted already; the add says nothing more.
+  it("hands the text back quietly when its list couldn't be created", async () => {
+    vi.mocked(toast.error).mockClear();
+    mutateAsync.mockRejectedValueOnce(new ListNotSavedError());
+    const user = userEvent.setup();
+    const { field } = setup();
+    await user.type(field, "Renew passport{Enter}");
+    await waitFor(() => expect(field).toHaveValue("Renew passport"));
+    expect(toast.error).not.toHaveBeenCalled();
   });
 
   it("hands back only the lines that failed from a pasted list", async () => {

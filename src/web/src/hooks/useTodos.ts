@@ -7,6 +7,11 @@ import { useEffect } from "react";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { updateAppBadge } from "@/lib/badge";
 import { API_URL } from "@/lib/config";
+import {
+  ListNotSavedError,
+  resolveListId,
+  savedListId,
+} from "@/lib/pending-lists";
 import { Sentry } from "@/lib/sentry";
 import { apiErrorFrom, messageFromError, toast } from "@/lib/toast";
 import {
@@ -59,7 +64,10 @@ export function useCreateTodo() {
   const { userId } = useAuth();
 
   return useMutation({
-    mutationFn: (input: CreateTodoInput) => createTodo({ data: input }),
+    mutationFn: async (input: CreateTodoInput) =>
+      createTodo({
+        data: { ...input, listId: await resolveListId(input.listId) },
+      }),
     onMutate: async (input) => {
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
       const previousTodos =
@@ -72,7 +80,7 @@ export function useCreateTodo() {
         // Caller-supplied (each list column's "+ New Todo" passes its own
         // listId; the `n` shortcut passes the Today list). Falls back to ""
         // only if omitted — resolved for real once the server responds.
-        listId: input.listId ?? "",
+        listId: savedListId(input.listId ?? ""),
         title: input.title,
         notes: input.notes ?? null,
         completed: false,
@@ -98,8 +106,11 @@ export function useCreateTodo() {
       return { previousTodos, optimisticId: optimisticTodo.id };
     },
     onError: (_err, _variables, context) => {
-      Sentry.captureException(_err, { tags: { mutation: "createTodo" } });
-      toast.error(messageFromError(_err, "Couldn’t add the todo"));
+      // Aimed at a list whose create failed: that create has already said so.
+      if (!(_err instanceof ListNotSavedError)) {
+        Sentry.captureException(_err, { tags: { mutation: "createTodo" } });
+        toast.error(messageFromError(_err, "Couldn’t add the todo"));
+      }
       if (!context) {
         return;
       }
@@ -139,8 +150,16 @@ export function useUpdateTodo() {
 
   return useMutation({
     mutationKey: UPDATE_TODO_MUTATION_KEY,
-    mutationFn: ({ id, input }: { id: string; input: UpdateTodoInput }) =>
-      updateTodo({ data: { id, input } }),
+    mutationFn: async ({ id, input }: { id: string; input: UpdateTodoInput }) =>
+      updateTodo({
+        data: {
+          id,
+          input:
+            input.listId === undefined
+              ? input
+              : { ...input, listId: await resolveListId(input.listId) },
+        },
+      }),
     onMutate: async ({ id, input }) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY });
@@ -189,7 +208,9 @@ export function useUpdateTodo() {
               }),
               // A move lands in its new list straight away, rather than
               // waiting for the refetch (the phone's "Move to …" relies on it).
-              ...(input.listId !== undefined && { listId: input.listId }),
+              ...(input.listId !== undefined && {
+                listId: savedListId(input.listId),
+              }),
             };
             // Optimistic recurrence advance: if this update marks a recurring
             // todo complete, roll dueDate forward, keep completed = false, and
@@ -220,8 +241,11 @@ export function useUpdateTodo() {
       return { previousTodos };
     },
     onError: (_err, _variables, context) => {
-      Sentry.captureException(_err, { tags: { mutation: "updateTodo" } });
-      toast.error(messageFromError(_err, "Couldn’t save that change"));
+      // A move to a list whose create failed: that create has already said so.
+      if (!(_err instanceof ListNotSavedError)) {
+        Sentry.captureException(_err, { tags: { mutation: "updateTodo" } });
+        toast.error(messageFromError(_err, "Couldn’t save that change"));
+      }
       // Rollback on error
       if (context?.previousTodos) {
         queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos);
@@ -364,6 +388,8 @@ export function useSmartCreate() {
       dueDate,
       parseDate,
     }: SmartCreateInput): Promise<SmartCreateResponse> => {
+      // A list that's still saving: wait for its real id.
+      listId = await resolveListId(listId);
       const token = await getToken();
       const response = await fetch(`${API_URL}/todos/smart`, {
         method: "POST",
@@ -424,7 +450,7 @@ export function useSmartCreate() {
         // Smart-create defaults to Today server-side when no listId is given;
         // the placeholder is reconciled wholesale by the onSettled refetch
         // regardless.
-        listId: listId ?? "",
+        listId: savedListId(listId ?? ""),
         title: preview.title,
         notes: preview.notes,
         completed: false,
@@ -462,7 +488,9 @@ export function useSmartCreate() {
       return { previousTodos, optimisticId: optimisticTodo.id };
     },
     onError: (err, _text, context) => {
-      Sentry.captureException(err, { tags: { mutation: "smartCreate" } });
+      if (!(err instanceof ListNotSavedError)) {
+        Sentry.captureException(err, { tags: { mutation: "smartCreate" } });
+      }
       // Toasting is handled by the caller (TodoInput) which restores the input
       // text; here we just roll the cache back to before the optimistic insert.
       if (context?.previousTodos !== undefined) {

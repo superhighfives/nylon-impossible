@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { useSmartCreate } from "@/hooks/useTodos";
+import { ListNotSavedError, savedListId } from "@/lib/pending-lists";
 import { messageFromError, toast } from "@/lib/toast";
 import {
   draftDueDay,
@@ -171,6 +172,9 @@ export function Composer({
     // go back in the box, so sending again can't duplicate the ones that did.
     const failed = new Set<PlannedTodo>();
     let firstError: unknown = null;
+    // Lines aimed at a list whose create failed go back in the box too, but
+    // that create's toast is the only one.
+    let listFailed = false;
     for (const todo of [...planned].reverse()) {
       try {
         await smartCreate.mutateAsync({
@@ -181,12 +185,14 @@ export function Composer({
         });
       } catch (err) {
         failed.add(todo);
-        firstError ??= err;
+        if (err instanceof ListNotSavedError) listFailed = true;
+        else firstError ??= err;
       }
     }
     if (failed.size > 0) {
       const unsaved = planned.filter((todo) => failed.has(todo));
       setDraft((current) => current || unsaved.map((t) => t.line).join("\n"));
+      if (listFailed) return;
       const reason = messageFromError(
         firstError,
         failed.size > 1 ? "Couldn’t add the todos" : "Couldn’t add the todo",
@@ -197,11 +203,13 @@ export function Composer({
       );
       return;
     }
-    if (!(isVisible ? isVisible(listId) : listId === currentListId)) {
-      const added = targets.find((t) => t.id === listId);
+    // A list that was still saving when this was sent has its real id now.
+    const addedTo = savedListId(listId);
+    if (!(isVisible ? isVisible(addedTo) : addedTo === currentListId)) {
+      const added = targets.find((t) => t.id === addedTo);
       const name = added ? inSentence(added) : "list";
       showActionToast(addedToast(planned.length, name), "View", () =>
-        onView(listId),
+        onView(addedTo),
       );
     }
   };
