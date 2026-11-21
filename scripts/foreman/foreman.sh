@@ -172,22 +172,34 @@ use_token() { # act as $AGENT from here on, or stop: it fails closed
 # ---- the board ---------------------------------------------------------------
 
 board_json() { # every item, in board order, with status and issue details
-  gh api graphql -f query='
-    query($owner: String!, $number: Int!) {
-      user(login: $owner) { projectV2(number: $number) {
-        id
-        field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } }
-        items(first: 100, orderBy: {field: POSITION, direction: ASC}) { nodes {
+  # GitHub returns at most 100 items a page. A board past 100 (Done fills up)
+  # hid every item after the 100th, Ready included, until this paged.
+  local after="" page board="null"
+  while :; do
+    page=$(gh api graphql -f query='
+      query($owner: String!, $number: Int!, $after: String) {
+        user(login: $owner) { projectV2(number: $number) {
           id
-          status: fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
-          content { __typename
-            ... on Issue { number title state author { login } labels(first: 20) { nodes { name } } }
-            ... on PullRequest { number state headRefName }
-            ... on DraftIssue { title body }
+          field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } }
+          items(first: 100, after: $after, orderBy: {field: POSITION, direction: ASC}) {
+            pageInfo { hasNextPage endCursor }
+            nodes {
+              id
+              status: fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+              content { __typename
+                ... on Issue { number title state author { login } labels(first: 20) { nodes { name } } }
+                ... on PullRequest { number state headRefName }
+                ... on DraftIssue { title body }
+              }
+            }
           }
         } }
-      } }
-    }' -F owner="$OWNER" -F number="$PROJECT" --jq '.data.user.projectV2'
+      }' -F owner="$OWNER" -F number="$PROJECT" ${after:+-f after="$after"} --jq '.data.user.projectV2') || return 1
+    board=$(jq -c --argjson page "$page" 'if . == null then $page else .items.nodes += $page.items.nodes end' <<<"$board") || return 1
+    [ "$(jq -r .items.pageInfo.hasNextPage <<<"$page")" = true ] || break
+    after=$(jq -r .items.pageInfo.endCursor <<<"$page")
+  done
+  printf '%s\n' "$board"
 }
 
 set_status() { # board_json issue-or-pr-number status-name
