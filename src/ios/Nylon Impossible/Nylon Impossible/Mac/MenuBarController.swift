@@ -59,19 +59,29 @@ final class MenuBarController: NSObject, NSWindowDelegate {
     }
 
     func show() {
-        guard let button = item?.button, let buttonWindow = button.window else { return }
+        guard let anchor else { return }
         let panel = panel ?? makePanel()
         self.panel = panel
         item?.button?.highlight(true)
-        // Under the icon, kept on the icon's screen.
-        let anchor = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
-        let size = panel.frame.size
-        var origin = NSPoint(x: anchor.midX - size.width / 2, y: anchor.minY - size.height - 4)
-        if let screen = buttonWindow.screen?.visibleFrame {
-            origin.x = min(max(origin.x, screen.minX + 8), screen.maxX - size.width - 8)
-        }
-        panel.setFrameOrigin(origin)
+        panel.setFrameOrigin(MacWindowPlacement.origin(for: panel.frame.size, under: anchor.icon, in: anchor.screen))
         panel.makeKeyAndOrderFront(nil)
+    }
+
+    /// Put `window` where the popover opens, under the icon. Without an icon
+    /// (a screenshot run, a test), in the middle of the screen.
+    func place(_ window: NSWindow) {
+        guard let anchor else {
+            window.center()
+            return
+        }
+        window.setFrameOrigin(MacWindowPlacement.origin(for: window.frame.size, under: anchor.icon, in: anchor.screen))
+    }
+
+    /// The icon's frame on screen, and its screen's visible frame.
+    var anchor: (icon: CGRect, screen: CGRect?)? {
+        guard let button = item?.button, let buttonWindow = button.window else { return nil }
+        let icon = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        return (icon, buttonWindow.screen?.visibleFrame)
     }
 
     func close() {
@@ -105,6 +115,28 @@ final class MenuBarController: NSObject, NSWindowDelegate {
         panel.delegate = self
         panel.setAccessibilityTitle("Nylon")
         return panel
+    }
+}
+
+/// Where the popover opens, and the windows it opens (Send feedback…,
+/// Settings…, Sign in): under the menu bar icon, kept on the icon's screen.
+/// Opened in the middle of the screen, a window looked unrelated to the menu
+/// bar it came from (#788).
+enum MacWindowPlacement {
+    /// The gap between the menu bar and what opens under it.
+    static let gap: CGFloat = 4
+    /// How far in from the screen's edges it stays.
+    static let margin: CGFloat = 8
+
+    /// The origin of a window of `size` centred under `icon`, both in screen
+    /// coordinates, kept inside `screen` (the visible frame) when there is one.
+    static func origin(for size: CGSize, under icon: CGRect, in screen: CGRect?) -> CGPoint {
+        var origin = CGPoint(x: icon.midX - size.width / 2, y: icon.minY - size.height - gap)
+        if let screen {
+            origin.x = min(max(origin.x, screen.minX + margin), screen.maxX - size.width - margin)
+            origin.y = max(origin.y, screen.minY + margin)
+        }
+        return origin
     }
 }
 #endif

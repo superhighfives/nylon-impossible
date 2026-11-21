@@ -3,9 +3,9 @@
 //  Nylon Impossible
 //
 //  The sign-in window the popover's Sign in opens: `MacSignInView` in a small
-//  window of its own, brought to the front. It closes itself once you're
-//  signed in, or on Cancel. A plain AppKit window rather than a SwiftUI
-//  `Window` scene, which would open at launch.
+//  window of its own, under the menu bar icon and brought to the front. It
+//  closes itself once you're signed in, or on Cancel. A plain AppKit window
+//  rather than a SwiftUI `Window` scene, which would open at launch.
 //
 
 #if os(macOS)
@@ -18,6 +18,9 @@ final class MacSignInWindow {
     private(set) var window: NSWindow?
     /// Brings the app forward first; see `MacWindowOpening`.
     var activate: () -> Void = { NSApp.activate(ignoringOtherApps: true) }
+    /// Where a new window opens; `MacServices` puts it under the menu bar
+    /// icon (`MenuBarController.place`).
+    var place: (NSWindow) -> Void = { $0.center() }
 
     var isVisible: Bool { window?.isVisible ?? false }
 
@@ -41,7 +44,7 @@ final class MacSignInWindow {
         window.title = "Sign in"
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
-        window.center()
+        place(window)
         return window
     }
 }

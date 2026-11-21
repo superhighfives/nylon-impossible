@@ -4,7 +4,8 @@
 //
 //  Send feedback… on the Mac, for an admin: the menu bar window's footer
 //  item (or ⇧⌘F while it's open) snapshots the menu bar window, closes it,
-//  and opens the feedback form in a small window of its own, like Settings.
+//  and opens the feedback form in a small window of its own, like Settings,
+//  under the menu bar icon.
 //  A sheet inside the menu bar window would vanish with it whenever it lost
 //  focus, taking a half-typed report along. Once an issue is filed, the
 //  menu bar window comes back with "Filed #N" and View, where the iPhone
@@ -69,6 +70,9 @@ final class MacFeedbackWindow: NSObject, NSWindowDelegate {
     /// The synced appearance preference, read as the form draws, so it
     /// follows a change made while it's open.
     var theme: () -> String = { "system" }
+    /// Where a new window opens; `MacServices` puts it under the menu bar
+    /// icon (`MenuBarController.place`).
+    var place: (NSWindow) -> Void = { $0.center() }
 
     var isVisible: Bool { window?.isVisible ?? false }
 
@@ -119,7 +123,7 @@ final class MacFeedbackWindow: NSObject, NSWindowDelegate {
         window.setContentSize(NSSize(width: 560, height: 560))
         window.isReleasedWhenClosed = false
         window.delegate = self
-        window.center()
+        place(window)
         return window
     }
 }
