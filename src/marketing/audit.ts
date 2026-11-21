@@ -470,8 +470,8 @@ async function keyboardWalk(page: Page) {
         if (!el || el === document.body) return { name: "(body)", visible: false };
         // Focus is visible when something changes with it: an outline (the
         // `ink` ring), a box-shadow or a background (the soft tint, a colour
-        // or `n-focus`'s background-image), on the element or one of its near ancestors. Compare
-        // focused with blurred.
+        // or `n-focus`'s background-image), on the element or one of its
+        // near ancestors. Compare focused with blurred.
         const chain: HTMLElement[] = [];
         for (let n: HTMLElement | null = el; n && chain.length < 5; n = n.parentElement) {
           chain.push(n);
