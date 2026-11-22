@@ -16,6 +16,7 @@ import AppKit
 import Carbon.HIToolbox
 import ClerkKit
 import Foundation
+import ServiceManagement
 import SwiftData
 import SwiftUI
 import Testing
@@ -768,6 +769,132 @@ struct MacWidgetTests {
         let fetched = TodayDigest.fetch(userId: "u", context: context, now: now)
         #expect(selected.map(\.id) == fetched.map(\.id))
         #expect(selected.count == 3)
+    }
+}
+
+/// `SMAppService.mainApp`, as far as the login item sees it.
+private final class FakeLoginItemService: LoginItemService {
+    var status: SMAppService.Status = .notRegistered
+    var registers = 0
+    var unregisters = 0
+    var fails = false
+    /// What `register()` leaves the status as.
+    var statusAfterRegister: SMAppService.Status = .enabled
+
+    func register() throws {
+        registers += 1
+        if fails { throw CocoaError(.featureUnsupported) }
+        status = statusAfterRegister
+    }
+
+    func unregister() throws {
+        unregisters += 1
+        if fails { throw CocoaError(.featureUnsupported) }
+        status = .notRegistered
+    }
+}
+
+@Suite("Open at login")
+@MainActor
+struct MacLoginItemTests {
+    private func make(_ service: FakeLoginItemService) throws -> (MacLoginItem, UserDefaults) {
+        let suite = "MacLoginItemTests-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defaults.removePersistentDomain(forName: suite)
+        return (MacLoginItem(service: service, defaults: defaults), defaults)
+    }
+
+    @Test("The toggle reads the system's state, and switching it registers or unregisters")
+    func toggle() throws {
+        let service = FakeLoginItemService()
+        let (item, _) = try make(service)
+        #expect(!item.isOn)
+        item.setEnabled(true)
+        #expect(service.registers == 1)
+        #expect(item.state == .on)
+        item.setEnabled(false)
+        #expect(service.unregisters == 1)
+        #expect(item.state == .off)
+        // Removed by hand in System Settings: Settings reads it again on open.
+        service.status = .enabled
+        item.refresh()
+        #expect(item.isOn)
+    }
+
+    @Test("A failed register leaves the toggle off, with the failure line")
+    func failedRegister() throws {
+        let service = FakeLoginItemService()
+        service.fails = true
+        let (item, _) = try make(service)
+        item.setEnabled(true)
+        #expect(item.state == .failedToTurnOn)
+        #expect(!item.isOn)
+    }
+
+    @Test("A failed turn-on stays shown when Settings opens again, until it's tried again")
+    func failureStays() throws {
+        let service = FakeLoginItemService()
+        service.fails = true
+        let (item, _) = try make(service)
+        item.signedIn(openAtLogin: true)
+        item.refresh()
+        #expect(item.state == .failedToTurnOn)
+        service.fails = false
+        item.setEnabled(true)
+        #expect(item.state == .on)
+        item.setEnabled(false)
+        #expect(item.state == .off)
+    }
+
+    @Test("A failed turn-off leaves the toggle on, with its own failure line")
+    func failedUnregister() throws {
+        let service = FakeLoginItemService()
+        let (item, _) = try make(service)
+        item.setEnabled(true)
+        service.fails = true
+        item.setEnabled(false)
+        #expect(item.state == .failedToTurnOff)
+        #expect(item.isOn)
+        item.refresh()
+        #expect(item.state == .failedToTurnOff)
+    }
+
+    @Test("Turning it off in Settings counts as a choice, so the next sign-in starts unticked")
+    func settingsChoiceCounts() throws {
+        let service = FakeLoginItemService()
+        let (item, _) = try make(service)
+        item.setEnabled(true)
+        item.setEnabled(false)
+        #expect(!item.signInDefault)
+    }
+
+    @Test("Waiting for approval reads as on, with the approval line")
+    func needsApproval() throws {
+        let service = FakeLoginItemService()
+        service.statusAfterRegister = .requiresApproval
+        let (item, _) = try make(service)
+        item.setEnabled(true)
+        #expect(item.state == .needsApproval)
+        #expect(item.isOn)
+    }
+
+    @Test("A fresh install registers nothing until sign-in, then follows the checkbox")
+    func freshSignIn() throws {
+        let ticked = FakeLoginItemService()
+        let (item, _) = try make(ticked)
+        #expect(ticked.registers == 0)
+        #expect(item.signInDefault)
+        item.signedIn(openAtLogin: true)
+        #expect(ticked.registers == 1)
+        #expect(item.isOn)
+
+        let unticked = FakeLoginItemService()
+        let (other, _) = try make(unticked)
+        other.signedIn(openAtLogin: false)
+        #expect(unticked.registers == 0)
+        #expect(!other.isOn)
+        // Signing in again starts from that "no".
+        #expect(!other.signInDefault)
     }
 }
 #endif

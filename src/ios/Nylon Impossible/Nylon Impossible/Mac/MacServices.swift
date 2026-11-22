@@ -24,6 +24,8 @@ final class MacServices {
     let syncService: SyncService
     let preferencesService: UserPreferencesService
     let settings: MacSettings
+    /// Open at login (`MacLoginItem`).
+    let loginItem: MacLoginItem
     /// Send feedback…, for an admin.
     let feedbackService: FeedbackService
     @ObservationIgnored private(set) var hotKey: GlobalHotKey?
@@ -48,6 +50,7 @@ final class MacServices {
         let apiService = APIService(authService: auth)
         preferencesService = UserPreferencesService(apiService: apiService, cache: .standard)
         settings = MacSettings()
+        loginItem = MacLoginItem()
         feedbackService = FeedbackService(apiService: apiService)
     }
 

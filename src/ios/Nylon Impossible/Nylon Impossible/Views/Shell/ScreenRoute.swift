@@ -145,6 +145,7 @@ struct ScreenRouteRoot: View {
             Group {
                 #if os(macOS)
                 MacSignInView {}
+                    .environment(MacServices.shared.loginItem)
                 #else
                 SignInView()
                 #endif
@@ -161,6 +162,7 @@ struct ScreenRouteRoot: View {
                 .environment(syncService)
                 .environment(authService)
                 .environment(MacServices.shared.settings)
+                .environment(MacServices.shared.loginItem)
                 .environment(\.screenRoute, route)
                 .modelContainer(container)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

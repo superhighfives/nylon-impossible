@@ -5,13 +5,15 @@
 //  The Settings window, opened from the popover's footer. The same contents
 //  as iOS Settings — appearance, timezone (automatic, or picked by hand),
 //  your account, signing out and deleting the account — plus the Mac's own:
-//  the quick-add hotkey. A native grouped form, because that's what a Mac
-//  Settings window is; the words and the order follow the app.
+//  open at login and the quick-add hotkey. A native grouped form, because
+//  that's what a Mac Settings window is; the words and the order follow the
+//  app.
 //
 
 #if os(macOS)
 import AppKit
 import ClerkKit
+import ServiceManagement
 import SwiftData
 import SwiftUI
 
@@ -39,6 +41,7 @@ struct MacSettingsView: View {
 struct MacGeneralSettings: View {
     @Environment(UserPreferencesService.self) private var preferences
     @Environment(MacSettings.self) private var settings
+    @Environment(MacLoginItem.self) private var loginItem
     @State private var isRecording = false
 
     var body: some View {
@@ -90,6 +93,26 @@ struct MacGeneralSettings: View {
             }
 
             Section("This Mac") {
+                Toggle("Open at login", isOn: Binding(
+                    get: { loginItem.isOn },
+                    set: { loginItem.setEnabled($0) }
+                ))
+                switch loginItem.state {
+                case .failedToTurnOn:
+                    Text("Couldn’t turn on open at login")
+                        .foregroundStyle(Theme.Colors.overdue)
+                case .failedToTurnOff:
+                    Text("Couldn’t turn off open at login")
+                        .foregroundStyle(Theme.Colors.overdue)
+                case .needsApproval:
+                    HStack {
+                        Text("Allow Nylon in System Settings → Login Items.")
+                        Spacer()
+                        Button("Open Login Items") { SMAppService.openSystemSettingsLoginItems() }
+                    }
+                case .on, .off:
+                    EmptyView()
+                }
                 Toggle("Quick add from anywhere", isOn: Binding(
                     get: { settings.hotKeyEnabled },
                     set: { enabled in
@@ -112,6 +135,8 @@ struct MacGeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        // Login Items can change in System Settings while this is closed.
+        .onAppear { loginItem.refresh() }
     }
 
     /// Every zone the system knows, with the current one first if it isn't
