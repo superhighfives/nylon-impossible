@@ -103,7 +103,6 @@ describe("OvernightPill", () => {
     );
     const pill = screen.getByRole("status");
     expect(pill).toHaveClass("bg-n-brand", "text-n-brand-ink");
-    expect(pill).not.toHaveClass("bg-n-notice-fill", "text-n-notice");
   });
 
   it("is a status with the text as a link and a labelled dismiss", async () => {

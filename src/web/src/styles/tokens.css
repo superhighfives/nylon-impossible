@@ -20,9 +20,6 @@
   --n-color-destructive: #ce2c31;
   --n-color-destructive-solid: #ce2c31;
   --n-color-destructive-solid-ink: #ffffff;
-  --n-color-destructive-fill: #feebec;
-  --n-color-notice: #b54700;
-  --n-color-notice-fill: #fff1e0;
   --n-color-brand: #ffe629;
   --n-color-brand-ink: #473b1f;
   --n-color-brand-soft: #ffe62938;
@@ -72,9 +69,6 @@
   --n-color-ink-subtle: #7b7b7b;
   --n-color-overdue: #ff9592;
   --n-color-destructive: #ff9592;
-  --n-color-destructive-fill: #3b1219;
-  --n-color-notice: #ff9a4d;
-  --n-color-notice-fill: #2b1a0c;
   --n-color-brand-soft: #ffe62929;
   --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 40%, transparent);
 }
