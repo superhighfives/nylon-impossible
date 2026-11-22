@@ -56,6 +56,10 @@ const cssHex = (hex, c, mode = "light") => {
 };
 const entries = (obj) =>
   Object.entries(obj).filter(([key]) => !key.startsWith("$"));
+/** Colours only the Apple apps draw with, so tokens.css leaves them out. */
+const APPLE_ONLY_COLORS = new Set(["destructiveFill", "notice", "noticeFill"]);
+const cssColors = (tokens) =>
+  entries(tokens.color).filter(([name]) => !APPLE_ONLY_COLORS.has(name));
 
 /** The sheet's shadow at one appearance's opacity. */
 const cssSheetShadow = (sheet, mode) => {
@@ -80,7 +84,7 @@ export function renderCss(tokens) {
     "   the app uses (`.dark` on <html>, set by SSR and ThemeSync). */",
     ":root {",
   );
-  for (const [name, c] of entries(tokens.color)) {
+  for (const [name, c] of cssColors(tokens)) {
     out.push(`  --n-color-${kebab(name)}: ${cssHex(c.light, c)};`);
   }
   out.push("");
@@ -140,14 +144,14 @@ export function renderCss(tokens) {
   out.push(`  --n-settle-min-tilt: ${tokens.motion.settleMinTilt}deg;`);
   out.push(`  --n-lift: ${tokens.motion.lift};`);
   out.push("}", "", ".dark {");
-  for (const [name, c] of entries(tokens.color)) {
+  for (const [name, c] of cssColors(tokens)) {
     if (cssHex(c.dark, c, "dark") !== cssHex(c.light, c)) {
       out.push(`  --n-color-${kebab(name)}: ${cssHex(c.dark, c, "dark")};`);
     }
   }
   out.push(`  --n-sheet-shadow: ${cssSheetShadow(sheet, "dark")};`);
   out.push("}", "");
-  const high = entries(tokens.color).filter(([, c]) => c.highContrast);
+  const high = cssColors(tokens).filter(([, c]) => c.highContrast);
   if (high.length > 0) {
     out.push(
       "/* Increase Contrast (macOS, iOS) and its equivalents reach the web as",
