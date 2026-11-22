@@ -778,6 +778,56 @@ describe("Gmail add-on", () => {
       expect(rows).toHaveLength(0);
     });
 
+    it("answers an empty quick-add with Type a todo first", async () => {
+      await linkUser();
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/quick-add", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: [""] } },
+          },
+        },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe(
+        "Type a todo first",
+      );
+      const db = getDb(env.DB);
+      const rows = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(rows).toHaveLength(0);
+    });
+
+    it("answers an empty add-from-message with the same Type a todo first", async () => {
+      await linkUser();
+      const token = await idToken();
+      const res = await post("/gmail-addon/actions/add-from-message", token, {
+        commonEventObject: {
+          formInputs: {
+            todoText: { stringInputs: { value: [""] } },
+          },
+          parameters: {
+            permalink: "https://mail.google.com/mail/u/0/#all/thread-xyz",
+            subject: "Q3 planning notes",
+          },
+        },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json<any>();
+      expect(body.renderActions.action.notification.text).toBe(
+        "Type a todo first",
+      );
+      const db = getDb(env.DB);
+      const rows = await db
+        .select()
+        .from(todos)
+        .where(eq(todos.userId, "user_test_123"));
+      expect(rows).toHaveLength(0);
+    });
+
     it("normalizes a bare-string form input value instead of indexing a char", async () => {
       await linkUser();
       const token = await idToken();

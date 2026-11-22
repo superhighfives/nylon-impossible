@@ -170,7 +170,7 @@ export async function gmailAddonAddFromMessage(c: Context<Env>) {
   const text = readFormInput(event, QUICK_ADD_INPUT);
   if (!text) {
     return refreshedContextual(c, userId, message, {
-      notification: "Add a title first",
+      notification: "Type a todo first",
     });
   }
   if (text.length > MAX_ADDON_TODO_TEXT) {

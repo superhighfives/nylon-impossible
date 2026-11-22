@@ -4233,7 +4233,7 @@ describe("WideApp, a row that fails to draw", () => {
     ];
     const { rerender } = render(<WideApp />);
     const groceries = column("Groceries");
-    expect(within(groceries).getByText("Couldn't show this")).toHaveClass(
+    expect(within(groceries).getByText("Couldn’t show this")).toHaveClass(
       "text-n-ink-muted",
     );
     expect(within(groceries).queryByText("Parmesan")).toBeNull();
@@ -4247,7 +4247,7 @@ describe("WideApp, a row that fails to draw", () => {
 
     todos = todos.map((t) => (t.id === "g2" ? makeTodo(t) : t));
     rerender(<WideApp />);
-    expect(within(groceries).queryByText("Couldn't show this")).toBeNull();
+    expect(within(groceries).queryByText("Couldn’t show this")).toBeNull();
     expect(rowButton("Olive oil")).toBeInTheDocument();
   });
 
@@ -4287,6 +4287,6 @@ describe("WideApp, a row that fails to draw", () => {
     expect(rowButton("Read")).toBeInTheDocument();
     await userEvent.keyboard("{ArrowDown}{Enter}");
     expect(document.querySelector("[data-detail-column]")).toBeInTheDocument();
-    expect(screen.queryByText("Couldn't show this")).toBeNull();
+    expect(screen.queryByText("Couldn’t show this")).toBeNull();
   });
 });

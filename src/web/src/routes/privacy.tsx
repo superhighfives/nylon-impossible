@@ -26,8 +26,8 @@ function PrivacyPage() {
             sign in with a provider like Google, your basic profile information.
           </li>
           <li>
-            <strong>Your todos.</strong> The tasks, notes, due dates, and lists
-            you create in the app.
+            <strong>Your todos.</strong> The todos you create in the app, with
+            their notes and when they're due, and your lists.
           </li>
         </ul>
       </LegalSection>
