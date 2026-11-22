@@ -28,31 +28,12 @@ struct ToastView: View {
 
     var body: some View {
         ZStack {
-            if let toast = toasts.current, compact {
-                compactPill(toast)
-            } else if let toast = toasts.current {
-                // The action sits beside the message, which wraps if it must.
-                // Only at accessibility text sizes does it drop underneath.
-                // (A ViewThatFits here could pick the stacked layout for a
-                // short "Done · Undo", leaving it two lines tall over the
-                // composer.)
+            if let toast = toasts.current {
                 Group {
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(alignment: .leading, spacing: 0) { content(toast, stacked: true) }
-                    } else {
-                        HStack(spacing: Theme.Space.s1) { content(toast, stacked: false) }
-                    }
+                    if compact { compactPill(toast) } else { pill(toast) }
                 }
-                .textStyle(Theme.Fonts.Role.control)
-                .fontWeight(.regular)
-                .foregroundStyle(Self.ink(toast))
-                .padding(.leading, Theme.Space.s4)
-                .padding(.trailing, toast.actionLabel == nil ? Theme.Space.s4 : Theme.Space.s1)
-                .background(Self.fill(toast), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
-                .padding(.horizontal, Theme.Space.s4)
                 .id(toast.id)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 10)))
+                .transition(compact || reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 10)))
                 .accessibilityElement(children: .contain)
                 .accessibilityAddTraits(.updatesFrequently)
                 .onAppear {
@@ -61,6 +42,29 @@ struct ToastView: View {
             }
         }
         .animation(Theme.Motion.easeOutStrong(Theme.Motion.base), value: toasts.current)
+    }
+
+    private func pill(_ toast: ToastCenter.Toast) -> some View {
+        // The action sits beside the message, which wraps if it must.
+        // Only at accessibility text sizes does it drop underneath.
+        // (A ViewThatFits here could pick the stacked layout for a
+        // short "Done · Undo", leaving it two lines tall over the
+        // composer.)
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) { content(toast, stacked: true) }
+            } else {
+                HStack(spacing: Theme.Space.s1) { content(toast, stacked: false) }
+            }
+        }
+        .textStyle(Theme.Fonts.Role.control)
+        .fontWeight(.regular)
+        .foregroundStyle(Self.ink(toast))
+        .padding(.leading, Theme.Space.s4)
+        .padding(.trailing, toast.actionLabel == nil ? Theme.Space.s4 : Theme.Space.s1)
+        .background(Self.fill(toast), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .shadow(color: .black.opacity(0.18), radius: 12, y: 6)
+        .padding(.horizontal, Theme.Space.s4)
     }
 
     /// The pill's fill: red for a failure, brand yellow for the rest.
@@ -100,13 +104,6 @@ struct ToastView: View {
         .padding(.vertical, Theme.Space.s1)
         .background(Self.fill(toast), in: Capsule())
         .help(toast.text)
-        .id(toast.id)
-        .transition(.opacity)
-        .accessibilityElement(children: .contain)
-        .accessibilityAddTraits(.updatesFrequently)
-        .onAppear {
-            AccessibilityNotification.Announcement(Self.announcement(for: toast)).post()
-        }
     }
 
     @ViewBuilder

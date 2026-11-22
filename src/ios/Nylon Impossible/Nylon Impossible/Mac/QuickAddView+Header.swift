@@ -3,8 +3,9 @@
 //  Nylon Impossible
 //
 //  The popover's header: the Nylon mark, the title and its count, a toast
-//  while one is up, and the link that opens the board on the web (⌘O). The old "Open Nylon" button
-//  sat where the link is, until the board window went (#690).
+//  while one is up, and the link that opens the board on the web (⌘O).
+//  The old "Open Nylon" button sat where the link is, until the board
+//  window went (#690).
 //
 
 #if os(macOS)
