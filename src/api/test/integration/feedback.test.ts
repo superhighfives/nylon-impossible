@@ -93,8 +93,10 @@ describe("POST /feedback", () => {
     );
     const res = await post(VALID);
     expect(res.status).toBe(502);
-    const body = await res.json<{ code: string }>();
+    const body = await res.json<{ code: string; error: string }>();
     expect(body.code).toBe("feedback_failed");
+    // The iPhone shows this verbatim, so it keeps Copy's curly apostrophe.
+    expect(body.error).toBe("Couldn’t file that feedback. Try again.");
   });
 });
 

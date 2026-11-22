@@ -407,7 +407,7 @@ describe("PhoneApp, a row that fails to draw", () => {
     ];
     render(<PhoneApp />);
     expect(
-      within(page("today")).getByText("Couldn't show this"),
+      within(page("today")).getByText("Couldn’t show this"),
     ).toBeInTheDocument();
     expect(within(page("thisWeek")).getByText("Send invoice")).toBeVisible();
   });

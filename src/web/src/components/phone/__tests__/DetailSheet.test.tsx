@@ -313,7 +313,7 @@ describe("DetailSheet", () => {
     expect(createTodo.mock.calls[0][0].position > "aa").toBe(true);
   });
 
-  it("shows Couldn't show this in place of a todo that fails to draw", () => {
+  it("shows Couldn’t show this in place of a todo that fails to draw", () => {
     // React logs the caught error; the test is that it's caught.
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
     const { urls: _, ...bare } = makeTodo({ title: "Olive oil" });
@@ -329,7 +329,7 @@ describe("DetailSheet", () => {
         onClose={vi.fn()}
       />,
     );
-    expect(screen.getByText("Couldn't show this")).toBeInTheDocument();
+    expect(screen.getByText("Couldn’t show this")).toBeInTheDocument();
     quiet.mockRestore();
   });
 

@@ -36,11 +36,11 @@ export const API_ERRORS = {
   validation_failed: { status: 400, message: "Request validation failed" },
   feedback_unavailable: {
     status: 503,
-    message: "Feedback isn't set up on this server",
+    message: "Feedback isn’t set up on this server",
   },
   feedback_failed: {
     status: 502,
-    message: "Couldn't file that feedback. Try again.",
+    message: "Couldn’t file that feedback. Try again.",
   },
   rate_limited: {
     status: 429,

@@ -57,7 +57,7 @@ struct MacGeneralSettings: View {
                 }
                 .pickerStyle(.segmented)
             } footer: {
-                Text("Synced across your devices.")
+                Text("Synced across your devices")
                     .foregroundStyle(.secondary)
             }
 

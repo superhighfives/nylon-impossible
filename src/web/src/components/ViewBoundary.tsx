@@ -44,7 +44,7 @@ export function ViewBoundary({
           data-view-error
           className={`m-0 py-2.5 text-n-wide-notes text-n-ink-muted ${className}`}
         >
-          Couldn't show this
+          Couldn’t show this
         </p>
       }
     >
