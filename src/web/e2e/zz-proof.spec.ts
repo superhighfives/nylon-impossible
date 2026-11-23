@@ -26,10 +26,26 @@ test.skip(({ layout }) => layout !== "wide", "wide only");
 
 type Mode = "main" | "branch";
 
-async function add(page: Page, tag: string, mode: Mode, answer400 = false) {
+async function add(
+  page: Page,
+  tag: string,
+  mode: Mode,
+  holdTicket: boolean,
+  answer400 = false,
+) {
   const title = `Smoke add ${tag}`;
   const today = () => column(page, "Today");
   const field = today().getByRole("textbox", { name: "New todo in today" });
+  if (holdTicket) {
+    // #785's timing: the board reloads and the WebSocket's ticket comes back
+    // 1.5s later, after the test has started watching and while the add is
+    // still held.
+    await page.route("**/ws/ticket", async (r) => {
+      await hold(1500);
+      await r.continue();
+    });
+    await reload(page, "wide");
+  }
   await field.click();
   await field.fill(title);
   await page.route("**/todos/smart", async (r) => {
@@ -49,11 +65,11 @@ async function add(page: Page, tag: string, mode: Mode, answer400 = false) {
 }
 
 for (const mode of ["main", "branch"] as const) {
-  test(`${mode}: save held 2s`, async ({ board: page, tag }) => {
-    await add(page, tag, mode);
+  test(`${mode}: ticket held 1.5s, save held 2s`, async ({
+    board: page,
+    tag,
+  }) => {
+    test.skip(test.info().repeatEachIndex > 0, "one run is the proof");
+    await add(page, tag, mode, true);
   });
 }
-
-test("branch: save answered 400", async ({ board: page, tag }) => {
-  await add(page, tag, "branch", true);
-});

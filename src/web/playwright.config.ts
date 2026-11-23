@@ -17,8 +17,9 @@ const CI = !!process.env.CI;
 
 export default defineConfig({
   testDir: "./e2e",
-  // TEMPORARY (#821): proof run only.
-  testMatch: /zz-proof/,
+  // TEMPORARY (#821): proof run and --repeat-each=10 of add, move and drag.
+  testMatch: /(zz-proof|add|move|drag)\.spec\.ts/,
+  repeatEach: 10,
   globalSetup: "./e2e/global-setup.ts",
   globalTeardown: "./e2e/global-teardown.ts",
   // Every spec reseeds the one smoke user, so they take turns.
