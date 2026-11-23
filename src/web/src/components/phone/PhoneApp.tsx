@@ -561,7 +561,7 @@ export function PhoneApp({
               }}
               enterKeyHint="done"
               placeholder="New list"
-              className="min-w-0 flex-1 rounded-n-chip bg-transparent p-0 font-n-display text-n-phone-title text-n-ink n-focus placeholder:text-n-ink-muted"
+              className="-ml-2 min-w-0 flex-1 rounded-n-chip bg-transparent px-2 py-0 font-n-display text-n-phone-title text-n-ink n-focus placeholder:text-n-ink-muted"
             />
           </label>
         </>
