@@ -76,6 +76,14 @@ const SECTION_LABEL = "mb-1.5 block text-n-phone-label text-n-ink-muted";
 /** Wide: "Add subtask" and "Paste a link", like a column's "+ Add". */
 const COLUMN_ADD = "flex min-h-11 items-center gap-4 text-n-ink-muted";
 
+/**
+ * "Add subtask" and "Paste a link" themselves. Padded so the focus tint
+ * clears the text, and pulled back by the same amount so the text still
+ * lines up with the rows above (#824).
+ */
+const ADD_FIELD =
+  "-ml-2 min-w-0 flex-1 rounded-n-chip bg-transparent px-2 py-2 text-n-ink n-focus placeholder:text-n-ink-muted";
+
 /** Wide: a section label like Done's day labels, no rule above it. */
 const COLUMN_LABEL = "mb-1 block text-n-wide-label text-n-ink-muted";
 
@@ -861,7 +869,7 @@ function Subtasks({
           }}
           enterKeyHint="done"
           placeholder="Add subtask"
-          className={`min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-n-ink n-focus placeholder:text-n-ink-muted ${
+          className={`${ADD_FIELD} ${
             column ? "text-n-wide-body" : "text-n-phone-item"
           }`}
         />
@@ -954,7 +962,7 @@ function Links({
           placeholder="Paste a link"
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
-          className={`min-w-0 flex-1 rounded-n-chip bg-transparent py-2 text-n-ink n-focus placeholder:text-n-ink-muted ${
+          className={`${ADD_FIELD} ${
             column ? "text-n-wide-body" : "text-n-phone-item"
           }`}
         />
