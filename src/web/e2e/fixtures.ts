@@ -133,20 +133,44 @@ export function sheet(page: Page): Locator {
 }
 
 /**
- * Start listening for the next write (POST/PATCH/PUT/DELETE) the app sends.
+ * The app's own data writes: its server functions (`/_serverFn/…`, where list
+ * and most todo writes go) and the API's `/todos…` and `/lists…` routes.
+ * Matched by path, not origin, since a local `vite dev` runs without
+ * `API_URL`. `/ws/ticket`, `/users/me`, `/feedback`, Clerk's token refresh
+ * and Sentry's envelopes aren't writes.
+ */
+const WRITE_PATH = /^\/(?:_serverFn\/|todos(?:\/|$)|lists(?:\/|$))/;
+
+/**
+ * Start listening for the app's next data write (a non-GET to `WRITE_PATH`).
  * Call it before the action that saves, pass the result to `reload`: the app
  * awaits its auth token before sending, so a reload straight after the
  * optimistic row can beat the request and lose the write. Pass `body` to wait
- * for the write that carries that text, not just the first one.
+ * for the write that carries that text, not just the first one. A write that
+ * comes back 4xx or 5xx fails the test with its status, rather than counting
+ * as saved.
  */
 export function watchWrite(page: Page, body?: string): Promise<unknown> {
-  return page.waitForResponse(
-    (res) =>
-      res.request().method() !== "GET" &&
-      res.status() < 500 &&
-      (!body || (res.request().postData() ?? "").includes(body)),
-    { timeout: 30_000 },
-  );
+  return page
+    .waitForResponse(
+      (res) => {
+        const req = res.request();
+        return (
+          req.method() !== "GET" &&
+          WRITE_PATH.test(new URL(res.url()).pathname) &&
+          (!body || (req.postData() ?? "").includes(body))
+        );
+      },
+      { timeout: 30_000 },
+    )
+    .then((res) => {
+      if (res.status() >= 400) {
+        throw new Error(
+          `The write failed: ${res.status()} from ${res.request().method()} ${res.url()}`,
+        );
+      }
+      return res;
+    });
 }
 
 /**

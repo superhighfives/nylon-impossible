@@ -27,7 +27,7 @@ test("a todo typed into Today's composer lands in Today and reaches D1", async (
   // On wide the composer rests read-only on Add until it's clicked.
   await field.click();
   await field.fill(title);
-  const saved = watchWrite(page);
+  const saved = watchWrite(page, title);
   await field.press("Enter");
   await expect(rowButton(today(), title)).toBeVisible();
 

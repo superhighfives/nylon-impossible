@@ -51,3 +51,10 @@ BASE_URL=https://….workers.dev bun run --cwd src/web e2e
   app's `data-*` hooks (`data-column`, `data-row-container`,
   `data-drop-indicator`) only where no role pins the element.
 - Put `tag` in any title you create, so an assertion never matches a leftover.
+- To check that a write survived a reload, call `watchWrite(page, text)` before
+  the action and pass its promise to `reload`. A write is a non-GET request to
+  the app's server functions (`/_serverFn/…`) or the API's `/todos…` and
+  `/lists…` routes; `/ws/ticket`, `/users/me`, `/feedback`, Clerk and Sentry
+  don't count. Pass text the write carries (a title, a note) where you have
+  some, so it waits for that write. A write that comes back 4xx or 5xx fails
+  the test with its status.
