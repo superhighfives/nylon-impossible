@@ -2,9 +2,10 @@
 //  QuickAddView+Header.swift
 //  Nylon Impossible
 //
-//  The popover's header: the Nylon mark, the title and its count, and the
-//  link that opens the board on the web (⌘O). The old "Open Nylon" button
-//  sat where the link is, until the board window went (#690).
+//  The popover's header: the Nylon mark, the title and its count, a toast
+//  while one is up, and the link that opens the board on the web (⌘O).
+//  The old "Open Nylon" button sat where the link is, until the board
+//  window went (#690).
 //
 
 #if os(macOS)
@@ -30,7 +31,12 @@ extension QuickAddView {
                         .foregroundStyle(Theme.Colors.inkMuted)
                         .accessibilityLabel(MastheadCopy.todos(count))
                 case .webLink:
-                    Spacer()
+                    Spacer(minLength: Theme.Space.s2)
+                    // In the header's empty space, so it covers nothing and
+                    // moves nothing (#790). It gives way first, so a long
+                    // failure is cut off, not the title.
+                    ToastView(toasts: actions.toasts, compact: true)
+                        .layoutPriority(-1)
                     webLink
                 }
             }
