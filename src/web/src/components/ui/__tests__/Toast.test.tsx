@@ -43,6 +43,21 @@ describe("Toast", () => {
     expect(undo).toHaveBeenCalledOnce();
   });
 
+  it("keeps the message 12px from the action, as on the iPhone", async () => {
+    render(<Toaster />);
+    act(() => {
+      toast.success("Done", { actionProps: { children: "Undo" } });
+    });
+    const action = await screen.findByRole("button", { name: "Undo" });
+    const content = action.parentElement;
+    if (!content) throw new Error("no toast content");
+    // The row's 6px gap plus the action's own 6px: the message sat 6px
+    // from Undo's outline, a third of every other gap in the pill (#825).
+    expect(content).toHaveClass("gap-1.5");
+    expect(action).toHaveClass("ml-1.5", "h-9", "px-3.5");
+    expect(pill(action)).toHaveClass("py-1.5", "pr-1.5", "pl-4", "gap-1.5");
+  });
+
   it("gives info toasts the same yellow pill", async () => {
     render(<Toaster />);
     act(() => {

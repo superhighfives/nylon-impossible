@@ -26,10 +26,12 @@ function ToastItem({ toast }: { toast: Toast.Root.ToastObject }) {
           <AlertCircle size={15} aria-hidden="true" className="shrink-0" />
         )}
         <Toast.Title className="truncate">{toast.title}</Toast.Title>
-        {/* Renders only when the toast was added with `actionProps`. */}
+        {/* Renders only when the toast was added with `actionProps`. The
+            extra 6px puts the message 12px from the outline, as on the
+            iPhone; the gap alone jammed "Done" against Undo (#825). */}
         <Toast.Action
           data-toast-action
-          className={`h-9 shrink-0 cursor-pointer rounded-[0.6875rem] border px-3.5 font-bold n-focus-toast ${error ? "border-n-destructive-solid-ink text-n-destructive-solid-ink" : "border-n-brand-ink text-n-brand-ink"}`}
+          className={`ml-1.5 h-9 shrink-0 cursor-pointer rounded-[0.6875rem] border px-3.5 font-bold n-focus-toast ${error ? "border-n-destructive-solid-ink text-n-destructive-solid-ink" : "border-n-brand-ink text-n-brand-ink"}`}
         />
         <Toast.Close
           aria-label="Dismiss"
