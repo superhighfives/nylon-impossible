@@ -87,6 +87,18 @@ describe("DetailSheet", () => {
         recurrence: null,
       });
     });
+
+    it("outlines Pick a date…'s calendar like the chips", () => {
+      const { group } = openDue(dueIn(1));
+      fireEvent.click(
+        within(group).getByRole("button", { name: "Pick a date…" }),
+      );
+      const frame = screen
+        .getByRole("button", { name: "Previous month" })
+        .closest(".border");
+      expect(frame).toHaveClass("border-n-hairline", "rounded-n-field");
+      expect(frame).not.toContainElement(group);
+    });
   });
 
   describe.each([
