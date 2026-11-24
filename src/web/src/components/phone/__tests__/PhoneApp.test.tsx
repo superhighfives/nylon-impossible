@@ -201,6 +201,14 @@ describe("PhoneApp", () => {
     expect(within(page("lists")).getByText("Groceries")).toBeVisible();
   });
 
+  it("pads New list inside its focus tint", () => {
+    render(<PhoneApp />);
+    const field = within(page("lists")).getByRole("textbox", {
+      name: "New list name",
+    });
+    expect(field).toHaveClass("n-focus", "px-2", "-ml-2");
+  });
+
   it("leaves Done out of the account sheet", async () => {
     render(<PhoneApp />);
     await userEvent.click(screen.getByRole("button", { name: "Account" }));

@@ -325,6 +325,38 @@ describe("DetailSheet", () => {
     expect(createTodo.mock.calls[0][0].position > "aa").toBe(true);
   });
 
+  it.each([
+    ["phone", undefined],
+    ["column", "column"],
+  ] as const)(
+    "pads Add subtask and Paste a link inside their focus tint, %s",
+    (_, variant) => {
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      render(
+        <DetailSheet
+          todo={makeTodo()}
+          subtasks={[]}
+          listTargets={[]}
+          listName={() => "Today"}
+          listInSentence={() => "today"}
+          timeZone="UTC"
+          actions={
+            { save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions
+          }
+          onClose={vi.fn()}
+          variant={variant}
+          container={variant ? container : undefined}
+          animated={false}
+        />,
+      );
+      for (const name of ["New subtask", "Add a link"]) {
+        const field = screen.getByRole("textbox", { name });
+        expect(field).toHaveClass("n-focus", "px-2", "-ml-2");
+      }
+    },
+  );
+
   it("shows Couldn’t show this in place of a todo that fails to draw", () => {
     // React logs the caught error; the test is that it's caught.
     const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
