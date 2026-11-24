@@ -398,7 +398,9 @@ function DetailBody({
             })}
           </fieldset>
           {picking && (
-            <div className="mt-2 w-full">
+            // Outlined like the chips above it, so the month reads as one
+            // control rather than numbers loose on the sheet.
+            <div className="mt-2 w-full rounded-n-field border border-n-hairline p-2">
               <Calendar
                 value={dueKey}
                 todayKey={dayKeyIn(now, timeZone)}
