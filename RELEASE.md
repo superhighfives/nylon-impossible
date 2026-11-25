@@ -51,9 +51,9 @@ Connect by hand unless we add `deliver` metadata later.
       content (todos, lists, notes, links), crash data and performance data
       (Sentry, linked because `SessionLifecycle` sets the Sentry user). No
       tracking. Check the Clerk and Sentry SDK manifests for anything else.
-      Copy the labels from the
-      privacy report, which merges the app's manifest with the SDKs': in
-      Xcode, Organizer → right-click the archive → Generate Privacy Report.
+      Copy the labels from the privacy report, which merges the app's
+      manifest with the SDKs': in Xcode, Organizer → right-click the
+      archive → Generate Privacy Report.
 - [ ] Name, subtitle, promotional text, description, keywords, category.
 - [ ] Screenshots for each required iPhone and Mac size. The app is
       iPhone only (`TARGETED_DEVICE_FAMILY = 1`), so no iPad shots. The
