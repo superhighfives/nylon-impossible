@@ -26,7 +26,16 @@ bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
 - [ ] Sign in with Apple. iOS offers Google and GitHub through Clerk's
       `AuthView`, so App Store guideline 4.8 requires an equivalent option.
       Decision (2026-11-24): add Apple as Clerk's third social connection,
-      which the free plan allows. Test it on iOS and on the Mac sign-in.
+      which the free plan allows. The apps use Clerk's native flow, which
+      needs no Services ID or key (those are for Apple sign-in on the web):
+      - [ ] Clerk production: register the app (App ID prefix and bundle
+            ID) under Native applications, and enable the Apple connection.
+      - [ ] Apple: add the Sign in with Apple capability to the App ID, then
+            regenerate the iOS and Mac App Store profiles and update their
+            secrets. CI signs with those profiles, so do this before the
+            code change merges.
+      - [ ] Code: the entitlement on iOS and macOS, and an Apple button in
+            `MacSignInView` (iOS gets it from `AuthView`). Test on both.
 - [ ] Update bot protection to "Challenge suspicious sign-ups" (Clerk
       recommends it in place of the legacy protection), and consider
       blocking disposable email addresses.
@@ -61,13 +70,55 @@ Connect by hand unless we add `deliver` metadata later.
 - [ ] Export compliance (HTTPS only: standard exemption).
 - [ ] Pricing: free, all territories.
 
+### App Store listing (draft)
+
+Built from the landing page's copy (`src/web/src/components/LandingPage.tsx`),
+so it says what the site says. Edit freely; the owner's version is the one
+that ships. Limits are App Store Connect's.
+
+- **Name (30):** Nylon Impossible. The home screen still says "Nylon"
+  (`CFBundleDisplayName`). Plain "Nylon" may be taken on the store.
+- **Subtitle (30):** A todo list shaped by time
+- **Promotional text (170):** Today, this week, someday. Things you don't
+  get to move along on their own, and done means gone. The same on the
+  web, iPhone and Mac.
+- **Keywords (100):** todo,to-do,list,today,this week,someday,planner,
+  reminders,checklist,menu bar,widget. "tasks" would help search, but
+  it's a "Not" word in PRINCIPLES.md's Vocabulary, so it's left out
+  unless the owner says keywords don't count as UI copy.
+- **Category:** Productivity (matches `LSApplicationCategoryType`).
+- **Description (4000):**
+
+  > Nylon is a todo list shaped by time.
+  >
+  > Today is what you're doing now. Anything still here tomorrow moves on
+  > to this week by itself. This week is what's coming up; after seven
+  > days it settles into someday, without you sorting it. Someday is
+  > everything else, kept out of the way until you want it.
+  >
+  > Done means gone. Tick a todo and it leaves straight away, with Undo if
+  > you need it.
+  >
+  > Add in one motion. Type "Call Sam tomorrow" and it's due tomorrow.
+  > Paste a link and it titles itself.
+  >
+  > Lists that stay put. Groceries, a project, a trip. Your own lists never
+  > age.
+  >
+  > Everywhere, synced as you type and fine offline:
+  > - iPhone: swipe to mark done, and a today widget on your Home Screen.
+  > - Mac: quick add and today's todos, from the menu bar.
+  > - Web: the full board in any desktop browser.
+  >
+  > Free.
+
 ### Mac
 
-- [ ] Certificates and profiles from the Mac section of
-      `src/ios/README.md`.
-- [ ] Set the repository variable `ENABLE_MAC_RELEASE` to `"true"` so the
-      `deploy-mac` jobs run.
-- [ ] One Mac TestFlight build installed and tried from the menu bar.
+The Mac release is already on: `ENABLE_MAC_RELEASE` has been `true` since
+2026-10-21, its five secrets exist, and `deploy-mac` passed on the last five
+`ios-deploy.yml` runs (checked 2026-11-24).
+
+- [ ] Install one Mac TestFlight build and try it from the menu bar.
 
 ### Operations
 
@@ -75,6 +126,13 @@ Connect by hand unless we add `deliver` metadata later.
 - [ ] Rate limits on the signed-in API and web routes (board item).
 - [ ] Sentry alert rules for new issues, and an uptime check on
       `api.nylonimpossible.com/health` and `nylonimpossible.com`.
+
+### Website
+
+- [ ] The landing page still says "Coming soon" and "You're on the list.
+      We'll email you when it's ready." (`LANDING_COPY` in
+      `src/web/src/components/LandingPage.tsx`). Prepare a PR that swaps the
+      waitlist for sign-up and App Store links, and merge it on launch day.
 
 ### Support
 
@@ -89,7 +147,8 @@ Connect by hand unless we add `deliver` metadata later.
    "unreleased" to "released").
 2. Submit the iOS and Mac builds for review from App Store Connect.
 3. When they're approved, release them by hand.
-4. In Clerk production, set the access mode to Open.
+4. In Clerk production, set the access mode to Open, and merge the
+   landing page PR.
 5. Invite the waitlist from Clerk's Waitlist page. Clerk sends each person
    an invitation email, so the owner does this step.
 6. Watch Sentry and the Cloudflare dashboards for the first day.
