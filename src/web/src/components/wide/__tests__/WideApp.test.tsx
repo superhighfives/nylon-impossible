@@ -1434,7 +1434,7 @@ describe("WideApp", () => {
     );
   });
 
-  it("→ into an empty column tints its head", () => {
+  it("→ into an empty column tints its head and lets go of the todo", () => {
     todos = todos.filter((t) => t.listId !== "list-someday");
     const { container } = render(<WideApp />);
     const board = container.querySelector("[data-wide-ready]");
@@ -1442,6 +1442,10 @@ describe("WideApp", () => {
     press("ArrowRight");
     const head = document.activeElement as HTMLElement;
     expect(head).toHaveAttribute("data-column-head", "list-someday");
+    // One selection on the board: the head, not the todo it came from.
+    expect(
+      container.querySelector("[data-row-container][data-selected]"),
+    ).toBeNull();
     expect(board).toHaveAttribute("data-keyboard");
     expect(head.className).toContain(
       "group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)]",
