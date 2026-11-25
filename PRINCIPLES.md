@@ -93,6 +93,8 @@ How the wide board (the web) shows each interaction state, with a pointer and by
 | Dragging (source) with a pointer | The original row stays, faded to 35% | — | — | — | — |
 | Drag preview with a pointer | `surface` card, `hairline` border, field radius, tilted at random up to 1.5° either way, checkbox and title | — | — | — | — |
 | Dragging by touch | The row lifts, raised and tilted, and follows the finger; no faded original | — | — | — | — |
+| Dragging one of your lists (pointer or touch) | — | — | The entry lifts, raised and tilted, and follows the pointer or finger up and down; no faded original. The time lists don't drag | — | — |
+| Drop target for a list | — | — | The other entries of your lists part around a `brandSoft` gap the entry's height, no line. Never among the time lists | — | — |
 
 - **Section with the keyboard.** The sidebar, a column or the open todo that has the keyboard shows a 4pt/4px `sectionOutline` (ink at 8%) drawn inside its edges: a frame, not a selection, and never `brand`. It shows whether the keyboard is on the section or in it, follows "Keyboard or pointer", and changes none of the looks inside it. At launch the keyboard is on Today, with the outline hidden until the first key press.
 - **Two bars, two roles.** The row's keyboard bar is `inkMuted`; the sidebar's bar for the column holding the selection is `ink`.

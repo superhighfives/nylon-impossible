@@ -25,6 +25,8 @@ function source(): PaletteSource {
     selected: null,
     columnList: null,
     toggleColumn: vi.fn(),
+    orderList: null,
+    moveList: vi.fn(),
     admin: false,
     board: {} as Board,
     goToColumn: vi.fn(),
@@ -112,5 +114,39 @@ describe("paletteGroups: Hide column", () => {
       "C",
       "Done",
     ]);
+  });
+});
+
+describe("paletteGroups: Move list up and down", () => {
+  const items = (over: Partial<PaletteSource>, query = "move list") =>
+    paletteGroups({ mode: "all" }, undefined, { ...source(), ...over }, query)
+      .find((g) => g.label === "Commands")
+      ?.items.filter((i) => i.label.startsWith("Move list")) ?? [];
+
+  it("offers both for a list in the middle, named beside them, with ⌥↑ and ⌥↓", () => {
+    const moveList = vi.fn();
+    const found = items({ orderList: collections[1], moveList });
+    expect(found.map((i) => [i.label, i.meta, i.hint])).toEqual([
+      ["Move list up", "B", "⌥↑"],
+      ["Move list down", "B", "⌥↓"],
+    ]);
+    found[0].run();
+    expect(moveList).toHaveBeenLastCalledWith(collections[1], -1);
+    found[1].run();
+    expect(moveList).toHaveBeenLastCalledWith(collections[1], 1);
+  });
+
+  it("offers neither past the first or last of your lists", () => {
+    expect(items({ orderList: collections[0] }).map((i) => i.label)).toEqual([
+      "Move list down",
+    ]);
+    expect(items({ orderList: collections[2] }).map((i) => i.label)).toEqual([
+      "Move list up",
+    ]);
+  });
+
+  it("offers nothing with no list of yours to move, or for a time list", () => {
+    expect(items({ orderList: null })).toEqual([]);
+    expect(items({ orderList: timeLists[0] })).toEqual([]);
   });
 });

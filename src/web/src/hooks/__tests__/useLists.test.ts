@@ -5,7 +5,12 @@ import { createElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "@/lib/toast";
 import type { SerializedList } from "@/types/database";
-import { useCreateList, useDeleteList, useUpdateList } from "../useLists";
+import {
+  useCreateList,
+  useDeleteList,
+  useReorderLists,
+  useUpdateList,
+} from "../useLists";
 
 vi.mock("@/server/lists", () => ({
   getLists: vi.fn(),
@@ -198,5 +203,89 @@ describe("failure toasts", () => {
     expect(await failWith(() => result.current.mutateAsync("list-1"))).toEqual([
       "Couldn’t delete the list",
     ]);
+  });
+});
+
+describe("useReorderLists", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const three = () => [
+    makeList({ id: "a", position: "a0" }),
+    makeList({ id: "b", position: "a1" }),
+    makeList({ id: "c", position: "a2" }),
+  ];
+  const order = (lists: SerializedList[] | undefined) =>
+    [...(lists ?? [])]
+      .sort((x, y) => (x.position < y.position ? -1 : 1))
+      .map((l) => l.id);
+
+  it("writes the new order into the cache at once, and saves each position", async () => {
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData<SerializedList[]>(["lists"], three());
+    mockUpdateList.mockResolvedValue(makeList());
+    mockGetLists.mockReturnValue(new Promise(() => {}));
+    const { result } = renderHook(() => useReorderLists(), {
+      wrapper: Wrapper,
+    });
+
+    act(() => result.current([{ id: "c", position: "Zz" }]));
+    // Before the request returns.
+    expect(order(queryClient.getQueryData(["lists"]))).toEqual(["c", "a", "b"]);
+    await waitFor(() =>
+      expect(mockUpdateList).toHaveBeenCalledWith({
+        data: { id: "c", input: { position: "Zz" } },
+      }),
+    );
+  });
+
+  it("puts the old order back and says so when the save fails", async () => {
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData<SerializedList[]>(["lists"], three());
+    mockUpdateList.mockRejectedValue(new Error("boom"));
+    mockGetLists.mockReturnValue(new Promise(() => {}));
+    const error = vi.spyOn(toast, "error");
+    const { result } = renderHook(() => useReorderLists(), {
+      wrapper: Wrapper,
+    });
+
+    act(() => result.current([{ id: "c", position: "Zz" }]));
+    await waitFor(() =>
+      expect(order(queryClient.getQueryData(["lists"]))).toEqual([
+        "a",
+        "b",
+        "c",
+      ]),
+    );
+    expect(error).toHaveBeenCalledWith("Couldn’t save the new order");
+    error.mockRestore();
+  });
+
+  it("a failed save doesn't undo a later reorder of another list", async () => {
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData<SerializedList[]>(["lists"], three());
+    let fail: (e: Error) => void = () => {};
+    mockUpdateList
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+      )
+      .mockResolvedValueOnce(makeList());
+    mockGetLists.mockReturnValue(new Promise(() => {}));
+    const error = vi.spyOn(toast, "error");
+    const { result } = renderHook(() => useReorderLists(), {
+      wrapper: Wrapper,
+    });
+
+    act(() => result.current([{ id: "c", position: "Zz" }]));
+    act(() => result.current([{ id: "a", position: "a3" }]));
+    expect(order(queryClient.getQueryData(["lists"]))).toEqual(["c", "b", "a"]);
+    act(() => fail(new Error("boom")));
+    await waitFor(() => expect(error).toHaveBeenCalled());
+    // c goes back to last; a stays where the second reorder put it.
+    expect(order(queryClient.getQueryData(["lists"]))).toEqual(["b", "c", "a"]);
+    error.mockRestore();
   });
 });

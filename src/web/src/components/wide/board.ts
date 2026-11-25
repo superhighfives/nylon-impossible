@@ -174,6 +174,8 @@ export interface BoardContext {
   openMenu: (todo: TodoWithUrls, row: HTMLElement, view: MenuView) => void;
   openMoveTo: (todo: TodoWithUrls) => void;
   jump: (target: JumpTarget) => void;
+  /** Move the list whose sidebar entry has focus one place up or down. */
+  moveList: (delta: 1 | -1) => void;
   startGo: () => void;
   newTodo: () => void;
   newList: () => void;
@@ -398,6 +400,7 @@ export function createBoard(ctx: BoardContext): Board {
     },
     palette: ctx.togglePalette,
     jump: ctx.jump,
+    moveList: ctx.moveList,
     startGo: ctx.startGo,
     goToList: ctx.goToList,
     shortcuts: ctx.toggleShortcuts,

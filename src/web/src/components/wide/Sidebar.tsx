@@ -1,13 +1,25 @@
 import { ContextMenu } from "@base-ui/react/context-menu";
 import { useDroppable } from "@dnd-kit/core";
 import { Check, Eye, EyeOff, Plus } from "lucide-react";
-import type { ReactNode } from "react";
+import { type ReactNode, useRef } from "react";
+import { RAISED } from "@/components/ui/styles";
 import type { SerializedList } from "@/types/database";
 import { MENU_ITEM, MENU_POPUP } from "./Column";
 import { NewListPopover } from "./NewListPopover";
+import {
+  isListDrag,
+  type ListDrag,
+  ListDropGap,
+  type ListSettle,
+  useListEntry,
+  useListSettle,
+} from "./useListDrag";
 
 /** Droppable ids for sidebar entries, distinct from column ids. */
 export const sidebarDropId = (listId: string) => `side:${listId}`;
+
+/** The Lists group, as a list drag names it (`data-list-group`). */
+export const SIDEBAR_LIST_GROUP = "sidebar";
 
 /** The entries' type, which the eye's row matches to line up. */
 const ENTRY_TEXT = "text-n-wide-action";
@@ -33,6 +45,8 @@ function SelectionBar({ on }: { on: boolean }) {
 /**
  * One list in the sidebar: a button that also accepts a dropped todo. While
  * a todo is dragged over it, it fills, so the drop target is unmistakable.
+ * Your lists' entries also drag, to reorder them (`reorder`): the whole
+ * entry, with no handle. The time lists' don't.
  * Your lists' entries have a right-click menu with Hide column (or Show
  * column); a hidden list's entry stays in place, muted, with its count. An
  * eye just before the count does the same: closed and always there when
@@ -53,6 +67,7 @@ function ListEntry({
   strong,
   onSelect,
   onToggleColumn,
+  reorder,
 }: {
   list: SerializedList;
   count: number;
@@ -63,12 +78,23 @@ function ListEntry({
   onSelect: (list: SerializedList) => void;
   /** Your lists only: hide its column, or show it again. */
   onToggleColumn?: (list: SerializedList) => void;
+  /** Your lists only: where it is in the group, and the drag under way. */
+  reorder?: { index: number; drag: ListDrag | null; animate: boolean };
 }) {
   const { setNodeRef, isOver, active } = useDroppable({
     id: sidebarDropId(list.id),
     data: { listId: list.id },
   });
-  const dropping = isOver && !!active;
+  const entry = useListEntry({
+    id: list.id,
+    group: SIDEBAR_LIST_GROUP,
+    index: reorder?.index ?? -1,
+    drag: reorder?.drag ?? null,
+    animate: reorder?.animate ?? false,
+    disabled: !reorder,
+  });
+  // A todo, not a list being reordered, fills the entry it's over.
+  const dropping = isOver && !!active && !isListDrag(active);
   const hidden = list.columnHidden;
   const button = (
     <button
@@ -77,6 +103,8 @@ function ListEntry({
       data-sidebar-nav
       data-column-hidden={hidden ? "" : undefined}
       aria-describedby={`sidebar-count-${list.id}`}
+      aria-keyshortcuts={reorder ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
+      {...entry.listeners}
       onClick={() => onSelect(list)}
       className={`${ENTRY} ${strong ? "font-semibold" : ""} ${
         dropping
@@ -140,7 +168,18 @@ function ListEntry({
     </span>
   ) : null;
   return (
-    <li ref={setNodeRef} className="group/entry relative">
+    <li
+      ref={(el) => {
+        setNodeRef(el);
+        entry.ref(el);
+      }}
+      data-list-entry={reorder ? list.id : undefined}
+      data-lifted={entry.lifted ? "" : undefined}
+      style={entry.style && { ...entry.style, ...entry.card }}
+      className={`group/entry relative ${
+        entry.lifted ? `${RAISED} n-lifted z-10` : ""
+      }`}
+    >
       {onToggleColumn ? (
         <ContextMenu.Root>
           <ContextMenu.Trigger>
@@ -177,7 +216,8 @@ const TIME_PLACEHOLDERS = ["Today", "This week", "Someday"];
 /**
  * The wide sidebar: the wordmark; Today, This week and Someday with counts;
  * a "Lists" heading, your lists and New list; then Done, Settings, Send
- * feedback (admins) and Keyboard shortcuts. Every list is a drop target.
+ * feedback (admins) and Keyboard shortcuts. Every list is a drop target,
+ * and your lists drag into a new order (⌥↑ and ⌥↓ from the keyboard).
  *
  * Every list you haven't hidden, and Done, are columns on the board, so an
  * entry scrolls to its column rather than opening it; a hidden list's entry
@@ -201,6 +241,9 @@ export function Sidebar({
   loading = false,
   listsFailed = false,
   keySection,
+  listDrag = null,
+  listSettle = null,
+  animate = false,
 }: {
   timeLists: SerializedList[];
   collections: SerializedList[];
@@ -230,7 +273,15 @@ export function Sidebar({
    * focused) or in it (`in`, an entry). Marks it for the outline.
    */
   keySection?: "on" | "in";
+  /** Your lists being dragged into a new order (`useListDrag`). */
+  listDrag?: ListDrag | null;
+  /** Where your lists were at a drop, to ease from. */
+  listSettle?: ListSettle | null;
+  /** False under reduced motion. */
+  animate?: boolean;
 }) {
+  const listsRef = useRef<HTMLUListElement>(null);
+  useListSettle(listsRef, listSettle);
   return (
     // Focusable itself, for the keyboard on its section. Its contents
     // scroll inside it, so the outline stays put.
@@ -277,8 +328,19 @@ export function Sidebar({
             <h2 className="mt-[1.125rem] mb-1.5 ml-2.5 text-n-wide-group-label text-n-ink-muted">
               Lists
             </h2>
-            <ul className="flex flex-col gap-0.5">
-              {collections.map((list) => (
+            {/* Your lists reorder by dragging, among themselves: the time
+                lists above are another group, so nothing lands among them. */}
+            <ul
+              ref={listsRef}
+              data-list-group={SIDEBAR_LIST_GROUP}
+              className="relative flex flex-col gap-0.5"
+            >
+              <ListDropGap
+                drag={listDrag}
+                group={SIDEBAR_LIST_GROUP}
+                animate={animate}
+              />
+              {collections.map((list, index) => (
                 <ListEntry
                   key={list.id}
                   list={list}
@@ -286,6 +348,7 @@ export function Sidebar({
                   current={selectionColumn === list.id}
                   onSelect={onCollection}
                   onToggleColumn={onToggleColumn}
+                  reorder={{ index, drag: listDrag, animate }}
                 />
               ))}
               <li>

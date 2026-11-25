@@ -32,6 +32,7 @@ const remove = vi.fn();
 const createList = vi.fn();
 const updateList = vi.fn();
 const deleteList = vi.fn();
+const reorderLists = vi.fn();
 const smartCreate = vi.fn();
 let lists = [
   makeList("list-today", "Today", "today", "a0"),
@@ -76,6 +77,7 @@ vi.mock("@/hooks/useLists", async (importOriginal) => {
     useCreateList: () => ({ mutate: createList }),
     useUpdateList: () => ({ mutate: updateList }),
     useDeleteList: () => ({ mutate: deleteList }),
+    useReorderLists: () => reorderLists,
   };
 });
 /**
@@ -4288,5 +4290,317 @@ describe("WideApp, a row that fails to draw", () => {
     await userEvent.keyboard("{ArrowDown}{Enter}");
     expect(document.querySelector("[data-detail-column]")).toBeInTheDocument();
     expect(screen.queryByText("Couldn’t show this")).toBeNull();
+  });
+});
+
+describe("WideApp reordering your lists", () => {
+  const defaults = lists;
+  const ENTRY = 36;
+  const PITCH = 38;
+  const GROUP_TOP = 300;
+  const group = () =>
+    document.querySelector<HTMLElement>(
+      '[data-list-group="sidebar"]',
+    ) as HTMLElement;
+  const entries = () => [
+    ...group().querySelectorAll<HTMLElement>(":scope > li[data-list-entry]"),
+  ];
+  const entryLi = (id: string) =>
+    group().querySelector<HTMLElement>(
+      `:scope > li[data-list-entry="${id}"]`,
+    ) as HTMLElement;
+  const entryButton = (id: string) =>
+    document.querySelector<HTMLElement>(
+      `[data-sidebar-list="${id}"]`,
+    ) as HTMLElement;
+  const gap = () => document.querySelector<HTMLElement>("[data-drop-gap]");
+  /** Saves as the server would: the next render has the new positions. */
+  const applyMoves = () =>
+    reorderLists.mockImplementation(
+      (moves: { id: string; position: string }[]) => {
+        lists = lists.map((l) => {
+          const m = moves.find((x) => x.id === l.id);
+          return m ? { ...l, position: m.position } : l;
+        });
+      },
+    );
+
+  /** jsdom has no layout: your lists' entries stacked, the group at 300. */
+  const layOut = () => {
+    group().getBoundingClientRect = () => ({ top: GROUP_TOP }) as DOMRect;
+    entries().forEach((li, i) => {
+      Object.defineProperty(li, "offsetTop", {
+        configurable: true,
+        value: i * PITCH,
+      });
+      Object.defineProperty(li, "offsetHeight", {
+        configurable: true,
+        value: ENTRY,
+      });
+    });
+  };
+  const pointerAt = (y: number) =>
+    window.dispatchEvent(new MouseEvent("pointermove", { clientY: y }));
+  /** A pointer drag of list `id`, through the board's handlers. */
+  const driveList = (id: string) => {
+    const index = entries().findIndex((li) => li.dataset.listEntry === id);
+    const ev = () =>
+      ({
+        active: {
+          id: `list:${id}`,
+          data: { current: { kind: "list", id, group: "sidebar" } },
+        },
+        over: null,
+        activatorEvent: new MouseEvent("pointerdown", {
+          clientY: GROUP_TOP + index * PITCH + 18,
+        }),
+        delta: { x: 0, y: 0 },
+      }) as never;
+    act(() => dnd.onDragStart?.(ev()));
+    return {
+      move: (y: number) => {
+        pointerAt(y);
+        act(() => dnd.onDragMove?.(ev()));
+      },
+      end: () => act(() => dnd.onDragEnd?.(ev())),
+    };
+  };
+
+  beforeEach(() => {
+    lists = [
+      ...defaults.slice(0, 3),
+      makeList("list-groceries", "Groceries", null, "a3"),
+      makeList("list-studio", "Studio", null, "a4"),
+      makeList("list-reading", "Reading", null, "a5"),
+    ];
+    todos = [makeTodo({ id: "t1", title: "Review PR", listId: "list-today" })];
+    reorderLists.mockReset();
+    update.mockReset();
+  });
+  afterEach(() => {
+    lists = defaults;
+    todos = [];
+  });
+
+  it("drags the last list to the top: the others part around a gap, no line, and the new position saves", () => {
+    const view = render(<WideApp />);
+    applyMoves();
+    layOut();
+    const drag = driveList("list-reading");
+    // Above Groceries' middle: first of your lists.
+    drag.move(GROUP_TOP + 5);
+    expect(entryLi("list-reading")).toHaveAttribute("data-lifted");
+    expect(entryLi("list-groceries").style.transform).toBe(
+      `translateY(${PITCH}px)`,
+    );
+    expect(entryLi("list-studio").style.transform).toBe(
+      `translateY(${PITCH}px)`,
+    );
+    expect(gap()).toHaveStyle({ top: "0px", height: `${ENTRY}px` });
+    expect(gap()?.querySelector("span")).toHaveClass("bg-n-brand-soft");
+    expect(document.querySelector("[data-drop-indicator]")).toBeNull();
+    // The entries it passes over aren't todo drop targets.
+    expect(entryButton("list-groceries")).not.toHaveClass("bg-n-brand");
+
+    drag.end();
+    expect(gap()).toBeNull();
+    expect(reorderLists).toHaveBeenCalledTimes(1);
+    const [moves] = reorderLists.mock.calls[0];
+    expect(moves).toEqual([
+      { id: "list-reading", position: expect.any(String) },
+    ]);
+    expect(moves[0].position < "a3").toBe(true);
+
+    // Saved: the sidebar and the board's columns both follow.
+    act(() => view.rerender(<WideApp />));
+    expect(entries().map((li) => li.dataset.listEntry)).toEqual([
+      "list-reading",
+      "list-groceries",
+      "list-studio",
+    ]);
+    expect(slides().slice(0, 6)).toEqual([
+      "list-today",
+      "list-week",
+      "list-someday",
+      "list-reading",
+      "list-groceries",
+      "list-studio",
+    ]);
+  });
+
+  it("drops between two lists, and in the last place", () => {
+    render(<WideApp />);
+    layOut();
+    let drag = driveList("list-groceries");
+    // Studio's lower half: after it, before Reading.
+    drag.move(GROUP_TOP + PITCH + 30);
+    expect(entryLi("list-studio").style.transform).toBe(
+      `translateY(-${PITCH}px)`,
+    );
+    expect(entryLi("list-reading").style.transform).toBe("");
+    drag.end();
+    let [moves] = reorderLists.mock.calls[0];
+    expect(moves[0].position > "a4" && moves[0].position < "a5").toBe(true);
+
+    drag = driveList("list-groceries");
+    // Below the last entry: last.
+    drag.move(GROUP_TOP + 3 * PITCH + 40);
+    drag.end();
+    [moves] = reorderLists.mock.calls[1];
+    expect(moves[0].position > "a5").toBe(true);
+  });
+
+  it("can't drag the time lists, or drop a list above or among them", () => {
+    render(<WideApp />);
+    layOut();
+    // The time lists' entries aren't in the group, and don't lift.
+    for (const id of ["list-today", "list-week", "list-someday"]) {
+      expect(entryButton(id).closest("[data-list-group]")).toBeNull();
+      expect(entryButton(id).closest("li")).not.toHaveAttribute(
+        "data-list-entry",
+      );
+    }
+    const today = entryButton("list-today");
+    const at = (y: number) => ({
+      clientX: 20,
+      clientY: y,
+      isPrimary: true,
+      button: 0,
+    });
+    fireEvent.pointerDown(today, at(100));
+    fireEvent.pointerMove(document, at(140));
+    fireEvent.pointerMove(document, at(400));
+    expect(document.querySelector("[data-lifted]")).toBeNull();
+    expect(gap()).toBeNull();
+    fireEvent.pointerUp(document, at(400));
+
+    // Studio dragged far above the group, over Today: first of your lists,
+    // still below Someday.
+    const drag = driveList("list-studio");
+    drag.move(40);
+    expect(gap()?.closest("[data-list-group]")).toBe(group());
+    expect(gap()).toHaveStyle({ top: "0px" });
+    drag.end();
+    const [moves] = reorderLists.mock.calls[0];
+    expect(moves[0].position < "a3").toBe(true);
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("a real pointer drag on one of your lists lifts it", () => {
+    render(<WideApp />);
+    layOut();
+    const at = (y: number) => ({
+      clientX: 20,
+      clientY: y,
+      isPrimary: true,
+      button: 0,
+    });
+    fireEvent.pointerDown(entryButton("list-studio"), at(GROUP_TOP + 50));
+    fireEvent.pointerMove(document, at(GROUP_TOP + 60));
+    expect(entryLi("list-studio")).toHaveAttribute("data-lifted");
+    expect(gap()).toBeInTheDocument();
+    // No card follows the pointer: the entry itself does.
+    expect(document.querySelector("[data-drag-preview]")).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    expect(entryLi("list-studio")).not.toHaveAttribute("data-lifted");
+    expect(reorderLists).not.toHaveBeenCalled();
+  });
+
+  it("a todo dropped on a sidebar list still moves into it, after a list drag", () => {
+    render(<WideApp />);
+    layOut();
+    const drag = driveList("list-reading");
+    drag.move(GROUP_TOP + 5);
+    drag.end();
+    const todoEvent = (over: string | null) =>
+      ({
+        active: {
+          id: "t1",
+          data: { current: { todo: todos[0] } },
+        },
+        over: over ? { id: over } : null,
+        activatorEvent: new MouseEvent("pointerdown", { clientY: 0 }),
+        delta: { x: 0, y: 0 },
+      }) as never;
+    act(() => dnd.onDragStart?.(todoEvent(null)));
+    act(() => dnd.onDragMove?.(todoEvent("side:list-studio")));
+    act(() => dnd.onDragEnd?.(todoEvent("side:list-studio")));
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update.mock.calls[0][0].input.listId).toBe("list-studio");
+  });
+
+  it("⌥↑ and ⌥↓ on an entry move its list one place, and no further than the ends", () => {
+    const view = render(<WideApp />);
+    applyMoves();
+    act(() => entryButton("list-groceries").focus());
+    fireEvent.keyDown(entryButton("list-groceries"), {
+      key: "ArrowUp",
+      altKey: true,
+    });
+    expect(reorderLists).not.toHaveBeenCalled();
+    fireEvent.keyDown(entryButton("list-groceries"), {
+      key: "ArrowDown",
+      altKey: true,
+    });
+    expect(reorderLists).toHaveBeenCalledTimes(1);
+    const [moves] = reorderLists.mock.calls[0];
+    expect(moves[0].id).toBe("list-groceries");
+    expect(moves[0].position > "a4" && moves[0].position < "a5").toBe(true);
+    act(() => view.rerender(<WideApp />));
+    expect(entries().map((li) => li.dataset.listEntry)).toEqual([
+      "list-studio",
+      "list-groceries",
+      "list-reading",
+    ]);
+    // Focus stays on the entry it moved.
+    expect(document.activeElement).toBe(entryButton("list-groceries"));
+
+    act(() => entryButton("list-reading").focus());
+    fireEvent.keyDown(entryButton("list-reading"), {
+      key: "ArrowDown",
+      altKey: true,
+    });
+    expect(reorderLists).toHaveBeenCalledTimes(1);
+    // ⌥↑ off an entry (a todo) moves no list.
+    act(() => rowButton("Review PR").focus());
+    fireEvent.keyDown(rowButton("Review PR"), { key: "ArrowUp", altKey: true });
+    expect(reorderLists).toHaveBeenCalledTimes(1);
+  });
+
+  it("the palette, opened from an entry, has Move list up and Move list down for its list", async () => {
+    render(<WideApp />);
+    act(() => entryButton("list-studio").focus());
+    fireEvent.keyDown(entryButton("list-studio"), { key: "k", metaKey: true });
+    const palette = await screen.findByRole("dialog", {
+      name: "Search and commands",
+    });
+    await userEvent.type(within(palette).getByRole("combobox"), "move list");
+    const options = within(palette)
+      .getAllByRole("option")
+      .map((o) => o.textContent);
+    expect(options).toEqual([
+      expect.stringMatching(/^Move list upStudio/),
+      expect.stringMatching(/^Move list downStudio/),
+    ]);
+    await userEvent.click(
+      within(palette).getByRole("option", { name: /^Move list up/ }),
+    );
+    const [moves] = reorderLists.mock.calls[0];
+    expect(moves[0].id).toBe("list-studio");
+    expect(moves[0].position < "a3").toBe(true);
+  });
+
+  it("the shortcuts dialog lists Move list up and down, with ⌥↑ and ⌥↓", async () => {
+    render(<WideApp />);
+    fireEvent.keyDown(window, { key: "?", shiftKey: true });
+    const dialog = await screen.findByRole("dialog", {
+      name: "Keyboard shortcuts",
+    });
+    const keysFor = (label: string) =>
+      within(dialog)
+        .getByText(label, { selector: "dt" })
+        .nextElementSibling?.textContent?.replace(/\s/g, "");
+    expect(keysFor("Move list up")).toBe("⌥↑");
+    expect(keysFor("Move list down")).toBe("⌥↓");
   });
 });
