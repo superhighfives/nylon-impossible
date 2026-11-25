@@ -99,6 +99,19 @@ describe("useReloadOnNewBuild", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it("doesn't reload while a toast offers Undo, and does once it's gone", async () => {
+    renderHook(() => useReloadOnNewBuild());
+    document.body.innerHTML =
+      "<div>Done<button data-toast-action>Undo</button></div>";
+    later();
+    await show();
+    expect(reload).not.toHaveBeenCalled();
+
+    document.body.innerHTML = "";
+    await show();
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
   it("checks at most once every 10 minutes", async () => {
     liveCommit("520071e");
     renderHook(() => useReloadOnNewBuild());

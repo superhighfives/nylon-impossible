@@ -19,14 +19,21 @@ import {
   useWebSocketConnection,
   WebSocketSyncContext,
 } from "@/hooks/useWebSocket";
+import { prefetchBoard } from "@/lib/prefetchBoard";
 
 /**
  * The app's one surface. A pathless layout, so `/`, `/today`, `/this-week`,
  * `/someday`, `/lists` and `/list/:id` (the child routes) all render this
  * same tree: moving between them changes the view, it doesn't remount the
  * board or drop the sync connection.
+ *
+ * Its loader puts your lists and todos in the query cache first, so the
+ * server renders the board, not its skeleton (#830).
  */
-export const Route = createFileRoute("/_board")({ component: App });
+export const Route = createFileRoute("/_board")({
+  loader: ({ context }) => prefetchBoard(context.queryClient),
+  component: App,
+});
 
 function SignedInContent() {
   const wsSync = useWebSocketConnection();

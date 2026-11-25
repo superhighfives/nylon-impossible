@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
 import { applyMoves, type ListMove } from "@/lib/listOrder";
 import {
@@ -18,11 +23,14 @@ import type {
 
 const LISTS_QUERY_KEY = ["lists"];
 
+/** Your lists: what `useLists` reads, and what the board's loader prefetches. */
+export const listsQuery = queryOptions<SerializedList[]>({
+  queryKey: LISTS_QUERY_KEY,
+  queryFn: () => getLists(),
+});
+
 export function useLists() {
-  return useQuery<SerializedList[]>({
-    queryKey: LISTS_QUERY_KEY,
-    queryFn: () => getLists(),
-  });
+  return useQuery(listsQuery);
 }
 
 export function useCreateList() {
