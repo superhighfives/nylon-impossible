@@ -421,6 +421,9 @@ export function WideApp({
           : rows[Math.min(index, rows.length - 1)]) ??
         rows[0] ??
         section.querySelector<HTMLElement>("[data-column-head]");
+      // An empty column takes the keyboard on its head, with nothing
+      // selected: let go of the todo it came from, as toSection does.
+      if (rows.length === 0) setSelectedId(null);
       // The board scrolls itself, smoothly; the focus only brings the row
       // into view within its column.
       target?.focus({ preventScroll: true });
