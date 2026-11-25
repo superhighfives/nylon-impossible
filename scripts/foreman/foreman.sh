@@ -2631,6 +2631,7 @@ cmd_job() { # build|triage issue: one the tick started; it reads the board itsel
   local kind="${1:?build or triage}" n="${2:?issue number}" board
   mkdir -p "$HOME_DIR"
   # Expanded now: n is local, and gone by the time EXIT runs under set -u.
+  # shellcheck disable=SC2064
   trap "rm -rf '$JOBS/$n'" EXIT
   use_token
   board=$(board_json) || die "#$n: couldn't read the board"
