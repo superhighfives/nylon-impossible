@@ -208,11 +208,11 @@ extension ContentView {
             viewModel.page = .thisWeek
             viewModel.newTaskText = "Call the dentist friday"
             focusComposer = true
-        case .detail, .notesmax, .done, .settings:
+        case .detail, .notesmax, .notescode, .notescodeedit, .done, .settings:
             Task {
                 try? await Task.sleep(for: .milliseconds(400))
                 switch route {
-                case .detail, .notesmax:
+                case .detail, .notesmax, .notescode, .notescodeedit:
                     viewModel.page = .thisWeek
                     let subtasks = subtasksByParent
                     if let todo = todos.first(where: { !(subtasks[$0.id] ?? []).isEmpty }) {

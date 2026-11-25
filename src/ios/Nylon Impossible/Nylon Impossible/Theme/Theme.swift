@@ -208,6 +208,7 @@ enum Theme {
             static let display = Style(size: 46, lineHeight: 46, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .largeTitle, tracking: -0.03)
             static let title = Style(size: 22, lineHeight: 28, weight: .semibold, variationWeight: 600, isDisplay: true, textStyle: .title2, tracking: -0.01)
             static let body = Style(size: 17, lineHeight: 22, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .body, tracking: 0)
+            static let noteBody = Style(size: 15, lineHeight: 21, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline, tracking: 0)
             static let meta = Style(size: 13, lineHeight: 18, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .footnote, tracking: 0)
             static let rowTitle = Style(size: 17, lineHeight: 23, weight: .medium, variationWeight: 500, isDisplay: false, textStyle: .body, tracking: -0.005)
             static let sheetTitle = Style(size: 32, lineHeight: 35, weight: .bold, variationWeight: 700, isDisplay: true, textStyle: .title1, tracking: -0.025)

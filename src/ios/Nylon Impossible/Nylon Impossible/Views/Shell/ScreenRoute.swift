@@ -8,8 +8,8 @@
 //    xcrun simctl launch <udid> com.superhighfives.Nylon-Impossible \
 //      -NylonScreen detail -NylonDark YES
 //
-//  Screens: today, week, someday, lists, collection, detail, notesmax (see
-//  ScreenRoute+NotesMax.swift), composer, done, settings, overnight (Today with the overnight note), link (no state of
+//  Screens: today, week, someday, lists, collection, detail, notesmax,
+//  notescode and notescodeedit (see ScreenRoute+NotesMax.swift), composer, done, settings, overnight (Today with the overnight note), link (no state of
 //  its own; pair it with `-NylonOpenURL nylon://add?list=this-week` to follow
 //  a deep link the way a tapped widget or control would. share and
 //  sharetext draw the share extension's sheet (a link, and three pasted
@@ -45,7 +45,7 @@ import SwiftUI
 
 enum ScreenRoute: String, CaseIterable {
     case today, week, someday, lists, collection, detail, composer, done, settings, overnight, link
-    case notesmax
+    case notesmax, notescode, notescodeedit
     case share, sharetext, widgets
     case signin, loading, empty, syncerror, perf
     /// The toast's yellow look and its red failure look, held on screen.
@@ -254,6 +254,7 @@ enum SampleData {
         case .empty: seedEmptyToday(container.mainContext)
         case .perf: seedMany(container.mainContext)
         case .notesmax: seed(container.mainContext); fillNotes(container.mainContext)
+        case .notescode, .notescodeedit: seed(container.mainContext); codeNotes(container.mainContext)
         default: seed(container.mainContext)
         }
         return container

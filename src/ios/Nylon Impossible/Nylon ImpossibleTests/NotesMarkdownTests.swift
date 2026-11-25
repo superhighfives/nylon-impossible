@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import Testing
 @testable import Nylon_Impossible
 
@@ -72,7 +73,7 @@ struct NotesMarkdownTests {
         #expect(links(text) == [URL(string: "https://example.com/a"), URL(string: "https://www.example.com")])
     }
 
-    @Test("a heading is bold body text, and #### isn't one")
+    @Test("a heading is a block of its own, and #### isn't one")
     func heading() throws {
         let blocks = NotesMarkdown.blocks("## Packing\n#### Not a heading")
         guard case let .heading(text) = blocks.first?.kind else {
@@ -80,8 +81,24 @@ struct NotesMarkdownTests {
             return
         }
         #expect(plain(text) == "Packing")
-        #expect(isStrong(text, "Packing"))
         #expect(paragraph(blocks.last).map(plain) == "#### Not a heading")
+    }
+
+    @Test("a heading draws semibold, not bold, and its inline bold stays bold (#835)")
+    @MainActor
+    func headingWeight() throws {
+        guard case let .heading(text) = NotesMarkdown.blocks("## Packing **list**").first?.kind else {
+            Issue.record("expected a heading")
+            return
+        }
+        #expect(!isStrong(text, "Packing"))
+        #expect(isStrong(text, "list"))
+        let semibold = Font.system(size: 15).weight(.semibold)
+        let drawn = NotesMarkdownView.heading(text, font: semibold)
+        let packing = try #require(drawn.range(of: "Packing"))
+        let list = try #require(drawn.range(of: "list"))
+        #expect(drawn[packing].runs.allSatisfy { $0.font == semibold })
+        #expect(drawn[list].runs.allSatisfy { $0.font == nil })
     }
 
     @Test("single newlines are kept as line breaks, and blank lines as gaps")

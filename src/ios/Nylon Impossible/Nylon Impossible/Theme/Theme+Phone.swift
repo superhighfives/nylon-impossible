@@ -23,8 +23,11 @@ extension Theme.Fonts {
         static let listName = Phone.title
         /// A todo's title in a row.
         static let rowTitle = Phone.rowTitle
-        /// Body copy: notes, settings rows, the composer.
+        /// Body copy: settings rows, the composer.
         static let body = Phone.body
+        /// A todo's notes in the detail, drawn and editing: a step under
+        /// the title, so they read as supporting detail.
+        static let notes = Phone.noteBody
         /// Switcher titles and quiet buttons ("‹ Lists", "Delete").
         static let control = Phone.control
         /// The masthead's subline ("Sunday, October 18 · 4 todos").
