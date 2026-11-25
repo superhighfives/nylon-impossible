@@ -2630,7 +2630,8 @@ cmd_build() {
 cmd_job() { # build|triage issue: one the tick started; it reads the board itself, since the tick's is old by now
   local kind="${1:?build or triage}" n="${2:?issue number}" board
   mkdir -p "$HOME_DIR"
-  trap 'rm -rf "$JOBS/$n"' EXIT
+  # Expanded now: n is local, and gone by the time EXIT runs under set -u.
+  trap "rm -rf '$JOBS/$n'" EXIT
   use_token
   board=$(board_json) || die "#$n: couldn't read the board"
   spec_column "$board"
