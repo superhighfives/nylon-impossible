@@ -10,7 +10,8 @@ Clerk, Google) and the launch-day steps.
 - 2026-11-24: Launch on web, iOS and Mac. Gmail follows later, as an unlisted
   add-on first, then the Workspace Marketplace if review allows.
 - 2026-11-24: Nylon is free. The `plan` field stays and gates nothing.
-- 2026-11-24: Sign-up is open to everyone.
+- 2026-11-24: Sign-up is open to everyone from launch day. Until then,
+  Clerk stays in Waitlist mode, and the owner invites the waitlist at launch.
 - 2026-11-24: Support is GitHub issues. The foreman acts only on what the
   owner labels (see "Support").
 
@@ -18,13 +19,17 @@ Clerk, Google) and the launch-day steps.
 
 ### Accounts and auth
 
-- [ ] Clerk production instance: confirm sign-up is open (no allowlist,
-      no waitlist mode) and note which social providers are on.
-- [ ] Sign in with Apple. If Clerk offers Google or another third-party
-      login on iOS, App Store guideline 4.8 requires an equivalent option
-      such as Sign in with Apple. iOS uses Clerk's `AuthView`
-      (`src/ios/Nylon Impossible/Nylon Impossible/Views/Auth/SignInView.swift`),
-      so enable Apple in Clerk and test it on iOS and on the Mac sign-in.
+Clerk production, checked 2026-11-24: access mode is Waitlist (sign-ups
+off), with 25 people waiting. Social sign-in is GitHub and Google. Legacy
+bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
+
+- [ ] Sign in with Apple. iOS offers Google and GitHub through Clerk's
+      `AuthView`, so App Store guideline 4.8 requires an equivalent option.
+      Decision (2026-11-24): add Apple as Clerk's third social connection,
+      which the free plan allows. Test it on iOS and on the Mac sign-in.
+- [ ] Update bot protection to "Challenge suspicious sign-ups" (Clerk
+      recommends it in place of the legacy protection), and consider
+      blocking disposable email addresses.
 - [ ] Clerk production limits and cost at the expected number of users.
 
 ### App Store Connect (iOS and Mac, one Universal Purchase record)
@@ -80,11 +85,14 @@ Connect by hand unless we add `deliver` metadata later.
 
 ## Launch day
 
-1. Merge the launch-day rules PR (it changes `CLAUDE.md` from "unreleased"
-   to "released").
+1. Merge the launch-day rules PR, #841 (it changes `CLAUDE.md` from
+   "unreleased" to "released").
 2. Submit the iOS and Mac builds for review from App Store Connect.
 3. When they're approved, release them by hand.
-4. Watch Sentry and the Cloudflare dashboards for the first day.
+4. In Clerk production, set the access mode to Open.
+5. Invite the waitlist from Clerk's Waitlist page. Clerk sends each person
+   an invitation email, so the owner does this step.
+6. Watch Sentry and the Cloudflare dashboards for the first day.
 
 ## Later
 
