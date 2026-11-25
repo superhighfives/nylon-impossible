@@ -3311,7 +3311,12 @@ describe("WideApp drag and drop", () => {
     it("saves nothing released where it started, over nothing, or cancelled", () => {
       render(<WideApp />);
       layOut("Today");
+      // Let go before the first move: the gap it lifted with is its own slot.
       let drag = drive(input, "t2");
+      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+      drag.end("col:list-today", 0);
+      expect(gaps()).toEqual([]);
+      drag = drive(input, "t2");
       drag.move("col:list-today", 60);
       drag.move("col:list-today", 2);
       drag.end("col:list-today", 2);
