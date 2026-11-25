@@ -27,6 +27,15 @@ bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
       `AuthView`, so App Store guideline 4.8 requires an equivalent option.
       Decision (2026-11-24): add Apple as Clerk's third social connection,
       which the free plan allows. Test it on iOS and on the Mac sign-in.
+      In the repo (#848): both app targets carry the Sign in with Apple
+      entitlement (not Share or Widget), and the Mac sign-in has Continue
+      with Apple first (Apple, GitHub, Google, as iOS's `AuthView` sorts
+      them), using Clerk's native `signInWithApple`. Outside the repo: the
+      capability on the App ID, the iOS and Mac App Store app profiles
+      regenerated with their secrets, Clerk production's Native
+      applications entry and Apple connection (done 2026-11-24); Apple on
+      in Clerk development too. Tick this once Apple sign-in works on an
+      iPhone and on the Mac through TestFlight, and on the web.
 - [ ] Update bot protection to "Challenge suspicious sign-ups" (Clerk
       recommends it in place of the legacy protection), and consider
       blocking disposable email addresses.
