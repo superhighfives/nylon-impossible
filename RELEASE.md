@@ -64,23 +64,29 @@ Connect by hand unless we add `deliver` metadata later.
       files use `UserDefaults`, a required-reason API. Add a manifest to the
       app, the widget and the share extension. App Store Connect rejects a
       submission without the declaration (ITMS-91053).
-- [ ] App privacy labels. Collected and linked to the user: email address
-      (Clerk), user content (todos, lists, notes, links). Not linked:
-      crash data and diagnostics (Sentry). No tracking. Check the Clerk and
-      Sentry SDK manifests for anything else.
-- [ ] Name, subtitle, promotional text, description, keywords, category.
+- [x] App privacy labels, published 2026-11-24. Collected, linked to the
+      user, for app functionality, no tracking: name and email address
+      (Clerk), user ID, other user content (todos, lists, notes, links),
+      crash data and performance data (Sentry). Sentry's data counts as
+      linked because the app sets the Sentry user
+      (`SessionLifecycle.swift`). Update the labels if that changes.
+- [x] Name, subtitle, promotional text, description, keywords, category,
+      on the iOS and Mac versions (2026-11-24).
+- [x] Release: manual on both versions, so approval doesn't publish them.
 - [ ] Screenshots for each required iPhone and Mac size. The app is
       iPhone only (`TARGETED_DEVICE_FAMILY = 1`), so no iPad shots. The
       `marketing-screenshots` pipeline can produce them; #611 (iOS
       captures on the self-hosted Mac) is blocked.
-- [ ] Support URL: the GitHub issues page, or a page on
-      nylonimpossible.com that links to it.
-- [ ] Privacy policy URL: https://nylonimpossible.com/privacy.
-- [ ] Age rating questionnaire.
+- [x] Support URL: the GitHub issues page. Marketing URL:
+      https://nylonimpossible.com.
+- [x] Privacy policy URL: https://nylonimpossible.com/privacy.
+- [x] Age rating: 4+ (every answer "None" or "No"; links open in the
+      system browser, and todos aren't shared with other people).
+- [ ] Review contact and copyright line (the owner's details).
 - [ ] Review notes and a demo account that App Review can sign in with.
       Seed it with lists and todos so every screen has content.
 - [ ] Export compliance (HTTPS only: standard exemption).
-- [ ] Pricing: free, all territories.
+- [x] Pricing: free, all 175 countries or regions, and future ones.
 
 ### App Store listing (draft)
 
@@ -88,10 +94,10 @@ Built from the landing page's copy (`src/web/src/components/LandingPage.tsx`),
 so it says what the site says. Edit freely; the owner's version is the one
 that ships. Limits are App Store Connect's.
 
-- **Name (30):** Nylon if the store allows it, otherwise Nylon Impossible
-  (owner, 2026-11-24: "nylonimpossible.com is just the domain"). The home
-  screen says "Nylon" either way (`CFBundleDisplayName`).
-- **Primary language:** English (Australia).
+- **Name (30):** Nylon, in English (Australia), the primary language.
+  English (U.S.) still says Nylon Impossible: the store refused "Nylon"
+  there (2026-11-24). The home screen says "Nylon"
+  (`CFBundleDisplayName`).
 - **Subtitle (30):** A todo list shaped by time
 - **Promotional text (170):** Today, this week, someday. Things you don't
   get to move along on their own, and done means gone. The same on the
