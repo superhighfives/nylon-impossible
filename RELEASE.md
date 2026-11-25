@@ -20,22 +20,34 @@ Clerk, Google) and the launch-day steps.
 ### Accounts and auth
 
 Clerk production, checked 2026-11-24: access mode is Waitlist (sign-ups
-off), with 25 people waiting. Social sign-in is GitHub and Google. Legacy
+off), with 25 people waiting. Social sign-in is GitHub and Google (Apple
+added the same day, below). Legacy
 bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
 
 - [ ] Sign in with Apple. iOS offers Google and GitHub through Clerk's
       `AuthView`, so App Store guideline 4.8 requires an equivalent option.
       Decision (2026-11-24): add Apple as Clerk's third social connection,
       which the free plan allows. The apps use Clerk's native flow, which
-      needs no Services ID or key (those are for Apple sign-in on the web):
-      - [ ] Clerk production: register the app (App ID prefix and bundle
-            ID) under Native applications, and enable the Apple connection.
-      - [ ] Apple: add the Sign in with Apple capability to the App ID, then
+      needs no Services ID or key. The web needs both: Clerk's sign-in
+      modal shows every enabled connection, and someone who signs up on
+      iPhone with Apple has no other way into the web app.
+      - [x] Clerk production: register the app (App ID prefix and bundle
+            ID) under Native applications (2026-11-24).
+      - [x] Apple: add the Sign in with Apple capability to the App ID, then
             regenerate the iOS and Mac App Store profiles and update their
-            secrets. CI signs with those profiles, so do this before the
-            code change merges.
+            secrets (2026-11-24). CI signs with those profiles. The next
+            `ios-deploy` run proves it.
+      - [x] Apple, for the web: Services ID
+            `com.superhighfives.Nylon-Impossible.web` (return URL
+            `https://clerk.nylonimpossible.com/v1/oauth_callback`), key
+            `5L5V9TNK55`, and Clerk's bounce address registered with the
+            private email relay (2026-11-24). Apple shows the key file
+            once; the owner keeps it.
+      - [x] Clerk production: enable the Apple connection with those
+            credentials (2026-11-24).
       - [ ] Code: the entitlement on iOS and macOS, and an Apple button in
             `MacSignInView` (iOS gets it from `AuthView`). Test on both.
+      - [ ] Sign in with Apple once on the web and once in each app.
 - [ ] Update bot protection to "Challenge suspicious sign-ups" (Clerk
       recommends it in place of the legacy protection), and consider
       blocking disposable email addresses.
@@ -76,16 +88,17 @@ Built from the landing page's copy (`src/web/src/components/LandingPage.tsx`),
 so it says what the site says. Edit freely; the owner's version is the one
 that ships. Limits are App Store Connect's.
 
-- **Name (30):** Nylon Impossible. The home screen still says "Nylon"
-  (`CFBundleDisplayName`). Plain "Nylon" may be taken on the store.
+- **Name (30):** Nylon if the store allows it, otherwise Nylon Impossible
+  (owner, 2026-11-24: "nylonimpossible.com is just the domain"). The home
+  screen says "Nylon" either way (`CFBundleDisplayName`).
+- **Primary language:** English (Australia).
 - **Subtitle (30):** A todo list shaped by time
 - **Promotional text (170):** Today, this week, someday. Things you don't
   get to move along on their own, and done means gone. The same on the
   web, iPhone and Mac.
 - **Keywords (100):** todo,to-do,list,today,this week,someday,planner,
-  reminders,checklist,menu bar,widget. "tasks" would help search, but
-  it's a "Not" word in PRINCIPLES.md's Vocabulary, so it's left out
-  unless the owner says keywords don't count as UI copy.
+  reminders,checklist,menu bar,widget. No "tasks": it's a "Not" word in
+  PRINCIPLES.md's Vocabulary (owner, 2026-11-24).
 - **Category:** Productivity (matches `LSApplicationCategoryType`).
 - **Description (4000):**
 
