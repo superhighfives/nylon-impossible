@@ -1619,7 +1619,7 @@ fix_shots_run() { # pr issue branch plan-file -> fix_shots' work, inside the lan
     sha=$before; [ "$side" = after ] && sha=$after
     (cd "$dir" && rm -rf src/ios && git checkout -q "$sha" -- src/ios && cd src/marketing \
       && FIX_SHOTS_DERIVED_DATA_IOS="$(derived_for fix-shots-ios)" FIX_SHOTS_DERIVED_DATA_MAC="$(derived_for fix-shots-mac)" \
-         perl -e 'alarm shift; exec @ARGV' "$SHOTS_TIMEOUT" \
+         env -u GH_TOKEN -u GITHUB_TOKEN perl -e 'alarm shift; exec @ARGV' "$SHOTS_TIMEOUT" \
            ./node_modules/.bin/tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$imgs") >>"$out" 2>&1 \
       || echo "capture --as $side failed" >>"$out"
   done
@@ -2005,8 +2005,9 @@ run_ui_tests() { # dir derived-data bundle log -> xcodebuild's exit status
   local udid
   udid=$(ui_test_simulator) || { echo "couldn't find or create $UI_TEST_SIM" >>"$4"; return 1; }
   # No NYLON_SLOW_SIMULATOR (nor CI): the timing checks run in full here.
+  # Nor the foreman's token: build phases and tests are the commit's code.
   (cd "$1/src/ios/Nylon Impossible" \
-    && env -u TEST_RUNNER_NYLON_SLOW_SIMULATOR -u TEST_RUNNER_CI -u NYLON_SLOW_SIMULATOR \
+    && env -u GH_TOKEN -u GITHUB_TOKEN -u TEST_RUNNER_NYLON_SLOW_SIMULATOR -u TEST_RUNNER_CI -u NYLON_SLOW_SIMULATOR \
          perl -e 'alarm shift; exec @ARGV' "$IOS_TIMEOUT" \
          xcodebuild test -project "Nylon Impossible.xcodeproj" -scheme "Nylon Impossible UI Tests" \
            -destination "platform=iOS Simulator,id=$udid" -derivedDataPath "$2" -resultBundlePath "$3" \
@@ -2032,7 +2033,9 @@ ui_test_job() { # sha pr|main [force] -> runs the UI tests on the commit and pos
   printf '\n==== %s: UI tests of %s (%s)\n' "$(date '+%F %T')" "$sha" "$on" >>"$log"
   if ! lane_checkout "$sha" >>"$log" 2>&1; then
     log "couldn't check out ${sha:0:7} for the UI tests"
-    post_status "$sha" error "Couldn't check it out on the Mac mini; the next tick tries again" || true
+    # Pending, not error: error is final, and only a head without a final
+    # status is queued again.
+    post_status "$sha" pending "Couldn't check it out on the Mac mini; the next tick tries again" || true
     return 0
   fi
   post_status "$sha" pending "Running on the Mac mini" || return 0
@@ -2052,7 +2055,10 @@ ui_test_job() { # sha pr|main [force] -> runs the UI tests on the commit and pos
   log "UI tests of ${sha:0:7} ($on): $state, $desc ($took min)"
   event ui_test "" "$([ "$on" = main ] || echo "$on")" "${sha:0:7}: $state, $desc"
   if [ "$on" = main ]; then
-    printf '%s\n%s\n' "$sha" "$(ios_revision "$sha" ios)" > "$IOS/ui-test-main"
+    # Only main's head: `foreman ui-test <older sha>` mustn't make the next tick rerun it.
+    if [ "$sha" = "$(git -C "$CLONE" rev-parse origin/main 2>/dev/null)" ]; then
+      printf '%s\n%s\n' "$sha" "$(ios_revision "$sha" ios)" > "$IOS/ui-test-main"
+    fi
     if [ "$state" != success ]; then
       routine_event ui-test failed "main at ${sha:0:7}: $desc"
       alert "main's iOS UI tests failed at ${sha:0:7}: $desc. Log: $log"
@@ -2075,7 +2081,7 @@ ui_test_job() { # sha pr|main [force] -> runs the UI tests on the commit and pos
 
 run_capture() { # dir log -> generate.ts's iOS captures in the lane's checkout; its exit status
   (cd "$1/src/marketing" && MARKETING_DERIVED_DATA="$(derived_for marketing)" \
-    perl -e 'alarm shift; exec @ARGV' "$IOS_TIMEOUT" \
+    env -u GH_TOKEN -u GITHUB_TOKEN perl -e 'alarm shift; exec @ARGV' "$IOS_TIMEOUT" \
     ./node_modules/.bin/tsx generate.ts --capture-ios --capture-parity-ios) >>"$2" 2>&1
 }
 

@@ -2073,6 +2073,20 @@ gh() { echo "gh $*" >> "$CALLS"; case "$1 $2" in "pr view") echo "sha-newer" ;; 
 ui_test_job sha11 11
 expect "a PR that moved on isn't tested, and gets no status" "no no" "$(called 'statuses/') $(called 'worktree')"
 
+# A checkout that fails leaves the head pending, which the queue picks up again.
+: > "$CALLS"
+gh() { echo "gh $*" >> "$CALLS"; return 0; }
+eval "$(declare -f lane_checkout | sed '1s/^/real_/')"
+lane_checkout() { return 1; }
+ui_test_job sha12 main
+expect "a failed checkout stays pending, for the next tick" "sha12 pending Couldn't check it out on the Mac mini; the next tick tries again" "$(statuses)"
+expect "and its head is queued again" $'12\tsha12\trun\tpending' \
+  "$(ui_test_candidates <<<'[{"number":12,"headRefOid":"sha12","author":{"login":"nylon-foreman"},"isDraft":false,"isCrossRepository":false,"statusCheckRollup":[{"context":"foreman/ios-ui-test","state":"PENDING"}]}]')"
+eval "$(declare -f real_lane_checkout | sed '1s/^real_//')"
+
+# Xcode and the capture scripts are the commit's code: they never see the token.
+expect "the UI tests, captures and fix-shots run without the token" 3 "$(grep -c 'env -u GH_TOKEN -u GITHUB_TOKEN' "$here/foreman.sh")"
+
 # The status's words, from xcresulttool's summary.json.
 verdict() { ui_test_verdict "$1" <<<"$2" | tr '\t' '|'; }
 expect "all passed"  "success|All 42 passed" "$(verdict 0 '{"result":"Passed","passedTests":42,"failedTests":0,"skippedTests":0,"testFailures":[]}')"

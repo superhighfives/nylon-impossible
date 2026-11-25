@@ -240,6 +240,14 @@ the `xcodebuild` invocation and `node_modules` all come from there. Only the
 **iOS paths** come from the commit under test: `src/ios`,
 `src/shared/src/todo-date-fixtures.json` and `src/shared/design`, the list
 `ios-test.yml` watches.
+- A PR's iOS paths replace `main`'s whole, so on a branch that's behind,
+  `main`'s newer iOS changes aren't in the tested tree, and the result may
+  not match the merge. The gate doesn't require an up-to-date branch;
+  rebasing the PR tests it again.
+- Xcode, `generate.ts` and `fix-shots.ts` run without `GH_TOKEN` or
+  `GITHUB_TOKEN`: build phases and tests are the commit's code. That keeps
+  the token out of their environment, not out of the machine; the trust
+  rule above is what keeps strangers' code off it.
 
 **Disk.** Each kind keeps its own DerivedData in `~/.foreman/derived/`
 (`ui-test`, `marketing`, `fix-shots-ios`, `fix-shots-mac`), so the second
@@ -270,6 +278,8 @@ build is incremental. Nothing goes to `/tmp`.
   last run gets "No iOS change since <sha>".
 - A newer head replaces an older one: the job checks the PR's head before it
   starts, and a superseded one never runs.
+- If the lane can't check the commit out, the status stays `pending`
+  ("Couldn't check it out…"), so the next tick queues it again.
 - The tests run without `NYLON_SLOW_SIMULATOR`, so the timing checks
   (`testDoneHoldsInPlaceThenLeavesWithUndo`, `testDoneUnderLoad`, the
   accessibility audits' -56) run in full here. Only the hosted

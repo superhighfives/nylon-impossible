@@ -53,6 +53,11 @@ publishing with a notice, and the foreman's dispatch publishes once both
 halves are fresh. Otherwise it publishes, with a warning if the iOS set is
 an older revision's.
 
+So if the mini is off, or `captures` is turned off (`routines` skill), the
+web shots don't publish after a deploy that changed the app, until someone
+dispatches `marketing.yml` by hand (Actions → Marketing → Run workflow, with
+`strict` off, to publish over the older iOS set).
+
 To recapture by hand, on the mini: `foreman captures --force`. A hand
 dispatch of `marketing.yml` runs `strict` by default, so a fallback fails
 rather than passing quietly.
