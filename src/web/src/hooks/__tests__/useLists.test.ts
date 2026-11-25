@@ -261,4 +261,31 @@ describe("useReorderLists", () => {
     expect(error).toHaveBeenCalledWith("Couldn’t save the new order");
     error.mockRestore();
   });
+
+  it("a failed save doesn't undo a later reorder of another list", async () => {
+    const { queryClient, Wrapper } = createWrapper();
+    queryClient.setQueryData<SerializedList[]>(["lists"], three());
+    let fail: (e: Error) => void = () => {};
+    mockUpdateList
+      .mockReturnValueOnce(
+        new Promise((_, reject) => {
+          fail = reject;
+        }),
+      )
+      .mockResolvedValueOnce(makeList());
+    mockGetLists.mockReturnValue(new Promise(() => {}));
+    const error = vi.spyOn(toast, "error");
+    const { result } = renderHook(() => useReorderLists(), {
+      wrapper: Wrapper,
+    });
+
+    act(() => result.current([{ id: "c", position: "Zz" }]));
+    act(() => result.current([{ id: "a", position: "a3" }]));
+    expect(order(queryClient.getQueryData(["lists"]))).toEqual(["c", "b", "a"]);
+    act(() => fail(new Error("boom")));
+    await waitFor(() => expect(error).toHaveBeenCalled());
+    // c goes back to last; a stays where the second reorder put it.
+    expect(order(queryClient.getQueryData(["lists"]))).toEqual(["b", "c", "a"]);
+    error.mockRestore();
+  });
 });

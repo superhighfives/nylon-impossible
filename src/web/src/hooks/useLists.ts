@@ -167,21 +167,24 @@ export function useReorderLists() {
 
   const mutation = useMutation({
     mutationKey: LISTS_QUERY_KEY,
-    mutationFn: ({
-      moves,
-    }: {
-      moves: ListMove[];
-      previous?: SerializedList[];
-    }) =>
+    mutationFn: ({ moves }: { moves: ListMove[]; undo: ListMove[] }) =>
       Promise.all(
         moves.map((m) =>
           updateList({ data: { id: m.id, input: { position: m.position } } }),
         ),
       ),
-    onError: (err, { previous }) => {
+    onError: (err, { moves, undo }) => {
       Sentry.captureException(err, { tags: { mutation: "reorderLists" } });
       toast.error(messageFromError(err, "Couldn’t save the new order"));
-      if (previous) queryClient.setQueryData(LISTS_QUERY_KEY, previous);
+      // Only this save's lists go back, and only those no later reorder has
+      // moved since, so a quick second reorder keeps its order.
+      const current =
+        queryClient.getQueryData<SerializedList[]>(LISTS_QUERY_KEY);
+      if (!current) return;
+      const ours = new Map(moves.map((m) => [m.id, m.position]));
+      const pos = new Map(current.map((l) => [l.id, l.position]));
+      const back = undo.filter((m) => pos.get(m.id) === ours.get(m.id));
+      queryClient.setQueryData(LISTS_QUERY_KEY, applyMoves(current, back));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
@@ -194,11 +197,16 @@ export function useReorderLists() {
     // A refetch already on its way would land the old order over this one.
     void queryClient.cancelQueries({ queryKey: LISTS_QUERY_KEY });
     const previous =
-      queryClient.getQueryData<SerializedList[]>(LISTS_QUERY_KEY);
-    if (previous) {
+      queryClient.getQueryData<SerializedList[]>(LISTS_QUERY_KEY) ?? [];
+    const was = new Map(previous.map((l) => [l.id, l.position]));
+    const undo = moves.flatMap((m) => {
+      const position = was.get(m.id);
+      return position === undefined ? [] : [{ id: m.id, position }];
+    });
+    if (previous.length > 0) {
       queryClient.setQueryData(LISTS_QUERY_KEY, applyMoves(previous, moves));
     }
-    mutation.mutate({ moves, previous });
+    mutation.mutate({ moves, undo });
   };
 }
 
