@@ -42,13 +42,18 @@ Connect by hand unless we add `deliver` metadata later.
 - [x] Privacy manifest. The app, the widget and the share extension each
       have a `PrivacyInfo.xcprivacy` declaring their `UserDefaults` use
       (#847), so App Store Connect doesn't reject the upload (ITMS-91053).
-      `PrivacyManifestTests` checks the built bundles.
-- [ ] App privacy labels. Collected and linked to the user: email address
-      (Clerk), user content (todos, lists, notes, links). Not linked:
-      crash data and diagnostics (Sentry). No tracking. Check the Clerk and
-      Sentry SDK manifests for anything else. Copy the labels from the
-      privacy report, which merges the app's manifest with the SDKs': in
-      Xcode, Organizer → right-click the archive → Generate Privacy Report.
+      The app's also lists the data it collects, matching the privacy
+      labels (#856). `PrivacyManifestTests` checks the built bundles.
+- [ ] App privacy labels, matching the app's privacy manifest. Collected
+      and linked to the user, for app functionality: name (the Clerk
+      account's first and last name, shown in the account sheet), email
+      address (Clerk), user ID (Clerk, also sent to Sentry), other user
+      content (todos, lists, notes, links), crash data and performance data
+      (Sentry, linked because `SessionLifecycle` sets the Sentry user). No
+      tracking. Check the Clerk and Sentry SDK manifests for anything else.
+      Copy the labels from the privacy report, which merges the app's
+      manifest with the SDKs': in Xcode, Organizer → right-click the
+      archive → Generate Privacy Report.
 - [ ] Name, subtitle, promotional text, description, keywords, category.
 - [ ] Screenshots for each required iPhone and Mac size. The app is
       iPhone only (`TARGETED_DEVICE_FAMILY = 1`), so no iPad shots. The
