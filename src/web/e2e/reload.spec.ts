@@ -15,7 +15,6 @@ test("the server renders the board with your todos, not the skeleton", async ({
     expect(response.ok()).toBe(true);
     const html = await response.text();
     expect(html, `${path}'s first HTML`).toContain(TITLE);
-    expect(html, `${path}'s first HTML`).toContain(`data-${layout}-ready`);
     expect(html, `${path}'s first HTML`).not.toContain("data-skeleton-rows");
   }
 

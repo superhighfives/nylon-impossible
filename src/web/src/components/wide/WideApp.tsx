@@ -7,6 +7,7 @@ import {
   EMPTY_NEXT,
   waitingIn,
 } from "@nylon-impossible/shared";
+import { useHydrated } from "@tanstack/react-router";
 import { generateKeyBetween } from "fractional-indexing";
 import { List } from "lucide-react";
 import {
@@ -192,6 +193,10 @@ export function WideApp({
     refetchLists,
     listsFetching,
   } = useBoardData();
+  // What the smoke suite and the marketing captures wait for: loaded and
+  // hydrated. The server renders the board with its data (#830), so without
+  // the second they'd act before the rows answer.
+  const hydrated = useHydrated();
   const createList = useCreateList();
   const updateList = useUpdateList();
   const reorderLists = useReorderLists();
@@ -1240,7 +1245,7 @@ export function WideApp({
 
   return (
     <div
-      data-wide-ready={loading ? undefined : ""}
+      data-wide-ready={loading || !hydrated ? undefined : ""}
       ref={boardRoot}
       aria-busy={loading || undefined}
       className="group/board fixed inset-x-0 top-[var(--n-offline-inset,0px)] bottom-0 z-10 flex bg-n-canvas pb-[env(safe-area-inset-bottom,0px)] font-n-text text-n-ink antialiased"
