@@ -15,6 +15,7 @@ import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
 import { DropDot } from "./useBoardDrag";
+import { isListDrag } from "./useListDrag";
 
 /**
  * The rows beside the open sheet: all but the selected one recede, and the
@@ -479,10 +480,16 @@ export function Column({
   /** The keyboard is on Add, not typing: the row keyboard bar beside it. */
   addSelected?: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({
+  const {
+    setNodeRef,
+    isOver: over,
+    active,
+  } = useDroppable({
     id: columnDropId(listId),
     data: { listId },
   });
+  // A list being reordered in the sidebar drops nowhere on the board.
+  const isOver = over && !isListDrag(active);
   const headingId = `column-${listId}-title`;
   const listRef = useRef<HTMLUListElement>(null);
   const settled = useRef<Settle | null>(null);

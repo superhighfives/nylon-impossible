@@ -36,7 +36,12 @@ import {
 import { SettingsScreen } from "@/components/phone/SettingsScreen";
 import { useBoardData } from "@/components/phone/useBoardData";
 import { useHints } from "@/hooks/useHints";
-import { useCreateList, useUpdateList } from "@/hooks/useLists";
+import {
+  useCreateList,
+  useReorderLists,
+  useUpdateList,
+} from "@/hooks/useLists";
+import { stepMoves } from "@/lib/listOrder";
 import { messageFromError, toast } from "@/lib/toast";
 import type { SerializedList, TodoWithUrls } from "@/types/database";
 import { FeedbackDialog, useCanSendFeedback } from "../FeedbackDialog";
@@ -89,6 +94,7 @@ import { DragPreview, useBoardDrag } from "./useBoardDrag";
 import { useBoardKeys } from "./useBoardKeys";
 import { useGoSequence } from "./useGoSequence";
 import { useKeyboardModality } from "./useKeyboardModality";
+import { routeDrag, useListDrag } from "./useListDrag";
 
 /** The time columns' names, known before the lists arrive. */
 const TIME_TITLES: Record<BoardTimeKind, string> = {
@@ -168,7 +174,7 @@ export function WideApp({
     lists,
     todos,
     byKind,
-    collections,
+    collections: savedCollections,
     listName,
     listInSentence,
     actions,
@@ -188,6 +194,13 @@ export function WideApp({
   } = useBoardData();
   const createList = useCreateList();
   const updateList = useUpdateList();
+  const reorderLists = useReorderLists();
+  const listDrag = useListDrag({
+    lists: savedCollections,
+    onMove: reorderLists,
+  });
+  /** Your lists, in the sidebar's order: a just-dropped one until it's saved. */
+  const collections = listDrag.ordered(savedCollections);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   /** The column last gone to or selected in, which the URL names. */
@@ -783,6 +796,39 @@ export function WideApp({
     goTo(listId);
   };
 
+  // --- Reordering your lists -----------------------------------------------
+  // By dragging an entry in the sidebar (`listDrag`), or one place at a time
+  // with ⌥↑ / ⌥↓ on an entry and the palette's Move list up / down.
+
+  /** Your list whose sidebar entry has focus, if one has. */
+  const focusedEntryList = () => {
+    const id = document.activeElement
+      ?.closest<HTMLElement>("[data-sidebar-list]")
+      ?.getAttribute("data-sidebar-list");
+    return collections.find((l) => l.id === id) ?? null;
+  };
+  /** A list moved from its entry keeps focus there once it's re-rendered. */
+  const entryFocus = useRef<string | null>(null);
+  useEffect(() => {
+    const id = entryFocus.current;
+    if (!id) return;
+    entryFocus.current = null;
+    const entry = sidebar()?.querySelector<HTMLElement>(
+      `[data-sidebar-list="${CSS.escape(id)}"]`,
+    );
+    if (entry && document.activeElement !== entry) {
+      entry.focus({ preventScroll: true });
+    }
+  });
+
+  /** One place up (-1) or down (1); nothing past the first or last. */
+  const stepList = (list: SerializedList, delta: 1 | -1) => {
+    const moves = stepMoves(collections, list.id, delta);
+    if (moves.length === 0) return;
+    if (focusedEntryList()?.id === list.id) entryFocus.current = list.id;
+    reorderLists(moves);
+  };
+
   // --- Keyboard -------------------------------------------------------------
   // Every key is a command in `commands.ts`, run against this board.
 
@@ -835,13 +881,22 @@ export function WideApp({
     },
     openMoveTo: (todo) => setPalette({ mode: "move", todoId: todo.id }),
     jump,
+    moveList: (delta) => {
+      const list = focusedEntryList();
+      if (list) stepList(list, delta);
+    },
     startGo: go.start,
     newTodo: () => {
       quickAddFrom.current = document.activeElement;
       setQuickAdd(true);
     },
     newList: () => setNewListOpen(true),
-    togglePalette: () => setPalette((p) => (p ? null : { mode: "all" })),
+    togglePalette: () => {
+      // Opened from one of your lists' entries, its Move list up / down are
+      // for that list.
+      const listId = focusedEntryList()?.id;
+      setPalette((p) => (p ? null : { mode: "all", listId }));
+    },
     goToList: () => setPalette({ mode: "lists" }),
     toggleShortcuts: () => setShortcuts((s) => !s),
     feedback: () => {
@@ -891,6 +946,15 @@ export function WideApp({
           collections.find((l) => l.id === (selectionColumn ?? urlColumn)) ??
           null,
         toggleColumn: (list) => toggleColumn(list, "board"),
+        orderList:
+          collections.find(
+            (l) =>
+              l.id ===
+              (palette?.mode === "all" && palette.listId
+                ? palette.listId
+                : (selectionColumn ?? urlColumn)),
+          ) ?? null,
+        moveList: stepList,
         admin: canSendFeedback,
         board,
         goToColumn: (list) => goTo(list.id),
@@ -1184,7 +1248,7 @@ export function WideApp({
       <DndContext
         sensors={drag.sensors}
         collisionDetection={pointerWithin}
-        {...drag.handlers}
+        {...routeDrag(listDrag.handlers, drag.handlers)}
         // The board's sideways scroll is the drag's own (`useBoardDrag`),
         // from its edges; dnd-kit scrolls the columns up and down.
         autoScroll={{
@@ -1199,7 +1263,10 @@ export function WideApp({
           selectionColumn={selectionColumn}
           doneCount={doneCount}
           onTimeList={(list) => focusColumn(list.id)}
-          onCollection={(list) => goTo(list.id)}
+          onCollection={(list) => {
+            // The click that ends a drag isn't a click on the entry.
+            if (!listDrag.justDragged.current) goTo(list.id);
+          }}
           onToggleColumn={(list) => toggleColumn(list, "sidebar")}
           onCreateList={addList}
           onDone={() => showDone()}
@@ -1209,6 +1276,9 @@ export function WideApp({
           loading={loading}
           listsFailed={listsFailed}
           keySection={keyOn(SIDEBAR)}
+          listDrag={listDrag.drag}
+          listSettle={listDrag.settle}
+          animate={animated}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <Toolbar

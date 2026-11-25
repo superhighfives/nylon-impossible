@@ -10,7 +10,8 @@ import { type Board, keyHint, visibleCommands } from "./commands";
 
 /** What the palette is showing: everything, just lists, or Move to. */
 export type PaletteState =
-  | { mode: "all" }
+  /** `listId`: opened from that list's sidebar entry. */
+  | { mode: "all"; listId?: string }
   | { mode: "lists" }
   | { mode: "move"; todoId: string };
 
@@ -30,6 +31,13 @@ export interface PaletteSource {
   columnList: SerializedList | null;
   /** Hide one of your lists' columns, or show it again. */
   toggleColumn: (list: SerializedList) => void;
+  /**
+   * The list Move list up / down are for: the entry the palette was opened
+   * from, else the column with the selection. Your list's, or none.
+   */
+  orderList: SerializedList | null;
+  /** One of your lists, one place up (-1) or down (1). */
+  moveList: (list: SerializedList, delta: 1 | -1) => void;
   /** Send feedback, for admins. */
   admin: boolean;
   board: Board;
@@ -106,6 +114,35 @@ function columnItems(s: PaletteSource): PaletteItem[] {
       run: () => s.toggleColumn(l),
     })),
   ];
+}
+
+/**
+ * Move list up and Move list down for `orderList`, named beside them; only
+ * the ones that would move it, so neither past the first or last list.
+ */
+function orderItems(s: PaletteSource): PaletteItem[] {
+  const list = s.orderList;
+  if (!list || list.systemKind) return [];
+  const at = s.collections.findIndex((l) => l.id === list.id);
+  if (at < 0) return [];
+  return (
+    [
+      ["up", -1, at > 0],
+      ["down", 1, at < s.collections.length - 1],
+    ] as const
+  ).flatMap(([dir, delta, can]) =>
+    can
+      ? [
+          {
+            id: `order-${dir}:${list.id}`,
+            label: `Move list ${dir}`,
+            meta: list.name,
+            hint: keyHint(`move-list-${dir}`),
+            run: () => s.moveList(list, delta),
+          },
+        ]
+      : [],
+  );
 }
 
 /** Todos: up to eight matching titles, Done included. */
@@ -194,7 +231,10 @@ export function paletteGroups(
     { label: "Go to", items: filterItems(goToItems(s), query) },
     {
       label: "Commands",
-      items: filterItems([...commandItems(s), ...columnItems(s)], query),
+      items: filterItems(
+        [...commandItems(s), ...columnItems(s), ...orderItems(s)],
+        query,
+      ),
     },
   ];
 }

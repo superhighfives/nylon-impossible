@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
+import { applyMoves, type ListMove } from "@/lib/listOrder";
 import {
   listCreateFailed,
   listCreateSaved,
@@ -152,6 +153,53 @@ export function useUpdateList() {
       notifyChanged();
     },
   });
+}
+
+/**
+ * Reorder your lists: each move is a `position` through the list update.
+ * The new order goes into the cache before this returns, not a tick later
+ * as a mutation's `onMutate` would, so a drop or ⌥↑ never shows the old
+ * order for a frame. A failure puts the old order back.
+ */
+export function useReorderLists() {
+  const queryClient = useQueryClient();
+  const { notifyChanged } = useWebSocketSync();
+
+  const mutation = useMutation({
+    mutationKey: LISTS_QUERY_KEY,
+    mutationFn: ({
+      moves,
+    }: {
+      moves: ListMove[];
+      previous?: SerializedList[];
+    }) =>
+      Promise.all(
+        moves.map((m) =>
+          updateList({ data: { id: m.id, input: { position: m.position } } }),
+        ),
+      ),
+    onError: (err, { previous }) => {
+      Sentry.captureException(err, { tags: { mutation: "reorderLists" } });
+      toast.error(messageFromError(err, "Couldn’t save the new order"));
+      if (previous) queryClient.setQueryData(LISTS_QUERY_KEY, previous);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: LISTS_QUERY_KEY });
+      notifyChanged();
+    },
+  });
+
+  return (moves: ListMove[]) => {
+    if (moves.length === 0) return;
+    // A refetch already on its way would land the old order over this one.
+    void queryClient.cancelQueries({ queryKey: LISTS_QUERY_KEY });
+    const previous =
+      queryClient.getQueryData<SerializedList[]>(LISTS_QUERY_KEY);
+    if (previous) {
+      queryClient.setQueryData(LISTS_QUERY_KEY, applyMoves(previous, moves));
+    }
+    mutation.mutate({ moves, previous });
+  };
 }
 
 export function useDeleteList() {

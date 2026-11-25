@@ -35,6 +35,8 @@ const lists = [
   makeList("list-someday", "Someday", "someday"),
   // Hidden on the wide board; the phone shows every list regardless (#645).
   { ...makeList("list-groceries", "Groceries", null), columnHidden: true },
+  makeList("list-studio", "Studio", null, "a1"),
+  makeList("list-reading", "Reading", null, "a2"),
 ];
 const startingTodos = [
   makeTodo({ id: "open", title: "Water the plants" }),
@@ -101,8 +103,10 @@ vi.mock("../OvernightNote", async (importOriginal) => ({
 vi.mock("@/hooks/useHints", () => ({
   useHints: () => ({ reducedMotion, timeZone: "UTC" }),
 }));
+const reorderLists = vi.fn();
 vi.mock("@/hooks/useLists", () => ({
   useCreateList: () => ({ mutate: vi.fn() }),
+  useReorderLists: () => reorderLists,
 }));
 vi.mock("@clerk/tanstack-react-start", () => ({
   useUser: () => ({ user: null }),
@@ -713,5 +717,108 @@ describe("PhoneApp reordering", () => {
       "list-today",
       dropPlacement(today(), todo("t1"), 2).position,
     );
+  });
+});
+
+describe("PhoneApp: reordering lists on the Lists page", () => {
+  const ROW = 56;
+  const entries = () => [
+    ...page("lists").querySelectorAll<HTMLElement>("li[data-list-entry]"),
+  ];
+  const entry = (id: string) =>
+    page("lists").querySelector<HTMLElement>(
+      `li[data-list-entry="${id}"]`,
+    ) as HTMLElement;
+  const gap = () => page("lists").querySelector<HTMLElement>("[data-drop-gap]");
+
+  /** jsdom has no layout: each list's row is ROW tall, the group at 200. */
+  const layOut = () => {
+    const group = page("lists").querySelector<HTMLElement>(
+      '[data-list-group="phone"]',
+    ) as HTMLElement;
+    group.getBoundingClientRect = () => ({ top: 200 }) as DOMRect;
+    entries().forEach((li, i) => {
+      Object.defineProperty(li, "offsetTop", { value: i * ROW });
+      Object.defineProperty(li, "offsetHeight", { value: ROW });
+    });
+  };
+
+  /** A long-press drag of list `id`, started `grab` px into its row. */
+  const driveList = (id: string, grab = 20) => {
+    const index = entries().findIndex((li) => li.dataset.listEntry === id);
+    const activatorEvent = {
+      type: "touchstart",
+      touches: [{ clientX: 100, clientY: 200 + index * ROW + grab }],
+    };
+    const ev = (deltaY: number) =>
+      ({
+        active: {
+          id: `list:${id}`,
+          data: { current: { kind: "list", id, group: "phone" } },
+        },
+        over: null,
+        activatorEvent,
+        delta: { x: 0, y: deltaY },
+      }) as never;
+    act(() => dnd.onDragStart?.(ev(0)));
+    return {
+      move: (deltaY: number) => act(() => dnd.onDragMove?.(ev(deltaY))),
+      end: (deltaY: number) => act(() => dnd.onDragEnd?.(ev(deltaY))),
+    };
+  };
+
+  beforeEach(() => {
+    reorderLists.mockReset();
+    reducedMotion = "no-preference";
+  });
+  afterEach(() => {
+    reducedMotion = "reduce";
+  });
+
+  it("long-press and drag parts the rows around a gap, and saves the new order", () => {
+    render(<PhoneApp />);
+    layOut();
+    expect(entries().map((li) => li.dataset.listEntry)).toEqual([
+      "list-groceries",
+      "list-studio",
+      "list-reading",
+    ]);
+    // The time lists aren't on the page to drag.
+    expect(entry("list-today")).toBeNull();
+
+    // Reading, the last, up past Groceries' middle: first.
+    const drag = driveList("list-reading");
+    drag.move(-2 * ROW);
+    expect(entry("list-reading")).toHaveAttribute("data-lifted");
+    expect(entry("list-groceries").style.transform).toBe(
+      `translateY(${ROW}px)`,
+    );
+    expect(entry("list-studio").style.transform).toBe(`translateY(${ROW}px)`);
+    expect(gap()).toHaveStyle({ top: "0px", height: `${ROW}px` });
+    // A gap, never the line.
+    expect(page("lists").querySelector("[data-drop-indicator]")).toBeNull();
+
+    drag.end(-2 * ROW);
+    expect(gap()).toBeNull();
+    expect(reorderLists).toHaveBeenCalledTimes(1);
+    const [moves] = reorderLists.mock.calls[0];
+    expect(moves).toHaveLength(1);
+    expect(moves[0].id).toBe("list-reading");
+    expect(moves[0].position < "a0").toBe(true);
+    // The dropped order shows straight away, before the save comes back.
+    expect(entries().map((li) => li.dataset.listEntry)).toEqual([
+      "list-reading",
+      "list-groceries",
+      "list-studio",
+    ]);
+  });
+
+  it("let go where it started saves nothing", () => {
+    render(<PhoneApp />);
+    layOut();
+    const drag = driveList("list-studio");
+    drag.move(4);
+    drag.end(4);
+    expect(reorderLists).not.toHaveBeenCalled();
   });
 });
