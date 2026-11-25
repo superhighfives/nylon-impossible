@@ -428,10 +428,12 @@ async function captureVideo(video: Video, dest: string, as: string, run: { testE
   // only the GIF outlives this function.
   const warmupPath = join(DERIVED_DATA.ios, "warmup.mp4");
   const raw = join(DERIVED_DATA.ios, `${basename(dest, ".gif")}.mp4`);
+  let warmup: Recording | undefined;
+  let recording: Recording | undefined;
   try {
     // Warm the recorder up with a throwaway recording. The first recordVideo
     // on a fresh simulator took ~2 minutes to start; later ones start at once.
-    const warmup = startRecording(udid, warmupPath);
+    warmup = startRecording(udid, warmupPath);
     console.log(`  Warming up the recorder: ${(await warmup.started) ? "started" : "didn't start in 3 minutes"}.`);
     await stopRecording(warmup);
 
@@ -440,7 +442,6 @@ async function captureVideo(video: Video, dest: string, as: string, run: { testE
     // Cutting a gesture out of a whole-test recording didn't work: the file's
     // timeline doesn't follow the clock, so cuts landed before the gesture or
     // after the app had quit.
-    let recording: Recording | undefined;
     console.log(`  Running ${video.test}…`);
     run.testExit = await runStreaming(
       "xcodebuild",
@@ -470,6 +471,11 @@ async function captureVideo(video: Video, dest: string, as: string, run: { testE
     );
     console.log(`  → ${dest}`);
   } finally {
+    // A throw (the test run failing to spawn, a recorder that ignored SIGINT)
+    // can leave a recorder running, holding the simulator past this capture.
+    for (const r of [warmup, recording]) {
+      if (r && r.process.exitCode === null && r.process.signalCode === null) r.process.kill("SIGKILL");
+    }
     rmSync(warmupPath, { force: true });
     rmSync(raw, { force: true });
   }
