@@ -601,7 +601,7 @@ function DetailBody({
           </PropertyRow>
 
           <div className="pt-4">
-            {notesField(COLUMN_LABEL, "min-h-[2.625rem] text-n-wide-notes")}
+            {notesField(COLUMN_LABEL, "min-h-[2.25rem] text-n-wide-note-body")}
           </div>
 
           {canSubtask && <Subtasks parent={todo} subtasks={subtasks} column />}
@@ -684,7 +684,7 @@ function DetailBody({
         {panel && choices(panel, PANEL_CLASS)}
 
         <hr className="mt-[1.375rem] mb-4 border-0 border-t border-n-hairline" />
-        {notesField(SECTION_LABEL, "min-h-[4.5rem] text-n-phone-notes")}
+        {notesField(SECTION_LABEL, "min-h-[3.9375rem] text-n-phone-note-body")}
 
         {canSubtask && <Subtasks parent={todo} subtasks={subtasks} />}
 

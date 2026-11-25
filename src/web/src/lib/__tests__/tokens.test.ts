@@ -334,6 +334,31 @@ describe("design token generator", () => {
       expect(box(phone.sheetTitle)).toEqual([32, 35, 700]);
     });
 
+    // Notes are supporting detail, a step under the title (#835). The
+    // phone role is the web phone's and Apple's, at Dynamic Type's
+    // subheadline; wide.notes stays for subtasks and the empty line.
+    it("sets the notes a step under the title, on the phone and wide", () => {
+      const { phone, wide } = tokens.type as Record<
+        string,
+        Record<string, Style>
+      >;
+      expect([phone.noteBody.size, phone.noteBody.lineHeight]).toEqual([
+        15, 21,
+      ]);
+      expect(phone.noteBody.iosTextStyle).toBe("subheadline");
+      expect([wide.noteBody.size, wide.noteBody.lineHeight]).toEqual([13, 18]);
+      expect(wide.noteBody.iosTextStyle).toBeUndefined();
+      expect(phone.notes).toBeUndefined();
+      expect([wide.notes.size, wide.notes.lineHeight]).toEqual([15, 21]);
+      expect(css).toContain("--text-n-phone-note-body: 0.9375rem;");
+      expect(css).toContain("--text-n-wide-note-body: 0.8125rem;");
+      expect(css).toContain("--text-n-wide-note-body--line-height: 1.125rem;");
+      expect(css).not.toContain("--text-n-phone-notes:");
+      expect(swift).toContain(
+        "static let noteBody = Style(size: 15, lineHeight: 21, weight: .regular, variationWeight: 400, isDisplay: false, textStyle: .subheadline, tracking: 0)",
+      );
+    });
+
     it("gives every role whole-pixel values, a known font and a 100–900 weight", () => {
       for (const [group, styles] of groups) {
         for (const [role, s] of Object.entries(styles)) {

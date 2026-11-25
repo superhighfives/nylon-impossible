@@ -1,9 +1,25 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { loadTokens } from "../../../../../shared/design/generate.mjs";
+import { DetailSheet } from "../DetailSheet";
+import { EmptyLine } from "../EmptyLine";
 import { Masthead } from "../Masthead";
 import { TodoRow, type TodoRowProps } from "../TodoRow";
+import type { TodoActions } from "../useTodoActions";
 import { makeTodo, NOW, TZ } from "./fixtures";
+
+vi.mock("@/hooks/useTodos", () => {
+  const mutation = () => ({ mutate: vi.fn(), isPending: false });
+  return {
+    useAddTodoUrl: mutation,
+    useCreateTodo: mutation,
+    useDeleteTodo: mutation,
+    useDeleteTodoUrl: mutation,
+    useProcessTodo: mutation,
+    useUpdateTodo: mutation,
+    useUpdateUrlPreview: mutation,
+  };
+});
 
 type Style = { size: number; lineHeight: number; weight: number };
 const type = loadTokens().type as Record<string, Record<string, Style>>;
@@ -74,5 +90,64 @@ describe("the web's type roles", () => {
     expect(title).toHaveClass("font-n-display");
     const subline = screen.getByText("Sunday, October 18");
     expect(role(roleClass(subline))).toEqual([14, 19, 400]);
+  });
+
+  // Notes step down a size from the title (#835): 13/18 in the wide sheet,
+  // 15/21 in the phone detail, drawn and editing alike. Subtasks and the
+  // empty line keep the row's 15/21.
+  describe.each([
+    ["the phone detail", false, "text-n-phone-note-body", [15, 21, 400]],
+    ["the wide sheet", true, "text-n-wide-note-body", [13, 18, 400]],
+  ] as const)("sets the notes in %s", (_, column, cls, box) => {
+    const open = (notes: string | null) => {
+      const container = document.createElement("div");
+      document.body.appendChild(container);
+      const parent = makeTodo({ id: "parent", notes });
+      render(
+        <DetailSheet
+          todo={parent}
+          subtasks={[
+            makeTodo({ id: "sub", title: "Pack the bag", parentId: "parent" }),
+          ]}
+          listTargets={[]}
+          listName={() => "Today"}
+          listInSentence={() => "today"}
+          timeZone={TZ}
+          actions={
+            { save: vi.fn(), destroy: vi.fn() } as unknown as TodoActions
+          }
+          onClose={vi.fn()}
+          {...(column && { variant: "column", container, animated: false })}
+        />,
+      );
+    };
+
+    it(`at ${box.join("/")}, drawn`, () => {
+      open("Some notes");
+      const drawn = document.querySelector<HTMLElement>(
+        "[data-notes-rendered]",
+      );
+      if (!drawn) throw new Error("not rendered");
+      expect(roleClass(drawn)).toBe(cls);
+      expect(role(cls)).toEqual([...box]);
+      if (column) {
+        expect(roleClass(screen.getByText("Pack the bag"))).toBe(
+          "text-n-wide-notes",
+        );
+      }
+    });
+
+    it(`at ${box.join("/")}, editing`, () => {
+      open(null);
+      const field = screen.getByRole("textbox", { name: "Notes" });
+      expect(roleClass(field)).toBe(cls);
+    });
+  });
+
+  it("keeps the empty line at the row's 15/21", () => {
+    render(<EmptyLine text="Nothing here yet." density="wide" />);
+    const words = screen.getByText("Nothing here yet.");
+    expect(roleClass(words)).toBe("text-n-wide-notes");
+    expect(role("text-n-wide-notes")).toEqual([15, 21, 400]);
   });
 });
