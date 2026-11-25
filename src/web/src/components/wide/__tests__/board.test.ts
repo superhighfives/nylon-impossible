@@ -114,12 +114,12 @@ describe("doneGap", () => {
   });
 
   it("hatches only a board wider than three columns at their widest", () => {
-    // 35rem columns on a 2000px board: the time lists leave 320px.
-    expect(doneGap({ board: 2000, column: 560, columns: 3, sheet: 0 })).toBe(
-      320,
+    // 30rem columns on a 2000px board: the time lists leave 560px.
+    expect(doneGap({ board: 2000, column: 480, columns: 3, sheet: 0 })).toBe(
+      560,
     );
     // Up to three widest columns, they fill it.
-    expect(doneGap({ board: 1680, column: 560, columns: 3, sheet: 0 })).toBe(0);
+    expect(doneGap({ board: 1440, column: 480, columns: 3, sheet: 0 })).toBe(0);
   });
 
   it("rounds up, so no fraction of Done shows", () => {
