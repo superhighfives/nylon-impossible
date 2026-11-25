@@ -42,7 +42,8 @@ Connect by hand unless we add `deliver` metadata later.
 - [x] Privacy manifest. The app, the widget and the share extension each
       have a `PrivacyInfo.xcprivacy` declaring their `UserDefaults` use
       (#847), so App Store Connect doesn't reject the upload (ITMS-91053).
-      `PrivacyManifestTests` checks the built bundles.
+      The app's also lists the data it collects, matching the privacy
+      labels (#856). `PrivacyManifestTests` checks the built bundles.
 - [ ] App privacy labels. Collected and linked to the user: email address
       (Clerk), user content (todos, lists, notes, links). Not linked:
       crash data and diagnostics (Sentry). No tracking. Check the Clerk and
