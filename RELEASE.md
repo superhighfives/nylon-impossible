@@ -39,14 +39,16 @@ uploads the binary only (`skip_metadata`, `skip_screenshots`,
 `submit_for_review: false`), so everything here is entered in App Store
 Connect by hand unless we add `deliver` metadata later.
 
-- [ ] Privacy manifest. The app has no `PrivacyInfo.xcprivacy`, and about 25
-      files use `UserDefaults`, a required-reason API. Add a manifest to the
-      app, the widget and the share extension. App Store Connect rejects a
-      submission without the declaration (ITMS-91053).
+- [x] Privacy manifest. The app, the widget and the share extension each
+      have a `PrivacyInfo.xcprivacy` declaring their `UserDefaults` use
+      (#847), so App Store Connect doesn't reject the upload (ITMS-91053).
+      `PrivacyManifestTests` checks the built bundles.
 - [ ] App privacy labels. Collected and linked to the user: email address
       (Clerk), user content (todos, lists, notes, links). Not linked:
       crash data and diagnostics (Sentry). No tracking. Check the Clerk and
-      Sentry SDK manifests for anything else.
+      Sentry SDK manifests for anything else. Copy the labels from the
+      privacy report, which merges the app's manifest with the SDKs': in
+      Xcode, Organizer → right-click the archive → Generate Privacy Report.
 - [ ] Name, subtitle, promotional text, description, keywords, category.
 - [ ] Screenshots for each required iPhone and Mac size. The app is
       iPhone only (`TARGETED_DEVICE_FAMILY = 1`), so no iPad shots. The
