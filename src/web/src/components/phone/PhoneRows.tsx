@@ -68,8 +68,9 @@ function DraggableRow({
 
 /**
  * A page's rows, which reorder by dragging: the rows part around the lifted
- * row to open a soft yellow gap where it would land. After a drop the rows ease from where they were into
- * the new order, and the dropped one swings past level as it lands.
+ * row to open a soft yellow gap where it would land. After a drop the rows
+ * ease from where they were into the new order, and the dropped one swings
+ * past level as it lands.
  */
 export function PhoneRows({
   listId,
