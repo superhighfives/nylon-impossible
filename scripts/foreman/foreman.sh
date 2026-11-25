@@ -248,6 +248,8 @@ guarded_path() { # path -> why it's guarded, or nothing
     wrangler.jsonc|*/wrangler.jsonc)           echo "touches Worker bindings ($1)" ;;
     fastlane/*|*/fastlane/*)                   echo "touches Fastlane config ($1)" ;;
     scripts/foreman/*)                         echo "changes the foreman itself ($1)" ;;
+    # Released (CLAUDE.md, "Merging"): production holds other people's data.
+    src/api/migrations/*)                      echo "changes a D1 migration ($1)" ;;
     # The rules the agents work under, merging included: the foreman runs
     # claude with bypassed permissions in worktrees cut from main. Skills
     # aren't guarded (owner, 2026-11-10); the rest of .claude/ (settings,

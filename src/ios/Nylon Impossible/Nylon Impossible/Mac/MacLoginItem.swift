@@ -9,8 +9,8 @@
 //
 //  It's on by default with consent (App Review 2.4.5(iii)): a fresh sign-in
 //  has an "Open at login" checkbox, ticked. After that, only the person turns
-//  it on or off. A Mac signed in before this shipped starts off: Nylon is
-//  unreleased, so there's no migration (CLAUDE.md, "Unreleased").
+//  it on or off. A Mac signed in before this shipped starts off: Nylon was
+//  unreleased then, so it has no migration.
 //
 
 #if os(macOS)
