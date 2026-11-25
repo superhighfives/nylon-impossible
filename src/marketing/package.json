@@ -5,6 +5,7 @@
   "scripts": {
     "capture": "tsx generate.ts --capture",
     "typecheck": "tsc --noEmit",
+    "test": "tsx --test fix-shots.test.ts",
     "web": "tsx generate.ts --web",
     "publish": "tsx generate.ts --publish",
     "all": "tsx generate.ts --all"

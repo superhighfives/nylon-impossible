@@ -14,11 +14,13 @@
  *
  *   { "shots": [{ "device": "iphone", "screen": "detail", "dark": true,
  *                 "note": "The close button sits clear of the grabber" }] }
- *   { "skip": "Gesture fix: a still image looks the same before and after." }
+ *   { "videos": [{ "device": "iphone", "test": "PullToRefreshUITests/testPullingTheChipRowDownDoesNotRefresh",
+ *                  "note": "Pulling the chip row down while adding a todo" }] }
+ *   { "skip": "Copy fix in an error path no route reaches." }
  *
  * The foreman runs `capture` on the fix branch (`--as after`) and on main
  * (`--as before`) — same derived data, so the second build is incremental —
- * then commits the PNGs to feedback-assets and puts `report`'s Markdown in
+ * then commits the PNGs (and GIFs) to feedback-assets and puts `report`'s Markdown in
  * the PR's "Try it" section, with the plan in a hidden comment so a retake
  * (a review round that changes src/ios, or `foreman.sh shots <pr>`) can
  * reuse it. Capture is best-effort per shot: a failure is recorded in
@@ -26,10 +28,16 @@
  *
  * Routes run on in-memory sample data with no account, so nothing personal
  * ends up in the (public) images.
+ *
+ * A video is for an interaction a still can't show (a gesture, timing, a sync
+ * in progress): a UI test that prints FIX-SHOTS-GESTURE just before the
+ * gesture, recorded from that line to the end of the test and made into a
+ * GIF. The before side runs main's app with the branch's UI tests, so the
+ * test exists there; it's expected to fail on that side.
  */
 
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -60,6 +68,8 @@ type Device = "iphone" | "mac";
 const DEVICES: Device[] = ["iphone", "mac"];
 const DEVICE_LABEL: Record<Device, string> = { iphone: "iPhone", mac: "Mac" };
 const MAX_SHOTS = 4;
+// A video is a whole UI-test build and run per side, so one is plenty.
+const MAX_VIDEOS = 1;
 
 interface Shot {
   device: Device;
@@ -68,13 +78,24 @@ interface Shot {
   note?: string;
 }
 
+/** A UI test (`Class/testMethod` in the UI-test target) that performs the interaction. */
+interface Video {
+  device: "iphone";
+  test: string;
+  note?: string;
+}
+
 interface Plan {
   shots?: Shot[];
+  videos?: Video[];
   skip?: string;
 }
 
-/** Per image, keyed by file name. */
-type Status = Record<string, { ok: true } | { ok: false; error: string }>;
+/**
+ * Per image, keyed by file name. A video's entry also has its UI test's exit
+ * code, once the test has run: failing on the after side is worth saying.
+ */
+type Status = Record<string, ({ ok: true } | { ok: false; error: string }) & { testExit?: number | null }>;
 
 // Our own simulator, so a capture never touches one the marketing run (or a
 // person) is using.
@@ -135,7 +156,25 @@ function readPlan(path: string): Plan {
       dark: shot.dark === true,
       note: typeof shot.note === "string" ? plainText(shot.note) : undefined,
     }));
-  return { shots };
+  // The test name ends up in an xcodebuild argument and a file name.
+  const videos = (Array.isArray(raw?.videos) ? raw.videos : [])
+    .filter((video) => {
+      const ok =
+        typeof video === "object" &&
+        video !== null &&
+        video.device === "iphone" &&
+        typeof video.test === "string" &&
+        /^[A-Za-z][A-Za-z0-9_]{0,60}\/test[A-Za-z0-9_]{0,80}$/.test(video.test);
+      if (!ok) console.error(`  Ignoring an invalid video: ${JSON.stringify(video)}`);
+      return ok;
+    })
+    .slice(0, MAX_VIDEOS)
+    .map((video) => ({
+      device: video.device,
+      test: video.test,
+      note: typeof video.note === "string" ? plainText(video.note) : undefined,
+    }));
+  return videos.length ? { shots, videos } : { shots };
 }
 
 /**
@@ -149,6 +188,10 @@ function plainText(text: string): string {
     .replace(/@(?!\u200b)/g, "@\u200b")
     .trim()
     .slice(0, 200);
+}
+
+function videoName(video: Video, index: number): string {
+  return `video-${index + 1}-${video.device}-${video.test.replace("/", "-")}`;
 }
 
 function shotName(shot: Shot, index: number): string {
@@ -281,6 +324,158 @@ async function captureSimulator(
 }
 
 // ---------------------------------------------------------------------------
+// Capture — video of a UI test
+// ---------------------------------------------------------------------------
+
+const UI_TEST_SCHEME = "Nylon Impossible UI Tests";
+const UI_TEST_TARGET = "Nylon ImpossibleUITests";
+// Printed by the test a few seconds before the gesture: recording starts
+// when it appears, so the test waits for the recorder before it moves.
+const GESTURE_MARKER = "FIX-SHOTS-GESTURE";
+
+/** Run a command, echoing its output, and resolve with its exit code. */
+function runStreaming(
+  cmd: string,
+  args: string[],
+  { onLine, timeout }: { onLine?: (line: string) => void; timeout?: number } = {},
+): Promise<number | null> {
+  const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "inherit"] });
+  let pending = "";
+  child.stdout.on("data", (chunk: Buffer) => {
+    process.stdout.write(chunk);
+    pending += chunk.toString();
+    for (let i = pending.indexOf("\n"); i >= 0; i = pending.indexOf("\n")) {
+      onLine?.(pending.slice(0, i));
+      pending = pending.slice(i + 1);
+    }
+  });
+  const timer = timeout ? setTimeout(() => child.kill("SIGTERM"), timeout) : undefined;
+  return new Promise((resolve, reject) => {
+    child.on("error", reject);
+    child.on("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
+}
+
+interface Recording {
+  process: ReturnType<typeof spawn>;
+  /** Resolves true once recordVideo reports it has started, false after 3 minutes. */
+  started: Promise<boolean>;
+}
+
+function startRecording(udid: string, path: string): Recording {
+  const recorder = spawn("xcrun", ["simctl", "io", udid, "recordVideo", "--codec=h264", "--force", path], {
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  recorder.stderr?.on("data", (chunk: Buffer) => process.stdout.write(`  [recordVideo] ${chunk}`));
+  const started = new Promise<boolean>((resolve) => {
+    const fallback = setTimeout(() => resolve(false), 180_000);
+    recorder.stderr?.on("data", (chunk: Buffer) => {
+      if (chunk.toString().includes("Recording started")) {
+        clearTimeout(fallback);
+        resolve(true);
+      }
+    });
+    recorder.on("exit", () => {
+      clearTimeout(fallback);
+      resolve(false);
+    });
+  });
+  return { process: recorder, started };
+}
+
+/** SIGINT makes recordVideo finish the file; until it exits, ffmpeg can't open it. */
+async function stopRecording({ process: recorder }: Recording): Promise<string> {
+  if (recorder.exitCode !== null || recorder.signalCode !== null) {
+    return `had already exited with ${recorder.signalCode ?? recorder.exitCode}`;
+  }
+  const exited = new Promise<string>((resolve) => {
+    const fallback = setTimeout(() => resolve("was still running after 60s"), 60_000);
+    recorder.on("exit", (code, signal) => {
+      clearTimeout(fallback);
+      resolve(`exited with ${signal ?? code}`);
+    });
+  });
+  recorder.kill("SIGINT");
+  return exited;
+}
+
+function hasFfmpeg(): boolean {
+  return !spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).error;
+}
+
+async function captureVideo(video: Video, dest: string, as: string, run: { testExit?: number | null }): Promise<void> {
+  // Installed on the Mac mini; without it there's nothing to make the GIF.
+  if (!hasFfmpeg()) throw new Error("ffmpeg isn't on the PATH, so there's no GIF to make");
+  const udid = ensureSimulator(SIMULATOR_NAME[video.device], manifest.ios.devices[video.device].types);
+  const common = [
+    "-project", join(WORKSPACE_ROOT, manifest.ios.project),
+    "-scheme", UI_TEST_SCHEME,
+    "-destination", `platform=iOS Simulator,id=${udid}`,
+    "-derivedDataPath", DERIVED_DATA.ios,
+  ];
+
+  // Build, then boot, as for stills: a build next to a booting simulator
+  // starves CoreSimulator (#445).
+  console.log("  Building the UI tests…");
+  const built = await runStreaming("xcodebuild", ["build-for-testing", ...common, "-quiet"]);
+  if (built !== 0) throw new Error(`build-for-testing exited with ${built}`);
+  await ensureBooted(udid);
+
+  // The recordings sit in the derived data, which nothing else clears, so
+  // only the GIF outlives this function.
+  const warmupPath = join(DERIVED_DATA.ios, "warmup.mp4");
+  const raw = join(DERIVED_DATA.ios, `${basename(dest, ".gif")}.mp4`);
+  try {
+    // Warm the recorder up with a throwaway recording. The first recordVideo
+    // on a fresh simulator took ~2 minutes to start; later ones start at once.
+    const warmup = startRecording(udid, warmupPath);
+    console.log(`  Warming up the recorder: ${(await warmup.started) ? "started" : "didn't start in 3 minutes"}.`);
+    await stopRecording(warmup);
+
+    // Record only around the gesture: start when the test prints its marker
+    // (it then waits a few seconds before moving), stop when it ends.
+    // Cutting a gesture out of a whole-test recording didn't work: the file's
+    // timeline doesn't follow the clock, so cuts landed before the gesture or
+    // after the app had quit.
+    let recording: Recording | undefined;
+    console.log(`  Running ${video.test}…`);
+    run.testExit = await runStreaming(
+      "xcodebuild",
+      ["test-without-building", ...common, `-only-testing:${UI_TEST_TARGET}/${video.test}`],
+      {
+        onLine: (line) => {
+          if (recording === undefined && line.includes(GESTURE_MARKER)) recording = startRecording(udid, raw);
+        },
+        timeout: 15 * 60_000,
+      },
+    );
+    // Before the fix the test is expected to fail; the recording is the point.
+    console.log(`  The test ${run.testExit === 0 ? "passed" : `exited with ${run.testExit}`} (${as}).`);
+    if (!recording) throw new Error("the test never printed its gesture marker");
+    const exit = await stopRecording(recording);
+    if (!existsSync(raw)) throw new Error(`recordVideo wrote no file (${exit})`);
+    console.log(`  recordVideo ${exit}; ${Math.round(statSync(raw).size / 1024)} KB.`);
+
+    execFileSync(
+      "ffmpeg",
+      [
+        "-y", "-loglevel", "error", "-t", "9", "-i", raw,
+        "-vf", "fps=12,scale=300:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse",
+        "-loop", "0", dest,
+      ],
+      { stdio: "inherit", timeout: 120_000 },
+    );
+    console.log(`  → ${dest}`);
+  } finally {
+    rmSync(warmupPath, { force: true });
+    rmSync(raw, { force: true });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Capture — Mac
 // ---------------------------------------------------------------------------
 
@@ -365,7 +560,8 @@ async function capture(): Promise<void> {
   const statusPath = join(out, `status-${as}.json`);
 
   const shots = (plan.shots ?? []).map((shot, i) => ({ shot, dest: join(out, `${shotName(shot, i)}-${as}.png`) }));
-  if (!shots.length) {
+  const videos = (plan.videos ?? []).map((video, i) => ({ video, dest: join(out, `${videoName(video, i)}-${as}.gif`) }));
+  if (!shots.length && !videos.length) {
     console.log(plan.skip ? `  Skipped: ${plan.skip}` : "  The plan has no shots.");
     writeFileSync(statusPath, JSON.stringify(status, null, 2));
     return;
@@ -396,10 +592,28 @@ async function capture(): Promise<void> {
     }
     writeFileSync(statusPath, JSON.stringify(status, null, 2));
   }
+
+  // Videos after the stills, so a slow test run can't cost them.
+  for (const { video, dest } of videos) {
+    console.log(`\n── Video: ${video.test} (${as}) ──`);
+    const run: { testExit?: number | null } = {};
+    try {
+      if (!windowOpen) {
+        await openSimulatorWindow();
+        windowOpen = true;
+      }
+      await captureVideo(video, dest, as, run);
+      status[basename(dest)] = { ok: true, ...run };
+    } catch (err) {
+      status[basename(dest)] = { ok: false, error: describeError(err).slice(0, 300), ...run };
+      console.log(`  ✗ ${video.test}: ${describeError(err)}`);
+    }
+    writeFileSync(statusPath, JSON.stringify(status, null, 2));
+  }
   writeFileSync(statusPath, JSON.stringify(status, null, 2));
 }
 
-/** The PR body section: a Before | After row per shot, or why there are none. */
+/** The PR body section: a Before | After row per shot and video, or why there are none. */
 function report(): void {
   const plan = readPlan(required("plan"));
   const out = resolve(required("out"));
@@ -413,7 +627,7 @@ function report(): void {
   const statuses = { before: readStatus("before"), after: readStatus("after") };
 
   const lines = ["### Before / after", ""];
-  if (plan.skip || !plan.shots?.length) {
+  if (plan.skip || (!plan.shots?.length && !plan.videos?.length)) {
     lines.push(`No screenshots: ${plan.skip ?? "no screen to show."}`);
   } else {
     const from = [beforeSha && `\`main\` at ${beforeSha}`, afterSha && `this branch at ${afterSha}`]
@@ -425,19 +639,27 @@ function report(): void {
       "| | Before | After |",
       "| --- | --- | --- |",
     );
+    const cellFor = (file: string, as: "before" | "after", width: number) =>
+      statuses[as][file]?.ok ? `<img src="${base}/${file}?raw=true" width="${width}" alt="${as}">` : "_not captured_";
     const width = (shot: Shot) => (shot.device === "mac" ? 480 : 280);
-    plan.shots.forEach((shot, i) => {
+    (plan.shots ?? []).forEach((shot, i) => {
       const name = shotName(shot, i);
-      const cell = (as: "before" | "after") => {
-        const file = `${name}-${as}.png`;
-        const result = statuses[as][file];
-        if (!result?.ok) return "_not captured_";
-        return `<img src="${base}/${file}?raw=true" width="${width(shot)}" alt="${as}">`;
-      };
+      const cell = (as: "before" | "after") => cellFor(`${name}-${as}.png`, as, width(shot));
       const label = [
         `**${DEVICE_LABEL[shot.device]}** · \`${shot.screen}\` · ${shot.dark ? "dark" : "light"}`,
         shot.note,
       ]
+        .filter(Boolean)
+        .join("<br>");
+      lines.push(`| ${label} | ${cell("before")} | ${cell("after")} |`);
+    });
+    (plan.videos ?? []).forEach((video, i) => {
+      const name = videoName(video, i);
+      const cell = (as: "before" | "after") => cellFor(`${name}-${as}.gif`, as, 280);
+      // Failing before the fix is expected; failing after it is news.
+      const testExit = statuses.after[`${name}-after.gif`]?.testExit;
+      const failed = testExit !== undefined && testExit !== 0 ? "The test failed on this branch." : undefined;
+      const label = [`**${DEVICE_LABEL[video.device]}** · video · \`${video.test}\``, video.note, failed]
         .filter(Boolean)
         .join("<br>");
       lines.push(`| ${label} | ${cell("before")} | ${cell("after")} |`);
