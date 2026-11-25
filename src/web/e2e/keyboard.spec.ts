@@ -34,7 +34,12 @@ test("the keyboard moves, opens, closes and marks done", async ({
   const order = await titles(today);
   expect(order.length).toBeGreaterThanOrEqual(2);
 
-  // j / k and ↓ / ↑ move through Today's todos.
+  // j / k and ↓ / ↑ move through Today's todos. The first j, from the
+  // column's title, reaches Add.
+  await page.keyboard.press("j");
+  await expect(
+    today.locator("[data-column-composer]:focus-within"),
+  ).toHaveCount(1);
   await page.keyboard.press("j");
   await expect(selected(page)).toHaveText(order[0]);
   await page.keyboard.press("j");
