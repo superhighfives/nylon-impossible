@@ -12,6 +12,9 @@ Clerk, Google) and the launch-day steps.
 - 2026-11-24: Nylon is free. The `plan` field stays and gates nothing.
 - 2026-11-24: Sign-up is open to everyone from launch day. Until then,
   Clerk stays in Waitlist mode, and the owner invites the waitlist at launch.
+- 2026-11-25: Sign-up opens when the builds are submitted for review, a few
+  days before launch, so App Review can sign in with Apple. There's no demo
+  account.
 - 2026-11-24: Support is GitHub issues. The foreman acts only on what the
   owner labels (see "Support").
 
@@ -45,8 +48,10 @@ bot sign-up protection (Turnstile) is on. Disposable-email blocking is off.
             once; the owner keeps it.
       - [x] Clerk production: enable the Apple connection with those
             credentials (2026-11-24).
-      - [ ] Code: the entitlement on iOS and macOS, and an Apple button in
-            `MacSignInView` (iOS gets it from `AuthView`). Test on both.
+      - [ ] Code (#848, Ready): the entitlement on iOS and macOS, and an
+            Apple button in `MacSignInView`, ordered Apple, GitHub, Google
+            like iOS's `AuthView`. The PR carries `owner-merge`: the owner
+            merges it, or asks a local session to.
       - [ ] Sign in with Apple once on the web and once in each app.
 - [ ] Update bot protection to "Challenge suspicious sign-ups" (Clerk
       recommends it in place of the legacy protection), and consider
@@ -60,10 +65,10 @@ uploads the binary only (`skip_metadata`, `skip_screenshots`,
 `submit_for_review: false`), so everything here is entered in App Store
 Connect by hand unless we add `deliver` metadata later.
 
-- [ ] Privacy manifest. The app has no `PrivacyInfo.xcprivacy`, and about 25
-      files use `UserDefaults`, a required-reason API. Add a manifest to the
-      app, the widget and the share extension. App Store Connect rejects a
-      submission without the declaration (ITMS-91053).
+- [ ] Privacy manifest (#856, Ready). The app has no `PrivacyInfo.xcprivacy`,
+      and 19 files use `UserDefaults`, a required-reason API. Add a manifest
+      to the app, the widget and the share extension. App Store Connect
+      rejects an upload without the declaration (ITMS-91053).
 - [x] App privacy labels, published 2026-11-24. Collected, linked to the
       user, for app functionality, no tracking: name and email address
       (Clerk), user ID, other user content (todos, lists, notes, links),
@@ -75,16 +80,21 @@ Connect by hand unless we add `deliver` metadata later.
 - [x] Release: manual on both versions, so approval doesn't publish them.
 - [ ] Screenshots for each required iPhone and Mac size. The app is
       iPhone only (`TARGETED_DEVICE_FAMILY = 1`), so no iPad shots. The
-      `marketing-screenshots` pipeline can produce them; #611 (iOS
-      captures on the self-hosted Mac) is blocked.
+      `marketing-screenshots` pipeline can produce them once #611 (iOS
+      captures on the Mac mini, run by the foreman) lands. It's Ready, and
+      the owner merges it.
 - [x] Support URL: the GitHub issues page. Marketing URL:
       https://nylonimpossible.com.
 - [x] Privacy policy URL: https://nylonimpossible.com/privacy.
 - [x] Age rating: 4+ (every answer "None" or "No"; links open in the
       system browser, and todos aren't shared with other people).
 - [ ] Review contact and copyright line (the owner's details).
-- [ ] Review notes and a demo account that App Review can sign in with.
-      Seed it with lists and todos so every screen has content.
+- [ ] Review notes. No demo account: production has no password sign-in,
+      and the Mac shows only provider buttons. Reviewers sign in with their
+      own Apple ID, so sign-up opens when the builds are submitted, not on
+      launch day (owner, 2026-11-25). Leave "Sign-in required" unchecked,
+      and say in the notes that Sign in with Apple creates an account and
+      the board starts empty. Needs #848.
 - [ ] Export compliance (HTTPS only: standard exemption).
 - [x] Pricing: free, all 175 countries or regions, and future ones.
 
@@ -164,10 +174,12 @@ The Mac release is already on: `ENABLE_MAC_RELEASE` has been `true` since
 
 1. Merge the launch-day rules PR, #841 (it changes `CLAUDE.md` from
    "unreleased" to "released").
-2. Submit the iOS and Mac builds for review from App Store Connect.
-3. When they're approved, release them by hand.
-4. In Clerk production, set the access mode to Open, and merge the
-   landing page PR.
+2. In Clerk production, set the access mode to Open, so App Review can
+   sign up with Sign in with Apple. The landing page still says "Coming
+   soon", so few people find it early.
+3. Submit the iOS and Mac builds for review from App Store Connect.
+4. When they're approved, release them by hand, and merge the landing
+   page PR.
 5. Invite the waitlist from Clerk's Waitlist page. Clerk sends each person
    an invitation email, so the owner does this step.
 6. Watch Sentry and the Cloudflare dashboards for the first day.
