@@ -6,6 +6,7 @@ import {
   EMPTY_NEXT,
   waitingIn,
 } from "@nylon-impossible/shared";
+import { useHydrated } from "@tanstack/react-router";
 import { generateKeyBetween } from "fractional-indexing";
 import { ArrowRight, Check, ChevronRight, Plus } from "lucide-react";
 import {
@@ -182,6 +183,10 @@ export function PhoneApp({
     refetchLists,
     listsFetching,
   } = useBoardData();
+  // What the smoke suite and the marketing captures wait for: loaded and
+  // hydrated. The server renders the board with its data (#830), so without
+  // the second they'd act before the rows answer.
+  const hydrated = useHydrated();
   const createList = useCreateList();
   const reorderLists = useReorderLists();
   const listDrag = useListDrag({
@@ -771,7 +776,7 @@ export function PhoneApp({
             onPointerDown={releaseScroll}
             onWheel={releaseScroll}
             onScrollEnd={releaseScroll}
-            data-phone-ready={loading ? undefined : ""}
+            data-phone-ready={loading || !hydrated ? undefined : ""}
             // Nothing to swipe to while loading, and a scroller with nothing
             // focusable in it is a dead end for the keyboard.
             className={`flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${

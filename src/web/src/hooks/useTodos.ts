@@ -1,7 +1,12 @@
 import { useAuth } from "@clerk/tanstack-react-start";
 import { createInitialTodo, toDueDay } from "@nylon-impossible/shared";
 import { nextDueDate } from "@nylon-impossible/shared/recurrence";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  queryOptions,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { generateKeyBetween, generateNKeysBetween } from "fractional-indexing";
 import { useEffect } from "react";
 import { useWebSocketSync } from "@/hooks/useWebSocket";
@@ -31,12 +36,15 @@ import type {
 
 const TODOS_QUERY_KEY = ["todos"];
 
+/** Your todos: what `useTodos` reads, and what the board's loader prefetches. */
+export const todosQuery = queryOptions<TodoWithUrls[]>({
+  queryKey: TODOS_QUERY_KEY,
+  queryFn: () => getTodos(),
+});
+
 export function useTodos() {
   const queryClient = useQueryClient();
-  const query = useQuery<TodoWithUrls[]>({
-    queryKey: TODOS_QUERY_KEY,
-    queryFn: () => getTodos(),
-  });
+  const query = useQuery(todosQuery);
 
   // Keep the app badge in sync with the visible cache. Recomputed whenever
   // the data changes (post-sync / post-mutation) and on tab visibility change

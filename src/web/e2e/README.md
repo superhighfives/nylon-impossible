@@ -1,8 +1,8 @@
 # Smoke suite
 
 Playwright specs that sign in and use the running web app: add, done, move,
-edit, lists, drag and the keyboard, on two projects, **wide** (1440×900) and
-**phone** (iPhone 15, touch). CI runs them as the `smoke` job in
+edit, lists, drag, the keyboard and the server render, on two projects,
+**wide** (1440×900) and **phone** (iPhone 15, touch). CI runs them as the `smoke` job in
 `web-deploy.yml`, against each PR's preview, after `deploy-preview`.
 
 ## The account
