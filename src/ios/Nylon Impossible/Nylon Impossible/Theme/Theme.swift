@@ -143,11 +143,11 @@ enum Theme {
         static let notice = dynamic(light: 0xB54700, dark: 0xFF9A4D)
         /// The overnight note's pill (orange-3)
         static let noticeFill = dynamic(light: 0xFFF1E0, dark: 0x2B1A0C)
-        /// Fills: done checkbox, send button, a sidebar list as a drop target, the drop line's dot, a due-today chip, the toast's pill (bar an error's), the overnight note. Thin lines only for the Settled exception: the drop line while dragging. Never a focus ring. Never text on white. (yellow-9)
+        /// Fills: done checkbox, send button, a sidebar list as a drop target, a due-today chip, the toast's pill (bar an error's), the overnight note. Never a thin line, a focus ring or text on white. (yellow-9)
         static let brand = dynamic(light: 0xFFE629, dark: 0xFFE629)
         /// Text, icons and outlines on a brand fill: the toast's outline action and its focus ring (yellow-12)
         static let brandInk = dynamic(light: 0x473B1F, dark: 0x473B1F)
-        /// The gap a touch drag opens between the rows it parts. A fill, never a line or text (yellow-9 at 22% (16% in dark, where 22% over canvas reads as olive))
+        /// The gap a drag opens between the rows it parts. A fill, never a line or text (yellow-9 at 22% (16% in dark, where 22% over canvas reads as olive))
         static let brandSoft = dynamic(light: 0xFFE629, dark: 0xFFE629, lightAlpha: 0.22, darkAlpha: 0.16)
     }
 

@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay } from "@dnd-kit/core";
+import { DndContext } from "@dnd-kit/core";
 import {
   BOARD_TIME_KINDS,
   type BoardView,
@@ -18,7 +18,6 @@ import {
 } from "react";
 import { RAISED } from "@/components/ui/styles";
 import { ViewBoundary } from "@/components/ViewBoundary";
-import { DragPreview } from "@/components/wide/useBoardDrag";
 import {
   type ListDrag,
   ListDropGap,
@@ -790,11 +789,6 @@ export function PhoneApp({
               </section>
             ))}
           </div>
-          <DragOverlay dropAnimation={null}>
-            {drag.drag?.mode === "pointer" ? (
-              <DragPreview todo={drag.drag.todo} tilt={drag.drag.tilt} />
-            ) : null}
-          </DragOverlay>
         </DndContext>
       </div>
 

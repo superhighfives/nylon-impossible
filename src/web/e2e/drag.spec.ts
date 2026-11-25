@@ -20,7 +20,7 @@ const STUDIO = [
 /**
  * Press on `from` with the mouse, move past the 6px that starts a drag, then
  * glide to (x, y) so the board tracks the pointer the whole way. Returns with
- * the button still down, so the caller can look at the drop line.
+ * the button still down, so the caller can look at the gap.
  */
 async function dragTo(page: Page, from: Locator, x: number, y: number) {
   const box = await from.boundingBox();
@@ -39,7 +39,7 @@ test.skip(
 );
 
 // Settled "Dropping with a pointer": over a row's lower half the todo goes
-// below it, shown by the drop line.
+// below it, where the rows part to make room.
 test("dragging the first todo below the third reorders the column", async ({
   board: page,
   layout,
@@ -58,7 +58,8 @@ test("dragging the first todo below the third reorders the column", async ({
     rows.x + rows.width / 2,
     rows.y + rows.height - 4,
   );
-  await expect(studio.locator("[data-drop-indicator]")).toBeVisible();
+  await expect(studio.locator("[data-drop-gap]")).toBeVisible();
+  await expect(page.locator("[data-drop-indicator]")).toHaveCount(0);
   const saved = watchWrite(page);
   await page.mouse.up();
 
@@ -89,7 +90,7 @@ test("dragging a todo onto another column moves it there", async ({
     target.x + target.width / 2,
     target.y + target.height - 4,
   );
-  await expect(thisWeek.locator("[data-drop-indicator]")).toBeVisible();
+  await expect(thisWeek.locator("[data-drop-gap]")).toBeVisible();
   const saved = watchWrite(page);
   await page.mouse.up();
 

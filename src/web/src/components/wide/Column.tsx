@@ -14,7 +14,6 @@ import { columnPart } from "@/lib/dragOrder";
 import type { TodoWithUrls } from "@/types/database";
 import { SkeletonRows } from "./Skeleton";
 import { type Settle, settleRows, settleTiming } from "./settle";
-import { DropDot } from "./useBoardDrag";
 import { isListDrag } from "./useListDrag";
 
 /**
@@ -42,15 +41,7 @@ export function isColumnBackground(target: EventTarget | null): boolean {
   );
 }
 
-/** The slot a drag would drop into, and where to draw the line. */
-export interface DropIndicator {
-  listId: string;
-  index: number;
-  /** Offset from the top of the column's row list (`data-drop-area`), in px. */
-  y: number;
-}
-
-/** Where a touch drag's gap opens: its slot, and its top in the drop area. */
+/** Where a drag's gap opens: its slot, and its top in the drop area. */
 export interface DropGap {
   listId: string;
   /** The slot among the column's other rows, clamped to the todo's tier. */
@@ -59,8 +50,8 @@ export interface DropGap {
   top: number;
 }
 
-/** A row lifted by a finger, which the columns part around. */
-export interface TouchDrag {
+/** A row lifted by a pointer or a finger, which the columns part around. */
+export interface LiftDrag {
   /** The column it was lifted from, and its index among the rows there. */
   listId: string;
   from: number;
@@ -70,7 +61,7 @@ export interface TouchDrag {
   gap: DropGap | null;
 }
 
-/** Rows parting around a touch drag: they slide, unless motion is reduced. */
+/** Rows parting around a drag: they slide, unless motion is reduced. */
 const PART_TRANSITION =
   "transform var(--n-duration-fast) var(--n-ease-out-strong)";
 
@@ -333,22 +324,22 @@ export function ColumnHeader({
 
 /**
  * A row a pointer or a finger can pick up from anywhere except its checkbox.
- * While a finger drags (`touch`), the lifted row's card stands in for it, so
+ * While a row is dragged (`lifting`), the lifted card stands in for it, so
  * its slot empties, and the others shift by `offset` to part around the gap.
  */
 function DraggableRow({
   todo,
   listId,
-  touch,
+  lifting,
   offset,
   animate,
   ...props
 }: Omit<
   TodoRowProps,
-  "bodyProps" | "containerProps" | "dragging" | "density" | "rowStyle"
+  "bodyProps" | "containerProps" | "density" | "rowStyle"
 > & {
   listId: string;
-  touch: boolean;
+  lifting: boolean;
   offset: number;
   animate: boolean;
 }) {
@@ -364,10 +355,9 @@ function DraggableRow({
       {...props}
       todo={todo}
       density="wide"
-      dragging={isDragging && !touch}
-      away={isDragging && touch}
+      away={isDragging}
       rowStyle={
-        touch
+        lifting
           ? {
               transform: offset ? `translateY(${offset}px)` : undefined,
               transition: animate ? PART_TRANSITION : "none",
@@ -390,9 +380,10 @@ function DraggableRow({
 /**
  * One board column: an Archivo title and subline on the shared baseline, a
  * hairline, the "+ Add" composer, then the rows. The whole column accepts a
- * dropped todo; `indicator` marks the slot it would land in. While its todo
- * is open (`sheetOpen`) the sheet lies over its right edge: the contents
- * move in clear of it, and everything but the selected row recedes.
+ * dropped todo, and its rows part around `lift`'s gap where it would land.
+ * While its todo is open (`sheetOpen`) the sheet lies over its right edge:
+ * the contents move in clear of it, and everything but the selected row
+ * recedes.
  */
 export function Column({
   listId,
@@ -404,8 +395,7 @@ export function Column({
   collapsing,
   highlightedId,
   selectedId,
-  indicator,
-  touch = null,
+  lift = null,
   animate = true,
   settle = null,
   composer,
@@ -436,9 +426,8 @@ export function Column({
   collapsing: ReadonlySet<string>;
   highlightedId: string | null;
   selectedId: string | null;
-  indicator: DropIndicator | null;
-  /** A touch drag on the board: the rows part around its gap. */
-  touch?: TouchDrag | null;
+  /** A drag on the board: the rows part around its gap. */
+  lift?: LiftDrag | null;
   /** False under reduced motion: rows part without sliding. */
   animate?: boolean;
   /** Where rows sat at a drop, so they ease into the new order. */
@@ -510,14 +499,14 @@ export function Column({
   const tabStopId = rows.some((r) => r.id === selectedId)
     ? selectedId
     : (rows[0]?.id ?? null);
-  // A touch drag's part in this column: lifted from it, its gap in it, both
-  // or neither. Rows count as the drag measures them, collapsing ones aside.
-  const from = touch?.listId === listId ? touch.from : null;
-  const gap = touch?.gap?.listId === listId ? touch.gap : null;
+  // A drag's part in this column: lifted from it, its gap in it, both or
+  // neither. Rows count as the drag measures them, collapsing ones aside.
+  const from = lift?.listId === listId ? lift.from : null;
+  const gap = lift?.gap?.listId === listId ? lift.gap : null;
   const live = rows.filter((r) => !collapsing.has(r.id)).map((r) => r.id);
   const offset = (id: string) =>
-    touch
-      ? columnPart(from, gap?.index ?? null, live.indexOf(id), touch.height)
+    lift
+      ? columnPart(from, gap?.index ?? null, live.indexOf(id), lift.height)
       : 0;
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: the keyboard reaches a column through its rows and title
@@ -576,12 +565,12 @@ export function Column({
         ) : (
           <ViewBoundary view="column" resetKey={resetKey}>
             <div data-drop-area={listId} className="relative min-h-24">
-              {gap && touch && (
+              {gap && lift && (
                 // Under the rows, filling the space they part to leave.
                 <div
                   aria-hidden="true"
                   data-drop-gap
-                  style={{ top: gap.top, height: touch.height }}
+                  style={{ top: gap.top, height: lift.height }}
                   className={`pointer-events-none absolute -inset-x-2.5 ${
                     animate
                       ? "transition-[top] duration-(--n-duration-fast) ease-n-out"
@@ -626,23 +615,13 @@ export function Column({
                       highlighted={highlightedId === todo.id}
                       selected={selectedId === todo.id}
                       tabStop={tabStopId === todo.id}
-                      touch={!!touch}
+                      lifting={!!lift}
                       offset={collapsing.has(todo.id) ? 0 : offset(todo.id)}
                       animate={animate}
                       {...rowCallbacks}
                     />
                   ))}
                 </ul>
-              )}
-              {indicator && indicator.listId === listId && (
-                <div
-                  aria-hidden="true"
-                  data-drop-indicator
-                  style={{ top: indicator.y }}
-                  className="pointer-events-none absolute -inset-x-2.5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
-                >
-                  <DropDot />
-                </div>
               )}
             </div>
           </ViewBoundary>

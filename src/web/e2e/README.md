@@ -49,7 +49,7 @@ BASE_URL=https://….workers.dev bun run --cwd src/web e2e
 - Ask for `board` to get a page that's signed in and seeded.
 - Find things by role and label (`getByRole`, `getByLabel`). Fall back to the
   app's `data-*` hooks (`data-column`, `data-row-container`,
-  `data-drop-indicator`) only where no role pins the element.
+  `data-drop-gap`) only where no role pins the element.
 - Put `tag` in any title you create, so an assertion never matches a leftover.
 - To check that a write survived a reload, call `watchWrite(page, text)` before
   the action and pass its promise to `reload`. A write is a non-GET request to
