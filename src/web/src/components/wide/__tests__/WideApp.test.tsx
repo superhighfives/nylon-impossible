@@ -886,6 +886,11 @@ describe("WideApp", () => {
   it("starts in Today when nothing is focused", () => {
     render(<WideApp />);
     (document.activeElement as HTMLElement | null)?.blur();
+    // Add first, then the first todo.
+    fireEvent.keyDown(window, { key: "j" });
+    expect(
+      document.activeElement?.closest("[data-column-composer]"),
+    ).not.toBeNull();
     fireEvent.keyDown(window, { key: "j" });
     expect(focusedTitle()).toContain("Review PR");
   });
@@ -1381,12 +1386,32 @@ describe("WideApp", () => {
     await userEvent.click(someday as HTMLElement);
     expect(container()).not.toHaveAttribute("data-selected");
     expect(document.activeElement?.hasAttribute("data-column-head")).toBe(true);
-    // ↓ starts at the top of the column that has focus.
+    // ↓ starts at the top of the column that has focus: Add, then the first
+    // todo.
     const column =
       document.activeElement?.closest<HTMLElement>("[data-column]");
     press("ArrowDown");
     expect(document.activeElement?.closest("[data-column]")).toBe(column);
+    expect(
+      document.activeElement?.closest("[data-column-composer]"),
+    ).not.toBeNull();
+    press("ArrowDown");
+    expect(document.activeElement?.closest("[data-column]")).toBe(column);
     expect(document.activeElement?.hasAttribute("data-row-id")).toBe(true);
+  });
+
+  it("↓ from an empty column's title reaches Add", async () => {
+    render(<WideApp />);
+    const head =
+      column("This week").querySelector<HTMLElement>("[data-column-head]");
+    act(() => head?.focus());
+    press("ArrowDown");
+    expect(
+      document.activeElement?.closest("[data-column-composer]"),
+    ).not.toBeNull();
+    expect(document.activeElement?.closest("[data-column]")).toBe(
+      column("This week"),
+    );
   });
 
   it("a click on a column's empty space shows no ring, even after key presses", async () => {
@@ -2431,6 +2456,7 @@ describe("WideApp", () => {
         listsLoading = false;
         rerender(<WideApp />);
         expect(keyed()).toBe("list-today on");
+        press("j");
         press("j");
         expect(focusedTitle()).toContain("Review PR");
       } finally {

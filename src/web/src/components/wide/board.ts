@@ -252,8 +252,12 @@ export function createBoard(ctx: BoardContext): Board {
         return;
       }
       const at = row ? rows.indexOf(row) : -1;
-      // From a column with nothing selected, ↓ starts at the top, ↑ at the end.
-      if (at === -1) (delta > 0 ? rows[0] : rows.at(-1))?.focus();
+      // From a column with nothing selected, ↓ starts at the top (Add, where
+      // there is one), ↑ at the end.
+      if (at === -1) {
+        if (delta > 0 && ctx.hasAdd(column)) ctx.focusAdd(column, false);
+        else (delta > 0 ? rows[0] : rows.at(-1))?.focus();
+      }
       // ↑ from the first todo reaches Add.
       else if (at === 0 && delta < 0 && ctx.hasAdd(column)) {
         ctx.focusAdd(column, false);
