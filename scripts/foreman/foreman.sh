@@ -1145,9 +1145,14 @@ build_rules() { # issue -> how a build checks, opens its PR and fills in "Try it
   - **Steps:** the routes to open and what to do there, in order.
   - **Apple:** if it changes the iPhone or the Mac menu bar, write
     \`.fix-shots/plan.json\` naming the \`-NylonScreen\` routes that show
-    it (feedback-flow skill). Don't commit it, and don't capture anything:
-    when you've finished, the foreman takes before and after shots on this
-    Mac and adds the table to the **Try it** section.
+    it (feedback-flow skill). If it's an iPhone interaction a still can't
+    show (a gesture, timing, a sync in progress), add a UI test that
+    reproduces the state in the report's screenshot, not the obvious one,
+    printing \`FIX-SHOTS-GESTURE\` just before the gesture, and name it in
+    the plan's \`videos\` (feedback-flow skill, "Videos"). Don't commit the
+    plan, and don't capture anything: when you've finished, the foreman
+    takes before and after shots on this Mac and adds the table to the
+    **Try it** section.
   - **Acceptance criteria:** each one from the issue, with the test or shot
     that shows it.
 - **Don't merge.** The foreman merges when the checks and the review allow
