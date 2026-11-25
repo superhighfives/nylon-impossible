@@ -40,7 +40,7 @@
   --n-sheet-shadow: -0.5rem 0rem 1.5rem color-mix(in srgb, black 8%, transparent);
 
   --n-board-column-min-width: 17rem;
-  --n-board-column-max-width: 35rem;
+  --n-board-column-max-width: 30rem;
   --n-board-section-outline-width: 0.25rem;
   --n-board-hatch-angle: 45deg;
   --n-board-hatch-width: 0.0625rem;
