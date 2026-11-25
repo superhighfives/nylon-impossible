@@ -1,6 +1,6 @@
 /**
- * A dragged todo's tilt (the board's pointer preview, and a phone row lifted
- * by a touch): one angle per drag, picked when it lifts and held until it's
+ * A dragged todo's tilt (the board's lifted card, and a phone row lifted in
+ * place): one angle per drag, picked when it lifts and held until it's
  * dropped, so it doesn't wobble as it moves. On landing it swings past level
  * the other way, then rests. The angles come from the tokens (`motion` in
  * tokens.json, read here from tokens.css).

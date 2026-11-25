@@ -2,7 +2,6 @@ import { useDraggable } from "@dnd-kit/core";
 import { useLayoutEffect, useRef } from "react";
 import { settleTiming } from "@/components/wide/settle";
 import { swingKeyframes } from "@/components/wide/tilt";
-import { DropDot } from "@/components/wide/useBoardDrag";
 import { partOffset } from "@/lib/dragOrder";
 import type { TodoWithUrls } from "@/types/database";
 import { TodoRow, type TodoRowProps } from "./TodoRow";
@@ -37,10 +36,8 @@ function DraggableRow({
   const { role: _role, tabIndex: _tabIndex, ...rest } = attributes;
   const mine = drag?.listId === listId ? drag : null;
   const active = mine?.todo.id === todo.id;
-  const touch = mine?.mode === "touch";
-  // Touch moves the row itself, vertically, and parts the others; a pointer
-  // drags a preview and leaves the rows in place.
-  const y = touch
+  // A drag moves the row itself, vertically, and parts the others.
+  const y = mine
     ? active
       ? (transform?.y ?? 0)
       : partOffset(mine.from, mine.slot, index, mine.height)
@@ -49,15 +46,14 @@ function DraggableRow({
     <TodoRow
       {...props}
       todo={todo}
-      dragging={active && !touch}
-      lifted={active && touch}
-      tilt={active && touch ? mine.tilt : undefined}
+      lifted={active}
+      tilt={active ? mine.tilt : undefined}
       rowRef={setNodeRef}
       rowStyle={
-        touch
+        mine
           ? {
               transform: y ? `translateY(${y}px)` : undefined,
-              // The lifted row keeps up with the finger; the others slide.
+              // The lifted row keeps up with the drag; the others slide.
               transition:
                 active || !animate
                   ? "none"
@@ -71,10 +67,10 @@ function DraggableRow({
 }
 
 /**
- * A page's rows, which reorder by dragging: the rows part around a touch
- * drag to open a soft yellow gap, and a pointer drag draws the yellow line
- * where it would land. After a drop the rows ease from where they were into
- * the new order, and the dropped one swings past level as it lands.
+ * A page's rows, which reorder by dragging: the rows part around the lifted
+ * row to open a soft yellow gap where it would land. After a drop the rows
+ * ease from where they were into the new order, and the dropped one swings
+ * past level as it lands.
  */
 export function PhoneRows({
   listId,
@@ -126,7 +122,6 @@ export function PhoneRows({
       );
     }
   }, [settleFrom]);
-  const line = drag?.listId === listId ? drag.lineY : null;
   const gap = drag?.listId === listId ? drag.gapY : null;
   return (
     <ul ref={listRef} data-phone-rows={listId} className="relative pt-2">
@@ -160,16 +155,6 @@ export function PhoneRows({
           highlighted={highlightedId === todo.id}
         />
       ))}
-      {line !== null && (
-        <li
-          aria-hidden="true"
-          data-drop-indicator
-          style={{ top: line }}
-          className="pointer-events-none absolute inset-x-5 h-0.5 -translate-y-1/2 rounded-full bg-n-brand"
-        >
-          <DropDot />
-        </li>
-      )}
     </ul>
   );
 }

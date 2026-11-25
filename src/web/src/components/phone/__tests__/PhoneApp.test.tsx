@@ -667,7 +667,7 @@ describe("PhoneApp reordering", () => {
     expect(titles()).toEqual(["p1", "t1", "t2", "t3", "t4"]);
   });
 
-  it("a mouse drags after 6px, with no long-press, the line and no parting", () => {
+  it("a mouse drags after 6px, with no long-press, lifting the row and parting the rows", () => {
     vi.useFakeTimers();
     render(<PhoneApp />);
     // No long-press with a mouse: right-click opens the menu instead.
@@ -701,17 +701,23 @@ describe("PhoneApp reordering", () => {
     expect(activate("pen")).toBe(true);
 
     const drag = drive("t1", mouseAt);
+    // The row lifts in place, as touch does: no preview card, no fade.
+    expect(row("t1")).toHaveAttribute("data-lifted");
+    expect(document.querySelector("[data-drag-preview]")).toBeNull();
     drag.move(80);
-    // The line between Call Mum and Water plants; the original fades.
-    expect(line()).toHaveStyle({ top: `${3 * ROW}px` });
-    expect(line()).toHaveClass("bg-n-brand");
-    expect(row("t1")).toHaveClass("opacity-35");
-    expect(row("t1")).not.toHaveAttribute("data-lifted");
-    for (const id of ["p1", "t2", "t3", "t4"]) {
+    // Call Mum parts up around a soft yellow gap; there's no line.
+    expect(row("t2").style.transform).toBe(`translateY(${-ROW}px)`);
+    for (const id of ["p1", "t3", "t4"]) {
       expect(row(id).style.transform).toBe("");
     }
-    drag.end(80);
+    const gap = page("today").querySelector<HTMLElement>("[data-drop-gap]");
+    expect(gap?.style.top).toBe(`${row("t2").offsetTop}px`);
     expect(line()).toBeNull();
+    expect(row("t1")).not.toHaveClass("opacity-35");
+    // No menu opens and the drag doesn't close one.
+    expect(menu()).toBeNull();
+    drag.end(80);
+    expect(page("today").querySelector("[data-drop-gap]")).toBeNull();
     expect(place).toHaveBeenCalledWith(
       todo("t1"),
       "list-today",
