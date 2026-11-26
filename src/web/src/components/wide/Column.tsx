@@ -101,14 +101,11 @@ const RECEDE = "opacity-(--n-sheet-recede)";
 
 /**
  * A focused column head. A click on the column's empty space focuses it so
- * the keys know which column you're in, and shows nothing; with the keyboard
- * in use (the board root's `data-keyboard`) it takes the sidebar cursor's
- * soft tint. Gated on the board's own modality rather than `:focus-visible`,
- * whose guess after a programmatic `focus()` varies by browser. Forced
- * colours drop the tint, so there it gets a system-coloured outline instead.
+ * the keys know which column you're in, and the keys put the keyboard on it.
+ * Neither shows anything here: the section's outline already says where the
+ * keyboard is (States, "Column head"), and draws in forced colours too.
  */
-export const HEAD_FOCUS =
-  "outline-none transition-colors duration-(--n-duration-fast) group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)] forced-colors:group-data-[keyboard]/board:focus:outline-2 forced-colors:group-data-[keyboard]/board:focus:outline-solid";
+const HEAD_FOCUS = "outline-none";
 
 /** A menu's popup and items: the column's ⋯ menu, the sidebar's right-click. */
 export const MENU_POPUP =
@@ -134,6 +131,7 @@ export function ColumnHeader({
   onHide,
   onCopyId,
   onDelete,
+  onMenuClosed,
   sheetOpen = false,
 }: {
   listId: string;
@@ -159,6 +157,12 @@ export function ColumnHeader({
   /** Your list's column: Copy list ID, for the personal API. */
   onCopyId?: () => void;
   onDelete?: () => void;
+  /**
+   * The ⋯ menu closed; `item` when an item it ran took focus on (Rename,
+   * Hide column, Delete list). True when the caller put the keyboard back
+   * itself, as the board does after its keys open the menu.
+   */
+  onMenuClosed?: (item: boolean) => boolean;
   /** The column's todo is open: clear of the sheet, and receded. */
   sheetOpen?: boolean;
 }) {
@@ -255,6 +259,9 @@ export function ColumnHeader({
       <div className="absolute top-3 right-(--n-sheet-overlap) flex items-center gap-0.5">
         {onDelete && (
           <Menu.Root
+            onOpenChange={(open) => {
+              if (open) fromMenu.current = false;
+            }}
             onOpenChangeComplete={(open) => {
               if (open || !hideOnClose.current) return;
               hideOnClose.current = false;
@@ -263,6 +270,8 @@ export function ColumnHeader({
           >
             <Menu.Trigger
               aria-label={`${title} options`}
+              aria-keyshortcuts="."
+              data-column-menu={listId}
               className={ICON_BUTTON}
             >
               <Ellipsis size={16} aria-hidden="true" />
@@ -270,7 +279,10 @@ export function ColumnHeader({
             <Menu.Portal>
               <Menu.Positioner align="end" sideOffset={4} className="z-50">
                 <Menu.Popup
-                  finalFocus={() => !fromMenu.current}
+                  finalFocus={() => {
+                    const item = fromMenu.current;
+                    return !(onMenuClosed?.(item) ?? false) && !item;
+                  }}
                   className={MENU_POPUP}
                 >
                   {onRename && (
@@ -304,7 +316,12 @@ export function ColumnHeader({
                   )}
                   <Menu.Item
                     className={`${MENU_ITEM} text-n-destructive`}
-                    onClick={onDelete}
+                    onClick={() => {
+                      // The column leaves; the one before it takes the
+                      // keyboard (`deleteList`).
+                      fromMenu.current = true;
+                      onDelete();
+                    }}
                   >
                     Delete list
                   </Menu.Item>
@@ -410,6 +427,7 @@ export function Column({
   onHide,
   onCopyId,
   onDelete,
+  onMenuClosed,
   onBackgroundClick,
   sheetOpen = false,
   resetKey,
@@ -455,6 +473,8 @@ export function Column({
   onCopyId?: () => void;
   /** Your list's column: Delete list, in the ⋯ menu. */
   onDelete?: () => void;
+  /** Its ⋯ menu closed (`ColumnHeader`). */
+  onMenuClosed?: (item: boolean) => boolean;
   /** A click on the column's empty space: focus it, select nothing. */
   onBackgroundClick?: () => void;
   /** Its todo is open, in the sheet beside it. */
@@ -532,6 +552,7 @@ export function Column({
         onHide={onHide}
         onCopyId={onCopyId}
         onDelete={onDelete}
+        onMenuClosed={onMenuClosed}
         sheetOpen={sheetOpen}
       />
       <div

@@ -84,7 +84,7 @@ How the wide board (the web) shows each interaction state, with a pointer and by
 | Pressed | Nothing extra: the click selects, and the selection is the feedback | — | — | — | — |
 | Selected by click | `fill`, chip radius | — | — | — | — |
 | Selected by keyboard | `fill` plus a 3px `inkMuted` bar, inset 6 | — | — | On Add, not typing: as a row, `fill` plus the `inkMuted` bar | `fill` |
-| Focused by keyboard | Same as selected by keyboard: rows have no ring | 20% of the title's colour behind it, as the sidebar cursor | 20% of its text colour | `surface`, 20% `ink` over it, and a 2px `ink` ring, 2px out | — |
+| Focused by keyboard | Same as selected by keyboard: rows have no ring | Nothing: the section outline shows it | 20% of its text colour | `surface`, 20% `ink` over it, and a 2px `ink` ring, 2px out | — |
 | Focused by click | Same as selected by click | Nothing visible | Nothing extra | `surface` and the 20% `ink` tint, no ring | — |
 | Column holds the selection | — | — | 3px `ink` bar | — | — |
 | Drop target | Rows part around a `brandSoft` gap the dragged row's height, no line | — | `brand` fill, `brandInk` text | — | — |
@@ -95,7 +95,7 @@ How the wide board (the web) shows each interaction state, with a pointer and by
 
 - **Section with the keyboard.** The sidebar, a column or the open todo that has the keyboard shows a 4pt/4px `sectionOutline` (ink at 8%) drawn inside its edges: a frame, not a selection, and never `brand`. It shows whether the keyboard is on the section or in it, follows "Keyboard or pointer", and changes none of the looks inside it. At launch the keyboard is on Today, with the outline hidden until the first key press.
 - **Two bars, two roles.** The row's keyboard bar is `inkMuted`; the sidebar's bar for the column holding the selection is `ink`.
-- **Keyboard or pointer** is the last input: a key press (not a modifier alone) turns the keyboard looks on, a pointer press turns them off. The rows' bar and the column head's tint follow it, not the browser's own guess at `:focus-visible`.
+- **Keyboard or pointer** is the last input: a key press (not a modifier alone) turns the keyboard looks on, a pointer press turns them off. The rows' bar and the section outline follow it, not the browser's own guess at `:focus-visible`.
 - **Dropping.** The whole column accepts a drop, and the gap always shows where the todo will land: over a row, the slot its nearer half points to; below the rows or in an empty column, after the last row. Releasing puts the todo where the gap was. There's one gap on the board at a time: its own column closes up once the pointer or finger leaves it, and the column under it parts. Done and an open todo aren't drop targets, and nothing parts over the sidebar.
 - **Dragging by touch.** A finger holds a row for 450ms within 10px to lift it, with the row's menu; moving turns that into a drag.
 - **Moving.** Moving a todo (1 / 2 / 3, Move to…, the menu's Move) keeps it selected, and the keyboard goes with it to its new column. Done and Delete hand the selection to the next todo.
