@@ -7,24 +7,18 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useEffect, useRef, useState } from "react";
-import { previewRect, SETTLE_TTL_MS } from "@/components/wide/settle";
+import { SETTLE_TTL_MS } from "@/components/wide/settle";
 import { landingSwing, pickTilt, tiltTokens } from "@/components/wide/tilt";
 import { useHints } from "@/hooks/useHints";
-import {
-  dropLineY,
-  dropPlacement,
-  gapTop,
-  type RowSpan,
-  slotAt,
-} from "@/lib/dragOrder";
+import { dropPlacement, gapTop, type RowSpan, slotAt } from "@/lib/dragOrder";
 import { isTouchEvent, NonTouchPointerSensor } from "@/lib/dragSensors";
 import type { TodoWithUrls } from "@/types/database";
 import { LONG_PRESS_MS, LONG_PRESS_SLOP } from "./TodoRow";
 
 /**
- * Touch drags in place: the lifted row follows the finger and the others part
- * to open a gap. A pointer (mouse, trackpad, pen) drags a preview and draws
- * the yellow line between rows, as on the wide board (principle 6).
+ * What started a drag. Both drag in place, the lifted row following and the
+ * others parting to open a gap (principle 6); only a finger's long-press
+ * opens the row's menu, which moving closes.
  */
 export type PhoneDragMode = "touch" | "pointer";
 
@@ -37,9 +31,7 @@ export interface PhoneDrag {
   from: number;
   /** Its slot among the *other* rows, clamped to its pinned/unpinned tier. */
   slot: number;
-  /** Pointer only: the line's offset from the top of the row list, in px. */
-  lineY: number | null;
-  /** Touch only: where the gap the rows part to leave starts, in px. */
+  /** Where the gap the rows part to leave starts, in px. */
   gapY: number | null;
   /** The dragged row's height, which the others part by. */
   height: number;
@@ -55,7 +47,7 @@ export interface PhoneSettle {
   landing: { id: string; tilt: number; swing: number };
 }
 
-/** A page's row list, which rows and the line are measured against. */
+/** A page's row list, which rows and the gap are measured against. */
 export const rowList = (listId: string) =>
   document.querySelector<HTMLElement>(
     `[data-phone-rows="${CSS.escape(listId)}"]`,
@@ -84,8 +76,9 @@ type RowDragData = { todo?: TodoWithUrls; listId?: string } | undefined;
 /**
  * Reordering a phone page's rows. Touch lifts a row after a long-press
  * (`LONG_PRESS_MS`, the same hold that opens the context menu) and moving it
- * past the slop turns the menu into a drag; a pointer drags after 6px. A
- * drag stays in its tier, and its position comes from `dropPlacement`.
+ * past the slop turns the menu into a drag; a pointer drags after 6px, with
+ * no menu. Either way the row lifts in place and the others part around a
+ * gap. A drag stays in its tier, and its position comes from `dropPlacement`.
  *
  * Spread `handlers` onto the `DndContext`; `ordered` shows a just-dropped
  * order until the saved one renders, and `settleFrom` is where rows were at
@@ -173,8 +166,7 @@ export function usePhoneDrag({
       mode,
       from,
       slot: from,
-      lineY: null,
-      gapY: mode === "touch" ? gapTop(spans.current, from, from) : null,
+      gapY: gapTop(spans.current, from, from),
       height: own ? own.bottom - own.top : 0,
       tilt: pickTilt(tiltTokens()?.max ?? 0),
     });
@@ -202,14 +194,12 @@ export function usePhoneDrag({
       cur.todo,
       slotAt(mids, y),
     );
-    const lineY =
-      cur.mode === "pointer"
-        ? dropLineY(spans.current, index, cur.from, y)
-        : null;
-    if (index !== cur.slot || lineY !== cur.lineY) {
-      const gapY =
-        cur.mode === "touch" ? gapTop(spans.current, cur.from, index) : null;
-      show({ ...cur, slot: index, lineY, gapY });
+    if (index !== cur.slot) {
+      show({
+        ...cur,
+        slot: index,
+        gapY: gapTop(spans.current, cur.from, index),
+      });
     }
   };
 
@@ -225,7 +215,7 @@ export function usePhoneDrag({
 
   const onDragEnd = (_e: DragEndEvent) => {
     const cur = shown.current;
-    // Read before the preview unmounts and the rows stop parting.
+    // Read before the rows stop parting.
     const tops = cur && reducedMotion !== "reduce" ? capture(cur) : null;
     const from =
       cur && tops
@@ -265,10 +255,7 @@ export function usePhoneDrag({
   };
 }
 
-/**
- * Each row's top on screen at the drop, parted or lifted as it is. A
- * pointer drop settles the dragged row from its preview instead.
- */
+/** Each row's top on screen at the drop, parted or lifted as it is. */
 function capture(drag: PhoneDrag): Map<string, number> | null {
   const list = rowList(drag.listId);
   if (!list) return null;
@@ -278,10 +265,6 @@ function capture(drag: PhoneDrag): Map<string, number> | null {
   )) {
     const id = li.querySelector<HTMLElement>("[data-row-id]")?.dataset.rowId;
     if (id) tops.set(id, li.getBoundingClientRect().top);
-  }
-  const preview = drag.mode === "pointer" ? previewRect() : null;
-  if (preview) {
-    tops.set(drag.todo.id, preview.top + preview.height / 2 - drag.height / 2);
   }
   return tops;
 }

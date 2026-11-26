@@ -421,6 +421,9 @@ export function WideApp({
           : rows[Math.min(index, rows.length - 1)]) ??
         rows[0] ??
         section.querySelector<HTMLElement>("[data-column-head]");
+      // An empty column takes the keyboard on its head, with nothing
+      // selected: let go of the todo it came from, as toSection does.
+      if (rows.length === 0) setSelectedId(null);
       // The board scrolls itself, smoothly; the focus only brings the row
       // into view within its column.
       target?.focus({ preventScroll: true });
@@ -1093,8 +1096,7 @@ export function WideApp({
         collapsing={actions.collapsing}
         highlightedId={menu?.id ?? null}
         selectedId={selectedId}
-        indicator={drag.indicator}
-        touch={drag.touch}
+        lift={drag.lift}
         animate={animated}
         settle={drag.settle}
         loading={loading}
@@ -1175,7 +1177,6 @@ export function WideApp({
       collapsing={actions.collapsing}
       highlightedId={null}
       selectedId={null}
-      indicator={null}
       loading
       position={position}
       error={null}
@@ -1377,11 +1378,7 @@ export function WideApp({
         </div>
         <DragOverlay dropAnimation={null}>
           {drag.dragging ? (
-            <DragPreview
-              todo={drag.dragging}
-              tilt={drag.tilt}
-              lifted={drag.touch !== null}
-            />
+            <DragPreview todo={drag.dragging} tilt={drag.tilt} />
           ) : null}
         </DragOverlay>
       </DndContext>

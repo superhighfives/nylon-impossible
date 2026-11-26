@@ -1434,7 +1434,7 @@ describe("WideApp", () => {
     );
   });
 
-  it("→ into an empty column tints its head", () => {
+  it("→ into an empty column tints its head and lets go of the todo", () => {
     todos = todos.filter((t) => t.listId !== "list-someday");
     const { container } = render(<WideApp />);
     const board = container.querySelector("[data-wide-ready]");
@@ -1442,6 +1442,10 @@ describe("WideApp", () => {
     press("ArrowRight");
     const head = document.activeElement as HTMLElement;
     expect(head).toHaveAttribute("data-column-head", "list-someday");
+    // One selection on the board: the head, not the todo it came from.
+    expect(
+      container.querySelector("[data-row-container][data-selected]"),
+    ).toBeNull();
     expect(board).toHaveAttribute("data-keyboard");
     expect(head.className).toContain(
       "group-data-[keyboard]/board:focus:bg-[color-mix(in_srgb,currentColor_20%,transparent)]",
@@ -2839,15 +2843,15 @@ describe("WideApp", () => {
 
 describe("WideApp drag and drop", () => {
   const ROW = 48;
-  const box = (top: number, height: number) =>
+  const box = (top: number, height: number, left = 0) =>
     ({
       top,
       bottom: top + height,
       height,
-      left: 0,
-      right: 300,
+      left,
+      right: left + 300,
       width: 300,
-      x: 0,
+      x: left,
       y: top,
       toJSON: () => ({}),
     }) as DOMRect;
@@ -2888,8 +2892,37 @@ describe("WideApp drag and drop", () => {
   };
   const end = (id: string, over: string | null) =>
     act(() => dnd.onDragEnd?.(event(id, over)));
+  // There's no drop line any more, for any input (Settled "Dropping with a
+  // pointer"): these stay to prove it.
   const line = () =>
-    document.querySelector<HTMLElement>("[data-drop-indicator]");
+    document.querySelector("[data-drop-indicator], [data-drop-dot]");
+
+  /** A row's slot in its column. */
+  const shell = (id: string) =>
+    document
+      .querySelector(`[data-column] [data-row-id="${id}"]`)
+      ?.closest("li") as HTMLElement;
+  const container = (id: string) =>
+    shell(id).querySelector("[data-row-container]") as HTMLElement;
+  const gaps = () => [
+    ...document.querySelectorAll<HTMLElement>("[data-drop-gap]"),
+  ];
+  const gapIn = (name: string) =>
+    column(name).querySelector<HTMLElement>("[data-drop-gap]");
+  const shift = (id: string) => shell(id).style.transform;
+  const menu = () => screen.queryByRole("menu", { name: "Todo actions" });
+  const lifted = () =>
+    document.querySelector<HTMLElement>("[data-drag-preview][data-lifted]");
+
+  const animate = vi.fn();
+  const realAnimate = Element.prototype.animate;
+  const layoutProps = (["offsetTop", "offsetHeight"] as const).map(
+    (prop) =>
+      [
+        prop,
+        Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop),
+      ] as const,
+  );
 
   beforeEach(() => {
     update.mockReset();
@@ -2903,25 +2936,68 @@ describe("WideApp drag and drop", () => {
     ].map(([id, title, listId, position]) =>
       makeTodo({ id, title, listId, position }),
     );
+    animate.mockReset();
+    Element.prototype.animate = animate;
+    // jsdom has no layout: a row sits at its index × ROW in its list, as
+    // laid out, whatever transform parts it.
+    Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+      configurable: true,
+      get(this: HTMLElement) {
+        const parent = this.parentElement;
+        return parent && this.matches("li")
+          ? [...parent.children].indexOf(this) * ROW
+          : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.matches("li") ? ROW : 0;
+      },
+    });
+    document.documentElement.style.setProperty("--n-duration-base", "220ms");
+    document.documentElement.style.setProperty(
+      "--n-ease-out-strong",
+      "cubic-bezier(0.23, 1, 0.32, 1)",
+    );
   });
 
-  it("draws a yellow line between rows, measured from the rows, not the composer", () => {
+  afterEach(() => {
+    reducedMotion = "reduce";
+    // dnd-kit lets go of the document's click a moment after a drag.
+    if (vi.isFakeTimers()) vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+    Element.prototype.animate = realAnimate;
+    for (const [prop, descriptor] of layoutProps) {
+      if (descriptor) {
+        Object.defineProperty(HTMLElement.prototype, prop, descriptor);
+      }
+    }
+    document.documentElement.removeAttribute("style");
+  });
+
+  it("a mouse parts the rows around a soft yellow gap, measured from the rows, not the composer", () => {
     render(<WideApp />);
     let top = layOut("Today", 60);
     start("t3");
-    // Below Review PR's middle: between it and Call Mum.
+    // Below Review PR's middle: between it and Call Mum, which parts down.
     move("t3", "col:list-today", top + 30);
-    expect(line()).toHaveStyle({ top: `${ROW}px` });
-    expect(line()).toHaveClass("bg-n-brand");
+    expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px`, height: `${ROW}px` });
+    expect(gapIn("Today")?.firstElementChild).toHaveClass("bg-n-brand-soft");
+    expect(shift("t1")).toBe("");
+    expect(shift("t2")).toBe(`translateY(${ROW}px)`);
+    expect(line()).toBeNull();
 
-    // A taller composer moves the rows, not the line within them.
+    // A taller composer moves the rows, not the gap within them.
     top = layOut("Today", 140);
     move("t3", "col:list-today", top + 30);
-    expect(line()).toHaveStyle({ top: `${ROW}px` });
+    expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
 
-    // Above the first row, and below the last.
-    move("t1", "col:list-today", top + 2);
-    expect(line()).toHaveStyle({ top: "0px" });
+    // Above the first row.
+    move("t3", "col:list-today", top + 2);
+    expect(gapIn("Today")).toHaveStyle({ top: "0px" });
+    expect(gaps()).toHaveLength(1);
+    expect(line()).toBeNull();
   });
 
   it("follows the real pointer when the column has scrolled", () => {
@@ -2931,51 +3007,51 @@ describe("WideApp drag and drop", () => {
     // dnd-kit's delta includes the scroll; the pointer is just under Call Mum's middle.
     pointerAt(top + ROW + 30);
     act(() => dnd.onDragMove?.(event("t1", "col:list-today", 900)));
-    // Its own slot is 0; Call Mum's bottom half points at the gap after it.
-    expect(line()).toHaveStyle({ top: `${2 * ROW}px` });
+    // Call Mum's bottom half points at the slot after it: it parts up.
+    expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+    expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
   });
 
-  it("drops exactly where the line last showed", () => {
+  it("drops exactly where the gap last showed", () => {
     render(<WideApp />);
     const top = layOut("Today");
     start("t3");
     move("t3", "col:list-today", top + 5);
-    expect(line()).toHaveStyle({ top: "0px" });
+    expect(gapIn("Today")).toHaveStyle({ top: "0px" });
     // The pointer moves on before the release, with no move event between.
     pointerAt(top + 2 * ROW + 40);
     end("t3", "col:list-today");
-    expect(line()).toBeNull();
+    expect(gaps()).toEqual([]);
     expect(update).toHaveBeenCalledTimes(1);
     const { id, input } = update.mock.calls[0][0];
     expect(id).toBe("t3");
     expect(input.position < "a0").toBe(true);
   });
 
-  it("changes nothing when dropped on the row's own faded slot", () => {
+  it("changes nothing when dropped on the row's own slot", () => {
     render(<WideApp />);
     const top = layOut("Today");
     start("t2");
-    // Over the top half of Call Mum's own row: the line is at its top edge.
+    // Either half of Call Mum's own slot: the gap is its own space.
     move("t2", "col:list-today", top + ROW + 12);
-    expect(line()).toHaveStyle({ top: `${ROW}px` });
-    // The bottom half: its bottom edge.
+    expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
     move("t2", "col:list-today", top + ROW + 40);
-    expect(line()).toHaveStyle({ top: `${2 * ROW}px` });
+    expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+    for (const id of ["t1", "t3"]) expect(shift(id)).toBe("");
     end("t2", "col:list-today");
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("drops into another column at the line's slot", () => {
+  it("drops into another column at the gap's slot", () => {
     render(<WideApp />);
     layOut("Today");
     const top = layOut("This week");
     start("t1");
     // Between Send invoice and Renew passport.
     move("t1", "col:list-week", top + 30);
-    expect(
-      column("This week").querySelector("[data-drop-indicator]"),
-    ).toHaveStyle({ top: `${ROW}px` });
-    expect(column("Today").querySelector("[data-drop-indicator]")).toBeNull();
+    expect(gapIn("This week")).toHaveStyle({ top: `${ROW}px` });
+    expect(gapIn("Today")).toBeNull();
+    expect(line()).toBeNull();
     end("t1", "col:list-week");
     const { id, input } = update.mock.calls[0][0];
     expect(id).toBe("t1");
@@ -2983,35 +3059,75 @@ describe("WideApp drag and drop", () => {
     expect(input.position > "a0" && input.position < "a1").toBe(true);
   });
 
-  it("fades the dragged row and fills a sidebar list yellow while it's over it", () => {
+  /** A real mouse drag through dnd-kit, so its active and over state is set. */
+  const mouse = (el: Element) => {
+    const at = (x: number, y: number) => ({
+      pointerType: "mouse",
+      clientX: x,
+      clientY: y,
+      isPrimary: true,
+      button: 0,
+    });
+    fireEvent.pointerDown(el, at(400, 100));
+    return {
+      to: (x: number, y: number) => {
+        fireEvent.pointerMove(document, at(x, y));
+        // The board tracks the real pointer from the window.
+        window.dispatchEvent(
+          new MouseEvent("pointermove", { clientX: x, clientY: y }),
+        );
+      },
+      up: (x: number, y: number) => fireEvent.pointerUp(document, at(x, y)),
+    };
+  };
+
+  it("a real mouse drag lifts the row and parts its column, with no line or dot", () => {
+    reducedMotion = "no-preference";
     render(<WideApp />);
-    // A real pointer drag through dnd-kit, so its own active and over state
-    // (which the row's fade and the entry's fill read) is set.
+    const top = layOut("Today");
+    // Today's column, right of the sidebar, as dnd-kit's collision sees it.
+    column("Today").getBoundingClientRect = () => box(0, 800, 300);
+    const drag = mouse(container("t1"));
+    drag.to(400, 110);
+    // Lifted, raised and tilted, with the grabbing cursor; its slot empties
+    // rather than fading.
+    expect(lifted()).toBeInTheDocument();
+    expect(lifted()).toHaveClass("n-lifted", "cursor-grabbing");
+    expect(lifted()?.style.getPropertyValue("--n-drag-tilt")).toMatch(/deg$/);
+    expect(shell("t1")).toHaveClass("opacity-0");
+    expect(shell("t1")).not.toHaveClass("opacity-35");
+    // Past Call Mum's middle: it parts up, and the gap opens below it.
+    drag.to(400, top + ROW + 30);
+    expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+    expect(shell("t2").style.transition).toContain("transform");
+    expect(shift("t3")).toBe("");
+    expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+    expect(gaps()).toHaveLength(1);
+    expect(line()).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+    expect(gaps()).toEqual([]);
+    expect(shift("t2")).toBe("");
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("fills a sidebar list yellow while a mouse drag is over it, and parts nothing", () => {
+    render(<WideApp />);
     const entry = document.querySelector<HTMLElement>(
       '[data-sidebar-list="list-groceries"]',
     ) as HTMLElement;
     (entry.closest("li") as HTMLElement).getBoundingClientRect = () =>
       box(500, 40);
-    const shell = rowButton("Review PR").closest("li") as HTMLElement;
-    const container = shell.querySelector("[data-row-container]") as Element;
-    const at = (y: number) => ({
-      clientX: 100,
-      clientY: y,
-      isPrimary: true,
-      button: 0,
-    });
-    fireEvent.pointerDown(container, at(100));
-    fireEvent.pointerMove(document, at(130));
-    fireEvent.pointerMove(document, at(520));
-    expect(shell).toHaveClass("opacity-35");
+    const drag = mouse(container("t1"));
+    drag.to(400, 130);
+    drag.to(100, 520);
     expect(entry).toHaveClass("bg-n-brand", "text-n-brand-ink");
-    expect(document.querySelector("[data-drag-preview]")).toBeInTheDocument();
-    // A mouse drag parts nothing, and its preview isn't the lifted row.
-    expect(document.querySelector("[data-drop-gap]")).toBeNull();
-    expect(document.querySelector("[data-lifted]")).toBeNull();
+    expect(lifted()).toBeInTheDocument();
+    // Over the sidebar there's no gap: its own column closes up.
+    expect(gaps()).toEqual([]);
+    expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
     fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
-    expect(shell).not.toHaveClass("opacity-35");
     expect(entry).not.toHaveClass("bg-n-brand");
+    expect(shell("t1")).not.toHaveClass("opacity-0");
   });
 
   it("scrolls the board near its side edges, so a todo drops into a list off screen", () => {
@@ -3057,22 +3173,6 @@ describe("WideApp drag and drop", () => {
     }
   });
 
-  it("moves to a sidebar list with no line", () => {
-    render(<WideApp />);
-    const top = layOut("Today");
-    start("t1");
-    move("t1", "col:list-today", top + 30);
-    move("t1", "side:list-groceries", top + 30);
-    expect(line()).toBeNull();
-    end("t1", "side:list-groceries");
-    expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "t1",
-        input: expect.objectContaining({ listId: "list-groceries" }),
-      }),
-    );
-  });
-
   it("moves to a hidden list's sidebar entry, and its column stays hidden", () => {
     const before = lists;
     lists = lists.map((l) =>
@@ -3097,109 +3197,218 @@ describe("WideApp drag and drop", () => {
     }
   });
 
-  describe("by touch", () => {
-    const animate = vi.fn();
-    const realAnimate = Element.prototype.animate;
-    const layoutProps = (["offsetTop", "offsetHeight"] as const).map(
-      (prop) =>
-        [
-          prop,
-          Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop),
-        ] as const,
-    );
+  /**
+   * A drag started by `input`, driven through dnd-kit's handlers: the
+   * finger or pointer goes down `grab` px into the row, then moves by
+   * `deltaY`.
+   */
+  const drive = (input: "touch" | "pointer", id: string, grab = 22) => {
+    const listId = todo(id).listId;
+    const index = todos
+      .filter((t) => t.listId === listId)
+      .findIndex((t) => t.id === id);
+    const top = 168 + index * ROW + grab;
+    const activatorEvent =
+      input === "touch"
+        ? { type: "touchstart", touches: [{ clientX: 100, clientY: top }] }
+        : new MouseEvent("pointerdown", { clientX: 100, clientY: top });
+    const ev = (over: string | null, deltaY: number) =>
+      ({
+        active: { id, data: { current: { todo: todo(id) } } },
+        over: over ? { id: over } : null,
+        activatorEvent,
+        delta: { x: 0, y: deltaY },
+      }) as never;
+    act(() => dnd.onDragStart?.(ev(null, 0)));
+    return {
+      move: (over: string | null, deltaY: number) =>
+        act(() => dnd.onDragMove?.(ev(over, deltaY))),
+      end: (over: string | null, deltaY: number) =>
+        act(() => dnd.onDragEnd?.(ev(over, deltaY))),
+      cancel: () => act(() => dnd.onDragCancel?.(ev(null, 0))),
+    };
+  };
 
+  // Every input drags the same way (principle 6): the rows part around a gap.
+  describe.each(["touch", "pointer"] as const)("by %s", (input) => {
     beforeEach(() => {
-      animate.mockReset();
-      Element.prototype.animate = animate;
-      // jsdom has no layout: a row sits at its index × ROW in its list, as
-      // laid out, whatever transform parts it.
-      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
-        configurable: true,
-        get(this: HTMLElement) {
-          const parent = this.parentElement;
-          return parent && this.matches("li")
-            ? [...parent.children].indexOf(this) * ROW
-            : 0;
-        },
-      });
-      Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
-        configurable: true,
-        get(this: HTMLElement) {
-          return this.matches("li") ? ROW : 0;
-        },
-      });
-      document.documentElement.style.setProperty("--n-duration-base", "220ms");
-      document.documentElement.style.setProperty(
-        "--n-ease-out-strong",
-        "cubic-bezier(0.23, 1, 0.32, 1)",
-      );
       update.mockImplementation(({ id, input }) => {
         todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
       });
     });
 
-    afterEach(() => {
-      reducedMotion = "reduce";
-      // dnd-kit lets go of the document's click a moment after a drag.
-      if (vi.isFakeTimers()) vi.runOnlyPendingTimers();
-      vi.useRealTimers();
-      Element.prototype.animate = realAnimate;
-      for (const [prop, descriptor] of layoutProps) {
-        if (descriptor) {
-          Object.defineProperty(HTMLElement.prototype, prop, descriptor);
-        }
-      }
-      document.documentElement.removeAttribute("style");
+    it("parts its own column around a soft yellow gap, with no line", () => {
+      reducedMotion = "no-preference";
+      render(<WideApp />);
+      const top = layOut("Today");
+      const drag = drive(input, "t1");
+      // Over its own slot: its own space is the gap.
+      expect(gapIn("Today")).toHaveStyle({ top: "0px", height: `${ROW}px` });
+      expect(gapIn("Today")?.firstElementChild).toHaveClass("bg-n-brand-soft");
+      // Down 80: past Call Mum's middle, not Water plants'.
+      drag.move("col:list-today", 80);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shell("t2").style.transition).toContain("transform");
+      expect(shift("t3")).toBe("");
+      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+      expect(gapIn("Today")).toHaveClass("transition-[top]");
+      expect(gaps()).toHaveLength(1);
+      expect(line()).toBeNull();
+      expect(top).toBe(168);
+
+      drag.end("col:list-today", 80);
+      expect(update).toHaveBeenCalledTimes(1);
+      const { id, input: saved } = update.mock.calls[0][0];
+      expect(id).toBe("t1");
+      expect(saved.position > "a1" && saved.position < "a2").toBe(true);
+      expect(gaps()).toEqual([]);
     });
 
-    /** A row's slot in its column. */
-    const shell = (id: string) =>
-      document
-        .querySelector(`[data-column] [data-row-id="${id}"]`)
-        ?.closest("li") as HTMLElement;
-    const container = (id: string) =>
-      shell(id).querySelector("[data-row-container]") as HTMLElement;
-    const gaps = () => [
-      ...document.querySelectorAll<HTMLElement>("[data-drop-gap]"),
-    ];
-    const gapIn = (name: string) =>
-      column(name).querySelector<HTMLElement>("[data-drop-gap]");
-    const shift = (id: string) => shell(id).style.transform;
-    const menu = () => screen.queryByRole("menu", { name: "Todo actions" });
-    const lifted = () =>
-      document.querySelector<HTMLElement>("[data-drag-preview][data-lifted]");
+    it("closes up its own column over another, which parts instead", () => {
+      render(<WideApp />);
+      layOut("Today");
+      layOut("This week");
+      const drag = drive(input, "t1");
+      // 30px into This week's rows (Today's and This week's line up):
+      // after Send invoke's middle, before Renew passport's.
+      drag.move("col:list-week", 8);
+      expect(gapIn("Today")).toBeNull();
+      expect(gapIn("This week")).toHaveStyle({ top: `${ROW}px` });
+      expect(gaps()).toHaveLength(1);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shift("t3")).toBe(`translateY(${-ROW}px)`);
+      expect(shift("w1")).toBe("");
+      expect(shift("w2")).toBe(`translateY(${ROW}px)`);
+      expect(line()).toBeNull();
 
-    /**
-     * A drag dnd-kit's touch sensor started, driven through the handlers:
-     * the finger goes down `grab` px into the row, then moves by `deltaY`.
-     */
-    const driveTouch = (id: string, grab = 22) => {
-      const listId = todo(id).listId;
-      const index = todos
-        .filter((t) => t.listId === listId)
-        .findIndex((t) => t.id === id);
-      const top = 168 + index * ROW + grab;
-      const activatorEvent = {
-        type: "touchstart",
-        touches: [{ clientX: 100, clientY: top }],
-      };
-      const ev = (over: string | null, deltaY: number) =>
-        ({
-          active: { id, data: { current: { todo: todo(id) } } },
-          over: over ? { id: over } : null,
-          activatorEvent,
-          delta: { x: 0, y: deltaY },
-        }) as never;
-      act(() => dnd.onDragStart?.(ev(null, 0)));
-      return {
-        move: (over: string | null, deltaY: number) =>
-          act(() => dnd.onDragMove?.(ev(over, deltaY))),
-        end: (over: string | null, deltaY: number) =>
-          act(() => dnd.onDragEnd?.(ev(over, deltaY))),
-        cancel: () => act(() => dnd.onDragCancel?.(ev(null, 0))),
-      };
-    };
+      // Below This week's rows: last.
+      drag.move("col:list-week", 200);
+      expect(gapIn("This week")).toHaveStyle({ top: `${2 * ROW}px` });
+      expect(shift("w2")).toBe("");
+      drag.end("col:list-week", 200);
+      expect(update).toHaveBeenCalledWith({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-week" }),
+      });
+      expect(update.mock.calls[0][0].input.position > "a1").toBe(true);
+    });
 
+    it("keeps a pinned row's gap among the pinned", () => {
+      todos = todos.map((t) =>
+        t.id === "t1" || t.id === "t2" ? { ...t, pinned: true } : t,
+      );
+      render(<WideApp />);
+      layOut("Today");
+      const drag = drive(input, "t1");
+      drag.move("col:list-today", 4 * ROW);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shift("t3")).toBe("");
+      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+    });
+
+    it("opens the top of an empty column", () => {
+      render(<WideApp />);
+      layOut("Today");
+      layOut("Someday");
+      const drag = drive(input, "t1");
+      drag.move("col:list-someday", 100);
+      expect(gapIn("Someday")).toHaveStyle({ top: "0px" });
+      drag.end("col:list-someday", 100);
+      expect(update).toHaveBeenCalledWith({
+        id: "t1",
+        input: expect.objectContaining({ listId: "list-someday" }),
+      });
+    });
+
+    it("moves to a sidebar list with no gap anywhere", () => {
+      render(<WideApp />);
+      layOut("Today");
+      const drag = drive(input, "t1");
+      drag.move("col:list-today", 80);
+      drag.move("side:list-groceries", 300);
+      expect(gaps()).toEqual([]);
+      expect(line()).toBeNull();
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      drag.end("side:list-groceries", 300);
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "t1",
+          input: expect.objectContaining({ listId: "list-groceries" }),
+        }),
+      );
+    });
+
+    it("saves nothing released where it started, over nothing, or cancelled", () => {
+      render(<WideApp />);
+      layOut("Today");
+      // Let go before the first move: the gap it lifted with is its own slot.
+      let drag = drive(input, "t2");
+      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
+      drag.end("col:list-today", 0);
+      expect(gaps()).toEqual([]);
+      drag = drive(input, "t2");
+      drag.move("col:list-today", 60);
+      drag.move("col:list-today", 2);
+      drag.end("col:list-today", 2);
+      // Over Done, the open todo or nothing: no gap, and back it goes.
+      drag = drive(input, "t2");
+      drag.move("col:list-today", 60);
+      drag.move(null, 400);
+      expect(gaps()).toEqual([]);
+      drag.end(null, 400);
+      drag = drive(input, "t2");
+      drag.move("col:list-today", 60);
+      expect(shift("t3")).toBe(`translateY(${-ROW}px)`);
+      drag.cancel();
+      expect(shift("t3")).toBe("");
+      expect(gaps()).toEqual([]);
+      expect(update).not.toHaveBeenCalled();
+      expect(rowIds("list-today")).toEqual(["t1", "t2", "t3"]);
+    });
+
+    it("eases the rows into the new order, holding them where they parted", () => {
+      reducedMotion = "no-preference";
+      const { rerender } = render(<WideApp />);
+      layOut("Today");
+      const drag = drive(input, "t1");
+      drag.move("col:list-today", 80);
+      const callMum = shell("t2");
+      drag.end("col:list-today", 80);
+      rerender(<WideApp />);
+      expect(rowIds("list-today")).toEqual(["t2", "t1", "t3"]);
+      const framesOf = (el: Element) =>
+        animate.mock.calls
+          .filter((_, i) => animate.mock.contexts[i] === el)
+          .map(([frames]) => frames);
+      // Call Mum is held where it parted to until the new order renders,
+      // which is where it lands: it doesn't spring back first.
+      expect(framesOf(callMum)[0]).toEqual([
+        { transform: `translateY(${-ROW}px)` },
+        { transform: `translateY(${-ROW}px)` },
+      ]);
+      // Review PR eases down from its old place.
+      expect(framesOf(shell("t1"))).toContainEqual([
+        { transform: `translateY(${-ROW}px)` },
+        { transform: "none" },
+      ]);
+    });
+
+    it("doesn't animate under reduced motion", () => {
+      const { rerender } = render(<WideApp />);
+      layOut("Today");
+      const drag = drive(input, "t1");
+      drag.move("col:list-today", 80);
+      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
+      expect(shell("t2").style.transition).toBe("none");
+      expect(gapIn("Today")).not.toHaveClass("transition-[top]");
+      drag.end("col:list-today", 80);
+      rerender(<WideApp />);
+      expect(rowIds("list-today")).toEqual(["t2", "t1", "t3"]);
+      expect(animate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("by touch only", () => {
     const touches = (x: number, y: number) => ({
       touches: [{ clientX: x, clientY: y }],
       changedTouches: [{ clientX: x, clientY: y }],
@@ -3221,7 +3430,6 @@ describe("WideApp drag and drop", () => {
       });
       fireEvent.touchStart(el, touches(x, y));
     };
-
     it("lifts a row only after a 450ms hold within 10px", async () => {
       vi.useFakeTimers();
       render(<WideApp />);
@@ -3289,129 +3497,6 @@ describe("WideApp drag and drop", () => {
       expect(lifted()).toBeNull();
     });
 
-    it("parts its own column around a soft yellow gap, with no line", () => {
-      reducedMotion = "no-preference";
-      render(<WideApp />);
-      const top = layOut("Today");
-      const drag = driveTouch("t1");
-      // Over its own slot: its own space is the gap.
-      expect(gapIn("Today")).toHaveStyle({ top: "0px", height: `${ROW}px` });
-      expect(gapIn("Today")?.firstElementChild).toHaveClass("bg-n-brand-soft");
-      // Down 80: past Call Mum's middle, not Water plants'.
-      drag.move("col:list-today", 80);
-      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
-      expect(shell("t2").style.transition).toContain("transform");
-      expect(shift("t3")).toBe("");
-      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
-      expect(gapIn("Today")).toHaveClass("transition-[top]");
-      expect(gaps()).toHaveLength(1);
-      expect(line()).toBeNull();
-      expect(top).toBe(168);
-
-      drag.end("col:list-today", 80);
-      expect(update).toHaveBeenCalledTimes(1);
-      const { id, input } = update.mock.calls[0][0];
-      expect(id).toBe("t1");
-      expect(input.position > "a1" && input.position < "a2").toBe(true);
-      expect(gaps()).toEqual([]);
-    });
-
-    it("closes up its own column over another, which parts instead", () => {
-      render(<WideApp />);
-      layOut("Today");
-      layOut("This week");
-      const drag = driveTouch("t1");
-      // 30px into This week's rows (Today's and This week's line up):
-      // after Send invoke's middle, before Renew passport's.
-      drag.move("col:list-week", 8);
-      expect(gapIn("Today")).toBeNull();
-      expect(gapIn("This week")).toHaveStyle({ top: `${ROW}px` });
-      expect(gaps()).toHaveLength(1);
-      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
-      expect(shift("t3")).toBe(`translateY(${-ROW}px)`);
-      expect(shift("w1")).toBe("");
-      expect(shift("w2")).toBe(`translateY(${ROW}px)`);
-      expect(line()).toBeNull();
-
-      // Below This week's rows: last.
-      drag.move("col:list-week", 200);
-      expect(gapIn("This week")).toHaveStyle({ top: `${2 * ROW}px` });
-      expect(shift("w2")).toBe("");
-      drag.end("col:list-week", 200);
-      expect(update).toHaveBeenCalledWith({
-        id: "t1",
-        input: expect.objectContaining({ listId: "list-week" }),
-      });
-      expect(update.mock.calls[0][0].input.position > "a1").toBe(true);
-    });
-
-    it("keeps a pinned row's gap among the pinned", () => {
-      todos = todos.map((t) =>
-        t.id === "t1" || t.id === "t2" ? { ...t, pinned: true } : t,
-      );
-      render(<WideApp />);
-      layOut("Today");
-      const drag = driveTouch("t1");
-      drag.move("col:list-today", 4 * ROW);
-      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
-      expect(shift("t3")).toBe("");
-      expect(gapIn("Today")).toHaveStyle({ top: `${ROW}px` });
-    });
-
-    it("opens the top of an empty column", () => {
-      render(<WideApp />);
-      layOut("Today");
-      layOut("Someday");
-      const drag = driveTouch("t1");
-      drag.move("col:list-someday", 100);
-      expect(gapIn("Someday")).toHaveStyle({ top: "0px" });
-      drag.end("col:list-someday", 100);
-      expect(update).toHaveBeenCalledWith({
-        id: "t1",
-        input: expect.objectContaining({ listId: "list-someday" }),
-      });
-    });
-
-    it("moves to a sidebar list with no gap anywhere", () => {
-      render(<WideApp />);
-      layOut("Today");
-      const drag = driveTouch("t1");
-      drag.move("col:list-today", 80);
-      drag.move("side:list-groceries", 300);
-      expect(gaps()).toEqual([]);
-      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
-      drag.end("side:list-groceries", 300);
-      expect(update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: "t1",
-          input: expect.objectContaining({ listId: "list-groceries" }),
-        }),
-      );
-    });
-
-    it("saves nothing released where it started, over nothing, or cancelled", () => {
-      render(<WideApp />);
-      layOut("Today");
-      let drag = driveTouch("t2");
-      drag.move("col:list-today", 60);
-      drag.move("col:list-today", 2);
-      drag.end("col:list-today", 2);
-      // Over Done, the open todo or nothing: no gap, and back it goes.
-      drag = driveTouch("t2");
-      drag.move("col:list-today", 60);
-      drag.move(null, 400);
-      expect(gaps()).toEqual([]);
-      drag.end(null, 400);
-      drag = driveTouch("t2");
-      drag.move("col:list-today", 60);
-      expect(shift("t3")).toBe(`translateY(${-ROW}px)`);
-      drag.cancel();
-      expect(shift("t3")).toBe("");
-      expect(gaps()).toEqual([]);
-      expect(update).not.toHaveBeenCalled();
-      expect(rowIds("list-today")).toEqual(["t1", "t2", "t3"]);
-    });
-
     it("scrolls the board near its side edges, following the finger", () => {
       vi.useFakeTimers();
       render(<WideApp />);
@@ -3427,7 +3512,7 @@ describe("WideApp drag and drop", () => {
             touches: [{ clientX: x, clientY: 300 }],
           }),
         );
-      const drag = driveTouch("t1");
+      const drag = drive("touch", "t1");
       drag.move("col:list-today", 40);
       finger(830);
       act(() => vi.advanceTimersByTime(100));
@@ -3442,47 +3527,6 @@ describe("WideApp drag and drop", () => {
         id: "t1",
         input: expect.objectContaining({ listId: "list-studio" }),
       });
-    });
-
-    it("eases the rows into the new order, holding them where they parted", () => {
-      reducedMotion = "no-preference";
-      const { rerender } = render(<WideApp />);
-      layOut("Today");
-      const drag = driveTouch("t1");
-      drag.move("col:list-today", 80);
-      const callMum = shell("t2");
-      drag.end("col:list-today", 80);
-      rerender(<WideApp />);
-      expect(rowIds("list-today")).toEqual(["t2", "t1", "t3"]);
-      const framesOf = (el: Element) =>
-        animate.mock.calls
-          .filter((_, i) => animate.mock.contexts[i] === el)
-          .map(([frames]) => frames);
-      // Call Mum is held where it parted to until the new order renders,
-      // which is where it lands: it doesn't spring back first.
-      expect(framesOf(callMum)[0]).toEqual([
-        { transform: `translateY(${-ROW}px)` },
-        { transform: `translateY(${-ROW}px)` },
-      ]);
-      // Review PR eases down from its old place.
-      expect(framesOf(shell("t1"))).toContainEqual([
-        { transform: `translateY(${-ROW}px)` },
-        { transform: "none" },
-      ]);
-    });
-
-    it("doesn't animate under reduced motion", () => {
-      const { rerender } = render(<WideApp />);
-      layOut("Today");
-      const drag = driveTouch("t1");
-      drag.move("col:list-today", 80);
-      expect(shift("t2")).toBe(`translateY(${-ROW}px)`);
-      expect(shell("t2").style.transition).toBe("none");
-      expect(gapIn("Today")).not.toHaveClass("transition-[top]");
-      drag.end("col:list-today", 80);
-      rerender(<WideApp />);
-      expect(rowIds("list-today")).toEqual(["t2", "t1", "t3"]);
-      expect(animate).not.toHaveBeenCalled();
     });
 
     it("a tap selects and a second tap opens; the checkbox ticks and never lifts", () => {
@@ -3513,7 +3557,7 @@ describe("WideApp drag and drop", () => {
       expect(check).toHaveAttribute("aria-pressed", "true");
     });
 
-    it("a mouse drag stays as it was: 6px, the line, no hold and no parting", () => {
+    it("a mouse starts after 6px, with no hold and no menu", () => {
       vi.useFakeTimers();
       render(<WideApp />);
       layOut("Today");
@@ -3534,57 +3578,15 @@ describe("WideApp drag and drop", () => {
       expect(menu()).toBeNull();
       expect(lifted()).toBeNull();
       fireEvent.pointerUp(document, { pointerType: "mouse" });
-
-      start("t1");
-      move("t1", "col:list-today", 168 + 2 * ROW + 30);
-      expect(line()).toBeInTheDocument();
-      expect(gaps()).toEqual([]);
-      for (const id of ["t2", "t3"]) expect(shift(id)).toBe("");
-      end("t1", "col:list-today");
     });
   });
 
   describe("easing rows into place", () => {
-    const animate = vi.fn();
-    const realAnimate = Element.prototype.animate;
-    const realOffsetTop = Object.getOwnPropertyDescriptor(
-      HTMLElement.prototype,
-      "offsetTop",
-    );
-
     beforeEach(() => {
-      animate.mockReset();
-      Element.prototype.animate = animate;
-      // jsdom has no layout: a row sits at its index × ROW in its list.
-      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
-        configurable: true,
-        get(this: HTMLElement) {
-          const parent = this.parentElement;
-          return parent ? [...parent.children].indexOf(this) * ROW : 0;
-        },
-      });
-      document.documentElement.style.setProperty("--n-duration-base", "220ms");
-      document.documentElement.style.setProperty(
-        "--n-ease-out-strong",
-        "cubic-bezier(0.23, 1, 0.32, 1)",
-      );
       // The drop lands as the server's answer would.
       update.mockImplementation(({ id, input }) => {
         todos = todos.map((t) => (t.id === id ? { ...t, ...input } : t));
       });
-    });
-
-    afterEach(() => {
-      reducedMotion = "reduce";
-      Element.prototype.animate = realAnimate;
-      if (realOffsetTop) {
-        Object.defineProperty(
-          HTMLElement.prototype,
-          "offsetTop",
-          realOffsetTop,
-        );
-      }
-      document.documentElement.removeAttribute("style");
     });
 
     const dropFirst = () => {
@@ -3601,13 +3603,21 @@ describe("WideApp drag and drop", () => {
       reducedMotion = "no-preference";
       dropFirst();
       const rows = [...column("Today").querySelectorAll("li")];
-      // Water plants rises from the bottom; the two above it step down.
+      // Water plants rises from its old slot; the two above it are held
+      // where they parted to, which is where they land, so they don't
+      // spring back for a frame first.
       expect(rows[0]).toHaveTextContent("Water plants");
-      expect(animate.mock.contexts).toEqual(rows);
-      expect(animate.mock.calls.map(([frames]) => frames[0])).toEqual([
-        { transform: `translateY(${2 * ROW}px)` },
-        { transform: `translateY(${-ROW}px)` },
-        { transform: `translateY(${-ROW}px)` },
+      expect(animate.mock.contexts).toEqual([rows[1], rows[2], rows[0]]);
+      expect(animate.mock.calls.map(([frames]) => frames)).toEqual([
+        [
+          { transform: `translateY(${ROW}px)` },
+          { transform: `translateY(${ROW}px)` },
+        ],
+        [
+          { transform: `translateY(${ROW}px)` },
+          { transform: `translateY(${ROW}px)` },
+        ],
+        [{ transform: `translateY(${2 * ROW}px)` }, { transform: "none" }],
       ]);
       expect(animate).toHaveBeenCalledWith(expect.anything(), {
         duration: 220,

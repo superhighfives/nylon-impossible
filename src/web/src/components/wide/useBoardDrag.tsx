@@ -14,7 +14,6 @@ import { useHints } from "@/hooks/useHints";
 import {
   columnGapTop,
   columnPart,
-  dropLineY,
   dropSlot,
   type RowSpan,
 } from "@/lib/dragOrder";
@@ -26,7 +25,7 @@ import {
 } from "@/lib/dragSensors";
 import type { TodoWithUrls } from "@/types/database";
 import { columnRows } from "./boardDom";
-import type { DropGap, DropIndicator, TouchDrag } from "./Column";
+import type { DropGap, LiftDrag } from "./Column";
 import { resolveDrop } from "./drop";
 import {
   captureRows,
@@ -37,9 +36,6 @@ import {
   type Settle,
 } from "./settle";
 import { landingSwing, pickTilt, tiltStyle, tiltTokens } from "./tilt";
-
-/** Where the line goes in an empty column, from the top of its row list. */
-const EMPTY_LINE_Y = 8;
 
 /** How near the board's side edges a dragged todo scrolls it, in px. */
 const EDGE = 64;
@@ -88,7 +84,7 @@ function pointerY(e: DragMoveEvent | DragEndEvent) {
   return (startPoint(e.activatorEvent)?.y ?? 0) + e.delta.y;
 }
 
-/** A column's drop area, which the line, the gap and row offsets measure from. */
+/** A column's drop area, which the gap and row offsets measure from. */
 const dropArea = (listId: string) =>
   document.querySelector<HTMLElement>(
     `[data-drop-area="${CSS.escape(listId)}"]`,
@@ -96,7 +92,7 @@ const dropArea = (listId: string) =>
 
 /**
  * A column's rows as laid out in its drop area: offsets, so rows parting
- * around a touch drag don't move what they're measured against.
+ * around a drag don't move what they're measured against.
  */
 function layoutSpans(listId: string): RowSpan[] {
   return columnRows(listId).map((el) => {
@@ -107,12 +103,12 @@ function layoutSpans(listId: string): RowSpan[] {
 
 /**
  * Drag and drop on the board: pick a row up from anywhere but its checkbox,
- * drop it between rows of any column or on a sidebar list. The input that
- * starts the drag decides how it looks (principle 6). A mouse, trackpad or
- * pen drags after 6px, with a preview and a line marking the slot. A finger
- * long-presses (`LONG_PRESS_MS`, as on the phone) to lift the row, and
- * the rows part around a soft gap where it'll land, one column at a time.
- * Held near the board's left or right edge, either scrolls the board, so a
+ * drop it between rows of any column or on a sidebar list. A mouse, trackpad
+ * or pen starts after 6px; a finger long-presses (`LONG_PRESS_MS`, as on the
+ * phone), which also opens the row's menu. Either way it looks the same
+ * (principle 6): the row lifts and follows, and the rows part around a soft
+ * gap where it'll land, one column at a time.
+ * Held near the board's left or right edge, it scrolls the board, so a
  * list that's off screen can take it. Spread `handlers` onto the
  * `DndContext`, and pass `settle` to the columns so their rows ease into a
  * new order after a drop.
@@ -137,16 +133,16 @@ export function useBoardDrag({
   const [dragging, setDragging] = useState<TodoWithUrls | null>(null);
   // The drag's tilt, in degrees: picked as it lifts, held until it drops.
   const [tilt, setTilt] = useState(0);
-  const [indicator, setIndicator] = useState<DropIndicator | null>(null);
-  // A touch drag: where it was lifted from and the gap it's opening.
-  const [touch, setTouch] = useState<TouchDrag | null>(null);
-  const touchShown = useRef<TouchDrag | null>(null);
+  // The drag: where it was lifted from and the gap it's opening.
+  const [lift, setLift] = useState<LiftDrag | null>(null);
+  // The drag as last drawn, which is where a release drops. A ref, so a
+  // release in the same tick as the last move still sees it.
+  const shown = useRef<LiftDrag | null>(null);
+  // A finger lifted it, with the row's menu.
+  const byTouch = useRef(false);
   // A finger has moved past the slop since the lift: it's a drag, not a menu.
   const moved = useRef(false);
   const [settle, setSettle] = useState<Settle | null>(null);
-  // The line as last drawn, which is where a release drops. A ref, so a
-  // release in the same tick as the last move still sees it.
-  const shown = useRef<DropIndicator | null>(null);
   // The real pointer, tracked while dragging.
   const pointer = useRef<number | null>(null);
   const pointerX = useRef<number | null>(null);
@@ -173,34 +169,14 @@ export function useBoardDrag({
     return () => clearTimeout(done);
   }, [settle]);
 
-  /** The slot under the pointer in column `listId`, and where its line goes. */
-  const measure = (
-    listId: string,
-    todo: TodoWithUrls,
-    y: number,
-  ): DropIndicator | null => {
-    const area = dropArea(listId);
-    if (!area) return null;
-    const rowEls = columnRows(listId);
-    const rects = rowEls.map((el) =>
-      (el.closest("li") ?? el).getBoundingClientRect(),
-    );
-    const dragged = rowEls.findIndex((el) => el.dataset.rowId === todo.id);
-    const index = dropSlot(rowsFor(listId), todo, rects, dragged, y);
-    // Measured against the element the line is drawn in.
-    const base = area.getBoundingClientRect().top;
-    const line = dropLineY(rects, index, dragged, y);
-    return { listId, index, y: line === null ? EMPTY_LINE_Y : line - base };
-  };
-
   /**
-   * The slot under the finger in column `listId`, by the line's rule, and
-   * where the gap the rows part to leave starts.
+   * The slot under the pointer or finger in column `listId`, by the nearer
+   * half of a row, and where the gap the rows part to leave starts.
    */
   const measureGap = (
     listId: string,
     todo: TodoWithUrls,
-    lift: Pick<TouchDrag, "listId" | "from">,
+    lift: Pick<LiftDrag, "listId" | "from">,
     y: number,
   ): DropGap | null => {
     const area = dropArea(listId);
@@ -212,13 +188,13 @@ export function useBoardDrag({
     return { listId, index, top: columnGapTop(spans, from, index) };
   };
 
-  const showTouch = (next: TouchDrag | null) => {
-    touchShown.current = next;
-    setTouch(next);
+  const showLift = (next: LiftDrag | null) => {
+    shown.current = next;
+    setLift(next);
   };
 
   const showGap = (gap: DropGap | null) => {
-    const cur = touchShown.current;
+    const cur = shown.current;
     if (!cur) return;
     const was = cur.gap;
     if (
@@ -231,20 +207,7 @@ export function useBoardDrag({
     ) {
       return;
     }
-    showTouch({ ...cur, gap });
-  };
-
-  const show = (next: DropIndicator | null) => {
-    shown.current = next;
-    setIndicator((cur) =>
-      cur &&
-      next &&
-      cur.listId === next.listId &&
-      cur.index === next.index &&
-      cur.y === next.y
-        ? cur
-        : next,
-    );
+    showLift({ ...cur, gap });
   };
 
   const onDragStart = (e: DragStartEvent) => {
@@ -284,19 +247,21 @@ export function useBoardDrag({
       clearInterval(edge);
     };
     moved.current = false;
-    if (!todo || !startedByTouch(e.activatorEvent)) {
-      showTouch(null);
-      onStart();
+    byTouch.current = startedByTouch(e.activatorEvent);
+    // A pointer's drag closes the menu at once; a finger's menu, opened by
+    // the long-press, stays until the finger moves.
+    if (!byTouch.current) onStart();
+    if (!todo) {
+      showLift(null);
       return;
     }
-    // A finger lifts the row in place: the gap opens in its own space, and
-    // the menu the long-press opened stays until the finger moves.
+    // The row lifts in place: the gap opens in its own space.
     const listId = todo.listId;
     const rowEls = columnRows(listId);
     const from = rowEls.findIndex((el) => el.dataset.rowId === todo.id);
     const li = rowEls[from]?.closest("li");
     const lift = { listId, from, height: li?.offsetHeight ?? 0 };
-    showTouch({
+    showLift({
       ...lift,
       gap:
         from < 0 || start === null
@@ -305,13 +270,13 @@ export function useBoardDrag({
     });
   };
 
-  // Also called as the column scrolls, so the line keeps up with auto-scroll.
+  // Also called as the column scrolls, so the gap keeps up with auto-scroll.
   const onDragMove = (e: DragMoveEvent) => {
     const todo = dragging;
     const overId = e.over?.id;
-    const lift = touchShown.current;
+    const lift = shown.current;
     if (
-      lift &&
+      byTouch.current &&
       !moved.current &&
       (Math.abs(e.delta.x) > LONG_PRESS_SLOP ||
         Math.abs(e.delta.y) > LONG_PRESS_SLOP)
@@ -319,20 +284,18 @@ export function useBoardDrag({
       moved.current = true;
       onStart();
     }
+    if (!lift) return;
     if (!todo || typeof overId !== "string" || !overId.startsWith("col:")) {
-      if (lift) showGap(null);
-      else show(null);
+      showGap(null);
       return;
     }
     const y = pointer.current ?? pointerY(e);
-    if (lift) showGap(measureGap(overId.slice(4), todo, lift, y));
-    else show(measure(overId.slice(4), todo, y));
+    showGap(measureGap(overId.slice(4), todo, lift, y));
   };
 
   const onDragCancel = () => {
     setDragging(null);
-    show(null);
-    showTouch(null);
+    showLift(null);
     untrack.current?.();
     untrack.current = null;
     pointer.current = null;
@@ -346,48 +309,38 @@ export function useBoardDrag({
   const onDragEnd = (e: DragEndEvent) => {
     const todo = dragging;
     const overId = e.over?.id;
-    const line = shown.current;
-    const lift = touchShown.current;
+    const lift = shown.current;
     const y = pointer.current ?? pointerY(e);
     // Read before the preview unmounts.
     const preview = previewRect();
     // A finger let go without moving: the menu stays, nothing changes.
-    const held = lift !== null && !moved.current;
+    const held = byTouch.current && !moved.current;
     onDragCancel();
-    if (!todo || typeof overId !== "string" || held) return;
+    if (!todo || !lift || typeof overId !== "string" || held) return;
     let slot = 0;
     if (overId.startsWith("col:")) {
       const listId = overId.slice(4);
-      // Exactly where the line or gap was; measured now only if neither
-      // showed.
-      const last = lift ? lift.gap : line;
+      // Exactly where the gap was; measured now only if it didn't show.
       slot =
-        last?.listId === listId
-          ? last.index
-          : ((lift
-              ? measureGap(listId, todo, lift, y)
-              : measure(listId, todo, y)
-            )?.index ?? 0);
+        lift.gap?.listId === listId
+          ? lift.gap.index
+          : (measureGap(listId, todo, lift, y)?.index ?? 0);
     }
     const drop = resolveDrop({ overId, todo, rowsFor, slot });
     if (drop?.kind === "move") actions.move(todo, drop.listId);
     else if (drop?.kind === "place") {
       if (reducedMotion !== "reduce") {
-        // A touch drop settles from where the rows were parted to, and
-        // they're held there until the new order renders.
-        const from = captureRows(
-          [todo.listId, drop.listId],
-          lift
-            ? (listId, index) =>
-                columnPart(
-                  lift.listId === listId ? lift.from : null,
-                  lift.gap?.listId === listId ? lift.gap.index : null,
-                  index,
-                  lift.height,
-                )
-            : undefined,
+        // A drop settles from where the rows were parted to, and they're
+        // held there until the new order renders.
+        const from = captureRows([todo.listId, drop.listId], (listId, index) =>
+          columnPart(
+            lift.listId === listId ? lift.from : null,
+            lift.gap?.listId === listId ? lift.gap.index : null,
+            index,
+            lift.height,
+          ),
         );
-        if (lift) holdRows(from);
+        holdRows(from);
         // Reduced motion has no settle, so no swing either.
         const swing = landingSwing(tilt, tiltTokens(), false);
         const landing = preview
@@ -402,8 +355,7 @@ export function useBoardDrag({
   return {
     dragging,
     tilt,
-    indicator,
-    touch,
+    lift,
     settle,
     justDragged,
     sensors,
@@ -412,54 +364,32 @@ export function useBoardDrag({
 }
 
 /**
- * What follows the pointer while a row is dragged: a card tilted by the
- * drag's angle (`tilt`, in degrees), lifted with a deeper shadow. A finger
- * lifts the row itself instead (`lifted`): the row's own width and look,
- * raised as the phone's lifted row is, with no faded original left behind.
+ * What follows the pointer or finger while a row is dragged: the row itself,
+ * lifted, at its own width and look, raised as the phone's lifted row is and
+ * tilted by the drag's angle (`tilt`, in degrees). No faded original is left
+ * behind; its slot is the gap.
  */
 export function DragPreview({
   todo,
   tilt,
-  lifted = false,
 }: {
   todo: TodoWithUrls;
   tilt: number;
-  lifted?: boolean;
 }) {
   return (
     <div
       data-drag-preview
-      data-lifted={lifted ? "" : undefined}
+      data-lifted
       style={tiltStyle(tilt)}
-      className={
-        lifted
-          ? `${RAISED} n-lifted -mx-2.5 flex items-start gap-3 px-2.5 py-2.5`
-          : "n-lifted flex w-72 cursor-grabbing items-start gap-3 rounded-n-field border border-n-hairline bg-n-surface px-3 py-2.5 shadow-[0_14px_30px_color-mix(in_srgb,black_16%,transparent)]"
-      }
+      className={`${RAISED} n-lifted -mx-2.5 flex cursor-grabbing items-start gap-3 px-2.5 py-2.5`}
     >
       <span
         aria-hidden="true"
         className="mt-px size-[1.375rem] shrink-0 rounded-[6px] border-[1.75px] border-n-ink"
       />
-      <span
-        className={`${lifted ? "line-clamp-3 wrap-anywhere" : "line-clamp-2"} text-n-wide-row-title text-n-ink`}
-      >
+      <span className="line-clamp-3 wrap-anywhere text-n-wide-row-title text-n-ink">
         {displayTitle(todo)}
       </span>
     </div>
-  );
-}
-
-/**
- * The drop line's dot: 8px of `brand` at its leading end, with a 2px
- * `canvas` ring so it reads over any row. Scales in; goes inside the line.
- */
-export function DropDot() {
-  return (
-    <span
-      aria-hidden="true"
-      data-drop-dot
-      className="absolute top-1/2 -left-1 size-2 -translate-y-1/2 animate-n-dot-in rounded-full bg-n-brand ring-2 ring-n-canvas"
-    />
   );
 }

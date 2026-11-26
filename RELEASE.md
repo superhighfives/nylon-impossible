@@ -65,16 +65,21 @@ uploads the binary only (`skip_metadata`, `skip_screenshots`,
 `submit_for_review: false`), so everything here is entered in App Store
 Connect by hand unless we add `deliver` metadata later.
 
-- [ ] Privacy manifest (#856, Ready). The app has no `PrivacyInfo.xcprivacy`,
-      and 19 files use `UserDefaults`, a required-reason API. Add a manifest
-      to the app, the widget and the share extension. App Store Connect
-      rejects an upload without the declaration (ITMS-91053).
-- [x] App privacy labels, published 2026-11-24. Collected, linked to the
-      user, for app functionality, no tracking: name and email address
-      (Clerk), user ID, other user content (todos, lists, notes, links),
-      crash data and performance data (Sentry). Sentry's data counts as
-      linked because the app sets the Sentry user
-      (`SessionLifecycle.swift`). Update the labels if that changes.
+- [x] Privacy manifest. The app, the widget and the share extension each
+      have a `PrivacyInfo.xcprivacy` declaring their `UserDefaults` use
+      (#853), so App Store Connect doesn't reject the upload (ITMS-91053).
+      The app's also lists the data it collects, matching the privacy
+      labels (#857). `PrivacyManifestTests` checks the built bundles.
+- [x] App privacy labels, published 2026-11-24, matching the app's privacy
+      manifest. Collected, linked to the user, for app functionality, no
+      tracking: name and email address (Clerk), user ID, other user content
+      (todos, lists, notes, links), crash data and performance data
+      (Sentry). Sentry's data counts as linked because the app sets the
+      Sentry user (`SessionLifecycle.swift`). Update the labels and the
+      manifest together if that changes. Before submitting, check them
+      against the privacy report, which merges the app's manifest with the
+      SDKs': in Xcode, Organizer → right-click the archive → Generate
+      Privacy Report.
 - [x] Name, subtitle, promotional text, description, keywords, category,
       on the iOS and Mac versions (2026-11-24).
 - [x] Release: manual on both versions, so approval doesn't publish them.

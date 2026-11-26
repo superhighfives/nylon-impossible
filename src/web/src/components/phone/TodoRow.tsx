@@ -137,12 +137,11 @@ function MetaLine({
 }
 
 /**
- * The row's slot: collapses out when done, fades while being dragged, rises
- * above the others while lifted, and empties while a card stands in for it.
+ * The row's slot: collapses out when done, rises above the others while
+ * lifted, and empties while a card stands in for it.
  */
 function RowShell({
   collapsing,
-  dragging,
   lifted = false,
   away = false,
   rowRef,
@@ -150,7 +149,6 @@ function RowShell({
   children,
 }: {
   collapsing: boolean;
-  dragging: boolean;
   lifted?: boolean;
   away?: boolean;
   rowRef?: Ref<HTMLLIElement>;
@@ -164,15 +162,13 @@ function RowShell({
       data-lifted={lifted ? "" : undefined}
       style={style}
       className={`relative grid transition-[grid-template-rows,opacity] duration-(--n-duration-base) ease-n-out ${
-        lifted ? "z-10" : ""
+        lifted ? "z-10 cursor-grabbing" : ""
       } ${
         collapsing
           ? "grid-rows-[0fr] opacity-0"
           : away
             ? "grid-rows-[1fr] opacity-0"
-            : dragging
-              ? "grid-rows-[1fr] opacity-35"
-              : "grid-rows-[1fr] opacity-100"
+            : "grid-rows-[1fr] opacity-100"
       }`}
       aria-hidden={collapsing || undefined}
     >
@@ -270,21 +266,19 @@ export interface TodoRowProps {
    * inside its column's gutter.
    */
   density?: "phone" | "wide";
-  /** Being dragged by a pointer: the original stays in place, faded. */
-  dragging?: boolean;
   /**
-   * Phone: lifted by a long-press, with the context menu preview's raised
-   * look. A touch drag moves the row itself, so it doesn't fade.
+   * Phone: lifted by a drag, with the context menu preview's raised look.
+   * The drag moves the row itself, so it doesn't fade.
    */
   lifted?: boolean;
-  /** Phone: a touch drag's tilt, in degrees, while `lifted`. */
+  /** Phone: a drag's tilt, in degrees, while `lifted`. */
   tilt?: number;
   /**
-   * Wide: lifted by a finger. The card that follows it stands in for the
-   * row, so its slot is left empty: the gap, while the finger's over it.
+   * Wide: being dragged. The card that follows the pointer or finger stands
+   * in for the row, so its slot is left empty: the gap, while it's over it.
    */
   away?: boolean;
-  /** The row's slot's style, for a touch drag's offsets. */
+  /** The row's slot's style, for a drag's offsets. */
   rowStyle?: CSSProperties;
   /** Extra props for the row's main button — drag listeners, data hooks. */
   bodyProps?: HTMLAttributes<HTMLButtonElement> &
@@ -396,7 +390,6 @@ function WideTodoRow({
   onCheck,
   onOpen,
   onMenu,
-  dragging = false,
   away = false,
   rowStyle,
   bodyProps,
@@ -422,7 +415,6 @@ function WideTodoRow({
   return (
     <RowShell
       collapsing={collapsing}
-      dragging={dragging}
       away={away}
       rowRef={rowRef}
       style={rowStyle}
@@ -526,7 +518,6 @@ function PhoneTodoRow({
   onCheck,
   onOpen,
   onMenu,
-  dragging = false,
   lifted = false,
   tilt = 0,
   rowStyle,
@@ -546,7 +537,6 @@ function PhoneTodoRow({
   return (
     <RowShell
       collapsing={collapsing}
-      dragging={dragging}
       lifted={lifted}
       rowRef={rowRef}
       style={rowStyle}
