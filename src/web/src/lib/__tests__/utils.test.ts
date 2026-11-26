@@ -1,10 +1,17 @@
 import { Cause, Effect, Exit, Layer, Option } from "effect";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthService } from "../auth";
-import { DatabaseError } from "../errors";
+import { DatabaseError, RateLimitedError } from "../errors";
+import { causeToClientError } from "../server-errors";
 import { ENSURE_USER_ATTEMPTS, withAuthenticatedUser } from "../utils";
 
-vi.mock("cloudflare:workers", () => ({ env: { DB: {} } }));
+const limit = vi.fn();
+vi.mock("cloudflare:workers", () => ({
+  env: {
+    DB: {},
+    USER_RATE_LIMIT: { limit: (...args: unknown[]) => limit(...args) },
+  },
+}));
 
 vi.mock("../db", () => ({ getDbClient: () => ({}) }));
 
@@ -39,6 +46,8 @@ describe("withAuthenticatedUser", () => {
 
   beforeEach(() => {
     ensureUserExists.mockReset();
+    limit.mockReset();
+    limit.mockResolvedValue({ success: true });
     warn = vi.spyOn(console, "warn").mockImplementation(() => {});
   });
 
@@ -81,5 +90,32 @@ describe("withAuthenticatedUser", () => {
     expect(callback).not.toHaveBeenCalled();
     // The final failure goes to Sentry instead of a warning.
     expect(warn).toHaveBeenCalledTimes(ENSURE_USER_ATTEMPTS - 1);
+  });
+
+  it("fails with RateLimitedError over the user's limit, before D1 or the callback", async () => {
+    limit.mockResolvedValue({ success: false });
+    const callback = vi.fn(() => Effect.succeed("board"));
+
+    const exit = await run(callback);
+
+    expect(Exit.isFailure(exit)).toBe(true);
+    if (!Exit.isFailure(exit)) return;
+    const failure = Option.getOrThrow(Cause.failureOption(exit.cause));
+    expect(failure).toBeInstanceOf(RateLimitedError);
+    expect(limit).toHaveBeenCalledWith({ key: user.id });
+    expect(ensureUserExists).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+    // What the client gets: the toast shows this message as it is.
+    expect(causeToClientError(exit.cause)).toMatchObject({
+      message: "Too many requests. Try again in a minute.",
+      status: 429,
+    });
+  });
+
+  it("counts every server function against the user's limit, keyed on their id", async () => {
+    ensureUserExists.mockResolvedValue(undefined);
+    await run(() => Effect.succeed("board"));
+    expect(limit).toHaveBeenCalledOnce();
+    expect(limit).toHaveBeenCalledWith({ key: "user_1" });
   });
 });

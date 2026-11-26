@@ -5,6 +5,7 @@ import { AuthService, AuthServiceLive, ensureUserExists } from "./auth";
 import { type DbClient, getDbClient } from "./db";
 import {
   DatabaseError,
+  RateLimitedError,
   type UnauthorizedError,
   type UserNotFoundError,
 } from "./errors";
@@ -54,13 +55,21 @@ export const withAuthenticatedUser = <A, E>(
   callback: (user: User, db: DbClient) => Effect.Effect<A, E>,
 ): Effect.Effect<
   A,
-  E | DatabaseError | UnauthorizedError | UserNotFoundError,
+  E | DatabaseError | RateLimitedError | UnauthorizedError | UserNotFoundError,
   AuthService
 > =>
   Effect.gen(function* () {
     // Get authenticated user from AuthService
     const authService = yield* AuthService;
     const user = yield* authService.getUser;
+
+    // Per-user rate limit, before the first D1 write (ensureUserExists).
+    const { success } = yield* Effect.promise(() =>
+      env.USER_RATE_LIMIT.limit({ key: user.id }),
+    );
+    if (!success) {
+      return yield* new RateLimitedError({ userId: user.id });
+    }
 
     // Get database client for this request
     const db = yield* Effect.try({

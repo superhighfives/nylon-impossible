@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DatabaseError,
   ListNotFoundError,
+  RateLimitedError,
   SystemListImmutableError,
   TodoNotFoundError,
   UnauthorizedError,
@@ -77,6 +78,11 @@ describe("causeToClientError", () => {
     [new UserNotFoundError({ userId: "u1" }), 401, "Unauthorized"],
     [new TodoNotFoundError({ id: "t1" }), 404, "Not found"],
     [new ListNotFoundError({ id: "l1" }), 404, "Not found"],
+    [
+      new RateLimitedError({ userId: "u1" }),
+      429,
+      "Too many requests. Try again in a minute.",
+    ],
     [
       new SystemListImmutableError({ id: "l1" }),
       403,

@@ -6,6 +6,7 @@ interface __BaseEnv_Env {
 	ENVIRONMENT: "development";
 	VITE_CLERK_PUBLISHABLE_KEY: string;
 	CLERK_SECRET_KEY: string;
+	USER_RATE_LIMIT: RateLimit;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

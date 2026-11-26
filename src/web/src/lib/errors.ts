@@ -57,6 +57,13 @@ export class ValidationError extends Data.TaggedError("ValidationError")<{
 }
 
 /**
+ * Thrown when a user is over their per-user rate limit (`USER_RATE_LIMIT`)
+ */
+export class RateLimitedError extends Data.TaggedError("RateLimitedError")<{
+  readonly userId: string;
+}> {}
+
+/**
  * Thrown when a list is not found
  */
 export class ListNotFoundError extends Data.TaggedError("ListNotFoundError")<{

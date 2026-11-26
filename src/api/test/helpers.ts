@@ -16,7 +16,7 @@ const OPEN_LIMIT = { limit: async () => ({ success: true }) };
 
 /**
  * Calls the worker directly rather than through SELF, so a test can swap a
- * binding (the /v1 rate limiter) and wait for `waitUntil` work (the API
+ * binding (a rate limiter) and wait for `waitUntil` work (the API
  * token's last-used write) before reading D1.
  */
 export async function callWorker(
@@ -33,7 +33,12 @@ export async function callWorker(
       unknown,
       IncomingRequestCfProperties
     >,
-    { ...env, V1_RATE_LIMIT: OPEN_LIMIT, ...overrides } as never,
+    {
+      ...env,
+      V1_RATE_LIMIT: OPEN_LIMIT,
+      USER_RATE_LIMIT: OPEN_LIMIT,
+      ...overrides,
+    } as never,
     ctx,
   );
   await waitOnExecutionContext(ctx);
