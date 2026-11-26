@@ -38,6 +38,14 @@
       "name": "V1_RATE_LIMIT",
       "namespace_id": "1001",
       "simple": { "limit": 60, "period": 60 }
+    },
+    // The suite's SELF.fetch calls all sign in as one user, so this limit stays
+    // out of their way. rate-limit.test.ts swaps in a limiter held to the
+    // number in wrangler.jsonc.
+    {
+      "name": "USER_RATE_LIMIT",
+      "namespace_id": "1002",
+      "simple": { "limit": 100000, "period": 60 }
     }
   ],
   "observability": {

@@ -69,6 +69,28 @@ describe("messageFromError", () => {
   });
 });
 
+describe("messageFromError, server functions", () => {
+  it("shows a rate-limited server function's message, which says what to do", () => {
+    // As it arrives from a server function: the ServerFnError's message on a
+    // plain Error (the shallow serializer drops the class and status).
+    expect(
+      messageFromError(
+        new Error("Too many requests. Try again in a minute."),
+        "Couldn’t save that change",
+      ),
+    ).toBe("Too many requests. Try again in a minute.");
+  });
+
+  it("keeps the action's sentence for any other server function error", () => {
+    expect(
+      messageFromError(
+        new Error("Something went wrong. Try again."),
+        "Couldn’t save that change",
+      ),
+    ).toBe("Couldn’t save that change");
+  });
+});
+
 describe("apiErrorFrom", () => {
   it("reads the envelope's message and code", async () => {
     const err = await apiErrorFrom(

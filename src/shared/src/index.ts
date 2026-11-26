@@ -9,6 +9,7 @@ export * from "./list-name";
 export * from "./recurrence";
 export * from "./schema";
 export * from "./smart-create";
+export * from "./sync";
 export * from "./timezone";
 export * from "./todo-date";
 export * from "./toast-copy";

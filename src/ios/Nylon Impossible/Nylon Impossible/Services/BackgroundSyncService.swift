@@ -88,7 +88,7 @@ struct BackgroundSyncService {
         let userId = self.userId
 
         // 1. Fetch unsynced items and build the payload on the main actor
-        let (changes, itemIDs): ([TodoChange], [PersistentIdentifier]) = try await MainActor.run {
+        let (changes, itemIDs): ([TodoChange], [String: PersistentIdentifier]) = try await MainActor.run {
             let context = ModelContext(modelContainer)
             let descriptor = FetchDescriptor<TodoItem>(
                 predicate: #Predicate { $0.userId == userId && !$0.isSynced }
@@ -115,12 +115,30 @@ struct BackgroundSyncService {
                     urls: pendingUrlChanges
                 )
             }
-            .orderedForSync()
-            return (changeList, unsyncedItems.map { $0.persistentModelID })
+            let ids = unsyncedItems.reduce(into: [String: PersistentIdentifier]()) { dict, todo in
+                dict[todo.id.uuidString.lowercased()] = todo.persistentModelID
+            }
+            return (changeList, ids)
         }
 
         guard !changes.isEmpty else { return }
 
+        // In batches the server accepts, parents before subtasks; each one is
+        // marked synced as it lands, so a failure leaves only the rest queued.
+        for batch in changes.syncBatches() {
+            try await upload(
+                batch,
+                itemIDs: batch.compactMap { itemIDs[$0.id] },
+                modelContainer: modelContainer
+            )
+        }
+    }
+
+    private func upload(
+        _ changes: [TodoChange],
+        itemIDs: [PersistentIdentifier],
+        modelContainer: ModelContainer
+    ) async throws {
         let url = apiBaseURL.appendingPathComponent("todos/sync")
         guard let authToken = await Self.currentToken() else {
             throw APIError.unauthorized(url: url.absoluteString)

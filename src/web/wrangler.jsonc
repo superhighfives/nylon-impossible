@@ -39,6 +39,18 @@
 	"vars": {
 		"ENVIRONMENT": "development"
 	},
+	// Per-user rate limit for the server functions (withAuthenticatedUser),
+	// keyed on the Clerk user id: 300 requests a minute, checked before the
+	// first D1 write. Its own namespace, so a busy web tab can't use up the
+	// API's budget (1002) and lock out the phone. Counted per Cloudflare
+	// location, so it's approximate.
+	"ratelimits": [
+		{
+			"name": "USER_RATE_LIMIT",
+			"namespace_id": "1003",
+			"simple": { "limit": 300, "period": 60 }
+		}
+	],
 	"observability": {
 		"enabled": true
 	},
@@ -61,6 +73,13 @@
 		"vars": {
 			"ENVIRONMENT": "preview"
 		},
+		"ratelimits": [
+			{
+				"name": "USER_RATE_LIMIT",
+				"namespace_id": "1003",
+				"simple": { "limit": 300, "period": 60 }
+			}
+		],
 		"observability": {
 			"enabled": true
 		}

@@ -10,6 +10,10 @@ final class MockAPIService: APIProviding {
     )
     var syncError: Error?
     var lastSyncRequest: (lastSyncedAt: Date?, changes: [TodoChange])?
+    /// Every sync request's changes, in order.
+    var syncRequests: [[TodoChange]] = []
+    /// Answers a sync in place of `syncResponse`, e.g. as a server would.
+    var syncHandler: (([TodoChange]) throws -> SyncResponse)?
 
     var getMeResponse: APIUser = APIUser(
         id: "mock-user-id",
@@ -26,8 +30,12 @@ final class MockAPIService: APIProviding {
 
     func sync(lastSyncedAt: Date?, changes: [TodoChange]) async throws -> SyncResponse {
         lastSyncRequest = (lastSyncedAt, changes)
+        syncRequests.append(changes)
         if let error = syncError {
             throw error
+        }
+        if let syncHandler {
+            return try syncHandler(changes)
         }
         return syncResponse
     }
