@@ -71,22 +71,58 @@ anything itself:
 `device` is `iphone` (a simulator) or `mac` (the Mac binary's own
 windows, e.g. `menubar`). At most 4 shots, on `-NylonScreen` routes (listed at the top of
 `src/ios/Nylon Impossible/Nylon Impossible/Views/Shell/ScreenRoute.swift`),
-in the report's appearance. If a still can't show the fix (a gesture,
-timing, sync, data that isn't in the sample), write
+in the report's appearance.
+
+### Videos
+
+If the fix is on the iPhone and a still can't show it (a gesture, timing,
+a sync in progress), add a UI test and name it in the plan's `videos`,
+beside any shots or instead of them:
+
+```json
+{"videos": [{"device": "iphone", "test": "PullToRefreshUITests/testPullingTheChipRowDownDoesNotRefresh", "note": "<what to look at>"}]}
+```
+
+At most one, `iphone` only, `Class/testMethod` in `Nylon ImpossibleUITests`.
+The foreman runs it on both sides and records it from a marker to the end
+of the test, as a GIF (about 9s) in a video row under the stills. The
+before side runs main's app with the branch's UI tests, so a new test
+exists there.
+
+- **Reproduce the state in the report's screenshot,** not the obvious one.
+  Look at where the problem appears before writing the test: #416's
+  spinner was in the list-chip row above the keyboard, with the composer
+  focused, and two hosted trials of a plain list pull showed nothing.
+- A `NylonUITestCase` subclass that `launch`es a `-NylonScreen` route
+  (sample data, no account), as `PullToRefreshUITests` does.
+- Just before the gesture, `print("FIX-SHOTS-GESTURE")`, `fflush(stdout)`
+  (a piped stdout holds it otherwise) and `sleep(3)`: recording starts when
+  the line appears, and the pause gives the recorder time to start.
+- Waits that are only there for the picture (a keyboard, an animation) are
+  generous and don't fail the test: `_ = x.waitForExistence(timeout: 15)`.
+- An assertion is welcome when a query can see the bug, but don't keep one
+  that passes with the bug on screen. A failure on the branch shows in the
+  row ("The test failed on this branch."); one on main's side is expected.
+
+If neither a still nor a video can show the fix (copy in an error path no
+route reaches, data that isn't in the sample), write
 `{"skip": "<one line why>"}` instead.
+
+### How it's captured
 
 After the run, the foreman runs `src/marketing/fix-shots.ts` on the Mac
 mini: `capture --as after` with the branch's `src/ios`, `--as before` with
-main's (the scripts stay main's), then `report`. The images go to
+main's (the scripts stay main's), then `report`. The PNGs and GIFs go to
 `feedback-assets` under `fixes/<issue>/<sha>/`, in a commit added on top
 (never forced). The table sits between `<!-- fix-shots:start/end -->`
 markers inside **Try it**, with the plan saved in a hidden comment.
 
 - **It's best-effort,** like the marketing captures (see the
-  `marketing-screenshots` skill): a shot that fails reads "not captured",
-  and the PR says how many and where the log is. Never make it fail the
-  run.
-- **Retakes:** a review round that changes `src/ios` retakes the shots from
-  the saved plan, and so does `foreman.sh shots <pr>`.
+  `marketing-screenshots` skill): a shot or video that fails reads "not
+  captured", and the PR says how many and where the log is. Never make it
+  fail the run. A video also needs `ffmpeg` on the PATH; the raw
+  recordings are deleted once the GIF is made.
+- **Retakes:** a review round that changes `src/ios` retakes the shots and
+  video from the saved plan, and so does `foreman.sh shots <pr>`.
 - The simulator helpers it shares with `generate.ts` live in
   `src/marketing/simulator.ts`.

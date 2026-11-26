@@ -1461,22 +1461,33 @@ tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
 expect "a branch that moved is built on, not forced" "$theirs new"  "$(git -C "$tmp/origin.git" rev-parse "$tip^") $(git -C "$tmp/origin.git" show "$tip:screenshots/2026/11/s.png")"
 
 # fix_shots end to end, with tsx faked: FAKE_SHOTS=ok takes every shot,
-# anything else is a simulator that never comes up.
+# anything else is a simulator that never comes up. A video's GIF holds the
+# app and the UI tests its side ran, and FAKE_GIF=none loses it on both sides.
 g checkout -q main && g pull -q origin main 2>/dev/null
-mkdir -p "$tmp/seed/src/ios" "$tmp/seed/src/marketing/node_modules/.bin"
+mkdir -p "$tmp/seed/$UI_TESTS" "$tmp/seed/src/marketing/node_modules/.bin"
 echo before > "$tmp/seed/src/ios/app.swift"
+echo main-tests > "$tmp/seed/$UI_TESTS/T.swift"
 cat > "$tmp/seed/src/marketing/node_modules/.bin/tsx" <<'TSX'
 #!/bin/sh
-cmd=$2 out="" as=""
-while [ $# -gt 0 ]; do case "$1" in --out) out=$2; shift ;; --as) as=$2; shift ;; esac; shift; done
+cmd=$2 out="" as="" plan=""
+while [ $# -gt 0 ]; do case "$1" in --out) out=$2; shift ;; --as) as=$2; shift ;; --plan) plan=$2; shift ;; esac; shift; done
+tests="../ios/Nylon Impossible/Nylon ImpossibleUITests/T.swift"
 case "$cmd" in
-  capture) [ "$FAKE_SHOTS" = ok ] && cat ../ios/app.swift > "$out/today-$as.png"; exit 0 ;;
-  report) printf '### Before / after\n\nTABLE %s\n\n<!-- fix-shots:plan {} -->\n' "$(ls "$out" | grep -c png)" ;;
+  capture)
+    echo "$as $(cat "$tests")" >> "$FAKE_TESTS_LOG"
+    [ "$FAKE_SHOTS" = ok ] || exit 0
+    cat ../ios/app.swift > "$out/today-$as.png"
+    if grep -q videos "$plan" && [ "$FAKE_GIF" != none ]; then
+      echo "$(cat ../ios/app.swift) $(cat "$tests")" > "$out/video-$as.gif"
+    fi
+    exit 0 ;;
+  report) printf '### Before / after\n\nTABLE %s\n\n<!-- fix-shots:plan {} -->\n' "$(ls "$out" | grep -cE 'png|gif')" ;;
 esac
 TSX
 chmod +x "$tmp/seed/src/marketing/node_modules/.bin/tsx"
 g add -A && g commit -qm "app" && g push -q origin HEAD:main
-g checkout -q -B foreman/9-x && echo after > "$tmp/seed/src/ios/app.swift" && g commit -qam fix && g push -q origin HEAD:refs/heads/foreman/9-x
+g checkout -q -B foreman/9-x && echo after > "$tmp/seed/src/ios/app.swift" && echo branch-tests > "$tmp/seed/$UI_TESTS/T.swift" \
+  && g commit -qam fix && g push -q origin HEAD:refs/heads/foreman/9-x
 FIX_SHA=$(g rev-parse HEAD)
 mkdir -p "$LOGS" "$WORKTREES" "$SHOTS"
 echo '{"shots":[{"device":"iphone","screen":"today"}]}' > "$SHOTS/9.json"
@@ -1488,10 +1499,11 @@ gh() {
     *) return 0 ;;
   esac
 }
+export FAKE_TESTS_LOG="$tmp/fake-tests.log"
 FAKE_SHOTS=fail fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
 expect "simulator down: the PR still gets the section"  "yes"  "$(grep -q 'TABLE 0' "$tmp/edited" && echo yes)"
 expect "inside Try it"                                   "yes"  "$(sed -n '/## Try it/,/## Notes/p' "$tmp/edited" | grep -q 'TABLE 0' && echo yes)"
-expect "saying what failed and where the log is"         "yes"  "$(grep -q "2 of 2 shots weren't captured. Log on the Mac mini" "$tmp/edited" && echo yes)"
+expect "saying what failed and where the log is"         "yes"  "$(grep -q "2 of 2 images weren't captured. Log on the Mac mini" "$tmp/edited" && echo yes)"
 expect "and nothing is pushed"                           "$tip" "$(git -C "$tmp/origin.git" rev-parse feedback-assets)"
 expect "the checkout is cleaned up"                      "no"   "$([ -d "$WORKTREES/shots-10" ] && echo yes || echo no)"
 
@@ -1499,6 +1511,21 @@ FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
 shots_tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
 expect "shots: both sides captured and in the PR"        "yes"  "$(grep -q 'TABLE 2' "$tmp/edited" && ! grep -q "weren't captured" "$tmp/edited" && echo yes)"
 expect "before is main's app, after is the branch's"     "before after"  "$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-before.png") $(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-after.png")"
+expect "with no video, each side keeps its own UI tests" "after branch-tests|before main-tests"  "$(tail -2 "$FAKE_TESTS_LOG" | paste -sd '|' -)"
+
+echo '{"shots":[{"device":"iphone","screen":"today"}],"videos":[{"device":"iphone","test":"T/testPull"}]}' > "$SHOTS/9.json"
+FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+shots_tip=$(git -C "$tmp/origin.git" rev-parse feedback-assets)
+expect "video: the branch's UI tests run on both sides"  "after branch-tests|before branch-tests"  "$(tail -2 "$FAKE_TESTS_LOG" | paste -sd '|' -)"
+expect "the GIFs go to feedback-assets with the PNGs"    "before branch-tests|after branch-tests|before"  "$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/video-before.gif")|$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/video-after.gif")|$(git -C "$tmp/origin.git" show "$shots_tip:fixes/9/${FIX_SHA:0:12}/today-before.png")"
+expect "and the table counts them"                       "yes"  "$(grep -q 'TABLE 4' "$tmp/edited" && ! grep -q "weren't captured" "$tmp/edited" && echo yes)"
+FAKE_SHOTS=ok FAKE_GIF=none fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+expect "a missing GIF counts as a missing image"         "yes"  "$(grep -q "2 of 4 images weren't captured" "$tmp/edited" && echo yes)"
+mv "$tmp/origin.git/hooks/pre-receive.sample" "$tmp/origin.git/hooks/pre-receive" 2>/dev/null
+printf '#!/bin/sh\nexit 1\n' > "$tmp/origin.git/hooks/pre-receive"; chmod +x "$tmp/origin.git/hooks/pre-receive"
+FAKE_SHOTS=ok fix_shots 10 9 foreman/9-x "$SHOTS/9.json" >/dev/null 2>&1
+expect "a failed push links no GIF either"               "yes 0"  "$(grep -q "couldn't be pushed" "$tmp/edited" && echo yes) $(find "$SHOTS/10" -name '*.gif' | wc -l | tr -d ' ')"
+rm -f "$tmp/origin.git/hooks/pre-receive"
 unset -f bun
 
 # ---- the machine account's token ---------------------------------------------

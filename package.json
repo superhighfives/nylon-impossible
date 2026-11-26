@@ -69,6 +69,7 @@
     "ios:open": "open 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj'",
     "ios:build": "xcodebuild -project 'src/ios/Nylon Impossible/Nylon Impossible.xcodeproj' -scheme 'Nylon Impossible' -configuration Debug build",
     "ios:simulator": "open -a Simulator",
+    "marketing:test": "bun run --cwd src/marketing test",
     "marketing:capture": "bun run --cwd src/marketing capture",
     "marketing:web": "bun run --cwd src/marketing web",
     "marketing:publish": "bun run --cwd src/marketing publish",

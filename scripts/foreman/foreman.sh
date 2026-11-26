@@ -1147,9 +1147,14 @@ build_rules() { # issue [tracked-issue] -> how a build checks, opens its PR and 
   - **Steps:** the routes to open and what to do there, in order.
   - **Apple:** if it changes the iPhone or the Mac menu bar, write
     \`.fix-shots/plan.json\` naming the \`-NylonScreen\` routes that show
-    it (feedback-flow skill). Don't commit it, and don't capture anything:
-    when you've finished, the foreman takes before and after shots on this
-    Mac and adds the table to the **Try it** section.
+    it (feedback-flow skill). If it's an iPhone interaction a still can't
+    show (a gesture, timing, a sync in progress), add a UI test that
+    reproduces the state in the report's screenshot, not the obvious one,
+    printing \`FIX-SHOTS-GESTURE\` just before the gesture, and name it in
+    the plan's \`videos\` (feedback-flow skill, "Videos"). Don't commit the
+    plan, and don't capture anything: when you've finished, the foreman
+    takes before and after shots on this Mac and adds the table to the
+    **Try it** section.
   - **Acceptance criteria:** each one from the issue, with the test or shot
     that shows it.
 - **Don't merge.** The foreman merges when the checks and the review allow
@@ -1736,10 +1741,10 @@ tracking_issue() { # board_json issue outside-report spec-dir -> a new issue of 
 
 # ---- before/after shots ------------------------------------------------------
 # For Apple changes: the build leaves .fix-shots/plan.json (the -NylonScreen
-# routes that show it), and src/marketing/fix-shots.ts captures them here,
-# with main's src/ios and then the branch's. The images go on the orphan
-# feedback-assets branch, which is only ever added to: never rebased, forced
-# or merged. Best-effort throughout: a failed capture is reported in the PR,
+# routes that show it, and a UI test to record for an interaction), and
+# src/marketing/fix-shots.ts captures them here, with main's src/ios and then
+# the branch's. The images go on the orphan feedback-assets branch, which is
+# only ever added to: never rebased, forced or merged. Best-effort throughout: a failed capture is reported in the PR,
 # never fatal.
 
 saved_plan() { # PR body (stdin) -> the shot plan fix-shots' report saved in it, or nothing
@@ -1771,10 +1776,11 @@ put_tree() { # commit path tree -> the commit's root tree with <path> set to <tr
   echo "$tree"
 }
 
-push_shots() { # dir-of-pngs path-on-branch message -> one commit adding them to feedback-assets; non-zero if it couldn't
+push_shots() { # dir-of-images path-on-branch message -> one commit adding its PNGs and GIFs to feedback-assets; non-zero if it couldn't
   local src f leaf tree parent commit try
   src=$(cd "$1" && pwd) || return 1
-  leaf=$(for f in "$src"/*.png; do
+  leaf=$(for f in "$src"/*.png "$src"/*.gif; do
+           [ -e "$f" ] || continue
            printf '100644 blob %s\t%s\n' "$(git -C "$CLONE" hash-object -w "$f")" "$(basename "$f")"
          done | git -C "$CLONE" mktree) || return 1
   # The API commits reports here too, so a rejected push means fetch and try
@@ -1789,6 +1795,8 @@ push_shots() { # dir-of-pngs path-on-branch message -> one commit adding them to
   done
   return 1
 }
+
+UI_TESTS="src/ios/Nylon Impossible/Nylon ImpossibleUITests"
 
 fix_shots() { # pr issue branch plan-file -> a Before | After table in the PR's "Try it"; never fails the caller
   local body why=""
@@ -1827,22 +1835,26 @@ fix_shots_run() { # pr issue branch plan-file -> fix_shots' work, inside the lan
 
   # The capture scripts stay main's; each side swaps in only the app. The
   # branch goes first: if time runs out, "after" is the side worth having.
+  # A video's UI test is usually new on the branch, so main's side runs the
+  # branch's UI tests against main's app.
+  tests=""; [ "$(jq '.videos // [] | length' "$plan" 2>/dev/null || echo 0)" -gt 0 ] && tests=$after
   for side in after before; do
     sha=$before; [ "$side" = after ] && sha=$after
-    (cd "$dir" && rm -rf src/ios && git checkout -q "$sha" -- src/ios && cd src/marketing \
+    (cd "$dir" && rm -rf src/ios && git checkout -q "$sha" -- src/ios \
+      && { [ -z "$tests" ] || { rm -rf "$UI_TESTS" && git checkout -q "$tests" -- "$UI_TESTS"; }; } && cd src/marketing \
       && FIX_SHOTS_DERIVED_DATA_IOS="$(derived_for fix-shots-ios)" FIX_SHOTS_DERIVED_DATA_MAC="$(derived_for fix-shots-mac)" \
          env -u GH_TOKEN -u GITHUB_TOKEN perl -e 'alarm shift; exec @ARGV' "$SHOTS_TIMEOUT" \
            ./node_modules/.bin/tsx fix-shots.ts capture --plan "$plan" --as "$side" --out "$imgs") >>"$out" 2>&1 \
       || echo "capture --as $side failed" >>"$out"
   done
-  want=$(( $(jq '.shots // [] | length' "$plan" 2>/dev/null || echo 0) * 2 ))
-  got=$(find "$imgs" -name '*.png' | wc -l | tr -d ' ')
-  [ "$got" -ge "$want" ] || note="$((want - got)) of $want shots weren't captured. Log on the Mac mini: \`$out\`."
+  want=$(( $(jq '(.shots // [] | length) + (.videos // [] | length)' "$plan" 2>/dev/null || echo 0) * 2 ))
+  got=$(find "$imgs" \( -name '*.png' -o -name '*.gif' \) | wc -l | tr -d ' ')
+  [ "$got" -ge "$want" ] || note="$((want - got)) of $want images weren't captured. Log on the Mac mini: \`$out\`."
 
   path="fixes/$issue/${after:0:12}"
   if [ "$got" -gt 0 ] && ! push_shots "$imgs" "$path" "Before/after for #$pr (#$issue)" >>"$out" 2>&1; then
     # Don't link images that never reached the branch.
-    find "$imgs" -name '*.png' -delete; find "$imgs" -name 'status-*.json' -delete
+    find "$imgs" \( -name '*.png' -o -name '*.gif' -o -name 'status-*.json' \) -delete
     note="The shots were taken but couldn't be pushed to feedback-assets. Log on the Mac mini: \`$out\`."
   fi
   section=$(cd "$dir/src/marketing" && ./node_modules/.bin/tsx fix-shots.ts report --plan "$plan" --out "$imgs" \
