@@ -22,6 +22,15 @@ GitHub any more: `feedback.yml` and the `feedback/*` branches are retired.
   anyone else's, the owner adds it after reading. It counts only if the
   label's latest event is the owner adding it, because the report becomes
   the prompt.
+- **An issue someone else opened on GitHub** needs only the owner's
+  `auto-fix`; the foreman adds `feedback` when it triages it. It's cleared
+  as it was when labelled: if its body (`lastEditedAt`) or title (a
+  `renamed` event) changed after that, by anyone, it's skipped with one
+  alert to the owner and nothing on the issue, until the owner takes
+  `auto-fix` off and puts it back. The prompt is that checked read, the
+  images pasted into its body, and only the owner's, `nylon-foreman`'s and
+  Claude's comments; never its `feedback-assets` links or other people's
+  comments or images.
 - **Intake.** Each run, the foreman takes the oldest cleared report it
   hasn't handled (not on the board past Ideas, no `spec` or
   `needs-decision`, no open PR) ahead of any Ready item.
@@ -38,6 +47,10 @@ GitHub any more: `feedback.yml` and the `feedback/*` branches are retired.
     owner's replies start spec runs, as for any spec (`prd` skill), and
     `needs-decision` comes off once **Open questions** reads "None.". The
     foreman then moves it to Ready, and it's built like any other item.
+    For someone else's issue the spec goes on a **new issue** opened by
+    `nylon-foreman`, with the report quoted under **Problem** and a link
+    back; the original gets "Tracking this in #m" and keeps its text, and
+    #m's PR says `Closes #m, closes #n`.
 - **After that it's the foreman's ordinary loop:** review rounds until 🟢,
   then the merge gate (CLAUDE.md, "Merging"). The owner tries the fix once
   it's live, from the PR's **Try it** section. The operator leaves

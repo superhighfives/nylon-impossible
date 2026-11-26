@@ -880,7 +880,7 @@ FB_ISSUES="[$(fb_issue 30 superhighfives feedback auto-fix platform:ios),
   $(fb_issue 25 superhighfives feedback auto-fix needs-decision),
   $(fb_issue 26 superhighfives feedback auto-fix spec),
   $(fb_issue 27 superhighfives feedback)]"
-expect "new reports: the owner's, cleared, not yet in hand, oldest first" "22 23 30" \
+expect "new reports: the owner's, cleared, and others' with auto-fix, not yet in hand, oldest first" "22 23 24 30" \
   "$(feedback_candidates "$FB_BOARD" "$FB_ISSUES" | paste -sd' ' -)"
 
 # feedback_next, with the label events stubbed per issue.
@@ -1032,6 +1032,10 @@ expect "a report's spec still gets runs while it waits on the owner" "41" "$(spe
 
 echo "triage outcomes"
 
+# The owner's own report, unless a case says otherwise.
+ISSUE_READ='{"number":22,"title":"t","body":"b","lastEditedAt":null,"author":{"login":"superhighfives"},"labels":{"nodes":[]}}'
+issue_read() { printf '%s\n' "$ISSUE_READ"; }
+
 # Everything around the claude run is stubbed; what's tested is what the
 # foreman does with the result.
 new_worktree() { :; }; run_claude() { return 0; }; opened_pr() { return 1; }
@@ -1064,6 +1068,187 @@ expect "neither: needs-decision"                      "yes"  "$(called '--add-la
 expect "and a comment"                                "yes"  "$(called 'issue comment 22')"
 expect "back in Ideas"                                "yes"  "$(called '--single-select-option-id o-ideas')"
 expect "and re-armed for when the label comes off"    "no"   "$([ -e "$FEEDBACK/22" ] && echo yes || echo no)"
+
+echo "outside issues"
+
+(
+  # Someone else's issue #24, cleared by the owner with auto-fix alone. Each
+  # read is stubbed from these, as gh would answer them.
+  # shellcheck disable=SC2329 # feedback_skipped calls it
+  event() { real_event "$@"; }
+  eval "$(sed -n '/^issue_read() {/,/^}/p' "$here/foreman.sh")"
+  label_at=2026-11-01T09:00:00Z before=2026-11-01T08:00:00Z after=2026-11-01T10:00:00Z later=2026-11-01T11:00:00Z
+  out_read() { # lastEditedAt|null [author] -> one issue_read answer
+    jq -cn --arg e "$1" --arg a "${2:-stranger}" --arg b "$OUT_BODY" \
+      '{number:24, title:"Button is wrong", body:$b, lastEditedAt:(if $e == "null" then null else $e end), author:{login:$a}, labels:{nodes:[{name:"auto-fix"}]}}'
+  }
+  ev() { # id event actor time [label] -> one issue event
+    jq -cn --argjson id "$1" --arg e "$2" --arg a "$3" --arg t "$4" --arg l "${5:-auto-fix}" \
+      '{id:$id, event:$e, actor:{login:$a}, created_at:$t} + (if $e == "renamed" then {rename:{from:"a", to:"b"}} else {label:{name:$l}} end)'
+  }
+  OUT_IMG=aaaaaaaa-0000-4000-8000-00000000000a STRANGER_IMG=bbbbbbbb-0000-4000-8000-00000000000b
+  OUT_BODY="It's the wrong colour. CLEARED-BODY
+![shot](https://github.com/user-attachments/assets/$OUT_IMG)
+![fb](https://github.com/superhighfives/nylon-impossible/blob/feedback-assets/screenshots/theirs.png)"
+  OUT_READ=$(out_read null)
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at")]"
+  OUT_COMMENTS=$(jq -cn --arg s "STRANGER-SAYS ![x](https://github.com/user-attachments/assets/$STRANGER_IMG)" \
+    '[{user:{login:"superhighfives"}, created_at:"t", body:"OWNER-SAYS", id:5},
+      {user:{login:"stranger"}, created_at:"t", body:$s, id:6},
+      {user:{login:"nylon-foreman"}, created_at:"t", body:"FOREMAN-SAYS", id:7},
+      {user:{login:"claude[bot]"}, created_at:"t", body:"CLAUDE-SAYS", id:8}]')
+  OUT_LIST="[$(fb_issue 24 stranger auto-fix)]"
+  gh() {
+    local jqf="" prev="" a
+    for a in "$@"; do [ "$prev" = --jq ] && jqf="$a"; prev="$a"; done
+    echo "$*" >> "$CALLS"
+    case "$*" in
+      "api graphql"*) printf '%s\n' "$OUT_READ" ;;
+      *issues/24/events*) printf '%s\n' "$OUT_EVENTS" ;;
+      *issues/24/comments*) jq -r "$jqf" <<<"$OUT_COMMENTS" ;;
+      *issues/*/comments*) jq -r "$jqf" <<<'[]' ;;
+      "issue list"*) printf '%s\n' "$OUT_LIST" ;;
+      "pr list"*) ;;
+      "issue view 90 "*) jq -r "$jqf" <<<"$(jq -cn --rawfile b "$tmp/created-body" '{author:{login:"nylon-foreman"}, body:$b, title:"t", labels:[]}')" ;;
+      "issue view"*) jq -r "$jqf" <<<'{"author":{"login":"stranger"}, "title":"Button is wrong", "body":"LIVE-BODY", "labels":[]}' ;;
+      "issue create"*) cat > "$tmp/created-body"; echo "https://github.com/superhighfives/nylon-impossible/issues/90" ;;
+      "project item-add"*) echo I90 ;;
+      *contents/*) echo "fb-bytes" ;;
+      *) return 0 ;;
+    esac
+  }
+  alerts() { grep -c '^alert skipped #24' "$CALLS"; }
+  fresh_out() { : > "$CALLS"; : > "$EVENTS"; rm -rf "$FEEDBACK" "$ONCE" "$SPECS"; OUT_READ=$(out_read null); OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at")]"; }
+
+  # The edit check, pure.
+  since() { edited_since "$label_at" "$1" <<<"$2"; }
+  expect "edited_since: no edit, no rename"         ""  "$(since "$(out_read null)" "[$(ev 1 labeled superhighfives "$label_at")]")"
+  expect "a body edited after the label"            "$after	body"  "$(since "$(out_read "$after")" "[]")"
+  expect "a body edited before it doesn't count"    ""  "$(since "$(out_read "$before")" "[]")"
+  expect "a title renamed after the label"          "$after	title"  "$(since "$(out_read null)" "[$(ev 2 renamed stranger "$after")]")"
+  expect "a title renamed before it doesn't count"  ""  "$(since "$(out_read null)" "[$(ev 2 renamed stranger "$before")]")"
+  expect "the latest change wins"                   "$later	title"  "$(since "$(out_read "$after")" "[$(ev 2 renamed stranger "$later")]")"
+  expect "the owner's own edit counts too"          "$after	title"  "$(since "$(out_read null)" "[$(ev 2 renamed superhighfives "$after")]")"
+  expect "fractional seconds still compare"         "2026-11-01T10:00:00.5Z	body"  "$(since "$(out_read 2026-11-01T10:00:00.5Z)" "[]")"
+
+  # Intake.
+  expect "candidates: someone else's, with auto-fix alone or feedback too; not feedback alone, nor spec" "24 28" \
+    "$(feedback_candidates "$FB_BOARD" "[$(fb_issue 24 stranger auto-fix), $(fb_issue 28 stranger feedback auto-fix),
+      $(fb_issue 29 stranger feedback), $(fb_issue 31 stranger auto-fix spec), $(fb_issue 32 superhighfives auto-fix)]" | paste -sd' ' -)"
+
+  fresh_out
+  expect "an unedited outside issue is next"                 "24"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  expect "listed by auto-fix alone"                          "yes" "$(called 'issue list -R superhighfives/nylon-impossible --state open --label auto-fix --limit')"
+  OUT_EVENTS="[$(ev 1 labeled stranger "$label_at")]"
+  expect "not if anyone else added auto-fix"                 ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at"), $(ev 2 unlabeled superhighfives "$after")]"
+  expect "nor if the owner added it and took it off"         ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at")]"; OUT_READ=$(out_read "$before")
+  expect "an edit before the label doesn't block it"         "24"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+
+  fresh_out; OUT_READ=$(out_read "$after")
+  log=$(feedback_next "$FB_BOARD" 2>&1 >/dev/null); next=$(feedback_next "$FB_BOARD" 2>/dev/null)
+  expect "one edited after the label is skipped"             ""    "$next"
+  expect "and logged, saying why"                            "yes" "$(grep -qF "#24's body changed at $after, after superhighfives added auto-fix" <<<"$log" && echo yes)"
+  expect "as a feedback_skipped event, once"                 "1"   "$(grep -c '"event":"feedback_skipped"' "$EVENTS")"
+  expect "two ticks, one alert"                              "1"   "$(alerts)"
+  expect "it isn't marked as triaged"                        "no"  "$([ -e "$FEEDBACK/24" ] && echo yes || echo no)"
+  expect "and nothing is posted on the issue"                "no no" "$(called 'issue comment') $(called 'issue edit')"
+  OUT_READ=$(out_read "$later"); feedback_next "$FB_BOARD" >/dev/null 2>&1
+  expect "a new edit sends another"                          "2"   "$(alerts)"
+  OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at"), $(ev 2 unlabeled superhighfives "$later"), $(ev 3 labeled superhighfives 2026-11-01T12:00:00Z)]"
+  expect "the owner relabels it, and it's picked up"         "24"  "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+
+  fresh_out; OUT_EVENTS="[$(ev 1 labeled superhighfives "$label_at"), $(ev 2 renamed stranger "$after")]"
+  expect "a title renamed after the label is skipped too"    ""    "$(feedback_next "$FB_BOARD" 2>/dev/null)"
+  expect "with its own alert"                                "yes" "$(called "alert skipped #24: #24's title changed at $after")"
+
+  # The prompt: built from the checked read, with trusted comments only.
+  fresh_out; outside_report 24 "$tmp/report.json" >/dev/null
+  OUT_READ=$(out_read null | jq -c '.body = "EDITED-LATER"') # what GitHub would say after the check
+  # shellcheck disable=SC2329 # the prompt calls it
+  build_rules() { :; }
+  prompt=$(feedback_prompt 24 "$tmp/report.json" "$tmp/spec24")
+  has() { grep -qF -- "$1" <<<"$prompt" && echo yes || echo no; }
+  expect "prompt: the body as checked, not as it is now"     "yes no no" "$(has CLEARED-BODY) $(has EDITED-LATER) $(has LIVE-BODY)"
+  # shellcheck disable=SC2016 # backticks, not an expansion
+  expect "it names the author"                               "yes" "$(has 'opened on GitHub by `stranger`')"
+  expect "and says not to re-read the issue"                 "yes" "$(tr '\n' ' ' <<<"$prompt" | grep -qF "don't re-read the issue from GitHub" && echo yes || echo no)"
+  expect "not that it came from Send feedback"               "no"  "$(has 'is a report from the apps')"
+  expect "the owner's, the foreman's and Claude's comments"  "yes yes yes" "$(has OWNER-SAYS) $(has FOREMAN-SAYS) $(has CLAUDE-SAYS)"
+  expect "and nobody else's"                                 "no"  "$(has STRANGER-SAYS)"
+  expect "the spec goes to files, not the body"              "yes no" "$(has "$tmp/spec24/spec.md") $(has 'gh issue edit 24 --body-file')"
+  unset -f build_rules; eval "$(sed -n '/^build_rules() {/,/^}/p' "$here/foreman.sh")"
+
+  # Images: the checked body's pasted ones, not its feedback-assets links or a stranger's comment's.
+  curl() {
+    local prev="" a url="" out=""
+    for a in "$@"; do [ "$prev" = -o ] && out="$a"; case "$a" in https://*) url="$a" ;; esac; prev="$a"; done
+    echo "curl $url" >> "$CALLS"; printf 'png' > "$out"; printf 'image/png'
+  }
+  d="$tmp/fetch-out"; rm -rf "$d"; mkdir -p "$d"; : > "$CALLS"
+  fetch_images 24 "$d" "$tmp/report.json" >/dev/null
+  expect "images: the body's pasted one is fetched"          "yes" "$([ -e "$d/.feedback-assets/user-attachments/$OUT_IMG.png" ] && echo yes)"
+  expect "not a stranger's comment's"                        "no"  "$(called "$STRANGER_IMG")"
+  expect "nor the body's feedback-assets link"               "no no" "$(called 'contents/') $([ -e "$d/.feedback-assets/screenshots/theirs.png" ] && echo yes || echo no)"
+  expect "and the live issue isn't read for them"            "no"  "$(called 'issue view')"
+  unset -f curl
+
+  # foreman triage <n>: the same rules.
+  use_token() { :; }; take_lock() { return 0; }; ensure_clone() { :; }; board_json() { echo "$FB_BOARD"; }
+  triage() { echo "TRIAGED $2"; }
+  fresh_out
+  expect "foreman triage takes an outside issue"             "TRIAGED 24" "$( (cmd_triage 24) 2>&1)"
+  OUT_READ=$(out_read "$after")
+  expect "and refuses an edited one"                         "foreman: #24's body changed at $after, after superhighfives added auto-fix. Take auto-fix off and put it back to clear it" "$( (cmd_triage 24) 2>&1)"
+  OUT_READ=$(out_read null); OUT_EVENTS="[$(ev 1 labeled stranger "$label_at")]"
+  expect "or one the owner didn't clear"                     "foreman: #24's auto-fix wasn't added by superhighfives" "$( (cmd_triage 24) 2>&1)"
+  unset -f triage; eval "$(sed -n '/^triage() {/,/^}/p' "$here/foreman.sh")"
+
+  # Triage, with the run stubbed to write what an unclear one would.
+  # shellcheck disable=SC2329 # triage calls them
+  new_worktree() { echo "new_worktree $*" >> "$CALLS"; }
+  # shellcheck disable=SC2329
+  opened_pr() { return 1; }
+  # shellcheck disable=SC2329
+  branch_for() { echo "foreman/$1-x"; }
+  RUN_ACT=""
+  # shellcheck disable=SC2329
+  run_claude() { echo "run_claude" >> "$CALLS"; eval "$RUN_ACT"; return 0; }
+  # shellcheck disable=SC2016 # expanded when the run's stub evals it
+  unclear_run='printf "Found it in Row.swift.\n\n%s\n" "${SPEC_OK#*It breaks.}" | sed "s/None\\./1. Which colour?/" > "$FEEDBACK/24.spec/spec.md"
+    echo "Row colour is wrong" > "$FEEDBACK/24.spec/title"; echo "{\"kind\":\"fix\"}" > "$FEEDBACK/24.spec/kind.json"
+    echo "1. Which colour? I recommend blue." > "$FEEDBACK/24.spec/questions.md"'
+  fresh_out; rm -f "$tmp/created-body"; RUN_ACT="$unclear_run"
+  triage "$FB_BOARD" 24 >/dev/null
+  expect "triage adds feedback to an outside issue"          "yes" "$(called 'issue edit 24 -R superhighfives/nylon-impossible --add-label feedback')"
+  expect "with the checked read for its images"              "yes" "$(called "new_worktree 24 foreman/24-x $FEEDBACK/24.report.json")"
+  expect "and doesn't put it on the board yet"               "no"  "$(called 'project item-add --url https://github.com/superhighfives/nylon-impossible/issues/24')"
+  expect "unclear: a new issue, labelled spec and feedback"  "yes" "$(called 'issue create -R superhighfives/nylon-impossible --title Row colour is wrong --label spec --label feedback')"
+  body=$(cat "$tmp/created-body" 2>/dev/null)
+  inbody() { grep -qF -- "$1" <<<"$body" && echo yes || echo no; }
+  expect "its Problem links back and quotes the report"      "yes yes yes" "$(inbody $'## Problem\n\nReported in #24 by stranger') $(inbody '> **Button is wrong**') $(inbody "> It's the wrong colour. CLEARED-BODY")"
+  expect "then the run's spec, under one Problem"            "yes 1" "$(inbody 'Found it in Row.swift.') $(grep -cx '## Problem' <<<"$body")"
+  expect "and it says what it tracks"                        "yes" "$(inbody '<!-- foreman: tracks #24 -->')"
+  expect "with needs-decision, its kind and questions"       "yes yes yes" "$(called 'issue edit 90 -R superhighfives/nylon-impossible --add-label needs-decision') $(called 'issue edit 90 -R superhighfives/nylon-impossible --add-label kind:fix') $(called "issue comment 90 -R superhighfives/nylon-impossible --body-file $FEEDBACK/24.spec/questions.md")"
+  expect "in Specced"                                        "yes yes" "$(called 'project item-add 1 --owner superhighfives --url https://github.com/superhighfives/nylon-impossible/issues/90') $(called '--id I90 --field-id F --single-select-option-id o-specced')"
+  expect "the original gets one tracking comment"            "1"   "$(grep -c 'issue comment 24 .*Tracking this in #90\.' "$CALLS")"
+  expect "and its body is never edited"                      "no"  "$(grep '^issue edit 24 ' "$CALLS" | grep -q -- '--body' && echo yes || echo no)"
+  expect "nor is it labelled spec or needs-decision"         "no no" "$(called 'issue edit 24 -R superhighfives/nylon-impossible --add-label spec') $(called 'issue edit 24 -R superhighfives/nylon-impossible --add-label needs-decision')"
+  expect "spec runs wait for the owner's next reply"         "yes" "$([ -e "$SPECS/90" ] && echo yes)"
+  expect "it's marked as triaged"                            "yes" "$([ -e "$FEEDBACK/24" ] && echo yes)"
+  expect "and the owner hears"                               "yes" "$(called 'alert #24 (from stranger) needs a spec, and #90 has questions for you')"
+  expect "its build closes both"                             "yes" "$(build_rules 90 "$(tracked_report 90)" | grep -qF 'starts with "Closes #90, closes #24"' && echo yes)"
+  expect "an ordinary build closes one"                      "yes" "$(build_rules 91 "" | grep -qF 'starts with "Closes #91" (or' && echo yes)"
+
+  fresh_out; OUT_READ=$(out_read "$after"); RUN_ACT="$unclear_run"
+  triage "$FB_BOARD" 24 >/dev/null
+  expect "a triage job re-checks: an edit since the tick stops it" "no no" "$(called run_claude) $([ -e "$FEEDBACK/24" ] && echo yes || echo no)"
+  expect "and alerts like the tick"                          "1"   "$(alerts)"
+
+  echo "$pass $fail" > "$tmp/counts"
+)
+read -r pass fail < "$tmp/counts"
 
 echo "headless runs"
 
