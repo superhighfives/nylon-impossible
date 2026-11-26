@@ -1,0 +1,10 @@
+{
+  "sha": "18d686cff518ff349b47b7203957019b1da48721",
+  "trees": {
+    "src/ios": "4af1ed5c70db44dc210b9657765fad2e7cc519e6",
+    "src/marketing/manifest.json": "1b306ef79af087f422e3c866668feccc14dd2a96",
+    "src/shared/design": "d8ce8620dbe8d29e22c98612832790bc9839e71b",
+    "src/shared/src/todo-date-fixtures.json": "0885dee0d7168fc0006ba388200d07b8c44fcfa3"
+  },
+  "captured_at": "2026-11-26T23:35:28Z"
+}
