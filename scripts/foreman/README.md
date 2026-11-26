@@ -20,6 +20,9 @@ the PR history shows who did what.
 
 Each tick:
 
+0. **iOS statuses.** Give every open PR's head the `foreman/ios-ui-test`
+   status that needs no build: "No iOS change", or "Not run" for someone
+   else's PR that changes the app ("The iOS lane", below).
 1. **Merge.** For each open `foreman/*` PR by `nylon-foreman`, run the merge
    gate. Merge if it passes. A merged PR whose body closes its issue
    (`Closes #n`) sets the issue to Done. One that says `Part of #n` puts it
@@ -30,6 +33,8 @@ Each tick:
    link to the PR's **Try it** section, for the owner to try it once it's
    live.
 2. **Tidy.** Remove worktrees whose PR has merged or closed.
+   Then, if the iOS lane is free, start its next job in the background
+   (below).
 3. **Spec.** Turn every draft in **Define** into an issue labelled `spec`,
    label `spec` on the owner's open issues there without it, then draft or
    revise at most one spec (below).
@@ -194,7 +199,8 @@ After the run, the foreman captures them here with
 `src/marketing/fix-shots.ts`, warm simulators and all:
 
 - in a detached checkout of `main`: `capture --as after` with the branch's
-  `src/ios`, then `--as before` with main's, each side at most 45 minutes;
+  `src/ios`, then `--as before` with main's, each side at most 45 minutes,
+  in the iOS lane (below), with DerivedData in `~/.foreman/derived`;
 - the images go to `feedback-assets` under `fixes/<issue>/<sha>/`, in one
   commit built from tree objects (the clone never downloads the branch) and
   pushed on top, never forced;
@@ -209,6 +215,120 @@ straight after its push, and for other pushes (the operator's, the owner's)
 the tick compares the head with the commit the shots show. That's once per
 head commit and one PR a tick, and `~/.foreman/shots/<pr>.checked` holds the
 head it last looked at. `foreman shots <pr>` retakes them by hand.
+
+## The iOS lane
+
+The iOS UI tests and the iOS marketing captures run here on the Mac mini,
+whose simulators and DerivedData stay warm, rather than on a hosted runner
+that starts cold every time (#611). The mini isn't a GitHub Actions runner:
+the repo is public, and a runner here would run strangers' PRs on the
+machine that holds the token. The foreman picks what runs, and that's only
+`main` and the owner's and `nylon-foreman`'s PRs.
+
+**One at a time.** UI tests, captures and before/after shots share one lock,
+`~/.foreman/jobs/ios-lane/` (a pid, like the build jobs'). The timing checks
+need a quiet simulator. A tick starts at most one iOS job in the background,
+as `foreman job ios <kind> <sha> [pr|main]`. It doesn't count toward
+`FOREMAN_MAX_JOBS` or the PR limit. Fix-shots waits up to 30 minutes for the
+lane (`FOREMAN_LANE_WAIT`), then gives up best-effort, saying so in the PR's
+**Try it**. The order: UI tests for open PR heads, oldest PR first; then
+`main`'s; then the captures.
+
+**Trusted checkout.** Every job works in `~/.foreman/worktrees/ios-lane`, a
+detached checkout of `main`'s head that's kept between jobs. The scripts,
+the `xcodebuild` invocation and `node_modules` all come from there. Only the
+**iOS paths** come from the commit under test: `src/ios`,
+`src/shared/src/todo-date-fixtures.json` and `src/shared/design`, the list
+`ios-test.yml` watches.
+- A PR's iOS paths replace `main`'s whole, so on a branch that's behind,
+  `main`'s newer iOS changes aren't in the tested tree, and the result may
+  not match the merge. The gate doesn't require an up-to-date branch;
+  rebasing the PR tests it again.
+- Xcode, `generate.ts` and `fix-shots.ts` run without `GH_TOKEN` or
+  `GITHUB_TOKEN`: build phases and tests are the commit's code. That keeps
+  the token out of their environment, not out of the machine; the trust
+  rule above is what keeps strangers' code off it.
+
+**Disk.** Each kind keeps its own DerivedData in `~/.foreman/derived/`
+(`ui-test`, `marketing`, `fix-shots-ios`, `fix-shots-mac`), so the second
+build is incremental. Nothing goes to `/tmp`.
+- After every iOS job, while `~/.foreman/derived` is over 15GB
+  (`FOREMAN_DERIVED_CAP_GB`), the least recently used folder goes.
+- With under 10GB free (`FOREMAN_MIN_FREE_GB`), no iOS job starts: an alert
+  and an `ios_skipped` event, once a day. PRs then wait on the status, and
+  the gate's wait says why.
+- The simulators stay created and are shut down after each job, and
+  `xcrun simctl delete unavailable` runs. `.xcresult` bundles go after 7 days.
+
+### UI tests: `foreman/ios-ui-test`
+
+- **No iOS change.** A PR whose files (against its merge base) touch none of
+  the iOS paths gets `success`, "No iOS change", in the tick's first pass,
+  with no build. Anyone's PR, forks included: it only reads the file list.
+- **Not run.** Any other PR that touches them (a fork, dependabot, anyone
+  but the owner and `nylon-foreman`) gets `failure`, "Not run: only the
+  owner's and the foreman's PRs run on the Mac mini".
+- **Run.** A trusted, non-draft PR's head, and `main`'s head after a merge
+  that changed the iOS paths, get `pending` ("Running on the Mac mini") when
+  the job starts, then `success` or `failure`: "All N passed", "Passed, 1 on
+  retry: testDoneUnderLoad" or "2 failed: testDoneUnderLoad, …". It's the
+  "Nylon Impossible UI Tests" scheme on `Nylon UI Test iPhone`, with
+  `-retry-tests-on-failure -test-iterations 2`, within 45 minutes
+  (`FOREMAN_IOS_TIMEOUT`). A `main` whose iOS paths didn't change since its
+  last run gets "No iOS change since <sha>".
+- A newer head replaces an older one: the job checks the PR's head before it
+  starts, and a superseded one never runs.
+- If the lane can't check the commit out, the status stays `pending`
+  ("Couldn't check it out…"), so the next tick queues it again.
+- The tests run without `NYLON_SLOW_SIMULATOR`, so the timing checks
+  (`testDoneHoldsInPlaceThenLeavesWithUndo`, `testDoneUnderLoad`, the
+  accessibility audits' -56) run in full here. Only the hosted
+  `ios-ui-test.yml` sets it.
+- A failure or a pass on retry comments on the PR with every test and its
+  result, the failures by name, and the log's path. On `main`, a failure
+  alerts, and a pass on retry is a line in the digest.
+- Logs: `~/.foreman/logs/ui-test-<sha>.log`, with the result bundle beside
+  it.
+- **The gate** waits on a foreman PR whose head has no `foreman/ios-ui-test`
+  yet (`wait: ios-ui-test not posted`), so it can't merge in the gap before
+  the job starts. The owner makes the status a required check on `main`.
+
+### Marketing captures
+
+- After a merge that changed the iOS paths or `src/marketing/manifest.json`
+  since the last capture. The revision is those paths' git ids
+  (`git rev-parse <sha>:src/ios` …), which `marketing.yml` computes the same
+  way. A failed capture isn't retried until the next change, or by hand.
+- In the lane's checkout of that commit: `generate.ts --capture-ios
+  --capture-parity-ios` (the parity sheet's iOS half; its web half needs
+  Clerk), within 45 minutes.
+- An all-fresh set (every entry in `capture-status.json` is `fresh`) goes to
+  the orphan `marketing-ios` branch, force-pushed as one parentless commit:
+  `source/ios-*.png`, `source/parity/ios-*.png`, `capture-status.json` and
+  `revision.json` (the source commit and the tree ids). It's the only branch
+  the foreman force-pushes. A partial set is never pushed.
+- Then, whether it worked or not, the foreman dispatches `marketing.yml`
+  (`strict=false`). That run fetches `marketing-ios` and publishes, without
+  Xcode. Its `workflow_run` trigger, after a deploy that changed the iOS
+  paths, skips publishing until `revision.json` matches, so the landing page
+  changes once, with both halves fresh.
+- A failure is a `captures` routine event and a line in the digest, and two
+  in a row alert. The hosted job publishes with the last good set.
+
+### By hand
+
+```sh
+~/.foreman/bin/foreman.sh ui-test 640       # a PR (the owner's or the foreman's), its head
+~/.foreman/bin/foreman.sh ui-test main      # or main's head, or a commit on main
+~/.foreman/bin/foreman.sh captures --force  # even if main's revision was captured
+~/.foreman/bin/foreman.sh routine ui-test off
+```
+
+Both go through the lane, waiting for it, and `ui-test` re-runs a head that
+already has its status. `ui-test` and `captures` turn off like the routines:
+`foreman routine <name> off`, or `FOREMAN_ROUTINES_OFF`. With `ui-test` off,
+no statuses are posted, so foreman PRs wait, and stall where the owner can see
+it.
 
 ## After the merge
 
@@ -414,6 +534,8 @@ off.
   list of names (`sentry,scout`);
 - on the Mac: `foreman.sh routine <name> off`, and `on` to undo it (a
   `~/.foreman/routines/<name>.off` marker);
+- the iOS lane's `ui-test` and `captures` turn off the same two ways ("The
+  iOS lane");
 - `FOREMAN_PAUSED`, or `foreman.sh pause`, stops everything, routines
   included.
 
@@ -462,8 +584,11 @@ place in the PR body and their push to `feedback-assets`, the token's
 expiry, and the routines: schedules either side of each time, the off
 switches and pause, the PR limit, the Sentry and scout filing rules, the
 dispatch, retaking shots after a push, closing superseded dependabot PRs, the
-`waiting-on-owner` label, and the digest's sections from a fixture
-`events.jsonl`. CI runs it whenever `scripts/foreman/` changes.
+`waiting-on-owner` label, the digest's sections from a fixture
+`events.jsonl`, and the iOS lane: which PRs get which status, the queue's
+order, the trusted checkout, the status's words from a sample
+`summary.json`, the push to `marketing-ios` and the failed-capture path, the
+DerivedData cap and the free-space refusal. CI runs it whenever `scripts/foreman/` changes.
 
 ## What it trusts
 
@@ -471,6 +596,8 @@ The repo is public, so:
 
 - The foreman **polls**. It isn't a self-hosted runner, so nothing on GitHub
   can push work to the machine.
+- The iOS lane builds only `main` and the owner's and `nylon-foreman`'s PRs,
+  not forks, and only their iOS paths, inside `main`'s scripts.
 - It only builds issues **opened by the owner or `nylon-foreman`** that are
   in Ready. `foreman build <n>` applies the same rule, and the spec check.
   `nylon-foreman`'s issues are the Sentry sweep's, which can carry
@@ -495,6 +622,8 @@ scripts/foreman/foreman.sh install           # copies itself to ~/.foreman/bin, 
 ~/.foreman/bin/foreman.sh build 548          # build one issue now
 ~/.foreman/bin/foreman.sh triage 568         # triage one feedback report now
 ~/.foreman/bin/foreman.sh shots 572          # retake a PR's before/after shots
+~/.foreman/bin/foreman.sh ui-test 640        # the iOS UI tests of a PR now ("The iOS lane")
+~/.foreman/bin/foreman.sh captures           # main's iOS marketing shots now, if they're out of date
 ~/.foreman/bin/foreman.sh routine digest --dry-run  # what a routine would do (below)
 ~/.foreman/bin/foreman.sh logs -f
 ```

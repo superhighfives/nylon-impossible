@@ -14,13 +14,16 @@ name: Generate Marketing Screenshots
 # workflow_call trigger. A screenshot flake can therefore still redden an App
 # Store release; capture degrading to the last good screenshots (see
 # capturePhase in generate.ts) is what keeps that rare.
+#
+# The iOS shots aren't taken here (#611). The foreman captures them on the
+# owner's Mac mini after a merge that changes the app, force-pushes them to
+# the orphan `marketing-ios` branch, and dispatches this workflow, which
+# fetches them and never runs Xcode (scripts/foreman/README.md, "The iOS
+# lane"). The web shots stay here, on the same macOS image as before, so
+# their fonts and rendering don't change.
 on:
   workflow_dispatch:
     inputs:
-      force_ios:
-        description: "Rebuild the iOS screenshots even if cached ones match this revision"
-        type: boolean
-        default: false
       strict:
         description: "Fail if any screenshot had to fall back to a cached one"
         type: boolean
@@ -35,9 +38,6 @@ on:
   # for it — it's scoped to "Deploy to Cloudflare", which a release never runs.
   workflow_call:
     inputs:
-      force_ios:
-        type: boolean
-        default: false
       # Callers get the lenient default: a flaky capture degrades to the last
       # good screenshots rather than reddening whatever pipeline invoked this.
       strict:
@@ -64,7 +64,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  screenshots:
+  # Whether the iOS shots on `marketing-ios` are this revision's. Their
+  # revision is the git ids of the paths below, which the foreman writes
+  # into revision.json; the list matches IOS_CAPTURE_PATHS in foreman.sh.
+  ios-shots:
     # Dispatched and called invocations always run. Only the workflow_run path
     # needs filtering: web-deploy also runs on pull_request, where
     # deploy-production is skipped and nothing new reached production.
@@ -72,13 +75,54 @@ jobs:
       github.event_name != 'workflow_run'
       || (github.event.workflow_run.conclusion == 'success'
           && contains(fromJSON('["push", "workflow_dispatch"]'), github.event.workflow_run.event))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
+    steps:
+      # Two commits deep, so the deploy's own change can be told apart.
+      - name: Checkout nylon-impossible
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 2
+
+      - name: Decide whether to publish
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          revision() { # commit -> {path: git id} for the iOS inputs, as the foreman writes it
+            for p in src/ios src/shared/src/todo-date-fixtures.json src/shared/design src/marketing/manifest.json; do
+              printf '%s\t%s\n' "$p" "$(git rev-parse -q --verify "$1:$p" || echo -)"
+            done | jq -Rn -c '[inputs | split("\t") | {key: .[0], value: .[1]}] | from_entries'
+          }
+          want=$(revision HEAD)
+          have=null
+          if git fetch -q --depth=1 origin marketing-ios 2>/dev/null; then
+            have=$(git show FETCH_HEAD:revision.json | jq -c '.trees // null') || have=null
+          fi
+          if [ "$(jq -S -c . <<<"$have")" = "$(jq -S -c . <<<"$want")" ]; then
+            echo "The Mac mini's iOS shots are this revision's."
+          elif [ "$EVENT" = workflow_run ] && git rev-parse -q --verify HEAD^ >/dev/null \
+               && [ "$(revision HEAD^)" != "$want" ]; then
+            # This deploy changed the app. The foreman captures it and then
+            # dispatches this workflow, which publishes both halves at once.
+            echo "::notice title=Waiting for the Mac mini's iOS shots::This deploy changed the iOS app; the foreman's dispatched run publishes once it has captured it."
+            echo "publish=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          else
+            echo "::warning title=iOS shots aren't this revision's::marketing-ios holds $(git show FETCH_HEAD:revision.json 2>/dev/null | jq -r '.sha // "nothing"' || echo nothing); publishing with them."
+          fi
+          echo "publish=1" >> "$GITHUB_OUTPUT"
+
+  screenshots:
+    needs: ios-shots
+    if: needs.ios-shots.outputs.publish == '1'
     runs-on: xcode-27
-    # A run that rebuilds the iOS screenshots spends about 42 minutes in the
-    # publish step alone, and the parity sheet up to about 37 more when its
-    # own iOS shots aren't cached. At 45 the job timed out in the parity
-    # sheet (or, once, in the publish step itself) and the whole run showed
-    # as cancelled; 100 leaves room for both plus the parity step's own 45.
-    timeout-minutes: 100
+    # No Xcode build or simulator here any more (#611), so the web capture,
+    # the composites and the parity sheet's web half are what's left.
+    timeout-minutes: 60
 
     steps:
       # Screenshot the commit that was actually deployed. A workflow_run event
@@ -117,7 +161,7 @@ jobs:
 
       # Every capture below is best-effort: generate.ts falls back to whatever
       # is already in src/marketing/source rather than failing the job (see
-      # capturePhase). These two restores are what puts something there. A
+      # capturePhase). This restore is what puts something there. A
       # degraded run then composites the previous screenshots, the publish step
       # finds nothing changed, and the flake costs a warning annotation instead
       # of a red run. Nothing is restored on the very first run, so a total
@@ -129,66 +173,28 @@ jobs:
           key: marketing-web-v2-${{ runner.os }}-${{ github.run_id }}
           restore-keys: marketing-web-v2-${{ runner.os }}-
 
-      # The iOS screenshots only change when the app does, but building the app
-      # and booting a simulator is ~12 of this job's minutes and its least
-      # reliable stretch. Key the cache on the iOS sources (which include the
-      # DEBUG screenshot routes and their sample data) plus the manifest that
-      # lists the shots and devices, so a web-only deploy
-      # skips the simulator entirely. An exact hit means "these screenshots are
-      # already current" → skip; a prefix-only hit still restores older PNGs, so
-      # if the simulator then flakes there's something to fall back to.
-      - name: Restore iOS screenshots for this app revision
-        id: ios-cache
-        uses: actions/cache/restore@v6
-        with:
-          path: |
-            src/marketing/source/ios-*.png
-            src/marketing/source/parity/ios-*.png
-          key: marketing-ios-v3-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
-          restore-keys: marketing-ios-v3-${{ runner.os }}-
-
-      - name: Decide whether to rebuild iOS screenshots
-        id: ios
-        env:
-          CACHE_HIT: ${{ steps.ios-cache.outputs.cache-hit }}
-          FORCE_IOS: ${{ inputs.force_ios }}
+      # The Mac mini's newest all-fresh iOS set: source/ios-*.png and
+      # source/parity/ios-*.png. The foreman only pushes a set where every
+      # shot was captured, so this is never a mix of revisions.
+      - name: Fetch the Mac mini's iOS screenshots
         run: |
-          if [ "$CACHE_HIT" = "true" ] && [ "$FORCE_IOS" != "true" ]; then
-            echo "iOS app unchanged — reusing cached screenshots."
-            echo "skip=1" >> "$GITHUB_OUTPUT"
-          else
-            echo "Rebuilding iOS screenshots (cache-hit=$CACHE_HIT force=$FORCE_IOS)."
-            echo "skip=" >> "$GITHUB_OUTPUT"
+          if ! git fetch -q --depth=1 origin marketing-ios; then
+            echo "::warning title=No iOS screenshots::the marketing-ios branch couldn't be fetched"
+            exit 0
           fi
+          mkdir -p "$RUNNER_TEMP/marketing-ios" src/marketing/source
+          git archive FETCH_HEAD | tar -x -C "$RUNNER_TEMP/marketing-ios"
+          cp -R "$RUNNER_TEMP/marketing-ios/source/." src/marketing/source/
+          jq . "$RUNNER_TEMP/marketing-ios/revision.json"
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
         working-directory: src/marketing
 
-      - name: Select Xcode
-        if: steps.ios.outputs.skip != '1'
-        run: "$GITHUB_WORKSPACE/.github/scripts/require-xcode-27.sh"
-
-      - name: Ensure iOS simulator platform is available
-        if: steps.ios.outputs.skip != '1'
-        run: |
-          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
-          import json, sys
-          data = json.load(sys.stdin)
-          devices = [d for devs in data['devices'].values() for d in devs
-                     if d.get('isAvailable') and 'iPhone' in d['name']]
-          print(devices[0]['name'] if devices else '')
-          ")
-          if [ -z "$DEVICE" ]; then
-            echo "No available iPhone simulator, downloading iOS platform…"
-            xcodebuild -downloadPlatform iOS
-          fi
-
       # No migrate/seed step here: generate.ts applies the D1 migrations and
       # writes the demo data (seed.ts) itself, inside the best-effort web
       # capture, because the seed needs the Clerk id of the capture account.
-      # iOS needs no data or account: it runs the app's DEBUG screenshot
-      # routes over in-memory sample data.
+      # The iOS shots came from the Mac mini, above.
 
       - name: Generate and publish marketing screenshots
         env:
@@ -196,7 +202,7 @@ jobs:
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
           CLERK_MARKETING_USER_EMAIL: ${{ secrets.CLERK_DEVELOPMENT_USER_EMAIL }}
           SUPERHIGHFIVES_DIR: ${{ github.workspace }}/superhighfives.com
-          MARKETING_SKIP_IOS: ${{ steps.ios.outputs.skip }}
+          MARKETING_SKIP_IOS: "1"
           # A hand-triggered run is asking "does this still work?", so it
           # defaults to the old all-or-nothing standard: any fallback to a
           # cached screenshot fails the run rather than passing quietly.
@@ -207,19 +213,18 @@ jobs:
       # The parity sheet: the same screens on iOS and web, side by side, for
       # review. It's never published, and a failure here doesn't fail the
       # job — a side that didn't capture shows as "not captured" on the sheet.
-      # With the iOS cache hit it reuses the cached iOS parity shots.
+      # Its iOS side is the Mac mini's, from marketing-ios.
       - name: Generate the parity sheet
         if: success()
         continue-on-error: true
         # Its own budget, so a slow sheet fails this step (which is allowed
-        # to fail) instead of running the job out of time. Building its iOS
-        # shots from scratch took 37 minutes in run 40974530544.
-        timeout-minutes: 45
+        # to fail) instead of running the job out of time.
+        timeout-minutes: 20
         env:
           VITE_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_DEVELOPMENT_PUBLISHABLE_KEY }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_DEVELOPMENT_SECRET_KEY }}
           CLERK_MARKETING_USER_EMAIL: ${{ secrets.CLERK_DEVELOPMENT_USER_EMAIL }}
-          MARKETING_SKIP_IOS: ${{ steps.ios.outputs.skip }}
+          MARKETING_SKIP_IOS: "1"
         run: npx tsx generate.ts --parity
         working-directory: src/marketing
 
@@ -244,36 +249,15 @@ jobs:
             jq -r 'to_entries[] | "| \(.key) | \(.value) |"' "$status"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # Only cache iOS screenshots this run actually captured. Storing a reused
-      # (stale) pair under the current revision's key would pin it there, and
-      # every later run would skip the simulator and keep publishing the wrong
-      # app screenshot.
       - name: Inspect capture results
         id: captured
         if: always()
         run: |
-          status=src/marketing/source/capture-status.json
-          # Every iOS asset must be fresh: one stale shot cached under
-          # this revision would be skipped (and republished) from then on.
-          if [ -f "$status" ] && jq -e '
-              [to_entries[] | select(.key | startswith("ios-")) | .value]
-              | length > 0 and all(. == "fresh")' "$status" > /dev/null; then
-            echo "ios_fresh=1" >> "$GITHUB_OUTPUT"
-          fi
           # actions/cache/save errors outright when nothing matches its path, so
           # don't call it at all if the job died before capture wrote anything.
           if ls src/marketing/source/web-*.png > /dev/null 2>&1; then
             echo "web_present=1" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Save iOS screenshots for this app revision
-        if: always() && steps.captured.outputs.ios_fresh == '1'
-        uses: actions/cache/save@v6
-        with:
-          path: |
-            src/marketing/source/ios-*.png
-            src/marketing/source/parity/ios-*.png
-          key: marketing-ios-v3-${{ runner.os }}-${{ hashFiles('src/ios/**', 'src/marketing/manifest.json') }}
 
       - name: Save last good web screenshots
         if: always() && steps.captured.outputs.web_present == '1'

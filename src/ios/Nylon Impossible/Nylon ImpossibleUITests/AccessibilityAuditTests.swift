@@ -70,10 +70,11 @@ final class AccessibilityAuditTests: NylonUITestCase {
             sleep(1)
             let window = app.windows.firstMatch.frame
             // The audit gives up with code -56 ("failed to complete in time")
-            // when the simulator is slow; that's not a finding. On CI the route
-            // is skipped on its first -56 (a retry would only time out again
-            // and eat the job's time); locally it runs once more before a
-            // second -56 counts as a failure.
+            // when the simulator is slow; that's not a finding. On the hosted
+            // runner's slow simulator the route is skipped on its first -56 (a
+            // retry would only time out again and eat the job's time); locally
+            // and on the Mac mini it runs once more before a second -56 counts
+            // as a failure.
             for attempt in 1...2 {
                 do {
                     try app.performAccessibilityAudit(for: .all) { issue in
@@ -85,10 +86,10 @@ final class AccessibilityAuditTests: NylonUITestCase {
                         return true
                     }
                 } catch {
-                    if onCI, (error as NSError).code == -56 {
+                    if slowSimulator, (error as NSError).code == -56 {
                         // Skipped for time, not failed; findings reported before
                         // the timeout still count.
-                        XCTContext.runActivity(named: "\(route): audit skipped for time (-56 on CI)") { activity in
+                        XCTContext.runActivity(named: "\(route): audit skipped for time (-56 on the slow simulator)") { activity in
                             activity.add(XCTAttachment(string: "\(error)"))
                         }
                         break
