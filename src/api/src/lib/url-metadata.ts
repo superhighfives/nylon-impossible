@@ -176,6 +176,8 @@ export async function readCappedText(
       total += chunk.byteLength;
     }
   } finally {
+    // Best-effort: what we need is already read, and a failed cancel only
+    // means the rest of the body was already gone.
     reader.cancel().catch(() => {});
   }
   const bytes = new Uint8Array(total);
