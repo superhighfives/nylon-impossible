@@ -1216,7 +1216,7 @@ echo "outside issues"
   # shellcheck disable=SC2329
   run_claude() { echo "run_claude" >> "$CALLS"; eval "$RUN_ACT"; return 0; }
   # shellcheck disable=SC2016 # expanded when the run's stub evals it
-  unclear_run='printf "Found it in Row.swift.\n\n%s\n" "${SPEC_OK#*It breaks.}" | sed "s/None\\./1. Which colour?/" > "$FEEDBACK/24.spec/spec.md"
+  unclear_run='printf "Found it in Row.swift.\n<!-- foreman: tracks #7 -->\n\n%s\n" "${SPEC_OK#*It breaks.}" | sed "s/None\\./1. Which colour?/" > "$FEEDBACK/24.spec/spec.md"
     echo "Row colour is wrong" > "$FEEDBACK/24.spec/title"; echo "{\"kind\":\"fix\"}" > "$FEEDBACK/24.spec/kind.json"
     echo "1. Which colour? I recommend blue." > "$FEEDBACK/24.spec/questions.md"'
   fresh_out; rm -f "$tmp/created-body"; RUN_ACT="$unclear_run"
@@ -1230,6 +1230,7 @@ echo "outside issues"
   expect "its Problem links back and quotes the report"      "yes yes yes" "$(inbody $'## Problem\n\nReported in #24 by stranger') $(inbody '> **Button is wrong**') $(inbody "> It's the wrong colour. CLEARED-BODY")"
   expect "then the run's spec, under one Problem"            "yes 1" "$(inbody 'Found it in Row.swift.') $(grep -cx '## Problem' <<<"$body")"
   expect "and it says what it tracks"                        "yes" "$(inbody '<!-- foreman: tracks #24 -->')"
+  expect "not a marker the run wrote itself"                 "no"  "$(inbody '<!-- foreman: tracks #7 -->')"
   expect "with needs-decision, its kind and questions"       "yes yes yes" "$(called 'issue edit 90 -R superhighfives/nylon-impossible --add-label needs-decision') $(called 'issue edit 90 -R superhighfives/nylon-impossible --add-label kind:fix') $(called "issue comment 90 -R superhighfives/nylon-impossible --body-file $FEEDBACK/24.spec/questions.md")"
   expect "in Specced"                                        "yes yes" "$(called 'project item-add 1 --owner superhighfives --url https://github.com/superhighfives/nylon-impossible/issues/90') $(called '--id I90 --field-id F --single-select-option-id o-specced')"
   expect "the original gets one tracking comment"            "1"   "$(grep -c 'issue comment 24 .*Tracking this in #90\.' "$CALLS")"

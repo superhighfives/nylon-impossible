@@ -1165,7 +1165,7 @@ TRACKS_MARK="<!-- foreman: tracks #%s -->"
 tracked_report() { # issue -> the report it tracks, if $AGENT opened it to spec someone else's; otherwise nothing
   { gh issue view "$1" -R "$OWNER/$REPO" --json author,body \
       --jq "select(.author.login == \"$AGENT\") | .body" 2>/dev/null || true; } \
-    | tr -d '\r' | sed -nE 's/^<!-- foreman: tracks #([0-9]+) -->$/\1/p' | head -1
+    | tr -d '\r' | sed -nE 's/^<!-- foreman: tracks #([0-9]+) -->$/\1/p' | tail -1
 }
 
 branch_for() { # issue -> foreman/<n>-<slug>
@@ -1508,7 +1508,11 @@ triage() { # board_json issue
     esac
   fi
   prompt=$(feedback_prompt "$n" "$report" "$spec")
-  if dry; then log "would triage feedback #$n on $branch"; printf '%s\n' "$prompt" | sed 's/^/    | /'; return 0; fi
+  if dry; then
+    log "would triage feedback #$n on $branch"; printf '%s\n' "$prompt" | sed 's/^/    | /'
+    [ -z "$report" ] || rm -rf "$report" "$spec"
+    return 0
+  fi
 
   new_worktree "$n" "$branch" "$report" || { log "couldn't make a worktree for #$n; retrying next tick"; return 0; }
   # Once per report, even if the run fails: the failure path below re-arms it.
@@ -1692,8 +1696,9 @@ tracking_body() { # issue outside-report spec-dir -> the new issue's body: the r
     "$1" "$(jq -r .author.login "$2")"
   jq -r '"**\(.title)**\n\n\(.body // "")"' "$2" | quote
   printf '\n'
-  # A Problem heading of the run's own would make two.
-  tr -d '\r' < "$3/spec.md" | sed -E '/^## Problem[[:space:]]*$/d'
+  # A Problem heading of the run's own would make two. The run read an
+  # outsider's report, so a marker of its own could name any issue.
+  tr -d '\r' < "$3/spec.md" | sed -E '/^## Problem[[:space:]]*$/d; /<!-- foreman: tracks #/d'
   printf '\n'
   # shellcheck disable=SC2059 # the mark is the format
   printf "$TRACKS_MARK\n" "$1"
