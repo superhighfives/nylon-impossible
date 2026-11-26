@@ -16,6 +16,23 @@ export FOREMAN_MERGEABLE_RETRY_SECONDS=0
 export FOREMAN_NOW=1793520000 # 2026-11-01T08:00:00Z, a Sunday
 export TZ=UTC # the routines' schedules are in local time
 export FOREMAN_OPERATOR_PLISTS="$tmp/LaunchAgents"
+# The tests run on the Mac mini too (builds run them), beside the real iOS
+# lane. A real `xcrun simctl shutdown` from ios_tidy would stop a live UI
+# test there (#852's audits crashed with SIGTERM that way), so Apple's tools
+# are fakes on PATH, which also covers calls through `env` and child scripts.
+mkdir -p "$tmp/bin"
+export APPLE_CALLS="$tmp/apple-calls"
+for tool in xcrun xcodebuild; do
+  cat > "$tmp/bin/$tool" <<'FAKE'
+#!/bin/sh
+echo "$(basename "$0") $*" >> "$APPLE_CALLS"
+case "$*" in
+  "simctl list"*) if [ -n "$FAKE_SIMS" ]; then printf '%s\n' "$FAKE_SIMS"; else echo '{"devices":{}}'; fi ;;
+esac
+FAKE
+  chmod +x "$tmp/bin/$tool"
+done
+export PATH="$tmp/bin:$PATH"
 # shellcheck source=SCRIPTDIR/foreman.sh
 source "$here/foreman.sh"
 set +e
@@ -2367,6 +2384,15 @@ lane_busy() { return 0; }; : > "$CALLS"
 ios_pass ""
 expect "a busy lane starts nothing" no "$(called start_ios_job)"
 unset -f df
+
+# ---- the tidy ----
+
+: > "$APPLE_CALLS"
+FAKE_SIMS='{"devices":{"r":[{"name":"Nylon UI Test iPhone","udid":"U1"},{"name":"Someone Else","udid":"U2"}]}}' ios_tidy
+expect "the tests' xcrun is the fake on PATH" "$tmp/bin/xcrun" "$(command -v xcrun)"
+expect "the tidy shuts down our booted simulators, through the fake" \
+  "xcrun simctl shutdown U1|xcrun simctl delete unavailable" \
+  "$(grep -E 'shutdown|delete' "$APPLE_CALLS" | paste -sd '|' -)"
 
 # ---- the lock ----
 
